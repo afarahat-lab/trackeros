@@ -1,6 +1,55 @@
 {
-  "correlationId": "8f53b75d-9b30-4d3b-a827-78bd9a655d99",
-  "domainChanges": [],
-  "apiContracts": [],
+  "correlationId": "7f353def-e7ea-4423-81c8-da64cc1adb09",
+  "domainChanges": [
+    {
+      "entityName": "Entities",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [
+    {
+      "method": "GET",
+      "path": "/api/v1/entities",
+      "description": "Retrieve a list of entities",
+      "requestBody": {},
+      "responseBody": {
+        "entities": "Array<Entity>"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/entities",
+      "description": "Create a new entity",
+      "requestBody": {
+        "name": "string",
+        "description": "string"
+      },
+      "responseBody": {
+        "entity": "Entity"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin"
+      ]
+    }
+  ],
   "componentSpecs": []
 }

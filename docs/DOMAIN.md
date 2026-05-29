@@ -34,6 +34,11 @@ To be populated as the design-agent and context-agent learn the domain.
 - **timestamp**: Date, required
 - **userId**: string, required
 
+### Entities
+
+- **name**: string, required
+- **description**: string, optional
+
 ## API Contracts
 
 ### POST /api/v1/leave-requests
@@ -131,3 +136,21 @@ To be populated as the design-agent and context-agent learn the domain.
   - updatedSettings: Record<string, string>
 - **Auth Required**: true
 - **Roles**: operator
+
+### GET /api/v1/entities
+- **Description**: Retrieve a list of entities
+- **Request Body**: {}
+- **Response Body**:
+  - entities: Array<Entity>
+- **Auth Required**: true
+- **Roles**: admin, operator
+
+### POST /api/v1/entities
+- **Description**: Create a new entity
+- **Request Body**:
+  - name: string
+  - description: string
+- **Response Body**:
+  - entity: Entity
+- **Auth Required**: true
+- **Roles**: admin
