@@ -1,6 +1,13 @@
 {
-  "correlationId": "8f53b75d-9b30-4d3b-a827-78bd9a655d99",
-  "domainChanges": [],
+  "correlationId": "48f4f1a6-4c54-4c45-9eb0-b8b1dc524f4f",
+  "domainChanges": [
+    {
+      "entityName": "Entities",
+      "operation": "create",
+      "fields": [],
+      "relationships": []
+    }
+  ],
   "apiContracts": [],
   "componentSpecs": []
 }
