@@ -1,10 +1,11 @@
 {
-  "id": "eb619540-a702-475d-aea5-9bf25fce58ab",
-  "correlationId": "8f53b75d-9b30-4d3b-a827-78bd9a655d99",
-  "rawIntent": "Add a string-case utility module under src/shared/utils/string-case with two pure functions: kebabCase(s: string): string and camelCase(s: string): string. No DB, no API, no logging. Unit tests only.",
+  "id": "078da833-ae1b-4733-b35c-d9d564b2963f",
+  "correlationId": "75625687-f96b-4f08-b33f-14b305e9a9cb",
+  "rawIntent": "Add a snake-case utility under src/shared/utils/snake-case with snakeCase(s: string): string. Pure function. Tests only.",
   "scope": {
     "affectedDomains": [],
     "affectedLayers": [
+      "domain",
       "test"
     ],
     "isBreakingChange": false,
@@ -13,16 +14,23 @@
   "successCriteria": [
     {
       "id": "sc-001",
-      "description": "The module src/shared/utils/string-case contains two pure functions: kebabCase and camelCase, both of which correctly transform strings as specified.",
+      "description": "A utility function snakeCase(s: string): string is implemented in src/shared/utils/snake-case.",
       "testable": true,
       "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "Unit tests are written and passing for the snakeCase function.",
+      "testable": true,
+      "layer": "test"
     }
   ],
-  "constraints": [],
+  "constraints": [
+    "No sensitive data in logs"
+  ],
   "outOfScope": [
-    "Database interactions",
-    "API development",
-    "Logging functionality"
+    "Integration with other modules",
+    "Deployment or integration into existing systems"
   ],
   "ambiguities": []
 }
