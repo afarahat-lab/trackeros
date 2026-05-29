@@ -32,7 +32,6 @@ To be populated as the design-agent and context-agent learn the domain.
 - **operation**: string, required
 - **entity**: string, required
 - **timestamp**: Date, required
-- **details**: string, required
 - **userId**: string, required
 
 ## API Contracts

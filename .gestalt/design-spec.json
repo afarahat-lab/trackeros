@@ -65,7 +65,7 @@
       "path": "/api/v1/settings",
       "description": "Update one or more settings keys",
       "requestBody": {
-        "settings": "Partial<Record<string, string>>"
+        "settings": "Record<string, string>"
       },
       "responseBody": {
         "success": "boolean"

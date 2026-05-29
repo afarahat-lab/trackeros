@@ -1,9 +1,7 @@
-import { AuditRecord } from '../../modules/settings/domain/audit-record';
+import { AuditRecord } from '../../modules/settings/domain/setting';
 
-/**
- * Appends an audit log record.
- * @param record The audit record to append.
- */
-export async function appendAuditLog(record: AuditRecord): Promise<void> {
-  // Implement audit log persistence logic here
-}
+export const auditLog = {
+  async append(record: AuditRecord): Promise<void> {
+    // Implement logic to append audit record to the log
+  }
+};

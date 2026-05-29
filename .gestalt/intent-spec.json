@@ -1,5 +1,5 @@
 {
-  "id": "717a7df2-6bf0-4abc-bca0-c3a451fac8ee",
+  "id": "f45ffb10-9e63-4c4e-b3ad-dc2833729288",
   "correlationId": "2a57b087-fdc1-48e5-a941-9b13a46d0d9c",
   "rawIntent": "Add a settings module under src/modules/settings with GET /settings (read current settings) and PATCH /settings (update one or more keys). Persist via the shared db layer. Validate input with Zod. Require operator role.",
   "scope": {
@@ -19,27 +19,33 @@
   "successCriteria": [
     {
       "id": "sc-001",
-      "description": "GET /settings endpoint returns the current settings successfully.",
+      "description": "A new settings module exists under src/modules/settings with GET /settings and PATCH /settings endpoints.",
       "testable": true,
       "layer": "integration"
     },
     {
       "id": "sc-002",
-      "description": "PATCH /settings endpoint updates one or more keys successfully.",
+      "description": "GET /settings returns the current settings.",
       "testable": true,
       "layer": "integration"
     },
     {
       "id": "sc-003",
+      "description": "PATCH /settings updates one or more keys in the settings.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "sc-004",
       "description": "Input for PATCH /settings is validated using Zod.",
       "testable": true,
       "layer": "unit"
     },
     {
-      "id": "sc-004",
-      "description": "Access to /settings endpoints is restricted to users with the operator role.",
+      "id": "sc-005",
+      "description": "Access to the settings endpoints requires the operator role.",
       "testable": true,
-      "layer": "e2e"
+      "layer": "integration"
     }
   ],
   "constraints": [
