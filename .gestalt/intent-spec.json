@@ -1,0 +1,31 @@
+{
+  "id": "595a8b44-280c-4de9-8083-de0fa7928fb6",
+  "correlationId": "75000cb2-cef4-453d-89af-c46778fd8c93",
+  "rawIntent": "Add a hello world endpoint at GET /hello returning JSON {message:\"hello\"}",
+  "scope": {
+    "affectedDomains": [],
+    "affectedLayers": [
+      "api"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "A GET request to /hello returns a JSON response with {message:\"hello\"}",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "RBAC enforced at middleware, never inline",
+    "Input validated at the API boundary",
+    "No sensitive data in logs"
+  ],
+  "outOfScope": [
+    "Any state-changing operations",
+    "Handling of authentication or authorization beyond RBAC middleware"
+  ],
+  "ambiguities": []
+}

@@ -1,0 +1,21 @@
+{
+  "correlationId": "75000cb2-cef4-453d-89af-c46778fd8c93",
+  "domainChanges": [],
+  "apiContracts": [
+    {
+      "method": "GET",
+      "path": "/api/v1/hello",
+      "description": "Returns a hello world message",
+      "requestBody": {},
+      "responseBody": {
+        "message": "string"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    }
+  ],
+  "componentSpecs": []
+}
