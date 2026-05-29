@@ -1,14 +1,16 @@
 {
-  "id": "8ccaa080-27c1-4f1e-b6b7-375bef8a79c0",
-  "correlationId": "b1f6eecd-bb57-42b2-a8ab-6d4e8afe118a",
-  "rawIntent": "Add an audit log dashboard module under src/modules/audit with GET /audit/logs (list with pagination by ?from=&to=&limit=). Use the existing audit-log infrastructure. RBAC must require admin role.",
+  "id": "3ff97c57-c72d-4aba-bd2c-c2cd5eb3ac1f",
+  "correlationId": "1b7aa93c-59a2-45de-b345-de09d708432e",
+  "rawIntent": "Add a notifications module under src/modules/notifications with POST /notifications (create a notification with userId, title, body, channel email|sms|push, scheduledFor) and GET /notifications. Persist via the shared db layer. Validate input with Zod. Require operator role.",
   "scope": {
     "affectedDomains": [
-      "Audit"
+      "Request",
+      "Response",
+      "Auth"
     ],
     "affectedLayers": [
       "api",
-      "ui"
+      "domain"
     ],
     "isBreakingChange": false,
     "estimatedComplexity": "medium"
@@ -16,21 +18,27 @@
   "successCriteria": [
     {
       "id": "sc-001",
-      "description": "A new audit log dashboard module is created under src/modules/audit with a GET /audit/logs endpoint that supports pagination.",
+      "description": "A new notifications module exists with endpoints POST /notifications and GET /notifications.",
       "testable": true,
       "layer": "integration"
     },
     {
       "id": "sc-002",
-      "description": "The GET /audit/logs endpoint uses the existing audit-log infrastructure.",
+      "description": "Notifications are persisted via the shared db layer.",
       "testable": true,
       "layer": "integration"
     },
     {
       "id": "sc-003",
-      "description": "RBAC is enforced on the GET /audit/logs endpoint, requiring an admin role.",
+      "description": "Input for notifications is validated using Zod.",
       "testable": true,
-      "layer": "integration"
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "Access to the notifications endpoints requires the operator role.",
+      "testable": true,
+      "layer": "e2e"
     }
   ],
   "constraints": [
@@ -40,8 +48,8 @@
     "No sensitive data in logs"
   ],
   "outOfScope": [
-    "Modifications to existing audit-log infrastructure",
-    "Changes to roles or role definitions outside of enforcing admin role for this endpoint"
+    "UI components for notifications",
+    "Notification delivery mechanisms"
   ],
   "ambiguities": []
 }

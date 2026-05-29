@@ -1,24 +1,86 @@
 {
-  "correlationId": "b1f6eecd-bb57-42b2-a8ab-6d4e8afe118a",
-  "domainChanges": [],
+  "correlationId": "1b7aa93c-59a2-45de-b345-de09d708432e",
+  "domainChanges": [
+    {
+      "entityName": "Notification",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "userId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "body",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "channel",
+          "type": "'email' | 'sms' | 'push'",
+          "required": true
+        },
+        {
+          "name": "scheduledFor",
+          "type": "Date",
+          "required": true
+        }
+      ],
+      "relationships": []
+    }
+  ],
   "apiContracts": [
     {
-      "method": "GET",
-      "path": "/api/v1/audit/logs",
-      "description": "Fetches a list of audit logs with pagination support",
-      "requestBody": {},
+      "method": "POST",
+      "path": "/api/v1/notifications",
+      "description": "Create a new notification",
+      "requestBody": {
+        "userId": "string",
+        "title": "string",
+        "body": "string",
+        "channel": "'email' | 'sms' | 'push'",
+        "scheduledFor": "Date"
+      },
       "responseBody": {
-        "logs": "Array<AuditLog>",
-        "pagination": {
-          "total": "number",
-          "limit": "number",
-          "from": "string",
-          "to": "string"
-        }
+        "id": "string",
+        "userId": "string",
+        "title": "string",
+        "body": "string",
+        "channel": "'email' | 'sms' | 'push'",
+        "scheduledFor": "Date",
+        "createdAt": "Date"
       },
       "authRequired": true,
       "roles": [
-        "admin"
+        "operator"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/notifications",
+      "description": "Retrieve all notifications",
+      "requestBody": {},
+      "responseBody": {
+        "notifications": [
+          {
+            "id": "string",
+            "userId": "string",
+            "title": "string",
+            "body": "string",
+            "channel": "'email' | 'sms' | 'push'",
+            "scheduledFor": "Date",
+            "createdAt": "Date"
+          }
+        ]
+      },
+      "authRequired": true,
+      "roles": [
+        "operator"
       ]
     }
   ],

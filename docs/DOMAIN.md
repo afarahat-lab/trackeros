@@ -14,6 +14,14 @@ To be populated as the design-agent and context-agent learn the domain.
 - **reason**: string, required
 - **status**: 'pending' | 'approved' | 'rejected', required
 
+### Notification
+
+- **userId**: string, required
+- **title**: string, required
+- **body**: string, required
+- **channel**: 'email' | 'sms' | 'push', required
+- **scheduledFor**: Date, required
+
 ## API Contracts
 
 ### POST /api/v1/leave-requests
@@ -60,3 +68,37 @@ To be populated as the design-agent and context-agent learn the domain.
     - to: string
 - **Auth Required**: true
 - **Roles**: admin
+
+### POST /api/v1/notifications
+- **Description**: Create a new notification
+- **Request Body**:
+  - userId: string
+  - title: string
+  - body: string
+  - channel: 'email' | 'sms' | 'push'
+  - scheduledFor: Date
+- **Response Body**:
+  - id: string
+  - userId: string
+  - title: string
+  - body: string
+  - channel: 'email' | 'sms' | 'push'
+  - scheduledFor: Date
+  - createdAt: Date
+- **Auth Required**: true
+- **Roles**: operator
+
+### GET /api/v1/notifications
+- **Description**: Retrieve all notifications
+- **Request Body**: {}
+- **Response Body**:
+  - notifications: array of
+    - id: string
+    - userId: string
+    - title: string
+    - body: string
+    - channel: 'email' | 'sms' | 'push'
+    - scheduledFor: Date
+    - createdAt: Date
+- **Auth Required**: true
+- **Roles**: operator
