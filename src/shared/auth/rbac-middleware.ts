@@ -1,15 +1,13 @@
-import { FastifyReply, FastifyRequest } from 'fastify';
+import { FastifyRequest, FastifyReply } from 'fastify';
 
 /**
- * Middleware to verify user roles.
- * @param allowedRoles - Array of roles allowed to access the route.
+ * Middleware to enforce role-based access control.
+ * @param roles - Allowed roles for the route.
  */
-export const verifyRoles = (allowedRoles: string[]) => {
-  return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
-    const userRoles = request.user?.roles || [];
-    const hasAccess = allowedRoles.some(role => userRoles.includes(role));
-
-    if (!hasAccess) {
+export const rbacMiddleware = (roles: string[]) => {
+  return async (request: FastifyRequest, reply: FastifyReply) => {
+    const userRole = request.user?.role;
+    if (!roles.includes(userRole)) {
       reply.status(403).send({ error: 'Forbidden' });
     }
   };

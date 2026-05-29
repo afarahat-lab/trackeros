@@ -1,10 +1,11 @@
-import { FastifyInstance } from 'fastify';
-import { registerHelloRoutes } from '../modules/hello';
+import fastify from 'fastify';
+import { rbacMiddleware } from '../shared/auth/rbac-middleware';
 
-/**
- * Registers all application routes.
- * @param app - The Fastify instance.
- */
-export const registerRoutes = (app: FastifyInstance): void => {
-  registerHelloRoutes(app);
-};
+const app = fastify();
+
+// Register routes from modules
+// Example: app.register(require('../modules/example/routes/example-routes'));
+
+app.addHook('preHandler', rbacMiddleware(['admin', 'user']));
+
+export default app;
