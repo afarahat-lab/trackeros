@@ -1,6 +1,84 @@
 {
-  "correlationId": "8f53b75d-9b30-4d3b-a827-78bd9a655d99",
-  "domainChanges": [],
-  "apiContracts": [],
+  "correlationId": "642a8256-a385-4340-8d05-b751a018a03b",
+  "domainChanges": [
+    {
+      "entityName": "Roles",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "roleName",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "permissions",
+          "type": "string[]",
+          "required": true
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [
+    {
+      "method": "GET",
+      "path": "/api/v1/roles",
+      "description": "Retrieve a list of all roles",
+      "requestBody": {},
+      "responseBody": {
+        "roles": "Role[]"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/roles",
+      "description": "Create a new role",
+      "requestBody": {
+        "roleName": "string",
+        "permissions": "string[]"
+      },
+      "responseBody": {
+        "roleId": "string"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/roles/{roleId}",
+      "description": "Update an existing role",
+      "requestBody": {
+        "roleName": "string",
+        "permissions": "string[]"
+      },
+      "responseBody": {
+        "success": "boolean"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/roles/{roleId}",
+      "description": "Delete a role",
+      "requestBody": {},
+      "responseBody": {
+        "success": "boolean"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin"
+      ]
+    }
+  ],
   "componentSpecs": []
 }
