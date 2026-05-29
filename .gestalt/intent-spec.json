@@ -1,55 +1,37 @@
 {
-  "id": "3ff97c57-c72d-4aba-bd2c-c2cd5eb3ac1f",
-  "correlationId": "1b7aa93c-59a2-45de-b345-de09d708432e",
-  "rawIntent": "Add a notifications module under src/modules/notifications with POST /notifications (create a notification with userId, title, body, channel email|sms|push, scheduledFor) and GET /notifications. Persist via the shared db layer. Validate input with Zod. Require operator role.",
+  "id": "40ca6718-cc22-43a1-ad3f-6dc9ab160124",
+  "correlationId": "66891cc2-f2a4-47ee-86ff-0b33a863aa58",
+  "rawIntent": "Add a pure utility module under src/shared/utils/date with two exported functions: formatIsoDate(date: Date): string and parseIsoDate(s: string): Date | null. No database, no API, no logging. Include unit tests.",
   "scope": {
-    "affectedDomains": [
-      "Request",
-      "Response",
-      "Auth"
-    ],
+    "affectedDomains": [],
     "affectedLayers": [
-      "api",
-      "domain"
+      "domain",
+      "test"
     ],
     "isBreakingChange": false,
-    "estimatedComplexity": "medium"
+    "estimatedComplexity": "small"
   },
   "successCriteria": [
     {
       "id": "sc-001",
-      "description": "A new notifications module exists with endpoints POST /notifications and GET /notifications.",
-      "testable": true,
-      "layer": "integration"
-    },
-    {
-      "id": "sc-002",
-      "description": "Notifications are persisted via the shared db layer.",
-      "testable": true,
-      "layer": "integration"
-    },
-    {
-      "id": "sc-003",
-      "description": "Input for notifications is validated using Zod.",
+      "description": "A utility module exists under src/shared/utils/date with the functions formatIsoDate and parseIsoDate correctly implemented.",
       "testable": true,
       "layer": "unit"
     },
     {
-      "id": "sc-004",
-      "description": "Access to the notifications endpoints requires the operator role.",
+      "id": "sc-002",
+      "description": "Unit tests exist and pass for both formatIsoDate and parseIsoDate functions.",
       "testable": true,
-      "layer": "e2e"
+      "layer": "unit"
     }
   ],
   "constraints": [
-    "Every state-changing operation produces an audit record",
-    "RBAC enforced at middleware, never inline",
-    "Input validated at the API boundary",
     "No sensitive data in logs"
   ],
   "outOfScope": [
-    "UI components for notifications",
-    "Notification delivery mechanisms"
+    "Database interactions",
+    "API development",
+    "Logging mechanisms"
   ],
   "ambiguities": []
 }
