@@ -1,3 +1,5 @@
+## Current DOMAIN.md
+
 # Domain Model — trackeros
 
 To be populated as the design-agent and context-agent learn the domain.
@@ -45,3 +47,16 @@ To be populated as the design-agent and context-agent learn the domain.
     - status: 'pending' | 'approved' | 'rejected'
 - **Auth Required**: true
 - **Roles**: admin, operator
+
+### GET /api/v1/audit/logs
+- **Description**: Fetches a list of audit logs with pagination support
+- **Request Body**: {}
+- **Response Body**:
+  - logs: Array<AuditLog>
+  - pagination:
+    - total: number
+    - limit: number
+    - from: string
+    - to: string
+- **Auth Required**: true
+- **Roles**: admin

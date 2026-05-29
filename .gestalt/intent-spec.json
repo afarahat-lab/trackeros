@@ -1,15 +1,14 @@
 {
-  "id": "4c9242e4-f450-4aef-8217-588386e589f5",
-  "correlationId": "593bc84d-e332-4f19-8e0c-e65e8602c6a0",
-  "rawIntent": "Add a leave-request module under src/modules/leave with POST /leave-requests (create) and GET /leave-requests (list, optionally filtered by ?status=). A leave request has employeeId, startDate, endDate, reason, status (pending|approved|rejected). Persist via the shared db layer.",
+  "id": "8ccaa080-27c1-4f1e-b6b7-375bef8a79c0",
+  "correlationId": "b1f6eecd-bb57-42b2-a8ab-6d4e8afe118a",
+  "rawIntent": "Add an audit log dashboard module under src/modules/audit with GET /audit/logs (list with pagination by ?from=&to=&limit=). Use the existing audit-log infrastructure. RBAC must require admin role.",
   "scope": {
     "affectedDomains": [
-      "leave-management"
+      "Audit"
     ],
     "affectedLayers": [
-      "domain",
       "api",
-      "infra"
+      "ui"
     ],
     "isBreakingChange": false,
     "estimatedComplexity": "medium"
@@ -17,39 +16,21 @@
   "successCriteria": [
     {
       "id": "sc-001",
-      "description": "The leave-request module is created under src/modules/leave with endpoints POST /leave-requests and GET /leave-requests.",
+      "description": "A new audit log dashboard module is created under src/modules/audit with a GET /audit/logs endpoint that supports pagination.",
       "testable": true,
       "layer": "integration"
     },
     {
       "id": "sc-002",
-      "description": "Leave requests can be created with employeeId, startDate, endDate, reason, and status.",
+      "description": "The GET /audit/logs endpoint uses the existing audit-log infrastructure.",
       "testable": true,
-      "layer": "unit"
+      "layer": "integration"
     },
     {
       "id": "sc-003",
-      "description": "Leave requests can be listed and optionally filtered by status.",
+      "description": "RBAC is enforced on the GET /audit/logs endpoint, requiring an admin role.",
       "testable": true,
       "layer": "integration"
-    },
-    {
-      "id": "sc-004",
-      "description": "All state-changing operations produce an audit record.",
-      "testable": true,
-      "layer": "integration"
-    },
-    {
-      "id": "sc-005",
-      "description": "Role-based access control is enforced by middleware on every route.",
-      "testable": true,
-      "layer": "e2e"
-    },
-    {
-      "id": "sc-006",
-      "description": "All request bodies are validated with Zod (or equivalent) before reaching the business logic.",
-      "testable": true,
-      "layer": "unit"
     }
   ],
   "constraints": [
@@ -59,8 +40,8 @@
     "No sensitive data in logs"
   ],
   "outOfScope": [
-    "UI components for leave requests",
-    "Notifications related to leave requests"
+    "Modifications to existing audit-log infrastructure",
+    "Changes to roles or role definitions outside of enforcing admin role for this endpoint"
   ],
   "ambiguities": []
 }

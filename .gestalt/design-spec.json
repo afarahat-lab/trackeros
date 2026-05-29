@@ -1,86 +1,24 @@
 {
-  "correlationId": "593bc84d-e332-4f19-8e0c-e65e8602c6a0",
-  "domainChanges": [
-    {
-      "entityName": "LeaveRequest",
-      "operation": "create",
-      "fields": [
-        {
-          "name": "employeeId",
-          "type": "string",
-          "required": true
-        },
-        {
-          "name": "startDate",
-          "type": "string",
-          "required": true
-        },
-        {
-          "name": "endDate",
-          "type": "string",
-          "required": true
-        },
-        {
-          "name": "reason",
-          "type": "string",
-          "required": true
-        },
-        {
-          "name": "status",
-          "type": "'pending' | 'approved' | 'rejected'",
-          "required": true
-        }
-      ],
-      "relationships": []
-    }
-  ],
+  "correlationId": "b1f6eecd-bb57-42b2-a8ab-6d4e8afe118a",
+  "domainChanges": [],
   "apiContracts": [
     {
-      "method": "POST",
-      "path": "/api/v1/leave-requests",
-      "description": "Create a new leave request",
-      "requestBody": {
-        "employeeId": "string",
-        "startDate": "string",
-        "endDate": "string",
-        "reason": "string",
-        "status": "'pending' | 'approved' | 'rejected'"
-      },
-      "responseBody": {
-        "id": "string",
-        "employeeId": "string",
-        "startDate": "string",
-        "endDate": "string",
-        "reason": "string",
-        "status": "'pending' | 'approved' | 'rejected'"
-      },
-      "authRequired": true,
-      "roles": [
-        "admin",
-        "operator"
-      ]
-    },
-    {
       "method": "GET",
-      "path": "/api/v1/leave-requests",
-      "description": "List leave requests, optionally filtered by status",
+      "path": "/api/v1/audit/logs",
+      "description": "Fetches a list of audit logs with pagination support",
       "requestBody": {},
       "responseBody": {
-        "leaveRequests": [
-          {
-            "id": "string",
-            "employeeId": "string",
-            "startDate": "string",
-            "endDate": "string",
-            "reason": "string",
-            "status": "'pending' | 'approved' | 'rejected'"
-          }
-        ]
+        "logs": "Array<AuditLog>",
+        "pagination": {
+          "total": "number",
+          "limit": "number",
+          "from": "string",
+          "to": "string"
+        }
       },
       "authRequired": true,
       "roles": [
-        "admin",
-        "operator"
+        "admin"
       ]
     }
   ],
