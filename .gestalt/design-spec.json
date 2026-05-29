@@ -1,6 +1,84 @@
 {
-  "correlationId": "8f53b75d-9b30-4d3b-a827-78bd9a655d99",
-  "domainChanges": [],
-  "apiContracts": [],
+  "correlationId": "9316f767-ef52-4b96-ad8e-8e54e42a550c",
+  "domainChanges": [
+    {
+      "entityName": "Description",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "title",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "content",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [
+    {
+      "method": "GET",
+      "path": "/api/v1/descriptions",
+      "description": "Retrieve a list of descriptions",
+      "requestBody": {},
+      "responseBody": {
+        "descriptions": "Description[]"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/descriptions",
+      "description": "Create a new description",
+      "requestBody": {
+        "title": "string",
+        "content": "string"
+      },
+      "responseBody": {
+        "description": "Description"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/descriptions/{id}",
+      "description": "Update an existing description",
+      "requestBody": {
+        "title": "string",
+        "content": "string"
+      },
+      "responseBody": {
+        "description": "Description"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/descriptions/{id}",
+      "description": "Delete a description",
+      "requestBody": {},
+      "responseBody": {
+        "success": "boolean"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin"
+      ]
+    }
+  ],
   "componentSpecs": []
 }
