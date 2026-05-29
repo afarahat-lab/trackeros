@@ -1,37 +1,56 @@
 {
-  "id": "40ca6718-cc22-43a1-ad3f-6dc9ab160124",
-  "correlationId": "66891cc2-f2a4-47ee-86ff-0b33a863aa58",
-  "rawIntent": "Add a pure utility module under src/shared/utils/date with two exported functions: formatIsoDate(date: Date): string and parseIsoDate(s: string): Date | null. No database, no API, no logging. Include unit tests.",
+  "id": "5eb172aa-5139-4854-b737-5ad37f9ef623",
+  "correlationId": "2a57b087-fdc1-48e5-a941-9b13a46d0d9c",
+  "rawIntent": "Add a settings module under src/modules/settings with GET /settings (read current settings) and PATCH /settings (update one or more keys). Persist via the shared db layer. Validate input with Zod. Require operator role.",
   "scope": {
-    "affectedDomains": [],
+    "affectedDomains": [
+      "Request",
+      "Response",
+      "Auth"
+    ],
     "affectedLayers": [
+      "api",
       "domain",
-      "test"
+      "config"
     ],
     "isBreakingChange": false,
-    "estimatedComplexity": "small"
+    "estimatedComplexity": "medium"
   },
   "successCriteria": [
     {
       "id": "sc-001",
-      "description": "A utility module exists under src/shared/utils/date with the functions formatIsoDate and parseIsoDate correctly implemented.",
+      "description": "A new settings module exists under src/modules/settings with endpoints GET /settings and PATCH /settings.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "sc-002",
+      "description": "The PATCH /settings endpoint updates one or more keys in the settings and persists changes via the shared db layer.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "sc-003",
+      "description": "Input for PATCH /settings is validated using Zod.",
       "testable": true,
       "layer": "unit"
     },
     {
-      "id": "sc-002",
-      "description": "Unit tests exist and pass for both formatIsoDate and parseIsoDate functions.",
+      "id": "sc-004",
+      "description": "Access to the settings endpoints requires the operator role.",
       "testable": true,
-      "layer": "unit"
+      "layer": "e2e"
     }
   ],
   "constraints": [
+    "Every state-changing operation produces an audit record",
+    "RBAC enforced at middleware, never inline",
+    "Input validated at the API boundary",
     "No sensitive data in logs"
   ],
   "outOfScope": [
-    "Database interactions",
-    "API development",
-    "Logging mechanisms"
+    "UI changes related to settings",
+    "Detailed logging implementation"
   ],
   "ambiguities": []
 }

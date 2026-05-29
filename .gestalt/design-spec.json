@@ -1,6 +1,80 @@
 {
-  "correlationId": "66891cc2-f2a4-47ee-86ff-0b33a863aa58",
-  "domainChanges": [],
-  "apiContracts": [],
+  "correlationId": "2a57b087-fdc1-48e5-a941-9b13a46d0d9c",
+  "domainChanges": [
+    {
+      "entityName": "Setting",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "key",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "value",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "AuditRecord",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "operation",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "entity",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "timestamp",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "details",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [
+    {
+      "method": "GET",
+      "path": "/api/v1/settings",
+      "description": "Read current settings",
+      "requestBody": {},
+      "responseBody": {
+        "settings": "Record<string, string>"
+      },
+      "authRequired": true,
+      "roles": [
+        "operator"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/settings",
+      "description": "Update one or more keys in the settings",
+      "requestBody": {
+        "settings": "Record<string, string>"
+      },
+      "responseBody": {
+        "updatedSettings": "Record<string, string>"
+      },
+      "authRequired": true,
+      "roles": [
+        "operator"
+      ]
+    }
+  ],
   "componentSpecs": []
 }

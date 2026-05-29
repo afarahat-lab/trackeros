@@ -22,6 +22,18 @@ To be populated as the design-agent and context-agent learn the domain.
 - **channel**: 'email' | 'sms' | 'push', required
 - **scheduledFor**: Date, required
 
+### Setting
+
+- **key**: string, required
+- **value**: string, required
+
+### AuditRecord
+
+- **operation**: string, required
+- **entity**: string, required
+- **timestamp**: Date, required
+- **details**: string, required
+
 ## API Contracts
 
 ### POST /api/v1/leave-requests
@@ -100,5 +112,22 @@ To be populated as the design-agent and context-agent learn the domain.
     - channel: 'email' | 'sms' | 'push'
     - scheduledFor: Date
     - createdAt: Date
+- **Auth Required**: true
+- **Roles**: operator
+
+### GET /api/v1/settings
+- **Description**: Read current settings
+- **Request Body**: {}
+- **Response Body**:
+  - settings: Record<string, string>
+- **Auth Required**: true
+- **Roles**: operator
+
+### PATCH /api/v1/settings
+- **Description**: Update one or more keys in the settings
+- **Request Body**:
+  - settings: Record<string, string>
+- **Response Body**:
+  - updatedSettings: Record<string, string>
 - **Auth Required**: true
 - **Roles**: operator
