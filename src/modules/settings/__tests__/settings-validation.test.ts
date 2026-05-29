@@ -2,14 +2,19 @@ import { describe, it, expect } from 'vitest';
 import { z } from 'zod';
 import { settingsSchema } from '../routes/settings-routes';
 
-describe('SC-3: Input validation for PATCH /settings using Zod', () => {
+describe('SC-3: Input for PATCH /settings is validated using Zod', () => {
   it('should validate correct input', () => {
-    const validInput = { settings: { key1: 'value1' } };
-    expect(() => settingsSchema.parse(validInput)).not.toThrow();
+    const input = { settings: { key1: 'value1' } };
+    expect(() => settingsSchema.parse(input)).not.toThrow();
   });
 
   it('should throw error for invalid input', () => {
-    const invalidInput = { invalidKey: 'value' };
-    expect(() => settingsSchema.parse(invalidInput)).toThrow();
+    const input = { settings: 'invalid' };
+    expect(() => settingsSchema.parse(input)).toThrow();
+  });
+
+  it('should allow partial updates', () => {
+    const input = { settings: { key1: 'value1' } };
+    expect(() => settingsSchema.parse(input)).not.toThrow();
   });
 });

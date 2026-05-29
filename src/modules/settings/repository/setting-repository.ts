@@ -6,7 +6,8 @@ export class SettingRepository {
     return {};
   }
 
-  async updateSettings(settings: Record<string, string>): Promise<void> {
+  async updateSettings(settings: Partial<Record<string, string>>): Promise<Record<string, string>> {
     // Implement database access to update settings
+    return {};
   }
 }

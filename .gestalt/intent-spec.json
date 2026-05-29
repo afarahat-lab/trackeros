@@ -1,17 +1,15 @@
 {
-  "id": "f45ffb10-9e63-4c4e-b3ad-dc2833729288",
+  "id": "8b31de2b-3b01-49d0-9292-1af4bbb3c533",
   "correlationId": "2a57b087-fdc1-48e5-a941-9b13a46d0d9c",
   "rawIntent": "Add a settings module under src/modules/settings with GET /settings (read current settings) and PATCH /settings (update one or more keys). Persist via the shared db layer. Validate input with Zod. Require operator role.",
   "scope": {
     "affectedDomains": [
       "Request",
-      "Response",
-      "Auth"
+      "Response"
     ],
     "affectedLayers": [
       "api",
-      "domain",
-      "config"
+      "domain"
     ],
     "isBreakingChange": false,
     "estimatedComplexity": "medium"
@@ -19,33 +17,27 @@
   "successCriteria": [
     {
       "id": "sc-001",
-      "description": "A new settings module exists under src/modules/settings with GET /settings and PATCH /settings endpoints.",
+      "description": "GET /settings endpoint returns the current settings successfully.",
       "testable": true,
       "layer": "integration"
     },
     {
       "id": "sc-002",
-      "description": "GET /settings returns the current settings.",
+      "description": "PATCH /settings endpoint updates one or more keys successfully and returns the updated settings.",
       "testable": true,
       "layer": "integration"
     },
     {
       "id": "sc-003",
-      "description": "PATCH /settings updates one or more keys in the settings.",
-      "testable": true,
-      "layer": "integration"
-    },
-    {
-      "id": "sc-004",
       "description": "Input for PATCH /settings is validated using Zod.",
       "testable": true,
       "layer": "unit"
     },
     {
-      "id": "sc-005",
-      "description": "Access to the settings endpoints requires the operator role.",
+      "id": "sc-004",
+      "description": "Access to the settings endpoints is restricted to users with the operator role.",
       "testable": true,
-      "layer": "integration"
+      "layer": "e2e"
     }
   ],
   "constraints": [
@@ -55,8 +47,8 @@
     "No sensitive data in logs"
   ],
   "outOfScope": [
-    "UI changes related to settings",
-    "Detailed audit log implementation specifics"
+    "UI changes related to settings management",
+    "Detailed logging of settings changes"
   ],
   "ambiguities": []
 }

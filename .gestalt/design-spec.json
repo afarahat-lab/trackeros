@@ -65,10 +65,10 @@
       "path": "/api/v1/settings",
       "description": "Update one or more settings keys",
       "requestBody": {
-        "settings": "Record<string, string>"
+        "settings": "Partial<Record<string, string>>"
       },
       "responseBody": {
-        "success": "boolean"
+        "updatedSettings": "Record<string, string>"
       },
       "authRequired": true,
       "roles": [

@@ -128,6 +128,6 @@ To be populated as the design-agent and context-agent learn the domain.
 - **Request Body**:
   - settings: Partial<Record<string, string>>
 - **Response Body**:
-  - success: boolean
+  - updatedSettings: Record<string, string>
 - **Auth Required**: true
 - **Roles**: operator
