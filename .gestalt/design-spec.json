@@ -38,7 +38,7 @@
           "required": true
         },
         {
-          "name": "details",
+          "name": "userId",
           "type": "string",
           "required": true
         }
@@ -50,7 +50,7 @@
     {
       "method": "GET",
       "path": "/api/v1/settings",
-      "description": "Read current settings",
+      "description": "Retrieve the current settings",
       "requestBody": {},
       "responseBody": {
         "settings": "Record<string, string>"
@@ -63,12 +63,12 @@
     {
       "method": "PATCH",
       "path": "/api/v1/settings",
-      "description": "Update one or more keys in the settings",
+      "description": "Update one or more settings keys",
       "requestBody": {
-        "settings": "Record<string, string>"
+        "settings": "Partial<Record<string, string>>"
       },
       "responseBody": {
-        "updatedSettings": "Record<string, string>"
+        "success": "boolean"
       },
       "authRequired": true,
       "roles": [

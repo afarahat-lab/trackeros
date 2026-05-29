@@ -1,20 +1,9 @@
-import { v4 as uuidv4 } from 'uuid';
+import { AuditRecord } from '../../modules/settings/domain/audit-record';
 
 /**
- * Append an audit log entry for state-changing operations.
- * @param userId - ID of the user performing the operation.
- * @param action - Description of the action performed.
- * @param details - Additional details about the operation.
+ * Appends an audit log record.
+ * @param record The audit record to append.
  */
-export const append = async (userId: string, action: string, details: Record<string, unknown>) => {
-  const auditEntry = {
-    id: uuidv4(),
-    timestamp: new Date().toISOString(),
-    userId,
-    action,
-    details
-  };
-  // Use platform logger instead of console.log
-  // logger.info('audit log entry', auditEntry);
-  // Persist auditEntry to a database or external service
-};
+export async function appendAuditLog(record: AuditRecord): Promise<void> {
+  // Implement audit log persistence logic here
+}

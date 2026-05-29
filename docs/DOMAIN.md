@@ -33,6 +33,7 @@ To be populated as the design-agent and context-agent learn the domain.
 - **entity**: string, required
 - **timestamp**: Date, required
 - **details**: string, required
+- **userId**: string, required
 
 ## API Contracts
 
@@ -116,7 +117,7 @@ To be populated as the design-agent and context-agent learn the domain.
 - **Roles**: operator
 
 ### GET /api/v1/settings
-- **Description**: Read current settings
+- **Description**: Retrieve the current settings
 - **Request Body**: {}
 - **Response Body**:
   - settings: Record<string, string>
@@ -124,10 +125,10 @@ To be populated as the design-agent and context-agent learn the domain.
 - **Roles**: operator
 
 ### PATCH /api/v1/settings
-- **Description**: Update one or more keys in the settings
+- **Description**: Update one or more settings keys
 - **Request Body**:
-  - settings: Record<string, string>
+  - settings: Partial<Record<string, string>>
 - **Response Body**:
-  - updatedSettings: Record<string, string>
+  - success: boolean
 - **Auth Required**: true
 - **Roles**: operator

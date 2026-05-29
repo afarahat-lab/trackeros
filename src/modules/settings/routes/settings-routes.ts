@@ -1,31 +1,43 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { SettingsService } from '../service/settings-service';
+import { authenticate } from '../../shared/auth/authenticate';
+import { authorize } from '../../shared/auth/authorize';
 
 const settingsSchema = z.object({
-  settings: z.record(z.string())
+  settings: z.record(z.string(), z.string())
 });
 
-export async function settingsRoutes(fastify: FastifyInstance): Promise<void> {
-  const settingsService = new SettingsService();
+const updateSettingsSchema = z.object({
+  settings: z.record(z.string(), z.string()).partial()
+});
 
-  fastify.get('/api/v1/settings', {
-    preHandler: fastify.auth([fastify.verifyJWT, fastify.verifyRole('operator')]),
-    handler: async (request, reply) => {
-      const settings = await settingsService.getSettings();
-      reply.send({ settings });
+export async function registerSettingsRoutes(app: FastifyInstance): Promise<void> {
+  const service = new SettingsService();
+
+  app.get('/api/v1/settings', {
+    preHandler: [authenticate, authorize(['operator'])],
+    schema: {
+      response: {
+        200: settingsSchema
+      }
     }
+  }, async (request, reply) => {
+    const settings = await service.getSettings();
+    reply.send({ settings });
   });
 
-  fastify.patch('/api/v1/settings', {
-    preHandler: fastify.auth([fastify.verifyJWT, fastify.verifyRole('operator')]),
-    handler: async (request, reply) => {
-      const validation = settingsSchema.safeParse(request.body);
-      if (!validation.success) {
-        return reply.status(400).send(validation.error);
+  app.patch('/api/v1/settings', {
+    preHandler: [authenticate, authorize(['operator'])],
+    schema: {
+      body: updateSettingsSchema,
+      response: {
+        200: z.object({ success: z.boolean() })
       }
-      const updatedSettings = await settingsService.updateSettings(validation.data.settings);
-      reply.send({ updatedSettings });
     }
+  }, async (request, reply) => {
+    const { settings } = updateSettingsSchema.parse(request.body);
+    await service.updateSettings(settings, request.user.id);
+    reply.send({ success: true });
   });
 }

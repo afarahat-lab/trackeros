@@ -1,38 +1,25 @@
-import { SettingRepository } from '../repository/setting-repository';
-import { AuditRecordRepository } from '../repository/audit-record-repository';
+import { SettingsRepository } from '../repository/settings-repository';
 import { AuditRecord } from '../domain/audit-record';
+import { appendAuditLog } from '../../shared/utils/audit-log';
 
 export class SettingsService {
-  private settingRepository: SettingRepository;
-  private auditRecordRepository: AuditRecordRepository;
+  private repository: SettingsRepository;
 
   constructor() {
-    this.settingRepository = new SettingRepository();
-    this.auditRecordRepository = new AuditRecordRepository();
+    this.repository = new SettingsRepository();
   }
 
-  /**
-   * Get all settings.
-   * @returns Promise<Record<string, string>>
-   */
   async getSettings(): Promise<Record<string, string>> {
-    return this.settingRepository.getAllSettings();
+    return this.repository.getSettings();
   }
 
-  /**
-   * Update settings and log the operation.
-   * @param settings Record<string, string>
-   * @returns Promise<Record<string, string>>
-   */
-  async updateSettings(settings: Record<string, string>): Promise<Record<string, string>> {
-    const updatedSettings = await this.settingRepository.updateSettings(settings);
-    const auditRecord: AuditRecord = {
+  async updateSettings(settings: Partial<Record<string, string>>, userId: string): Promise<void> {
+    await this.repository.updateSettings(settings);
+    await appendAuditLog({
       operation: 'update',
       entity: 'Setting',
       timestamp: new Date(),
-      details: JSON.stringify(settings)
-    };
-    await this.auditRecordRepository.append(auditRecord);
-    return updatedSettings;
+      userId
+    });
   }
 }

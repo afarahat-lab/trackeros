@@ -1,5 +1,5 @@
 {
-  "id": "5eb172aa-5139-4854-b737-5ad37f9ef623",
+  "id": "717a7df2-6bf0-4abc-bca0-c3a451fac8ee",
   "correlationId": "2a57b087-fdc1-48e5-a941-9b13a46d0d9c",
   "rawIntent": "Add a settings module under src/modules/settings with GET /settings (read current settings) and PATCH /settings (update one or more keys). Persist via the shared db layer. Validate input with Zod. Require operator role.",
   "scope": {
@@ -19,13 +19,13 @@
   "successCriteria": [
     {
       "id": "sc-001",
-      "description": "A new settings module exists under src/modules/settings with endpoints GET /settings and PATCH /settings.",
+      "description": "GET /settings endpoint returns the current settings successfully.",
       "testable": true,
       "layer": "integration"
     },
     {
       "id": "sc-002",
-      "description": "The PATCH /settings endpoint updates one or more keys in the settings and persists changes via the shared db layer.",
+      "description": "PATCH /settings endpoint updates one or more keys successfully.",
       "testable": true,
       "layer": "integration"
     },
@@ -37,7 +37,7 @@
     },
     {
       "id": "sc-004",
-      "description": "Access to the settings endpoints requires the operator role.",
+      "description": "Access to /settings endpoints is restricted to users with the operator role.",
       "testable": true,
       "layer": "e2e"
     }
@@ -50,7 +50,7 @@
   ],
   "outOfScope": [
     "UI changes related to settings",
-    "Detailed logging implementation"
+    "Detailed audit log implementation specifics"
   ],
   "ambiguities": []
 }
