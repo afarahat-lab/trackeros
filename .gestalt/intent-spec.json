@@ -1,16 +1,15 @@
 {
-  "id": "4efa35c2-b75e-41e4-a44e-0272b2ae0534",
-  "correlationId": "13cdf1b4-bf70-4c3e-ac6d-7b9d69759eee",
-  "rawIntent": "Set up the initial scaffold",
+  "id": "4c9242e4-f450-4aef-8217-588386e589f5",
+  "correlationId": "593bc84d-e332-4f19-8e0c-e65e8602c6a0",
+  "rawIntent": "Add a leave-request module under src/modules/leave with POST /leave-requests (create) and GET /leave-requests (list, optionally filtered by ?status=). A leave request has employeeId, startDate, endDate, reason, status (pending|approved|rejected). Persist via the shared db layer.",
   "scope": {
-    "affectedDomains": [],
+    "affectedDomains": [
+      "leave-management"
+    ],
     "affectedLayers": [
       "domain",
       "api",
-      "ui",
-      "infra",
-      "test",
-      "config"
+      "infra"
     ],
     "isBreakingChange": false,
     "estimatedComplexity": "medium"
@@ -18,8 +17,38 @@
   "successCriteria": [
     {
       "id": "sc-001",
-      "description": "The initial scaffold is set up with all necessary modules and configurations.",
-      "testable": false,
+      "description": "The leave-request module is created under src/modules/leave with endpoints POST /leave-requests and GET /leave-requests.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "sc-002",
+      "description": "Leave requests can be created with employeeId, startDate, endDate, reason, and status.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "Leave requests can be listed and optionally filtered by status.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "sc-004",
+      "description": "All state-changing operations produce an audit record.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "sc-005",
+      "description": "Role-based access control is enforced by middleware on every route.",
+      "testable": true,
+      "layer": "e2e"
+    },
+    {
+      "id": "sc-006",
+      "description": "All request bodies are validated with Zod (or equivalent) before reaching the business logic.",
+      "testable": true,
       "layer": "unit"
     }
   ],
@@ -30,18 +59,8 @@
     "No sensitive data in logs"
   ],
   "outOfScope": [
-    "Implementation of specific business logic",
-    "Integration with external systems"
+    "UI components for leave requests",
+    "Notifications related to leave requests"
   ],
-  "ambiguities": [
-    {
-      "id": "amb-001",
-      "description": "What specific components are included in the initial scaffold?",
-      "options": [
-        "Basic project structure only",
-        "Include sample modules and configurations"
-      ],
-      "impactIfWrong": "medium"
-    }
-  ]
+  "ambiguities": []
 }

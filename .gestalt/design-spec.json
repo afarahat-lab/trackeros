@@ -1,6 +1,88 @@
 {
-  "correlationId": "13cdf1b4-bf70-4c3e-ac6d-7b9d69759eee",
-  "domainChanges": [],
-  "apiContracts": [],
+  "correlationId": "593bc84d-e332-4f19-8e0c-e65e8602c6a0",
+  "domainChanges": [
+    {
+      "entityName": "LeaveRequest",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "employeeId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "startDate",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "endDate",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "reason",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "status",
+          "type": "'pending' | 'approved' | 'rejected'",
+          "required": true
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [
+    {
+      "method": "POST",
+      "path": "/api/v1/leave-requests",
+      "description": "Create a new leave request",
+      "requestBody": {
+        "employeeId": "string",
+        "startDate": "string",
+        "endDate": "string",
+        "reason": "string",
+        "status": "'pending' | 'approved' | 'rejected'"
+      },
+      "responseBody": {
+        "id": "string",
+        "employeeId": "string",
+        "startDate": "string",
+        "endDate": "string",
+        "reason": "string",
+        "status": "'pending' | 'approved' | 'rejected'"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/leave-requests",
+      "description": "List leave requests, optionally filtered by status",
+      "requestBody": {},
+      "responseBody": {
+        "leaveRequests": [
+          {
+            "id": "string",
+            "employeeId": "string",
+            "startDate": "string",
+            "endDate": "string",
+            "reason": "string",
+            "status": "'pending' | 'approved' | 'rejected'"
+          }
+        ]
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    }
+  ],
   "componentSpecs": []
 }
