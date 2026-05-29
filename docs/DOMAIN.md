@@ -34,6 +34,11 @@ To be populated as the design-agent and context-agent learn the domain.
 - **timestamp**: Date, required
 - **userId**: string, required
 
+### Description
+
+- **title**: string, required
+- **content**: string, required
+
 ## API Contracts
 
 ### POST /api/v1/leave-requests
@@ -131,3 +136,39 @@ To be populated as the design-agent and context-agent learn the domain.
   - updatedSettings: Record<string, string>
 - **Auth Required**: true
 - **Roles**: operator
+
+### GET /api/v1/descriptions
+- **Description**: Retrieve a list of descriptions
+- **Request Body**: {}
+- **Response Body**:
+  - descriptions: Description[]
+- **Auth Required**: true
+- **Roles**: admin, operator
+
+### POST /api/v1/descriptions
+- **Description**: Create a new description
+- **Request Body**:
+  - title: string
+  - content: string
+- **Response Body**:
+  - description: Description
+- **Auth Required**: true
+- **Roles**: admin
+
+### PUT /api/v1/descriptions/{id}
+- **Description**: Update an existing description
+- **Request Body**:
+  - title: string
+  - content: string
+- **Response Body**:
+  - description: Description
+- **Auth Required**: true
+- **Roles**: admin
+
+### DELETE /api/v1/descriptions/{id}
+- **Description**: Delete a description
+- **Request Body**: {}
+- **Response Body**:
+  - message: string
+- **Auth Required**: true
+- **Roles**: admin
