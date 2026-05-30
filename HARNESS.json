@@ -46,7 +46,7 @@
     "maxRetries": 3
   },
   "pipeline": {
-    "adapter": "noop"
+    "adapter": "github-actions"
   },
   "maintenance": {
     "driftCheck": {
