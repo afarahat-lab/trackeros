@@ -1,0 +1,9 @@
+{
+  "name": "trackeros",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "test": "echo \"no tests yet\" && exit 0"
+  },
+  "packageManager": "pnpm@9.15.4"
+}
