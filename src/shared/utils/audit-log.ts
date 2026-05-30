@@ -1,7 +1,6 @@
-import { AuditRecord } from '../../modules/settings/domain/audit-record';
-
 export const auditLog = {
-  async append(record: AuditRecord): Promise<void> {
-    // Implement logic to append audit record
+  async append(logEntry: Record<string, unknown>): Promise<void> {
+    // Implement logic to append the log entry to the audit log
+    throw new Error('Not implemented');
   }
 };

@@ -1,6 +1,55 @@
 {
-  "correlationId": "8f53b75d-9b30-4d3b-a827-78bd9a655d99",
-  "domainChanges": [],
-  "apiContracts": [],
+  "correlationId": "e7fc791b-746f-48d9-a329-8e1a1dab253f",
+  "domainChanges": [
+    {
+      "entityName": "Roles",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "roleName",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "permissions",
+          "type": "string[]",
+          "required": true
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [
+    {
+      "method": "GET",
+      "path": "/api/v1/roles",
+      "description": "Retrieve a list of all roles",
+      "requestBody": {},
+      "responseBody": {
+        "roles": "Role[]"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/roles",
+      "description": "Create a new role",
+      "requestBody": {
+        "roleName": "string",
+        "permissions": "string[]"
+      },
+      "responseBody": {
+        "roleId": "string"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin"
+      ]
+    }
+  ],
   "componentSpecs": []
 }
