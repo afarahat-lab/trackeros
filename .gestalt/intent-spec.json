@@ -1,28 +1,34 @@
 {
-  "id": "eb619540-a702-475d-aea5-9bf25fce58ab",
-  "correlationId": "8f53b75d-9b30-4d3b-a827-78bd9a655d99",
-  "rawIntent": "Add a string-case utility module under src/shared/utils/string-case with two pure functions: kebabCase(s: string): string and camelCase(s: string): string. No DB, no API, no logging. Unit tests only.",
+  "id": "119ddc88-16b1-4378-bfda-8e59db286191",
+  "correlationId": "c3260b6f-a9cc-448e-a54d-9ef87008ec18",
+  "rawIntent": "[gestalt-maintenance/CONTEXT_ALIGNMENT] Reconcile docs/DOMAIN.md and docs/ARCHITECTURE.md: entity 'description' exists in the domain model but no module references it. Decide whether to introduce the module under src/modules/description/ or to remove the entity from the domain model.",
   "scope": {
-    "affectedDomains": [],
+    "affectedDomains": [
+      "Description"
+    ],
     "affectedLayers": [
-      "test"
+      "domain"
     ],
     "isBreakingChange": false,
-    "estimatedComplexity": "small"
+    "estimatedComplexity": "medium"
   },
   "successCriteria": [
     {
       "id": "sc-001",
-      "description": "The module src/shared/utils/string-case contains two pure functions: kebabCase and camelCase, both of which correctly transform strings as specified.",
+      "description": "The entity 'description' is either introduced as a module under src/modules/description/ or removed from the domain model, and the documentation is updated accordingly.",
       "testable": true,
-      "layer": "unit"
+      "layer": "integration"
     }
   ],
-  "constraints": [],
+  "constraints": [
+    "Every state-changing operation produces an audit record",
+    "RBAC enforced at middleware, never inline",
+    "Input validated at the API boundary",
+    "No sensitive data in logs"
+  ],
   "outOfScope": [
-    "Database interactions",
-    "API development",
-    "Logging functionality"
+    "Changes to other domains or modules not related to 'description'",
+    "Implementation of new features unrelated to the reconciliation of docs"
   ],
   "ambiguities": []
 }
