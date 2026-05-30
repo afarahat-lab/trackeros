@@ -1,0 +1,32 @@
+{
+  "id": "962f83f4-097b-473e-beb9-31cf23e821ae",
+  "correlationId": "67e5ee02-a325-4a6d-b554-92d03856690a",
+  "rawIntent": "Add a kebab-case utility under src/shared/utils/kebab-case with kebabCase(s: string): string",
+  "scope": {
+    "affectedDomains": [],
+    "affectedLayers": [
+      "domain"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "A utility function kebabCase(s: string): string exists under src/shared/utils/kebab-case and correctly converts strings to kebab-case.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Every state-changing operation produces an audit record",
+    "RBAC enforced at middleware, never inline",
+    "Input validated at the API boundary",
+    "No sensitive data in logs"
+  ],
+  "outOfScope": [
+    "Integration of the utility function into other parts of the application",
+    "UI changes to utilize the new utility function"
+  ],
+  "ambiguities": []
+}
