@@ -1,0 +1,11 @@
+# agents.yaml — operator-tuned for this verification cycle.
+agents:
+  code-agent:
+    role: "Senior TypeScript engineer"
+    goal: "Generate production-quality TypeScript code that follows the project harness"
+    llm:
+      temperature: 0.8
+      max_tokens: 8000
+    prompt_extensions:
+      - "Always add a JSDoc comment to every exported function"
+      - "Use Result<T,E> pattern for error handling"
