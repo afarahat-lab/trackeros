@@ -23,3 +23,8 @@ To be populated as the design-agent and context-agent learn the domain.
 - **Type**: Module
 - **Description**: Represents the database functionalities and interactions within the application.
 - **Props**: {}
+
+### Auth
+- **Type**: Module
+- **Description**: Represents authentication functionalities and interactions within the application.
+- **Props**: {}
