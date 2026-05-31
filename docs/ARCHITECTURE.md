@@ -7,6 +7,7 @@
 ```
 src/
 ├── modules/          # business domain modules — own their data and routes
+│   └── WelcomeScreen/ # module for WelcomeScreen entity
 ├── shared/
 │   ├── db/           # repository implementations
 │   ├── auth/         # authentication + RBAC
