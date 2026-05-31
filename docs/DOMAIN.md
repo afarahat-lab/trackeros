@@ -28,3 +28,8 @@ To be populated as the design-agent and context-agent learn the domain.
 - **Type**: Module
 - **Description**: Represents authentication functionalities and interactions within the application.
 - **Props**: {}
+
+### Utils
+- **Type**: Module
+- **Description**: Represents utility functions and helpers used across the application.
+- **Props**: {}
