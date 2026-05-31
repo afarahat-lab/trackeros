@@ -18,3 +18,8 @@ To be populated as the design-agent and context-agent learn the domain.
 - **Type**: Module
 - **Description**: Represents shared functionalities or components used across different parts of the application.
 - **Props**: {}
+
+### DB
+- **Type**: Module
+- **Description**: Represents the database functionalities and interactions within the application.
+- **Props**: {}
