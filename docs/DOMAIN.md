@@ -23,3 +23,5 @@ To be populated as the design-agent and context-agent learn the domain.
 > Note: Introduce a module under src/modules/description/ to align with the domain model entity 'description'.
 
 > Note: Introduce a module under src/modules/props/ to align with the domain model entity 'props'.
+
+> Note: Reconcile docs/DOMAIN.md and docs/ARCHITECTURE.md: entity 'components' exists in the domain model but no module references it. Decide whether to introduce the module under src/modules/components/ or to remove the entity from the domain model.
