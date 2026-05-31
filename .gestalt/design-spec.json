@@ -1,6 +1,66 @@
 {
-  "correlationId": "90c0e8d1-0037-485d-90ab-7e1bb348fb49",
-  "domainChanges": [],
-  "apiContracts": [],
+  "correlationId": "953abbdf-5859-45da-8489-b050b6bf04ad",
+  "domainChanges": [
+    {
+      "entityName": "Components",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "props",
+          "type": "Props",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "Type",
+          "type": "one-to-many"
+        }
+      ]
+    }
+  ],
+  "apiContracts": [
+    {
+      "method": "GET",
+      "path": "/api/v1/components",
+      "description": "Retrieve a list of components",
+      "requestBody": {},
+      "responseBody": {
+        "components": "Components[]"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/components",
+      "description": "Create a new component",
+      "requestBody": {
+        "name": "string",
+        "description": "string",
+        "props": "Props"
+      },
+      "responseBody": {
+        "component": "Components"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin"
+      ]
+    }
+  ],
   "componentSpecs": []
 }
