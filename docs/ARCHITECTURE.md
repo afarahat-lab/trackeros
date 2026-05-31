@@ -8,7 +8,7 @@
 src/
 ├── modules/          # business domain modules — own their data and routes
 │   ├── WelcomeScreen/ # module for WelcomeScreen entity
-│   └── StartButton/  # module for StartButton entity
+│   ├── StartButton/  # module for StartButton entity
 ├── shared/
 │   ├── db/           # repository implementations
 │   ├── auth/         # authentication + RBAC
