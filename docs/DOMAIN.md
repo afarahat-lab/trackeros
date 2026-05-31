@@ -19,3 +19,5 @@ To be populated as the design-agent and context-agent learn the domain.
 > Note: Introduce a module under src/modules/components/ to align with the domain model entity 'components'.
 
 > Note: Introduce a module under src/modules/type/ to align with the domain model entity 'type'.
+
+> Note: Introduce a module under src/modules/description/ to align with the domain model entity 'description'.
