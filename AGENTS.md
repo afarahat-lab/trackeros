@@ -14,6 +14,7 @@ A simle web application that helps user to capture his notes. It shall run serve
 3. Every state-changing operation produces an audit record (GP-001)
 4. RBAC enforced at middleware, never inline (GP-002)
 5. Ensure all external API calls are retried on failure (GP-003)
+6. All configuration must be environment-based, never hardcoded (GP-004)
 
 ## When context is missing
 
