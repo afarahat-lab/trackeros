@@ -1,13 +1,11 @@
 {
-  "id": "981d2035-ff6c-4a6e-ad1d-9659775bf436",
-  "correlationId": "8f6177e8-7ae3-4441-9c05-717e78bc5dd3",
-  "rawIntent": "Fix the following issue with intent \"make it better\": Intent is too vague — no success criteria could be extracted.. Create admin readme file to instruct how to start this application\nAdd user readme file as well",
+  "id": "3f1a67b2-2796-4072-8357-7c0ef478be8f",
+  "correlationId": "b64b10ed-1b73-4c4a-965c-9c8eb9115256",
+  "rawIntent": "Add a formatDate utility under src/shared/utils/format-date that returns YYYY-MM-DD strings",
   "scope": {
-    "affectedDomains": [
-      "Description"
-    ],
+    "affectedDomains": [],
     "affectedLayers": [
-      "config"
+      "domain"
     ],
     "isBreakingChange": false,
     "estimatedComplexity": "small"
@@ -15,13 +13,7 @@
   "successCriteria": [
     {
       "id": "sc-001",
-      "description": "An admin README file exists with instructions on how to start the application.",
-      "testable": true,
-      "layer": "unit"
-    },
-    {
-      "id": "sc-002",
-      "description": "A user README file exists with instructions relevant to end-users.",
+      "description": "A utility function named formatDate exists under src/shared/utils/format-date that returns dates in YYYY-MM-DD format.",
       "testable": true,
       "layer": "unit"
     }
@@ -30,7 +22,8 @@
     "No sensitive data in logs"
   ],
   "outOfScope": [
-    "Modifying application code or functionality"
+    "Integration with other modules or systems",
+    "Handling of time zones or locale-specific formats"
   ],
   "ambiguities": []
 }
