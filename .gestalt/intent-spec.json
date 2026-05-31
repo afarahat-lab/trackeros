@@ -1,0 +1,28 @@
+{
+  "id": "04d9cb54-e168-467b-84c5-29db2a00ea40",
+  "correlationId": "88607481-9ef9-4ff8-ae47-fdc38ad273a2",
+  "rawIntent": "[gestalt-maintenance/CONTEXT_ALIGNMENT] Update AGENTS.md to reference golden principle GP-004 so all agents reading the orientation document see the rule.",
+  "scope": {
+    "affectedDomains": [],
+    "affectedLayers": [
+      "config"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "AGENTS.md is updated to include a reference to golden principle GP-004.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No sensitive data in logs"
+  ],
+  "outOfScope": [
+    "Changes to any other documentation or files outside of AGENTS.md"
+  ],
+  "ambiguities": []
+}
