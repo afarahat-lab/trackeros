@@ -1,32 +1,34 @@
 {
-  "id": "5782b202-a9bb-4fdc-b403-9b111e341aac",
-  "correlationId": "90c0e8d1-0037-485d-90ab-7e1bb348fb49",
-  "rawIntent": "Create readme md file to instruct user how to run this server",
+  "id": "b684b503-7d46-4600-8be2-fcbabc312433",
+  "correlationId": "309aa712-554d-44ab-a4cc-daddcfdde8ac",
+  "rawIntent": "[gestalt-maintenance/CONTEXT_ALIGNMENT] Reconcile docs/DOMAIN.md and docs/ARCHITECTURE.md: entity 'type' exists in the domain model but no module references it. Decide whether to introduce the module under src/modules/type/ or to remove the entity from the domain model.",
   "scope": {
     "affectedDomains": [
-      "Description"
+      "Type"
     ],
     "affectedLayers": [
-      "ui",
+      "domain",
       "config"
     ],
-    "isBreakingChange": false,
-    "estimatedComplexity": "small"
+    "isBreakingChange": true,
+    "estimatedComplexity": "medium"
   },
   "successCriteria": [
     {
       "id": "sc-001",
-      "description": "A README.md file exists in the project root with instructions on how to run the server.",
+      "description": "The 'type' entity is either removed from the domain model or a new module is introduced under src/modules/type/ with appropriate references.",
       "testable": true,
-      "layer": "unit"
+      "layer": "integration"
     }
   ],
   "constraints": [
+    "Every state-changing operation produces an audit record",
+    "RBAC enforced at middleware, never inline",
+    "Input validated at the API boundary",
     "No sensitive data in logs"
   ],
   "outOfScope": [
-    "Implementing server functionality",
-    "Modifying existing server code"
+    "Changes to other unrelated modules or entities"
   ],
   "ambiguities": []
 }

@@ -1,6 +1,84 @@
 {
-  "correlationId": "90c0e8d1-0037-485d-90ab-7e1bb348fb49",
-  "domainChanges": [],
-  "apiContracts": [],
+  "correlationId": "309aa712-554d-44ab-a4cc-daddcfdde8ac",
+  "domainChanges": [
+    {
+      "entityName": "Type",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [
+    {
+      "method": "GET",
+      "path": "/api/v1/types",
+      "description": "Retrieve a list of all types",
+      "requestBody": {},
+      "responseBody": {
+        "types": "Type[]"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/types",
+      "description": "Create a new type",
+      "requestBody": {
+        "name": "string",
+        "description": "string"
+      },
+      "responseBody": {
+        "type": "Type"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/types/{id}",
+      "description": "Update an existing type",
+      "requestBody": {
+        "name": "string",
+        "description": "string"
+      },
+      "responseBody": {
+        "type": "Type"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/types/{id}",
+      "description": "Delete a type",
+      "requestBody": {},
+      "responseBody": {
+        "message": "string"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin"
+      ]
+    }
+  ],
   "componentSpecs": []
 }
