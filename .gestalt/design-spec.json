@@ -1,6 +1,55 @@
 {
-  "correlationId": "90c0e8d1-0037-485d-90ab-7e1bb348fb49",
-  "domainChanges": [],
-  "apiContracts": [],
+  "correlationId": "cef4c762-31df-446d-a171-e99236a18ef1",
+  "domainChanges": [
+    {
+      "entityName": "Props",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "value",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [
+    {
+      "method": "GET",
+      "path": "/api/v1/props",
+      "description": "Retrieve a list of all props",
+      "requestBody": {},
+      "responseBody": {
+        "props": "Array<Props>"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/props",
+      "description": "Create a new prop",
+      "requestBody": {
+        "name": "string",
+        "value": "string"
+      },
+      "responseBody": {
+        "prop": "Props"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin"
+      ]
+    }
+  ],
   "componentSpecs": []
 }
