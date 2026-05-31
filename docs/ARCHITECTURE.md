@@ -16,6 +16,7 @@ src/
 └── api/              # route registration
 src/modules/Shared/    — Shared module
 src/modules/DB/        — DB module
+src/modules/Auth/      — Auth module
 ```
 
 ## Dependency rules
