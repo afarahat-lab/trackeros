@@ -1,0 +1,19 @@
+{
+  "correlationId": "45b2683b-cd9c-4fda-97c9-23d08f86eb42",
+  "domainChanges": [],
+  "apiContracts": [],
+  "componentSpecs": [
+    {
+      "name": "WelcomeScreen",
+      "type": "page",
+      "description": "Displays a welcome message and a start button. Clicking the start button shows a message that the system is yet to be developed.",
+      "props": {}
+    },
+    {
+      "name": "StartButton",
+      "type": "component",
+      "description": "A button that, when clicked, displays a message indicating the system is yet to be developed.",
+      "props": {}
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "id": "7b49e45d-adbb-480d-b88c-35924b089f58",
+  "correlationId": "45b2683b-cd9c-4fda-97c9-23d08f86eb42",
+  "rawIntent": "Build initial screeen. Screen should welcome user and show one button to start. Currently start button should show a message that system is yet to be developed. system shall be developed with react.js and node.js backend",
+  "scope": {
+    "affectedDomains": [
+      "UI"
+    ],
+    "affectedLayers": [
+      "ui",
+      "api"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "A screen is displayed that welcomes the user and shows a start button. Clicking the start button displays a message indicating the system is yet to be developed.",
+      "testable": true,
+      "layer": "e2e"
+    }
+  ],
+  "constraints": [
+    "Every state-changing operation produces an audit record",
+    "RBAC enforced at middleware, never inline",
+    "Input validated at the API boundary",
+    "No sensitive data in logs"
+  ],
+  "outOfScope": [
+    "Development of the full system functionality beyond the initial screen and start button message"
+  ],
+  "ambiguities": []
+}
