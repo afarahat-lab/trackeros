@@ -15,6 +15,7 @@ src/
 │   └── utils/        # cross-cutting helpers
 └── api/              # route registration
 src/modules/Shared/    — Shared module
+src/modules/DB/        — DB module
 ```
 
 ## Dependency rules
