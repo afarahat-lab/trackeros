@@ -17,6 +17,7 @@ src/
 src/modules/Shared/    — Shared module
 src/modules/DB/        — DB module
 src/modules/Auth/      — Auth module
+src/modules/Utils/     — Utils module
 ```
 
 ## Dependency rules
