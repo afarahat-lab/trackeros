@@ -29,3 +29,5 @@ To be populated as the design-agent and context-agent learn the domain.
 > Note: Reconcile docs/DOMAIN.md and docs/ARCHITECTURE.md: entity 'type' exists in the domain model but no module references it. Decide whether to introduce the module under src/modules/type/ or to remove the entity from the domain model.
 
 > Note: Reconcile docs/DOMAIN.md and docs/ARCHITECTURE.md: entity 'description' exists in the domain model but no module references it. Decide whether to introduce the module under src/modules/description/ or to remove the entity from the domain model.
+
+> Note: Reconcile docs/DOMAIN.md and docs/ARCHITECTURE.md: entity 'props' exists in the domain model but no module references it. Decide whether to introduce the module under src/modules/props/ or to remove the entity from the domain model.
