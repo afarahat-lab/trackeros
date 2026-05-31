@@ -1,6 +1,113 @@
 {
-  "correlationId": "90c0e8d1-0037-485d-90ab-7e1bb348fb49",
-  "domainChanges": [],
-  "apiContracts": [],
+  "correlationId": "a4dba8ce-fed6-4db9-ace1-5c1110d97b10",
+  "domainChanges": [
+    {
+      "entityName": "Description",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "text",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": true
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [
+    {
+      "method": "POST",
+      "path": "/api/v1/descriptions",
+      "description": "Create a new description",
+      "requestBody": {
+        "text": "string"
+      },
+      "responseBody": {
+        "id": "string",
+        "text": "string",
+        "createdAt": "Date",
+        "updatedAt": "Date"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/descriptions",
+      "description": "Retrieve all descriptions",
+      "requestBody": {},
+      "responseBody": {
+        "descriptions": "Array<{id: string, text: string, createdAt: Date, updatedAt: Date}>"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/descriptions/{id}",
+      "description": "Retrieve a specific description by ID",
+      "requestBody": {},
+      "responseBody": {
+        "id": "string",
+        "text": "string",
+        "createdAt": "Date",
+        "updatedAt": "Date"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/descriptions/{id}",
+      "description": "Update a specific description by ID",
+      "requestBody": {
+        "text": "string"
+      },
+      "responseBody": {
+        "id": "string",
+        "text": "string",
+        "createdAt": "Date",
+        "updatedAt": "Date"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/descriptions/{id}",
+      "description": "Delete a specific description by ID",
+      "requestBody": {},
+      "responseBody": {
+        "success": "boolean"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    }
+  ],
   "componentSpecs": []
 }
