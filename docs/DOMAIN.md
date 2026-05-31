@@ -33,3 +33,8 @@ To be populated as the design-agent and context-agent learn the domain.
 - **Type**: Module
 - **Description**: Represents utility functions and helpers used across the application.
 - **Props**: {}
+
+### API
+- **Type**: Module
+- **Description**: Represents the API functionalities and interactions within the application.
+- **Props**: {}
