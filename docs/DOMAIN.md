@@ -13,3 +13,5 @@ To be populated as the design-agent and context-agent learn the domain.
 - **Type**: Component
 - **Description**: A button that, when clicked, displays a message indicating the system is yet to be developed.
 - **Props**: {}
+
+> Note: Ensure that the 'components' entity is aligned with the architecture documentation, and consider introducing a module under src/modules/components/ if necessary.
