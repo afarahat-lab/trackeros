@@ -1,32 +1,35 @@
 {
-  "id": "5782b202-a9bb-4fdc-b403-9b111e341aac",
-  "correlationId": "90c0e8d1-0037-485d-90ab-7e1bb348fb49",
-  "rawIntent": "Create readme md file to instruct user how to run this server",
+  "id": "a6d438d7-a924-40c7-80e2-6b91a1d2a65a",
+  "correlationId": "d2bb9661-ad6a-4651-8b05-f18fd355a788",
+  "rawIntent": "[gestalt-maintenance/CONTEXT_ALIGNMENT] Reconcile docs/DOMAIN.md and docs/ARCHITECTURE.md: entity 'props' exists in the domain model but no module references it. Decide whether to introduce the module under src/modules/props/ or to remove the entity from the domain model.",
   "scope": {
     "affectedDomains": [
-      "Description"
+      "Props"
     ],
     "affectedLayers": [
-      "ui",
+      "domain",
       "config"
     ],
-    "isBreakingChange": false,
-    "estimatedComplexity": "small"
+    "isBreakingChange": true,
+    "estimatedComplexity": "medium"
   },
   "successCriteria": [
     {
       "id": "sc-001",
-      "description": "A README.md file exists in the project root with instructions on how to run the server.",
+      "description": "The entity 'props' is either removed from the domain model or a new module is introduced under src/modules/props/.",
       "testable": true,
       "layer": "unit"
     }
   ],
   "constraints": [
+    "Every state-changing operation produces an audit record",
+    "RBAC enforced at middleware, never inline",
+    "Input validated at the API boundary",
     "No sensitive data in logs"
   ],
   "outOfScope": [
-    "Implementing server functionality",
-    "Modifying existing server code"
+    "Changes to other modules or domains not related to 'props'",
+    "Implementation of any new features unrelated to the reconciliation of 'props'"
   ],
   "ambiguities": []
 }
