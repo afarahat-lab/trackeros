@@ -13,3 +13,8 @@ To be populated as the design-agent and context-agent learn the domain.
 - **Type**: Component
 - **Description**: A button that, when clicked, displays a message indicating the system is yet to be developed.
 - **Props**: {}
+
+### Shared
+- **Type**: Module
+- **Description**: Represents shared functionalities or components used across different parts of the application.
+- **Props**: {}
