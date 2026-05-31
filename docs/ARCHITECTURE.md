@@ -14,6 +14,7 @@ src/
 │   ├── auth/         # authentication + RBAC
 │   └── utils/        # cross-cutting helpers
 └── api/              # route registration
+src/modules/Shared/    — Shared module
 ```
 
 ## Dependency rules
