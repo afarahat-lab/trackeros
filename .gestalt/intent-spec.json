@@ -1,13 +1,12 @@
 {
-  "id": "5782b202-a9bb-4fdc-b403-9b111e341aac",
-  "correlationId": "90c0e8d1-0037-485d-90ab-7e1bb348fb49",
-  "rawIntent": "Create readme md file to instruct user how to run this server",
+  "id": "08a9edb2-03c5-4eda-9add-07ecc9ffdebc",
+  "correlationId": "ff0aeb0e-77e4-4003-9f3a-3e809e288f6d",
+  "rawIntent": "[gestalt-maintenance/CONTEXT_ALIGNMENT] Update AGENTS.md to reference golden principle GP-003 so all agents reading the orientation document see the rule.",
   "scope": {
     "affectedDomains": [
       "Description"
     ],
     "affectedLayers": [
-      "ui",
       "config"
     ],
     "isBreakingChange": false,
@@ -16,7 +15,7 @@
   "successCriteria": [
     {
       "id": "sc-001",
-      "description": "A README.md file exists in the project root with instructions on how to run the server.",
+      "description": "AGENTS.md is updated to include a reference to golden principle GP-003.",
       "testable": true,
       "layer": "unit"
     }
@@ -25,8 +24,8 @@
     "No sensitive data in logs"
   ],
   "outOfScope": [
-    "Implementing server functionality",
-    "Modifying existing server code"
+    "Changes to any other documents or files outside of AGENTS.md",
+    "Modifications to the implementation of golden principle GP-003"
   ],
   "ambiguities": []
 }
