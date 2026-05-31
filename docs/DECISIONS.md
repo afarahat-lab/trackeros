@@ -6,6 +6,6 @@ Date: 2026-05-30
 Status: Accepted
 
 Decision: Project initialised via the Gestalt platform.
-Description: TrackerOS — agent harness verification project. Will host a tiny set of utility modules used to smoke-test the Gestalt SDLC end-to-end.
+Description: A simle web application that helps user to capture his notes. It shall run server on a docker image
 Stack: TypeScript / Node.js / React / PostgreSQL
 Architecture: Modular monolith (corporate-ops-web-mobile template, tier 1)

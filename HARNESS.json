@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "tier": "tier1",
   "templateId": "corporate-ops-web-mobile",
-  "description": "TrackerOS — agent harness verification project. Will host a tiny set of utility modules used to smoke-test the Gestalt SDLC end-to-end.",
+  "description": "A simle web application that helps user to capture his notes. It shall run server on a docker image",
   "stack": {
     "language": "typescript",
     "runtime": "node20",
@@ -46,7 +46,7 @@
     "maxRetries": 3
   },
   "pipeline": {
-    "adapter": "github-actions"
+    "adapter": "noop"
   },
   "maintenance": {
     "driftCheck": {

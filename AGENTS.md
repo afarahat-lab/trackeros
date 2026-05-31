@@ -5,7 +5,7 @@ Read this file completely before taking any action.
 
 ## What this project is
 
-TrackerOS — agent harness verification project. Will host a tiny set of utility modules used to smoke-test the Gestalt SDLC end-to-end.
+A simle web application that helps user to capture his notes. It shall run server on a docker image
 
 ## Architecture rules
 
