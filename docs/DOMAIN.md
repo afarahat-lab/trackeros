@@ -15,3 +15,5 @@ To be populated as the design-agent and context-agent learn the domain.
 - **Props**: {}
 
 > Note: Ensure that the 'components' entity is aligned with the architecture documentation, and consider introducing a module under src/modules/components/ if necessary. Additionally, review the entity 'type' for alignment with architecture modules and introduce a module under src/modules/type/ if needed. Consider introducing a module under src/modules/description/ to align with the domain model entity 'description'. Consider introducing a module under src/modules/props/ to align with the domain model entity 'props'.
+
+> Note: Introduce a module under src/modules/components/ to align with the domain model entity 'components'.
