@@ -1,23 +1,6 @@
 {
-  "correlationId": "5274ede1-142a-4577-a4f5-4b5125de8c84",
+  "correlationId": "7bbcc38f-12d9-45a0-b5e8-5f0eac478352",
   "domainChanges": [],
-  "apiContracts": [
-    {
-      "method": "PATCH",
-      "path": "/api/v1/package-config",
-      "description": "Updates the tsx version in package.json to ^4.7.0",
-      "requestBody": {
-        "tsxVersion": "string"
-      },
-      "responseBody": {
-        "success": "boolean",
-        "message": "string"
-      },
-      "authRequired": true,
-      "roles": [
-        "admin"
-      ]
-    }
-  ],
+  "apiContracts": [],
   "componentSpecs": []
 }
