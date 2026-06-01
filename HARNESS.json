@@ -85,5 +85,49 @@
     "roleMapping": [],
     "defaultRole": null,
     "sessionTtlMinutes": 480
+  },
+  "constraints": {
+    "rules": [
+      {
+        "id": "no-direct-db-access-outside-shared-db",
+        "description": "Database access must go through repositories under src/shared/db/. Route handlers, services, and modules must NOT import postgres / mysql / sqlite directly.",
+        "severity": "high"
+      },
+      {
+        "id": "no-inline-rbac-checks",
+        "description": "RBAC must be enforced via middleware on the route. Do not inline `if (user.role !== ...)` checks inside handlers.",
+        "severity": "high"
+      },
+      {
+        "id": "audit-state-changes",
+        "description": "Every POST/PUT/PATCH/DELETE handler must append an audit record (GP-002).",
+        "severity": "critical"
+      },
+      {
+        "id": "validate-input-with-zod",
+        "description": "All request bodies must be validated with a Zod schema at the API boundary before any business logic runs (GP-003).",
+        "severity": "high"
+      },
+      {
+        "id": "no-process-env-outside-config",
+        "description": "Do not read `process.env` directly. Use the config module so configuration stays validated and centralised.",
+        "severity": "medium"
+      },
+      {
+        "id": "no-console-log",
+        "description": "Use the platform logger instead of `console.log` / `console.error`. Logs must be structured and respect log levels.",
+        "severity": "medium"
+      },
+      {
+        "id": "no-any-type",
+        "description": "Do not use TypeScript `any`. Use `unknown` with a type guard, or define a precise interface.",
+        "severity": "medium"
+      },
+      {
+        "id": "no-hardcoded-secrets",
+        "description": "Secrets, API keys, tokens must never appear as string literals. Load from environment + config module.",
+        "severity": "critical"
+      }
+    ]
   }
 }
