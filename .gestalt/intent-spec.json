@@ -1,17 +1,16 @@
 {
-  "id": "e2cb816d-debb-497a-aa55-ab08d1365bea",
-  "correlationId": "5467f598-c1a7-4e76-ba51-0fe431691c2f",
-  "rawIntent": "Scaffold the project foundation for a TypeScript application: create package.json (name: trackeros, version: 0.1.0, private: true, packageManager: pnpm@9.15.4) with scripts for build (tsc), test (vitest run), and dev (tsx src/index.ts). Add TypeScript 5.x, Vitest, and tsx as dev dependencies. Create tsconfig.json with strict mode targeting ES2022 with Node module resolution. Create src/index.ts with a simple hello world export. Create a basic Vitest test at src/index.test.ts that imports and verifies the export.",
+  "id": "c30baba8-05e5-4d30-ac1d-4fd3e1284420",
+  "correlationId": "b06cb312-3713-4a3f-9aa5-b3b131e7f620",
+  "rawIntent": "Scaffold the project foundation: package.json for a TypeScript application, tsconfig.json, src/index.ts as the entry point",
   "scope": {
     "affectedDomains": [
-      "Type",
-      "Description",
-      "Props"
+      "package.json",
+      "tsconfig.json",
+      "src/index.ts"
     ],
     "affectedLayers": [
-      "infra",
       "config",
-      "test"
+      "infra"
     ],
     "isBreakingChange": false,
     "estimatedComplexity": "medium"
@@ -19,20 +18,17 @@
   "successCriteria": [
     {
       "id": "sc-001",
-      "description": "The project is scaffolded with the specified package.json, tsconfig.json, src/index.ts, and src/index.test.ts files.",
+      "description": "The project foundation files (package.json, tsconfig.json, src/index.ts) are created with the correct initial configurations for a TypeScript application.",
       "testable": true,
       "layer": "integration"
     }
   ],
   "constraints": [
-    "Every state-changing operation produces an audit record.",
-    "RBAC enforced at middleware, never inline.",
-    "Input validated at the API boundary.",
-    "No sensitive data in logs."
+    "Input validated at the API boundary",
+    "No sensitive data in logs"
   ],
   "outOfScope": [
-    "Implementation of business logic beyond the scaffolded files.",
-    "Deployment or hosting configurations."
+    "Any files or configurations not explicitly mentioned in the intent"
   ],
   "ambiguities": []
 }
