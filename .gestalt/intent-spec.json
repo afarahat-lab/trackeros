@@ -1,31 +1,38 @@
 {
-  "id": "0e185f15-6c06-43e4-b473-827110865645",
-  "correlationId": "2a3406b2-0a12-4505-98f9-32c15063686f",
-  "rawIntent": "Add a capitalize utility function at src/shared/utils/capitalize.ts that exports capitalize(s: string): string — returns the input with the first character uppercased",
+  "id": "e2cb816d-debb-497a-aa55-ab08d1365bea",
+  "correlationId": "5467f598-c1a7-4e76-ba51-0fe431691c2f",
+  "rawIntent": "Scaffold the project foundation for a TypeScript application: create package.json (name: trackeros, version: 0.1.0, private: true, packageManager: pnpm@9.15.4) with scripts for build (tsc), test (vitest run), and dev (tsx src/index.ts). Add TypeScript 5.x, Vitest, and tsx as dev dependencies. Create tsconfig.json with strict mode targeting ES2022 with Node module resolution. Create src/index.ts with a simple hello world export. Create a basic Vitest test at src/index.test.ts that imports and verifies the export.",
   "scope": {
-    "affectedDomains": [],
+    "affectedDomains": [
+      "Type",
+      "Description",
+      "Props"
+    ],
     "affectedLayers": [
       "infra",
+      "config",
       "test"
     ],
     "isBreakingChange": false,
-    "estimatedComplexity": "small"
+    "estimatedComplexity": "medium"
   },
   "successCriteria": [
     {
       "id": "sc-001",
-      "description": "The capitalize function is implemented and correctly capitalizes the first character of the input string.",
+      "description": "The project is scaffolded with the specified package.json, tsconfig.json, src/index.ts, and src/index.test.ts files.",
       "testable": true,
-      "layer": "unit"
+      "layer": "integration"
     }
   ],
   "constraints": [
-    "Input validated at the API boundary",
-    "No sensitive data in logs"
+    "Every state-changing operation produces an audit record.",
+    "RBAC enforced at middleware, never inline.",
+    "Input validated at the API boundary.",
+    "No sensitive data in logs."
   ],
   "outOfScope": [
-    "Changes to other utility functions",
-    "Modifications to existing modules or domains"
+    "Implementation of business logic beyond the scaffolded files.",
+    "Deployment or hosting configurations."
   ],
   "ambiguities": []
 }

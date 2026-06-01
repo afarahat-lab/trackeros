@@ -1,0 +1,16 @@
+{
+  "name": "trackeros",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@9.15.4",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "dev": "tsx src/index.ts"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "vitest": "^0.0.0",
+    "tsx": "^0.0.0"
+  }
+}
