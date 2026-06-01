@@ -1,6 +1,17 @@
 {
-  "correlationId": "8f6177e8-7ae3-4441-9c05-717e78bc5dd3",
+  "correlationId": "fbcc2a99-e52a-45bc-8009-2cf97912c7bf",
   "domainChanges": [],
   "apiContracts": [],
-  "componentSpecs": []
+  "componentSpecs": [
+    {
+      "name": "PadEndUtility",
+      "type": "service",
+      "description": "A utility function that right-pads a string to a specified target length.",
+      "props": {
+        "inputString": "string",
+        "targetLength": "number",
+        "padString": "string"
+      }
+    }
+  ]
 }
