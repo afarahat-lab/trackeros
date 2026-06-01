@@ -1,38 +1,31 @@
 {
-  "id": "e2cb816d-debb-497a-aa55-ab08d1365bea",
-  "correlationId": "5467f598-c1a7-4e76-ba51-0fe431691c2f",
-  "rawIntent": "Scaffold the project foundation for a TypeScript application: create package.json (name: trackeros, version: 0.1.0, private: true, packageManager: pnpm@9.15.4) with scripts for build (tsc), test (vitest run), and dev (tsx src/index.ts). Add TypeScript 5.x, Vitest, and tsx as dev dependencies. Create tsconfig.json with strict mode targeting ES2022 with Node module resolution. Create src/index.ts with a simple hello world export. Create a basic Vitest test at src/index.test.ts that imports and verifies the export.",
+  "id": "e05bcc97-b7c7-4f8c-a4ef-8541548bb505",
+  "correlationId": "4e17c014-aa2b-4c4a-95ce-a69d1dbaede1",
+  "rawIntent": "fix tsx version in package.json — change tsx@^0.0.0 to tsx@^4.7.0",
   "scope": {
     "affectedDomains": [
-      "Type",
-      "Description",
-      "Props"
+      "package.json"
     ],
     "affectedLayers": [
-      "infra",
-      "config",
-      "test"
+      "config"
     ],
     "isBreakingChange": false,
-    "estimatedComplexity": "medium"
+    "estimatedComplexity": "small"
   },
   "successCriteria": [
     {
       "id": "sc-001",
-      "description": "The project is scaffolded with the specified package.json, tsconfig.json, src/index.ts, and src/index.test.ts files.",
+      "description": "The tsx version in package.json is updated to tsx@^4.7.0",
       "testable": true,
-      "layer": "integration"
+      "layer": "unit"
     }
   ],
   "constraints": [
-    "Every state-changing operation produces an audit record.",
-    "RBAC enforced at middleware, never inline.",
-    "Input validated at the API boundary.",
-    "No sensitive data in logs."
+    "Input validated at the API boundary",
+    "No sensitive data in logs"
   ],
   "outOfScope": [
-    "Implementation of business logic beyond the scaffolded files.",
-    "Deployment or hosting configurations."
+    "everything outside package.json"
   ],
   "ambiguities": []
 }
