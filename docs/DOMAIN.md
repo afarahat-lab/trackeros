@@ -38,3 +38,9 @@ To be populated as the design-agent and context-agent learn the domain.
 - **Type**: Module
 - **Description**: Represents the API functionalities and interactions within the application.
 - **Props**: {}
+
+### PriceFormatter
+- **Type**: Service
+- **Description**: Utility service for formatting price from cents to a string representation.
+- **Props**: 
+  - **cents**: number
