@@ -1,6 +1,15 @@
 {
-  "correlationId": "4e17c014-aa2b-4c4a-95ce-a69d1dbaede1",
+  "correlationId": "b2602516-1470-48e7-a873-ddb3f9ca6702",
   "domainChanges": [],
   "apiContracts": [],
-  "componentSpecs": []
+  "componentSpecs": [
+    {
+      "name": "PriceFormatter",
+      "type": "service",
+      "description": "Utility service for formatting price from cents to a string representation.",
+      "props": {
+        "cents": "number"
+      }
+    }
+  ]
 }
