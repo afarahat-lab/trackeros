@@ -1,13 +1,14 @@
 {
-  "id": "981d2035-ff6c-4a6e-ad1d-9659775bf436",
-  "correlationId": "8f6177e8-7ae3-4441-9c05-717e78bc5dd3",
-  "rawIntent": "Fix the following issue with intent \"make it better\": Intent is too vague — no success criteria could be extracted.. Create admin readme file to instruct how to start this application\nAdd user readme file as well",
+  "id": "9cdb0e7c-d13d-4faf-9bff-e2c7dd2f1a83",
+  "correlationId": "1581ab36-86d5-4e32-9bac-8617c278eb07",
+  "rawIntent": "Add a trimEnd utility under src/shared/utils/trim-end that strips trailing whitespace from a string",
   "scope": {
     "affectedDomains": [
-      "Description"
+      "Utility"
     ],
     "affectedLayers": [
-      "config"
+      "domain",
+      "test"
     ],
     "isBreakingChange": false,
     "estimatedComplexity": "small"
@@ -15,22 +16,20 @@
   "successCriteria": [
     {
       "id": "sc-001",
-      "description": "An admin README file exists with instructions on how to start the application.",
-      "testable": true,
-      "layer": "unit"
-    },
-    {
-      "id": "sc-002",
-      "description": "A user README file exists with instructions relevant to end-users.",
+      "description": "The trimEnd utility correctly strips trailing whitespace from a string.",
       "testable": true,
       "layer": "unit"
     }
   ],
   "constraints": [
+    "Every state-changing operation produces an audit record",
+    "RBAC enforced at middleware, never inline",
+    "Input validated at the API boundary",
     "No sensitive data in logs"
   ],
   "outOfScope": [
-    "Modifying application code or functionality"
+    "Modifications to existing utilities",
+    "Changes to the directory structure outside of src/shared/utils"
   ],
   "ambiguities": []
 }
