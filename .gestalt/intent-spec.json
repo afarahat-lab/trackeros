@@ -1,13 +1,16 @@
 {
-  "id": "e05bcc97-b7c7-4f8c-a4ef-8541548bb505",
-  "correlationId": "4e17c014-aa2b-4c4a-95ce-a69d1dbaede1",
-  "rawIntent": "fix tsx version in package.json — change tsx@^0.0.0 to tsx@^4.7.0",
+  "id": "c30baba8-05e5-4d30-ac1d-4fd3e1284420",
+  "correlationId": "b06cb312-3713-4a3f-9aa5-b3b131e7f620",
+  "rawIntent": "Scaffold the project foundation: package.json for a TypeScript application, tsconfig.json, src/index.ts as the entry point",
   "scope": {
     "affectedDomains": [
-      "package.json"
+      "package.json",
+      "tsconfig.json",
+      "src/index.ts"
     ],
     "affectedLayers": [
-      "config"
+      "config",
+      "infra"
     ],
     "isBreakingChange": false,
     "estimatedComplexity": "small"
@@ -15,7 +18,7 @@
   "successCriteria": [
     {
       "id": "sc-001",
-      "description": "The tsx version in package.json is updated to tsx@^4.7.0",
+      "description": "The project foundation files (package.json, tsconfig.json, src/index.ts) are created with the correct initial configurations for a TypeScript application.",
       "testable": true,
       "layer": "unit"
     }
@@ -25,7 +28,7 @@
     "No sensitive data in logs"
   ],
   "outOfScope": [
-    "everything outside package.json"
+    "Any files or configurations not explicitly mentioned in the intent"
   ],
   "ambiguities": []
 }
