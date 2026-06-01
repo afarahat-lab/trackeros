@@ -16,6 +16,12 @@ agents:
       model: gpt-4o         # best model for code generation
       temperature: 0.2
       max_tokens: 8000
+    tools:
+      builtin:
+        - readFile
+        - listDirectory
+        - searchFiles
+        - getFileTree
     prompt_extensions:
       - "Always add a JSDoc comment to every exported function"
       - "Use Result<T,E> pattern for error handling"
