@@ -13,14 +13,14 @@
       "infra"
     ],
     "isBreakingChange": false,
-    "estimatedComplexity": "medium"
+    "estimatedComplexity": "small"
   },
   "successCriteria": [
     {
       "id": "sc-001",
       "description": "The project foundation files (package.json, tsconfig.json, src/index.ts) are created with the correct initial configurations for a TypeScript application.",
       "testable": true,
-      "layer": "integration"
+      "layer": "unit"
     }
   ],
   "constraints": [

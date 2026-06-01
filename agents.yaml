@@ -16,6 +16,12 @@ agents:
       model: gpt-4o         # best model for code generation
       temperature: 0.2
       max_tokens: 8000
+    tools:
+      builtin:
+        - readFile
+        - listDirectory
+        - searchFiles
+        - getFileTree
     prompt_extensions:
       - "Always add a JSDoc comment to every exported function"
       - "Use Result<T,E> pattern for error handling"
@@ -44,25 +50,5 @@ custom_agents:
           { "severity": "low", "file": "path", "description": "Missing JSDoc on: <function name>" }
         ],
         "summary": "one line"
-      }
-  - name: usage-example-agent
-    role: "Documentation example checker"
-    goal: "Ensure every utility file ships with at least one @example block"
-    llm:
-      temperature: 0
-    prompt: |
-      You are {{role}}. Goal: {{goal}}.
-
-      For EACH file in {{artifacts}}, return exactly ONE finding with
-      severity "low" and description "Missing @example block (verification path)".
-      Do not omit any file. Use the file's path as the `file` field.
-
-      Return JSON only:
-      {
-        "passed": false,
-        "findings": [
-          { "severity": "low", "file": "path", "description": "Missing @example block (verification path)" }
-        ],
-        "summary": "Verification: expecting 1 LINT_FAILURE per file"
       }
 
