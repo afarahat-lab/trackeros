@@ -1,27 +1,23 @@
 {
-  "id": "e2cb816d-debb-497a-aa55-ab08d1365bea",
-  "correlationId": "5467f598-c1a7-4e76-ba51-0fe431691c2f",
-  "rawIntent": "Scaffold the project foundation for a TypeScript application: create package.json (name: trackeros, version: 0.1.0, private: true, packageManager: pnpm@9.15.4) with scripts for build (tsc), test (vitest run), and dev (tsx src/index.ts). Add TypeScript 5.x, Vitest, and tsx as dev dependencies. Create tsconfig.json with strict mode targeting ES2022 with Node module resolution. Create src/index.ts with a simple hello world export. Create a basic Vitest test at src/index.test.ts that imports and verifies the export.",
+  "id": "275715d3-26cc-4e85-bdc9-9ce5effd701e",
+  "correlationId": "b2602516-1470-48e7-a873-ddb3f9ca6702",
+  "rawIntent": "verify-prompt-sections: add a price-formatter utility under src/shared/utils/price-format with formatPrice(cents: number): string",
   "scope": {
     "affectedDomains": [
-      "Type",
-      "Description",
-      "Props"
+      "Utils"
     ],
     "affectedLayers": [
-      "infra",
-      "config",
-      "test"
+      "infra"
     ],
     "isBreakingChange": false,
-    "estimatedComplexity": "medium"
+    "estimatedComplexity": "small"
   },
   "successCriteria": [
     {
       "id": "sc-001",
-      "description": "The project is scaffolded with the specified package.json, tsconfig.json, src/index.ts, and src/index.test.ts files.",
+      "description": "The price-formatter utility is implemented and can format cents to a string representation correctly.",
       "testable": true,
-      "layer": "integration"
+      "layer": "unit"
     }
   ],
   "constraints": [
@@ -31,8 +27,8 @@
     "No sensitive data in logs."
   ],
   "outOfScope": [
-    "Implementation of business logic beyond the scaffolded files.",
-    "Deployment or hosting configurations."
+    "Changes to existing utilities outside of the price-formatter.",
+    "Integration with other modules or services."
   ],
   "ambiguities": []
 }
