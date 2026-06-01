@@ -1,10 +1,20 @@
-# agents.yaml — operator-tuned for this verification cycle.
+# agents.yaml — verification of per-agent model override
 agents:
+  intent-agent:
+    role: "Senior software architect"
+    goal: "Extract a precise, unambiguous specification from a natural language intent"
+    llm:
+      model: gpt-4o-mini    # cheaper model for intent parsing
+      temperature: 0.1
+      max_tokens: 2000
+    prompt_extensions: []
+
   code-agent:
     role: "Senior TypeScript engineer"
     goal: "Generate production-quality TypeScript code that follows the project harness"
     llm:
-      temperature: 0.8
+      model: gpt-4o         # best model for code generation
+      temperature: 0.2
       max_tokens: 8000
     prompt_extensions:
       - "Always add a JSDoc comment to every exported function"
