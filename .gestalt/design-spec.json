@@ -1,15 +1,23 @@
 {
-  "correlationId": "b2602516-1470-48e7-a873-ddb3f9ca6702",
+  "correlationId": "5274ede1-142a-4577-a4f5-4b5125de8c84",
   "domainChanges": [],
-  "apiContracts": [],
-  "componentSpecs": [
+  "apiContracts": [
     {
-      "name": "PriceFormatter",
-      "type": "service",
-      "description": "Utility service for formatting price from cents to a string representation.",
-      "props": {
-        "cents": "number"
-      }
+      "method": "PATCH",
+      "path": "/api/v1/package-config",
+      "description": "Updates the tsx version in package.json to ^4.7.0",
+      "requestBody": {
+        "tsxVersion": "string"
+      },
+      "responseBody": {
+        "success": "boolean",
+        "message": "string"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin"
+      ]
     }
-  ]
+  ],
+  "componentSpecs": []
 }
