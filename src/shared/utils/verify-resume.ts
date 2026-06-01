@@ -1,0 +1,1 @@
+export function verifyResume(): string { return "ok"; }
