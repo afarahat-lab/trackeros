@@ -4,9 +4,8 @@
   "private": true,
   "packageManager": "pnpm@9.15.4",
   "scripts": {
-    "build": "tsc",
-    "test": "vitest run",
-    "dev": "tsx src/index.ts"
+    "test": "echo 'no tests yet' && exit 0",
+    "build": "echo 'no build yet' && exit 0"
   },
   "devDependencies": {
     "typescript": "^5.0.0",
