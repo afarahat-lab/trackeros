@@ -1,14 +1,13 @@
 {
-  "id": "f52ca8b2-8273-4e8e-9225-f90584130101",
-  "correlationId": "f7179e68-d105-4523-b807-21d1dccfbb9e",
-  "rawIntent": "Add an isEven utility under src/shared/utils/is-even with isEven(n: number): boolean.",
+  "id": "956405d3-1bbf-4531-bc0b-9dc6eb4f8ffa",
+  "correlationId": "a647b1cd-c0b6-4661-bdd6-24b7154abef0",
+  "rawIntent": "fix tsx version in package.json — change tsx@^0.0.0 to tsx@^4.7.0",
   "scope": {
     "affectedDomains": [
-      "is-even"
+      "package.json"
     ],
     "affectedLayers": [
-      "domain",
-      "test"
+      "config"
     ],
     "isBreakingChange": false,
     "estimatedComplexity": "small"
@@ -16,19 +15,17 @@
   "successCriteria": [
     {
       "id": "sc-001",
-      "description": "The isEven utility function is implemented and returns a boolean indicating if the input number is even.",
+      "description": "The tsx version in package.json is updated to tsx@^4.7.0",
       "testable": true,
       "layer": "unit"
     }
   ],
   "constraints": [
-    "Every state-changing operation produces an audit record.",
-    "RBAC enforced at middleware, never inline.",
-    "Input validated at the API boundary.",
-    "No sensitive data in logs."
+    "Input validated at the API boundary",
+    "No sensitive data in logs"
   ],
   "outOfScope": [
-    "Any other utilities or files outside of src/shared/utils/is-even."
+    "everything outside package.json"
   ],
   "ambiguities": []
 }
