@@ -1,16 +1,14 @@
 {
-  "id": "8debd73f-9de3-410d-9ecd-5375b3776d07",
-  "correlationId": "38cb409e-9aea-4fab-9122-fcb67f53abcf",
-  "rawIntent": "initialize the project, adding package.json and all required files",
+  "id": "ef6335f9-566e-4918-948d-ce073cc1c39b",
+  "correlationId": "ead130dd-11c6-4ad7-a877-9ea1ece32441",
+  "rawIntent": "check package.json file. I can see dependencies addes with version 0.0.0 whichis invalid. Fix all",
   "scope": {
     "affectedDomains": [
-      "Type",
-      "Description",
-      "Props"
+      "package.json"
     ],
     "affectedLayers": [
-      "infra",
-      "config"
+      "domain",
+      "api"
     ],
     "isBreakingChange": false,
     "estimatedComplexity": "small"
@@ -18,7 +16,7 @@
   "successCriteria": [
     {
       "id": "sc-001",
-      "description": "The project is initialized with a package.json file and all required configuration files are present.",
+      "description": "All dependencies in package.json have valid version numbers instead of 0.0.0.",
       "testable": true,
       "layer": "integration"
     }
@@ -28,8 +26,7 @@
     "No sensitive data in logs"
   ],
   "outOfScope": [
-    "Implementation of specific package dependencies",
-    "Configuration of project settings beyond initial files"
+    "everything outside package.json"
   ],
   "ambiguities": []
 }

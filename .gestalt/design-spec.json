@@ -1,6 +1,23 @@
 {
-  "correlationId": "38cb409e-9aea-4fab-9122-fcb67f53abcf",
+  "correlationId": "ead130dd-11c6-4ad7-a877-9ea1ece32441",
   "domainChanges": [],
-  "apiContracts": [],
+  "apiContracts": [
+    {
+      "method": "PATCH",
+      "path": "/api/v1/dependencies",
+      "description": "Update invalid dependency versions in package.json",
+      "requestBody": {
+        "dependencies": "Record<string, string>"
+      },
+      "responseBody": {
+        "success": "boolean",
+        "message": "string"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin"
+      ]
+    }
+  ],
   "componentSpecs": []
 }
