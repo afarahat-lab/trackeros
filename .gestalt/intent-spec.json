@@ -1,7 +1,7 @@
 {
-  "id": "97751d9a-6ac8-4e9c-a4b7-bf6a6e387959",
-  "correlationId": "8c7a53ba-757e-4952-b8cb-52e64ae40e08",
-  "rawIntent": "Add an isPositive utility under src/shared/utils/is-positive with isPositive(n: number): boolean returning true when n > 0.",
+  "id": "0651be70-e586-48d5-aed3-de261e711a1a",
+  "correlationId": "e43b3246-29c0-47ca-bcef-f21aa18fdd55",
+  "rawIntent": "Add an isNonEmpty utility under src/shared/utils/is-non-empty with isNonEmpty(s: string): boolean returning true when s.length > 0.",
   "scope": {
     "affectedDomains": [
       "utils"
@@ -15,19 +15,17 @@
   "successCriteria": [
     {
       "id": "sc-001",
-      "description": "The isPositive utility function is implemented and returns true for positive numbers and false for zero or negative numbers.",
+      "description": "The isNonEmpty utility function is implemented and returns true when the input string length is greater than 0.",
       "testable": true,
       "layer": "unit"
     }
   ],
   "constraints": [
-    "Every state-changing operation produces an audit record.",
-    "RBAC enforced at middleware, never inline.",
-    "Input validated at the API boundary.",
-    "No sensitive data in logs."
+    "Input validated at the API boundary: All request bodies validated with Zod (or equivalent) before reaching.",
+    "No sensitive data in logs: PII, tokens, passwords, and PCI/PHI data must never appear in log lines."
   ],
   "outOfScope": [
-    "Everything outside src/shared/utils/is-positive"
+    "Any other utilities or functions outside of src/shared/utils/is-non-empty"
   ],
   "ambiguities": []
 }
