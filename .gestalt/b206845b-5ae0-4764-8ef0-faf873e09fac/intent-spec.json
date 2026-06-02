@@ -1,0 +1,33 @@
+{
+  "id": "0fd63334-5be4-4428-92b3-757c5f98596a",
+  "correlationId": "b206845b-5ae0-4764-8ef0-faf873e09fac",
+  "rawIntent": "Add a padStart utility function at src/shared/utils/padStart.ts that exports padStart(s: string, length: number, char?: string): string — pads the beginning of a string to the specified length with the given character (default space)",
+  "scope": {
+    "affectedDomains": [
+      "Type",
+      "Description"
+    ],
+    "affectedLayers": [
+      "domain",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "The padStart function is correctly implemented and exported from src/shared/utils/padStart.ts.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Input validated at the API boundary: All request bodies validated with Zod (or equivalent) before reaching.",
+    "No sensitive data in logs: PII, tokens, passwords, and PCI/PHI data must never appear in log lines."
+  ],
+  "outOfScope": [
+    "Everything outside src/shared/utils/padStart.ts"
+  ],
+  "ambiguities": []
+}
