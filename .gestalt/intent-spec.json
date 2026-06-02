@@ -1,13 +1,13 @@
 {
-  "id": "24c312df-4a6a-41da-ac8a-f50af9f258c2",
-  "correlationId": "7bbcc38f-12d9-45a0-b5e8-5f0eac478352",
-  "rawIntent": "Add a clamp utility under src/shared/utils/clamp with clamp(n: number, min: number, max: number): number that returns n clamped to the [min, max] inclusive range.",
+  "id": "4eb68763-9cc9-466a-b6ad-d1c3bfc2cab6",
+  "correlationId": "b173f212-3c62-4e0d-9f0d-38d41f39fdf8",
+  "rawIntent": "Change pnpm version used in github action (pipeline) to latest version 10",
   "scope": {
     "affectedDomains": [
-      "utils"
+      "github-action-pipeline"
     ],
     "affectedLayers": [
-      "domain"
+      "config"
     ],
     "isBreakingChange": false,
     "estimatedComplexity": "small"
@@ -15,19 +15,17 @@
   "successCriteria": [
     {
       "id": "sc-001",
-      "description": "The clamp utility function is implemented and returns the correct clamped value.",
+      "description": "The pnpm version in the GitHub action pipeline is updated to the latest version 10.",
       "testable": true,
-      "layer": "unit"
+      "layer": "integration"
     }
   ],
   "constraints": [
-    "Every state-changing operation produces an audit record",
-    "RBAC enforced at middleware, never inline",
     "Input validated at the API boundary",
     "No sensitive data in logs"
   ],
   "outOfScope": [
-    "Any other utilities or modules outside src/shared/utils/clamp"
+    "Changes to other configurations or files outside the GitHub action pipeline"
   ],
   "ambiguities": []
 }
