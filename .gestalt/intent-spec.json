@@ -1,13 +1,14 @@
 {
-  "id": "0651be70-e586-48d5-aed3-de261e711a1a",
-  "correlationId": "e43b3246-29c0-47ca-bcef-f21aa18fdd55",
-  "rawIntent": "Add an isNonEmpty utility under src/shared/utils/is-non-empty with isNonEmpty(s: string): boolean returning true when s.length > 0.",
+  "id": "f52ca8b2-8273-4e8e-9225-f90584130101",
+  "correlationId": "f7179e68-d105-4523-b807-21d1dccfbb9e",
+  "rawIntent": "Add an isEven utility under src/shared/utils/is-even with isEven(n: number): boolean.",
   "scope": {
     "affectedDomains": [
-      "utils"
+      "is-even"
     ],
     "affectedLayers": [
-      "domain"
+      "domain",
+      "test"
     ],
     "isBreakingChange": false,
     "estimatedComplexity": "small"
@@ -15,17 +16,19 @@
   "successCriteria": [
     {
       "id": "sc-001",
-      "description": "The isNonEmpty utility function is implemented and returns true when the input string length is greater than 0.",
+      "description": "The isEven utility function is implemented and returns a boolean indicating if the input number is even.",
       "testable": true,
       "layer": "unit"
     }
   ],
   "constraints": [
-    "Input validated at the API boundary: All request bodies validated with Zod (or equivalent) before reaching.",
-    "No sensitive data in logs: PII, tokens, passwords, and PCI/PHI data must never appear in log lines."
+    "Every state-changing operation produces an audit record.",
+    "RBAC enforced at middleware, never inline.",
+    "Input validated at the API boundary.",
+    "No sensitive data in logs."
   ],
   "outOfScope": [
-    "Any other utilities or functions outside of src/shared/utils/is-non-empty"
+    "Any other utilities or files outside of src/shared/utils/is-even."
   ],
   "ambiguities": []
 }
