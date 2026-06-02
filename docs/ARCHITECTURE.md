@@ -19,6 +19,7 @@ src/modules/DB/        — DB module
 src/modules/Auth/      — Auth module
 src/modules/Utils/     — Utils module
 src/modules/API/       — API module
+src/modules/PriceFormatter/    — PriceFormatter module
 ```
 
 ## Dependency rules
