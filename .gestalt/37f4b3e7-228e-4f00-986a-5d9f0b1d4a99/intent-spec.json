@@ -1,0 +1,33 @@
+{
+  "id": "7eaa5929-0a12-4463-87ff-636d2de464ce",
+  "correlationId": "37f4b3e7-228e-4f00-986a-5d9f0b1d4a99",
+  "rawIntent": "Add a startsWith utility at src/shared/utils/starts-with/startsWith.ts that checks if a string starts with a given prefix",
+  "scope": {
+    "affectedDomains": [
+      "Type",
+      "Description"
+    ],
+    "affectedLayers": [
+      "domain",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "The startsWith utility function is implemented and correctly checks if a string starts with a given prefix.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Input validated at the API boundary",
+    "No sensitive data in logs"
+  ],
+  "outOfScope": [
+    "Any other utilities or files outside src/shared/utils/starts-with/startsWith.ts"
+  ],
+  "ambiguities": []
+}
