@@ -46,7 +46,9 @@
     "maxRetries": 3
   },
   "pipeline": {
-    "adapter": "github-actions"
+    "adapter": "github-actions",
+    "autoMerge": true,
+    "mergeMethod": "squash"
   },
   "maintenance": {
     "driftCheck": {
