@@ -1,0 +1,36 @@
+{
+  "id": "1e1e3287-ef44-4f76-a695-0e3eda19ff94",
+  "correlationId": "53dfc2d4-d6dd-43db-8e8b-791e504d76f5",
+  "rawIntent": "Add a trimStart utility at src/shared/utils/trim-start/trimStart.ts that trims leading whitespace from a string",
+  "scope": {
+    "affectedDomains": [
+      "Type",
+      "Description",
+      "Props"
+    ],
+    "affectedLayers": [
+      "domain",
+      "api"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "The trimStart utility correctly trims leading whitespace from a string.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Every state-changing operation produces an audit record",
+    "RBAC enforced at middleware, never inline",
+    "Input validated at the API boundary",
+    "No sensitive data in logs"
+  ],
+  "outOfScope": [
+    "Everything outside src/shared/utils/trim-start/trimStart.ts"
+  ],
+  "ambiguities": []
+}
