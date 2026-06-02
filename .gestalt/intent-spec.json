@@ -1,14 +1,13 @@
 {
-  "id": "ef6335f9-566e-4918-948d-ce073cc1c39b",
-  "correlationId": "ead130dd-11c6-4ad7-a877-9ea1ece32441",
-  "rawIntent": "check package.json file. I can see dependencies addes with version 0.0.0 whichis invalid. Fix all",
+  "id": "4eb68763-9cc9-466a-b6ad-d1c3bfc2cab6",
+  "correlationId": "b173f212-3c62-4e0d-9f0d-38d41f39fdf8",
+  "rawIntent": "Change pnpm version used in github action (pipeline) to latest version 10",
   "scope": {
     "affectedDomains": [
-      "package.json"
+      "github-action-pipeline"
     ],
     "affectedLayers": [
-      "domain",
-      "api"
+      "config"
     ],
     "isBreakingChange": false,
     "estimatedComplexity": "small"
@@ -16,7 +15,7 @@
   "successCriteria": [
     {
       "id": "sc-001",
-      "description": "All dependencies in package.json have valid version numbers instead of 0.0.0.",
+      "description": "The pnpm version in the GitHub action pipeline is updated to the latest version 10.",
       "testable": true,
       "layer": "integration"
     }
@@ -26,7 +25,7 @@
     "No sensitive data in logs"
   ],
   "outOfScope": [
-    "everything outside package.json"
+    "Changes to other configurations or files outside the GitHub action pipeline"
   ],
   "ambiguities": []
 }
