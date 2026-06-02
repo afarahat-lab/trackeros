@@ -1,0 +1,36 @@
+{
+  "id": "3b725000-50c2-4ac3-b938-b9bdd443108d",
+  "correlationId": "8b3fcc4a-4b6a-4cf2-8129-10c62ac9a208",
+  "rawIntent": "Add a trimEnd utility at src/shared/utils/trim-end/trimEnd.ts that trims trailing whitespace from a string",
+  "scope": {
+    "affectedDomains": [
+      "Type",
+      "Description",
+      "Props"
+    ],
+    "affectedLayers": [
+      "domain",
+      "api"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "The trimEnd utility correctly trims trailing whitespace from a string.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Every state-changing operation produces an audit record.",
+    "RBAC enforced at middleware, never inline.",
+    "Input validated at the API boundary.",
+    "No sensitive data in logs."
+  ],
+  "outOfScope": [
+    "Any other utilities or files outside src/shared/utils/trim-end/trimEnd.ts"
+  ],
+  "ambiguities": []
+}
