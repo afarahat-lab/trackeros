@@ -1,7 +1,7 @@
 {
-  "id": "24c312df-4a6a-41da-ac8a-f50af9f258c2",
-  "correlationId": "7bbcc38f-12d9-45a0-b5e8-5f0eac478352",
-  "rawIntent": "Add a clamp utility under src/shared/utils/clamp with clamp(n: number, min: number, max: number): number that returns n clamped to the [min, max] inclusive range.",
+  "id": "97751d9a-6ac8-4e9c-a4b7-bf6a6e387959",
+  "correlationId": "8c7a53ba-757e-4952-b8cb-52e64ae40e08",
+  "rawIntent": "Add an isPositive utility under src/shared/utils/is-positive with isPositive(n: number): boolean returning true when n > 0.",
   "scope": {
     "affectedDomains": [
       "utils"
@@ -15,19 +15,19 @@
   "successCriteria": [
     {
       "id": "sc-001",
-      "description": "The clamp utility function is implemented and returns the correct clamped value.",
+      "description": "The isPositive utility function is implemented and returns true for positive numbers and false for zero or negative numbers.",
       "testable": true,
       "layer": "unit"
     }
   ],
   "constraints": [
-    "Every state-changing operation produces an audit record",
-    "RBAC enforced at middleware, never inline",
-    "Input validated at the API boundary",
-    "No sensitive data in logs"
+    "Every state-changing operation produces an audit record.",
+    "RBAC enforced at middleware, never inline.",
+    "Input validated at the API boundary.",
+    "No sensitive data in logs."
   ],
   "outOfScope": [
-    "Any other utilities or modules outside src/shared/utils/clamp"
+    "Everything outside src/shared/utils/is-positive"
   ],
   "ambiguities": []
 }
