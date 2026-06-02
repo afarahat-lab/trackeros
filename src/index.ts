@@ -1,13 +1,14 @@
-import { createContextLogger } from '@gestalt/core';
+import { createServer } from './api';
 
-const logger = createContextLogger('gestalt-platform');
+const startServer = async () => {
+  const server = await createServer();
+  server.listen(3000, (err, address) => {
+    if (err) {
+      console.error(err);
+      process.exit(1);
+    }
+    console.log(`Server listening at ${address}`);
+  });
+};
 
-/**
- * Entry point for the Gestalt platform application.
- */
-function main() {
-  logger.info('Starting Gestalt platform application...');
-  // Application initialization logic goes here
-}
-
-main();
+startServer();
