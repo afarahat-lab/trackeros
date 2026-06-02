@@ -17,7 +17,7 @@
       "id": "sc-001",
       "description": "A pnpm test is added that always returns success.",
       "testable": true,
-      "layer": "unit"
+      "layer": "integration"
     }
   ],
   "constraints": [

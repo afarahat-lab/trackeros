@@ -39,8 +39,15 @@ To be populated as the design-agent and context-agent learn the domain.
 - **Description**: Represents the API functionalities and interactions within the application.
 - **Props**: {}
 
-### PriceFormatter
-- **Type**: Service
-- **Description**: Utility service for formatting price from cents to a string representation.
-- **Props**: 
-  - **cents**: number
+## API Contracts
+
+### PATCH /api/v1/dependencies
+- **Description**: Update invalid dependency versions in package.json
+- **Request Body**: 
+  - `dependencies`: Record<string, string>
+- **Response Body**:
+  - `success`: boolean
+  - `message`: string
+- **Auth Required**: true
+- **Roles**: 
+  - admin
