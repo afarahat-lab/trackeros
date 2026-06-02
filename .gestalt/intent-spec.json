@@ -18,12 +18,10 @@
       "id": "sc-001",
       "description": "All dependencies in package.json have valid version numbers instead of 0.0.0.",
       "testable": true,
-      "layer": "unit"
+      "layer": "integration"
     }
   ],
   "constraints": [
-    "Every state-changing operation produces an audit record",
-    "RBAC enforced at middleware, never inline",
     "Input validated at the API boundary",
     "No sensitive data in logs"
   ],
