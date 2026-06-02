@@ -1,0 +1,35 @@
+{
+  "id": "1dcacf56-3335-44fd-b655-a7cafc2e079d",
+  "correlationId": "c01e4471-8ed8-4d88-b36e-68a19aa8c734",
+  "rawIntent": "Add a new help icon in the main screen that pops up a tooltip to describe the application to end user",
+  "scope": {
+    "affectedDomains": [
+      "UI"
+    ],
+    "affectedLayers": [
+      "ui"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "A help icon is visible on the main screen and displays a tooltip with application description when clicked.",
+      "testable": true,
+      "layer": "e2e"
+    }
+  ],
+  "constraints": [
+    "Every state-changing operation produces an audit record.",
+    "RBAC enforced at middleware, never inline.",
+    "Input validated at the API boundary.",
+    "No sensitive data in logs."
+  ],
+  "outOfScope": [
+    "Changes to other screens or components not mentioned in the intent.",
+    "Backend API changes.",
+    "Styling or design changes beyond the tooltip functionality."
+  ],
+  "ambiguities": []
+}

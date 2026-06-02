@@ -1,5 +1,6 @@
 import React from 'react';
 import { StartButton } from './StartButton';
+import HelpIcon from './HelpIcon';
 
 /**
  * WelcomeScreen component displays a welcome message and a start button.
@@ -9,6 +10,7 @@ const WelcomeScreen: React.FC = () => {
   return (
     <div>
       <h1>Welcome to Trackeros</h1>
+      <HelpIcon tooltipText="This application helps you track your tasks efficiently." />
       <StartButton />
     </div>
   );
