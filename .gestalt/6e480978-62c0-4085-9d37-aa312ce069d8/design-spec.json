@@ -1,0 +1,64 @@
+{
+  "correlationId": "6e480978-62c0-4085-9d37-aa312ce069d8",
+  "domainChanges": [
+    {
+      "entityName": "PackageManager",
+      "operation": "update",
+      "fields": [
+        {
+          "name": "version",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "AuditRecord",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "entityName",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "operation",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "timestamp",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "userId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [
+    {
+      "method": "PATCH",
+      "path": "/api/v1/package-managers/{id}/version",
+      "description": "Update the package manager version to the latest available",
+      "requestBody": {
+        "version": "string"
+      },
+      "responseBody": {
+        "success": "boolean",
+        "message": "string"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    }
+  ],
+  "componentSpecs": []
+}
