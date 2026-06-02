@@ -1,12 +1,15 @@
 {
-  "id": "956405d3-1bbf-4531-bc0b-9dc6eb4f8ffa",
-  "correlationId": "a647b1cd-c0b6-4661-bdd6-24b7154abef0",
-  "rawIntent": "fix tsx version in package.json — change tsx@^0.0.0 to tsx@^4.7.0",
+  "id": "8debd73f-9de3-410d-9ecd-5375b3776d07",
+  "correlationId": "38cb409e-9aea-4fab-9122-fcb67f53abcf",
+  "rawIntent": "initialize the project, adding package.json and all required files",
   "scope": {
     "affectedDomains": [
-      "package.json"
+      "Type",
+      "Description",
+      "Props"
     ],
     "affectedLayers": [
+      "infra",
       "config"
     ],
     "isBreakingChange": false,
@@ -15,9 +18,9 @@
   "successCriteria": [
     {
       "id": "sc-001",
-      "description": "The tsx version in package.json is updated to tsx@^4.7.0",
+      "description": "The project is initialized with a package.json file and all required configuration files are present.",
       "testable": true,
-      "layer": "unit"
+      "layer": "integration"
     }
   ],
   "constraints": [
@@ -25,7 +28,8 @@
     "No sensitive data in logs"
   ],
   "outOfScope": [
-    "everything outside package.json"
+    "Implementation of specific package dependencies",
+    "Configuration of project settings beyond initial files"
   ],
   "ambiguities": []
 }
