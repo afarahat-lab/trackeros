@@ -1,13 +1,14 @@
 {
-  "id": "24c312df-4a6a-41da-ac8a-f50af9f258c2",
-  "correlationId": "7bbcc38f-12d9-45a0-b5e8-5f0eac478352",
-  "rawIntent": "Add a clamp utility under src/shared/utils/clamp with clamp(n: number, min: number, max: number): number that returns n clamped to the [min, max] inclusive range.",
+  "id": "ef6335f9-566e-4918-948d-ce073cc1c39b",
+  "correlationId": "ead130dd-11c6-4ad7-a877-9ea1ece32441",
+  "rawIntent": "check package.json file. I can see dependencies addes with version 0.0.0 whichis invalid. Fix all",
   "scope": {
     "affectedDomains": [
-      "utils"
+      "package.json"
     ],
     "affectedLayers": [
-      "domain"
+      "domain",
+      "api"
     ],
     "isBreakingChange": false,
     "estimatedComplexity": "small"
@@ -15,7 +16,7 @@
   "successCriteria": [
     {
       "id": "sc-001",
-      "description": "The clamp utility function is implemented and returns the correct clamped value.",
+      "description": "All dependencies in package.json have valid version numbers instead of 0.0.0.",
       "testable": true,
       "layer": "unit"
     }
@@ -27,7 +28,7 @@
     "No sensitive data in logs"
   ],
   "outOfScope": [
-    "Any other utilities or modules outside src/shared/utils/clamp"
+    "everything outside package.json"
   ],
   "ambiguities": []
 }
