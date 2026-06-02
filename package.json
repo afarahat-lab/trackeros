@@ -2,7 +2,7 @@
   "name": "trackeros",
   "version": "0.1.0",
   "private": true,
-  "packageManager": "pnpm@9.17.0",
+  "packageManager": "pnpm@10.34.1",
   "scripts": {
     "test": "echo 'no tests yet' && exit 0",
     "build": "echo 'no build yet' && exit 0"
