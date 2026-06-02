@@ -1,13 +1,14 @@
 {
-  "id": "24c312df-4a6a-41da-ac8a-f50af9f258c2",
-  "correlationId": "7bbcc38f-12d9-45a0-b5e8-5f0eac478352",
-  "rawIntent": "Add a clamp utility under src/shared/utils/clamp with clamp(n: number, min: number, max: number): number that returns n clamped to the [min, max] inclusive range.",
+  "id": "f52ca8b2-8273-4e8e-9225-f90584130101",
+  "correlationId": "f7179e68-d105-4523-b807-21d1dccfbb9e",
+  "rawIntent": "Add an isEven utility under src/shared/utils/is-even with isEven(n: number): boolean.",
   "scope": {
     "affectedDomains": [
-      "utils"
+      "is-even"
     ],
     "affectedLayers": [
-      "domain"
+      "domain",
+      "test"
     ],
     "isBreakingChange": false,
     "estimatedComplexity": "small"
@@ -15,19 +16,19 @@
   "successCriteria": [
     {
       "id": "sc-001",
-      "description": "The clamp utility function is implemented and returns the correct clamped value.",
+      "description": "The isEven utility function is implemented and returns a boolean indicating if the input number is even.",
       "testable": true,
       "layer": "unit"
     }
   ],
   "constraints": [
-    "Every state-changing operation produces an audit record",
-    "RBAC enforced at middleware, never inline",
-    "Input validated at the API boundary",
-    "No sensitive data in logs"
+    "Every state-changing operation produces an audit record.",
+    "RBAC enforced at middleware, never inline.",
+    "Input validated at the API boundary.",
+    "No sensitive data in logs."
   ],
   "outOfScope": [
-    "Any other utilities or modules outside src/shared/utils/clamp"
+    "Any other utilities or files outside of src/shared/utils/is-even."
   ],
   "ambiguities": []
 }
