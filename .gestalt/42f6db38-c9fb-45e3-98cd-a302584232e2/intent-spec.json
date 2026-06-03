@@ -1,13 +1,14 @@
 {
-  "id": "6899ac67-faf8-4c9f-adc3-0428c8afc47a",
+  "id": "e5cfdd3e-97f6-41ff-b9aa-8a931421f2d0",
   "correlationId": "42f6db38-c9fb-45e3-98cd-a302584232e2",
-  "rawIntent": "Add a noop utility under src/shared/utils/noop with noop(): void {} as an exported function. Single file only.",
+  "rawIntent": "Add a noop utility under src/shared/utils/noop with noop(): void {} as an exported function. Ensure it passes all tests.",
   "scope": {
     "affectedDomains": [
-      "src/shared/utils/noop"
+      "Type"
     ],
     "affectedLayers": [
-      "domain"
+      "domain",
+      "test"
     ],
     "isBreakingChange": false,
     "estimatedComplexity": "small"
@@ -15,21 +16,24 @@
   "successCriteria": [
     {
       "id": "sc-001",
-      "description": "A noop utility function is added under src/shared/utils/noop and is exported correctly.",
+      "description": "The noop utility function is added under src/shared/utils/noop and is exported correctly.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "All tests for the noop utility function pass successfully.",
       "testable": true,
       "layer": "unit"
     }
   ],
   "constraints": [
-    "Repository pattern: All database access goes through repository interfaces.",
-    "Audit records: All state-changing operations write an audit record.",
     "Input validation: Validate all inputs at API boundaries before processing.",
     "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
-    "RBAC enforcement: All API endpoints enforce role-based access control.",
     "Error handling: No unhandled promise rejections. All async errors are caught and handled."
   ],
   "outOfScope": [
-    "everything outside src/shared/utils/noop"
+    "Everything outside src/shared/utils/noop"
   ],
   "ambiguities": []
 }
