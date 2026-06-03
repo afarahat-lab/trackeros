@@ -5,7 +5,7 @@ Read this file completely before taking any action.
 
 ## What this project is
 
-A simle web application that helps user to capture his notes. It shall run server on a docker image
+Web application to help user to track his tasks
 
 ## Architecture rules
 
@@ -13,8 +13,6 @@ A simle web application that helps user to capture his notes. It shall run serve
 2. All database access through the repository pattern
 3. Every state-changing operation produces an audit record (GP-001)
 4. RBAC enforced at middleware, never inline (GP-002)
-5. Ensure all external API calls are retried on failure (GP-003)
-6. All configuration must be environment-based, never hardcoded (GP-004)
 
 ## When context is missing
 
@@ -36,3 +34,28 @@ Without the workflow scope the deploy layer's pipeline-agent will fail with
 a `GOLDEN_PRINCIPLE_BREACH` signal and the intent will be escalated for
 human review. Re-issue the PAT with the missing scope and re-register the
 project to recover.
+
+## Custom agents
+
+Project-specific agents can be defined in `agents.yaml` under
+`custom_agents`. They run after the framework generate agents
+(intent / design / context / lint-config / code / test) and BEFORE
+dispatch to the quality gate. Each custom agent receives the
+generated artifacts as part of its prompt and returns structured
+findings.
+
+The orchestrator routes findings to typed signals the gate
+evaluates:
+
+- `high` severity findings → `CONSTRAINT_VIOLATION`
+- `medium` / `low` findings → `LINT_FAILURE`
+- LLM error or response parse failure → `CONTEXT_GAP`
+
+Custom agents **never** emit `GOLDEN_PRINCIPLE_BREACH` — that
+signal type is reserved for framework infrastructure agents and
+the review-agent.
+
+See `agents.yaml` for the full schema and a commented-out example.
+Run `gestalt agents list <projectName>` to see the active agents
+for this project; `gestalt agents validate <projectName>` checks
+that your custom-agent definitions parse cleanly.
