@@ -1,0 +1,39 @@
+{
+  "id": "e5cfdd3e-97f6-41ff-b9aa-8a931421f2d0",
+  "correlationId": "42f6db38-c9fb-45e3-98cd-a302584232e2",
+  "rawIntent": "Add a noop utility under src/shared/utils/noop with noop(): void {} as an exported function. Ensure it passes all tests.",
+  "scope": {
+    "affectedDomains": [
+      "Type"
+    ],
+    "affectedLayers": [
+      "domain",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "The noop utility function is added under src/shared/utils/noop and is exported correctly.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "All tests for the noop utility function pass successfully.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "Everything outside src/shared/utils/noop"
+  ],
+  "ambiguities": []
+}
