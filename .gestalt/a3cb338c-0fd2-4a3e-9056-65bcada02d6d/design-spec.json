@@ -1,0 +1,15 @@
+{
+  "correlationId": "a3cb338c-0fd2-4a3e-9056-65bcada02d6d",
+  "domainChanges": [],
+  "apiContracts": [],
+  "componentSpecs": [
+    {
+      "name": "HelpIcon",
+      "type": "component",
+      "description": "Renders an icon with a tooltip for help information.",
+      "props": {
+        "tooltipText": "string"
+      }
+    }
+  ]
+}

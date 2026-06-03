@@ -1,0 +1,31 @@
+{
+  "id": "47f4af99-3446-4647-9391-cb85d89dc931",
+  "correlationId": "a3cb338c-0fd2-4a3e-9056-65bcada02d6d",
+  "rawIntent": "pnpm run failed, fix: $ pnpm run build && node dist/index.js\n$ tsc\nsrc/modules/welcome/__tests__/HelpIcon.test.ts:8:22 - error TS1005: '>' expected.\n\n8     render(<HelpIcon tooltipText=This",
+  "scope": {
+    "affectedDomains": [
+      "test"
+    ],
+    "affectedLayers": [
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "The TypeScript error in src/modules/welcome/__tests__/HelpIcon.test.ts is resolved and the test file compiles successfully.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "Everything outside src/modules/welcome/__tests__/HelpIcon.test.ts"
+  ],
+  "ambiguities": []
+}
