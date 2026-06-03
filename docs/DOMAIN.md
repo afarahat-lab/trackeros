@@ -39,6 +39,11 @@ To be populated as the design-agent and context-agent learn the domain.
 - **Description**: Represents the API functionalities and interactions within the application.
 - **Props**: {}
 
+### PriceFormatter
+- **Type**: Module
+- **Description**: Represents the functionalities related to formatting prices within the application.
+- **Props**: {}
+
 ## API Contracts
 
 ### PATCH /api/v1/dependencies
