@@ -1,0 +1,23 @@
+{
+  "correlationId": "6fbc5872-bd62-4952-ab70-60a027d87ad2",
+  "domainChanges": [],
+  "apiContracts": [],
+  "componentSpecs": [
+    {
+      "name": "HomePage",
+      "type": "page",
+      "description": "Displays the home page with moving icons to enhance visual appeal.",
+      "props": {}
+    },
+    {
+      "name": "MovingIcon",
+      "type": "component",
+      "description": "Renders an icon with animation to create a dynamic visual effect.",
+      "props": {
+        "iconType": "string",
+        "animationType": "string",
+        "duration": "number"
+      }
+    }
+  ]
+}
