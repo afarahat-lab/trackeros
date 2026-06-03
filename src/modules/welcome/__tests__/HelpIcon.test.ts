@@ -8,13 +8,13 @@ import HelpIcon from '../components/HelpIcon';
 
 describe('SC-1: HelpIcon Component', () => {
   it('should render the help icon on the main screen', () => {
-    render(<HelpIcon tooltipText={"This application helps you track your tasks efficiently."} />);
+    render(<HelpIcon tooltipText="This application helps you track your tasks efficiently." />);
     const helpIcon = screen.getByText('❓');
     expect(helpIcon).toBeInTheDocument();
   });
 
   it('should display a tooltip with application description when the help icon is clicked', () => {
-    render(<HelpIcon tooltipText={"This application helps you track your tasks efficiently."} />);
+    render(<HelpIcon tooltipText="This application helps you track your tasks efficiently." />);
     const helpIcon = screen.getByText('❓');
     fireEvent.click(helpIcon);
     const tooltip = screen.getByText('This application helps you track your tasks efficiently.');
@@ -22,7 +22,7 @@ describe('SC-1: HelpIcon Component', () => {
   });
 
   it('should hide the tooltip when the help icon is clicked again', () => {
-    render(<HelpIcon tooltipText={"This application helps you track your tasks efficiently."} />);
+    render(<HelpIcon tooltipText="This application helps you track your tasks efficiently." />);
     const helpIcon = screen.getByText('❓');
     fireEvent.click(helpIcon);
     fireEvent.click(helpIcon);
@@ -32,7 +32,7 @@ describe('SC-1: HelpIcon Component', () => {
 
   // Error case: Ensure no tooltip is shown if tooltipText is empty
   it('should not display a tooltip if tooltipText is empty', () => {
-    render(<HelpIcon tooltipText={""} />);
+    render(<HelpIcon tooltipText="" />);
     const helpIcon = screen.getByText('❓');
     fireEvent.click(helpIcon);
     const tooltip = screen.queryByText('');
