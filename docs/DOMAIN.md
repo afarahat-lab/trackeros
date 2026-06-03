@@ -22,3 +22,10 @@ To be populated as the design-agent and context-agent learn the domain.
 - **Type**: page
 - **Description**: Displays the help information including credits for the web application
 - **Props**: None
+
+### TrimUtility
+
+- **Type**: service
+- **Description**: A utility service that trims whitespace from both ends of a string using regex.
+- **Props**:
+  - `inputString`: string
