@@ -33,6 +33,6 @@ To be populated as the design-agent and context-agent learn the domain.
 ### HelpIcon
 
 - **Type**: component
-- **Description**: Renders an icon with a tooltip for help information.
+- **Description**: Renders a help icon with an optional tooltip.
 - **Props**:
   - `tooltipText`: string
