@@ -1,0 +1,34 @@
+{
+  "id": "891480f1-e14a-4053-80a0-f7e2c8526afd",
+  "correlationId": "7bdb0e53-9085-44b3-b598-ea50ed25a66b",
+  "rawIntent": "Fix golden principle breach in the affected file: [review/security] Use of 'execSync' for command execution can lead to security vulnerabilities. Hint: Consider using a safer method for executing shell commands or mocking them more securely.. don't use execSync, use another alternative",
+  "scope": {
+    "affectedDomains": [
+      "Request"
+    ],
+    "affectedLayers": [
+      "infra"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "The use of 'execSync' is replaced with a safer method for executing shell commands or securely mocked.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Audit records: All state-changing operations write an audit record.",
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "RBAC enforcement: All API endpoints enforce role-based access control.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "Everything outside the specific file mentioned in the intent"
+  ],
+  "ambiguities": []
+}

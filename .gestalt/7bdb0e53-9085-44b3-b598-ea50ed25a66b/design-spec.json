@@ -1,0 +1,16 @@
+{
+  "correlationId": "7bdb0e53-9085-44b3-b598-ea50ed25a66b",
+  "domainChanges": [],
+  "apiContracts": [],
+  "componentSpecs": [
+    {
+      "name": "CommandExecutor",
+      "type": "service",
+      "description": "Executes shell commands in a secure manner, replacing the use of 'execSync'.",
+      "props": {
+        "command": "string",
+        "options": "object"
+      }
+    }
+  ]
+}
