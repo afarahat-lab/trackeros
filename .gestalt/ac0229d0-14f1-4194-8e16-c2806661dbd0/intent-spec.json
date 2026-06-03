@@ -1,0 +1,36 @@
+{
+  "id": "f7de7426-0bbd-4270-b63f-4a7be8562c0a",
+  "correlationId": "ac0229d0-14f1-4194-8e16-c2806661dbd0",
+  "rawIntent": "Implement help page show credits of this web application",
+  "scope": {
+    "affectedDomains": [
+      "ui"
+    ],
+    "affectedLayers": [
+      "ui"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "The help page displays the credits of the web application.",
+      "testable": true,
+      "layer": "e2e"
+    }
+  ],
+  "constraints": [
+    "Audit records: All state-changing operations write an audit record.",
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "RBAC enforcement: All API endpoints enforce role-based access control.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "Backend logic",
+    "Database schema changes",
+    "API modifications"
+  ],
+  "ambiguities": []
+}
