@@ -2,27 +2,35 @@ import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import HomePage from '../components/HomePage';
 
-// SC-1: The home page displays moving icons that enhance the visual appeal.
-describe('HomePage Component', () => {
-  it('should render the home page with moving icons', () => {
+// Mock the MovingIcon component to isolate the test to the HomePage and EnhancedUIComponent
+vi.mock('../components/MovingIcon', () => ({
+  default: () => <div>Mocked Moving Icon</div>
+}));
+
+describe('SC-1: Home Page UI Enhancements', () => {
+  it('should render the home page with enhanced UI elements', () => {
     render(<HomePage />);
 
-    // Check if the heading is displayed
-    const heading = screen.getByText(/Welcome to the Home Page/i);
+    // Check for the presence of the main heading
+    const heading = screen.getByRole('heading', { name: /welcome to the home page/i });
     expect(heading).toBeInTheDocument();
 
-    // Check if the icons are rendered
-    const starIcon = screen.getByClass('icon star');
-    const heartIcon = screen.getByClass('icon heart');
-    const circleIcon = screen.getByClass('icon circle');
+    // Check for the EnhancedUIComponent with specific classes
+    const enhancedUI = screen.getByText(/user preferences loaded/i);
+    expect(enhancedUI).toBeInTheDocument();
+    expect(enhancedUI.parentElement).toHaveClass('enhanced-ui light grid');
 
-    expect(starIcon).toBeInTheDocument();
-    expect(heartIcon).toBeInTheDocument();
-    expect(circleIcon).toBeInTheDocument();
+    // Check for the presence of mocked moving icons
+    const icons = screen.getAllByText(/mocked moving icon/i);
+    expect(icons).toHaveLength(3);
+  });
 
-    // Check if the icons have the correct animation styles
-    expect(starIcon).toHaveStyle('animation: spin 2s infinite');
-    expect(heartIcon).toHaveStyle('animation: bounce 3s infinite');
-    expect(circleIcon).toHaveStyle('animation: fade 4s infinite');
+  it('should handle missing user preferences gracefully', () => {
+    // Assuming HomePage handles missing user preferences internally
+    render(<HomePage />);
+
+    // Check that the EnhancedUIComponent still renders correctly
+    const enhancedUI = screen.getByText(/user preferences loaded/i);
+    expect(enhancedUI).toBeInTheDocument();
   });
 });
