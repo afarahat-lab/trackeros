@@ -1,0 +1,30 @@
+{
+  "id": "0940cc43-cbaf-445a-80b6-246fca21e0c1",
+  "correlationId": "8cbb3625-22a6-413d-ae6d-b288ba781df7",
+  "rawIntent": "chanage pnpm version to 11.5.1",
+  "scope": {
+    "affectedDomains": [
+      "config"
+    ],
+    "affectedLayers": [
+      "infra"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "The pnpm version in the configuration is updated to 11.5.1.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No sensitive data in logs"
+  ],
+  "outOfScope": [
+    "everything outside package.json"
+  ],
+  "ambiguities": []
+}
