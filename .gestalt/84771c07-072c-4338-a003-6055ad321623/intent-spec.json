@@ -1,0 +1,35 @@
+{
+  "id": "27e92e12-6c90-4448-84ec-c29e30a2a7e5",
+  "correlationId": "84771c07-072c-4338-a003-6055ad321623",
+  "rawIntent": "Add run to start application with pnpm",
+  "scope": {
+    "affectedDomains": [
+      "Config"
+    ],
+    "affectedLayers": [
+      "config"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "The application can be started using pnpm with a new run command.",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Audit records: All state-changing operations write an audit record.",
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "RBAC enforcement: All API endpoints enforce role-based access control.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "Everything outside package.json"
+  ],
+  "ambiguities": []
+}
