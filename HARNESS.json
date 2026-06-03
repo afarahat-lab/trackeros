@@ -71,7 +71,7 @@
   },
   "pipeline": {
     "adapter": "github-actions",
-    "autoMerge": false,
+    "autoMerge": true,
     "mergeMethod": "squash"
   },
   "maintenance": {
