@@ -1,0 +1,45 @@
+{
+  "id": "81cea7b7-48d8-4b21-866d-5f3b346e783a",
+  "correlationId": "2010514b-e269-4d37-936d-0b5ce118a0db",
+  "rawIntent": "Fix pipeline to install npm version 22 to suppor the new pnpm",
+  "scope": {
+    "affectedDomains": [
+      "config"
+    ],
+    "affectedLayers": [
+      "infra"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "The pipeline installs npm version 22 successfully and supports the new pnpm.",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Audit records: All state-changing operations write an audit record.",
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "RBAC enforcement: All API endpoints enforce role-based access control.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "Everything outside the pipeline configuration"
+  ],
+  "ambiguities": [
+    {
+      "id": "amb-001",
+      "description": "The specific pipeline configuration file or location is not mentioned.",
+      "options": [
+        "Modify existing pipeline configuration file",
+        "Create a new pipeline configuration file"
+      ],
+      "impactIfWrong": "medium"
+    }
+  ]
+}

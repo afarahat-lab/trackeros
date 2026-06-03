@@ -1,14 +1,3 @@
-# Gestalt-managed pipeline (ADR-033).
-#
-# Dispatched by the platform on two occasions:
-#   1. pipeline-agent triggers it after pr-agent opens a PR
-#   2. promotion-agent triggers it on each environment promotion
-#      (`environment` input set to `staging` then `production`)
-#
-# Customise the steps for your project (build, lint, integration tests,
-# deploy commands) — checkout / Node setup / install / test is the
-# minimum the platform expects to be present.
-
 name: gestalt
 on:
   workflow_dispatch:
@@ -38,6 +27,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
+
+      - name: Upgrade npm to version 22
+        run: npm install -g npm@22
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v3
