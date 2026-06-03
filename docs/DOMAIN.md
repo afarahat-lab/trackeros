@@ -29,3 +29,10 @@ To be populated as the design-agent and context-agent learn the domain.
 - **Description**: A utility service that trims whitespace from both ends of a string using regex.
 - **Props**:
   - `inputString`: string
+
+### HelpIcon
+
+- **Type**: component
+- **Description**: Renders an icon with a tooltip for help information.
+- **Props**:
+  - `tooltipText`: string
