@@ -1,0 +1,32 @@
+{
+  "id": "95009aaf-cba3-4bd5-84ee-ab7337d5bf5b",
+  "correlationId": "c5505876-8ded-4a8c-a48a-6768d14885b8",
+  "rawIntent": "pnpm build is not configured correclty. Fix",
+  "scope": {
+    "affectedDomains": [
+      "config"
+    ],
+    "affectedLayers": [
+      "config"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "The pnpm build configuration is corrected and the build process completes successfully without errors.",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "Everything outside the build configuration files."
+  ],
+  "ambiguities": []
+}
