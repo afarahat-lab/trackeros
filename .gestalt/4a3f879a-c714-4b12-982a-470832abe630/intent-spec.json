@@ -1,0 +1,32 @@
+{
+  "id": "3eeed124-f52f-4936-a5d6-7982a692a4eb",
+  "correlationId": "4a3f879a-c714-4b12-982a-470832abe630",
+  "rawIntent": "Update github actions to use pnpm version 11.5.1",
+  "scope": {
+    "affectedDomains": [
+      "config"
+    ],
+    "affectedLayers": [
+      "infra"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "GitHub Actions configuration is updated to use pnpm version 11.5.1",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "No sensitive data in logs",
+    "RBAC enforcement",
+    "Error handling"
+  ],
+  "outOfScope": [
+    "Everything outside GitHub Actions configuration"
+  ],
+  "ambiguities": []
+}
