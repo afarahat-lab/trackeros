@@ -1,0 +1,43 @@
+{
+  "id": "ed3e4743-1171-433f-be0d-9058c93f2586",
+  "correlationId": "51760cea-0eb6-4077-850e-cb8a4aee4b6c",
+  "rawIntent": "Fix golden principle breach in the affected file: [review/security] Use of 'exec' for command execution can lead to command injection vulnerabilities. Hint: Consider using a safer alternative like 'execFile' or properly sanitize inputs.. Don't use exec command, use another safe command\nYou need also to update gihub action file to set node version to 22",
+  "scope": {
+    "affectedDomains": [
+      "Request"
+    ],
+    "affectedLayers": [
+      "infra",
+      "config"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "The use of 'exec' is replaced with 'execFile' or inputs are properly sanitized to prevent command injection vulnerabilities.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "The GitHub Action file is updated to set the Node.js version to 22.",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Audit records: All state-changing operations write an audit record.",
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "RBAC enforcement: All API endpoints enforce role-based access control.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "Everything outside the specific file mentioned for the 'exec' command fix",
+    "Everything outside the GitHub Action file for Node.js version update"
+  ],
+  "ambiguities": []
+}
