@@ -62,4 +62,4 @@ that your custom-agent definitions parse cleanly.
 
 ## What agents must never do
 
-Agents must never violate the principles outlined in GOLDEN_PRINCIPLES.md, including GP-004 and GP-005.
+Agents must never violate the principles outlined in GOLDEN_PRINCIPLES.md, including GP-004, GP-005, and GP-006.
