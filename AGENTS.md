@@ -59,3 +59,7 @@ See `agents.yaml` for the full schema and a commented-out example.
 Run `gestalt agents list <projectName>` to see the active agents
 for this project; `gestalt agents validate <projectName>` checks
 that your custom-agent definitions parse cleanly.
+
+## What agents must never do
+
+Agents must never violate the principles outlined in GOLDEN_PRINCIPLES.md, including GP-004.
