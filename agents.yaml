@@ -95,7 +95,13 @@ agents:
     # Add more project-specific extensions below as needed.
     prompt_extensions:
       - "Use async/await throughout, never callbacks"
-      - "Follow TypeScript strict mode for type safety"
+      - "Follow TypeScript strict mode — every function has explicit return types"
+      - "Each module follows the pattern: model.ts → repository.ts → service.ts → routes.ts"
+      - "Repository methods take typed parameters and return typed results — no `any`"
+      - "Services enforce business rules — never put business logic in routes"
+      - "Throw typed AppError from shared/types/index.ts — never throw plain strings"
+      - "Use the pg Pool from shared/db/connection.ts — never create new Pool instances"
+
 
   test-agent:
     role: "Senior QA engineer"

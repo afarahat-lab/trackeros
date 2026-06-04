@@ -1,42 +1,96 @@
-# Architecture — trackeros
+# Architecture — leave-management
 
 ## Overview
 
-The system is a backend application using Express for handling HTTP requests and PostgreSQL for data persistence. It follows a modular structure with separate directories for controllers, models, routes, services, and utilities.
+A corporate leave management system. Employees apply for annual,
+sick, and emergency leave. Managers approve or reject requests.
+HR configures leave policies and views reports. The system enforces
+leave balance limits and prevents overlapping requests.
 
 ## Stack
 
 - Runtime: Node 22 LTS
+- Language: TypeScript 5.x (strict mode)
 - Package manager: npm
-- Test framework: Jest
-- Backend: Express
-- Database: PostgreSQL
+- Backend framework: Express 4
+- Database: PostgreSQL (via `pg` driver, no ORM)
+- Test framework: Jest + Supertest
+- Auth: JWT (jsonwebtoken)
+
+## Domain model
+
+### Core entities
+- **Employee** — id, name, email, role (employee | manager | hr), managerId
+- **LeaveBalance** — employeeId, leaveType, totalDays, usedDays, year
+- **LeaveRequest** — id, employeeId, type (annual|sick|emergency),
+  startDate, endDate, status (pending|approved|rejected), managerId,
+  managerComment, createdAt
+- **LeavePolicy** — id, leaveType, defaultDaysPerYear, maxConsecutiveDays,
+  requiresApproval, createdAt
+
+### Business rules (enforced in service layer)
+1. Leave balance must be sufficient before a request is approved
+2. Overlapping leave requests for the same employee are rejected
+3. Only the assigned manager can approve/reject a subordinate's request
+4. HR can configure policies and view all requests
+5. Emergency leave bypasses balance checks but still records usage
 
 ## Module structure
-
-```
 src/
-  controllers/
-  models/
-  routes/
-  services/
-  utils/
+modules/
+leave/
+leave.model.ts          ← TypeScript types/interfaces
+leave.repository.ts     ← SQL queries, implements ILeaveRepository
+leave.service.ts        ← business logic, balance enforcement
+leave.routes.ts         ← Express router
+leave.test.ts           ← Jest unit tests
+employee/
+employee.model.ts
+employee.repository.ts
+employee.service.ts
+employee.routes.ts
+policy/
+policy.model.ts
+policy.repository.ts
+policy.service.ts
+policy.routes.ts
+balance/
+balance.model.ts
+balance.repository.ts
+balance.service.ts
+shared/
+db/
+connection.ts           ← pg Pool, single instance
+base-repository.ts      ← shared query helpers
+middleware/
+auth.middleware.ts      ← JWT verification
+role.middleware.ts      ← role-based access (employee|manager|hr)
+error.middleware.ts     ← centralised error handler
+types/
+index.ts                ← shared types, enums, error classes
 tests/
-  unit/
-  integration/
-```
+unit/                       ← service layer tests (mock repositories)
+integration/                ← API tests using Supertest
 
-## Key patterns
-
-- See `AGENTS.md` for stack-specific coding conventions
-- See `docs/GOLDEN_PRINCIPLES.md` for the non-negotiable rules every
-  cycle is checked against
+## API surface (planned)
+POST   /auth/login
+GET    /employees/:id/balance
+POST   /leave/requests             ← employee submits request
+GET    /leave/requests             ← employee sees own; manager sees team
+GET    /leave/requests/:id
+PATCH  /leave/requests/:id/approve ← manager only
+PATCH  /leave/requests/:id/reject  ← manager only
+GET    /leave/calendar             ← team calendar view
+GET    /reports/leave-summary      ← HR only
+GET    /policies                   ← HR view
+POST   /policies                   ← HR create
+PATCH  /policies/:id               ← HR update
 
 ## Dependency rules
 
-- Modules import from each other ONLY through their declared public
-  entry point (`index.ts`, `__init__.py`, package root — whatever the
-  stack uses)
-- All database access goes through a repository layer — no inline SQL
-  / ORM calls in route handlers or business logic
+- Route handlers call services only — never repositories directly
+- Services call repositories only — never `pg` directly
 - No circular dependencies between modules
+- All database access goes through the repository layer
+- Error handling: services throw typed errors from `shared/types/index.ts`
+  which the error middleware catches and maps to HTTP responses
