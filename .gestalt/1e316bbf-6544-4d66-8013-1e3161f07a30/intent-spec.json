@@ -1,0 +1,62 @@
+{
+  "id": "c4e01657-f6bc-4b85-9232-e37be3ddc7bd",
+  "correlationId": "1e316bbf-6544-4d66-8013-1e3161f07a30",
+  "rawIntent": "Scaffold the project foundation. Create package.json with express pg jsonwebtoken bcrypt and dotenv as dependencies. Add typescript ts-node jest and the relevant type definitions as dev dependencies. Create tsconfig.json with strict mode targeting Node 22. Create jest.config.js. Create src/shared/types/index.ts with the AppError class and Leave domain enums for LeaveType LeaveStatus and UserRole. Create src/shared/db/connection.ts with the pg Pool singleton.",
+  "scope": {
+    "affectedDomains": [
+      "Leave"
+    ],
+    "affectedLayers": [
+      "config",
+      "infra",
+      "domain",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "package.json is created with specified dependencies and dev dependencies.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "tsconfig.json is created with strict mode targeting Node 22.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "jest.config.js is created.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "src/shared/types/index.ts contains the AppError class and enums for LeaveType, LeaveStatus, and UserRole.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "src/shared/db/connection.ts contains the pg Pool singleton.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Audit records: All state-changing operations write an audit record.",
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "RBAC enforcement: All API endpoints enforce role-based access control.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "Everything outside package.json, tsconfig.json, jest.config.js, src/shared/types/index.ts, and src/shared/db/connection.ts"
+  ],
+  "ambiguities": []
+}
