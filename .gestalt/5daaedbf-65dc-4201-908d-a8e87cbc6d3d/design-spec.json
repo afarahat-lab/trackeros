@@ -1,0 +1,144 @@
+{
+  "correlationId": "5daaedbf-65dc-4201-908d-a8e87cbc6d3d",
+  "domainChanges": [
+    {
+      "entityName": "LeaveRequest",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "employeeId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "leaveType",
+          "type": "LeaveType",
+          "required": true
+        },
+        {
+          "name": "status",
+          "type": "LeaveStatus",
+          "required": true
+        },
+        {
+          "name": "startDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "endDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "reason",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "managerId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "User",
+          "type": "one-to-one"
+        }
+      ]
+    }
+  ],
+  "apiContracts": [
+    {
+      "method": "POST",
+      "path": "/api/v1/leave-requests",
+      "description": "Create a new leave request",
+      "requestBody": {
+        "employeeId": "string",
+        "leaveType": "LeaveType",
+        "startDate": "Date",
+        "endDate": "Date",
+        "reason": "string"
+      },
+      "responseBody": {
+        "id": "string",
+        "status": "LeaveStatus"
+      },
+      "authRequired": true,
+      "roles": [
+        "employee"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/leave-requests/{id}",
+      "description": "Get a leave request by ID",
+      "requestBody": {},
+      "responseBody": {
+        "id": "string",
+        "employeeId": "string",
+        "leaveType": "LeaveType",
+        "status": "LeaveStatus",
+        "startDate": "Date",
+        "endDate": "Date",
+        "reason": "string",
+        "managerId": "string"
+      },
+      "authRequired": true,
+      "roles": [
+        "employee",
+        "manager"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/employees/{employeeId}/leave-requests",
+      "description": "Get all leave requests for an employee",
+      "requestBody": {},
+      "responseBody": {
+        "leaveRequests": "LeaveRequest[]"
+      },
+      "authRequired": true,
+      "roles": [
+        "employee",
+        "manager"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/managers/{managerId}/pending-leave-requests",
+      "description": "Get all pending leave requests for a manager",
+      "requestBody": {},
+      "responseBody": {
+        "leaveRequests": "LeaveRequest[]"
+      },
+      "authRequired": true,
+      "roles": [
+        "manager"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/leave-requests/{id}/status",
+      "description": "Update the status of a leave request",
+      "requestBody": {
+        "status": "LeaveStatus"
+      },
+      "responseBody": {
+        "id": "string",
+        "status": "LeaveStatus"
+      },
+      "authRequired": true,
+      "roles": [
+        "manager"
+      ]
+    }
+  ],
+  "componentSpecs": []
+}
