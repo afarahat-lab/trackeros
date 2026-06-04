@@ -16,6 +16,7 @@ src/
 
 src/modules/HelpPage/    — HelpPage module
 src/modules/TrimUtility/    — TrimUtility module
+src/modules/HelpIcon/    — HelpIcon module
 
 ## Dependency rules
 
