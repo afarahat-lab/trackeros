@@ -14,6 +14,8 @@ src/
 └── api/              # route registration
 ```
 
+src/modules/HelpPage/    — HelpPage module
+
 ## Dependency rules
 
 - Modules may only import from each other's index.ts
