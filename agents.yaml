@@ -75,6 +75,12 @@ agents:
         - listDirectory     # explore the project structure
         - searchFiles       # find where things are defined
         - getFileTree       # understand project layout
+        - executeScript     # TEST_REPORT_010 — verify generated
+                            # code with `tsc --noEmit` / `npm run
+                            # lint` BEFORE emitting the JSON files
+                            # array. Without this, the mandatory-
+                            # pre-emit-verification prompt block
+                            # (TEST_REPORT_008) was advisory only.
       # ADR-039 — MCP (Model Context Protocol) servers extend the
       # agent with external tools (issue trackers, dashboards, docs).
       # Tool names are auto-namespaced as `<serverName>__<toolName>`
