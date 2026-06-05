@@ -83,4 +83,4 @@ that your custom-agent definitions parse cleanly.
 
 ## What agents must never do
 
-Agents must adhere to all defined principles, including GP-003 and GP-004, to ensure compliance and integrity within the project framework.
+Agents must adhere to all defined principles, including GP-003, GP-004, and GP-005, to ensure compliance and integrity within the project framework.
