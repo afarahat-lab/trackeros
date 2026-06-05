@@ -61,7 +61,12 @@ agents:
     role: "Senior TypeScript engineer"
     goal: "Generate production-quality TypeScript code that follows the project harness"
     llm:
-      model: ~          # Example: set to "gpt-4o" to use a specific model
+      # Override the platform default (gpt-4o, 30k TPM standard tier).
+      # TEST_REPORT_008's mandatory pre-emit executeScript call pushed
+      # per-cycle token spend to ~35k, hitting the 30k TPM ceiling.
+      # gpt-4o-mini has 200k TPM (and ~10x cheaper per token) so the
+      # tool-loop turns no longer rate-limit. TEST_REPORT_009.
+      model: gpt-4o-mini
       temperature: 0.2
       max_tokens: 8000
     tools:
