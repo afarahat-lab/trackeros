@@ -1,0 +1,44 @@
+{
+  "id": "475c750c-77cf-45cd-803f-e6e06b9f6531",
+  "correlationId": "a41959f9-5338-484e-ab00-ad6b0f5a74cc",
+  "rawIntent": "Create the Leave module foundation. Create src/modules/leave/leave.model.ts with TypeScript interfaces for LeaveRequest and CreateLeaveRequestDto using the LeaveType LeaveStatus and UserRole enums from src/shared/types/index.ts. Create src/modules/leave/leave.repository.ts with an ILeaveRepository interface and a PostgresLeaveRepository class that implements it using the pg Pool from src/shared/db/connection.ts. The repository must implement createRequest findById findByEmployeeId findPendingByManagerId and updateStatus methods. All SQL queries go in the repository and nowhere else.",
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "domain"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "The Leave module foundation is created with the specified TypeScript interfaces and repository pattern.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "The repository implements the specified methods and uses the pg Pool for database operations.",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Audit records: All state-changing operations write an audit record.",
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "RBAC enforcement: All API endpoints enforce role-based access control.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "UI components",
+    "API endpoints",
+    "Infrastructure setup",
+    "Testing beyond unit and integration tests"
+  ],
+  "ambiguities": []
+}
