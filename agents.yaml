@@ -135,7 +135,16 @@ agents:
       # Narrower than code-agent — review-agent operates primarily
       # off the artifact set already in its prompt; the tools are for
       # spot-checking referenced files before flagging issues.
-      builtin: [readFile, searchFiles]
+      # TEST_REPORT_012 — executeScript appended so the mandatory
+      # tool-first review protocol (STEP 1: `npx tsc --noEmit`,
+      # STEP 2: searchFiles for direct DB access, STEP 3: readFile
+      # package.json) can actually fire. Without executeScript the
+      # LLM was told to "verify by running tsc" but couldn't reach
+      # the tool — TR_011's 0-tool-calls / 8-round hallucination
+      # loop. Mirrors TR_010's code-agent fix (the platform-side
+      # loader silently dropped executeScript when a project's
+      # tools.builtin override stripped it).
+      builtin: [readFile, searchFiles, executeScript]
     prompt_extensions: []
 
   # ── Maintenance layer (Amendment 2026-06: tools enabled) ──────
