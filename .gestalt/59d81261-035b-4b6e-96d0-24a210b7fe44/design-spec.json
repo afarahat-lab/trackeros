@@ -16,7 +16,7 @@
       "responseBody": {
         "status": "string",
         "message": "string",
-        "requestId": "string"
+        "leaveRequestId": "string"
       },
       "authRequired": true,
       "roles": [
@@ -30,8 +30,7 @@
       "description": "Retrieves leave information for an employee.",
       "requestBody": {},
       "responseBody": {
-        "leaves": "array",
-        "total": "number"
+        "leaveRequests": "array"
       },
       "authRequired": true,
       "roles": [
