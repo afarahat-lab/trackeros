@@ -1,0 +1,44 @@
+{
+  "id": "bf5389de-7b3c-4f6d-8349-ce3bd6c124ab",
+  "correlationId": "37bd74af-fa9b-4ba9-9d5c-50ffaafb3060",
+  "rawIntent": "Add a health check endpoint to the Express application. Create src/app.ts that initialises an Express app, mounts GET /health returning json status ok, and exports the app. Create src/index.ts as the entry point that starts the server on port 3000.",
+  "scope": {
+    "affectedDomains": [
+      "app"
+    ],
+    "affectedLayers": [
+      "api",
+      "infra"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "The Express application has a health check endpoint at GET /health that returns a JSON response with status ok.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "sc-002",
+      "description": "The server starts successfully on port 3000 without errors.",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "All database access goes through repository interfaces.",
+    "All state-changing operations write an audit record.",
+    "Validate all inputs at API boundaries before processing.",
+    "Never log passwords, tokens, PII, or financial data.",
+    "All API endpoints enforce role-based access control.",
+    "No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "Any other endpoints or features not mentioned in the intent.",
+    "Existing application logic unrelated to the health check.",
+    "Configuration files outside of src/app.ts and src/index.ts."
+  ],
+  "ambiguities": []
+}
