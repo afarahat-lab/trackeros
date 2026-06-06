@@ -23,12 +23,12 @@ Submits a leave request for an employee.
 **Roles:** admin, operator
 
 ### GET /api/v1/leave
-Retrieves leave information for an employee.
+Retrieves the leave records for an employee.
 
 **Request Body:** None
 
 **Response Body:**
-- `leaves`: array
+- `leaveRecords`: array
 
 **Auth Required:** Yes  
 **Roles:** admin, operator
