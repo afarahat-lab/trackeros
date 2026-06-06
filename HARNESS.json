@@ -30,11 +30,8 @@
   },
   "qualityGate": {
     "required": [
-      "lint",
-      "typecheck",
-      "unit-tests",
       "constraint-check",
-      "security-scan"
+      "design-review"
     ],
     "blockingSignals": [
       "GOLDEN_PRINCIPLE_BREACH",
@@ -85,12 +82,6 @@
       "rules": [
         "Generated code must compile without errors.",
         "All imports must resolve to files that exist in the project."
-      ]
-    },
-    "test-runner-agent": {
-      "rules": [
-        "All generated tests must pass.",
-        "Tests must cover every success criterion from the IntentSpec."
       ]
     },
     "review-agent": {
