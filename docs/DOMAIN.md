@@ -17,7 +17,7 @@ Submits a leave request for an employee.
 **Response Body:**
 - `status`: string
 - `message`: string
-- `leaveRequestId`: string
+- `requestId`: string
 
 **Auth Required:** Yes  
 **Roles:** admin, operator
@@ -28,7 +28,8 @@ Retrieves leave information for the authenticated employee.
 **Request Body:** None
 
 **Response Body:**
-- `leaves`: Array<Leave>
+- `leaves`: array
+- `total`: number
 
 **Auth Required:** Yes  
 **Roles:** admin, operator
