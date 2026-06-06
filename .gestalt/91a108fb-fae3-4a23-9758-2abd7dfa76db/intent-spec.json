@@ -1,5 +1,5 @@
 {
-  "id": "04d6b723-d113-4859-af94-032ea3eaf4c4",
+  "id": "e12ce7a5-7b55-4f5b-aa9f-b00130455abc",
   "correlationId": "91a108fb-fae3-4a23-9758-2abd7dfa76db",
   "rawIntent": "Add a health check endpoint to the Express application. Create src/app.ts that initialises an Express app, mounts GET /health returning json status ok, and exports the app. Create src/index.ts as the entry point that starts the server on port 3000.",
   "scope": {
@@ -22,7 +22,7 @@
     },
     {
       "id": "sc-002",
-      "description": "The server starts successfully on port 3000.",
+      "description": "The server starts successfully on port 3000 without errors.",
       "testable": true,
       "layer": "integration"
     }
@@ -37,7 +37,8 @@
   ],
   "outOfScope": [
     "Any other endpoints or features not mentioned in the intent.",
-    "Changes to existing files outside of src/app.ts and src/index.ts."
+    "Existing application logic unrelated to the health check.",
+    "Configuration files outside of src/app.ts and src/index.ts."
   ],
   "ambiguities": []
 }
