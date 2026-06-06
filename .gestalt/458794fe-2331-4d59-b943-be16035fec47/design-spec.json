@@ -1,0 +1,59 @@
+{
+  "correlationId": "458794fe-2331-4d59-b943-be16035fec47",
+  "domainChanges": [
+    {
+      "entityName": "LeaveRequest",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "employeeId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "startDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "endDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "reason",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [
+    {
+      "method": "POST",
+      "path": "/api/v1/leave-requests",
+      "description": "Submits a leave request for an employee.",
+      "requestBody": {
+        "employeeId": "string",
+        "startDate": "Date",
+        "endDate": "Date",
+        "reason": "string"
+      },
+      "responseBody": {
+        "id": "string",
+        "employeeId": "string",
+        "startDate": "Date",
+        "endDate": "Date",
+        "reason": "string",
+        "status": "string"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    }
+  ],
+  "componentSpecs": []
+}
