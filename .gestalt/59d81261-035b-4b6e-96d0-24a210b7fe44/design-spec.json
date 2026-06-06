@@ -30,7 +30,7 @@
       "description": "Retrieves leave information for an employee.",
       "requestBody": {},
       "responseBody": {
-        "leaveRequests": "array"
+        "leaves": "array"
       },
       "authRequired": true,
       "roles": [
