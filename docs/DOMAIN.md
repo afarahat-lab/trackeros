@@ -17,13 +17,12 @@ Submits a leave request for an employee.
 **Response Body:**
 - `status`: string
 - `message`: string
-- `leaveRequestId`: string
 
 **Auth Required:** Yes  
 **Roles:** admin, operator
 
 ### GET /api/v1/leave
-Retrieves leave information for the authenticated employee.
+Retrieves leave records for an employee.
 
 **Request Body:** None
 

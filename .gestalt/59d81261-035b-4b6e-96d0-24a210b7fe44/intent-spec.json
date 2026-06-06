@@ -1,5 +1,5 @@
 {
-  "id": "40272a9f-a8be-4982-bbd3-27a9a4c6b357",
+  "id": "7fd93ffa-0f4d-4edb-a983-1ce74a965eed",
   "correlationId": "59d81261-035b-4b6e-96d0-24a210b7fe44",
   "rawIntent": "Create src/modules/leave/leave.routes.ts with an Express router that mounts POST /leave calling LeaveService.submitLeaveRequest and GET /leave calling LeaveService.getEmployeeLeave. Import LeaveService from leave.service.ts which already exists.",
   "scope": {
@@ -28,8 +28,7 @@
     "Error handling: No unhandled promise rejections. All async errors are caught and handled."
   ],
   "outOfScope": [
-    "Everything outside src/modules/leave/leave.routes.ts",
-    "Everything outside LeaveService in leave.service.ts"
+    "All other modules and files outside src/modules/leave/leave.routes.ts and leave.service.ts"
   ],
   "ambiguities": []
 }
