@@ -1,5 +1,5 @@
 {
-  "id": "6900da19-628b-4df6-9fa9-2ffe307dc2d4",
+  "id": "c46c882d-5cb2-4bfc-b0b6-42e2e06f75ad",
   "correlationId": "91a108fb-fae3-4a23-9758-2abd7dfa76db",
   "rawIntent": "Add a health check endpoint to the Express application. Create src/app.ts that initialises an Express app, mounts GET /health returning json status ok, and exports the app. Create src/index.ts as the entry point that starts the server on port 3000.",
   "scope": {
@@ -23,7 +23,7 @@
     },
     {
       "id": "sc-002",
-      "description": "The server starts successfully on port 3000 without errors.",
+      "description": "The server starts successfully on port 3000.",
       "testable": true,
       "layer": "integration"
     }
@@ -37,8 +37,8 @@
     "Error handling: No unhandled promise rejections. All async errors are caught and handled."
   ],
   "outOfScope": [
-    "Any other endpoints or features not mentioned in the intent.",
-    "Existing files outside of src/app.ts and src/index.ts."
+    "All other endpoints and application logic not mentioned in the intent.",
+    "Any database interactions or repository implementations."
   ],
   "ambiguities": []
 }
