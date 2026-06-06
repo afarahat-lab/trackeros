@@ -4,8 +4,8 @@
   "apiContracts": [
     {
       "method": "GET",
-      "path": "/api/v1/health",
-      "description": "Checks the health of the application and returns a status.",
+      "path": "/api/v1/health-check",
+      "description": "Checks the health status of the application.",
       "requestBody": {},
       "responseBody": {
         "status": "string"
