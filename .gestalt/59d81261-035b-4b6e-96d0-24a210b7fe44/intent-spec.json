@@ -1,5 +1,5 @@
 {
-  "id": "15e15df2-c2e5-408e-bf6c-0fe8e99b53d0",
+  "id": "f06e4f5f-91b3-4f9d-b3ac-1b65512fd3cc",
   "correlationId": "59d81261-035b-4b6e-96d0-24a210b7fe44",
   "rawIntent": "Create src/modules/leave/leave.routes.ts with an Express router that mounts POST /leave calling LeaveService.submitLeaveRequest and GET /leave calling LeaveService.getEmployeeLeave. Import LeaveService from leave.service.ts which already exists.",
   "scope": {
@@ -17,18 +17,20 @@
       "id": "sc-001",
       "description": "The Express router is created in leave.routes.ts and correctly mounts the POST and GET endpoints to the LeaveService methods.",
       "testable": true,
-      "layer": "unit"
+      "layer": "integration"
     }
   ],
   "constraints": [
     "Repository pattern: All database access goes through repository interfaces.",
     "Audit records: All state-changing operations write an audit record.",
     "Input validation: Validate all inputs at API boundaries before processing.",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
     "RBAC enforcement: All API endpoints enforce role-based access control.",
     "Error handling: No unhandled promise rejections. All async errors are caught and handled."
   ],
   "outOfScope": [
-    "Any other modules or files outside of src/modules/leave/leave.routes.ts and src/modules/leave/leave.service.ts"
+    "Everything outside src/modules/leave/leave.routes.ts",
+    "LeaveService implementation in leave.service.ts"
   ],
   "ambiguities": []
 }

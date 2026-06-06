@@ -1,7 +1,7 @@
 # Aider session
 
 **Exit code:** 0
-**Duration:** 4711ms
+**Duration:** 5644ms
 **Files changed:** 1
 
 ## Prompt sent to Aider
@@ -14,7 +14,8 @@ Create src/modules/leave/leave.routes.ts with an Express router that mounts POST
 - The Express router is created in leave.routes.ts and correctly mounts the POST and GET endpoints to the LeaveService methods.
 
 ## Out of scope (do NOT touch these)
-- Any other modules or files outside of src/modules/leave/leave.routes.ts and src/modules/leave/leave.service.ts
+- Everything outside src/modules/leave/leave.routes.ts
+- LeaveService implementation in leave.service.ts
 
 ## Project rules
 - Generated code must compile without errors.
@@ -99,11 +100,13 @@ base-repository.ts      ← shared
         "employeeId": "string",
         "leaveType": "string",
         "startDate": "string",
-        "endDate": "string"
+        "endDate": "string",
+        "reason": "string"
       },
       "responseBody": {
         "status": "string",
-        "message": "string"
+        "message": "string",
+        "leaveRequestId": "string"
       },
       "authRequired": true,
       "roles": [
@@ -117,7 +120,7 @@ base-repository.ts      ← shared
       "description": "Retrieves leave information for an employee.",
       "requestBody": {},
       "responseBody": {
-        "leaveRecords": "array"
+        "leaves": "Array<LeaveRecord>"
       },
       "authRequired": true,
       "roles": [
@@ -147,21 +150,46 @@ src/modules/leave/leave.routes.ts
                                                                                 
 @@ -1,5 +1,6 @@                                                                 
  import { Router } from 'express';                                              
+                                                                                
+ router.post('/leave', async (req, res) => {                                    
+     try {                                                                      
+         const leaveRequest = await LeaveService.submitLeaveRequest(req.body);  
++        res.status(201).json({                                                 
++        res.status(201).json({                                                 
++            status: 'success',                                                 
++            message: 'Leave request submitted successfully',                   
++            leaveRequestId: leaveRequest.id,                                   
++        });                                                                    
+     } catch (error) {                                                          
+-        res.status(400).json({ status: 'error', message: error.message });     
++        res.status(400).json({                                                 
++            status: 'error',                                                   
++            message: error.message,                                            
++        });                                                                    
+     }                                                                          
  });                                                                            
                                                                                 
  router.get('/leave', async (req, res) => {                                     
      try {                                                                      
--        const leaves = await LeaveService.getEmployeeLeave(req.user.id);       
--        res.status(200).json({ leaves });                                      
-+        const leaveRecords = await LeaveService.getEmployeeLeave(req.user.id); 
-+        res.status(200).json({ leaveRecords });                                
+-        const leaveRecords = await LeaveService.getEmployeeLeave(req.user.id); 
+-        res.status(200).json({ leaveRecords });                                
++        const leaves = await LeaveService.getEmployeeLeave(req.user.id);       
++        res.status(200).json({                                                 
++            leaves,                                                            
++        });                                                                    
      } catch (error) {                                                          
-         res.status(400).json({ status: 'error', message: error.message });     
+-        res.status(400).json({ status: 'error', message: error.message });     
++        res.status(400).json({                                                 
++            status: 'error',                                                   
++            message: error.message,                                            
++        });                                                                    
      }                                                                          
  });                                                                            
                                                                                 
+ export default router;                                                         
+                                                                                
 
-Tokens: 1.5k sent, 198 received. Cost: $0.00035 message, $0.00035 session.
+Tokens: 1.5k sent, 229 received. Cost: $0.00037 message, $0.00037 session.
 
 src/modules/leave/leave.routes.ts
 Applied edit to src/modules/leave/leave.routes.ts
