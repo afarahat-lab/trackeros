@@ -1,5 +1,5 @@
 {
-  "id": "f8b011b3-a08d-4b73-9122-adea02a185c2",
+  "id": "57c91cc4-e893-4f7e-9718-b3e80a4f124f",
   "correlationId": "91a108fb-fae3-4a23-9758-2abd7dfa76db",
   "rawIntent": "Add a health check endpoint to the Express application. Create src/app.ts that initialises an Express app, mounts GET /health returning json status ok, and exports the app. Create src/index.ts as the entry point that starts the server on port 3000.",
   "scope": {
