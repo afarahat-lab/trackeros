@@ -1,7 +1,7 @@
 # Aider session
 
 **Exit code:** 0
-**Duration:** 3542ms
+**Duration:** 3582ms
 **Files changed:** 2
 
 ## Prompt sent to Aider
@@ -11,7 +11,7 @@
 Add a health check endpoint to the Express application. Create src/app.ts that initialises an Express app, mounts GET /health returning json status ok, and exports the app. Create src/index.ts as the entry point that starts the server on port 3000.
 
 ## Success criteria
-- The Express application has a GET /health endpoint that returns a JSON response with status 'ok'.
+- The Express application has a GET /health endpoint that returns a JSON response with status ok.
 - The server starts successfully on port 3000 without errors.
 
 ## Out of scope (do NOT touch these)
