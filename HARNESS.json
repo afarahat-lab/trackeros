@@ -110,5 +110,8 @@
     "roleMapping": [],
     "defaultRole": null,
     "sessionTtlMinutes": 480
+  },
+  "codeGeneration": {
+    "backend": "aider"
   }
 }
