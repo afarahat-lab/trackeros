@@ -1,0 +1,43 @@
+{
+  "correlationId": "59d81261-035b-4b6e-96d0-24a210b7fe44",
+  "domainChanges": [],
+  "apiContracts": [
+    {
+      "method": "POST",
+      "path": "/api/v1/leave",
+      "description": "Submits a leave request for an employee.",
+      "requestBody": {
+        "employeeId": "string",
+        "leaveType": "string",
+        "startDate": "string",
+        "endDate": "string",
+        "reason": "string"
+      },
+      "responseBody": {
+        "status": "string",
+        "message": "string",
+        "leaveRequestId": "string"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/leave",
+      "description": "Retrieves leave information for an employee.",
+      "requestBody": {},
+      "responseBody": {
+        "leaves": "array"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    }
+  ],
+  "componentSpecs": []
+}

@@ -1,0 +1,182 @@
+# Aider session
+
+**Exit code:** 0
+**Duration:** 5238ms
+**Files changed:** 1
+
+## Prompt sent to Aider
+
+```
+## Task
+Create src/modules/leave/leave.routes.ts with an Express router that mounts POST /leave calling LeaveService.submitLeaveRequest and GET /leave calling LeaveService.getEmployeeLeave. Import LeaveService from leave.service.ts which already exists.
+
+## Success criteria
+- The leave.routes.ts file is created with the specified Express router and correctly imports LeaveService.
+
+## Out of scope (do NOT touch these)
+- Everything outside src/modules/leave/leave.routes.ts
+- LeaveService implementation in leave.service.ts
+
+## Project rules
+- Generated code must compile without errors.
+- All imports must resolve to files that exist in the project.
+
+## Project architecture
+# Architecture — leave-management
+
+## Overview
+
+A corporate leave management system. Employees apply for annual,
+sick, and emergency leave. Managers approve or reject requests.
+HR configures leave policies and views reports. The system enforces
+leave balance limits and prevents overlapping requests.
+
+## Stack
+
+- Runtime: Node 22 LTS
+- Language: TypeScript 5.x (strict mode)
+- Package manager: npm
+- Backend framework: Express 4
+- Database: PostgreSQL (via `pg` driver, no ORM)
+- Test framework: Jest + Supertest
+- Auth: JWT (jsonwebtoken)
+
+## Domain model
+
+### Core entities
+- **Employee** — id, name, email, role (employee | manager | hr), managerId
+- **LeaveBalance** — employeeId, leaveType, totalDays, usedDays, year
+- **LeaveRequest** — id, employeeId, type (annual|sick|emergency),
+  startDate, endDate, status (pending|approved|rejected), managerId,
+  managerComment, createdAt
+- **LeavePolicy** — id, leaveType, defaultDaysPerYear, maxConsecutiveDays,
+  requiresApproval, createdAt
+
+### Business rules (enforced in service layer)
+1. Leave balance must be sufficient before a request is approved
+2. Overlapping leave requests for the same employee are rejected
+3. Only the assigned manager can approve/reject a subordinate's request
+4. HR can configure policies and view all requests
+5. Emergency leave bypasses balance checks but still records usage
+
+## Module structure
+src/
+modules/
+leave/
+leave.model.ts          ← TypeScript types/interfaces
+leave.repository.ts     ← SQL queries, implements ILeaveRepository
+leave.service.ts        ← business logic, balance enforcement
+leave.routes.ts         ← Express router
+leave.test.ts           ← Jest unit tests
+employee/
+employee.model.ts
+employee.repository.ts
+employee.service.ts
+employee.routes.ts
+policy/
+policy.model.ts
+policy.repository.ts
+policy.service.ts
+policy.routes.ts
+balance/
+balance.model.ts
+balance.repository.ts
+balance.service.ts
+shared/
+db/
+connection.ts           ← pg Pool, single instance
+base-repository.ts      ← shared
+
+## Design context
+{
+  "correlationId": "59d81261-035b-4b6e-96d0-24a210b7fe44",
+  "domainChanges": [],
+  "apiContracts": [
+    {
+      "method": "POST",
+      "path": "/api/v1/leave",
+      "description": "Submits a leave request for an employee.",
+      "requestBody": {
+        "employeeId": "string",
+        "leaveType": "string",
+        "startDate": "string",
+        "endDate": "string",
+        "reason": "string"
+      },
+      "responseBody": {
+        "status": "string",
+        "message": "string",
+        "leaveRequestId": "string"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/leave",
+      "description": "Retrieves leave information for an employee.",
+      "requestBody": {},
+      "responseBody": {
+        "leaves": "array"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    }
+  ],
+  "componentSpecs": []
+}
+```
+
+## Aider output
+
+```
+────────────────────────────────────────────────────────────────────────────────
+Aider v0.86.2
+Model: gpt-4o-mini with whole edit format
+Git repo: none
+Repo-map: disabled
+
+
+https://aider.chat/HISTORY.html#release-notes
+
+Here is the implementation for the leave.routes.ts file with the specified      
+Express router:                                                                 
+
+src/modules/leave/leave.routes.ts                                               
+
+                                                                                
+import { Router } from 'express';                                               
+                                                                                
+import LeaveService from './leave.service';                                     
+                                                                                
+                                                                                
+                                                                                
+const router = Router();                                                        
+                                                                                
+                                                                                
+                                                                                
+router.post('/leave', LeaveService.submitLeaveRequest);                         
+                                                                                
+router.get('/leave', LeaveService.getEmployeeLeave);                            
+                                                                                
+                                                                                
+                                                                                
+export default router;                                                          
+                                                                                
+
+Tokens: 1.5k sent, 77 received. Cost: $0.00027 message, $0.00027 session.
+
+src/modules/leave/leave.routes.ts
+Applied edit to src/modules/leave/leave.routes.ts
+
+```
+
+## Files written
+
+- src/modules/leave/leave.routes.ts
