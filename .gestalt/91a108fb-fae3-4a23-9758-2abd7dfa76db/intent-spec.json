@@ -1,5 +1,5 @@
 {
-  "id": "e34f9e12-4797-4a3c-8a12-34724d0ee15a",
+  "id": "d4095c2b-e5c9-451e-8c38-8c7cb1488fb6",
   "correlationId": "91a108fb-fae3-4a23-9758-2abd7dfa76db",
   "rawIntent": "Add a health check endpoint to the Express application. Create src/app.ts that initialises an Express app, mounts GET /health returning json status ok, and exports the app. Create src/index.ts as the entry point that starts the server on port 3000.",
   "scope": {
@@ -17,7 +17,7 @@
   "successCriteria": [
     {
       "id": "sc-001",
-      "description": "The Express application has a GET /health endpoint that returns a JSON response with status 'ok'.",
+      "description": "The Express application has a GET /health endpoint that returns a JSON response with status ok.",
       "testable": true,
       "layer": "integration"
     },
@@ -38,7 +38,8 @@
   ],
   "outOfScope": [
     "Any other endpoints or features not mentioned in the intent.",
-    "Existing application logic unrelated to the health check endpoint."
+    "Existing application logic unrelated to the health check.",
+    "Configuration files outside of src/app.ts and src/index.ts."
   ],
   "ambiguities": []
 }
