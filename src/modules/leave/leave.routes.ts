@@ -14,8 +14,8 @@ router.post('/leave', async (req, res) => {
 
 router.get('/leave', async (req, res) => {
     try {
-        const leaves = await LeaveService.getEmployeeLeave(req.user.id);
-        res.status(200).json({ leaves });
+        const leaveRecords = await LeaveService.getEmployeeLeave(req.user.id);
+        res.status(200).json({ leaveRecords });
     } catch (error) {
         res.status(400).json({ status: 'error', message: error.message });
     }

@@ -12,7 +12,6 @@ Submits a leave request for an employee.
 - `leaveType`: string
 - `startDate`: string
 - `endDate`: string
-- `reason`: string
 
 **Response Body:**
 - `status`: string
@@ -27,7 +26,7 @@ Retrieves leave information for the authenticated employee.
 **Request Body:** None
 
 **Response Body:**
-- `leaves`: array
+- `leaveRecords`: array
 
 **Auth Required:** Yes  
 **Roles:** admin, operator

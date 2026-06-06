@@ -10,8 +10,7 @@
         "employeeId": "string",
         "leaveType": "string",
         "startDate": "string",
-        "endDate": "string",
-        "reason": "string"
+        "endDate": "string"
       },
       "responseBody": {
         "status": "string",
@@ -29,7 +28,7 @@
       "description": "Retrieves leave information for an employee.",
       "requestBody": {},
       "responseBody": {
-        "leaves": "array"
+        "leaveRecords": "array"
       },
       "authRequired": true,
       "roles": [
