@@ -15,7 +15,8 @@
       },
       "responseBody": {
         "status": "string",
-        "message": "string"
+        "message": "string",
+        "leaveRequestId": "string"
       },
       "authRequired": true,
       "roles": [
@@ -26,10 +27,10 @@
     {
       "method": "GET",
       "path": "/api/v1/leave",
-      "description": "Retrieves leave information for an employee.",
+      "description": "Retrieves leave information for the authenticated employee.",
       "requestBody": {},
       "responseBody": {
-        "leaves": "array"
+        "leaves": "Array<Leave>"
       },
       "authRequired": true,
       "roles": [
