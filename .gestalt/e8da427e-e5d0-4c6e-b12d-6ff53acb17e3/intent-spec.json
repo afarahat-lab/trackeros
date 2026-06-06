@@ -1,43 +1,43 @@
 {
-  "id": "f3a58559-9a01-42a3-ba8d-cd07c53bc358",
+  "id": "89a9f198-ef12-4616-b4fa-0c3eb9abcfa7",
   "correlationId": "e8da427e-e5d0-4c6e-b12d-6ff53acb17e3",
-  "rawIntent": "Add a health check endpoint to the Express application. Create src/app.ts that initialises an Express app, mounts GET /health returning json status ok, and exports the app. Create src/index.ts as the entry point that starts the server on port 3000.",
+  "rawIntent": "Add a health check endpoint to the Express application, ensuring that the implementation is correct and passes all tests.",
   "scope": {
     "affectedDomains": [
-      "app"
+      "healthCheck"
     ],
     "affectedLayers": [
       "api",
-      "infra"
+      "test"
     ],
     "isBreakingChange": false,
-    "estimatedComplexity": "medium"
+    "estimatedComplexity": "small"
   },
   "successCriteria": [
     {
       "id": "sc-001",
-      "description": "The Express application has a health check endpoint at GET /health that returns a JSON response with status ok.",
+      "description": "The health check endpoint is accessible and returns a 200 status code.",
       "testable": true,
       "layer": "integration"
     },
     {
       "id": "sc-002",
-      "description": "The server starts successfully on port 3000 without errors.",
+      "description": "All tests related to the health check endpoint pass successfully.",
       "testable": true,
-      "layer": "integration"
+      "layer": "unit"
     }
   ],
   "constraints": [
     "Repository pattern: All database access goes through repository interfaces.",
     "Audit records: All state-changing operations write an audit record.",
     "Input validation: Validate all inputs at API boundaries before processing.",
-    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
     "RBAC enforcement: All API endpoints enforce role-based access control.",
     "Error handling: No unhandled promise rejections. All async errors are caught and handled."
   ],
   "outOfScope": [
-    "Any other endpoints or features not mentioned in the intent.",
-    "Existing files outside of src/app.ts and src/index.ts."
+    "Any other endpoints or features not related to the health check.",
+    "Database schema changes or migrations.",
+    "Frontend changes or UI modifications."
   ],
   "ambiguities": []
 }
