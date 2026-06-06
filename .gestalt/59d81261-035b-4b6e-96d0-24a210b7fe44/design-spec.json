@@ -27,10 +27,10 @@
     {
       "method": "GET",
       "path": "/api/v1/leave",
-      "description": "Retrieves leave information for the authenticated employee.",
+      "description": "Retrieves leave information for an employee.",
       "requestBody": {},
       "responseBody": {
-        "leaves": "Array<Leave>"
+        "leaves": "array"
       },
       "authRequired": true,
       "roles": [
