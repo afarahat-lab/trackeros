@@ -1,5 +1,5 @@
 {
-  "id": "296f9542-de19-444e-888e-aa4b50fa4158",
+  "id": "fb0d2aee-af8f-4c37-bce3-6bf9d4de2ddd",
   "correlationId": "59d81261-035b-4b6e-96d0-24a210b7fe44",
   "rawIntent": "Create src/modules/leave/leave.routes.ts with an Express router that mounts POST /leave calling LeaveService.submitLeaveRequest and GET /leave calling LeaveService.getEmployeeLeave. Import LeaveService from leave.service.ts which already exists.",
   "scope": {
@@ -15,7 +15,7 @@
   "successCriteria": [
     {
       "id": "sc-001",
-      "description": "The Express router is created in leave.routes.ts and correctly mounts the POST and GET endpoints to the respective LeaveService methods.",
+      "description": "The src/modules/leave/leave.routes.ts file is created with the correct Express router setup for POST /leave and GET /leave endpoints.",
       "testable": true,
       "layer": "unit"
     }
@@ -28,8 +28,9 @@
     "Error handling: No unhandled promise rejections. All async errors are caught and handled."
   ],
   "outOfScope": [
-    "Any changes to leave.service.ts",
-    "Other modules or files outside of src/modules/leave/leave.routes.ts"
+    "Any other modules or files outside of src/modules/leave/leave.routes.ts and src/modules/leave/leave.service.ts",
+    "Changes to existing service logic in LeaveService",
+    "Frontend or UI components"
   ],
   "ambiguities": []
 }
