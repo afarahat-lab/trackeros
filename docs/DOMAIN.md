@@ -4,7 +4,7 @@ To be populated as the design-agent and context-agent learn the domain.
 
 ## API Contracts
 
-### POST /api/v1/leaves
+### POST /api/v1/leave
 Submits a leave request for an employee.
 
 **Request Body:**
@@ -22,7 +22,7 @@ Submits a leave request for an employee.
 **Auth Required:** Yes  
 **Roles:** admin, operator
 
-### GET /api/v1/leaves
+### GET /api/v1/leave
 Retrieves leave records for an employee.
 
 **Request Body:** None
