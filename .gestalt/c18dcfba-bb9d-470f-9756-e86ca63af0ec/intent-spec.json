@@ -1,0 +1,42 @@
+{
+  "id": "c84748bd-200d-464a-ba99-ba438378118e",
+  "correlationId": "c18dcfba-bb9d-470f-9756-e86ca63af0ec",
+  "rawIntent": "Add a health check endpoint to the Express application. Create src/app.ts that initialises an Express app, mounts GET /health returning json status ok, and exports the app. Create src/index.ts as the entry point that starts the server on port 3000.",
+  "scope": {
+    "affectedDomains": [
+      "app"
+    ],
+    "affectedLayers": [
+      "api",
+      "infra"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "The Express application has a GET /health endpoint that returns a JSON response with status 'ok'.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "sc-002",
+      "description": "The server starts successfully on port 3000 without errors.",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Audit records: All state-changing operations write an audit record.",
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "RBAC enforcement: All API endpoints enforce role-based access control.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "All files outside src/app.ts and src/index.ts"
+  ],
+  "ambiguities": []
+}

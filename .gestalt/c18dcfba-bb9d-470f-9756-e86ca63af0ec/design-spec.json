@@ -1,0 +1,18 @@
+{
+  "correlationId": "c18dcfba-bb9d-470f-9756-e86ca63af0ec",
+  "domainChanges": [],
+  "apiContracts": [
+    {
+      "method": "GET",
+      "path": "/api/v1/health",
+      "description": "Checks the health of the application and returns a status.",
+      "requestBody": {},
+      "responseBody": {
+        "status": "string"
+      },
+      "authRequired": false,
+      "roles": []
+    }
+  ],
+  "componentSpecs": []
+}
