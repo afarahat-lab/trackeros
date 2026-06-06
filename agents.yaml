@@ -124,12 +124,38 @@ agents:
     prompt_extensions: []
 
   # ── Gate layer (Amendment 2026-06: tools enabled by default) ──
+  #
+  # TEST_REPORT_016 — gate agents pinned to gpt-4o.
+  # gpt-4o-mini cannot reliably follow rules that contradict its
+  # training bias. TR_015 proved this — the model READS the rule
+  # (the rule's title prefix appears verbatim in 26/28
+  # constraint-agent signals) but REASONS the opposite of the
+  # rule's body (15/28 signals assert "pool.query in a repository
+  # file is not allowed" against the rule that says the same
+  # thing IS the repository's job). The gate's instruction-
+  # following bar is structurally higher than the code-agent's
+  # creative-completion bar, so the two agents need different
+  # models. Aider's code-generation path stays on gpt-4o-mini.
+  # temperature: 0.0 is mandatory — gate verdicts must be
+  # deterministic, the rules give the model no leeway to be
+  # creative.
+  constraint-agent:
+    role: "Architectural constraint evaluator"
+    goal: "Verify generated code satisfies all project architectural rules using executeScript + read-only file tools"
+    llm:
+      model: gpt-4o     # override — gpt-4o for reliable rule-following
+      temperature: 0.0
+      max_tokens: 2000
+    tools:
+      builtin: [executeScript, readFile, searchFiles]
+    prompt_extensions: []
+
   review-agent:
     role: "Senior engineer and code reviewer"
     goal: "Assess generated code quality and architectural correctness"
     llm:
-      model: ~
-      temperature: 0.1
+      model: gpt-4o     # override — gpt-4o for reliable rule-following
+      temperature: 0.0
       max_tokens: 4000
     tools:
       # Narrower than code-agent — review-agent operates primarily
