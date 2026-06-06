@@ -28,7 +28,7 @@ Retrieves the leave records for an employee.
 **Request Body:** None
 
 **Response Body:**
-- `leaveRecords`: array
+- `leaves`: Array<LeaveRecord>
 
 **Auth Required:** Yes  
 **Roles:** admin, operator
