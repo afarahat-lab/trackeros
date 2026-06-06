@@ -28,7 +28,7 @@ Retrieves leave information for the authenticated employee.
 **Request Body:** None
 
 **Response Body:**
-- `leaves`: Array<LeaveRecord>
+- `leaves`: array
 
 **Auth Required:** Yes  
 **Roles:** admin, operator
