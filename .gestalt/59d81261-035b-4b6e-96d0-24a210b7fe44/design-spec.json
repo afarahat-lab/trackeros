@@ -4,7 +4,7 @@
   "apiContracts": [
     {
       "method": "POST",
-      "path": "/api/v1/leave",
+      "path": "/api/v1/leaves",
       "description": "Submits a leave request for an employee.",
       "requestBody": {
         "employeeId": "string",
@@ -26,11 +26,11 @@
     },
     {
       "method": "GET",
-      "path": "/api/v1/leave",
-      "description": "Retrieves leave information for an employee.",
+      "path": "/api/v1/leaves",
+      "description": "Retrieves leave records for an employee.",
       "requestBody": {},
       "responseBody": {
-        "leaves": "array"
+        "leaves": "Array<LeaveRecord>"
       },
       "authRequired": true,
       "roles": [
