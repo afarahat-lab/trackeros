@@ -15,8 +15,7 @@
       },
       "responseBody": {
         "status": "string",
-        "message": "string",
-        "leaveRequestId": "string"
+        "message": "string"
       },
       "authRequired": true,
       "roles": [

@@ -17,7 +17,6 @@ Submits a leave request for an employee.
 **Response Body:**
 - `status`: string
 - `message`: string
-- `leaveRequestId`: string
 
 **Auth Required:** Yes  
 **Roles:** admin, operator
