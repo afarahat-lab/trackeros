@@ -52,19 +52,18 @@
   "agentConfig": {
     "constraint-agent": {
       "rules": [
-        "Repository pattern — VIOLATION: A non-repository file (service, route, controller) calls pool.query(), db.execute(), or new Pool() directly.",
-        "Repository pattern — CORRECT (do NOT flag): A repository file (*.repository.ts) calling pool.query() — that IS its job.",
-        "Repository pattern — CORRECT (do NOT flag): A service file importing ILeaveRepository and calling this.repository.createRequest() — that IS the correct pattern.",
-        "No SQL queries outside repository files",
-        "No console.log in production source files",
+        "REPOSITORY PATTERN — what is a VIOLATION (flag this): A service, route, or controller file calls pool.query(), db.execute(), db.query(), new Pool(), or createConnection() directly. Example violation: a file named leave.service.ts containing pool.query('SELECT...').",
+        "REPOSITORY PATTERN — what is CORRECT (do NOT flag): A file named *.repository.ts calling pool.query() or db.query() — that IS the repository's job. This is correct and must never be flagged.",
+        "REPOSITORY PATTERN — what is CORRECT (do NOT flag): A service file importing a repository class or interface (e.g. import LeaveRepository from './leave.repository') and calling methods on it (e.g. this.leaveRepository.createLeaveRequest(req)). This IS the correct pattern.",
+        "No SQL queries outside *.repository.ts files",
+        "No console.log/warn/error in production source files",
         "All async functions must handle errors"
       ]
     },
     "code-agent": {
       "rules": [
-        "Generated code must compile without errors. Verify with executeScript before returning.",
-        "All imports must resolve to files that exist in the project or are declared in package.json.",
-        "You MUST run a compile/lint check via executeScript before emitting the final files. This is not optional."
+        "Generated code must compile without errors.",
+        "All imports must resolve to files that exist in the project."
       ]
     },
     "test-runner-agent": {
@@ -76,9 +75,10 @@
     "review-agent": {
       "rules": [
         "Only flag violations for layers explicitly in scope for this intent.",
-        "Do not flag items as missing if they already exist on the project's main branch.",
-        "Verify import resolution by running tsc --noEmit before flagging unresolved imports.",
-        "Do not flag golden principle violations for concerns excluded by IntentSpec.outOfScope."
+        "Do not flag items as missing if they already exist on the project main branch.",
+        "REPOSITORY PATTERN — what is CORRECT (do NOT flag): A *.repository.ts file that calls pool.query() or db.query(). That is its purpose.",
+        "REPOSITORY PATTERN — what is CORRECT (do NOT flag): A service file that imports a repository and delegates to it.",
+        "REPOSITORY PATTERN — VIOLATION: Any non-repository file calling pool.query() or new Pool() directly."
       ]
     }
   },
