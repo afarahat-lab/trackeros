@@ -1,0 +1,41 @@
+{
+  "id": "1dc77de2-d5d8-4ff0-aa3f-396b7a071d7b",
+  "correlationId": "490183e7-41c7-46c1-9122-a42285151c61",
+  "rawIntent": "Create src/modules/leave/leave.service.ts implementing the LeaveService class. It must import LeaveRepository from './leave.repository' and implement submitLeaveRequest(req): Promise<LeaveRequest> by delegating to leaveRepository.createLeaveRequest(req). Also generate the matching unit test at tests/unit/modules/leave/leave.service.test.ts using vitest. Scope: ONLY the service file and its unit test. Out of scope: API routes, RBAC middleware, audit logging, input validation middleware, any other modules outside src/modules/leave.",
+  "scope": {
+    "affectedDomains": [
+      "leave.service.ts",
+      "leave.service.test.ts"
+    ],
+    "affectedLayers": [
+      "domain",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "The LeaveService class is implemented correctly and the submitLeaveRequest method delegates to leaveRepository.createLeaveRequest.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Audit records: All state-changing operations write an audit record.",
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "RBAC enforcement: All API endpoints enforce role-based access control.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "API routes",
+    "RBAC middleware",
+    "audit logging",
+    "input validation middleware",
+    "any other modules outside src/modules/leave"
+  ],
+  "ambiguities": []
+}
