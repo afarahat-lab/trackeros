@@ -6,18 +6,30 @@ const router = Router();
 router.post('/leave', async (req, res) => {
     try {
         const leaveRequest = await LeaveService.submitLeaveRequest(req.body);
-        res.status(201).json(leaveRequest);
+        res.status(201).json({
+            status: 'success',
+            message: 'Leave request submitted successfully',
+            leaveRequestId: leaveRequest.id
+        });
     } catch (error) {
-        res.status(400).json({ message: error.message });
+        res.status(400).json({
+            status: 'error',
+            message: error.message
+        });
     }
 });
 
 router.get('/leave', async (req, res) => {
     try {
         const leaves = await LeaveService.getEmployeeLeave(req.user.id);
-        res.status(200).json(leaves);
+        res.status(200).json({
+            leaves
+        });
     } catch (error) {
-        res.status(400).json({ message: error.message });
+        res.status(400).json({
+            status: 'error',
+            message: error.message
+        });
     }
 });
 
