@@ -27,7 +27,7 @@
     {
       "method": "GET",
       "path": "/api/v1/leave",
-      "description": "Retrieves the leave records for an employee.",
+      "description": "Retrieves leave information for an employee.",
       "requestBody": {},
       "responseBody": {
         "leaves": "array"
