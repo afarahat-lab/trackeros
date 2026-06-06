@@ -1,7 +1,7 @@
 # Aider session
 
 **Exit code:** 0
-**Duration:** 5631ms
+**Duration:** 5227ms
 **Files changed:** 1
 
 ## Prompt sent to Aider
@@ -11,10 +11,10 @@
 Create src/modules/leave/leave.routes.ts with an Express router that mounts POST /leave calling LeaveService.submitLeaveRequest and GET /leave calling LeaveService.getEmployeeLeave. Import LeaveService from leave.service.ts which already exists.
 
 ## Success criteria
-- The src/modules/leave/leave.routes.ts file is created with the specified Express router and correctly imports LeaveService.
+- The Express router is created in leave.routes.ts and correctly mounts the POST and GET endpoints.
 
 ## Out of scope (do NOT touch these)
-- Any other modules or files outside src/modules/leave/leave.routes.ts and leave.service.ts
+- Any other modules or files outside of src/modules/leave/leave.routes.ts and src/modules/leave/leave.service.ts
 
 ## Project rules
 - Generated code must compile without errors.
@@ -119,7 +119,7 @@ base-repository.ts      ← shared
       "description": "Retrieves leave information for an employee.",
       "requestBody": {},
       "responseBody": {
-        "leaves": "array"
+        "leaves": "Array<Leave>"
       },
       "authRequired": true,
       "roles": [
@@ -141,8 +141,8 @@ Model: gpt-4o-mini with whole edit format
 Git repo: none
 Repo-map: disabled
 
-Here is the implementation for the src/modules/leave/leave.routes.ts file with  
-the specified Express router:                                                   
+Here is the implementation for the Express router in leave.routes.ts that mounts
+the specified POST and GET endpoints.                                           
 
 src/modules/leave/leave.routes.ts                                               
 
