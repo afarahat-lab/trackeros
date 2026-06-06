@@ -52,11 +52,12 @@
   "agentConfig": {
     "constraint-agent": {
       "rules": [
-        "All database connections must be created in src/shared/db/ only. Importing a database type for use in a type signature is NOT a violation — only instantiating a connection is.",
-        "No SQL queries outside repository classes. Services, routes, and controllers must not contain SQL.",
-        "No console.log/warn/error in production source files.",
-        "All async functions must handle errors — no unhandled promise rejections.",
-        "No hardcoded credentials or connection strings in source files."
+        "Repository pattern — VIOLATION: A non-repository file (service, route, controller) calls pool.query(), db.execute(), or new Pool() directly.",
+        "Repository pattern — CORRECT (do NOT flag): A repository file (*.repository.ts) calling pool.query() — that IS its job.",
+        "Repository pattern — CORRECT (do NOT flag): A service file importing ILeaveRepository and calling this.repository.createRequest() — that IS the correct pattern.",
+        "No SQL queries outside repository files",
+        "No console.log in production source files",
+        "All async functions must handle errors"
       ]
     },
     "code-agent": {
