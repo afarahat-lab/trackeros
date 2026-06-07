@@ -19,11 +19,12 @@
 # without needing the platform to dispatch it.
 
 name: gestalt
+# TR_020 — pull_request trigger removed (duplicated push, tripled CI
+# minutes in TR_019). push handles every Aider commit; workflow_dispatch
+# stays for promotion-agent's staging / production deploys.
 on:
   push:
     branches: ['gestalt/**']
-  pull_request:
-    branches: [main]
   workflow_dispatch:
     inputs:
       environment:
