@@ -1,0 +1,18 @@
+{
+  "correlationId": "1cc73ae1-4822-4e6e-b336-8fbbd541ed41",
+  "domainChanges": [],
+  "apiContracts": [
+    {
+      "method": "GET",
+      "path": "/api/v1/health",
+      "description": "Health check endpoint that returns the status of the application.",
+      "requestBody": {},
+      "responseBody": {
+        "status": "string"
+      },
+      "authRequired": false,
+      "roles": []
+    }
+  ],
+  "componentSpecs": []
+}
