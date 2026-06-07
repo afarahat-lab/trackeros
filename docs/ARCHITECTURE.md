@@ -94,3 +94,11 @@ PATCH  /policies/:id               ← HR update
 - All database access goes through the repository layer
 - Error handling: services throw typed errors from `shared/types/index.ts`
   which the error middleware catches and maps to HTTP responses
+
+## Version Endpoint
+
+### Overview
+A new endpoint to return the current application version from package.json.
+
+### API Surface
+GET /version  ← returns the current version of the application.
