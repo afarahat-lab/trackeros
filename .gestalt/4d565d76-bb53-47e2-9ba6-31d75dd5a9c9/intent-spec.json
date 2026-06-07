@@ -1,5 +1,5 @@
 {
-  "id": "9bd57328-59db-40b6-ba0a-7d25bd109cd6",
+  "id": "04651d7e-d482-4131-8f99-e34ba1e0a891",
   "correlationId": "4d565d76-bb53-47e2-9ba6-31d75dd5a9c9",
   "rawIntent": "[Feature: Leave management module — Phase 1: Create leave model]\n\nCreate src/modules/leave/leave.model.ts. Define LeaveRequest, CreateLeaveRequestDto. Import LeaveType from src/shared/types/index.ts.\n\nPhase architecture notes:\nThis phase establishes the foundational data structures for leave requests.",
   "scope": {
@@ -15,7 +15,7 @@
   "successCriteria": [
     {
       "id": "sc-001",
-      "description": "LeaveRequest and CreateLeaveRequestDto are defined correctly in src/modules/leave/leave.model.ts and LeaveType is imported from src/shared/types/index.ts.",
+      "description": "LeaveRequest and CreateLeaveRequestDto are defined correctly in leave.model.ts and LeaveType is imported successfully.",
       "testable": true,
       "layer": "unit"
     }
@@ -29,7 +29,8 @@
     "Error handling: No unhandled promise rejections. All async errors are caught and handled."
   ],
   "outOfScope": [
-    "Any other modules or files outside src/modules/leave/leave.model.ts and src/shared/types/index.ts"
+    "Everything outside src/modules/leave/leave.model.ts",
+    "Any other modules or files not mentioned in the intent"
   ],
   "ambiguities": []
 }
