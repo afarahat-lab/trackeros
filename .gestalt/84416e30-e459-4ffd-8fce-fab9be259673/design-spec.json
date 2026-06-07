@@ -34,16 +34,6 @@
           "name": "status",
           "type": "string",
           "required": true
-        },
-        {
-          "name": "createdAt",
-          "type": "Date",
-          "required": true
-        },
-        {
-          "name": "updatedAt",
-          "type": "Date",
-          "required": true
         }
       ],
       "relationships": []
@@ -52,11 +42,6 @@
       "entityName": "CreateLeaveRequestDto",
       "operation": "create",
       "fields": [
-        {
-          "name": "employeeId",
-          "type": "string",
-          "required": true
-        },
         {
           "name": "leaveType",
           "type": "LeaveType",
@@ -82,16 +67,13 @@
       "path": "/api/v1/leave-requests",
       "description": "Creates a new leave request.",
       "requestBody": {
-        "employeeId": "string",
         "leaveType": "LeaveType",
         "startDate": "Date",
         "endDate": "Date"
       },
       "responseBody": {
         "id": "string",
-        "status": "string",
-        "createdAt": "Date",
-        "updatedAt": "Date"
+        "status": "string"
       },
       "authRequired": true,
       "roles": [
