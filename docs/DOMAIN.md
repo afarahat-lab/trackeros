@@ -39,7 +39,7 @@ None
 - **Roles**: None
 
 ### POST /api/v1/leave-requests
-- **Description**: Creates a new leave request
+- **Description**: Creates a new leave request.
 - **Request Body**:
   - `employeeId`: string
   - `leaveType`: LeaveType
@@ -47,10 +47,6 @@ None
   - `endDate`: Date
 - **Response Body**:
   - `id`: string
-  - `employeeId`: string
-  - `leaveType`: LeaveType
-  - `startDate`: Date
-  - `endDate`: Date
   - `status`: string
   - `createdAt`: Date
   - `updatedAt`: Date
