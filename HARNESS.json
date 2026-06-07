@@ -87,7 +87,8 @@
     "code-agent": {
       "rules": [
         "Generated code must compile without errors.",
-        "All imports must resolve to files that exist in the project."
+        "All imports must resolve to files that exist in the project.",
+        "Do not use require() for JSON imports — import them using ES module syntax with resolveJsonModule enabled in tsconfig."
       ]
     },
     "review-agent": {
@@ -150,9 +151,10 @@
   },
   "planner": {
     "enabled": true,
-    "maxPhasesPerFeature": 4,
-    "maxFilesPerPhase": 3,
-    "architectureReviewPerPhase": false
+    "maxPhasesPerFeature": 10,
+    "maxFilesPerPhase": 5,
+    "architectureReviewPerPhase": false,
+    "maxPhaseRetries": 2
   },
   "maintenance": {
     "driftCheck": {
