@@ -1,0 +1,18 @@
+{
+  "correlationId": "be199f39-7746-46e0-ab09-67680f58fdb1",
+  "domainChanges": [],
+  "apiContracts": [
+    {
+      "method": "GET",
+      "path": "/api/v1/alives",
+      "description": "Checks if the service is alive and returns a status.",
+      "requestBody": {},
+      "responseBody": {
+        "alive": "boolean"
+      },
+      "authRequired": false,
+      "roles": []
+    }
+  ],
+  "componentSpecs": []
+}
