@@ -80,7 +80,7 @@
     {
       "method": "POST",
       "path": "/api/v1/leave-requests",
-      "description": "Creates a new leave request",
+      "description": "Creates a new leave request.",
       "requestBody": {
         "employeeId": "string",
         "leaveType": "LeaveType",

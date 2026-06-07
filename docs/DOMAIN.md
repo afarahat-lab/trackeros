@@ -13,12 +13,12 @@ To be populated as the design-agent and context-agent learn the domain.
 - **Roles**: None
 
 ### POST /api/v1/leave-requests
-- **Description**: Creates a new leave request
+- **Description**: Creates a new leave request.
 - **Request Body**:
-  - `employeeId`: string
-  - `leaveType`: LeaveType
-  - `startDate`: Date
-  - `endDate`: Date
+  - `employeeId`: string (required)
+  - `leaveType`: LeaveType (required)
+  - `startDate`: Date (required)
+  - `endDate`: Date (required)
 - **Response Body**:
   - `id`: string
   - `status`: string
