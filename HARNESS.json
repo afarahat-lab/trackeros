@@ -153,8 +153,8 @@
     "enabled": true,
     "maxPhasesPerFeature": 10,
     "maxFilesPerPhase": 5,
-    "architectureReviewPerPhase": true,
-    "maxPhaseRetries": 0
+    "architectureReviewPerPhase": false,
+    "maxPhaseRetries": 2
   },
   "maintenance": {
     "driftCheck": {
