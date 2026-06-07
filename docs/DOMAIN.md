@@ -11,3 +11,40 @@ To be populated as the design-agent and context-agent learn the domain.
   - `status`: string
 - **Auth Required**: No
 - **Roles**: None
+
+### POST /api/v1/leave-requests
+- **Description**: Creates a new leave request.
+- **Request Body**:
+  - `employeeId`: string
+  - `leaveType`: LeaveType
+  - `startDate`: Date
+  - `endDate`: Date
+- **Response Body**:
+  - `id`: string
+  - `status`: string
+  - `createdAt`: Date
+  - `updatedAt`: Date
+- **Auth Required**: Yes
+- **Roles**: admin, operator
+
+## Domain Changes
+
+### LeaveRequest
+- **Operation**: create
+- **Fields**:
+  - `id`: string (required)
+  - `employeeId`: string (required)
+  - `leaveType`: LeaveType (required)
+  - `startDate`: Date (required)
+  - `endDate`: Date (required)
+  - `status`: string (required)
+  - `createdAt`: Date (required)
+  - `updatedAt`: Date (required)
+
+### CreateLeaveRequestDto
+- **Operation**: create
+- **Fields**:
+  - `employeeId`: string (required)
+  - `leaveType`: LeaveType (required)
+  - `startDate`: Date (required)
+  - `endDate`: Date (required)
