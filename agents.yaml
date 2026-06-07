@@ -158,20 +158,19 @@ agents:
       temperature: 0.0
       max_tokens: 4000
     tools:
-      # Narrower than code-agent — review-agent operates primarily
-      # off the artifact set already in its prompt; the tools are for
-      # spot-checking referenced files before flagging issues.
-      # TEST_REPORT_012 — executeScript appended so the mandatory
-      # tool-first review protocol (STEP 1: `npx tsc --noEmit`,
-      # STEP 2: searchFiles for direct DB access, STEP 3: readFile
-      # package.json) can actually fire. Without executeScript the
-      # LLM was told to "verify by running tsc" but couldn't reach
-      # the tool — TR_011's 0-tool-calls / 8-round hallucination
-      # loop. Mirrors TR_010's code-agent fix (the platform-side
-      # loader silently dropped executeScript when a project's
-      # tools.builtin override stripped it).
-      builtin: [readFile, searchFiles, executeScript]
-    prompt_extensions: []
+      # TR_020 — executeScript STRIPPED. Under ADR-041 the gate runs
+      # post-CI and CI has already verified compile / test / lint /
+      # security. Re-running `tsc --noEmit` from the gate clone
+      # always fails because the clone has no node_modules (TR_019's
+      # .gitignore fix on trackeros), and the LLM then hallucinates
+      # "TypeScript not installed" — exactly what burned TR_020's
+      # first cycle (4 rounds, 83k review-agent tokens, all four
+      # signals were the same TS-compiler hallucination). Trust CI's
+      # verdict on build correctness; the gate's job is architecture
+      # and intent-spec adherence, not re-running compilers.
+      builtin: [readFile, searchFiles]
+    prompt_extensions:
+      - "CI has already verified build, tests, lint, and security scan before you ran. Do NOT re-run `tsc --noEmit`, `npm test`, `npm run lint`, or any other build/test/lint command — CI is the source of truth for those. Do NOT flag missing tools (TypeScript, etc.) — they are present in CI; the gate's clone is a read-only architectural review environment without node_modules. Focus on architectural review, design-spec adherence, and constraint-rule compliance."
 
   # ── Maintenance layer (Amendment 2026-06: tools enabled) ──────
   drift-agent:
