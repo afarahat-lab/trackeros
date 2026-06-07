@@ -5,7 +5,7 @@
     {
       "method": "GET",
       "path": "/api/v1/health",
-      "description": "Health check endpoint that returns the status of the application.",
+      "description": "Checks the health status of the application.",
       "requestBody": {},
       "responseBody": {
         "status": "string"
