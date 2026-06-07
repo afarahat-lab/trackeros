@@ -1,0 +1,109 @@
+{
+  "correlationId": "0f428dd4-861c-4c21-8454-f71af7c17f2c",
+  "domainChanges": [
+    {
+      "entityName": "LeaveRequest",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "employeeId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "leaveType",
+          "type": "LeaveType",
+          "required": true
+        },
+        {
+          "name": "startDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "endDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "status",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "Employee",
+          "type": "one-to-many"
+        }
+      ]
+    },
+    {
+      "entityName": "CreateLeaveRequestDto",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "employeeId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "leaveType",
+          "type": "LeaveType",
+          "required": true
+        },
+        {
+          "name": "startDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "endDate",
+          "type": "Date",
+          "required": true
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [
+    {
+      "method": "POST",
+      "path": "/api/v1/leave-requests",
+      "description": "Create a new leave request",
+      "requestBody": {
+        "employeeId": "string",
+        "leaveType": "LeaveType",
+        "startDate": "Date",
+        "endDate": "Date"
+      },
+      "responseBody": {
+        "id": "string",
+        "status": "string",
+        "createdAt": "Date",
+        "updatedAt": "Date"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    }
+  ],
+  "componentSpecs": []
+}
