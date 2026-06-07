@@ -1,26 +1,18 @@
-import { LeaveType, LeaveStatus } from '../../shared/types';
+import { LeaveType } from '../../shared/types/index';
 
-/**
- * Interface representing a leave request.
- */
 export interface LeaveRequest {
-  id: string;
-  employeeId: string;
-  leaveType: LeaveType;
-  status: LeaveStatus;
-  startDate: Date;
-  endDate: Date;
-  reason?: string;
-  managerId: string;
+    id: string;
+    employeeId: string;
+    leaveType: LeaveType;
+    startDate: Date;
+    endDate: Date;
+    status: string;
+    createdAt: Date;
+    updatedAt: Date;
 }
 
-/**
- * Data Transfer Object for creating a leave request.
- */
 export interface CreateLeaveRequestDto {
-  employeeId: string;
-  leaveType: LeaveType;
-  startDate: Date;
-  endDate: Date;
-  reason?: string;
+    leaveType: LeaveType;
+    startDate: Date;
+    endDate: Date;
 }
