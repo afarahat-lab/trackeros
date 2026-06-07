@@ -1,10 +1,11 @@
 {
-  "id": "95042271-8c84-4103-bff0-6d4e381ded77",
+  "id": "d18798c7-72d8-4b32-9127-d3607f32ea13",
   "correlationId": "b26ff755-456c-4fbd-aa09-cec7bb5c8394",
-  "rawIntent": "[Feature: Add /version endpoint with test — Phase 1: Implement /version endpoint]\n\nCreate src/modules/version/version.controller.ts that exports a function getVersion() returning the version from package.json. Create src/modules/version/version.routes.ts to define the /version endpoint using Express. Include a Jest unit test in tests/unit/version.test.ts to verify the /version endpoint returns the correct version.\n\nPhase architecture notes:\nThis phase introduces a new endpoint to the Express app, enhancing the API surface by providing version information.",
+  "rawIntent": "Ensure the /version endpoint correctly retrieves and returns the version from package.json, and that the Jest test accurately verifies this functionality.",
   "scope": {
     "affectedDomains": [
-      "version"
+      "Request",
+      "Response"
     ],
     "affectedLayers": [
       "api",
@@ -18,19 +19,24 @@
       "id": "sc-001",
       "description": "The /version endpoint returns the correct version from package.json.",
       "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "sc-002",
+      "description": "The Jest test successfully verifies the functionality of the /version endpoint.",
+      "testable": true,
       "layer": "unit"
     }
   ],
   "constraints": [
     "Repository pattern: All database access goes through repository interfaces.",
-    "Audit records: All state-changing operations write an audit record.",
     "Input validation: Validate all inputs at API boundaries before processing.",
-    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
     "RBAC enforcement: All API endpoints enforce role-based access control.",
     "Error handling: No unhandled promise rejections. All async errors are caught and handled."
   ],
   "outOfScope": [
-    "everything outside src/modules/version/version.controller.ts, src/modules/version/version.routes.ts, and tests/unit/version.test.ts"
+    "Everything outside the /version endpoint and its associated tests.",
+    "Changes to other endpoints or modules not mentioned in the intent."
   ],
   "ambiguities": []
 }

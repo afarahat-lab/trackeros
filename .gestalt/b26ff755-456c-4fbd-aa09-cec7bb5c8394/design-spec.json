@@ -5,7 +5,7 @@
     {
       "method": "GET",
       "path": "/api/v1/version",
-      "description": "Retrieves the current version of the application from package.json.",
+      "description": "Retrieves the current version from package.json.",
       "requestBody": {},
       "responseBody": {
         "version": "string"
