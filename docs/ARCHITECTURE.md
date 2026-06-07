@@ -105,3 +105,13 @@ GET /version  ← returns the current version of the application.
 
 ## Leave Management Module
 This module allows employees to apply for various types of leave, while managers can approve or reject these requests. It enforces leave balance limits and prevents overlapping requests.
+
+## Uptime Module
+
+### Overview
+
+A new module to provide an endpoint for system uptime.
+
+### Endpoints
+
+- GET /uptime: Returns the process uptime in seconds.
