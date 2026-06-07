@@ -6,11 +6,6 @@
       "operation": "create",
       "fields": [
         {
-          "name": "id",
-          "type": "string",
-          "required": true
-        },
-        {
           "name": "employeeId",
           "type": "string",
           "required": true
@@ -34,16 +29,6 @@
           "name": "status",
           "type": "string",
           "required": true
-        },
-        {
-          "name": "createdAt",
-          "type": "Date",
-          "required": true
-        },
-        {
-          "name": "updatedAt",
-          "type": "Date",
-          "required": true
         }
       ],
       "relationships": [
@@ -57,11 +42,6 @@
       "entityName": "CreateLeaveRequestDto",
       "operation": "create",
       "fields": [
-        {
-          "name": "employeeId",
-          "type": "string",
-          "required": true
-        },
         {
           "name": "leaveType",
           "type": "LeaveType",
@@ -85,18 +65,29 @@
     {
       "method": "POST",
       "path": "/api/v1/leave-requests",
-      "description": "Create a new leave request",
+      "description": "Creates a new leave request.",
       "requestBody": {
-        "employeeId": "string",
         "leaveType": "LeaveType",
         "startDate": "Date",
         "endDate": "Date"
       },
       "responseBody": {
         "id": "string",
-        "status": "string",
-        "createdAt": "Date",
-        "updatedAt": "Date"
+        "status": "string"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/leave-requests",
+      "description": "Retrieves a list of leave requests.",
+      "requestBody": {},
+      "responseBody": {
+        "leaveRequests": "LeaveRequest[]"
       },
       "authRequired": true,
       "roles": [

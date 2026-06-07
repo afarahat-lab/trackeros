@@ -1,5 +1,5 @@
 {
-  "id": "67e455a6-e876-4f6a-86ef-dd644f3e2120",
+  "id": "7c4317b7-b185-479a-9f9c-16bade33189f",
   "correlationId": "0f428dd4-861c-4c21-8454-f71af7c17f2c",
   "rawIntent": "[Feature: Leave management module — Phase 1: Create leave model]\n\nCreate src/modules/leave/leave.model.ts. Define LeaveRequest, CreateLeaveRequestDto. Import LeaveType from src/shared/types/index.ts.\n\nPhase architecture notes:\nThis phase establishes the foundational data structures for leave requests.",
   "scope": {
@@ -15,7 +15,7 @@
   "successCriteria": [
     {
       "id": "sc-001",
-      "description": "LeaveRequest and CreateLeaveRequestDto are defined correctly in src/modules/leave/leave.model.ts and LeaveType is imported from src/shared/types/index.ts.",
+      "description": "LeaveRequest and CreateLeaveRequestDto are defined correctly in leave.model.ts and LeaveType is imported successfully.",
       "testable": true,
       "layer": "unit"
     }
@@ -24,11 +24,13 @@
     "Repository pattern: All database access goes through repository interfaces.",
     "Audit records: All state-changing operations write an audit record.",
     "Input validation: Validate all inputs at API boundaries before processing.",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
     "RBAC enforcement: All API endpoints enforce role-based access control.",
     "Error handling: No unhandled promise rejections. All async errors are caught and handled."
   ],
   "outOfScope": [
-    "Any other modules or files outside src/modules/leave/leave.model.ts and src/shared/types/index.ts"
+    "Everything outside src/modules/leave/leave.model.ts",
+    "Any other modules or files not mentioned in the intent"
   ],
   "ambiguities": []
 }
