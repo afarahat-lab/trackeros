@@ -12,6 +12,7 @@ export interface LeaveRequest {
 }
 
 export interface CreateLeaveRequestDto {
+    employeeId: string;
     leaveType: LeaveType;
     startDate: Date;
     endDate: Date;

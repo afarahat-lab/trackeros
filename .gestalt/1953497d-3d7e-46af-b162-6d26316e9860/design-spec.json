@@ -46,17 +46,17 @@
           "required": true
         }
       ],
-      "relationships": [
-        {
-          "entity": "Employee",
-          "type": "one-to-many"
-        }
-      ]
+      "relationships": []
     },
     {
       "entityName": "CreateLeaveRequestDto",
       "operation": "create",
       "fields": [
+        {
+          "name": "employeeId",
+          "type": "string",
+          "required": true
+        },
         {
           "name": "leaveType",
           "type": "LeaveType",
@@ -80,14 +80,19 @@
     {
       "method": "POST",
       "path": "/api/v1/leave-requests",
-      "description": "Create a new leave request",
+      "description": "Creates a new leave request",
       "requestBody": {
+        "employeeId": "string",
         "leaveType": "LeaveType",
         "startDate": "Date",
         "endDate": "Date"
       },
       "responseBody": {
         "id": "string",
+        "employeeId": "string",
+        "leaveType": "LeaveType",
+        "startDate": "Date",
+        "endDate": "Date",
         "status": "string",
         "createdAt": "Date",
         "updatedAt": "Date"

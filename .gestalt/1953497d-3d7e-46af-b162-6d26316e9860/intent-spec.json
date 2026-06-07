@@ -1,5 +1,5 @@
 {
-  "id": "197d0f05-d51d-4698-9d2d-310256694cbc",
+  "id": "d402b527-bd55-4c52-b171-b845139143c6",
   "correlationId": "1953497d-3d7e-46af-b162-6d26316e9860",
   "rawIntent": "[Feature: Leave management module — Phase 1: Create leave model]\n\nCreate src/modules/leave/leave.model.ts. Define LeaveRequest, CreateLeaveRequestDto. Import LeaveType from src/shared/types/index.ts.\n\nPhase architecture notes:\nThis phase establishes the foundational data structures for leave requests.",
   "scope": {
@@ -24,6 +24,7 @@
     "Repository pattern: All database access goes through repository interfaces.",
     "Audit records: All state-changing operations write an audit record.",
     "Input validation: Validate all inputs at API boundaries before processing.",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
     "RBAC enforcement: All API endpoints enforce role-based access control.",
     "Error handling: No unhandled promise rejections. All async errors are caught and handled."
   ],

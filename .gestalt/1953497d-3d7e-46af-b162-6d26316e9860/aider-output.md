@@ -1,7 +1,7 @@
 # Aider session
 
 **Exit code:** 0
-**Duration:** 4657ms
+**Duration:** 5777ms
 **Files changed:** 1
 
 ## Prompt sent to Aider
@@ -141,17 +141,17 @@ base-repository.ts      ← shared
           "required": true
         }
       ],
-      "relationships": [
-        {
-          "entity": "Employee",
-          "type": "one-to-many"
-        }
-      ]
+      "relationships": []
     },
     {
       "entityName": "CreateLeaveRequestDto",
       "operation": "create",
       "fields": [
+        {
+          "name": "employeeId",
+          "type": "string",
+          "required": true
+        },
         {
           "name": "leaveType",
           "type": "LeaveType",
@@ -175,17 +175,16 @@ base-repository.ts      ← shared
     {
       "method": "POST",
       "path": "/api/v1/leave-requests",
-      "description": "Create a new leave request",
+      "description": "Creates a new leave request",
       "requestBody": {
+        "employeeId": "string",
         "leaveType": "LeaveType",
         "startDate": "Date",
         "endDate": "Date"
       },
       "responseBody": {
         "id": "string",
-        "status": "string",
-        "createdAt": "Date",
-        "updatedAt": "Date"
+        "employeeId": "string",
 ```
 
 ## Aider output
@@ -204,48 +203,20 @@ specified path.
 src/modules/leave/leave.model.ts                                                
 
                                                                                 
-@@ -1,6 +1,4 @@                                                                 
--import { LeaveType, LeaveStatus } from '../../shared/types';                   
-+import { LeaveType } from '../../shared/types/index';                          
-                                                                                
--/**                                                                            
-- * Interface representing a leave request.                                     
-- */                                                                            
- export interface LeaveRequest {                                                
-+    id: string;                                                                
-+    employeeId: string;                                                        
-+    leaveType: LeaveType;                                                      
--  status: LeaveStatus;                                                         
--  startDate: Date;                                                             
--  endDate: Date;                                                               
--  reason?: string;                                                             
--  managerId: string;                                                           
-+    id: string;                                                                
-+    employeeId: string;                                                        
-+    leaveType: LeaveType;                                                      
-+    startDate: Date;                                                           
-+    endDate: Date;                                                             
-+    status: string;                                                            
-+    createdAt: Date;                                                           
-+    updatedAt: Date;                                                           
+@@ -1,5 +1,6 @@                                                                 
+ import { LeaveType } from '../../shared/types/index';                          
+     updatedAt: Date;                                                           
  }                                                                              
                                                                                 
--/**                                                                            
-- * Data Transfer Object for creating a leave request.                          
-- */                                                                            
  export interface CreateLeaveRequestDto {                                       
--  employeeId: string;                                                          
--  leaveType: LeaveType;                                                        
--  startDate: Date;                                                             
--  endDate: Date;                                                               
--  reason?: string;                                                             
-+    leaveType: LeaveType;                                                      
-+    startDate: Date;                                                           
-+    endDate: Date;                                                             
++    employeeId: string;                                                        
+     leaveType: LeaveType;                                                      
+     startDate: Date;                                                           
+     endDate: Date;                                                             
  }                                                                              
                                                                                 
 
-Tokens: 1.8k sent, 136 received. Cost: $0.00035 message, $0.00035 session.
+Tokens: 1.8k sent, 142 received. Cost: $0.00036 message, $0.00036 session.
 
 src/modules/leave/leave.model.ts
 Applied edit to src/modules/leave/leave.model.ts
