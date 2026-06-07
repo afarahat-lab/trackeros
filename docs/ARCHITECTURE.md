@@ -102,3 +102,6 @@ A new endpoint to return the current application version from package.json.
 
 ### API Surface
 GET /version  ← returns the current version of the application.
+
+## Leave Management Module
+This module allows employees to apply for various types of leave, while managers can approve or reject these requests. It enforces leave balance limits and prevents overlapping requests.
