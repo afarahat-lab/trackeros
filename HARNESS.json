@@ -88,7 +88,8 @@
       "rules": [
         "Generated code must compile without errors.",
         "All imports must resolve to files that exist in the project.",
-        "Do not use require() for JSON imports — import them using ES module syntax with resolveJsonModule enabled in tsconfig."
+        "Do not use require() for JSON imports — import them using ES module syntax with resolveJsonModule enabled in tsconfig.",
+        "Before generating any repository, service, or controller code, read the DTO and interface files it will use. Never reference a field on a type without confirming it exists in the type definition."
       ]
     },
     "review-agent": {
@@ -123,13 +124,16 @@
       "rules": [
         "Maximum 3 files per phase",
         "Each phase must be independently deployable through CI and the gate",
-        "Phases must be ordered by dependency"
+        "Phases must be ordered by dependency",
+        "Domain model files (*.model.ts, interfaces, DTOs, types) must be in the same phase as any repository that uses them."
       ],
       "phaseScopingRules": [
         "GOOD scope: 'Create src/health/health.ts exporting a function getHealth(): { status: string }. Single small file.' — specific, concrete.",
         "BAD scope: 'Build the health module' — too broad.",
         "Always mention existing files the phase depends on by exact path.",
-        "Include test file expectations in the scope — 'Include a Jest unit test in tests/unit/'."
+        "Include test file expectations in the scope — 'Include a Jest unit test in tests/unit/'.",
+        "Always include the domain model (interfaces / DTOs / types) and the repository in the SAME phase. Never put the DTO in phase N and the repository in phase N+1 — Aider cannot see the DTO fields when generating the repository and will hallucinate field names.",
+        "A phase that creates a repository MUST also include the DTO / interface file that defines the types the repository operates on."
       ]
     },
     "phase-evaluator-agent": {
