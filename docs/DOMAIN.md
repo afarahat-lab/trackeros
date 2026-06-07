@@ -11,3 +11,11 @@ To be populated as the design-agent and context-agent learn the domain.
   - `status`: string
 - **Auth Required**: No
 - **Roles**: None
+
+### GET /api/v1/version
+- **Description**: Retrieves the current version of the application from package.json.
+- **Request Body**: None
+- **Response Body**:
+  - `version`: string
+- **Auth Required**: No
+- **Roles**: None

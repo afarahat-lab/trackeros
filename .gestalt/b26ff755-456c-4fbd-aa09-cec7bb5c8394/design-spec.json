@@ -1,0 +1,18 @@
+{
+  "correlationId": "b26ff755-456c-4fbd-aa09-cec7bb5c8394",
+  "domainChanges": [],
+  "apiContracts": [
+    {
+      "method": "GET",
+      "path": "/api/v1/version",
+      "description": "Retrieves the current version of the application from package.json.",
+      "requestBody": {},
+      "responseBody": {
+        "version": "string"
+      },
+      "authRequired": false,
+      "roles": []
+    }
+  ],
+  "componentSpecs": []
+}
