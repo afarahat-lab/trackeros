@@ -115,3 +115,8 @@ A new module to provide an endpoint for system uptime.
 ### Endpoints
 
 - GET /uptime: Returns the process uptime in seconds.
+
+## Leave Management Module
+
+### Overview
+The leave management module allows employees to apply for various types of leave, while managers can approve or reject these requests. The system ensures that leave balances are tracked and that overlapping requests are prevented.
