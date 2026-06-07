@@ -1,0 +1,50 @@
+{
+  "id": "8e7a7479-8751-4f54-8fdc-24f37a1e778a",
+  "correlationId": "7d3bccf0-b3a7-4fcb-9862-e91c56648652",
+  "rawIntent": "[Feature: Add /uptime endpoint — Phase 1: Create Uptime Module]\n\nCreate src/modules/uptime/uptime.ts exporting a function getUptime(): { uptime: number }. This function should return the process uptime in seconds. Include a Jest unit test in tests/unit/uptime.test.ts.\n\nPhase architecture notes:\nThis phase encapsulates the uptime functionality within its own module, adhering to the existing architecture.\n\nDetailed phase architecture (architecture-agent):\n{\n  \"interfaces\": [\n    \"interface UptimeResponse { uptime: number; }\"\n  ],\n  \"importStatements\": [\n    \"import { Router } from \\\"express\\\";\",\n    \"import { UptimeResponse } from \\\"src/shared/types/index\\\";\"\n  ],\n  \"successCriteria\": [\n    \"src/modules/uptime/uptime.routes.ts exists and exports a GET /uptime endpoint\",\n    \"GET /uptime returns a JSON response with the uptime in seconds\",\n    \"UptimeResponse interface is defined in src/shared/types/index.ts\"\n  ]\n}",
+  "scope": {
+    "affectedDomains": [
+      "Request",
+      "Response"
+    ],
+    "affectedLayers": [
+      "domain",
+      "api",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/uptime/uptime.routes.ts exists and exports a GET /uptime endpoint",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "sc-002",
+      "description": "GET /uptime returns a JSON response with the uptime in seconds",
+      "testable": true,
+      "layer": "e2e"
+    },
+    {
+      "id": "sc-003",
+      "description": "UptimeResponse interface is defined in src/shared/types/index.ts",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Audit records: All state-changing operations write an audit record.",
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "RBAC enforcement: All API endpoints enforce role-based access control.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "Everything outside src/modules/uptime/uptime.ts, src/modules/uptime/uptime.routes.ts, tests/unit/uptime.test.ts, and src/shared/types/index.ts"
+  ],
+  "ambiguities": []
+}
