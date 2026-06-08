@@ -1,0 +1,101 @@
+{
+  "correlationId": "0bf8e979-4274-43e6-b5ab-ba9ea0f6f1ba",
+  "domainChanges": [
+    {
+      "entityName": "LeaveRequest",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "employeeId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "leaveType",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "startDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "endDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "status",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "Employee",
+          "type": "one-to-many"
+        }
+      ]
+    }
+  ],
+  "apiContracts": [
+    {
+      "method": "POST",
+      "path": "/api/v1/leave-requests",
+      "description": "Create a new leave request",
+      "requestBody": {
+        "employeeId": "string",
+        "leaveType": "string",
+        "startDate": "Date",
+        "endDate": "Date"
+      },
+      "responseBody": {
+        "id": "string",
+        "status": "string"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/leave-requests/{id}",
+      "description": "Retrieve a specific leave request by ID",
+      "requestBody": {},
+      "responseBody": {
+        "id": "string",
+        "employeeId": "string",
+        "leaveType": "string",
+        "startDate": "Date",
+        "endDate": "Date",
+        "status": "string"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/leave-requests/{id}",
+      "description": "Update the status of a leave request",
+      "requestBody": {
+        "status": "string"
+      },
+      "responseBody": {
+        "id": "string",
+        "status": "string"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    }
+  ],
+  "componentSpecs": []
+}
