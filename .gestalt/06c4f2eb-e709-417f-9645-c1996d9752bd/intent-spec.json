@@ -1,5 +1,5 @@
 {
-  "id": "6055468d-f529-42ee-bc28-7a8dace1cef2",
+  "id": "bf1c517c-1705-47b3-beed-0aa6ff6404c7",
   "correlationId": "06c4f2eb-e709-417f-9645-c1996d9752bd",
   "rawIntent": "[Feature: Leave management module — Phase 1: Create leave model]\n\nCreate src/modules/leave/leave.model.ts. Define LeaveRequest and CreateLeaveRequestDto. Import LeaveType from src/shared/types/index.ts. Include a Jest unit test in tests/unit/leave.model.test.ts.\n\nPhase architecture notes:\nThis phase establishes the foundational data structures for leave requests.",
   "scope": {

@@ -14,8 +14,9 @@ describe('Leave Model', () => {
             updatedAt: new Date(),
         };
 
-        expect(leaveRequest).toBeDefined();
-        expect(leaveRequest.status).toBe('pending');
+        expect(leaveRequest).toHaveProperty('id', '1');
+        expect(leaveRequest).toHaveProperty('employeeId', '123');
+        expect(leaveRequest).toHaveProperty('leaveType', LeaveType.ANNUAL);
     });
 
     it('should create a CreateLeaveRequestDto object', () => {
@@ -23,10 +24,10 @@ describe('Leave Model', () => {
             employeeId: '123',
             leaveType: LeaveType.SICK,
             startDate: new Date('2023-01-01'),
-            endDate: new Date('2023-01-10'),
+            endDate: new Date('2023-01-05'),
         };
 
-        expect(createLeaveRequestDto).toBeDefined();
-        expect(createLeaveRequestDto.leaveType).toBe(LeaveType.SICK);
+        expect(createLeaveRequestDto).toHaveProperty('employeeId', '123');
+        expect(createLeaveRequestDto).toHaveProperty('leaveType', LeaveType.SICK);
     });
 });

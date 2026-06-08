@@ -1,7 +1,7 @@
 # Aider session
 
 **Exit code:** 0
-**Duration:** 11109ms
+**Duration:** 49198ms
 
 ## Prompt sent to Aider
 
@@ -175,7 +175,7 @@ base-repository.ts      ← shared
     {
       "method": "POST",
       "path": "/api/v1/leave-requests",
-      "description": "Creates a new leave request.",
+      "description": "Creates a new leave request",
       "requestBody": {
         "employeeId": "string",
         "leaveType": "LeaveType",
@@ -184,7 +184,7 @@ base-repository.ts      ← shared
       },
       "responseBody": {
         "id": "string",
-        "status": "string",
+        "employeeId": "string",
 ```
 
 ## Aider output
@@ -196,7 +196,8 @@ Model: gpt-4o-mini with whole edit format
 Git repo: none
 Repo-map: disabled
 
-Here are the implementations for the requested files:                           
+Here are the implementations for the LeaveRequest and CreateLeaveRequestDto in  
+leave.model.ts, along with the Jest unit test in leave.model.test.ts.           
 
 src/modules/leave/leave.model.ts                                                
 
@@ -207,78 +208,43 @@ src/modules/leave/leave.model.ts
 tests/unit/leave.model.test.ts                                                  
 
                                                                                 
-import { LeaveRequest, CreateLeaveRequestDto } from                             
+@@ -1,3 +1,4 @@                                                                 
+ import { LeaveRequest, CreateLeaveRequestDto } from                            
 '../../src/modules/leave/leave.model';                                          
+             updatedAt: new Date(),                                             
+         };                                                                     
                                                                                 
-import { LeaveType } from '../../src/shared/types/index';                       
+-        expect(leaveRequest).toBeDefined();                                    
+-        expect(leaveRequest.status).toBe('pending');                           
++        expect(leaveRequest).toHaveProperty('id', '1');                        
++        expect(leaveRequest).toHaveProperty('employeeId', '123');              
++        expect(leaveRequest).toHaveProperty('leaveType', LeaveType.ANNUAL);    
+     });                                                                        
                                                                                 
+     it('should create a CreateLeaveRequestDto object', () => {                 
+         const createLeaveRequestDto: CreateLeaveRequestDto = {                 
+             employeeId: '123',                                                 
+             leaveType: LeaveType.SICK,                                         
+             startDate: new Date('2023-01-01'),                                 
+-            endDate: new Date('2023-01-10'),                                   
++            endDate: new Date('2023-01-05'),                                   
+         };                                                                     
                                                                                 
-                                                                                
-describe('Leave Model', () => {                                                 
-                                                                                
-    it('should create a LeaveRequest object', () => {                           
-                                                                                
-        const leaveRequest: LeaveRequest = {                                    
-                                                                                
-            id: '1',                                                            
-                                                                                
-            employeeId: '123',                                                  
-                                                                                
-            leaveType: LeaveType.ANNUAL,                                        
-                                                                                
-            startDate: new Date('2023-01-01'),                                  
-                                                                                
-            endDate: new Date('2023-01-10'),                                    
-                                                                                
-            status: 'pending',                                                  
-                                                                                
-            createdAt: new Date(),                                              
-                                                                                
-            updatedAt: new Date(),                                              
-                                                                                
-        };                                                                      
-                                                                                
-                                                                                
-                                                                                
-        expect(leaveRequest).toBeDefined();                                     
-                                                                                
-        expect(leaveRequest.status).toBe('pending');                            
-                                                                                
-    });                                                                         
-                                                                                
-                                                                                
-                                                                                
-    it('should create a CreateLeaveRequestDto object', () => {                  
-                                                                                
-        const createLeaveRequestDto: CreateLeaveRequestDto = {                  
-                                                                                
-            employeeId: '123',                                                  
-                                                                                
-            leaveType: LeaveType.SICK,                                          
-                                                                                
-            startDate: new Date('2023-01-01'),                                  
-                                                                                
-            endDate: new Date('2023-01-10'),                                    
-                                                                                
-        };                                                                      
-                                                                                
-                                                                                
-                                                                                
-        expect(createLeaveRequestDto).toBeDefined();                            
-                                                                                
-        expect(createLeaveRequestDto.leaveType).toBe(LeaveType.SICK);           
-                                                                                
-    });                                                                         
-                                                                                
-});                                                                             
+-        expect(createLeaveRequestDto).toBeDefined();                           
+-        expect(createLeaveRequestDto.leaveType).toBe(LeaveType.SICK);          
++        expect(createLeaveRequestDto).toHaveProperty('employeeId', '123');     
++        expect(createLeaveRequestDto).toHaveProperty('leaveType',              
+LeaveType.SICK);                                                                
+     });                                                                        
+ });                                                                            
                                                                                 
 
-Tokens: 1.8k sent, 377 received. Cost: $0.00050 message, $0.00050 session.
+Tokens: 1.8k sent, 442 received. Cost: $0.00054 message, $0.00054 session.
 
 src/modules/leave/leave.model.ts
 
 tests/unit/leave.model.test.ts
-Applied edit to src/modules/leave/leave.model.ts
 Applied edit to tests/unit/leave.model.test.ts
+Applied edit to src/modules/leave/leave.model.ts
 
 ```
