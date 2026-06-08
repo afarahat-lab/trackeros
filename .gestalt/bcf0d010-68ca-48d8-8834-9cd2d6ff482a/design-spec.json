@@ -5,7 +5,7 @@
     {
       "method": "GET",
       "path": "/api/v1/metrics",
-      "description": "Exposes default Node.js process metrics in Prometheus text format.",
+      "description": "Exposes Node.js process metrics in Prometheus text format.",
       "requestBody": {},
       "responseBody": {
         "metrics": "string"

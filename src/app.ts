@@ -13,7 +13,7 @@ app.get('/api/v1/metrics', (req, res) => {
     res.end(register.metrics());
 });
 
-// Other existing endpoints...
+// Other routes and middleware...
 
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
