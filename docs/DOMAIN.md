@@ -15,19 +15,12 @@ To be populated as the design-agent and context-agent learn the domain.
 ### POST /api/v1/leave-requests
 - **Description**: Creates a new leave request.
 - **Request Body**:
-  - `employeeId`: string
-  - `leaveType`: LeaveType
+  - `leaveTypeId`: string
   - `startDate`: Date
   - `endDate`: Date
 - **Response Body**:
   - `id`: string
-  - `employeeId`: string
-  - `leaveType`: LeaveType
-  - `startDate`: Date
-  - `endDate`: Date
   - `status`: string
-  - `createdAt`: Date
-  - `updatedAt`: Date
 - **Auth Required**: Yes
 - **Roles**: admin, operator
 
@@ -38,12 +31,22 @@ To be populated as the design-agent and context-agent learn the domain.
   - Array of leave requests:
     - `id`: string
     - `employeeId`: string
-    - `leaveType`: LeaveType
+    - `leaveTypeId`: string
     - `startDate`: Date
     - `endDate`: Date
     - `status`: string
     - `createdAt`: Date
     - `updatedAt`: Date
+- **Auth Required**: Yes
+- **Roles**: admin, operator
+
+### GET /api/v1/leave-balances
+- **Description**: Retrieves the leave balance for an employee.
+- **Request Body**: {}
+- **Response Body**:
+  - `employeeId`: string
+  - `leaveTypeId`: string
+  - `balance`: number
 - **Auth Required**: Yes
 - **Roles**: admin, operator
 
@@ -53,7 +56,7 @@ To be populated as the design-agent and context-agent learn the domain.
 - **Fields**:
   - `id`: string (required)
   - `employeeId`: string (required)
-  - `leaveType`: LeaveType (required)
+  - `leaveTypeId`: string (required)
   - `startDate`: Date (required)
   - `endDate`: Date (required)
   - `status`: string (required)
@@ -62,7 +65,12 @@ To be populated as the design-agent and context-agent learn the domain.
 
 ### CreateLeaveRequestDto
 - **Fields**:
-  - `employeeId`: string (required)
-  - `leaveType`: LeaveType (required)
+  - `leaveTypeId`: string (required)
   - `startDate`: Date (required)
   - `endDate`: Date (required)
+
+### LeaveBalance
+- **Fields**:
+  - `employeeId`: string (required)
+  - `leaveTypeId`: string (required)
+  - `balance`: number (required)
