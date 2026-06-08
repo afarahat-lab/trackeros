@@ -1,0 +1,114 @@
+{
+  "correlationId": "fdb61e6a-e3b7-4756-b2c9-cc778718db3d",
+  "domainChanges": [
+    {
+      "entityName": "LeaveRequest",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "employeeId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "leaveType",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "startDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "endDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "status",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "LeaveBalance",
+          "type": "one-to-one"
+        }
+      ]
+    },
+    {
+      "entityName": "LeaveBalance",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "employeeId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "totalLeaves",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "usedLeaves",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "remainingLeaves",
+          "type": "number",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "LeaveRequest",
+          "type": "one-to-many"
+        }
+      ]
+    }
+  ],
+  "apiContracts": [
+    {
+      "method": "POST",
+      "path": "/api/v1/leave-requests",
+      "description": "Create a new leave request",
+      "requestBody": {
+        "employeeId": "string",
+        "leaveType": "string",
+        "startDate": "Date",
+        "endDate": "Date"
+      },
+      "responseBody": {
+        "id": "string",
+        "status": "string"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/leave-balances",
+      "description": "Retrieve leave balance for an employee",
+      "requestBody": {},
+      "responseBody": {
+        "employeeId": "string",
+        "totalLeaves": "number",
+        "usedLeaves": "number",
+        "remainingLeaves": "number"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    }
+  ],
+  "componentSpecs": []
+}
