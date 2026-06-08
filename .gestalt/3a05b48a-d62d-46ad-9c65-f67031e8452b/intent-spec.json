@@ -1,0 +1,39 @@
+{
+  "id": "079b5618-f253-4c8e-a1f6-b1c4a25dbb8e",
+  "correlationId": "3a05b48a-d62d-46ad-9c65-f67031e8452b",
+  "rawIntent": "[Feature: Build the leave management module — Phase 2: Create leave repository]\n\nCreate src/modules/leave/leave.repository.ts. Implement functions to interact with the leave data, using LeaveRequest and LeaveBalance. Include a Jest unit test in tests/unit/leave.repository.test.ts.\n\nThis phase depends on: src/modules/leave/leave.model.ts.\n\nPhase architecture notes:\nThis phase provides the data access layer for leave requests and balances.",
+  "scope": {
+    "affectedDomains": [
+      "LeaveRequest",
+      "LeaveBalance"
+    ],
+    "affectedLayers": [
+      "domain",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "Functions to interact with leave data are implemented in leave.repository.ts and pass unit tests.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Audit records: All state-changing operations write an audit record.",
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "RBAC enforcement: All API endpoints enforce role-based access control.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "Any changes to files outside src/modules/leave/leave.repository.ts and tests/unit/leave.repository.test.ts",
+    "Implementation details of LeaveRequest and LeaveBalance",
+    "Any other phases of the leave management module"
+  ],
+  "ambiguities": []
+}
