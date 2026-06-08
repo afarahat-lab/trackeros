@@ -1,0 +1,43 @@
+{
+  "id": "73cdde88-9373-4ec9-88bc-a62c00bb25d3",
+  "correlationId": "356f3734-5a9b-483f-a481-86be890b3f80",
+  "rawIntent": "[Feature: Leave management module — Phase 1: Define Leave Request and Balance Models]\n\nCreate src/modules/leave/leave.model.ts defining LeaveRequest and CreateLeaveRequestDto. Create src/modules/balance/balance.model.ts defining LeaveBalance. Import LeaveType from src/shared/types/index.ts. Include Jest unit tests in tests/unit/leave.model.test.ts and tests/unit/balance.model.test.ts.\n\nPhase architecture notes:\nThis phase establishes the core data structures required for managing leave requests and balances.",
+  "scope": {
+    "affectedDomains": [
+      "Description",
+      "Request"
+    ],
+    "affectedLayers": [
+      "domain",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "LeaveRequest and CreateLeaveRequestDto are defined in src/modules/leave/leave.model.ts and LeaveBalance is defined in src/modules/balance/balance.model.ts.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "Jest unit tests are included and pass for both leave and balance models.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Audit records: All state-changing operations write an audit record.",
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "RBAC enforcement: All API endpoints enforce role-based access control.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "Any other modules or files not explicitly mentioned in the intent."
+  ],
+  "ambiguities": []
+}
