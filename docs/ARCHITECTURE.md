@@ -123,3 +123,6 @@ The leave management module allows employees to apply for various types of leave
 
 ## Leave Management Module
 This module allows employees to apply for various types of leave and enables managers to approve or reject these requests while tracking leave balances and policies.
+
+## Leave Management Module
+This module allows employees to apply for various types of leave, while enabling managers to approve or reject these requests. It ensures compliance with leave policies and maintains accurate leave balances.
