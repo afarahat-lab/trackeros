@@ -22,9 +22,14 @@ name: gestalt
 # TR_020 — pull_request trigger removed (duplicated push, tripled CI
 # minutes in TR_019). push handles every Aider commit; workflow_dispatch
 # stays for promotion-agent's staging / production deploys.
+# TR_027 — pull_request re-added (gated to the `ai-review` job only)
+# so PR-Agent can post its review comment when pr-agent opens a PR.
+# The `quality` job stays push-only.
 on:
   push:
     branches: ['gestalt/**']
+  pull_request:
+    branches: ['main']
   workflow_dispatch:
     inputs:
       environment:
@@ -43,6 +48,9 @@ on:
 
 jobs:
   quality:
+    # TR_027 — skip on pull_request events so this job doesn't
+    # double-run on PR sync. PR-Agent has its own job below.
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -82,3 +90,25 @@ jobs:
         with:
           config: auto
         continue-on-error: true
+
+  ai-review:
+    # ADR-051 — PR-Agent posts a code-review comment on the PR.
+    # pipeline-agent reads the verdict via the GitHub API before
+    # dispatching the Gestalt LLM gate; on `changes-requested` the
+    # self-healing diagnostician reads the comment text and picks
+    # `retry` / `fix-intent` / `escalate` per ADR-050. Custom focus
+    # comes from `.pr_agent.toml` — generated from HARNESS.json.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    steps:
+      - name: AI Code Review (PR-Agent)
+        uses: Codium-ai/pr-agent@main
+        env:
+          OPENAI_KEY: ${{ secrets.GESTALT_LLM_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          command: review
