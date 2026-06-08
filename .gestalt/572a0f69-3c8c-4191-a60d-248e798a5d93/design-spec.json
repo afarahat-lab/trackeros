@@ -1,0 +1,21 @@
+{
+  "correlationId": "572a0f69-3c8c-4191-a60d-248e798a5d93",
+  "domainChanges": [],
+  "apiContracts": [
+    {
+      "method": "GET",
+      "path": "/api/v1/metrics",
+      "description": "Retrieves metrics data.",
+      "requestBody": {},
+      "responseBody": {
+        "metrics": "object"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    }
+  ],
+  "componentSpecs": []
+}

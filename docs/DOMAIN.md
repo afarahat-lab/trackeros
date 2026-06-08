@@ -11,3 +11,13 @@ To be populated as the design-agent and context-agent learn the domain.
   - `status`: string
 - **Auth Required**: No
 - **Roles**: None
+
+### GET /api/v1/metrics
+- **Description**: Retrieves metrics data.
+- **Request Body**: None
+- **Response Body**:
+  - `metrics`: object
+- **Auth Required**: Yes
+- **Roles**:
+  - admin
+  - operator

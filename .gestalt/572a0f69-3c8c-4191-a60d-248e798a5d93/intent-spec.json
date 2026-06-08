@@ -1,0 +1,35 @@
+{
+  "id": "79ef3118-7113-4bba-b9a2-c5888f04121f",
+  "correlationId": "572a0f69-3c8c-4191-a60d-248e798a5d93",
+  "rawIntent": "Install 'dotenv' and 'pg' as dependencies in package.json. Add '@types/express' as a dev dependency. Update src/app.ts to explicitly define types for 'req' and 'res' parameters in the GET /metrics endpoint.",
+  "scope": {
+    "affectedDomains": [
+      "package.json",
+      "src/app.ts"
+    ],
+    "affectedLayers": [
+      "config",
+      "api"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "The 'dotenv' and 'pg' packages are listed as dependencies in package.json, and '@types/express' is listed as a dev dependency. The GET /metrics endpoint in src/app.ts has explicitly defined types for 'req' and 'res'.",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "RBAC enforcement: All API endpoints enforce role-based access control.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "Everything outside package.json and src/app.ts"
+  ],
+  "ambiguities": []
+}
