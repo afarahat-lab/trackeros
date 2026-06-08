@@ -120,3 +120,6 @@ A new module to provide an endpoint for system uptime.
 
 ### Overview
 The leave management module allows employees to apply for various types of leave, while managers can approve or reject these requests. The system ensures that leave balances are tracked and that overlapping requests are prevented.
+
+## Leave Management Module
+This module allows employees to apply for various types of leave and enables managers to approve or reject these requests while tracking leave balances and policies.
