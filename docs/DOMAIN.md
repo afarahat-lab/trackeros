@@ -16,13 +16,13 @@ To be populated as the design-agent and context-agent learn the domain.
 - **Description**: Creates a new leave request.
 - **Request Body**:
   - `employeeId`: string
-  - `leaveType`: string
+  - `leaveType`: LeaveType
   - `startDate`: Date
   - `endDate`: Date
 - **Response Body**:
   - `id`: string
   - `employeeId`: string
-  - `leaveType`: string
+  - `leaveType`: LeaveType
   - `startDate`: Date
   - `endDate`: Date
   - `status`: string
@@ -38,7 +38,7 @@ To be populated as the design-agent and context-agent learn the domain.
   - Array of leave requests:
     - `id`: string
     - `employeeId`: string
-    - `leaveType`: string
+    - `leaveType`: LeaveType
     - `startDate`: Date
     - `endDate`: Date
     - `status`: string
@@ -53,7 +53,7 @@ To be populated as the design-agent and context-agent learn the domain.
 - **Fields**:
   - `id`: string (required)
   - `employeeId`: string (required)
-  - `leaveType`: string (required)
+  - `leaveType`: LeaveType (required)
   - `startDate`: Date (required)
   - `endDate`: Date (required)
   - `status`: string (required)
@@ -63,6 +63,6 @@ To be populated as the design-agent and context-agent learn the domain.
 ### CreateLeaveRequestDto
 - **Fields**:
   - `employeeId`: string (required)
-  - `leaveType`: string (required)
+  - `leaveType`: LeaveType (required)
   - `startDate`: Date (required)
   - `endDate`: Date (required)
