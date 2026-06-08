@@ -1,0 +1,33 @@
+{
+  "id": "169a966d-bd76-48fd-a3d6-dcf8fd351717",
+  "correlationId": "aa2d2f9a-e510-41bb-bc9b-272860516d18",
+  "rawIntent": "Add a GET /uptime endpoint to src/app.ts that returns JSON {uptime: process.uptime()}. Preserve the existing 'export default app' statement at the bottom of src/app.ts unchanged.",
+  "scope": {
+    "affectedDomains": [
+      "Request"
+    ],
+    "affectedLayers": [
+      "api"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "The GET /uptime endpoint returns a JSON response with the uptime value.",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "RBAC enforcement: All API endpoints enforce role-based access control.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "Everything outside src/app.ts"
+  ],
+  "ambiguities": []
+}
