@@ -13,19 +13,15 @@ To be populated as the design-agent and context-agent learn the domain.
 - **Roles**: None
 
 ### POST /api/v1/leave-requests
-- **Description**: Creates a new leave request.
+- **Description**: Creates a new leave request for an employee.
 - **Request Body**:
   - `employeeId`: string (required)
+  - `leaveType`: string (required)
   - `startDate`: Date (required)
   - `endDate`: Date (required)
-  - `reason`: string (required)
 - **Response Body**:
   - `id`: string
-  - `employeeId`: string
-  - `startDate`: Date
-  - `endDate`: Date
   - `status`: string
-  - `reason`: string
 - **Auth Required**: Yes
 - **Roles**: admin, operator
 
@@ -45,6 +41,19 @@ To be populated as the design-agent and context-agent learn the domain.
 - **Auth Required**: Yes
 - **Roles**: admin, operator
 
+### GET /api/v1/leave-requests/{id}
+- **Description**: Retrieves a specific leave request by ID.
+- **Request Body**: {}
+- **Response Body**:
+  - `id`: string
+  - `employeeId`: string
+  - `leaveType`: string
+  - `startDate`: Date
+  - `endDate`: Date
+  - `status`: string
+- **Auth Required**: Yes
+- **Roles**: admin, operator
+
 ### GET /api/v1/leave-balances
 - **Description**: Retrieves the leave balance for an employee.
 - **Request Body**: {}
@@ -61,19 +70,19 @@ To be populated as the design-agent and context-agent learn the domain.
 - **Fields**:
   - `id`: string (required)
   - `employeeId`: string (required)
+  - `leaveType`: string (required)
   - `startDate`: Date (required)
   - `endDate`: Date (required)
   - `status`: string (required)
-  - `reason`: string (required)
   - `createdAt`: Date (required)
   - `updatedAt`: Date (required)
 
 ### CreateLeaveRequestDto
 - **Fields**:
   - `employeeId`: string (required)
+  - `leaveType`: string (required)
   - `startDate`: Date (required)
   - `endDate`: Date (required)
-  - `reason`: string (required)
 
 ### LeaveBalance
 - **Fields**:
