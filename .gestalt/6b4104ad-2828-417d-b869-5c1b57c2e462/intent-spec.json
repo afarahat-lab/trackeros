@@ -1,5 +1,5 @@
 {
-  "id": "baacd089-d5d3-424b-89a8-1475a7632ed6",
+  "id": "2d48235b-f510-4d19-97be-183a8100966c",
   "correlationId": "6b4104ad-2828-417d-b869-5c1b57c2e462",
   "rawIntent": "[Feature: Leave management module — Phase 1: Create leave model]\n\nCreate src/modules/leave/leave.model.ts. Define LeaveRequest and CreateLeaveRequestDto. Import LeaveType from src/shared/types/index.ts. Include a Jest unit test in tests/unit/leave.model.test.ts.\n\nPhase architecture notes:\nThis phase establishes the foundational data structures for leave requests.",
   "scope": {
@@ -16,7 +16,7 @@
   "successCriteria": [
     {
       "id": "sc-001",
-      "description": "LeaveRequest and CreateLeaveRequestDto are defined correctly in leave.model.ts and Jest unit tests are passing.",
+      "description": "LeaveRequest and CreateLeaveRequestDto are defined correctly in leave.model.ts and a Jest unit test is included in leave.model.test.ts.",
       "testable": true,
       "layer": "unit"
     }
@@ -31,7 +31,7 @@
   ],
   "outOfScope": [
     "Any files outside src/modules/leave/leave.model.ts and tests/unit/leave.model.test.ts",
-    "Implementation details of LeaveType in src/shared/types/index.ts"
+    "Other modules or domains not related to leave management"
   ],
   "ambiguities": []
 }
