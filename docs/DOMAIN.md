@@ -15,12 +15,17 @@ To be populated as the design-agent and context-agent learn the domain.
 ### POST /api/v1/leave-requests
 - **Description**: Creates a new leave request.
 - **Request Body**:
-  - `leaveTypeId`: string
-  - `startDate`: Date
-  - `endDate`: Date
+  - `employeeId`: string (required)
+  - `startDate`: Date (required)
+  - `endDate`: Date (required)
+  - `reason`: string (required)
 - **Response Body**:
   - `id`: string
+  - `employeeId`: string
+  - `startDate`: Date
+  - `endDate`: Date
   - `status`: string
+  - `reason`: string
 - **Auth Required**: Yes
 - **Roles**: admin, operator
 
@@ -56,19 +61,19 @@ To be populated as the design-agent and context-agent learn the domain.
 - **Fields**:
   - `id`: string (required)
   - `employeeId`: string (required)
-  - `leaveTypeId`: string (required)
   - `startDate`: Date (required)
   - `endDate`: Date (required)
   - `status`: string (required)
+  - `reason`: string (required)
   - `createdAt`: Date (required)
   - `updatedAt`: Date (required)
-  - `leaveType`: string (required)  
 
 ### CreateLeaveRequestDto
 - **Fields**:
-  - `leaveTypeId`: string (required)
+  - `employeeId`: string (required)
   - `startDate`: Date (required)
   - `endDate`: Date (required)
+  - `reason`: string (required)
 
 ### LeaveBalance
 - **Fields**:

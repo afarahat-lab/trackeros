@@ -1,0 +1,148 @@
+{
+  "correlationId": "a6e5c943-77e0-4050-8ffe-b6e7ac2de70c",
+  "domainChanges": [
+    {
+      "entityName": "LeaveRequest",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "employeeId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "startDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "endDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "status",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "reason",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "CreateLeaveRequestDto",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "employeeId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "startDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "endDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "reason",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [
+    {
+      "method": "POST",
+      "path": "/api/v1/leave-requests",
+      "description": "Creates a new leave request.",
+      "requestBody": {
+        "employeeId": "string",
+        "startDate": "Date",
+        "endDate": "Date",
+        "reason": "string"
+      },
+      "responseBody": {
+        "id": "string",
+        "employeeId": "string",
+        "startDate": "Date",
+        "endDate": "Date",
+        "status": "string",
+        "reason": "string"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/leave-requests/{id}",
+      "description": "Retrieves a specific leave request by ID.",
+      "requestBody": {},
+      "responseBody": {
+        "id": "string",
+        "employeeId": "string",
+        "startDate": "Date",
+        "endDate": "Date",
+        "status": "string",
+        "reason": "string"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/leave-requests/{id}",
+      "description": "Updates an existing leave request.",
+      "requestBody": {
+        "status": "string"
+      },
+      "responseBody": {
+        "id": "string",
+        "employeeId": "string",
+        "startDate": "Date",
+        "endDate": "Date",
+        "status": "string",
+        "reason": "string"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/leave-requests/{id}",
+      "description": "Deletes a specific leave request by ID.",
+      "requestBody": {},
+      "responseBody": {},
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    }
+  ],
+  "componentSpecs": []
+}

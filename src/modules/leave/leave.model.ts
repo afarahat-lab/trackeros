@@ -1,25 +1,15 @@
-import { LeaveType } from '../../shared/types/index';
-
 export interface LeaveRequest {
     id: string;
     employeeId: string;
-    leaveTypeId: string;
     startDate: Date;
     endDate: Date;
-    status: 'pending' | 'approved' | 'rejected';
-    managerId?: string;
-    managerComment?: string;
-    createdAt: Date;
+    status: string; // pending | approved | rejected
+    reason: string;
 }
 
 export interface CreateLeaveRequestDto {
-    leaveTypeId: string;
+    employeeId: string;
     startDate: Date;
     endDate: Date;
-}
-
-export interface LeaveBalance {
-    employeeId: string;
-    leaveTypeId: string;
-    balance: number;
+    reason: string;
 }
