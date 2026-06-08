@@ -1,0 +1,33 @@
+{
+  "id": "904025e2-842a-44f8-b01f-0709f82682cd",
+  "correlationId": "bcf0d010-68ca-48d8-8834-9cd2d6ff482a",
+  "rawIntent": "Add a GET /metrics endpoint in src/app.ts that uses the prom-client library to expose default Node.js process metrics in Prometheus text format.",
+  "scope": {
+    "affectedDomains": [
+      "Request"
+    ],
+    "affectedLayers": [
+      "api"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "The GET /metrics endpoint is successfully added and returns Node.js process metrics in Prometheus text format.",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "RBAC enforcement: All API endpoints enforce role-based access control.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "All other endpoints and files outside of src/app.ts"
+  ],
+  "ambiguities": []
+}

@@ -1,0 +1,21 @@
+{
+  "correlationId": "bcf0d010-68ca-48d8-8834-9cd2d6ff482a",
+  "domainChanges": [],
+  "apiContracts": [
+    {
+      "method": "GET",
+      "path": "/api/v1/metrics",
+      "description": "Exposes default Node.js process metrics in Prometheus text format.",
+      "requestBody": {},
+      "responseBody": {
+        "metrics": "string"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    }
+  ],
+  "componentSpecs": []
+}

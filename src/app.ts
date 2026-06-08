@@ -1,9 +1,20 @@
 import express from 'express';
+import { collectDefaultMetrics, register } from 'prom-client';
 
 const app = express();
+const PORT = process.env.PORT || 3000;
 
-app.get('/health', (req, res) => {
-    res.json({ status: 'ok' });
+// Collect default metrics
+collectDefaultMetrics();
+
+// Define the /metrics endpoint
+app.get('/api/v1/metrics', (req, res) => {
+    res.set('Content-Type', register.contentType);
+    res.end(register.metrics());
 });
 
-export default app;
+// Other existing endpoints...
+
+app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+});
