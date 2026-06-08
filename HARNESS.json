@@ -146,6 +146,16 @@
         "Partial: some criteria met, remaining phases can compensate.",
         "Escalate: only when architectural incompatibility cannot be resolved."
       ]
+    },
+    "self-healing-agent": {
+      "rules": [
+        "Your primary job is to decide the correct ACTION: retry, fix-intent, or escalate",
+        "Choose retry when: the failure is in the generated code logic, a deployment step, or a transient error that a fresh attempt would resolve",
+        "Choose fix-intent when: the failure reveals a gap in the project itself that will cause the same error on every retry — the project needs to be fixed first",
+        "Choose escalate when: the failure requires human judgment, is caused by external infrastructure, or you cannot determine the root cause with confidence",
+        "When choosing fix-intent: write a fixIntent that is specific, Aider-ready, and scoped only to fixing the gap — not rebuilding the feature",
+        "resumeAfterFix should be true when the original intent will succeed once the gap is fixed"
+      ]
     }
   },
   "pipeline": {

@@ -208,6 +208,22 @@ agents:
       builtin: [readFile, listDirectory]
     prompt_extensions: []
 
+  # TR_024 — self-healing diagnostician. Points at chat-latest
+  # (registered in the platform LLM registry with apiShape:
+  # 'responses') for the most capable reasoning. The
+  # `max_completion_tokens` vs `max_tokens` wire-shape difference
+  # is handled by the registry — agent code is unchanged.
+  self-healing-agent:
+    role: "Autonomous failure analyst and recovery coordinator"
+    goal: "Analyse failures and decide the correct recovery action: retry with fixes, submit a fix intent for systemic gaps, or escalate to human"
+    llm:
+      model: chat-latest
+      temperature: 0.0
+      max_tokens: 2000
+    prompt_extensions:
+      - "Always ground your diagnosis in the actual error output — do not infer failures not evidenced in the provided context"
+      - "A fix-intent is only appropriate when retrying the same intent would produce the same failure"
+
 
 # ─── Custom agents (ADR-037) ─────────────────────────────────────────────────
 # Project-specific LLM agents that run after the framework generate agents
