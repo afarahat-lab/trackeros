@@ -1,0 +1,48 @@
+{
+  "id": "807f5c21-3643-48d1-b57a-e3f3831fa5fb",
+  "correlationId": "efd898ae-03ed-4aef-8435-fe965c0788d1",
+  "rawIntent": "Add a GET /metrics endpoint in src/app.ts that uses the prom-client library to expose default Node.js process metrics in Prometheus text format. Ensure that 'prom-client' is installed as a dependency and add a default export to the module.",
+  "scope": {
+    "affectedDomains": [
+      "Request"
+    ],
+    "affectedLayers": [
+      "api"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "A GET /metrics endpoint is available that returns Node.js process metrics in Prometheus text format.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "sc-002",
+      "description": "'prom-client' is listed as a dependency in package.json.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "The module exports the metrics endpoint as a default export.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Audit records: All state-changing operations write an audit record.",
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "RBAC enforcement: All API endpoints enforce role-based access control.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "Everything outside src/app.ts",
+    "Any other endpoints or features not mentioned in the intent"
+  ],
+  "ambiguities": []
+}
