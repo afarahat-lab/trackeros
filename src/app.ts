@@ -2,11 +2,11 @@ import express from 'express';
 
 const app = express();
 
-// Other existing routes and middleware
+// Existing routes and middleware...
 
-app.get('/api/v1/uptime', (req, res) => {
-    res.json({ uptime: process.uptime() });
+app.get('/api/v1/ping', (req, res) => {
+    res.json({ pong: true });
 });
 
-// Existing export statement
+// Existing export statement...
 export default app;
