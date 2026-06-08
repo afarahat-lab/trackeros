@@ -48,7 +48,7 @@ To be populated as the design-agent and context-agent learn the domain.
 - **Roles**: admin, operator
 
 ### GET /api/v1/uptime
-- **Description**: Returns the process uptime in seconds as JSON.
+- **Description**: Returns the process uptime in seconds as a JSON response.
 - **Request Body**: {}
 - **Response Body**:
   - `uptime`: number
