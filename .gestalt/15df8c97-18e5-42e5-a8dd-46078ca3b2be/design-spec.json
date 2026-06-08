@@ -2,9 +2,14 @@
   "correlationId": "15df8c97-18e5-42e5-a8dd-46078ca3b2be",
   "domainChanges": [
     {
-      "entityName": "LeaveRequest",
+      "entityName": "Leave",
       "operation": "create",
       "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
         {
           "name": "employeeId",
           "type": "string",
@@ -29,12 +34,22 @@
           "name": "status",
           "type": "string",
           "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": true
         }
       ],
       "relationships": [
         {
           "entity": "Employee",
-          "type": "one-to-one"
+          "type": "one-to-many"
         }
       ]
     }
@@ -42,8 +57,8 @@
   "apiContracts": [
     {
       "method": "POST",
-      "path": "/api/v1/leave-requests",
-      "description": "Creates a new leave request for an employee.",
+      "path": "/api/v1/leaves",
+      "description": "Create a new leave request",
       "requestBody": {
         "employeeId": "string",
         "leaveType": "string",
@@ -52,7 +67,9 @@
       },
       "responseBody": {
         "id": "string",
-        "status": "string"
+        "status": "string",
+        "createdAt": "Date",
+        "updatedAt": "Date"
       },
       "authRequired": true,
       "roles": [
@@ -62,8 +79,8 @@
     },
     {
       "method": "GET",
-      "path": "/api/v1/leave-requests/{id}",
-      "description": "Retrieves a specific leave request by ID.",
+      "path": "/api/v1/leaves/{id}",
+      "description": "Retrieve a specific leave request by ID",
       "requestBody": {},
       "responseBody": {
         "id": "string",
@@ -71,7 +88,27 @@
         "leaveType": "string",
         "startDate": "Date",
         "endDate": "Date",
+        "status": "string",
+        "createdAt": "Date",
+        "updatedAt": "Date"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/leaves/{id}",
+      "description": "Update an existing leave request",
+      "requestBody": {
         "status": "string"
+      },
+      "responseBody": {
+        "id": "string",
+        "status": "string",
+        "updatedAt": "Date"
       },
       "authRequired": true,
       "roles": [

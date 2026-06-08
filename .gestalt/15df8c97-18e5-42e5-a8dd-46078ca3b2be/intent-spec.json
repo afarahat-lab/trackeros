@@ -1,5 +1,5 @@
 {
-  "id": "a65733f2-9131-43a4-908e-d587b46e2301",
+  "id": "f9118962-c4cc-42f7-8a94-684b987b8539",
   "correlationId": "15df8c97-18e5-42e5-a8dd-46078ca3b2be",
   "rawIntent": "[Feature: Build the leave management module — Phase 2: Implement leave service logic]\n\nCreate src/modules/leave/leave.service.ts to implement business logic for handling leave requests, including validation and processing. This phase depends on src/modules/leave/leave.model.ts and src/modules/leave/leave.repository.ts from Phase 1.\n\nThis phase depends on: src/modules/leave/leave.model.ts, src/modules/leave/leave.repository.ts.\n\nPhase architecture notes:\nThis phase encapsulates the business rules and logic for leave management.",
   "scope": {
@@ -29,8 +29,7 @@
     "Error handling: No unhandled promise rejections. All async errors are caught and handled."
   ],
   "outOfScope": [
-    "Implementation of leave.model.ts and leave.repository.ts",
-    "Any other modules or files not explicitly mentioned"
+    "Everything outside src/modules/leave/leave.service.ts"
   ],
   "ambiguities": []
 }
