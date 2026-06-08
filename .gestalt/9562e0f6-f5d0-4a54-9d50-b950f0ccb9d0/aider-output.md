@@ -1,7 +1,7 @@
 # Aider session
 
 **Exit code:** 0
-**Duration:** 12271ms
+**Duration:** 13956ms
 **Files changed:** 3
 
 ## Prompt sent to Aider
@@ -121,98 +121,19 @@ Here are the updated files:
 package.json                                                                    
 
                                                                                 
-@@ -1,3 +1,5 @@                                                                 
+@@ -1,4 +1,5 @@                                                                 
  {                                                                              
-   "name": "leave-management",                                                  
-   "version": "1.0.0",                                                          
--  "main": "index.js",                                                          
--  "license": "MIT",                                                            
-+  "main": "src/index.ts",                                                      
-   "scripts": {                                                                 
-     "start": "ts-node src/index.ts",                                           
--    "build": "tsc --noEmit",                                                   
--    "test": "jest --passWithNoTests",                                          
--    "lint": "echo \"No lint configured\""                                      
--  },                                                                           
--  "dependencies": {                                                            
--    "express": "^4.17.1",                                                      
--    "pg": "^8.7.1",                                                            
--    "jsonwebtoken": "^8.5.1",                                                  
--    "bcrypt": "^5.0.1",                                                        
--    "dotenv": "^10.0.0"                                                        
-+    "test": "jest"                                                             
-   },                                                                           
-   "devDependencies": {                                                         
--    "typescript": "^5.0.0",                                                    
--    "ts-node": "^10.0.0",                                                      
-+    "ts-node": "^10.0.0",                                                      
-     "pg": "^8.7.1",                                                            
--    "jsonwebtoken": "^8.5.1",                                                  
--    "bcrypt": "^5.0.1",                                                        
--    "dotenv": "^10.0.0"                                                        
--  },                                                                           
--  "devDependencies": {                                                         
--    "typescript": "^5.0.0",                                                    
--    "ts-node": "^10.0.0",                                                      
--    "ts-jest": "^29.0.0",                                                      
--    "jest": "^29.0.0",                                                         
--    "@types/express": "^4.17.13",                                              
--    "@types/pg": "^8.6.1",                                                     
--    "@types/jsonwebtoken": "^8.5.5",                                           
--    "@types/bcrypt": "^5.0.0",                                                 
--    "@types/node": "^16.0.0",                                                  
--    "@types/jest": "^29.0.0"                                                   
-+    "jsonwebtoken": "^8.5.1"                                                   
-   }                                                                            
- }                                                                              
-                                                                                
 
 src/index.ts                                                                    
 
                                                                                 
-@@ -1,2 +1,5 @@                                                                 
-+import express, { Request, Response } from 'express';                          
-+import dotenv from 'dotenv';                                                   
- import app from './app';                                                       
-                                                                                
--const PORT = 3000;                                                             
-+dotenv.config();                                                               
-                                                                                
-+const PORT = process.env.PORT || 3000;                                         
-+                                                                               
-+const server = express();                                                      
-+                                                                               
-+server.use(express.json());                                                    
-+server.use(app);                                                               
-+                                                                               
-+const startServer = () => {                                                    
-+    server.listen(PORT, () => {                                                
-+                                                                               
-+const startServer = () => {                                                    
-+    server.listen(PORT, () => {                                                
-+        console.log(`Server is running on port ${PORT}`);                      
-+    });                                                                        
-+};                                                                             
-+                                                                               
-+export default startServer;                                                    
-                                                                                
+@@ -1,4 +1,5 @@                                                                 
+ import dotenv from 'dotenv';                                                   
 
 src/app.ts                                                                      
 
                                                                                 
 @@ -1,4 +1,5 @@                                                                 
--import express from 'express';                                                 
-+import express, { Request, Response } from 'express';                          
-                                                                                
- const app = express();                                                         
-                                                                                
--app.get('/health', (req, res) => {                                             
--    res.json({ status: 'ok' });                                                
-+app.get('/', (req: Request, res: Response) => {                                
-+    res.send('Welcome to the Leave Management System');                        
- });                                                                            
-                                                                                
- export default app;                                                            
                                                                                 
 
 Tokens: 1.4k sent, 446 received. Cost: $0.00048 message, $0.00048 session.
@@ -222,14 +143,14 @@ package.json
 src/index.ts
 
 src/app.ts
-Applied edit to src/index.ts
 Applied edit to src/app.ts
 Applied edit to package.json
+Applied edit to src/index.ts
 
 ```
 
 ## Files written
 
-- src/index.ts
 - src/app.ts
 - package.json
+- src/index.ts

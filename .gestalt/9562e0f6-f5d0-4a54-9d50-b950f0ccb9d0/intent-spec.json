@@ -1,5 +1,5 @@
 {
-  "id": "4b0f3227-9489-452f-833b-052f27ec6ea6",
+  "id": "a175e2cf-eb24-49c4-8497-53c90d2cae3f",
   "correlationId": "9562e0f6-f5d0-4a54-9d50-b950f0ccb9d0",
   "rawIntent": "Install '@types/dotenv' and '@types/express' as dev dependencies in package.json. Ensure that 'src/index.ts' has a default export for the module. Update 'src/index.ts' and 'src/app.ts' to include 'export default ...' where necessary and explicitly type the parameters 'req' and 'res' in the relevant functions.",
   "scope": {
@@ -9,7 +9,7 @@
       "src/app.ts"
     ],
     "affectedLayers": [
-      "infra",
+      "config",
       "domain"
     ],
     "isBreakingChange": false,
