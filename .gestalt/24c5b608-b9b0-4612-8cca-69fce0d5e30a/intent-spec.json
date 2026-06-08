@@ -1,13 +1,15 @@
 {
-  "id": "02ce634f-9dc9-4ab3-9242-d797c7d55bf9",
+  "id": "2514a677-91a2-452a-ad83-6a74b0ca60e9",
   "correlationId": "24c5b608-b9b0-4612-8cca-69fce0d5e30a",
-  "rawIntent": "Define the LeaveBalance type to include properties: remainingLeaves, usedLeaves, and totalLeaves. Define the LeaveRequest type to include the property leaveType. Ensure these types are correctly exported for use in leave.repository.ts.",
+  "rawIntent": "[Feature: Build the leave management module — Phase 2: Create leave repository]\n\nCreate src/modules/leave/leave.repository.ts. Implement functions to interact with the leave data, using LeaveRequest and LeaveBalance. Include a Jest unit test in tests/unit/leave.repository.test.ts.\n\nThis phase depends on: src/modules/leave/leave.model.ts.\n\nPhase architecture notes:\nThis phase provides the data access layer for leave requests and balances.",
   "scope": {
     "affectedDomains": [
-      "Fields"
+      "LeaveRequest",
+      "LeaveBalance"
     ],
     "affectedLayers": [
-      "domain"
+      "domain",
+      "test"
     ],
     "isBreakingChange": false,
     "estimatedComplexity": "medium"
@@ -15,17 +17,21 @@
   "successCriteria": [
     {
       "id": "sc-001",
-      "description": "LeaveBalance and LeaveRequest types are defined with the specified properties and correctly exported in leave.repository.ts.",
+      "description": "Functions to interact with leave data are implemented and tested.",
       "testable": true,
       "layer": "unit"
     }
   ],
   "constraints": [
     "Repository pattern: All database access goes through repository interfaces.",
-    "Input validation: Validate all inputs at API boundaries before processing."
+    "Audit records: All state-changing operations write an audit record.",
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "RBAC enforcement: All API endpoints enforce role-based access control.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
   ],
   "outOfScope": [
-    "Any changes to other modules or domains not mentioned in the intent."
+    "Everything outside src/modules/leave/leave.repository.ts and tests/unit/leave.repository.test.ts"
   ],
   "ambiguities": []
 }

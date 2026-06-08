@@ -1,19 +1,26 @@
 # Aider session
 
 **Exit code:** 0
-**Duration:** 4193ms
+**Duration:** 13191ms
 
 ## Prompt sent to Aider
 
 ```
 ## Task
-Define the LeaveBalance type to include properties: remainingLeaves, usedLeaves, and totalLeaves. Define the LeaveRequest type to include the property leaveType. Ensure these types are correctly exported for use in leave.repository.ts.
+[Feature: Build the leave management module — Phase 2: Create leave repository]
+
+Create src/modules/leave/leave.repository.ts. Implement functions to interact with the leave data, using LeaveRequest and LeaveBalance. Include a Jest unit test in tests/unit/leave.repository.test.ts.
+
+This phase depends on: src/modules/leave/leave.model.ts.
+
+Phase architecture notes:
+This phase provides the data access layer for leave requests and balances.
 
 ## Success criteria
-- LeaveBalance and LeaveRequest types are defined with the specified properties and correctly exported in leave.repository.ts.
+- Functions to interact with leave data are implemented and tested.
 
 ## Out of scope (do NOT touch these)
-- Any changes to other modules or domains not mentioned in the intent.
+- Everything outside src/modules/leave/leave.repository.ts and tests/unit/leave.repository.test.ts
 
 ## Project rules
 - Generated code must compile without errors.
@@ -92,11 +99,53 @@ base-repository.ts      ← shared
   "correlationId": "24c5b608-b9b0-4612-8cca-69fce0d5e30a",
   "domainChanges": [
     {
+      "entityName": "LeaveRequest",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "employeeId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "leaveType",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "startDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "endDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "status",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "LeaveBalance",
+          "type": "one-to-one"
+        }
+      ]
+    },
+    {
       "entityName": "LeaveBalance",
       "operation": "create",
       "fields": [
         {
-          "name": "remainingLeaves",
+          "name": "employeeId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "totalLeaves",
           "type": "number",
           "required": true
         },
@@ -106,29 +155,42 @@ base-repository.ts      ← shared
           "required": true
         },
         {
-          "name": "totalLeaves",
+          "name": "remainingLeaves",
           "type": "number",
           "required": true
         }
       ],
-      "relationships": []
-    },
-    {
-      "entityName": "LeaveRequest",
-      "operation": "create",
-      "fields": [
+      "relationships": [
         {
-          "name": "leaveType",
-          "type": "string",
-          "required": true
+          "entity": "LeaveRequest",
+          "type": "one-to-many"
         }
-      ],
-      "relationships": []
+      ]
     }
   ],
-  "apiContracts": [],
-  "componentSpecs": []
-}
+  "apiContracts": [
+    {
+      "method": "POST",
+      "path": "/api/v1/leave-requests",
+      "description": "Create a new leave request",
+      "requestBody": {
+        "employeeId": "string",
+        "leaveType": "string",
+        "startDate": "Date",
+        "endDate": "Date"
+      },
+      "responseBody": {
+        "id": "string",
+        "status": "string"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    },
+    {
+      "method": "GET",
 ```
 
 ## Aider output
@@ -140,36 +202,133 @@ Model: gpt-4o-mini with whole edit format
 Git repo: none
 Repo-map: disabled
 
-Based on your request, I will create the LeaveBalance and LeaveRequest types in 
-the leave.model.ts file and ensure they are correctly exported.                 
+To implement the leave repository and its associated unit tests, I will create  
+the following files:                                                            
 
-Here are the changes:                                                           
+ 1 src/modules/leave/leave.repository.ts - This file will contain functions to  
+   interact with the leave data using LeaveRequest and LeaveBalance.            
+ 2 tests/unit/leave.repository.test.ts - This file will contain Jest unit tests 
+   for the leave repository functions.                                          
 
-leave.model.ts                                                                  
+Here are the complete implementations for both files:                           
+
+src/modules/leave/leave.repository.ts                                           
 
                                                                                 
-export type LeaveBalance = {                                                    
+import { Pool } from 'pg';                                                      
                                                                                 
-    remainingLeaves: number;                                                    
-                                                                                
-    usedLeaves: number;                                                         
-                                                                                
-    totalLeaves: number;                                                        
-                                                                                
-};                                                                              
+import { LeaveRequest, LeaveBalance } from './leave.model';                     
                                                                                 
                                                                                 
                                                                                 
-export type LeaveRequest = {                                                    
+const pool = new Pool();                                                        
                                                                                 
-    leaveType: string;                                                          
                                                                                 
-};                                                                              
+                                                                                
+export class LeaveRepository {                                                  
+                                                                                
+    async createLeaveRequest(leaveRequest: LeaveRequest): Promise<LeaveRequest> 
+{                                                                               
+                                                                                
+        const { employeeId, leaveType, startDate, endDate, status } =           
+leaveRequest;                                                                   
+                                                                                
+        const result = await pool.query(                                        
+                                                                                
+            'INSERT INTO leave_requests (employeeId, leaveType, startDate,      
+endDate, status) VALUES ($1, $2, $3, $4, $5) RETURNING *',                      
+                                                                                
+            [employeeId, leaveType, startDate, endDate, status]                 
+                                                                                
+        );                                                                      
+                                                                                
+        return result.rows[0];                                                  
+                                                                                
+    }                                                                           
+                                                                                
+                                                                                
+                                                                                
+    async getLeaveRequestsByEmployeeId(employeeId: string):                     
+Promise<LeaveRequest[]> {                                                       
+                                                                                
+        const result = await pool.query(                                        
+                                                                                
+            'SELECT * FROM leave_requests WHERE employeeId = $1',               
+                                                                                
+            [employeeId]                                                        
+                                                                                
+        );                                                                      
+                                                                                
+        return result.rows;                                                     
+                                                                                
+    }                                                                           
+                                                                                
+                                                                                
+                                                                                
+    async createLeaveBalance(leaveBalance: LeaveBalance): Promise<LeaveBalance> 
+{                                                                               
+                                                                                
+        const { employeeId, totalDays, usedDays, year } = leaveBalance;         
+                                                                                
+        const result = await pool.query(                                        
+                                                                                
+            'INSERT INTO leave_balances (employeeId, totalDays, usedDays, year) 
+VALUES ($1, $2, $3, $4) RETURNING *',                                           
+                                                                                
+            [employeeId, totalDays, usedDays, year]                             
+                                                                                
+        );                                                                      
+                                                                                
+        return result.rows[0];                                                  
+                                                                                
+    }                                                                           
+                                                                                
+                                                                                
+                                                                                
+    async getLeaveBalanceByEmployeeId(employeeId: string, year: number):        
+Promise<LeaveBalance | null> {                                                  
+                                                                                
+        const result = await pool.query(                                        
+                                                                                
+            'SELECT * FROM leave_balances WHERE employeeId = $1 AND year = $2', 
+                                                                                
+            [employeeId, year]                                                  
+                                                                                
+        );                                                                      
+                                                                                
+        return result.rows[0] || null;                                          
+                                                                                
+    }                                                                           
+                                                                                
+}                                                                               
                                                                                 
 
-Tokens: 1.5k sent, 87 received. Cost: $0.00028 message, $0.00028 session.
+tests/unit/leave.repository.test.ts                                             
 
-leave.model.ts
-Applied edit to leave.model.ts
-
+                                                                                
+import { LeaveRepository } from '../../modules/leave/leave.repository';         
+                                                                                
+import { LeaveRequest, LeaveBalance } from '../../modules/leave/leave.model';   
+                                                                                
+                                                                                
+                                                                                
+describe('LeaveRepository', () => {                                             
+                                                                                
+    const leaveRepository = new LeaveRepository();                              
+                                                                                
+                                                                                
+                                                                                
+    it('should create a leave request', async () => {                           
+                                                                                
+        const leaveRequest: LeaveRequest = {                                    
+                                                                                
+            employeeId: '1',                                                    
+                                                                                
+            leaveType: 'annual',                                                
+                                                                                
+            startDate: new Date(),                                              
+                                                                                
+            endDate: new Date(),                                                
+                     
+[stdout truncated at 10000 chars]
 ```
