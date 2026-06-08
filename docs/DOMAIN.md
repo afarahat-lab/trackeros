@@ -64,6 +64,8 @@ To be populated as the design-agent and context-agent learn the domain.
   - `status`: string (required)
   - `createdAt`: Date (required)
   - `updatedAt`: Date (required)
+- **Relationships**:
+  - `LeaveBalance`: one-to-one
 
 ### CreateLeaveRequestDto
 - **Fields**:
@@ -78,4 +80,5 @@ To be populated as the design-agent and context-agent learn the domain.
   - `totalLeaves`: number (required)
   - `usedLeaves`: number (required)
   - `remainingLeaves`: number (required)
-
+- **Relationships**:
+  - `LeaveRequest`: one-to-many

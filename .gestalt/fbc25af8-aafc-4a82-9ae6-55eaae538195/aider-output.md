@@ -1,7 +1,7 @@
 # Aider session
 
 **Exit code:** 0
-**Duration:** 15217ms
+**Duration:** 15301ms
 
 ## Prompt sent to Aider
 
@@ -17,7 +17,7 @@ Phase architecture notes:
 This phase provides the data access layer for leave requests and balances.
 
 ## Success criteria
-- Functions to interact with leave data are implemented and tested.
+- Functions to interact with leave data are implemented and pass unit tests.
 
 ## Out of scope (do NOT touch these)
 - Everything outside src/modules/leave/leave.repository.ts and tests/unit/leave.repository.test.ts
@@ -202,133 +202,132 @@ Model: gpt-4o-mini with whole edit format
 Git repo: none
 Repo-map: disabled
 
-To implement the leave repository and its associated unit tests, I will create  
-the following files:                                                            
+Based on your request, I will create the leave.repository.ts file to implement  
+functions for interacting with the leave data, using LeaveRequest and           
+LeaveBalance. Additionally, I will create a Jest unit test file                 
+leave.repository.test.ts to ensure the functionality works as expected.         
 
- 1 src/modules/leave/leave.repository.ts - This file will contain functions to  
-   interact with the leave data using LeaveRequest and LeaveBalance.            
- 2 tests/unit/leave.repository.test.ts - This file will contain Jest unit tests 
-   for the leave repository functions.                                          
-
-Here are the complete implementations for both files:                           
+Here are the implementations:                                                   
 
 src/modules/leave/leave.repository.ts                                           
 
                                                                                 
-import { LeaveRequest, LeaveBalance } from './leave.model';                     
+@@ -1,5 +1,6 @@                                                                 
++import { Pool } from 'pg';                                                     
+ import { LeaveRequest, LeaveBalance } from './leave.model';                    
+-import { Pool } from 'pg';                                                     
                                                                                 
-import { Pool } from 'pg';                                                      
+ const pool = new Pool();                                                       
                                                                                 
-                                                                                
-                                                                                
-const pool = new Pool();                                                        
-                                                                                
-                                                                                
-                                                                                
-export class LeaveRepository {                                                  
-                                                                                
-    async createLeaveRequest(leaveRequest: LeaveRequest): Promise<LeaveRequest> 
+ export class LeaveRepository {                                                 
+     async createLeaveRequest(leaveRequest: LeaveRequest): Promise<LeaveRequest>
 {                                                                               
-                                                                                
-        const result = await pool.query(                                        
-                                                                                
-            `INSERT INTO leave_requests (employeeId, leaveType, startDate,      
+         const result = await pool.query(                                       
+-            `INSERT INTO leave_requests (employeeId, leaveType, startDate,     
 endDate, status, createdAt)                                                     
-                                                                                
-            VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING *`,                    
-                                                                                
-            [leaveRequest.employeeId, leaveRequest.leaveType,                   
+-            VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING *`,                   
++            `INSERT INTO leave_requests (employeeId, leaveType, startDate,     
+endDate, status)                                                                
++             VALUES ($1, $2, $3, $4, $5) RETURNING *`,                         
+             [leaveRequest.employeeId, leaveRequest.leaveType,                  
 leaveRequest.startDate, leaveRequest.endDate, leaveRequest.status]              
+         );                                                                     
+         return result.rows[0];                                                 
+     }                                                                          
                                                                                 
-        );                                                                      
-                                                                                
-        return result.rows[0];                                                  
-                                                                                
-    }                                                                           
-                                                                                
-                                                                                
-                                                                                
-    async getLeaveRequestsByEmployeeId(employeeId: string):                     
+     async getLeaveRequestsByEmployeeId(employeeId: string):                    
 Promise<LeaveRequest[]> {                                                       
-                                                                                
-        const result = await pool.query(                                        
-                                                                                
-            `SELECT * FROM leave_requests WHERE employeeId = $1`,               
-                                                                                
-            [employeeId]                                                        
-                                                                                
-        );                                                                      
-                                                                                
-        return result.rows;                                                     
-                                                                                
-    }                                                                           
-                                                                                
-                                                                                
-                                                                                
-    async createLeaveBalance(leaveBalance: LeaveBalance): Promise<LeaveBalance> 
+     }                                                                          
+     async createLeaveBalance(leaveBalance: LeaveBalance): Promise<LeaveBalance>
 {                                                                               
-                                                                                
-        const result = await pool.query(                                        
-                                                                                
-            `INSERT INTO leave_balances (employeeId, totalDays, usedDays, year) 
-                                                                                
-            VALUES ($1, $2, $3, $4) RETURNING *`,                               
-                                                                                
-            [leaveBalance.employeeId, leaveBalance.totalDays,                   
+         const result = await pool.query(                                       
+             `INSERT INTO leave_balances (employeeId, totalDays, usedDays, year)
+-            VALUES ($1, $2, $3, $4) RETURNING *`,                              
++             VALUES ($1, $2, $3, $4) RETURNING *`,                             
+             [leaveBalance.employeeId, leaveBalance.totalDays,                  
 leaveBalance.usedDays, leaveBalance.year]                                       
+         );                                                                     
+         return result.rows[0];                                                 
+     }                                                                          
                                                                                 
-        );                                                                      
-                                                                                
-        return result.rows[0];                                                  
-                                                                                
-    }                                                                           
-                                                                                
-                                                                                
-                                                                                
-    async getLeaveBalanceByEmployeeId(employeeId: string, year: number):        
+-    async getLeaveBalanceByEmployeeId(employeeId: string, year: number):       
 Promise<LeaveBalance> {                                                         
-                                                                                
-        const result = await pool.query(                                        
-                                                                                
-            `SELECT * FROM leave_balances WHERE employeeId = $1 AND year = $2`, 
-                                                                                
-            [employeeId, year]                                                  
-                                                                                
-        );                                                                      
-                                                                                
-        return result.rows[0];                                                  
-                                                                                
-    }                                                                           
-                                                                                
-}                                                                               
++    async getLeaveBalanceByEmployeeId(employeeId: string):                     
+Promise<LeaveBalance> {                                                         
+         const result = await pool.query(                                       
+-            `SELECT * FROM leave_balances WHERE employeeId = $1 AND year = $2`,
+-            [employeeId, year]                                                 
++            `SELECT * FROM leave_balances WHERE employeeId = $1`,              
++            [employeeId]                                                       
+         );                                                                     
+         return result.rows[0];                                                 
+     }                                                                          
+ }                                                                              
                                                                                 
 
 tests/unit/leave.repository.test.ts                                             
 
                                                                                 
-import { LeaveRepository } from '../../src/modules/leave/leave.repository';     
-                                                                                
-import { LeaveRequest, LeaveBalance } from                                      
+@@ -1,4 +1,4 @@                                                                 
+-import { LeaveRepository } from '../../src/modules/leave/leave.repository';    
+-import { LeaveRequest, LeaveBalance } from                                     
 '../../src/modules/leave/leave.model';                                          
+-import { Pool } from 'pg';                                                     
+-                                                                               
+-jest.mock('pg');                                                               
+-                                                                               
+-const mockPool = new Pool() as jest.Mocked<Pool>;                              
+-const leaveRepository = new LeaveRepository();                                 
++import { LeaveRepository } from '../../modules/leave/leave.repository';        
++import { LeaveRequest, LeaveBalance } from '../../modules/leave/leave.model';  
                                                                                 
-import { Pool } from 'pg';                                                      
+ describe('LeaveRepository', () => {                                            
+-    beforeEach(() => {                                                         
+-        jest.clearAllMocks();                                                  
+-    });                                                                        
++    const leaveRepository = new LeaveRepository();                             
                                                                                 
+     it('should create a leave request', async () => {                          
+         const leaveRequest: LeaveRequest = {                                   
+             employeeId: '1',                                                   
+             leaveType: 'annual',                                               
+             startDate: new Date(),                                             
+             endDate: new Date(),                                               
+             status: 'pending',                                                 
+-            id: '1',                                                           
+-            managerId: null,                                                   
+-            managerComment: null,                                              
+-            createdAt: new Date(),                                             
+         };                                                                     
                                                                                 
+-        mockPool.query.mockResolvedValueOnce({                                 
+-            rows: [leaveRequest],                                              
+-        });                                                                    
+-                                                                               
+-        const result = await leaveRepository.createLeaveRequest(leaveRequest); 
+-        expect(result).toEqual(leaveRequest);                                  
+-        expect(mockPool.query).toHaveBeenCalledWith(                           
+-            expect.any(String),                                                
+-            [leaveRequest.employeeId, leaveRequest.leaveType,                  
+leaveRequest.startDate, leaveRequest.endDate, leaveRequest.status]              
+-        );                                                                     
++        const createdRequest = await                                           
+leaveRepository.createLeaveRequest(leaveRequest);                               
++        expect(createdRequest).toHaveProperty('id');                           
++        expect(createdRequest.status).toBe('pending');                         
+     });                                                                        
                                                                                 
-jest.mock('pg');                                                                
-                                                                                
-                                                                                
-                                                                                
-const mockPool = new Pool() as jest.Mocked<Pool>;                               
-                                                                                
-const leaveRepository = new LeaveRepository();                                  
-                                                                                
-                                                                                
-                                                                                
-describe('LeaveRepository', () => {                                             
-                                                                                
-    beforeEach(() => {                                                          
-                                                                                
-        jest.clearAll
+     it('should get leave requests by employee ID', async () => {               
+-        const leaveRequests: LeaveRequest[] = [{                               
+-            employeeId: '1',                                                   
+-            leaveType: 'annual',                                               
+-            startDate: new Date(),                                             
+-            endDate: new Date(),                                               
+-            status: 'pending',                                                 
+-            id: '1',                                                           
+-            managerId: null,                                                   
+-            managerComment: null,                                              
+-            createdAt: new Date(),                                             
+-        }];          
 [stdout truncated at 10000 chars]
 ```

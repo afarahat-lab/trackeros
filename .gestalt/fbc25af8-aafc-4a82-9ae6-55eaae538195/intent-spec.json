@@ -1,5 +1,5 @@
 {
-  "id": "6c0f40dd-c80f-4e54-b3de-ae27e845a7f6",
+  "id": "55b96349-26a2-4541-a9b2-0bff5bb09725",
   "correlationId": "fbc25af8-aafc-4a82-9ae6-55eaae538195",
   "rawIntent": "[Feature: Build the leave management module — Phase 2: Create leave repository]\n\nCreate src/modules/leave/leave.repository.ts. Implement functions to interact with the leave data, using LeaveRequest and LeaveBalance. Include a Jest unit test in tests/unit/leave.repository.test.ts.\n\nThis phase depends on: src/modules/leave/leave.model.ts.\n\nPhase architecture notes:\nThis phase provides the data access layer for leave requests and balances.",
   "scope": {
@@ -17,7 +17,7 @@
   "successCriteria": [
     {
       "id": "sc-001",
-      "description": "Functions to interact with leave data are implemented and tested.",
+      "description": "Functions to interact with leave data are implemented and pass unit tests.",
       "testable": true,
       "layer": "unit"
     }
