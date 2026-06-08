@@ -1,0 +1,37 @@
+{
+  "id": "e75eb20f-302f-4c9b-b36f-41d6ad6d5eb8",
+  "correlationId": "1276b783-a5dc-44f3-8315-bd04aa085635",
+  "rawIntent": "Install '@types/pg' as a dev dependency in package.json. Ensure that 'src/index.ts' has a default export for the module. Update the code in 'src/index.ts' to include 'export default ...' where necessary.",
+  "scope": {
+    "affectedDomains": [
+      "package.json",
+      "src/index.ts"
+    ],
+    "affectedLayers": [
+      "infra",
+      "domain"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "'@types/pg' is listed as a dev dependency in package.json and 'src/index.ts' has a default export.",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Audit records: All state-changing operations write an audit record.",
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "RBAC enforcement: All API endpoints enforce role-based access control.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "Everything outside package.json and src/index.ts"
+  ],
+  "ambiguities": []
+}

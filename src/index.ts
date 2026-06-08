@@ -1,7 +1,14 @@
-import app from './app';
+import express from 'express';
 
-const PORT = 3000;
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.get('/', (req, res) => {
+    res.send('Welcome to the Leave Management System');
+});
+
+export default app;
 
 app.listen(PORT, () => {
-    console.log(`Server is running on http://localhost:${PORT}`);
+    console.log(`Server is running on port ${PORT}`);
 });
