@@ -1,7 +1,7 @@
 # Aider session
 
 **Exit code:** 0
-**Duration:** 16691ms
+**Duration:** 14132ms
 
 ## Prompt sent to Aider
 
@@ -17,12 +17,10 @@ Phase architecture notes:
 This phase provides the data access layer for leave requests and balances.
 
 ## Success criteria
-- Functions to interact with leave data are implemented in leave.repository.ts and pass unit tests.
+- Functions to interact with leave data are implemented and tested.
 
 ## Out of scope (do NOT touch these)
-- Any changes to files outside src/modules/leave/leave.repository.ts and tests/unit/leave.repository.test.ts
-- Implementation details of LeaveRequest and LeaveBalance
-- Any other phases of the leave management module
+- Everything outside src/modules/leave/leave.repository.ts and tests/unit/leave.repository.test.ts
 
 ## Project rules
 - Generated code must compile without errors.
@@ -169,7 +167,7 @@ base-repository.ts      ← shared
     {
       "method": "POST",
       "path": "/api/v1/leave-requests",
-      "description": "Creates a new leave request.",
+      "description": "Create a new leave request",
       "requestBody": {
         "employeeId": "string",
         "leaveType": "string",
@@ -178,10 +176,6 @@ base-repository.ts      ← shared
       },
       "responseBody": {
         "id": "string",
-        "employeeId": "string",
-        "leaveType": "string",
-        "startDate": "Date",
-        "endDate": "Date",
         "status": "string"
       },
       "authRequired": true,
@@ -190,6 +184,10 @@ base-repository.ts      ← shared
         "operator"
       ]
     },
+    {
+      "method": "GET",
+      "path": "/api/v1/leave-balances/{employeeId}",
+      "description": "Retrieve leave balan
 ```
 
 ## Aider output
@@ -201,131 +199,131 @@ Model: gpt-4o-mini with whole edit format
 Git repo: none
 Repo-map: disabled
 
-Here are the implementations for the leave repository and its corresponding unit
-tests.                                                                          
+Here are the implementations for the leave repository and the corresponding Jest
+unit test.                                                                      
 
 src/modules/leave/leave.repository.ts                                           
 
                                                                                 
-import { LeaveRequest, LeaveBalance } from './leave.model';                     
+@@ -1,3 +1,5 @@                                                                 
+ import { LeaveRequest, LeaveBalance } from './leave.model';                    
+ import { Pool } from 'pg';                                                     
                                                                                 
-import { Pool } from 'pg';                                                      
-                                                                                
-                                                                                
-                                                                                
-export interface ILeaveRepository {                                             
-                                                                                
-    createLeaveRequest(leaveRequest: LeaveRequest): Promise<LeaveRequest>;      
-                                                                                
-    getLeaveRequestById(id: string): Promise<LeaveRequest | null>;              
-                                                                                
-    updateLeaveRequestStatus(id: string, status: string): Promise<LeaveRequest |
-null>;                                                                          
-                                                                                
-    getLeaveBalance(employeeId: string): Promise<LeaveBalance | null>;          
-                                                                                
-    updateLeaveBalance(employeeId: string, usedLeaves: number):                 
+-export interface ILeaveRepository {                                            
+-    createLeaveRequest(leaveRequest: LeaveRequest): Promise<LeaveRequest>;     
+-    getLeaveRequestById(id: string): Promise<LeaveRequest | null>;             
+-    updateLeaveRequestStatus(id: string, status: string): Promise<LeaveRequest 
+| null>;                                                                        
+-    getLeaveBalance(employeeId: string): Promise<LeaveBalance | null>;         
+-    updateLeaveBalance(employeeId: string, usedLeaves: number):                
 Promise<LeaveBalance | null>;                                                   
+-}                                                                              
+-                                                                               
+-export class LeaveRepository implements ILeaveRepository {                     
++export class LeaveRepository {                                                 
+     private db: Pool;                                                          
                                                                                 
-}                                                                               
+     constructor(db: Pool) {                                                    
+         this.db = db;                                                          
+     }                                                                          
                                                                                 
-                                                                                
-                                                                                
-export class LeaveRepository implements ILeaveRepository {                      
-                                                                                
-    private db: Pool;                                                           
-                                                                                
-                                                                                
-                                                                                
-    constructor(db: Pool) {                                                     
-                                                                                
-        this.db = db;                                                           
-                                                                                
-    }                                                                           
-                                                                                
-                                                                                
-                                                                                
-    async createLeaveRequest(leaveRequest: LeaveRequest): Promise<LeaveRequest> 
+     async createLeaveRequest(leaveRequest: LeaveRequest): Promise<LeaveRequest>
 {                                                                               
+         const result = await this.db.query(                                    
+             'INSERT INTO leave_requests (employeeId, leaveType, startDate,     
+     }                                                                          
                                                                                 
-        const result = await this.db.query(                                     
-                                                                                
-            'INSERT INTO leave_requests (employeeId, leaveType, startDate,      
-endDate, status) VALUES ($1, $2, $3, $4, $5) RETURNING *',                      
-                                                                                
-            [leaveRequest.employeeId, leaveRequest.leaveType,                   
-leaveRequest.startDate, leaveRequest.endDate, leaveRequest.status]              
-                                                                                
-        );                                                                      
-                                                                                
-        return result.rows[0];                                                  
-                                                                                
-    }                                                                           
-                                                                                
-                                                                                
-                                                                                
-    async getLeaveRequestById(id: string): Promise<LeaveRequest | null> {       
-                                                                                
-        const result = await this.db.query('SELECT * FROM leave_requests WHERE  
+-    async getLeaveRequestById(id: string): Promise<LeaveRequest | null> {      
+-        const result = await this.db.query('SELECT * FROM leave_requests WHERE 
 id = $1', [id]);                                                                
-                                                                                
-        return result.rows.length ? result.rows[0] : null;                      
-                                                                                
-    }                                                                           
-                                                                                
-                                                                                
-                                                                                
-    async updateLeaveRequestStatus(id: string, status: string):                 
+-        return result.rows.length ? result.rows[0] : null;                     
+-    }                                                                          
+-                                                                               
+-    async updateLeaveRequestStatus(id: string, status: string):                
 Promise<LeaveRequest | null> {                                                  
++    async getLeaveBalance(employeeId: string): Promise<LeaveBalance> {         
+         const result = await this.db.query(                                    
+-            'UPDATE leave_requests SET status = $1 WHERE id = $2 RETURNING *', 
                                                                                 
-        const result = await this.db.query(                                     
-                                                                                
-            'UPDATE leave_requests SET status = $1 WHERE id = $2 RETURNING *',  
-                                                                                
-            [status, id]                                                        
-                                                                                
-        );                                                                      
-                                                                                
-        return result.rows.length ? result.rows[0] : null;                      
-                                                                                
-    }                                                                           
-                                                                                
-                                                                                
-                                                                                
-    async getLeaveBalance(employeeId: string): Promise<LeaveBalance | null> {   
-                                                                                
-        const result = await this.db.query('SELECT * FROM leave_balances WHERE  
+-    async updateLeaveRequestStatus(id: string, status: string):                
+Promise<LeaveRequest | null> {                                                  
+-        const result = await this.db.query(                                    
+-            'UPDATE leave_requests SET status = $1 WHERE id = $2 RETURNING *', 
+-            [status, id]                                                       
+-        );                                                                     
+-        return result.rows.length ? result.rows[0] : null;                     
+-    }                                                                          
+-                                                                               
+-    async getLeaveBalance(employeeId: string): Promise<LeaveBalance | null> {  
+-        const result = await this.db.query('SELECT * FROM leave_balances WHERE 
 employeeId = $1', [employeeId]);                                                
-                                                                                
-        return result.rows.length ? result.rows[0] : null;                      
-                                                                                
-    }                                                                           
-                                                                                
-                                                                                
-                                                                                
-    async updateLeaveBalance(employeeId: string, usedLeaves: number):           
+-        return result.rows.length ? result.rows[0] : null;                     
+-    }                                                                          
+-                                                                               
+-    async updateLeaveBalance(employeeId: string, usedLeaves: number):          
 Promise<LeaveBalance | null> {                                                  
-                                                                                
-        const result = await this.db.query(                                     
-                                                                                
-            'UPDATE leave_balances SET usedLeaves = usedLeaves + $1 WHERE       
++    async updateLeaveBalance(employeeId: string, usedLeaves: number):          
+Promise<LeaveBalance> {                                                         
+         const result = await this.db.query(                                    
+             'UPDATE leave_balances SET usedLeaves = usedLeaves + $1 WHERE      
 employeeId = $2 RETURNING *',                                                   
-                                                                                
-            [usedLeaves, employeeId]                                            
-                                                                                
-        );                                                                      
-                                                                                
-        return result.rows.length ? result.rows[0] : null;                      
-                                                                                
-    }                                                                           
-                                                                                
-}                                                                               
+             [usedLeaves, employeeId]                                           
+         );                                                                     
+-        return result.rows.length ? result.rows[0] : null;                     
++        return result.rows[0];                                                 
+     }                                                                          
+ }                                                                              
                                                                                 
 
 tests/unit/leave.repository.test.ts                                             
 
                                                                                 
-import { Pool } from 'pg';                                                      
-                       
+@@ -1,4 +1,4 @@                                                                 
++import { LeaveRepository } from '../../src/modules/leave/leave.repository';    
+ import { Pool } from 'pg';                                                     
+-import { LeaveRepository } from '../../src/modules/leave/leave.repository';    
+-import { LeaveRequest, LeaveBalance } from                                     
+'../../src/modules/leave/leave.model';                                          
+                                                                                
+-const mockDb = new Pool();                                                     
+-const leaveRepository = new LeaveRepository(mockDb);                           
++const mockDb = {                                                               
++    query: jest.fn()                                                           
++};                                                                             
++                                                                               
++const leaveRepository = new LeaveRepository(mockDb as unknown as Pool);        
+                                                                                
+ describe('LeaveRepository', () => {                                            
+     it('should create a leave request', async () => {                          
+-        const leaveRequest: LeaveRequest = {                                   
++        const leaveRequest = {                                                 
+             employeeId: '1',                                                   
+             leaveType: 'annual',                                               
+             startDate: new Date(),                                             
+             endDate: new Date(),                                               
+-            status: 'pending',                                                 
++            status: 'pending'                                                  
+         };                                                                     
+                                                                                
+-        const createdRequest = await                                           
+leaveRepository.createLeaveRequest(leaveRequest);                               
+-        expect(createdRequest).toHaveProperty('id');                           
+-        expect(createdRequest.employeeId).toBe(leaveRequest.employeeId);       
+-    });                                                                        
++        mockDb.query.mockResolvedValueOnce({                                   
++            rows: [leaveRequest]                                               
++        });                                                                    
+                                                                                
++        const result = await leaveRepository.createLeaveRequest(leaveRequest); 
++        expect(mockDb.query).toHaveBeenCalledWith(                             
++            'INSERT INTO leave_requests (employeeId, leaveType, startDate,     
+endDate, status) VALUES ($1, $2, $3, $4, $5) RETURNING *',                      
++            [leaveRequest.employeeId, leaveRequest.leaveType,                  
+-                                                                               
+-    it('should update leave request status', async () => {                     
+-        const updatedRequest = await                                           
+leaveRepository.updateLeaveRequestStatus('1', 'approved');                      
+-        expect(updatedRequest).toBeNull(); // Assuming no request exists with  
+id '1'                 
 [stdout truncated at 10000 chars]
 ```

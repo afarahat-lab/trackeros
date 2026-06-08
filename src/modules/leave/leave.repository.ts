@@ -1,15 +1,7 @@
 import { LeaveRequest, LeaveBalance } from './leave.model';
 import { Pool } from 'pg';
 
-export interface ILeaveRepository {
-    createLeaveRequest(leaveRequest: LeaveRequest): Promise<LeaveRequest>;
-    getLeaveRequestById(id: string): Promise<LeaveRequest | null>;
-    updateLeaveRequestStatus(id: string, status: string): Promise<LeaveRequest | null>;
-    getLeaveBalance(employeeId: string): Promise<LeaveBalance | null>;
-    updateLeaveBalance(employeeId: string, usedLeaves: number): Promise<LeaveBalance | null>;
-}
-
-export class LeaveRepository implements ILeaveRepository {
+export class LeaveRepository {
     private db: Pool;
 
     constructor(db: Pool) {
@@ -24,29 +16,19 @@ export class LeaveRepository implements ILeaveRepository {
         return result.rows[0];
     }
 
-    async getLeaveRequestById(id: string): Promise<LeaveRequest | null> {
-        const result = await this.db.query('SELECT * FROM leave_requests WHERE id = $1', [id]);
-        return result.rows.length ? result.rows[0] : null;
-    }
-
-    async updateLeaveRequestStatus(id: string, status: string): Promise<LeaveRequest | null> {
+    async getLeaveBalance(employeeId: string): Promise<LeaveBalance> {
         const result = await this.db.query(
-            'UPDATE leave_requests SET status = $1 WHERE id = $2 RETURNING *',
-            [status, id]
+            'SELECT * FROM leave_balances WHERE employeeId = $1',
+            [employeeId]
         );
-        return result.rows.length ? result.rows[0] : null;
+        return result.rows[0];
     }
 
-    async getLeaveBalance(employeeId: string): Promise<LeaveBalance | null> {
-        const result = await this.db.query('SELECT * FROM leave_balances WHERE employeeId = $1', [employeeId]);
-        return result.rows.length ? result.rows[0] : null;
-    }
-
-    async updateLeaveBalance(employeeId: string, usedLeaves: number): Promise<LeaveBalance | null> {
+    async updateLeaveBalance(employeeId: string, usedLeaves: number): Promise<LeaveBalance> {
         const result = await this.db.query(
             'UPDATE leave_balances SET usedLeaves = usedLeaves + $1 WHERE employeeId = $2 RETURNING *',
             [usedLeaves, employeeId]
         );
-        return result.rows.length ? result.rows[0] : null;
+        return result.rows[0];
     }
 }
