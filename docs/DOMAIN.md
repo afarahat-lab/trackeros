@@ -21,10 +21,6 @@ To be populated as the design-agent and context-agent learn the domain.
   - `endDate`: Date
 - **Response Body**:
   - `id`: string
-  - `employeeId`: string
-  - `leaveType`: LeaveType
-  - `startDate`: Date
-  - `endDate`: Date
   - `status`: string
   - `createdAt`: Date
   - `updatedAt`: Date
@@ -35,15 +31,7 @@ To be populated as the design-agent and context-agent learn the domain.
 - **Description**: Retrieves a list of leave requests.
 - **Request Body**: {}
 - **Response Body**:
-  - Array of leave requests:
-    - `id`: string
-    - `employeeId`: string
-    - `leaveType`: LeaveType
-    - `startDate`: Date
-    - `endDate`: Date
-    - `status`: string
-    - `createdAt`: Date
-    - `updatedAt`: Date
+  - `leaveRequests`: LeaveRequest[]
 - **Auth Required**: Yes
 - **Roles**: admin, operator
 
