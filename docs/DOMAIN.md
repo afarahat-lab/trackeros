@@ -47,6 +47,14 @@ To be populated as the design-agent and context-agent learn the domain.
 - **Auth Required**: Yes
 - **Roles**: admin, operator
 
+### GET /api/v1/uptime
+- **Description**: Returns the process uptime in seconds as JSON.
+- **Request Body**: {}
+- **Response Body**:
+  - `uptime`: number
+- **Auth Required**: Yes
+- **Roles**: admin, operator
+
 ## Domain Entities
 
 ### LeaveRequest

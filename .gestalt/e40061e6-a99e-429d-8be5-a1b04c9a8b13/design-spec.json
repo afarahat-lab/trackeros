@@ -1,0 +1,21 @@
+{
+  "correlationId": "e40061e6-a99e-429d-8be5-a1b04c9a8b13",
+  "domainChanges": [],
+  "apiContracts": [
+    {
+      "method": "GET",
+      "path": "/api/v1/uptime",
+      "description": "Returns the process uptime in seconds as JSON.",
+      "requestBody": {},
+      "responseBody": {
+        "uptime": "number"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    }
+  ],
+  "componentSpecs": []
+}
