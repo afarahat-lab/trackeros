@@ -1,0 +1,18 @@
+{
+  "correlationId": "3648e162-2341-4d5c-b62d-375f417765f3",
+  "domainChanges": [],
+  "apiContracts": [
+    {
+      "method": "GET",
+      "path": "/api/v1/ping",
+      "description": "Responds with a JSON object indicating the service is alive.",
+      "requestBody": {},
+      "responseBody": {
+        "pong": "boolean"
+      },
+      "authRequired": false,
+      "roles": []
+    }
+  ],
+  "componentSpecs": []
+}
