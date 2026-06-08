@@ -62,6 +62,7 @@ To be populated as the design-agent and context-agent learn the domain.
   - `status`: string (required)
   - `createdAt`: Date (required)
   - `updatedAt`: Date (required)
+  - `leaveType`: string (required)  
 
 ### CreateLeaveRequestDto
 - **Fields**:
@@ -74,3 +75,6 @@ To be populated as the design-agent and context-agent learn the domain.
   - `employeeId`: string (required)
   - `leaveTypeId`: string (required)
   - `balance`: number (required)
+  - `remainingLeaves`: number (required)
+  - `usedLeaves`: number (required)
+  - `totalLeaves`: number (required)
