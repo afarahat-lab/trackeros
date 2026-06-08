@@ -1,0 +1,35 @@
+{
+  "id": "36f49149-d832-4f67-a6c7-502efc785131",
+  "correlationId": "cd590ffc-1bdb-480a-8374-8292842a70c4",
+  "rawIntent": "[Feature: Leave management module — Phase 2: Implement Leave Service Logic]\n\nCreate src/modules/leave/leave.service.ts to handle business logic for leave requests, including validation and processing. Use LeaveRequest and CreateLeaveRequestDto from src/modules/leave/leave.model.ts.\n\nThis phase depends on: src/modules/leave/leave.model.ts.\n\nPhase architecture notes:\nThis phase implements the service layer that processes leave requests and ensures business rules are followed.",
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "domain"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "Leave service logic is implemented and passes all validation and processing tests.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Audit records: All state-changing operations write an audit record.",
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "RBAC enforcement: All API endpoints enforce role-based access control.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "Any changes to leave.model.ts",
+    "Any other modules or files outside of src/modules/leave/leave.service.ts"
+  ],
+  "ambiguities": []
+}
