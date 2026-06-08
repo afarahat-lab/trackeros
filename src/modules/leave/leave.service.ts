@@ -1,6 +1,5 @@
 import { LeaveRequest } from './leave.model';
 import { ILeaveRepository } from './leave.repository';
-import { LeavePolicy } from '../policy/policy.model';
 import { LeaveBalance } from '../balance/balance.model';
 
 export class LeaveService {
@@ -13,7 +12,8 @@ export class LeaveService {
 
     private async validateLeaveRequest(leaveRequest: LeaveRequest): Promise<void> {
         const leaveBalance = await this.leaveRepository.getLeaveBalance(leaveRequest.employeeId, leaveRequest.leaveType);
-        if (!leaveBalance || leaveBalance.totalDays - leaveBalance.usedDays <= 0) {
+        
+        if (!leaveBalance || leaveBalance.totalDays - leaveBalance.usedDays < this.calculateLeaveDays(leaveRequest.startDate, leaveRequest.endDate)) {
             throw new Error('Insufficient leave balance');
         }
 
@@ -23,23 +23,10 @@ export class LeaveService {
         }
     }
 
-    async approveLeaveRequest(requestId: string, managerId: string, comment?: string): Promise<LeaveRequest> {
-        const leaveRequest = await this.leaveRepository.getLeaveRequestById(requestId);
-        if (leaveRequest.managerId !== managerId) {
-            throw new Error('Only the assigned manager can approve this request');
-        }
-        leaveRequest.status = 'approved';
-        leaveRequest.managerComment = comment;
-        return this.leaveRepository.updateLeaveRequest(leaveRequest);
-    }
-
-    async rejectLeaveRequest(requestId: string, managerId: string, comment?: string): Promise<LeaveRequest> {
-        const leaveRequest = await this.leaveRepository.getLeaveRequestById(requestId);
-        if (leaveRequest.managerId !== managerId) {
-            throw new Error('Only the assigned manager can reject this request');
-        }
-        leaveRequest.status = 'rejected';
-        leaveRequest.managerComment = comment;
-        return this.leaveRepository.updateLeaveRequest(leaveRequest);
+    private calculateLeaveDays(startDate: Date, endDate: Date): number {
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        const timeDiff = end.getTime() - start.getTime();
+        return Math.ceil(timeDiff / (1000 * 3600 * 24)) + 1; // Include both start and end dates
     }
 }

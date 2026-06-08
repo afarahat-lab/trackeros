@@ -1,5 +1,5 @@
 {
-  "id": "40f55eba-8944-4905-be09-eadde89c8970",
+  "id": "87873534-abc0-422d-920f-d6be59d0499e",
   "correlationId": "270bbf67-d9e2-4d83-be3c-0c158ed66a72",
   "rawIntent": "[Feature: Build the leave management module — Phase 2: Implement leave service logic]\n\nCreate src/modules/leave/leave.service.ts to implement business logic for handling leave requests, including validation and processing. This phase depends on src/modules/leave/leave.model.ts and src/modules/leave/leave.repository.ts from Phase 1.\n\nThis phase depends on: src/modules/leave/leave.model.ts, src/modules/leave/leave.repository.ts.\n\nPhase architecture notes:\nThis phase encapsulates the business rules and logic for leave management.",
   "scope": {
@@ -24,7 +24,6 @@
     "Repository pattern: All database access goes through repository interfaces.",
     "Audit records: All state-changing operations write an audit record.",
     "Input validation: Validate all inputs at API boundaries before processing.",
-    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
     "RBAC enforcement: All API endpoints enforce role-based access control.",
     "Error handling: No unhandled promise rejections. All async errors are caught and handled."
   ],
