@@ -1,5 +1,5 @@
 {
-  "id": "4b0d1e12-92b1-4ffe-b730-8d4f6f46b0fa",
+  "id": "86dadda9-0a8d-4812-8659-dc32eb2edfdf",
   "correlationId": "b94d8f42-c479-4e2a-b664-dd70a0e5fcd1",
   "rawIntent": "[Feature: Leave management module — Phase 1: Create leave model]\n\nCreate src/modules/leave/leave.model.ts. Define LeaveRequest and CreateLeaveRequestDto. Import LeaveType from src/shared/types/index.ts. Include a Jest unit test in tests/unit/leave.model.test.ts.\n\nPhase architecture notes:\nThis phase establishes the foundational data structures for leave requests.",
   "scope": {
@@ -16,7 +16,7 @@
   "successCriteria": [
     {
       "id": "sc-001",
-      "description": "LeaveRequest and CreateLeaveRequestDto are defined correctly in leave.model.ts and a Jest unit test is included in leave.model.test.ts.",
+      "description": "LeaveRequest and CreateLeaveRequestDto are defined correctly in leave.model.ts and Jest unit tests are passing.",
       "testable": true,
       "layer": "unit"
     }
@@ -30,8 +30,8 @@
     "Error handling: No unhandled promise rejections. All async errors are caught and handled."
   ],
   "outOfScope": [
-    "Any files outside src/modules/leave/leave.model.ts and tests/unit/leave.model.test.ts",
-    "Implementation details of LeaveType in src/shared/types/index.ts"
+    "Any changes outside src/modules/leave/leave.model.ts and tests/unit/leave.model.test.ts",
+    "Other modules or files not mentioned in the intent"
   ],
   "ambiguities": []
 }
