@@ -1,5 +1,5 @@
-import { LeaveRepository } from '../../modules/leave/leave.repository';
-import { LeaveRequest, LeaveBalance } from '../../modules/leave/leave.model';
+import { LeaveRepository } from '../../src/modules/leave/leave.repository';
+import { LeaveRequest, LeaveBalance } from '../../src/modules/leave/leave.model';
 
 describe('LeaveRepository', () => {
     const leaveRepository = new LeaveRepository();
@@ -12,9 +12,9 @@ describe('LeaveRepository', () => {
             endDate: new Date(),
             status: 'pending',
         };
-        const createdRequest = await leaveRepository.createLeaveRequest(leaveRequest);
-        expect(createdRequest).toHaveProperty('id');
-        expect(createdRequest.status).toBe('pending');
+        const result = await leaveRepository.createLeaveRequest(leaveRequest);
+        expect(result).toHaveProperty('id');
+        expect(result.status).toBe('pending');
     });
 
     it('should get leave requests by employee ID', async () => {
@@ -29,9 +29,9 @@ describe('LeaveRepository', () => {
             usedDays: 5,
             year: 2023,
         };
-        const createdBalance = await leaveRepository.createLeaveBalance(leaveBalance);
-        expect(createdBalance).toHaveProperty('id');
-        expect(createdBalance.totalDays).toBe(20);
+        const result = await leaveRepository.createLeaveBalance(leaveBalance);
+        expect(result).toHaveProperty('id');
+        expect(result.totalDays).toBe(20);
     });
 
     it('should get leave balance by employee ID and year', async () => {

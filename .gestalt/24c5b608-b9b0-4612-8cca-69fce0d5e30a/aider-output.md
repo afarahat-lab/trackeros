@@ -1,7 +1,7 @@
 # Aider session
 
 **Exit code:** 0
-**Duration:** 13191ms
+**Duration:** 11817ms
 
 ## Prompt sent to Aider
 
@@ -215,120 +215,69 @@ Here are the complete implementations for both files:
 src/modules/leave/leave.repository.ts                                           
 
                                                                                 
-import { Pool } from 'pg';                                                      
+@@ -1,5 +1,6 @@                                                                 
+ import { Pool } from 'pg';                                                     
+ const pool = new Pool();                                                       
+ export class LeaveRepository {                                                 
+         const { employeeId, leaveType, startDate, endDate, status } =          
                                                                                 
-import { LeaveRequest, LeaveBalance } from './leave.model';                     
+@@ -1,4 +1,5 @@                                                                 
+-import { LeaveRepository } from '../../modules/leave/leave.repository';        
+-import { LeaveRequest, LeaveBalance } from '../../modules/leave/leave.model';  
++import { LeaveRepository } from '../../src/modules/leave/leave.repository';    
++import { LeaveRequest, LeaveBalance } from                                     
+'../../src/modules/leave/leave.model';                                          
                                                                                 
+ describe('LeaveRepository', () => {                                            
+     const leaveRepository = new LeaveRepository();                             
                                                                                 
+     it('should create a leave request', async () => {                          
+         const leaveRequest: LeaveRequest = {                                   
+             employeeId: '1',                                                   
+             startDate: new Date(),                                             
+             endDate: new Date(),                                               
+             status: 'pending',                                                 
+         };                                                                     
+-        const createdRequest = await                                           
+leaveRepository.createLeaveRequest(leaveRequest);                               
+-        expect(createdRequest).toHaveProperty('id');                           
+-        expect(createdRequest.status).toBe('pending');                         
++        const result = await leaveRepository.createLeaveRequest(leaveRequest); 
++        expect(result).toHaveProperty('id');                                   
++        expect(result.status).toBe('pending');                                 
+     });                                                                        
                                                                                 
-const pool = new Pool();                                                        
+     it('should get leave requests by employee ID', async () => {               
+         const requests = await                                                 
+leaveRepository.getLeaveRequestsByEmployeeId('1');                              
+         expect(Array.isArray(requests)).toBe(true);                            
+@@ -24,5 +24,6 @@                                                               
                                                                                 
+             totalDays: 20,                                                     
+             usedDays: 5,                                                       
+             year: 2023,                                                        
+         };                                                                     
+-        const createdBalance = await                                           
+leaveRepository.createLeaveBalance(leaveBalance);                               
+-        expect(createdBalance).toHaveProperty('id');                           
+-        expect(createdBalance.totalDays).toBe(20);                             
++        const result = await leaveRepository.createLeaveBalance(leaveBalance); 
++        expect(result).toHaveProperty('id');                                   
++        expect(result.totalDays).toBe(20);                                     
+     });                                                                        
                                                                                 
-                                                                                
-export class LeaveRepository {                                                  
-                                                                                
-    async createLeaveRequest(leaveRequest: LeaveRequest): Promise<LeaveRequest> 
-{                                                                               
-                                                                                
-        const { employeeId, leaveType, startDate, endDate, status } =           
-leaveRequest;                                                                   
-                                                                                
-        const result = await pool.query(                                        
-                                                                                
-            'INSERT INTO leave_requests (employeeId, leaveType, startDate,      
-endDate, status) VALUES ($1, $2, $3, $4, $5) RETURNING *',                      
-                                                                                
-            [employeeId, leaveType, startDate, endDate, status]                 
-                                                                                
-        );                                                                      
-                                                                                
-        return result.rows[0];                                                  
-                                                                                
-    }                                                                           
-                                                                                
-                                                                                
-                                                                                
-    async getLeaveRequestsByEmployeeId(employeeId: string):                     
-Promise<LeaveRequest[]> {                                                       
-                                                                                
-        const result = await pool.query(                                        
-                                                                                
-            'SELECT * FROM leave_requests WHERE employeeId = $1',               
-                                                                                
-            [employeeId]                                                        
-                                                                                
-        );                                                                      
-                                                                                
-        return result.rows;                                                     
-                                                                                
-    }                                                                           
-                                                                                
-                                                                                
-                                                                                
-    async createLeaveBalance(leaveBalance: LeaveBalance): Promise<LeaveBalance> 
-{                                                                               
-                                                                                
-        const { employeeId, totalDays, usedDays, year } = leaveBalance;         
-                                                                                
-        const result = await pool.query(                                        
-                                                                                
-            'INSERT INTO leave_balances (employeeId, totalDays, usedDays, year) 
-VALUES ($1, $2, $3, $4) RETURNING *',                                           
-                                                                                
-            [employeeId, totalDays, usedDays, year]                             
-                                                                                
-        );                                                                      
-                                                                                
-        return result.rows[0];                                                  
-                                                                                
-    }                                                                           
-                                                                                
-                                                                                
-                                                                                
-    async getLeaveBalanceByEmployeeId(employeeId: string, year: number):        
-Promise<LeaveBalance | null> {                                                  
-                                                                                
-        const result = await pool.query(                                        
-                                                                                
-            'SELECT * FROM leave_balances WHERE employeeId = $1 AND year = $2', 
-                                                                                
-            [employeeId, year]                                                  
-                                                                                
-        );                                                                      
-                                                                                
-        return result.rows[0] || null;                                          
-                                                                                
-    }                                                                           
-                                                                                
-}                                                                               
+     it('should get leave balance by employee ID and year', async () => {       
+         const balance = await leaveRepository.getLeaveBalanceByEmployeeId('1', 
+2023);                                                                          
+         expect(balance).toHaveProperty('employeeId', '1');                     
                                                                                 
 
-tests/unit/leave.repository.test.ts                                             
+Tokens: 1.9k sent, 810 received. Cost: $0.00077 message, $0.00077 session.
 
-                                                                                
-import { LeaveRepository } from '../../modules/leave/leave.repository';         
-                                                                                
-import { LeaveRequest, LeaveBalance } from '../../modules/leave/leave.model';   
-                                                                                
-                                                                                
-                                                                                
-describe('LeaveRepository', () => {                                             
-                                                                                
-    const leaveRepository = new LeaveRepository();                              
-                                                                                
-                                                                                
-                                                                                
-    it('should create a leave request', async () => {                           
-                                                                                
-        const leaveRequest: LeaveRequest = {                                    
-                                                                                
-            employeeId: '1',                                                    
-                                                                                
-            leaveType: 'annual',                                                
-                                                                                
-            startDate: new Date(),                                              
-                                                                                
-            endDate: new Date(),                                                
-                     
-[stdout truncated at 10000 chars]
+src/modules/leave/leave.repository.ts
+
+tests/unit/leave.repository.test.ts
+Applied edit to src/modules/leave/leave.repository.ts
+Applied edit to tests/unit/leave.repository.test.ts
+
 ```

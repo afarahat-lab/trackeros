@@ -94,11 +94,10 @@
     },
     {
       "method": "GET",
-      "path": "/api/v1/leave-balances",
-      "description": "Retrieve leave balance for an employee",
+      "path": "/api/v1/leave-balances/{employeeId}",
+      "description": "Retrieve leave balance for a specific employee",
       "requestBody": {},
       "responseBody": {
-        "employeeId": "string",
         "totalLeaves": "number",
         "usedLeaves": "number",
         "remainingLeaves": "number"

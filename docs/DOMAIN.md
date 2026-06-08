@@ -32,7 +32,7 @@ To be populated as the design-agent and context-agent learn the domain.
   - Array of leave requests:
     - `id`: string
     - `employeeId`: string
-    - `leaveTypeId`: string
+    - `leaveType`: string
     - `startDate`: Date
     - `endDate`: Date
     - `status`: string
@@ -41,11 +41,10 @@ To be populated as the design-agent and context-agent learn the domain.
 - **Auth Required**: Yes
 - **Roles**: admin, operator
 
-### GET /api/v1/leave-balances
-- **Description**: Retrieves the leave balance for an employee.
+### GET /api/v1/leave-balances/{employeeId}
+- **Description**: Retrieve leave balance for a specific employee.
 - **Request Body**: {}
 - **Response Body**:
-  - `employeeId`: string
   - `totalLeaves`: number
   - `usedLeaves`: number
   - `remainingLeaves`: number
