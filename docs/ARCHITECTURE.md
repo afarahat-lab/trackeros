@@ -132,3 +132,6 @@ This module allows employees to apply for leave and managers to approve or rejec
 
 ## Leave Management Module
 This module handles the leave request process, including submission, approval, and balance management for employees. It consists of the LeaveRequest, LeaveBalance, and LeavePolicy entities.
+
+## Leave Management Module
+This module handles leave requests, balances, and policies, ensuring compliance with business rules.
