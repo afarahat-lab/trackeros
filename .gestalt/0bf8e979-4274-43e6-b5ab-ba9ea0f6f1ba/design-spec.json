@@ -2,9 +2,14 @@
   "correlationId": "0bf8e979-4274-43e6-b5ab-ba9ea0f6f1ba",
   "domainChanges": [
     {
-      "entityName": "LeaveRequest",
+      "entityName": "Leave",
       "operation": "create",
       "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
         {
           "name": "employeeId",
           "type": "string",
@@ -29,6 +34,16 @@
           "name": "status",
           "type": "string",
           "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": true
         }
       ],
       "relationships": [
@@ -42,7 +57,7 @@
   "apiContracts": [
     {
       "method": "POST",
-      "path": "/api/v1/leave-requests",
+      "path": "/api/v1/leaves",
       "description": "Create a new leave request",
       "requestBody": {
         "employeeId": "string",
@@ -52,7 +67,9 @@
       },
       "responseBody": {
         "id": "string",
-        "status": "string"
+        "status": "string",
+        "createdAt": "Date",
+        "updatedAt": "Date"
       },
       "authRequired": true,
       "roles": [
@@ -62,7 +79,7 @@
     },
     {
       "method": "GET",
-      "path": "/api/v1/leave-requests/{id}",
+      "path": "/api/v1/leaves/{id}",
       "description": "Retrieve a specific leave request by ID",
       "requestBody": {},
       "responseBody": {
@@ -71,7 +88,9 @@
         "leaveType": "string",
         "startDate": "Date",
         "endDate": "Date",
-        "status": "string"
+        "status": "string",
+        "createdAt": "Date",
+        "updatedAt": "Date"
       },
       "authRequired": true,
       "roles": [
@@ -81,14 +100,15 @@
     },
     {
       "method": "PATCH",
-      "path": "/api/v1/leave-requests/{id}",
-      "description": "Update the status of a leave request",
+      "path": "/api/v1/leaves/{id}",
+      "description": "Update a leave request",
       "requestBody": {
         "status": "string"
       },
       "responseBody": {
         "id": "string",
-        "status": "string"
+        "status": "string",
+        "updatedAt": "Date"
       },
       "authRequired": true,
       "roles": [
@@ -97,5 +117,24 @@
       ]
     }
   ],
-  "componentSpecs": []
+  "componentSpecs": [
+    {
+      "name": "LeaveRequestForm",
+      "type": "component",
+      "description": "Form for submitting a leave request",
+      "props": {
+        "onSubmit": "function",
+        "employeeId": "string"
+      }
+    },
+    {
+      "name": "LeaveRequestList",
+      "type": "component",
+      "description": "Displays a list of leave requests",
+      "props": {
+        "leaves": "array",
+        "onDelete": "function"
+      }
+    }
+  ]
 }
