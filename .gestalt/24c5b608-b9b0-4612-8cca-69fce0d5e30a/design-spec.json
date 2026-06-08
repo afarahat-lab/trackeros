@@ -1,0 +1,41 @@
+{
+  "correlationId": "24c5b608-b9b0-4612-8cca-69fce0d5e30a",
+  "domainChanges": [
+    {
+      "entityName": "LeaveBalance",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "remainingLeaves",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "usedLeaves",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "totalLeaves",
+          "type": "number",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "LeaveRequest",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "leaveType",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}

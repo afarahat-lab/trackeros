@@ -1,0 +1,31 @@
+{
+  "id": "02ce634f-9dc9-4ab3-9242-d797c7d55bf9",
+  "correlationId": "24c5b608-b9b0-4612-8cca-69fce0d5e30a",
+  "rawIntent": "Define the LeaveBalance type to include properties: remainingLeaves, usedLeaves, and totalLeaves. Define the LeaveRequest type to include the property leaveType. Ensure these types are correctly exported for use in leave.repository.ts.",
+  "scope": {
+    "affectedDomains": [
+      "Fields"
+    ],
+    "affectedLayers": [
+      "domain"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "LeaveBalance and LeaveRequest types are defined with the specified properties and correctly exported in leave.repository.ts.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Input validation: Validate all inputs at API boundaries before processing."
+  ],
+  "outOfScope": [
+    "Any changes to other modules or domains not mentioned in the intent."
+  ],
+  "ambiguities": []
+}
