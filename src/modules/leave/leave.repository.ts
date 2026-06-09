@@ -1,4 +1,4 @@
-import { LeaveRequest } from './leave.model';
+import { LeaveRequest, CreateLeaveRequestDto } from './leave.model';
 import { Pool } from 'pg';
 
 export class LeaveRepository {
@@ -8,24 +8,17 @@ export class LeaveRepository {
         this.db = db;
     }
 
-    async createLeaveRequest(leaveRequest: LeaveRequest): Promise<LeaveRequest> {
-        const query = `
-            INSERT INTO leave_requests (id, employeeId, leaveType, startDate, endDate, status, createdAt, updatedAt)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-            RETURNING *;
-        `;
-        const values = [
-            leaveRequest.id,
-            leaveRequest.employeeId,
-            leaveRequest.leaveType,
-            leaveRequest.startDate,
-            leaveRequest.endDate,
-            leaveRequest.status,
-            leaveRequest.createdAt,
-            leaveRequest.updatedAt,
-        ];
+    async createLeaveRequest(dto: CreateLeaveRequestDto): Promise<LeaveRequest> {
+        const { employeeId, leaveType, startDate, endDate } = dto;
+        const createdAt = new Date();
+        const updatedAt = new Date();
 
-        const result = await this.db.query(query, values);
+        const result = await this.db.query(
+            `INSERT INTO leave_requests (employeeId, leaveType, startDate, endDate, status, createdAt, updatedAt)
+             VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+            [employeeId, leaveType, startDate, endDate, 'pending', createdAt, updatedAt]
+        );
+
         return result.rows[0];
     }
 }
