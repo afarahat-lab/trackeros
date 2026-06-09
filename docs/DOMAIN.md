@@ -74,6 +74,59 @@ To be populated as the design-agent and context-agent learn the domain.
 - **Auth Required**: Yes
 - **Roles**: admin, operator
 
+### GET /api/v1/balances
+- **Description**: List leave balances by employee
+- **Request Body**: {}
+- **Response Body**:
+  - `balances`: LeaveBalance[]
+- **Auth Required**: Yes
+- **Roles**: admin, operator
+
+### GET /api/v1/balances/{employeeId}/{leaveType}
+- **Description**: Get leave balance for a specific employee and leave type
+- **Request Body**: {}
+- **Response Body**:
+  - `balance`: LeaveBalance
+- **Auth Required**: Yes
+- **Roles**: admin, operator
+
+### POST /api/v1/balances
+- **Description**: Create or update leave balance
+- **Request Body**:
+  - `balance`: CreateOrUpdateLeaveBalanceDto
+- **Response Body**:
+  - `balance`: LeaveBalance
+- **Auth Required**: Yes
+- **Roles**: admin, operator
+
+### PATCH /api/v1/balances/adjust-pending
+- **Description**: Adjust pending leave balance
+- **Request Body**:
+  - `adjustment`: BalanceAdjustmentDto
+- **Response Body**:
+  - `balance`: LeaveBalance
+- **Auth Required**: Yes
+- **Roles**: admin, operator
+
+### PATCH /api/v1/balances/adjust-used
+- **Description**: Adjust used leave balance
+- **Request Body**:
+  - `adjustment`: BalanceAdjustmentDto
+- **Response Body**:
+  - `balance`: LeaveBalance
+- **Auth Required**: Yes
+- **Roles**: admin, operator
+
+### DELETE /api/v1/balances/reset-period
+- **Description**: Reset leave balance period
+- **Request Body**:
+  - `employeeId`: string
+  - `leaveType`: LeaveType
+- **Response Body**:
+  - `message`: Period reset successfully
+- **Auth Required**: Yes
+- **Roles**: admin, operator
+
 ## Domain Entities
 
 ### LeaveRequest
@@ -99,8 +152,25 @@ To be populated as the design-agent and context-agent learn the domain.
 ### LeaveBalance
 - **Fields**:
   - `employeeId`: string (required)
-  - `leaveTypeId`: string (required)
-  - `balance`: number (required)
-  - `remainingLeaves`: number (required)
-  - `usedLeaves`: number (required)
-  - `totalLeaves`: number (required)
+  - `leaveType`: LeaveType (required)
+  - `totalBalance`: number (required)
+  - `usedBalance`: number (required)
+  - `pendingBalance`: number (required)
+  - `periodStart`: Date (required)
+  - `periodEnd`: Date (required)
+
+### CreateOrUpdateLeaveBalanceDto
+- **Fields**:
+  - `employeeId`: string (required)
+  - `leaveType`: LeaveType (required)
+  - `totalBalance`: number (required)
+  - `usedBalance`: number (required)
+  - `pendingBalance`: number (required)
+  - `periodStart`: Date (required)
+  - `periodEnd`: Date (required)
+
+### BalanceAdjustmentDto
+- **Fields**:
+  - `employeeId`: string (required)
+  - `leaveType`: LeaveType (required)
+  - `amount`: number (required)
