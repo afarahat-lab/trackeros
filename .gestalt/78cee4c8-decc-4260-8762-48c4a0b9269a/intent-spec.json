@@ -1,0 +1,35 @@
+{
+  "id": "fb85bfaa-5fd8-4aa8-8f52-a4fbbfde4de7",
+  "correlationId": "78cee4c8-decc-4260-8762-48c4a0b9269a",
+  "rawIntent": "[Feature: Build the leave management module — Phase 1: Create leave model and repository]\n\nCreate src/modules/leave/leave.model.ts defining LeaveRequest and CreateLeaveRequestDto. Create src/modules/leave/leave.repository.ts implementing the repository for LeaveRequest. This phase depends on no prior files.\n\nPhase architecture notes:\nThis phase establishes the core data structure for leave requests and the persistence layer.",
+  "scope": {
+    "affectedDomains": [
+      "Leave"
+    ],
+    "affectedLayers": [
+      "domain",
+      "infra"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "LeaveRequest and CreateLeaveRequestDto are defined in leave.model.ts and the repository for LeaveRequest is implemented in leave.repository.ts.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Audit records: All state-changing operations write an audit record.",
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "RBAC enforcement: All API endpoints enforce role-based access control.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "Any files or modules outside of src/modules/leave/leave.model.ts and src/modules/leave/leave.repository.ts"
+  ],
+  "ambiguities": []
+}
