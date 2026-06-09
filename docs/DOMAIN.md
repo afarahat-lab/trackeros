@@ -12,38 +12,59 @@ To be populated as the design-agent and context-agent learn the domain.
 - **Auth Required**: No
 - **Roles**: None
 
-### POST /api/v1/leave-requests
+### POST /api/v1/leaves
 - **Description**: Creates a new leave request.
 - **Request Body**:
   - `employeeId`: string (required)
-  - `leaveType`: LeaveType (required)
+  - `balanceId`: string (required)
   - `startDate`: Date (required)
   - `endDate`: Date (required)
+  - `status`: string (required)
 - **Response Body**:
   - `id`: string
   - `employeeId`: string
-  - `leaveType`: LeaveType
+  - `balanceId`: string
   - `startDate`: Date
   - `endDate`: Date
   - `status`: string
-  - `createdAt`: Date
-  - `updatedAt`: Date
 - **Auth Required**: Yes
 - **Roles**: admin, operator
 
-### GET /api/v1/leave-requests
-- **Description**: Retrieves a list of leave requests.
+### GET /api/v1/leaves/{id}
+- **Description**: Retrieves a leave request by ID.
 - **Request Body**: {}
 - **Response Body**:
-  - Array of leave requests:
-    - `id`: string
-    - `employeeId`: string
-    - `leaveTypeId`: string
-    - `startDate`: Date
-    - `endDate`: Date
-    - `status`: string
-    - `createdAt`: Date
-    - `updatedAt`: Date
+  - `id`: string
+  - `employeeId`: string
+  - `balanceId`: string
+  - `startDate`: Date
+  - `endDate`: Date
+  - `status`: string
+- **Auth Required**: Yes
+- **Roles**: admin, operator
+
+### PUT /api/v1/leaves/{id}
+- **Description**: Updates an existing leave request.
+- **Request Body**:
+  - `employeeId`: string (required)
+  - `balanceId`: string (required)
+  - `startDate`: Date (required)
+  - `endDate`: Date (required)
+  - `status`: string (required)
+- **Response Body**:
+  - `id`: string
+  - `employeeId`: string
+  - `balanceId`: string
+  - `startDate`: Date
+  - `endDate`: Date
+  - `status`: string
+- **Auth Required**: Yes
+- **Roles**: admin, operator
+
+### DELETE /api/v1/leaves/{id}
+- **Description**: Deletes a leave request by ID.
+- **Request Body**: {}
+- **Response Body**: {}
 - **Auth Required**: Yes
 - **Roles**: admin, operator
 
@@ -59,23 +80,22 @@ To be populated as the design-agent and context-agent learn the domain.
 
 ## Domain Entities
 
-### LeaveRequest
+### Leave
 - **Fields**:
   - `id`: string (required)
   - `employeeId`: string (required)
-  - `leaveType`: LeaveType (required)
+  - `balanceId`: string (required)
   - `startDate`: Date (required)
   - `endDate`: Date (required)
   - `status`: string (required)
-  - `createdAt`: Date (required)
-  - `updatedAt`: Date (required)
 
 ### CreateLeaveRequestDto
 - **Fields**:
   - `employeeId`: string (required)
-  - `leaveType`: LeaveType (required)
+  - `balanceId`: string (required)
   - `startDate`: Date (required)
   - `endDate`: Date (required)
+  - `status`: string (required)
 
 ### LeaveBalance
 - **Fields**:
