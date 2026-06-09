@@ -1,19 +1,24 @@
 # Aider session
 
 **Exit code:** 0
-**Duration:** 12765ms
+**Duration:** 91899ms
 
 ## Prompt sent to Aider
 
 ```
 ## Task
-The CI pipeline failed with the error: 'Cannot find module '../../shared/db' or its corresponding type declarations.' This error occurred in the file src/modules/balance/balance.repository.ts, which was trying to import the database adapter to implement persistence methods. The failure indicates that the import path may be incorrect or the module is missing. Preserve all existing exports, types, interfaces, and imports. Only add or modify what is needed to resolve the CI failure shown above.
+[Feature: Build the leave management module — Phase 1: Create balance domain model and repository]
+
+Create exactly these files: src/modules/balance/balance.model.ts, src/modules/balance/balance.repository.ts, tests/unit/balance.repository.spec.ts. In src/modules/balance/balance.model.ts define the balance-side domain contracts: LeaveType enum with annual, sick, emergency values; LeaveBalance; CreateOrUpdateLeaveBalanceDto; BalanceAdjustmentDto. In src/modules/balance/balance.repository.ts implement persistence methods for getByEmployeeAndType, listByEmployee, upsertBalance, adjustPending, adjustUsed, and resetPeriod using the existing database adapter at src/shared/db/index.ts. The repository MUST import all DTOs/types it operates on from src/modules/balance/balance.model.ts in this same phase. Include a Jest unit test in tests/unit/balance.repository.spec.ts with the DB adapter mocked, covering lookup, upsert, pending adjustment, and used adjustment behavior.
+
+Phase architecture notes:
+Balance persistence is established first because leave submission and approval depend on reliable entitlement, pending, and used leave tracking.
 
 ## Success criteria
-- The CI pipeline passes without errors related to the database adapter import.
+- The balance domain model and repository are created with the specified files and methods, and the unit tests cover the required behaviors.
 
 ## Out of scope (do NOT touch these)
-- everything outside src/modules/balance/balance.repository.ts
+- Any files or modules outside of src/modules/balance and tests/unit/balance.repository.spec.ts
 
 ## Project rules
 - Generated code must compile without errors.
@@ -93,10 +98,89 @@ base-repository.ts      ← shared
 ## Design context
 {
   "correlationId": "8377bcec-a372-42e5-9c94-9197982f6c2b",
-  "domainChanges": [],
-  "apiContracts": [],
-  "componentSpecs": []
-}
+  "domainChanges": [
+    {
+      "entityName": "LeaveBalance",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "employeeId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "leaveType",
+          "type": "LeaveType",
+          "required": true
+        },
+        {
+          "name": "entitlement",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "pending",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "used",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "periodStart",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "periodEnd",
+          "type": "Date",
+          "required": true
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [
+    {
+      "method": "GET",
+      "path": "/api/v1/balances/employee/{employeeId}/type/{leaveType}",
+      "description": "Retrieve the leave balance for a specific employee and leave type.",
+      "requestBody": {},
+      "responseBody": {
+        "balance": "LeaveBalance"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/balances/employee/{employeeId}",
+      "description": "List all leave balances for a specific employee.",
+      "requestBody": {},
+      "responseBody": {
+        "balances": "LeaveBalance[]"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/balances",
+      "description": "Create or update the leave balance for an employee.",
+      "requestBody": {
+        "leaveBalance": "CreateOrUpdateLeaveBalanceDto"
+      },
+      "responseBody": {
+        "balance": "LeaveBalance"
+  
 
 ## Important — architecture context is reference only
 The architecture and design context above describes the intended
@@ -115,22 +199,133 @@ Model: gpt-5.5 with whole edit format
 Git repo: none
 Repo-map: disabled
 Added PLAN.md to the chat (read-only).
-Added package.json to the chat (read-only).
 Added tsconfig.json to the chat (read-only).
+Added package.json to the chat (read-only).
 
-I can fix this, but I need the current contents of:                             
+Implemented Phase 1 by creating:                                                
 
- 1 src/modules/balance/balance.repository.ts                                    
- 2 The existing database adapter file, likely one of:                           
-    • src/shared/db/index.ts                                                    
-    • src/shared/db/connection.ts                                               
-    • any other file under src/shared/db/                                       
+ 1 Balance domain contracts with LeaveType, LeaveBalance,                       
+   CreateOrUpdateLeaveBalanceDto, and BalanceAdjustmentDto.                     
+ 2 A PostgreSQL-backed BalanceRepository with lookup, list, upsert, pending     
+   adjustment, used adjustment, and period reset methods.                       
+ 3 Jest unit tests with the DB adapter mocked, covering lookup, upsert, pending 
+   adjustment, and used adjustment behavior.                                    
 
-Because the task requires preserving all existing                               
-exports/types/interfaces/imports and only modifying                             
-src/modules/balance/balance.repository.ts, I need the full current file content 
-before I can safely return the complete updated file.                           
+src/modules/balance/balance.model.ts                                            
 
-Tokens: 3.7k sent, 109 received. Cost: $0.02 message, $0.02 session.
+                                                                                
+export enum LeaveType {                                                         
+                                                                                
+  Annual = 'annual',                                                            
+                                                                                
+  Sick = 'sick',                                                                
+                                                                                
+  Emergency = 'emergency',                                                      
+                                                                                
+}                                                                               
+                                                                                
+                                                                                
+                                                                                
+export interface LeaveBalance {                                                 
+                                                                                
+  employeeId: string;                                                           
+                                                                                
+  leaveType: LeaveType;                                                         
+                                                                                
+  entitlement: number;                                                          
+                                                                                
+  pending: number;                                                              
+                                                                                
+  used: number;                                                                 
+                                                                                
+  periodStart: Date;                                                            
+                                                                                
+  periodEnd: Date;                                                              
+                                                                                
+}                                                                               
+                                                                                
+                                                                                
+                                                                                
+export interface CreateOrUpdateLeaveBalanceDto {                                
+                                                                                
+  employeeId: string;                                                           
+                                                                                
+  leaveType: LeaveType;                                                         
+                                                                                
+  entitlement: number;                                                          
+                                                                                
+  pending?: number;                                                             
+                                                                                
+  used?: number;                                                                
+                                                                                
+  periodStart: Date;                                                            
+                                                                                
+  periodEnd: Date;                                                              
+                                                                                
+}                                                                               
+                                                                                
+                                                                                
+                                                                                
+export interface BalanceAdjustmentDto {                                         
+                                                                                
+  employeeId: string;                                                           
+                                                                                
+  leaveType: LeaveType;                                                         
+                                                                                
+  amount: number;                                                               
+                                                                                
+}                                                                               
+                                                                                
 
+src/modules/balance/balance.repository.ts                                       
+
+                                                                                
+import * as db from '../../shared/db';                                          
+                                                                                
+import {                                                                        
+                                                                                
+  BalanceAdjustmentDto,                                                         
+                                                                                
+  CreateOrUpdateLeaveBalanceDto,                                                
+                                                                                
+  LeaveBalance,                                                                 
+                                                                                
+  LeaveType,                                                                    
+                                                                                
+} from './balance.model';                                                       
+                                                                                
+                                                                                
+                                                                                
+interface QueryResult<Row> {                                                    
+                                                                                
+  rows: Row[];                                                                  
+                                                                                
+}                                                                               
+                                                                                
+                                                                                
+                                                                                
+interface DatabaseAdapter {                                                     
+                                                                                
+  query<Row = unknown>(sql: string, params?: unknown[]):                        
+Promise<QueryResult<Row>>;                                                      
+                                                                                
+}                                                                               
+                                                                                
+                                                                                
+                                                                                
+interface LeaveBalanceRow {                                                     
+                                                                                
+  employee_id: string;                                                          
+                                                                                
+  leave_type: LeaveType;                                                        
+                                                                                
+  entitlement: number | string;                                                 
+                                                                                
+  pending: number | string;                                                     
+                                                                                
+  used: number | string;                                                        
+                                                                                
+  period_start: Date | string;                                                  
+                                                            
+[stdout truncated at 10000 chars]
 ```

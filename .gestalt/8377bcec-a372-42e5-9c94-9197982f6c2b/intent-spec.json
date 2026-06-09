@@ -1,34 +1,37 @@
 {
-  "id": "df9c04ad-40a6-41d5-a5e3-1a85582d6d4e",
+  "id": "e8c13673-41b4-4a8f-be93-da58bcf27a04",
   "correlationId": "8377bcec-a372-42e5-9c94-9197982f6c2b",
-  "rawIntent": "The CI pipeline failed with the error: 'Cannot find module '../../shared/db' or its corresponding type declarations.' This error occurred in the file src/modules/balance/balance.repository.ts, which was trying to import the database adapter to implement persistence methods. The failure indicates that the import path may be incorrect or the module is missing. Preserve all existing exports, types, interfaces, and imports. Only add or modify what is needed to resolve the CI failure shown above.",
+  "rawIntent": "[Feature: Build the leave management module — Phase 1: Create balance domain model and repository]\n\nCreate exactly these files: src/modules/balance/balance.model.ts, src/modules/balance/balance.repository.ts, tests/unit/balance.repository.spec.ts. In src/modules/balance/balance.model.ts define the balance-side domain contracts: LeaveType enum with annual, sick, emergency values; LeaveBalance; CreateOrUpdateLeaveBalanceDto; BalanceAdjustmentDto. In src/modules/balance/balance.repository.ts implement persistence methods for getByEmployeeAndType, listByEmployee, upsertBalance, adjustPending, adjustUsed, and resetPeriod using the existing database adapter at src/shared/db/index.ts. The repository MUST import all DTOs/types it operates on from src/modules/balance/balance.model.ts in this same phase. Include a Jest unit test in tests/unit/balance.repository.spec.ts with the DB adapter mocked, covering lookup, upsert, pending adjustment, and used adjustment behavior.\n\nPhase architecture notes:\nBalance persistence is established first because leave submission and approval depend on reliable entitlement, pending, and used leave tracking.",
   "scope": {
     "affectedDomains": [
-      "balance"
+      "Balance"
     ],
     "affectedLayers": [
-      "domain"
+      "domain",
+      "infra",
+      "test"
     ],
     "isBreakingChange": false,
-    "estimatedComplexity": "small"
+    "estimatedComplexity": "medium"
   },
   "successCriteria": [
     {
       "id": "sc-001",
-      "description": "The CI pipeline passes without errors related to the database adapter import.",
+      "description": "The balance domain model and repository are created with the specified files and methods, and the unit tests cover the required behaviors.",
       "testable": true,
-      "layer": "integration"
+      "layer": "unit"
     }
   ],
   "constraints": [
     "Repository pattern: All database access goes through repository interfaces.",
+    "Audit records: All state-changing operations write an audit record.",
     "Input validation: Validate all inputs at API boundaries before processing.",
     "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
     "RBAC enforcement: All API endpoints enforce role-based access control.",
     "Error handling: No unhandled promise rejections. All async errors are caught and handled."
   ],
   "outOfScope": [
-    "everything outside src/modules/balance/balance.repository.ts"
+    "Any files or modules outside of src/modules/balance and tests/unit/balance.repository.spec.ts"
   ],
   "ambiguities": []
 }

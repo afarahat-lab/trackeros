@@ -74,6 +74,58 @@ To be populated as the design-agent and context-agent learn the domain.
 - **Auth Required**: Yes
 - **Roles**: admin, operator
 
+### GET /api/v1/balances/employee/{employeeId}/type/{leaveType}
+- **Description**: Retrieve the leave balance for a specific employee and leave type.
+- **Request Body**: {}
+- **Response Body**:
+  - `balance`: LeaveBalance
+- **Auth Required**: Yes
+- **Roles**: admin, operator
+
+### GET /api/v1/balances/employee/{employeeId}
+- **Description**: List all leave balances for a specific employee.
+- **Request Body**: {}
+- **Response Body**:
+  - `balances`: LeaveBalance[]
+- **Auth Required**: Yes
+- **Roles**: admin, operator
+
+### POST /api/v1/balances
+- **Description**: Create or update the leave balance for an employee.
+- **Request Body**:
+  - `leaveBalance`: CreateOrUpdateLeaveBalanceDto
+- **Response Body**:
+  - `balance`: LeaveBalance
+- **Auth Required**: Yes
+- **Roles**: admin, operator
+
+### PATCH /api/v1/balances/adjust/pending
+- **Description**: Adjust the pending leave balance for an employee.
+- **Request Body**:
+  - `adjustment`: BalanceAdjustmentDto
+- **Response Body**:
+  - `balance`: LeaveBalance
+- **Auth Required**: Yes
+- **Roles**: admin, operator
+
+### PATCH /api/v1/balances/adjust/used
+- **Description**: Adjust the used leave balance for an employee.
+- **Request Body**:
+  - `adjustment`: BalanceAdjustmentDto
+- **Response Body**:
+  - `balance`: LeaveBalance
+- **Auth Required**: Yes
+- **Roles**: admin, operator
+
+### DELETE /api/v1/balances/reset/period
+- **Description**: Reset the leave balance period for an employee.
+- **Request Body**:
+  - `employeeId`: string
+- **Response Body**:
+  - `message`: Period reset successfully
+- **Auth Required**: Yes
+- **Roles**: admin, operator
+
 ## Domain Entities
 
 ### LeaveRequest
@@ -99,8 +151,9 @@ To be populated as the design-agent and context-agent learn the domain.
 ### LeaveBalance
 - **Fields**:
   - `employeeId`: string (required)
-  - `leaveTypeId`: string (required)
-  - `balance`: number (required)
-  - `remainingLeaves`: number (required)
-  - `usedLeaves`: number (required)
-  - `totalLeaves`: number (required)
+  - `leaveType`: LeaveType (required)
+  - `entitlement`: number (required)
+  - `pending`: number (required)
+  - `used`: number (required)
+  - `periodStart`: Date (required)
+  - `periodEnd`: Date (required)
