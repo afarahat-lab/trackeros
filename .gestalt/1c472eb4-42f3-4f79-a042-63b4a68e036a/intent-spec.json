@@ -1,0 +1,38 @@
+{
+  "id": "1dd37c40-3ac4-49c0-b8a3-35b072976a20",
+  "correlationId": "1c472eb4-42f3-4f79-a042-63b4a68e036a",
+  "rawIntent": "The CI pipeline failed with the following errors: 'error' is of type 'unknown' at lines 49, 37, and 26; 'updateLeaveRequest' does not exist on type 'LeaveService' at line 46; 'getAllLeaveRequests' does not exist on type 'LeaveService' at line 23; and parameters 'req', 'res', and 'next' implicitly have an 'any' type at line 10 in src/modules/leave/leave.routes.ts. Additionally, 'user' does not exist on type 'Request' at line 5 in src/modules/leave/leave.middleware.ts. The code was trying to implement API endpoints and middleware for leave management but failed due to these type issues. Preserve all existing exports, types, interfaces, and imports. Only add or modify what is needed to resolve the CI failure shown above.",
+  "scope": {
+    "affectedDomains": [
+      "LeaveService",
+      "leave.routes.ts",
+      "leave.middleware.ts"
+    ],
+    "affectedLayers": [
+      "api"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "All type errors in the CI pipeline are resolved and the pipeline passes successfully.",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Audit records: All state-changing operations write an audit record.",
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "RBAC enforcement: All API endpoints enforce role-based access control.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "Any changes outside of LeaveService, leave.routes.ts, and leave.middleware.ts",
+    "New features or endpoints not mentioned in the intent"
+  ],
+  "ambiguities": []
+}
