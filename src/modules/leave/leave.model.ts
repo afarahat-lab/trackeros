@@ -6,7 +6,7 @@ export interface LeaveRequest {
     leaveType: LeaveType;
     startDate: Date;
     endDate: Date;
-    status: string; // pending | approved | rejected
+    status: string;
     createdAt: Date;
     updatedAt: Date;
 }
