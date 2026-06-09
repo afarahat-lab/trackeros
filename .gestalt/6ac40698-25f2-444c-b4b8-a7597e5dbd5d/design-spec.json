@@ -1,6 +1,147 @@
 {
   "correlationId": "6ac40698-25f2-444c-b4b8-a7597e5dbd5d",
-  "domainChanges": [],
-  "apiContracts": [],
+  "domainChanges": [
+    {
+      "entityName": "LeaveBalance",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "employeeId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "leaveType",
+          "type": "LeaveType",
+          "required": true
+        },
+        {
+          "name": "totalBalance",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "pendingBalance",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "usedBalance",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "periodStart",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "periodEnd",
+          "type": "Date",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "Employee",
+          "type": "one-to-many"
+        }
+      ]
+    }
+  ],
+  "apiContracts": [
+    {
+      "method": "GET",
+      "path": "/api/v1/leave-balances/employee/:employeeId/type/:leaveType",
+      "description": "Retrieve leave balance for a specific employee and leave type.",
+      "requestBody": {},
+      "responseBody": {
+        "balance": "LeaveBalance"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/leave-balances/employee/:employeeId",
+      "description": "List all leave balances for a specific employee.",
+      "requestBody": {},
+      "responseBody": {
+        "balances": "LeaveBalance[]"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/leave-balances",
+      "description": "Create or update leave balance for an employee.",
+      "requestBody": {
+        "balance": "CreateOrUpdateLeaveBalanceDto"
+      },
+      "responseBody": {
+        "balance": "LeaveBalance"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/leave-balances/adjust/pending",
+      "description": "Adjust pending leave balance for an employee.",
+      "requestBody": {
+        "adjustment": "BalanceAdjustmentDto"
+      },
+      "responseBody": {
+        "balance": "LeaveBalance"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/leave-balances/adjust/used",
+      "description": "Adjust used leave balance for an employee.",
+      "requestBody": {
+        "adjustment": "BalanceAdjustmentDto"
+      },
+      "responseBody": {
+        "balance": "LeaveBalance"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/leave-balances/reset/period",
+      "description": "Reset leave balance period for an employee.",
+      "requestBody": {
+        "employeeId": "string"
+      },
+      "responseBody": {
+        "message": "Period reset successfully"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    }
+  ],
   "componentSpecs": []
 }
