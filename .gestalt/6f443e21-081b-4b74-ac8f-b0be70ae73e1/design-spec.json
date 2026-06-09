@@ -1,0 +1,56 @@
+{
+  "correlationId": "6f443e21-081b-4b74-ac8f-b0be70ae73e1",
+  "domainChanges": [
+    {
+      "entityName": "LeaveRequest",
+      "operation": "update",
+      "fields": [
+        {
+          "name": "reason",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [
+    {
+      "method": "POST",
+      "path": "/api/v1/leave-requests",
+      "description": "Creates a new leave request with a reason.",
+      "requestBody": {
+        "reason": "string"
+      },
+      "responseBody": {
+        "id": "string",
+        "reason": "string",
+        "status": "string"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/leave-requests/{id}",
+      "description": "Updates an existing leave request with a reason.",
+      "requestBody": {
+        "reason": "string"
+      },
+      "responseBody": {
+        "id": "string",
+        "reason": "string",
+        "status": "string"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    }
+  ],
+  "componentSpecs": []
+}
