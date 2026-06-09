@@ -1,18 +1,19 @@
 import { LeaveRequest } from './leave.model';
 
-export class LeaveRepository {
+export interface ILeaveRepository {
+    createLeaveRequest(leaveRequest: LeaveRequest): Promise<LeaveRequest>;
+    getLeaveRequests(): Promise<LeaveRequest[]>;
+}
+
+export class LeaveRepository implements ILeaveRepository {
     private leaveRequests: LeaveRequest[] = [];
 
-    public create(leaveRequest: LeaveRequest): LeaveRequest {
+    async createLeaveRequest(leaveRequest: LeaveRequest): Promise<LeaveRequest> {
         this.leaveRequests.push(leaveRequest);
         return leaveRequest;
     }
 
-    public findById(id: string): LeaveRequest | undefined {
-        return this.leaveRequests.find(request => request.id === id);
-    }
-
-    public findAll(): LeaveRequest[] {
+    async getLeaveRequests(): Promise<LeaveRequest[]> {
         return this.leaveRequests;
     }
 }

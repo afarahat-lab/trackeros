@@ -29,7 +29,7 @@ To be populated as the design-agent and context-agent learn the domain.
 - **Description**: Retrieves a list of leave requests.
 - **Request Body**: {}
 - **Response Body**:
-  - Array of leave requests:
+  - `leaveRequests`: Array of LeaveRequest:
     - `id`: string
     - `employeeId`: string
     - `startDate`: Date

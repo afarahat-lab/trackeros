@@ -36,12 +36,7 @@
           "required": true
         }
       ],
-      "relationships": [
-        {
-          "entity": "Employee",
-          "type": "one-to-many"
-        }
-      ]
+      "relationships": []
     },
     {
       "entityName": "CreateLeaveRequestDto",
