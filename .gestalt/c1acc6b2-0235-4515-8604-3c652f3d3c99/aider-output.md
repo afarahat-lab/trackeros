@@ -1,7 +1,7 @@
 # Aider session
 
 **Exit code:** 0
-**Duration:** 9729ms
+**Duration:** 6699ms
 
 ## Prompt sent to Aider
 
@@ -37,7 +37,7 @@ Do not assume a type's shape — read its definition.
 - LeaveRequest and CreateLeaveRequestDto are defined in leave.model.ts and the repository for LeaveRequest is implemented in leave.repository.ts.
 
 ## Out of scope (do NOT touch these)
-- Any other modules or files outside src/modules/leave/leave.model.ts and src/modules/leave/leave.repository.ts
+- Any other modules or files not mentioned in the intent.
 
 ## Project rules
 - Generated code must compile without errors.
@@ -140,22 +140,17 @@ base-repository.ts      ← shared
           "required": true
         },
         {
-          "name": "reason",
+          "name": "status",
           "type": "string",
           "required": true
         },
         {
-          "name": "status",
+          "name": "reason",
           "type": "string",
           "required": true
         }
       ],
-      "relationships": [
-        {
-          "entity": "Employee",
-          "type": "one-to-one"
-        }
-      ]
+      "relationships": []
     },
     {
       "entityName": "CreateLeaveRequestDto",
@@ -189,7 +184,7 @@ base-repository.ts      ← shared
     {
       "method": "POST",
       "path": "/api/v1/leave-requests",
-      "description": "Creates a new leave request.",
+      "description": "Creates a new leave request",
       "requestBody": {
         "employeeId": "string",
         "startDate": "Date",
@@ -208,7 +203,9 @@ base-repository.ts      ← shared
     },
     {
       "method": "GET",
-      "path"
+      "path": "/api/v1/leave-requests",
+      "description": "Retrieves a list of leave requests",
+    
 
 ## Important — architecture context is reference only
 The architecture and design context above describes the intended
@@ -238,84 +235,75 @@ Here are the complete implementations for both files:
 src/modules/leave/leave.model.ts                                                
 
                                                                                 
-@@ -1,4 +1,3 @@                                                                 
--import { LeaveType } from '../../shared/types/index';                          
--                                                                               
+@@ -1,4 +1,5 @@                                                                 
  export interface LeaveRequest {                                                
      id: string;                                                                
      employeeId: string;                                                        
--    leaveType: LeaveType;                                                      
      startDate: Date;                                                           
      endDate: Date;                                                             
-+    reason: string;                                                            
-     status: string;                                                            
--    createdAt: Date;                                                           
--    updatedAt: Date;                                                           
++    status: string;                                                            
+     reason: string;                                                            
+-    status: string;                                                            
  }                                                                              
                                                                                 
  export interface CreateLeaveRequestDto {                                       
      employeeId: string;                                                        
--    leaveType: LeaveType;                                                      
      startDate: Date;                                                           
-     endDate: Date;                                                             
-+    reason: string;                                                            
- }                                                                              
                                                                                 
 
 src/modules/leave/leave.repository.ts                                           
 
                                                                                 
 @@ -1,3 +1,4 @@                                                                 
--import { LeaveRequest, CreateLeaveRequestDto } from './leave.model';           
-+import { LeaveRequest } from './leave.model';                                  
- import { Pool } from 'pg';                                                     
+ import { LeaveRequest } from './leave.model';                                  
+-import { Pool } from 'pg';                                                     
                                                                                 
- export class LeaveRepository {                                                 
-     private db: Pool;                                                          
+-export class LeaveRepository {                                                 
+-    private db: Pool;                                                          
++export interface ILeaveRepository {                                            
++    createLeaveRequest(leaveRequest: LeaveRequest): Promise<LeaveRequest>;     
++    getLeaveRequests(): Promise<LeaveRequest[]>;                               
++}                                                                              
                                                                                 
-     constructor(db: Pool) {                                                    
-         this.db = db;                                                          
-     }                                                                          
+-    constructor(db: Pool) {                                                    
+-        this.db = db;                                                          
+-    }                                                                          
++export class LeaveRepository implements ILeaveRepository {                     
++    private leaveRequests: LeaveRequest[] = [];                                
                                                                                 
-+    async createLeaveRequest(leaveRequest: LeaveRequest): Promise<LeaveRequest>
 {                                                                               
-+        const query = `                                                        
-+            INSERT INTO leave_requests (id, employeeId, startDate, endDate,    
-reason, status)                                                                 
-+            VALUES ($1, $2, $3, $4, $5, $6)                                    
-+            RETURNING *;                                                       
-+        `;                                                                     
-+        const values = [                                                       
-+            leaveRequest.id,                                                   
-+            leaveRequest.employeeId,                                           
-+            RETURNING *;                                                       
-+        `;                                                                     
-+        const values = [                                                       
-+            leaveRequest.id,                                                   
-+            leaveRequest.employeeId,                                           
-+            leaveRequest.startDate,                                            
-+            leaveRequest.endDate,                                              
-+            leaveRequest.reason,                                               
-+            leaveRequest.status,                                               
-+        ];                                                                     
-                                                                                
--        const result = await this.db.query(                                    
--            `INSERT INTO leave_requests (employeeId, leaveType, startDate,     
-endDate, status, createdAt, updatedAt)                                          
--             VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,                 
--            [employeeId, leaveType, startDate, endDate, 'pending', createdAt,  
-updatedAt]                                                                      
--        );                                                                     
--                                                                               
-+        const result = await this.db.query(query, values);                     
-         return result.rows[0];                                                 
++        this.leaveRequests.push(leaveRequest);                                 
++        return leaveRequest;                                                   
      }                                                                          
-+                                                                               
-+    // Additional repository methods can be added here                         
+                                                                                
+-    async createLeaveRequest(leaveRequest: LeaveRequest): Promise<LeaveRequest>
+{                                                                               
+-        const query = `                                                        
+-            INSERT INTO leave_requests (id, employeeId, startDate, endDate,    
+reason, status)                                                                 
+-            VALUES ($1, $2, $3, $4, $5, $6)                                    
+-            RETURNING *;                                                       
+-        `;                                                                     
+-        const values = [                                                       
+-            leaveRequest.id,                                                   
+-            leaveRequest.employeeId,                                           
+-            leaveRequest.startDate,                                            
+-            leaveRequest.endDate,                                              
+-            leaveRequest.reason,                                               
+-            leaveRequest.status,                                               
+-        ];                                                                     
+-                                                                               
+-        const result = await this.db.query(query, values);                     
+-        return result.rows[0];                                                 
++    async getLeaveRequests(): Promise<LeaveRequest[]> {                        
++        return this.leaveRequests;                                             
+     }                                                                          
+-                                                                               
+-    // Additional repository methods can be added here                         
  }                                                                              
                                                                                 
 
-Tokens: 2.1k sent, 346 received. Cost: $0.00053 message, $0.00053 session.
+Tokens: 2.1k sent, 281 received. Cost: $0.00048 message, $0.00048 session.
 
 src/modules/leave/leave.model.ts
 

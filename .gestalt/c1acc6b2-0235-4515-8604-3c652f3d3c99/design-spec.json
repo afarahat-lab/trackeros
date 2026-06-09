@@ -26,22 +26,17 @@
           "required": true
         },
         {
-          "name": "reason",
+          "name": "status",
           "type": "string",
           "required": true
         },
         {
-          "name": "status",
+          "name": "reason",
           "type": "string",
           "required": true
         }
       ],
-      "relationships": [
-        {
-          "entity": "Employee",
-          "type": "one-to-one"
-        }
-      ]
+      "relationships": []
     },
     {
       "entityName": "CreateLeaveRequestDto",
@@ -75,7 +70,7 @@
     {
       "method": "POST",
       "path": "/api/v1/leave-requests",
-      "description": "Creates a new leave request.",
+      "description": "Creates a new leave request",
       "requestBody": {
         "employeeId": "string",
         "startDate": "Date",
@@ -95,7 +90,7 @@
     {
       "method": "GET",
       "path": "/api/v1/leave-requests",
-      "description": "Retrieves a list of leave requests.",
+      "description": "Retrieves a list of leave requests",
       "requestBody": {},
       "responseBody": {
         "leaveRequests": "LeaveRequest[]"
