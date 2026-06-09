@@ -21,10 +21,6 @@ To be populated as the design-agent and context-agent learn the domain.
   - `endDate`: Date (required)
 - **Response Body**:
   - `id`: string
-  - `employeeId`: string
-  - `leaveType`: string
-  - `startDate`: Date
-  - `endDate`: Date
   - `status`: string
   - `createdAt`: Date
   - `updatedAt`: Date
@@ -71,12 +67,7 @@ To be populated as the design-agent and context-agent learn the domain.
   - `status`: string
 - **Response Body**:
   - `id`: string
-  - `employeeId`: string
-  - `leaveType`: string
-  - `startDate`: Date
-  - `endDate`: Date
   - `status`: string
-  - `createdAt`: Date
   - `updatedAt`: Date
 - **Auth Required**: Yes
 - **Roles**: admin, operator
@@ -111,6 +102,8 @@ To be populated as the design-agent and context-agent learn the domain.
   - `status`: string (required)
   - `createdAt`: Date (required)
   - `updatedAt`: Date (required)
+- **Relationships**:
+  - `employee`: Employee (one-to-many)
 
 ### CreateLeaveRequestDto
 - **Fields**:

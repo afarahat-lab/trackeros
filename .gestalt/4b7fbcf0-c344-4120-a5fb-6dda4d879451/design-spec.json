@@ -46,14 +46,19 @@
           "required": true
         }
       ],
-      "relationships": []
+      "relationships": [
+        {
+          "entity": "Employee",
+          "type": "one-to-many"
+        }
+      ]
     }
   ],
   "apiContracts": [
     {
       "method": "POST",
       "path": "/api/v1/leave-requests",
-      "description": "Create a new leave request",
+      "description": "Create a new leave request.",
       "requestBody": {
         "employeeId": "string",
         "leaveType": "string",
@@ -62,10 +67,6 @@
       },
       "responseBody": {
         "id": "string",
-        "employeeId": "string",
-        "leaveType": "string",
-        "startDate": "Date",
-        "endDate": "Date",
         "status": "string",
         "createdAt": "Date",
         "updatedAt": "Date"
@@ -79,7 +80,7 @@
     {
       "method": "GET",
       "path": "/api/v1/leave-requests/{id}",
-      "description": "Retrieve a specific leave request by ID",
+      "description": "Retrieve a specific leave request by ID.",
       "requestBody": {},
       "responseBody": {
         "id": "string",
@@ -100,7 +101,7 @@
     {
       "method": "PUT",
       "path": "/api/v1/leave-requests/{id}",
-      "description": "Update an existing leave request",
+      "description": "Update an existing leave request.",
       "requestBody": {
         "leaveType": "string",
         "startDate": "Date",
@@ -109,12 +110,7 @@
       },
       "responseBody": {
         "id": "string",
-        "employeeId": "string",
-        "leaveType": "string",
-        "startDate": "Date",
-        "endDate": "Date",
         "status": "string",
-        "createdAt": "Date",
         "updatedAt": "Date"
       },
       "authRequired": true,
@@ -126,10 +122,10 @@
     {
       "method": "DELETE",
       "path": "/api/v1/leave-requests/{id}",
-      "description": "Delete a leave request by ID",
+      "description": "Delete a leave request.",
       "requestBody": {},
       "responseBody": {
-        "message": "Leave request deleted successfully"
+        "message": "string"
       },
       "authRequired": true,
       "roles": [

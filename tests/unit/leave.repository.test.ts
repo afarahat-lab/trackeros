@@ -7,30 +7,33 @@ const leaveRequestRepo = new LeaveRequestRepository(mockDb);
 
 describe('LeaveRequestRepository', () => {
     it('should create a leave request', async () => {
-        const leaveRequestData = {
-            employeeId: '1',
+        const leaveRequest: LeaveRequest = {
+            id: '1',
+            employeeId: '123',
             leaveType: 'annual',
             startDate: new Date(),
             endDate: new Date(),
+            status: 'pending',
+            createdAt: new Date(),
+            updatedAt: new Date(),
         };
-        const leaveRequest = await leaveRequestRepo.create(leaveRequestData);
-        expect(leaveRequest).toHaveProperty('id');
-        expect(leaveRequest.employeeId).toBe(leaveRequestData.employeeId);
+        const createdRequest = await leaveRequestRepo.create(leaveRequest);
+        expect(createdRequest).toHaveProperty('id');
     });
 
     it('should find a leave request by id', async () => {
         const leaveRequest = await leaveRequestRepo.findById('1');
-        expect(leaveRequest).toBeNull(); // Assuming no leave request with id '1' exists
+        expect(leaveRequest).toBeTruthy();
     });
 
     it('should update a leave request', async () => {
-        const updatedLeaveRequest = await leaveRequestRepo.update('1', { status: 'approved' });
-        expect(updatedLeaveRequest).toBeNull(); // Assuming no leave request with id '1' exists
+        const updatedRequest = await leaveRequestRepo.update('1', { status: 'approved' });
+        expect(updatedRequest).toHaveProperty('status', 'approved');
     });
 
     it('should delete a leave request', async () => {
         await leaveRequestRepo.delete('1');
         const leaveRequest = await leaveRequestRepo.findById('1');
-        expect(leaveRequest).toBeNull(); // Assuming no leave request with id '1' exists
+        expect(leaveRequest).toBeNull();
     });
 });
