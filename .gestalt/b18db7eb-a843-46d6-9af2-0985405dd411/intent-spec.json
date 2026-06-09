@@ -1,0 +1,44 @@
+{
+  "id": "210db162-5b98-4819-b774-54268fccc7d2",
+  "correlationId": "b18db7eb-a843-46d6-9af2-0985405dd411",
+  "rawIntent": "[Feature: Build the leave management module — Phase 2: Implement leave request repository]\n\nCreate src/modules/leave/leave.repository.ts. Implement LeaveRequestRepository to handle database interactions for leave requests. This phase depends on src/modules/leave/leave.model.ts from Phase 1. Include a Jest unit test in tests/unit/leave.repository.test.ts.\n\nThis phase depends on: src/modules/leave/leave.model.ts.\n\nPhase architecture notes:\nThis phase provides the data access layer for leave requests, enabling CRUD operations.",
+  "scope": {
+    "affectedDomains": [
+      "Request"
+    ],
+    "affectedLayers": [
+      "domain",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "LeaveRequestRepository is implemented and can handle CRUD operations for leave requests.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "Unit tests for LeaveRequestRepository are written and passing.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Audit records: All state-changing operations write an audit record.",
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "RBAC enforcement: All API endpoints enforce role-based access control.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "Implementation of leave model or any other modules.",
+    "Any changes to existing database schemas.",
+    "Integration tests or e2e tests beyond the specified unit tests."
+  ],
+  "ambiguities": []
+}
