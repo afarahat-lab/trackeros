@@ -51,8 +51,7 @@
       "description": "Updates an existing leave request.",
       "requestBody": {
         "reason": "string",
-        "leaveType": "string",
-        "updatedAt": "Date"
+        "leaveType": "string"
       },
       "responseBody": {
         "id": "string",

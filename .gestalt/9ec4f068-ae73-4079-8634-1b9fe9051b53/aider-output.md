@@ -1,7 +1,7 @@
 # Aider session
 
 **Exit code:** 0
-**Duration:** 5895ms
+**Duration:** 6025ms
 
 ## Prompt sent to Aider
 
@@ -147,8 +147,7 @@ base-repository.ts      ← shared
       "description": "Updates an existing leave request.",
       "requestBody": {
         "reason": "string",
-        "leaveType": "string",
-        "updatedAt": "Date"
+        "leaveType": "string"
       },
       "responseBody": {
         "id": "string",
@@ -192,35 +191,15 @@ Here is the updated file:
 src/modules/leave/leave.model.ts                                                
 
                                                                                 
-@@ -1,5 +1,4 @@                                                                 
--import { LeaveType } from '../../shared/types/index';                          
--                                                                               
+@@ -1,4 +1,5 @@                                                                 
  export interface LeaveRequest {                                                
      id: string;                                                                
      employeeId: string;                                                        
--    leaveType: LeaveType;                                                      
-+    type: 'annual' | 'sick' | 'emergency';                                     
+     type: 'annual' | 'sick' | 'emergency';                                     
      startDate: Date;                                                           
-     endDate: Date;                                                             
--    status: string;                                                            
-+    status: 'pending' | 'approved' | 'rejected';                               
-+    managerId: string;                                                         
-+    managerComment?: string;                                                   
-     createdAt: Date;                                                           
-+    reason: string;                                                            
-     updatedAt: Date;                                                           
-+    leaveType: string;                                                         
- }                                                                              
--                                                                               
--export interface CreateLeaveRequestDto {                                       
--    employeeId: string;                                                        
--    leaveType: LeaveType;                                                      
--    startDate: Date;                                                           
--    endDate: Date;                                                             
--}                                                                              
++   5 /  14 lines [██████████░░░░░░░░░░░░░░░░░░░░]  36%                         
                                                                                 
-
-Tokens: 1.9k sent, 152 received. Cost: $0.00037 message, $0.00037 session.
+Tokens: 1.8k sent, 152 received. Cost: $0.00037 message, $0.00037 session.
 
 src/modules/leave/leave.model.ts
 Applied edit to src/modules/leave/leave.model.ts
