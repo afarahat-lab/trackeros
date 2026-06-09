@@ -153,3 +153,6 @@ This module handles leave requests, balances, and policies for employees, manage
 
 ## Leave Management Module
 This module handles leave requests, balances, and policies for employees, managers, and HR.
+
+## Leave Management Module
+This module handles leave requests, balances, and policies for employees, managers, and HR.
