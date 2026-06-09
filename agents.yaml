@@ -218,7 +218,9 @@ agents:
     llm:
       model: gpt-5.5-pro    # TR_033 — upgraded from chat-latest. Uses responses API shape (registered in platform_llms).
       temperature: 0.0
-      max_tokens: 2000
+      # gpt-5.5-pro is a heavier reasoning variant — give it room to
+      # think + emit the structured fix-intent JSON.
+      max_tokens: 6000
     prompt_extensions:
       - "Always ground your diagnosis in the actual error output — do not infer failures not evidenced in the provided context"
       - "A fix-intent is only appropriate when retrying the same intent would produce the same failure"
@@ -235,7 +237,11 @@ agents:
     llm:
       model: gpt-5.5
       temperature: 0.1
-      max_tokens: 3000
+      # gpt-5.5 is a reasoning model; reasoning tokens count toward
+      # this budget. 3000 was too tight for the planner's JSON output
+      # (74s + incomplete JSON in the first verification cycle). Bumped
+      # to keep the same headroom on the (faster) architecture-agent.
+      max_tokens: 6000
     prompt_extensions: []
 
   planner-agent:
@@ -244,7 +250,9 @@ agents:
     llm:
       model: gpt-5.5
       temperature: 0.1
-      max_tokens: 3000
+      # gpt-5.5 reasoning + a multi-phase JSON plan needs significant
+      # headroom — 3000 produced truncated JSON in the first cycle.
+      max_tokens: 12000
     prompt_extensions: []
 
   phase-evaluator-agent:
@@ -253,7 +261,7 @@ agents:
     llm:
       model: gpt-5.5
       temperature: 0.1
-      max_tokens: 2000
+      max_tokens: 8000
     tools:
       builtin: [executeScript, readFile, searchFiles]
     prompt_extensions: []
