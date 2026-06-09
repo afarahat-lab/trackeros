@@ -1,0 +1,32 @@
+{
+  "id": "b0862abc-dd2f-46e0-99a9-2a49ffb6dd7b",
+  "correlationId": "aa67a49a-346c-47cc-ab34-49deb1d73212",
+  "rawIntent": "CI failed: TypeScript errors in leave.service.ts. The service references '../employee/employee.model' and '../balance/balance.model', which cannot be found. Additionally, it incorrectly references 'ILeaveRepository' from './leave.repository', which does not exist. Analyze and fix these import issues to ensure the leave.service.ts file compiles correctly.",
+  "scope": {
+    "affectedDomains": [
+      "leave.service.ts"
+    ],
+    "affectedLayers": [
+      "domain"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "The leave.service.ts file compiles without TypeScript errors after fixing the import issues.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "All files outside leave.service.ts"
+  ],
+  "ambiguities": []
+}

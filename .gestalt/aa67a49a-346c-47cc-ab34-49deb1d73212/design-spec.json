@@ -1,0 +1,134 @@
+{
+  "correlationId": "aa67a49a-346c-47cc-ab34-49deb1d73212",
+  "domainChanges": [
+    {
+      "entityName": "Leave",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "employeeId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "balanceId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "startDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "endDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "status",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "Employee",
+          "type": "one-to-one"
+        },
+        {
+          "entity": "Balance",
+          "type": "one-to-one"
+        }
+      ]
+    },
+    {
+      "entityName": "LeaveRepository",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "getLeaveById",
+          "type": "(id: string) => Promise<Leave>",
+          "required": true
+        },
+        {
+          "name": "createLeave",
+          "type": "(leave: Leave) => Promise<Leave>",
+          "required": true
+        },
+        {
+          "name": "updateLeave",
+          "type": "(leave: Leave) => Promise<Leave>",
+          "required": true
+        },
+        {
+          "name": "deleteLeave",
+          "type": "(id: string) => Promise<void>",
+          "required": true
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [
+    {
+      "method": "POST",
+      "path": "/api/v1/leaves",
+      "description": "Creates a new leave request.",
+      "requestBody": {
+        "employeeId": "string",
+        "balanceId": "string",
+        "startDate": "Date",
+        "endDate": "Date",
+        "status": "string"
+      },
+      "responseBody": {
+        "id": "string",
+        "employeeId": "string",
+        "balanceId": "string",
+        "startDate": "Date",
+        "endDate": "Date",
+        "status": "string"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/leaves/:id",
+      "description": "Retrieves a leave request by ID.",
+      "requestBody": {},
+      "responseBody": {
+        "id": "string",
+        "employeeId": "string",
+        "balanceId": "string",
+        "startDate": "Date",
+        "endDate": "Date",
+        "status": "string"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    }
+  ],
+  "componentSpecs": [
+    {
+      "name": "LeaveService",
+      "type": "service",
+      "description": "Handles leave-related operations and business logic.",
+      "props": {
+        "leaveRepository": "LeaveRepository"
+      }
+    }
+  ]
+}
