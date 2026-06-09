@@ -16,18 +16,35 @@ To be populated as the design-agent and context-agent learn the domain.
 - **Description**: Creates a new leave request.
 - **Request Body**:
   - `employeeId`: string (required)
-  - `leaveType`: LeaveType (required)
+  - `leaveType`: string (required)
   - `startDate`: Date (required)
   - `endDate`: Date (required)
 - **Response Body**:
   - `id`: string
+  - `status`: string
+- **Auth Required**: Yes
+- **Roles**: admin, operator
+
+### GET /api/v1/leave-requests/{id}
+- **Description**: Retrieves a specific leave request by ID.
+- **Request Body**: {}
+- **Response Body**:
+  - `id`: string
   - `employeeId`: string
-  - `leaveType`: LeaveType
+  - `leaveType`: string
   - `startDate`: Date
   - `endDate`: Date
   - `status`: string
-  - `createdAt`: Date
-  - `updatedAt`: Date
+- **Auth Required**: Yes
+- **Roles**: admin, operator
+
+### PATCH /api/v1/leave-requests/{id}
+- **Description**: Updates the status of a leave request.
+- **Request Body**:
+  - `status`: string
+- **Response Body**:
+  - `id`: string
+  - `status`: string
 - **Auth Required**: Yes
 - **Roles**: admin, operator
 
@@ -63,17 +80,19 @@ To be populated as the design-agent and context-agent learn the domain.
 - **Fields**:
   - `id`: string (required)
   - `employeeId`: string (required)
-  - `leaveType`: LeaveType (required)
+  - `leaveType`: string (required)
   - `startDate`: Date (required)
   - `endDate`: Date (required)
   - `status`: string (required)
+- **Relationships**:
+  - `employee`: Employee (one-to-one)
   - `createdAt`: Date (required)
   - `updatedAt`: Date (required)
 
 ### CreateLeaveRequestDto
 - **Fields**:
   - `employeeId`: string (required)
-  - `leaveType`: LeaveType (required)
+  - `leaveType`: string (required)
   - `startDate`: Date (required)
   - `endDate`: Date (required)
 
