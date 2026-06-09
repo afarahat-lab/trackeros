@@ -1,5 +1,5 @@
 {
-  "id": "210db162-5b98-4819-b774-54268fccc7d2",
+  "id": "7f2a7289-8f77-4c36-a707-c31b9bf2b863",
   "correlationId": "b18db7eb-a843-46d6-9af2-0985405dd411",
   "rawIntent": "[Feature: Build the leave management module — Phase 2: Implement leave request repository]\n\nCreate src/modules/leave/leave.repository.ts. Implement LeaveRequestRepository to handle database interactions for leave requests. This phase depends on src/modules/leave/leave.model.ts from Phase 1. Include a Jest unit test in tests/unit/leave.repository.test.ts.\n\nThis phase depends on: src/modules/leave/leave.model.ts.\n\nPhase architecture notes:\nThis phase provides the data access layer for leave requests, enabling CRUD operations.",
   "scope": {
@@ -16,13 +16,13 @@
   "successCriteria": [
     {
       "id": "sc-001",
-      "description": "LeaveRequestRepository is implemented and can handle CRUD operations for leave requests.",
+      "description": "LeaveRequestRepository is implemented and can perform CRUD operations on leave requests.",
       "testable": true,
       "layer": "unit"
     },
     {
       "id": "sc-002",
-      "description": "Unit tests for LeaveRequestRepository are written and passing.",
+      "description": "Unit tests for LeaveRequestRepository are written and pass successfully.",
       "testable": true,
       "layer": "unit"
     }
@@ -36,9 +36,7 @@
     "Error handling: No unhandled promise rejections. All async errors are caught and handled."
   ],
   "outOfScope": [
-    "Implementation of leave model or any other modules.",
-    "Any changes to existing database schemas.",
-    "Integration tests or e2e tests beyond the specified unit tests."
+    "Implementation of leave model or any other modules outside leave.repository.ts and tests/unit/leave.repository.test.ts."
   ],
   "ambiguities": []
 }

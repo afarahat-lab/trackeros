@@ -9,24 +9,27 @@ export class LeaveRequestRepository {
     }
 
     async create(leaveRequest: LeaveRequest): Promise<LeaveRequest> {
-        const { id, employeeId, startDate, endDate, status, reason } = leaveRequest;
+        const { employeeId, leaveType, startDate, endDate } = leaveRequest;
+        const createdAt = new Date();
         const result = await this.db.query(
-            'INSERT INTO leave_requests (id, employeeId, startDate, endDate, status, reason) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-            [id, employeeId, startDate, endDate, status, reason]
+            'INSERT INTO leave_requests (employeeId, leaveType, startDate, endDate, status, createdAt, updatedAt) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+            [employeeId, leaveType, startDate, endDate, 'pending', createdAt, createdAt]
         );
         return result.rows[0];
     }
 
     async findById(id: string): Promise<LeaveRequest | null> {
         const result = await this.db.query('SELECT * FROM leave_requests WHERE id = $1', [id]);
-        return result.rows[0] || null;
+        return result.rows.length ? result.rows[0] : null;
     }
 
     async update(id: string, leaveRequest: Partial<LeaveRequest>): Promise<LeaveRequest | null> {
-        const fields = Object.keys(leaveRequest).map((key, index) => `${key} = $${index + 1}`).join(', ');
-        const values = Object.values(leaveRequest);
-        const result = await this.db.query(`UPDATE leave_requests SET ${fields} WHERE id = $${values.length + 1} RETURNING *`, [...values, id]);
-        return result.rows[0] || null;
+        const updatedAt = new Date();
+        const result = await this.db.query(
+            'UPDATE leave_requests SET employeeId = $1, leaveType = $2, startDate = $3, endDate = $4, status = $5, updatedAt = $6 WHERE id = $7 RETURNING *',
+            [leaveRequest.employeeId, leaveRequest.leaveType, leaveRequest.startDate, leaveRequest.endDate, leaveRequest.status, updatedAt, id]
+        );
+        return result.rows.length ? result.rows[0] : null;
     }
 
     async delete(id: string): Promise<void> {

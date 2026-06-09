@@ -16,6 +16,11 @@
           "required": true
         },
         {
+          "name": "leaveType",
+          "type": "string",
+          "required": true
+        },
+        {
           "name": "startDate",
           "type": "Date",
           "required": true
@@ -31,9 +36,14 @@
           "required": true
         },
         {
-          "name": "reason",
-          "type": "string",
-          "required": false
+          "name": "createdAt",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": true
         }
       ],
       "relationships": [
@@ -48,16 +58,18 @@
     {
       "method": "POST",
       "path": "/api/v1/leave-requests",
-      "description": "Create a new leave request",
+      "description": "Create a new leave request.",
       "requestBody": {
         "employeeId": "string",
+        "leaveType": "string",
         "startDate": "Date",
-        "endDate": "Date",
-        "reason": "string"
+        "endDate": "Date"
       },
       "responseBody": {
         "id": "string",
-        "status": "string"
+        "status": "string",
+        "createdAt": "Date",
+        "updatedAt": "Date"
       },
       "authRequired": true,
       "roles": [
@@ -68,15 +80,17 @@
     {
       "method": "GET",
       "path": "/api/v1/leave-requests/{id}",
-      "description": "Retrieve a specific leave request by ID",
+      "description": "Retrieve a specific leave request by ID.",
       "requestBody": {},
       "responseBody": {
         "id": "string",
         "employeeId": "string",
+        "leaveType": "string",
         "startDate": "Date",
         "endDate": "Date",
         "status": "string",
-        "reason": "string"
+        "createdAt": "Date",
+        "updatedAt": "Date"
       },
       "authRequired": true,
       "roles": [
@@ -87,14 +101,17 @@
     {
       "method": "PUT",
       "path": "/api/v1/leave-requests/{id}",
-      "description": "Update an existing leave request",
+      "description": "Update an existing leave request.",
       "requestBody": {
-        "status": "string",
-        "reason": "string"
+        "leaveType": "string",
+        "startDate": "Date",
+        "endDate": "Date",
+        "status": "string"
       },
       "responseBody": {
         "id": "string",
-        "status": "string"
+        "status": "string",
+        "updatedAt": "Date"
       },
       "authRequired": true,
       "roles": [
@@ -105,10 +122,10 @@
     {
       "method": "DELETE",
       "path": "/api/v1/leave-requests/{id}",
-      "description": "Delete a leave request by ID",
+      "description": "Delete a leave request.",
       "requestBody": {},
       "responseBody": {
-        "message": "Leave request deleted successfully"
+        "message": "Leave request deleted successfully."
       },
       "authRequired": true,
       "roles": [
