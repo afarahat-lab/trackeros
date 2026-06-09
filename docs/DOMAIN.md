@@ -16,13 +16,28 @@ To be populated as the design-agent and context-agent learn the domain.
 - **Description**: Creates a new leave request.
 - **Request Body**:
   - `employeeId`: string (required)
-  - `leaveType`: LeaveType (required)
+  - `leaveType`: string (required)
+  - `reason`: string (required)
   - `startDate`: Date (required)
   - `endDate`: Date (required)
 - **Response Body**:
   - `id`: string
-  - `status`: string
-  - `createdAt`: Date
+  - `reason`: string
+  - `leaveType`: string
+  - `updatedAt`: Date
+- **Auth Required**: Yes
+- **Roles**: admin, operator
+
+### PUT /api/v1/leave-requests/{id}
+- **Description**: Updates an existing leave request.
+- **Request Body**:
+  - `reason`: string (required)
+  - `leaveType`: string (required)
+  - `updatedAt`: Date (required)
+- **Response Body**:
+  - `id`: string
+  - `reason`: string
+  - `leaveType`: string
   - `updatedAt`: Date
 - **Auth Required**: Yes
 - **Roles**: admin, operator
@@ -38,6 +53,7 @@ To be populated as the design-agent and context-agent learn the domain.
     - `startDate`: Date
     - `endDate`: Date
     - `status`: string
+    - `reason`: string
     - `createdAt`: Date
     - `updatedAt`: Date
 - **Auth Required**: Yes
@@ -59,7 +75,8 @@ To be populated as the design-agent and context-agent learn the domain.
 - **Fields**:
   - `id`: string (required)
   - `employeeId`: string (required)
-  - `leaveType`: LeaveType (required)
+  - `leaveType`: string (required)
+  - `reason`: string (required)
   - `startDate`: Date (required)
   - `endDate`: Date (required)
   - `status`: string (required)
@@ -69,7 +86,8 @@ To be populated as the design-agent and context-agent learn the domain.
 ### CreateLeaveRequestDto
 - **Fields**:
   - `employeeId`: string (required)
-  - `leaveType`: LeaveType (required)
+  - `leaveType`: string (required)
+  - `reason`: string (required)
   - `startDate`: Date (required)
   - `endDate`: Date (required)
 

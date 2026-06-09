@@ -1,19 +1,14 @@
-import { LeaveType } from '../../shared/types/index';
-
 export interface LeaveRequest {
     id: string;
     employeeId: string;
-    leaveType: LeaveType;
+    type: 'annual' | 'sick' | 'emergency';
     startDate: Date;
     endDate: Date;
-    status: string;
+    status: 'pending' | 'approved' | 'rejected';
+    managerId: string;
+    managerComment?: string;
     createdAt: Date;
+    reason: string;
     updatedAt: Date;
-}
-
-export interface CreateLeaveRequestDto {
-    employeeId: string;
-    leaveType: LeaveType;
-    startDate: Date;
-    endDate: Date;
+    leaveType: string;
 }

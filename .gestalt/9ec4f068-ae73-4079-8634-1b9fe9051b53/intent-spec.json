@@ -1,0 +1,35 @@
+{
+  "id": "5da17e9c-8388-4276-866d-20572a84bab7",
+  "correlationId": "9ec4f068-ae73-4079-8634-1b9fe9051b53",
+  "rawIntent": "Update the LeaveRequest model in src/modules/leave/leave.model.ts to include the following properties: 'reason: string', 'updatedAt: Date', and 'leaveType: string'. This will ensure that the LeaveRequestRepository can handle leave requests correctly without TypeScript errors.",
+  "scope": {
+    "affectedDomains": [
+      "LeaveRequest"
+    ],
+    "affectedLayers": [
+      "domain"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "The LeaveRequest model includes the properties 'reason', 'updatedAt', and 'leaveType' without TypeScript errors.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Audit records: All state-changing operations write an audit record.",
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "RBAC enforcement: All API endpoints enforce role-based access control.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "Everything outside src/modules/leave/leave.model.ts"
+  ],
+  "ambiguities": []
+}
