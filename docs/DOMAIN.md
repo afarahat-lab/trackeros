@@ -59,6 +59,8 @@ To be populated as the design-agent and context-agent learn the domain.
   - `endDate`: Date (required)
   - `reason`: string (required)
   - `status`: string (required)
+- **Relationships**:
+  - `Employee`: one-to-many
 
 ### CreateLeaveRequestDto
 - **Fields**:

@@ -1,5 +1,5 @@
 {
-  "id": "fb85bfaa-5fd8-4aa8-8f52-a4fbbfde4de7",
+  "id": "5acd2631-aaa3-4123-abda-5a6fe148d60f",
   "correlationId": "78cee4c8-decc-4260-8762-48c4a0b9269a",
   "rawIntent": "[Feature: Build the leave management module — Phase 1: Create leave model and repository]\n\nCreate src/modules/leave/leave.model.ts defining LeaveRequest and CreateLeaveRequestDto. Create src/modules/leave/leave.repository.ts implementing the repository for LeaveRequest. This phase depends on no prior files.\n\nPhase architecture notes:\nThis phase establishes the core data structure for leave requests and the persistence layer.",
   "scope": {
@@ -29,7 +29,9 @@
     "Error handling: No unhandled promise rejections. All async errors are caught and handled."
   ],
   "outOfScope": [
-    "Any files or modules outside of src/modules/leave/leave.model.ts and src/modules/leave/leave.repository.ts"
+    "Any other modules or files outside src/modules/leave/",
+    "UI components related to leave management",
+    "API endpoints for leave management"
   ],
   "ambiguities": []
 }

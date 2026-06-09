@@ -1,18 +1,31 @@
+import { Pool } from 'pg';
 import { LeaveRequest } from './leave.model';
 
 export class LeaveRepository {
-    private leaveRequests: LeaveRequest[] = [];
+    private db: Pool;
 
-    public create(leaveRequest: LeaveRequest): LeaveRequest {
-        this.leaveRequests.push(leaveRequest);
-        return leaveRequest;
+    constructor(db: Pool) {
+        this.db = db;
     }
 
-    public findAll(): LeaveRequest[] {
-        return this.leaveRequests;
+    async createLeaveRequest(leaveRequest: LeaveRequest): Promise<LeaveRequest> {
+        const query = `
+            INSERT INTO leave_requests (id, employeeId, startDate, endDate, reason, status)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            RETURNING *;
+        `;
+        const values = [
+            leaveRequest.id,
+            leaveRequest.employeeId,
+            leaveRequest.startDate,
+            leaveRequest.endDate,
+            leaveRequest.reason,
+            leaveRequest.status,
+        ];
+
+        const result = await this.db.query(query, values);
+        return result.rows[0];
     }
 
-    public findById(id: string): LeaveRequest | undefined {
-        return this.leaveRequests.find(request => request.id === id);
-    }
+    // Additional methods for retrieving, updating, and deleting leave requests can be added here
 }

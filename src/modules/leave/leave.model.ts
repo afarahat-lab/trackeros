@@ -4,7 +4,7 @@ export interface LeaveRequest {
     startDate: Date;
     endDate: Date;
     reason: string;
-    status: string;
+    status: string; // e.g., pending, approved, rejected
 }
 
 export interface CreateLeaveRequestDto {
