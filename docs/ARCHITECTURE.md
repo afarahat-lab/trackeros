@@ -73,6 +73,7 @@ unit/                       ← service layer tests (mock repositories)
 integration/                ← API tests using Supertest
 LeaveRequest/             ← LeaveRequest module
 CreateLeaveRequestDto/    — CreateLeaveRequestDto module
+LeaveBalance/             — LeaveBalance module
 
 ## API surface (planned)
 POST   /auth/login
