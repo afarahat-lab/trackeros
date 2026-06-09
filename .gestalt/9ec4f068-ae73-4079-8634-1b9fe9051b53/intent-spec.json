@@ -1,5 +1,5 @@
 {
-  "id": "bd01839e-88e2-4956-a16d-e30b0514168d",
+  "id": "c6ec9a65-83cf-4cc0-b5c3-ff4d60872e6d",
   "correlationId": "9ec4f068-ae73-4079-8634-1b9fe9051b53",
   "rawIntent": "Update the LeaveRequest model in src/modules/leave/leave.model.ts to include the following properties: 'reason: string', 'updatedAt: Date', and 'leaveType: string'. This will ensure that the LeaveRequestRepository can handle leave requests correctly without TypeScript errors.",
   "scope": {
@@ -9,15 +9,21 @@
     "affectedLayers": [
       "domain"
     ],
-    "isBreakingChange": false,
-    "estimatedComplexity": "small"
+    "isBreakingChange": true,
+    "estimatedComplexity": "medium"
   },
   "successCriteria": [
     {
       "id": "sc-001",
-      "description": "The LeaveRequest model includes the properties 'reason', 'updatedAt', and 'leaveType' without TypeScript errors.",
+      "description": "The LeaveRequest model includes 'reason', 'updatedAt', and 'leaveType' properties without TypeScript errors.",
       "testable": true,
       "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "All functions used in LeaveRequestRepository are available and correctly handle the updated LeaveRequest model.",
+      "testable": true,
+      "layer": "integration"
     }
   ],
   "constraints": [
@@ -29,7 +35,8 @@
     "Error handling: No unhandled promise rejections. All async errors are caught and handled."
   ],
   "outOfScope": [
-    "Everything outside src/modules/leave/leave.model.ts"
+    "Everything outside src/modules/leave/leave.model.ts",
+    "Any other modules or files not mentioned in the intent"
   ],
   "ambiguities": []
 }

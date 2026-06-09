@@ -18,6 +18,8 @@ To be populated as the design-agent and context-agent learn the domain.
   - `employeeId`: string (required)
   - `leaveType`: string (required)
   - `reason`: string (required)
+  - `startDate`: Date (required)
+  - `endDate`: Date (required)
 - **Response Body**:
   - `id`: string
   - `reason`: string

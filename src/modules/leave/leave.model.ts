@@ -8,7 +8,7 @@ export interface LeaveRequest {
     managerId: string;
     managerComment?: string;
     createdAt: Date;
-    reason: string;
-    updatedAt: Date;
-    leaveType: string;
+    reason: string; // New property
+    updatedAt: Date; // New property
+    leaveType: string; // New property
 }
