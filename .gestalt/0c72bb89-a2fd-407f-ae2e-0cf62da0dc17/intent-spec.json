@@ -1,0 +1,36 @@
+{
+  "id": "70c6c7d3-ea2d-49f0-b5d4-4340dc366011",
+  "correlationId": "0c72bb89-a2fd-407f-ae2e-0cf62da0dc17",
+  "rawIntent": "[Feature: Build the leave management module — Phase 1: Create leave model]\n\nCreate src/modules/leave/leave.model.ts. Define LeaveRequest and CreateLeaveRequestDto. Import LeaveType from src/shared/types/index.ts. Include a Jest unit test in tests/unit/leave.model.test.ts.\n\nPhase architecture notes:\nThis phase establishes the core data structure for leave requests, which is essential for the repository and service layers.",
+  "scope": {
+    "affectedDomains": [
+      "Leave"
+    ],
+    "affectedLayers": [
+      "domain",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "LeaveRequest and CreateLeaveRequestDto are defined correctly in leave.model.ts and Jest unit tests are passing.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Audit records: All state-changing operations write an audit record.",
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "RBAC enforcement: All API endpoints enforce role-based access control.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "Everything outside src/modules/leave/leave.model.ts and tests/unit/leave.model.test.ts"
+  ],
+  "ambiguities": []
+}
