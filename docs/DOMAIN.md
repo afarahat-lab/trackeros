@@ -21,6 +21,10 @@ To be populated as the design-agent and context-agent learn the domain.
   - `endDate`: Date (required)
 - **Response Body**:
   - `id`: string
+  - `employeeId`: string
+  - `leaveType`: LeaveType
+  - `startDate`: Date
+  - `endDate`: Date
   - `status`: string
   - `createdAt`: Date
   - `updatedAt`: Date
