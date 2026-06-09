@@ -162,3 +162,34 @@ This module handles leave requests, balances, and policies for employees, manage
 
 ## Leave Management Module
 This module handles leave requests, balances, and policies for employees, managers, and HR.
+
+## Feature: Leave Management Module
+
+### Domain entities
+- **Employee** — id, name, email, role, managerId. Represents leave applicants, managers, and HR users.
+- **LeaveRequest** — id, employeeId, type, startDate, endDate, status, managerId, managerComment, createdAt. Represents the lifecycle of a leave application.
+- **LeaveBalance** — employeeId, leaveType, totalDays, usedDays, year. Tracks entitlement and consumption by employee, leave type, and year.
+- **LeavePolicy** — id, leaveType, defaultDaysPerYear, maxConsecutiveDays, requiresApproval, createdAt. Defines validation rules for leave types.
+
+### Modules
+- `src/modules/leave` owns leave request models, persistence, business workflow, HTTP routes, approval/rejection orchestration, and overlap validation.
+- `src/modules/balance` owns leave balance models, persistence, balance availability checks, and usage recording.
+- `src/modules/employee` owns employee lookup and manager-subordinate relationship validation.
+- `src/modules/policy` owns leave policy lookup used during leave validation.
+- `src/shared/db` owns the shared PostgreSQL connection foundation.
+- `src/shared/middleware` owns authentication, authorization, and centralized error handling.
+- `src/shared/types` owns shared enums, error classes, and cross-module primitive types.
+
+### Dependency direction
+- `src/modules/leave` may depend on `src/modules/balance`, `src/modules/employee`, `src/modules/policy`, `src/shared/middleware`, `src/shared/types`, and `src/shared/db`.
+- `src/modules/balance`, `src/modules/employee`, and `src/modules/policy` may depend on `src/shared/types` and `src/shared/db`.
+- Shared modules must not depend on feature modules.
+- `src/modules/balance`, `src/modules/employee`, and `src/modules/policy` must not depend on `src/modules/leave`.
+
+### Recommended phase sequence
+1. Define leave and balance domain contracts.
+2. Implement balance persistence and service foundation.
+3. Implement leave request persistence.
+4. Implement leave request service workflow.
+5. Expose leave HTTP routes and middleware integration.
+6. Add leave module tests.
