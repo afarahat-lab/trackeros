@@ -1,0 +1,34 @@
+{
+  "id": "b4b93d5d-aa20-4c10-b0a6-e183de0a9409",
+  "correlationId": "4ed1d3ab-4425-42c0-bb2d-15f505363e70",
+  "rawIntent": "The CI pipeline failed with the error: 'Cannot find module '../../shared/db' or its corresponding type declarations.' This error occurred in the file src/modules/balance/balance.repository.ts, which was attempting to import the database adapter to implement persistence methods. The import path may be incorrect or the module may not exist. Preserve all existing exports, types, interfaces, and imports. Only add or modify what is needed to resolve the CI failure shown above.",
+  "scope": {
+    "affectedDomains": [
+      "balance"
+    ],
+    "affectedLayers": [
+      "domain"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "The CI pipeline passes without errors related to the database adapter import.",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "RBAC enforcement: All API endpoints enforce role-based access control.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "everything outside src/modules/balance/balance.repository.ts"
+  ],
+  "ambiguities": []
+}
