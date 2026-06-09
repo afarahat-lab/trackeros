@@ -61,13 +61,12 @@ agents:
     role: "Senior TypeScript engineer"
     goal: "Generate production-quality TypeScript code that follows the project harness"
     llm:
-      # Override the platform default (gpt-4o, 30k TPM standard tier).
-      # TEST_REPORT_008's mandatory pre-emit executeScript call pushed
-      # per-cycle token spend to ~35k, hitting the 30k TPM ceiling.
-      # gpt-4o-mini has 200k TPM (and ~10x cheaper per token) so the
-      # tool-loop turns no longer rate-limit. TEST_REPORT_009.
-      model: gpt-4o-mini
-      temperature: 0.2
+      # TR_033 — upgraded from gpt-4o-mini to gpt-5.5. Operator
+      # choice for the verification cycle pushing for full
+      # autonomous feature completion. Temperature dropped from
+      # 0.2 → 0.1 for tighter rule-following.
+      model: gpt-5.5
+      temperature: 0.1
       max_tokens: 8000
     tools:
       builtin:
@@ -143,7 +142,7 @@ agents:
     role: "Architectural constraint evaluator"
     goal: "Verify generated code satisfies all project architectural rules using executeScript + read-only file tools"
     llm:
-      model: gpt-4o     # override — gpt-4o for reliable rule-following
+      model: gpt-5.5    # TR_033 — upgraded from gpt-4o
       temperature: 0.0
       max_tokens: 2000
     tools:
@@ -154,7 +153,7 @@ agents:
     role: "Senior engineer and code reviewer"
     goal: "Assess generated code quality and architectural correctness"
     llm:
-      model: gpt-4o     # override — gpt-4o for reliable rule-following
+      model: gpt-5.5    # TR_033 — upgraded from gpt-4o
       temperature: 0.0
       max_tokens: 4000
     tools:
@@ -217,12 +216,47 @@ agents:
     role: "Autonomous failure analyst and recovery coordinator"
     goal: "Analyse failures and decide the correct recovery action: retry with fixes, submit a fix intent for systemic gaps, or escalate to human"
     llm:
-      model: chat-latest
+      model: gpt-5.5-pro    # TR_033 — upgraded from chat-latest. Uses responses API shape (registered in platform_llms).
       temperature: 0.0
       max_tokens: 2000
     prompt_extensions:
       - "Always ground your diagnosis in the actual error output — do not infer failures not evidenced in the provided context"
       - "A fix-intent is only appropriate when retrying the same intent would produce the same failure"
+
+  # ── Planning layer (migration 024) ────────────────────────────
+  # TR_033 — added explicit blocks for the three planning agents.
+  # All three use gpt-5.5 for stronger reasoning during feature
+  # decomposition + per-phase evaluation. Architecture-agent runs
+  # at both the feature level (high-level design) and per-phase
+  # (focused) under ADR-049.
+  architecture-agent:
+    role: "Chief software architect"
+    goal: "Design feature-level architecture and per-phase technical specifications"
+    llm:
+      model: gpt-5.5
+      temperature: 0.1
+      max_tokens: 3000
+    prompt_extensions: []
+
+  planner-agent:
+    role: "Senior engineering planner"
+    goal: "Decompose features into ordered, deployable phases bounded by HARNESS planner limits"
+    llm:
+      model: gpt-5.5
+      temperature: 0.1
+      max_tokens: 3000
+    prompt_extensions: []
+
+  phase-evaluator-agent:
+    role: "Senior engineering phase reviewer"
+    goal: "Evaluate completed phases via git diff and adjust remaining phase scopes when necessary"
+    llm:
+      model: gpt-5.5
+      temperature: 0.1
+      max_tokens: 2000
+    tools:
+      builtin: [executeScript, readFile, searchFiles]
+    prompt_extensions: []
 
 
 # ─── Custom agents (ADR-037) ─────────────────────────────────────────────────
