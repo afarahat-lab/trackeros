@@ -1,0 +1,107 @@
+{
+  "correlationId": "ab3efa7d-3cf7-415e-9dcc-8fa388644ead",
+  "domainChanges": [
+    {
+      "entityName": "Leave",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "leaveType",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "startDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "endDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "status",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "employeeId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "Employee",
+          "type": "one-to-many"
+        }
+      ]
+    }
+  ],
+  "apiContracts": [
+    {
+      "method": "GET",
+      "path": "/api/v1/leaves",
+      "description": "Retrieve a list of leave requests",
+      "requestBody": {},
+      "responseBody": {
+        "leaves": "Leave[]"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/leaves",
+      "description": "Create a new leave request",
+      "requestBody": {
+        "leaveType": "string",
+        "startDate": "Date",
+        "endDate": "Date",
+        "employeeId": "string"
+      },
+      "responseBody": {
+        "leave": "Leave"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/leaves/:id",
+      "description": "Update an existing leave request",
+      "requestBody": {
+        "status": "string"
+      },
+      "responseBody": {
+        "leave": "Leave"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/leaves/:id",
+      "description": "Delete a leave request",
+      "requestBody": {},
+      "responseBody": {
+        "message": "string"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin"
+      ]
+    }
+  ],
+  "componentSpecs": []
+}

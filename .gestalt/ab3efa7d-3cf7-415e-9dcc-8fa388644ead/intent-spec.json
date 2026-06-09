@@ -1,0 +1,36 @@
+{
+  "id": "28fd0b42-6979-40fd-bc8f-569ca4ab92eb",
+  "correlationId": "ab3efa7d-3cf7-415e-9dcc-8fa388644ead",
+  "rawIntent": "[Feature: Build the leave management module — Phase 3: Create leave routes and middleware]\n\nCreate src/modules/leave/leave.routes.ts to expose API endpoints for leave management. Implement access control middleware in src/modules/leave/leave.middleware.ts. This phase depends on src/modules/leave/leave.service.ts.\n\nThis phase depends on: src/modules/leave/leave.service.ts.\n\nPhase architecture notes:\nThis phase provides the API layer for interacting with the leave management functionality.",
+  "scope": {
+    "affectedDomains": [
+      "Request",
+      "Auth"
+    ],
+    "affectedLayers": [
+      "api"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "API endpoints for leave management are successfully exposed in leave.routes.ts and access control middleware is implemented in leave.middleware.ts.",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Audit records: All state-changing operations write an audit record.",
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "RBAC enforcement: All API endpoints enforce role-based access control.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "Everything outside src/modules/leave/leave.routes.ts and src/modules/leave/leave.middleware.ts"
+  ],
+  "ambiguities": []
+}
