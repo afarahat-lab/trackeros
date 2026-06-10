@@ -13,10 +13,10 @@ describe('SC-2: LeaveRepository CRUD Operations', () => {
   const leaveRequest: LeaveRequest = {
     id: '1',
     employeeId: 'emp-123',
-    leaveType: 'sick',
+    leaveType: 'SICK',
     startDate: new Date(),
     endDate: new Date(),
-    status: 'pending',
+    status: 'PENDING',
   };
 
   it('should create a leave request', async () => {
@@ -42,7 +42,7 @@ describe('SC-2: LeaveRepository CRUD Operations', () => {
   });
 
   it('should update an existing leave request', async () => {
-    const updatedLeaveRequest = { ...leaveRequest, status: 'approved' };
+    const updatedLeaveRequest = { ...leaveRequest, status: 'APPROVED' };
     mockDb.query.mockResolvedValueOnce({ rows: [updatedLeaveRequest] });
     const result = await leaveRepository.update('1', updatedLeaveRequest);
     expect(result).toEqual(updatedLeaveRequest);
