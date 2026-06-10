@@ -106,3 +106,33 @@ No reverse dependencies are permitted. The architecture must remain a modular mo
 - PENDING
 - APPROVED
 - REJECTED
+
+## Leave Management Module
+
+### Domain Entities
+- LeaveRequest: id, employeeId, leaveType, startDate, endDate, status, approverEmployeeId, createdAt.
+- LeaveBalance: employeeId, leaveType, availableDays.
+- Employee: id, managerId, name.
+- LeavePolicy: id, leaveType, annualEntitlement.
+- Notification: id, recipientEmployeeId, type, status.
+
+### Module Ownership
+- src/modules/leave owns leave request creation, approval, rejection, and status transitions.
+- src/modules/balance owns leave balance storage and adjustments.
+- src/modules/employee owns employee records and manager relationships.
+- src/modules/policy owns leave entitlement policies.
+- src/modules/notification owns notification records and delivery tracking.
+
+### Dependency Direction
+- leave -> employee
+- leave -> policy
+- leave -> balance
+- leave -> notification
+
+No reverse dependencies into the leave module are permitted. This preserves modular-monolith boundaries and avoids circular dependencies.
+
+### Implementation Sequence
+1. Define Leave Domain Models and Repository Layer.
+2. Implement Leave Application Workflow.
+3. Implement Approval and Rejection Workflow.
+4. Expose Fastify API Endpoints.
