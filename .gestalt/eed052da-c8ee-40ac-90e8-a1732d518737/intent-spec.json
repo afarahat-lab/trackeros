@@ -1,0 +1,75 @@
+{
+  "id": "d5cc01fe-9dde-42cd-9f80-15e07648fe3a",
+  "correlationId": "eed052da-c8ee-40ac-90e8-a1732d518737",
+  "rawIntent": "[Feature: Build the leave management module — Phase 1: Create LeaveRequest domain model and repository]\n\nCreate approximately 3 files in src/modules/leave: src/modules/leave/leave.model.ts defining the canonical LeaveRequest entity and DTO/types used by persistence, src/modules/leave/leave.repository.ts defining repository interfaces and PostgreSQL-backed operations including createLeaveRequest, approveLeaveRequest, and rejectLeaveRequest, and tests/unit/modules/leave/leave.repository.test.ts covering repository behavior. Keep the model and repository in the same phase so repository methods reference the actual LeaveRequest definitions.\n\nPhase architecture notes:\nEstablishes persistence contracts and storage implementation for LeaveRequest.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/leave/leave.model.ts\\nexport type LeaveRequestStatus = \\\"PENDING\\\" | \\\"APPROVED\\\" | \\\"REJECTED\\\";\\nexport type LeaveType = \\\"ANNUAL\\\" | \\\"SICK\\\" | \\\"EMERGENCY\\\";\\nexport interface LeaveRequest { id: string; employeeId: string; leaveType: LeaveType; startDate: Date; endDate: Date; status: LeaveRequestStatus; createdAt: Date; updatedAt: Date; }\\nexport interface CreateLeaveRequestInput { id: string; employeeId: string; leaveType: LeaveType; startDate: Date; endDate: Date; }\\nexport interface AuditRecord { entityId: string; entityType: \\\"LEAVE_REQUEST\\\"; action: \\\"CREATE\\\" | \\\"APPROVE\\\" | \\\"REJECT\\\"; performedBy: string; createdAt: Date; }\",\"File: src/modules/leave/leave.repository.ts\\nimport { AuditRecord, CreateLeaveRequestInput, LeaveRequest } from \\\"./leave.model\\\";\\nexport interface LeaveRequestRepository { createLeaveRequest(input: CreateLeaveRequestInput, auditRecord: AuditRecord): Promise<LeaveRequest>; findById(id: string): Promise<LeaveRequest | null>; approveLeaveRequest(id: string, approvedBy: string, auditRecord: AuditRecord): Promise<LeaveRequest>; rejectLeaveRequest(id: string, rejectedBy: string, auditRecord: AuditRecord): Promise<LeaveRequest>; findByEmployeeId(employeeId: string): Promise<LeaveRequest[]>; }\\nexport class PostgreSQLLeaveRequestRepository implements LeaveRequestRepository { constructor() {} createLeaveRequest(input: CreateLeaveRequestInput, auditRecord: AuditRecord): Promise<LeaveRequest> { throw new Error(\\\"Not implemented\\\"); } findById(id: string): Promise<LeaveRequest | null> { throw new Error(\\\"Not implemented\\\"); } approveLeaveRequest(id: string, approvedBy: string, auditRecord: AuditRecord): Promise<LeaveRequest> { throw new Error(\\\"Not implemented\\\"); } rejectLeaveRequest(id: string, rejectedBy: string, auditRecord: AuditRecord): Promise<LeaveRequest> { throw new Error(\\\"Not implemented\\\"); } findByEmployeeId(employeeId: string): Promise<LeaveRequest[]> { throw new Error(\\\"Not implemented\\\"); } }\",\"File: tests/unit/modules/leave/leave.repository.test.ts\\nimport { describe, it, expect } from \\\"vitest\\\";\\nimport { PostgreSQLLeaveRequestRepository } from \\\"../../../../src/modules/leave/leave.repository\\\";\\ndescribe(\\\"PostgreSQLLeaveRequestRepository\\\", () => { it(\\\"defines repository behavior contracts\\\", () => { expect(PostgreSQLLeaveRequestRepository).toBeDefined(); }); });\"],\"importStatements\":[\"import { AuditRecord, CreateLeaveRequestInput, LeaveRequest } from \\\"./leave.model\\\"\",\"import { describe, it, expect } from \\\"vitest\\\"\",\"import { PostgreSQLLeaveRequestRepository } from \\\"../../../../src/modules/leave/leave.repository\\\"\"],\"successCriteria\":[\"src/modules/leave/leave.model.ts exists and exports LeaveRequest, LeaveRequestStatus, LeaveType, CreateLeaveRequestInput, and AuditRecord\",\"src/modules/leave/leave.repository.ts exists and exports LeaveRequestRepository plus the concrete PostgreSQLLeaveRequestRepository implementation\",\"LeaveRequestRepository defines createLeaveRequest, findById, approveLeaveRequest, rejectLeaveRequest, and findByEmployeeId with the exact TypeScript signatures specified in this phase\",\"All state-changing repository methods (createLeaveRequest, approveLeaveRequest, rejectLeaveRequest) require an AuditRecord parameter to satisfy audit-record requirements\",\"tests/unit/modules/leave/leave.repository.test.ts exists and executes with Vitest, validating the repository contract exports and behavior scaffolding\"]}\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 2 — Create LeaveBalance domain model and repository: Create approximately 3 files in src/modules/balance: src/modules/balance/leave-balance.model.ts defi\n- Phase 3 — Create AuditRecord domain model and repository: Create approximately 3 files in src/modules/audit: src/modules/audit/audit-record.model.ts defining \n- Phase 4 — Implement leave submission workflow service: Create approximately 3 files centered on submission logic. Create src/modules/leave/leave.service.ts\n- Phase 5 — Implement approval and rejection workflow service methods: Modify or extend approximately 2-3 files to add approveLeaveRequest and rejectLeaveRequest behavior \n- Phase 6 — Add employee leave API endpoints: Create approximately 3 files for Fastify exposure of employee actions. Create src/modules/leave/leav\n- Phase 7 — Add manager approval and balance API endpoints with RBAC: Extend approximately 3-4 files to expose manager approval and rejection endpoints and leave balance \n- Phase 8 — Create Notification domain model and repository: Create approximately 3 files in src/modules/notification: src/modules/notification/notification.mode\n- Phase 9 — Integrate notifications and balance mutations into workflow: Modify approximately 4-5 files to generate Notification records for submission, approval, and reject\n- Phase 10 — Add end-to-end leave management test coverage: Create approximately 4-5 Vitest test files covering complete workflows. This phase depends on src/mo",
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "domain",
+      "infra",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/leave/leave.model.ts exists and exports LeaveRequestStatus, LeaveType, LeaveRequest, CreateLeaveRequestInput, and AuditRecord with the specified TypeScript definitions.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/leave/leave.repository.ts exists and exports LeaveRequestRepository and PostgreSQLLeaveRequestRepository.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "LeaveRequestRepository defines createLeaveRequest, findById, approveLeaveRequest, rejectLeaveRequest, and findByEmployeeId using the exact TypeScript signatures specified in the phase architecture.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "All state-changing repository methods (createLeaveRequest, approveLeaveRequest, rejectLeaveRequest) require an AuditRecord parameter.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "tests/unit/modules/leave/leave.repository.test.ts exists, runs under Vitest, and validates repository contract exports and behavior scaffolding.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Limit implementation scope to src/modules/leave/leave.model.ts, src/modules/leave/leave.repository.ts, and tests/unit/modules/leave/leave.repository.test.ts.",
+    "Repository pattern: all persistence access must be represented through repository interfaces.",
+    "Use the exact interfaces, types, method names, and signatures defined in the provided phase architecture.",
+    "PostgreSQLLeaveRequestRepository must implement LeaveRequestRepository.",
+    "All state-changing repository operations must require an AuditRecord parameter to satisfy audit-record requirements.",
+    "Audit records are required for state-changing operations; this phase only models and passes AuditRecord, not a separate audit repository implementation.",
+    "No unhandled promise rejections; async methods must be defined in a way that supports handled errors.",
+    "Do not introduce API endpoints, services, workflow orchestration, balance mutations, notification integration, or cross-module dependencies in this phase.",
+    "Keep dependency direction consistent with architecture; work remains within the leave module.",
+    "Tests must use Vitest.",
+    "No sensitive data should be logged if any logging is introduced."
+  ],
+  "outOfScope": [
+    "LeaveBalance domain models or repositories.",
+    "Separate audit module or audit repository implementation.",
+    "Leave workflow service implementation (submission, approval, rejection orchestration).",
+    "Balance deduction logic.",
+    "Notification domain models, repositories, or integrations.",
+    "Fastify API endpoints, request validation, or RBAC endpoint enforcement.",
+    "Employee module changes.",
+    "Policy module changes.",
+    "End-to-end workflow tests.",
+    "Database schema creation, migrations, or full PostgreSQL persistence implementation beyond repository scaffolding/contracts."
+  ],
+  "ambiguities": []
+}
