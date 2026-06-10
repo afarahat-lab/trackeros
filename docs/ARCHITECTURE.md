@@ -72,3 +72,37 @@ This module handles leave requests, approvals, and leave balance tracking for em
 - leave -> notification
 
 No reverse dependencies are introduced, preserving an acyclic module graph.
+
+## Leave Management Module
+
+### Domain Entities
+- LeaveRequest: id, employeeId, leaveType, startDate, endDate, status, approverEmployeeId, createdAt, updatedAt.
+- LeaveBalance: employeeId, leaveType, remainingDays.
+- Employee: id, managerId, name.
+- LeavePolicy: id, leaveType, annualEntitlement.
+- Notification: id, recipientEmployeeId, type, status, relatedLeaveRequestId, createdAt.
+
+### Module Ownership
+- src/modules/leave owns LeaveRequest lifecycle, submission, approval, rejection, and workflow orchestration.
+- src/modules/balance owns LeaveBalance records and balance adjustments.
+- src/modules/employee owns employee records and reporting hierarchy.
+- src/modules/policy owns leave entitlement rules.
+- src/modules/notification owns notification creation and delivery tracking.
+
+### Dependency Direction
+- leave -> employee
+- leave -> policy
+- leave -> balance
+- leave -> notification
+
+No reverse dependencies are permitted. The architecture must remain a modular monolith with the leave module orchestrating workflows while dependent modules retain ownership of their data and business rules.
+
+### Supported Leave Types
+- ANNUAL
+- SICK
+- EMERGENCY
+
+### Leave Request Statuses
+- PENDING
+- APPROVED
+- REJECTED
