@@ -43,3 +43,6 @@ src/shared/error types.ts
 
 ## Leave Management Module
 This module handles leave requests, approvals, and leave balance tracking for employees.
+
+## Leave Management Module
+This module handles leave requests, approvals, and leave balance tracking for employees.
