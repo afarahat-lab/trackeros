@@ -267,3 +267,46 @@ Architecture Style: modular-monolith using TypeScript, Node.js 20, Fastify, Post
 - Validate all API inputs before processing.
 - Catch and handle all async errors.
 - Do not log sensitive data.
+
+## Leave Management Module
+
+### Domain Entities
+- LeaveRequest: employee leave application.
+- LeaveBalance: remaining leave entitlement by employee and leave type.
+- Employee: employee identity, manager relationship, and role information.
+- LeavePolicy: leave entitlement rules.
+- Notification: workflow notifications.
+- AuditRecord: audit trail for all state-changing operations.
+
+### Leave Types
+- ANNUAL
+- SICK
+- EMERGENCY
+
+### Leave Request Statuses
+- PENDING
+- APPROVED
+- REJECTED
+
+### Relationships
+- LeaveRequest.employeeId references Employee.id.
+- Employee.managerId references Employee.id.
+- LeaveBalance is maintained per Employee and leave type.
+- LeavePolicy defines entitlement rules for a leave type.
+- Notification is generated from LeaveRequest workflow events.
+- AuditRecord is written for every LeaveRequest and LeaveBalance state-changing operation.
+
+### Modules
+- src/modules/leave owns LeaveRequest lifecycle and approval workflow.
+- src/modules/balance owns LeaveBalance management.
+- src/modules/employee owns employee and manager relationships.
+- src/modules/policy owns leave entitlement rules.
+- src/modules/notification owns workflow notifications.
+- src/modules/audit owns audit record persistence.
+
+### Dependency Direction
+- leave -> employee
+- leave -> policy
+- leave -> balance
+- leave -> notification
+- leave -> audit
