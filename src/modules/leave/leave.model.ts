@@ -1,3 +1,4 @@
+// Importing LeaveType from shared types
 import { LeaveType } from '../../shared/types/index';
 
 /**
