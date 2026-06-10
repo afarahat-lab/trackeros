@@ -1,16 +1,19 @@
 import { describe, it, expect } from 'vitest';
 
+// Import the LeaveRequest interface
+import type { LeaveRequest } from '../../../src/modules/leave/leave.model';
 
-describe('Leave Model', () => {
-  it('should export LeaveRequest interface', () => {
+describe('SC-1: LeaveRequest Model', () => {
+  it('should have the correct properties', () => {
     const leaveRequest: LeaveRequest = {
       id: '1',
       employeeId: 'emp-123',
-      leaveType: 'SICK',
+      leaveType: 'sick',
       startDate: new Date(),
       endDate: new Date(),
-      status: 'PENDING',
+      status: 'pending'
     };
+
     expect(leaveRequest).toHaveProperty('id');
     expect(leaveRequest).toHaveProperty('employeeId');
     expect(leaveRequest).toHaveProperty('leaveType');
