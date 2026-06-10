@@ -112,7 +112,7 @@ agents:
 
   test-agent:
     role: "Senior QA engineer"
-    goal: "Generate comprehensive Vitest tests mapped to success criteria"
+    goal: "Generate comprehensive Jest tests mapped to success criteria"
     llm:
       model: ~
       temperature: 0.1
