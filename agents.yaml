@@ -242,7 +242,17 @@ agents:
       # (74s + incomplete JSON in the first verification cycle). Bumped
       # to keep the same headroom on the (faster) architecture-agent.
       max_tokens: 6000
-    prompt_extensions: []
+    prompt_extensions:
+      # TR_034 — scope every per-phase design to exact file paths +
+      # exports + import statements. Aider's hallucinations in TR_033
+      # came from module-name references in the architecture
+      # description; these rules force the agent to emit file paths
+      # only.
+      - "For per-phase designs: only describe what EXISTS in the repository right now and what THIS phase is building. Never describe future modules or modules not yet built."
+      - "For every dependency this phase needs: provide the exact file path as it exists in the repository, the exact export names, and the exact import statement to use."
+      - "Do not use module names as import paths. Use file paths."
+      - "Example of correct output: 'The database connection is at src/shared/db/connection.ts and exports: export const pool: Pool. Import it as: import { pool } from \"../../shared/db/connection\"'"
+      - "Example of incorrect output: 'Use the shared/db module'"
 
   planner-agent:
     role: "Senior engineering planner"

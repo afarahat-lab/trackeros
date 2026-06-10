@@ -120,7 +120,9 @@
       "architectureGuidance": [
         "For high-level design: identify domain entities (names + key attributes), module list (name + path + what it owns), dependency direction, and recommended phase sequence. Nothing more.",
         "For per-phase design: produce exact TypeScript interface signatures, specific import statements using actual file paths, and 3-5 measurable success criteria.",
-        "Phase designs must reference only files that already exist OR files being created in this phase — never assume future phases exist."
+        "Phase designs must reference only files that already exist OR files being created in this phase — never assume future phases exist.",
+        "Per-phase design must include for each dependency: exact file path, exact exported names, exact import statement. Scope: only files that exist now + files being created this phase. Nothing else.",
+        "Never reference a module by name alone — always by its exact file path relative to the file being created."
       ]
     },
     "planner-agent": {
@@ -186,7 +188,7 @@
     "enabled": true,
     "maxPhasesPerFeature": 10,
     "maxFilesPerPhase": 5,
-    "architectureReviewPerPhase": false,
+    "architectureReviewPerPhase": true,
     "maxPhaseRetries": 2
   },
   "maintenance": {
