@@ -18,7 +18,7 @@ None
 ### Create Leave Request
 - **Method**: POST
 - **Path**: /api/v1/leave-requests
-- **Description**: Create a new leave request
+- **Description**: Creates a new leave request
 - **Request Body**:
   - employeeId: string
   - leaveType: string
@@ -38,7 +38,7 @@ None
 ### Retrieve Leave Request
 - **Method**: GET
 - **Path**: /api/v1/leave-requests/{id}
-- **Description**: Retrieve a specific leave request by ID
+- **Description**: Retrieves a specific leave request by ID
 - **Request Body**: {}
 - **Response Body**:
   - id: string
@@ -53,7 +53,7 @@ None
 ### Update Leave Request
 - **Method**: PUT
 - **Path**: /api/v1/leave-requests/{id}
-- **Description**: Update an existing leave request
+- **Description**: Updates an existing leave request
 - **Request Body**:
   - employeeId: string
   - leaveType: string
@@ -73,8 +73,9 @@ None
 ### Delete Leave Request
 - **Method**: DELETE
 - **Path**: /api/v1/leave-requests/{id}
-- **Description**: Delete a leave request by ID
+- **Description**: Deletes a specific leave request by ID
 - **Request Body**: {}
-- **Response Body**: {}
+- **Response Body**:
+  - message: "Leave request deleted successfully"
 - **Auth Required**: true
 - **Roles**: admin, operator

@@ -1,10 +1,10 @@
 {
-  "id": "3d33b5d5-be66-4b86-8e25-b7de1d377911",
+  "id": "9f0ddfa2-5674-4d0a-a7fa-4f7c0db0f5b5",
   "correlationId": "98811e72-17e8-4072-9ec7-ca6ed3cc0490",
   "rawIntent": "[Feature: Build the leave management module — Phase 1: Create leave model]\n\nCreate src/modules/leave/leave.model.ts. Define LeaveRequest, CreateLeaveRequestDto. Import LeaveType from src/shared/types/index.ts.\n\nPhase architecture notes:\n{\"interfaces\":[\"interface LeaveRequest { id: string; employeeId: string; leaveType: string; startDate: Date; endDate: Date; status: string; }\"],\"importStatements\":[\"import { Pool } from \\\"src/shared/db/connection\\\"\"],\"successCriteria\":[\"src/modules/leave/leave.model.ts exists and exports LeaveRequest\",\"src/modules/leave/leave.repository.ts exists and contains methods for CRUD operations on LeaveRequest\"]}\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"interface LeaveRequest { id: string; employeeId: string; leaveType: string; startDate: Date; endDate: Date; status: string; }\"],\"importStatements\":[\"import { Pool } from \\\"src/shared/db/connection\\\"\"],\"successCriteria\":[\"src/modules/leave/leave.model.ts exists and exports LeaveRequest\",\"src/modules/leave/leave.repository.ts exists and contains methods for CRUD operations on LeaveRequest\"]}",
   "scope": {
     "affectedDomains": [
-      "leave"
+      "Leave"
     ],
     "affectedLayers": [
       "domain"
@@ -35,7 +35,7 @@
     "Error handling: No unhandled promise rejections. All async errors are caught and handled."
   ],
   "outOfScope": [
-    "everything outside src/modules/leave/leave.model.ts and src/modules/leave/leave.repository.ts"
+    "Everything outside src/modules/leave/leave.model.ts and src/modules/leave/leave.repository.ts"
   ],
   "ambiguities": []
 }
