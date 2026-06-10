@@ -193,3 +193,35 @@ This module handles leave requests, balances, and policies for employees, manage
 4. Implement leave request service workflow.
 5. Expose leave HTTP routes and middleware integration.
 6. Add leave module tests.
+
+## Leave Management Module Feature
+
+### Domain entities
+- **Employee** — id, name, email, role, managerId. Represents the requester or assigned manager.
+- **LeaveRequest** — id, employeeId, type, startDate, endDate, status, managerId, managerComment, createdAt. Represents the leave application lifecycle.
+- **LeaveBalance** — employeeId, leaveType, totalDays, usedDays, year. Tracks employee entitlement and usage.
+- **LeavePolicy** — id, leaveType, defaultDaysPerYear, maxConsecutiveDays, requiresApproval, createdAt. Defines validation constraints for leave types.
+
+### Module ownership
+- `src/modules/leave` owns leave request models, persistence, service workflows, and HTTP routes.
+- `src/modules/balance` owns balance models, persistence, availability checks, and usage updates.
+- `src/modules/employee` owns employee lookup and manager-subordinate relationship validation.
+- `src/modules/policy` owns leave policy lookup and configuration data.
+- `src/shared/db` owns the PostgreSQL connection.
+- `src/shared/base-repository.ts` owns shared repository query helpers.
+- `src/shared/middleware` owns authentication, authorization, and error middleware.
+- `src/shared/types` owns shared enums, request context types, and error classes.
+
+### Dependency direction
+- `src/modules/leave` may depend on `src/modules/balance`, `src/modules/employee`, `src/modules/policy`, `src/shared/middleware`, `src/shared/types`, and `src/shared/base-repository.ts`.
+- `src/modules/balance`, `src/modules/employee`, and `src/modules/policy` may depend on `src/shared/base-repository.ts`.
+- `src/shared/base-repository.ts` may depend on `src/shared/db`.
+- `src/modules/balance`, `src/modules/employee`, and `src/modules/policy` must not depend on `src/modules/leave`.
+
+### Recommended implementation sequence
+1. Define shared domain contracts for leave requests.
+2. Build leave request persistence.
+3. Build balance integration for leave workflows.
+4. Build leave service workflows.
+5. Expose leave HTTP routes.
+6. Add leave module tests.
