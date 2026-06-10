@@ -8,10 +8,10 @@ describe('SC-1: LeaveRequest Interface', () => {
     const leaveRequest: LeaveRequest = {
       id: '1',
       employeeId: '123',
-      leaveType: 'SICK', // Assuming LeaveType is a string union type
+      leaveType: 'sick', // assuming LeaveType is a string union
       startDate: new Date('2023-01-01'),
       endDate: new Date('2023-01-10'),
-      status: 'PENDING'
+      status: 'approved'
     };
 
     expect(leaveRequest).toHaveProperty('id');
@@ -26,10 +26,10 @@ describe('SC-1: LeaveRequest Interface', () => {
     const leaveRequest: LeaveRequest = {
       id: '1',
       employeeId: '123',
-      leaveType: 'SICK', // Assuming LeaveType is a string union type
+      leaveType: 'sick', // assuming LeaveType is a string union
       startDate: new Date('2023-01-01'),
       endDate: new Date('2023-01-10'),
-      status: 'PENDING'
+      status: 'approved'
     };
 
     expect(typeof leaveRequest.id).toBe('string');
