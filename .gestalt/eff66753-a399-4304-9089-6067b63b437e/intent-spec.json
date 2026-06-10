@@ -1,16 +1,14 @@
 {
-  "id": "6a17fd02-c6b2-4f2d-a4a0-580008659ed8",
+  "id": "ccf2d231-3a3f-4508-a9ab-6bed5d1f694d",
   "correlationId": "eff66753-a399-4304-9089-6067b63b437e",
   "rawIntent": "[Feature: Build the leave management module — Phase 1: Create leave model]\n\nCreate src/modules/leave/leave.model.ts. Define LeaveRequest, CreateLeaveRequestDto. Import LeaveType from src/shared/types/index.ts.\n\nPhase architecture notes:\n{\"interfaces\":[\"interface LeaveRequest { id: string; employeeId: string; leaveType: string; startDate: Date; endDate: Date; status: string; }\"],\"importStatements\":[\"import { Pool } from \\\"src/shared/db/connection\\\"\"],\"successCriteria\":[\"src/modules/leave/leave.model.ts exists and exports LeaveRequest\"]}\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"interface LeaveRequest { id: string; employeeId: string; leaveType: string; startDate: Date; endDate: Date; status: string; }\"],\"importStatements\":[\"import { Pool } from \\\"src/shared/db/connection\\\"\"],\"successCriteria\":[\"src/modules/leave/leave.model.ts exists and exports LeaveRequest\"]}",
   "scope": {
     "affectedDomains": [
       "Method",
-      "Path",
-      "Description"
+      "Path"
     ],
     "affectedLayers": [
-      "domain",
-      "api"
+      "domain"
     ],
     "isBreakingChange": false,
     "estimatedComplexity": "medium"
@@ -32,7 +30,7 @@
     "Error handling: No unhandled promise rejections. All async errors are caught and handled."
   ],
   "outOfScope": [
-    "Everything outside src/modules/leave/leave.model.ts and src/shared/types/index.ts"
+    "Everything outside src/modules/leave/leave.model.ts"
   ],
   "ambiguities": []
 }

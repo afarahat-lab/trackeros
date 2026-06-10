@@ -8,7 +8,7 @@ describe('SC-1: LeaveRequest Interface', () => {
     const leaveRequest: LeaveRequest = {
       id: '1',
       employeeId: '123',
-      leaveType: 'SICK', // Assuming LeaveType is a string enum
+      leaveType: 'SICK', // Assuming LeaveType is a string union type
       startDate: new Date('2023-01-01'),
       endDate: new Date('2023-01-10'),
       status: 'PENDING'
@@ -22,11 +22,11 @@ describe('SC-1: LeaveRequest Interface', () => {
     expect(leaveRequest).toHaveProperty('status');
   });
 
-  it('should enforce correct types', () => {
+  it('should enforce types correctly', () => {
     const leaveRequest: LeaveRequest = {
       id: '1',
       employeeId: '123',
-      leaveType: 'SICK', // Assuming LeaveType is a string enum
+      leaveType: 'SICK', // Assuming LeaveType is a string union type
       startDate: new Date('2023-01-01'),
       endDate: new Date('2023-01-10'),
       status: 'PENDING'
