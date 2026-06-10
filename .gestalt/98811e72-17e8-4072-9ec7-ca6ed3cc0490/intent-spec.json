@@ -1,0 +1,41 @@
+{
+  "id": "1c52596c-1bdf-48cb-b58f-e5ef50e0fabf",
+  "correlationId": "98811e72-17e8-4072-9ec7-ca6ed3cc0490",
+  "rawIntent": "[Feature: Build the leave management module — Phase 1: Create leave model]\n\nCreate src/modules/leave/leave.model.ts. Define LeaveRequest, CreateLeaveRequestDto. Import LeaveType from src/shared/types/index.ts.\n\nPhase architecture notes:\n{\"interfaces\":[\"interface LeaveRequest { id: string; employeeId: string; leaveType: string; startDate: Date; endDate: Date; status: string; }\"],\"importStatements\":[\"import { Pool } from \\\"src/shared/db/connection\\\"\"],\"successCriteria\":[\"src/modules/leave/leave.model.ts exists and exports LeaveRequest\",\"src/modules/leave/leave.repository.ts exists and contains methods for CRUD operations on LeaveRequest\"]}\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"interface LeaveRequest { id: string; employeeId: string; leaveType: string; startDate: Date; endDate: Date; status: string; }\"],\"importStatements\":[\"import { Pool } from \\\"src/shared/db/connection\\\"\"],\"successCriteria\":[\"src/modules/leave/leave.model.ts exists and exports LeaveRequest\",\"src/modules/leave/leave.repository.ts exists and contains methods for CRUD operations on LeaveRequest\"]}",
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "domain"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/leave/leave.model.ts exists and exports LeaveRequest",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/leave/leave.repository.ts exists and contains methods for CRUD operations on LeaveRequest",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access goes through repository interfaces.",
+    "All state-changing operations write an audit record.",
+    "Validate all inputs at API boundaries before processing.",
+    "Never log passwords, tokens, PII, or financial data.",
+    "All API endpoints enforce role-based access control.",
+    "No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "Everything outside src/modules/leave/leave.model.ts and src/modules/leave/leave.repository.ts"
+  ],
+  "ambiguities": []
+}
