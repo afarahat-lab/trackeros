@@ -136,3 +136,27 @@ No reverse dependencies into the leave module are permitted. This preserves modu
 2. Implement Leave Application Workflow.
 3. Implement Approval and Rejection Workflow.
 4. Expose Fastify API Endpoints.
+
+## Leave Management Module
+
+### Domain Entities
+- LeaveRequest: id, employeeId, leaveType, startDate, endDate, status.
+- LeaveBalance: employeeId, leaveType, availableDays.
+- Employee: id, managerId, status.
+- LeavePolicy: id, leaveType, annualEntitlement.
+- Notification: id, recipientEmployeeId, type, status.
+
+### Module Ownership
+- src/modules/leave owns LeaveRequest data and leave workflow state transitions.
+- src/modules/balance owns LeaveBalance data and balance calculations.
+- src/modules/employee owns Employee data and reporting relationships.
+- src/modules/policy owns LeavePolicy data and validation rules.
+- src/modules/notification owns Notification records and delivery tracking.
+
+### Dependency Direction
+- src/modules/leave -> src/modules/employee
+- src/modules/leave -> src/modules/policy
+- src/modules/leave -> src/modules/balance
+- src/modules/leave -> src/modules/notification
+
+No reverse dependencies are permitted. The modular-monolith structure must remain acyclic with the leave module orchestrating cross-module workflow operations.
