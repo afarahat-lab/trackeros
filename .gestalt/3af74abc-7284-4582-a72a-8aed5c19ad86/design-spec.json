@@ -43,7 +43,7 @@
     {
       "method": "POST",
       "path": "/api/v1/leave-requests",
-      "description": "Creates a new leave request",
+      "description": "Creates a new leave request.",
       "requestBody": {
         "employeeId": "string",
         "leaveType": "string",
@@ -68,7 +68,7 @@
     {
       "method": "GET",
       "path": "/api/v1/leave-requests/{id}",
-      "description": "Retrieves a specific leave request by ID",
+      "description": "Retrieves a specific leave request by ID.",
       "requestBody": {},
       "responseBody": {
         "id": "string",
@@ -87,9 +87,8 @@
     {
       "method": "PUT",
       "path": "/api/v1/leave-requests/{id}",
-      "description": "Updates an existing leave request",
+      "description": "Updates an existing leave request.",
       "requestBody": {
-        "employeeId": "string",
         "leaveType": "string",
         "startDate": "Date",
         "endDate": "Date",
@@ -112,11 +111,9 @@
     {
       "method": "DELETE",
       "path": "/api/v1/leave-requests/{id}",
-      "description": "Deletes a specific leave request by ID",
+      "description": "Deletes a specific leave request by ID.",
       "requestBody": {},
-      "responseBody": {
-        "message": "Leave request deleted successfully"
-      },
+      "responseBody": {},
       "authRequired": true,
       "roles": [
         "admin",

@@ -1,9 +1,9 @@
 // Leave Model
 
-import type { LeaveType } from '../../shared/types/index';
+import { LeaveType } from '../../shared/types/index';
 
 /**
- * Represents a leave request.
+ * LeaveRequest represents a leave request made by an employee.
  */
 export interface LeaveRequest {
   id: string;
@@ -15,7 +15,7 @@ export interface LeaveRequest {
 }
 
 /**
- * Data Transfer Object for creating a leave request.
+ * CreateLeaveRequestDto is the data transfer object for creating a leave request.
  */
 export interface CreateLeaveRequestDto {
   employeeId: string;

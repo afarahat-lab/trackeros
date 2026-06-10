@@ -21,5 +21,44 @@ export class LeaveRepository {
     return result.rows[0];
   }
 
-  // Additional CRUD methods can be implemented here.
+  /**
+   * Retrieves a leave request by ID.
+   * @param id - The ID of the leave request.
+   * @returns The leave request.
+   */
+  async getById(id: string): Promise<LeaveRequest | null> {
+    const result = await pool.query(
+      'SELECT * FROM leave_requests WHERE id = $1',
+      [id]
+    );
+    return result.rows.length ? result.rows[0] : null;
+  }
+
+  /**
+   * Updates an existing leave request.
+   * @param id - The ID of the leave request.
+   * @param dto - The data transfer object for updating a leave request.
+   * @returns The updated leave request.
+   */
+  async update(id: string, dto: Partial<CreateLeaveRequestDto>): Promise<LeaveRequest | null> {
+    const { leaveType, startDate, endDate, status } = dto;
+    const result = await pool.query(
+      'UPDATE leave_requests SET leave_type = $1, start_date = $2, end_date = $3, status = $4 WHERE id = $5 RETURNING *',
+      [leaveType, startDate, endDate, status, id]
+    );
+    return result.rows.length ? result.rows[0] : null;
+  }
+
+  /**
+   * Deletes a leave request by ID.
+   * @param id - The ID of the leave request.
+   * @returns A message indicating the deletion status.
+   */
+  async delete(id: string): Promise<string> {
+    await pool.query(
+      'DELETE FROM leave_requests WHERE id = $1',
+      [id]
+    );
+    return 'Leave request deleted successfully';
+  }
 }
