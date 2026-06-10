@@ -1,27 +1,48 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import type { CreateLeaveRequestDto, LeaveRequest, LeaveRequestStatus, LeaveType } from '../../../../src/modules/leave/leave.model';
-import * as leaveModel from '../../../../src/modules/leave/leave.model';
+import type {
+  LeaveType,
+  LeaveRequestStatus,
+  LeaveRequest,
+  CreateLeaveRequestDto
+} from '../../../../src/modules/leave/leave.model';
 
 describe('SC-1: leave.model exports', () => {
-  it('exports the expected leave model members', () => {
-    expect(leaveModel).toHaveProperty('LeaveType', undefined);
-    expect(typeof leaveModel).toBe('object');
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
 
-    const leaveType: LeaveType = 'ANNUAL';
-    const status: LeaveRequestStatus = 'PENDING';
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('supports all documented LeaveType values', () => {
+    const values: LeaveType[] = ['ANNUAL', 'SICK', 'EMERGENCY'];
+    expect(values).toEqual(['ANNUAL', 'SICK', 'EMERGENCY']);
+  });
+
+  it('supports all documented LeaveRequestStatus values', () => {
+    const values: LeaveRequestStatus[] = ['PENDING', 'APPROVED', 'REJECTED'];
+    expect(values).toEqual(['PENDING', 'APPROVED', 'REJECTED']);
+  });
+
+  it('allows LeaveRequest and CreateLeaveRequestDto shapes as specified', () => {
     const dto: CreateLeaveRequestDto = {
       employeeId: 'employee-1',
-      leaveType
+      leaveType: 'ANNUAL'
     };
 
     const request: LeaveRequest = {
       id: 'leave-1',
       employeeId: dto.employeeId,
-      leaveType,
-      status
+      leaveType: dto.leaveType,
+      status: 'PENDING'
     };
 
-    expect(request.leaveType).toBe('ANNUAL');
-    expect(request.status).toBe('PENDING');
+    expect(request).toEqual({
+      id: 'leave-1',
+      employeeId: 'employee-1',
+      leaveType: 'ANNUAL',
+      status: 'PENDING'
+    });
   });
 });

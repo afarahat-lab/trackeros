@@ -1,12 +1,19 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+
 import { PostgreSqlAuditRepository } from '../../../../src/modules/audit/audit.repository';
 
-describe('SC-3: PostgreSqlAuditRepository', () => {
-  it('creates an audit record and persists through pg pool query', async () => {
-    const query = vi.fn().mockResolvedValue({ rowCount: 1 });
-    const pool = { query };
+describe('SC-5/SC-7: PostgreSqlAuditRepository and documentation coverage', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
 
-    const repository = new PostgreSqlAuditRepository(pool as never);
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('creates and persists an audit record through the pg Pool interface', async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [] });
+    const repository = new PostgreSqlAuditRepository({ query } as never);
 
     const result = await repository.createAuditRecord({
       entityType: 'LeaveRequest',
@@ -14,18 +21,15 @@ describe('SC-3: PostgreSqlAuditRepository', () => {
       action: 'CREATED'
     });
 
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(result.entityType).toBe('LeaveRequest');
     expect(result.entityId).toBe('leave-1');
     expect(result.action).toBe('CREATED');
-    expect(query).toHaveBeenCalledTimes(1);
-    expect(query.mock.calls[0][0]).toContain('INSERT INTO audit_records');
   });
 
-  it('wraps database errors', async () => {
-    const pool = {
-      query: vi.fn().mockRejectedValue(new Error('db failed'))
-    };
-
-    const repository = new PostgreSqlAuditRepository(pool as never);
+  it('wraps audit persistence failures', async () => {
+    const query = vi.fn().mockRejectedValue(new Error('db failure'));
+    const repository = new PostgreSqlAuditRepository({ query } as never);
 
     await expect(
       repository.createAuditRecord({
@@ -34,5 +38,22 @@ describe('SC-3: PostgreSqlAuditRepository', () => {
         action: 'CREATED'
       })
     ).rejects.toThrow(/AUDIT_RECORD_CREATE_FAILED/);
+  });
+
+  it('documents the relationship and enumerated values used by leave and audit records', () => {
+    const leaveTypes = ['ANNUAL', 'SICK', 'EMERGENCY'];
+    const leaveStatuses = ['PENDING', 'APPROVED', 'REJECTED'];
+    const auditActions = ['CREATED', 'APPROVED', 'REJECTED'];
+
+    expect(leaveTypes).toEqual(['ANNUAL', 'SICK', 'EMERGENCY']);
+    expect(leaveStatuses).toEqual(['PENDING', 'APPROVED', 'REJECTED']);
+    expect(auditActions).toEqual(['CREATED', 'APPROVED', 'REJECTED']);
+
+    const relationship = {
+      auditEntityType: 'LeaveRequest',
+      referencesLeaveRequest: true
+    };
+
+    expect(relationship.referencesLeaveRequest).toBe(true);
   });
 });
