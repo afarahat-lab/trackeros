@@ -1,18 +1,20 @@
-// Leave model for managing leave requests
+// src/modules/leave/leave.model.ts
 
-import { Pool } from 'src/shared/db/connection';
+import { LeaveType } from '../../shared/types/index';
 
-/**
- * Interface representing a leave request.
- */
 export interface LeaveRequest {
   id: string;
   employeeId: string;
-  leaveType: string;
+  leaveType: LeaveType;
   startDate: Date;
   endDate: Date;
   status: string;
 }
 
-// Exporting the LeaveRequest interface
-export default LeaveRequest;
+export interface CreateLeaveRequestDto {
+  employeeId: string;
+  leaveType: LeaveType;
+  startDate: Date;
+  endDate: Date;
+  status: string;
+}

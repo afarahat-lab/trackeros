@@ -1,16 +1,19 @@
 {
-  "id": "d07b7c36-d2f2-4011-b76a-7f9ed3999b21",
+  "id": "6a17fd02-c6b2-4f2d-a4a0-580008659ed8",
   "correlationId": "eff66753-a399-4304-9089-6067b63b437e",
   "rawIntent": "[Feature: Build the leave management module — Phase 1: Create leave model]\n\nCreate src/modules/leave/leave.model.ts. Define LeaveRequest, CreateLeaveRequestDto. Import LeaveType from src/shared/types/index.ts.\n\nPhase architecture notes:\n{\"interfaces\":[\"interface LeaveRequest { id: string; employeeId: string; leaveType: string; startDate: Date; endDate: Date; status: string; }\"],\"importStatements\":[\"import { Pool } from \\\"src/shared/db/connection\\\"\"],\"successCriteria\":[\"src/modules/leave/leave.model.ts exists and exports LeaveRequest\"]}\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"interface LeaveRequest { id: string; employeeId: string; leaveType: string; startDate: Date; endDate: Date; status: string; }\"],\"importStatements\":[\"import { Pool } from \\\"src/shared/db/connection\\\"\"],\"successCriteria\":[\"src/modules/leave/leave.model.ts exists and exports LeaveRequest\"]}",
   "scope": {
     "affectedDomains": [
-      "leave"
+      "Method",
+      "Path",
+      "Description"
     ],
     "affectedLayers": [
-      "domain"
+      "domain",
+      "api"
     ],
     "isBreakingChange": false,
-    "estimatedComplexity": "small"
+    "estimatedComplexity": "medium"
   },
   "successCriteria": [
     {
@@ -21,17 +24,15 @@
     }
   ],
   "constraints": [
-    "All database access goes through repository interfaces.",
-    "All state-changing operations write an audit record.",
-    "Validate all inputs at API boundaries before processing.",
-    "Never log passwords, tokens, PII, or financial data.",
-    "All API endpoints enforce role-based access control.",
-    "No unhandled promise rejections. All async errors are caught and handled."
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Audit records: All state-changing operations write an audit record.",
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "RBAC enforcement: All API endpoints enforce role-based access control.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
   ],
   "outOfScope": [
-    "CreateLeaveRequestDto definition",
-    "Importing LeaveType from src/shared/types/index.ts",
-    "Any other modules or files outside src/modules/leave/leave.model.ts"
+    "Everything outside src/modules/leave/leave.model.ts and src/shared/types/index.ts"
   ],
   "ambiguities": []
 }

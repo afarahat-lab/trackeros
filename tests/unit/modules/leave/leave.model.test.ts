@@ -1,17 +1,17 @@
 import { describe, it, expect } from 'vitest';
 
-// Importing the LeaveRequest interface from the leave model
-import LeaveRequest from 'src/modules/leave/leave.model';
+import { LeaveRequest } from '../../../src/modules/leave/leave.model';
+
 
 describe('SC-1: LeaveRequest Interface', () => {
   it('should have the correct properties', () => {
     const leaveRequest: LeaveRequest = {
       id: '1',
-      employeeId: 'emp-123',
-      leaveType: 'sick',
-      startDate: new Date('2023-10-01'),
-      endDate: new Date('2023-10-05'),
-      status: 'pending'
+      employeeId: '123',
+      leaveType: 'SICK', // Assuming LeaveType is a string enum
+      startDate: new Date('2023-01-01'),
+      endDate: new Date('2023-01-10'),
+      status: 'PENDING'
     };
 
     expect(leaveRequest).toHaveProperty('id');
@@ -22,14 +22,14 @@ describe('SC-1: LeaveRequest Interface', () => {
     expect(leaveRequest).toHaveProperty('status');
   });
 
-  it('should enforce correct types for properties', () => {
+  it('should enforce correct types', () => {
     const leaveRequest: LeaveRequest = {
       id: '1',
-      employeeId: 'emp-123',
-      leaveType: 'sick',
-      startDate: new Date('2023-10-01'),
-      endDate: new Date('2023-10-05'),
-      status: 'pending'
+      employeeId: '123',
+      leaveType: 'SICK', // Assuming LeaveType is a string enum
+      startDate: new Date('2023-01-01'),
+      endDate: new Date('2023-01-10'),
+      status: 'PENDING'
     };
 
     expect(typeof leaveRequest.id).toBe('string');
