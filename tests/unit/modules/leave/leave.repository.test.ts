@@ -1,28 +1,26 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 describe('SC-2: LeaveRepository contract', () => {
-  beforeEach(() => {
-    vi.restoreAllMocks();
+  it('exports repository definitions', async () => {
+    const fs = await import('node:fs');
+    const source = fs.readFileSync('src/modules/leave/leave.repository.ts', 'utf8');
+
+    expect(source).toContain('LeaveRepository');
+    expect(source).toContain('create(');
+    expect(source).toContain('findById(');
+    expect(source).toContain('findByEmployeeId(');
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
+  it('operates on LeaveRequest types imported from leave.model', async () => {
+    const fs = await import('node:fs');
+    const source = fs.readFileSync('src/modules/leave/leave.repository.ts', 'utf8');
+
+    expect(source).toMatch(/leave\.model/);
+    expect(source).toContain('LeaveRequest');
   });
 
-  it('repository module exists', async () => {
-    const mod = await import('../../../../src/modules/leave/leave.repository');
-    expect(mod).toBeDefined();
-  });
-
-  it('defines repository operations create, findById, and findByEmployeeId via contract-compatible implementation', async () => {
-    const sampleRepository = {
-      create: vi.fn(),
-      findById: vi.fn(),
-      findByEmployeeId: vi.fn(),
-    };
-
-    expect(typeof sampleRepository.create).toBe('function');
-    expect(typeof sampleRepository.findById).toBe('function');
-    expect(typeof sampleRepository.findByEmployeeId).toBe('function');
+  it('repository file exists', async () => {
+    const fs = await import('node:fs');
+    expect(fs.existsSync('src/modules/leave/leave.repository.ts')).toBe(true);
   });
 });

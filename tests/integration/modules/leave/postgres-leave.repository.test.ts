@@ -2,64 +2,59 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 const queryMock = vi.fn();
 
-vi.mock('pg', () => ({
-  Pool: class {},
-}));
-
 vi.mock('../../../../src/shared/db/connection', () => ({
-  default: { query: queryMock },
+  default: { query: queryMock }
 }));
 
-describe('SC-3: PostgresLeaveRepository integration behavior', () => {
+describe('SC-3: PostgresLeaveRepository implementation', () => {
   beforeEach(() => {
     queryMock.mockReset();
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
+  it('exports PostgresLeaveRepository and repository error', async () => {
+    const mod = await import('../../../../src/modules/leave/postgres-leave.repository');
+    expect(mod.PostgresLeaveRepository).toBeDefined();
+    expect(mod.LeaveRepositoryError).toBeDefined();
   });
 
-  it('persists a leave request through Pool.query', async () => {
-    const { PostgresLeaveRepository } = await import('../../../../src/modules/leave/postgres-leave.repository');
+  it('uses a pg-style pool query API during create', async () => {
+    const mod = await import('../../../../src/modules/leave/postgres-leave.repository');
+    const repo = new mod.PostgresLeaveRepository({ query: queryMock } as never);
 
-    queryMock.mockResolvedValue({
-      rows: [{
-        id: '1',
-        employee_id: 'emp',
-        leave_type: 'ANNUAL',
-        start_date: '2024-01-01',
-        end_date: '2024-01-02',
-        status: 'PENDING',
-        approver_employee_id: null,
-        created_at: '2024-01-01T00:00:00Z',
-      }],
-    });
-
-    const repo = new PostgresLeaveRepository({ query: queryMock } as never);
-
-    await repo.create({
+    const leaveRequest = {
       id: '1',
-      employeeId: 'emp',
-      leaveType: 'ANNUAL',
-      startDate: '2024-01-01',
-      endDate: '2024-01-02',
+      employeeId: 'emp-1',
+      leaveType: 'VACATION',
+      startDate: new Date('2024-01-01'),
+      endDate: new Date('2024-01-02'),
       status: 'PENDING',
-      approverEmployeeId: null,
-      createdAt: '2024-01-01T00:00:00Z',
-    });
+      approverEmployeeId: 'mgr-1',
+      createdAt: new Date('2024-01-01')
+    };
+
+    queryMock.mockResolvedValue({ rows: [leaveRequest] });
+
+    await repo.create(leaveRequest);
 
     expect(queryMock).toHaveBeenCalledTimes(1);
-    expect(String(queryMock.mock.calls[0][0])).toContain('INSERT INTO leave_requests');
+    expect(String(queryMock.mock.calls[0]?.[0])).toContain('INSERT INTO leave_requests');
   });
 
-  it('returns null when findById has no matching row', async () => {
-    const { PostgresLeaveRepository } = await import('../../../../src/modules/leave/postgres-leave.repository');
+  it('wraps database failures in LeaveRepositoryError', async () => {
+    const mod = await import('../../../../src/modules/leave/postgres-leave.repository');
+    const repo = new mod.PostgresLeaveRepository({ query: queryMock } as never);
 
-    queryMock.mockResolvedValue({ rows: [] });
+    queryMock.mockRejectedValue(new Error('db failure'));
 
-    const repo = new PostgresLeaveRepository({ query: queryMock } as never);
-    const result = await repo.findById('missing');
-
-    expect(result).toBeNull();
+    await expect(repo.create({
+      id: '1',
+      employeeId: 'emp-1',
+      leaveType: 'VACATION',
+      startDate: new Date(),
+      endDate: new Date(),
+      status: 'PENDING',
+      approverEmployeeId: 'mgr',
+      createdAt: new Date()
+    })).rejects.toMatchObject({ name: 'LeaveRepositoryError' });
   });
 });

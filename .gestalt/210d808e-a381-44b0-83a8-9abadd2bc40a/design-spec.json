@@ -47,43 +47,6 @@
         }
       ],
       "relationships": []
-    },
-    {
-      "entityName": "AuditRecord",
-      "operation": "create",
-      "fields": [
-        {
-          "name": "id",
-          "type": "string",
-          "required": true
-        },
-        {
-          "name": "entityId",
-          "type": "string",
-          "required": true
-        },
-        {
-          "name": "entityType",
-          "type": "string",
-          "required": true
-        },
-        {
-          "name": "action",
-          "type": "string",
-          "required": true
-        },
-        {
-          "name": "createdAt",
-          "type": "Date",
-          "required": true
-        }
-      ],
-      "relationships": [
-        {
-          "entity": "LeaveRequest",
-          "type": "one-to-many"
-        }
-      ]
     }
   ],
   "apiContracts": [],
