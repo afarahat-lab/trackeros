@@ -84,6 +84,10 @@ export class PostgreSqlLeaveRepository implements LeaveRepository {
         [id, status]
       );
 
+      if (result.rows.length === 0) {
+        throw new Error(`LEAVE_REQUEST_NOT_FOUND:${id}`);
+      }
+
       const row = result.rows[0] as {
         id: string;
         employee_id: string;
