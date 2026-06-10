@@ -1,11 +1,10 @@
 import { describe, it, expect } from 'vitest';
 
-// Test for LeaveRequest interface existence
+// Import the LeaveRequest interface to test its existence
+import { LeaveRequest } from '../../../src/modules/leave/leave.model';
 
-describe('SC-1: LeaveRequest Model', () => {
+describe('SC-1: LeaveRequest Interface', () => {
   it('should exist and be defined', () => {
-    // Check if LeaveRequest is defined
-    const LeaveRequest = {} as any; // Mocking the interface
     expect(LeaveRequest).toBeDefined();
   });
 });

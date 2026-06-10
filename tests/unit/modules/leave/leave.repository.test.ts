@@ -1,13 +1,13 @@
 import { describe, it, expect, vi } from 'vitest';
 import { LeaveRepository } from '../../../src/modules/leave/leave.repository';
-import type { LeaveRequest } from '../../../src/modules/leave/leave.model';
+import { LeaveRequest } from '../../../src/modules/leave/leave.model';
 
 vi.mock('../../shared/db/connection', () => ({
   query: vi.fn(),
 }));
 
 const mockDb = require('../../shared/db/connection');
-const leaveRepo = new LeaveRepository(mockDb);
+const leaveRepository = new LeaveRepository(mockDb);
 
 describe('SC-2: LeaveRepository CRUD Operations', () => {
   const leaveRequest: LeaveRequest = {
@@ -21,7 +21,7 @@ describe('SC-2: LeaveRepository CRUD Operations', () => {
 
   it('should create a leave request', async () => {
     mockDb.query.mockResolvedValueOnce({ rows: [leaveRequest] });
-    const result = await leaveRepo.create(leaveRequest);
+    const result = await leaveRepository.create(leaveRequest);
     expect(result).toEqual(leaveRequest);
     expect(mockDb.query).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO leave_requests'),
@@ -31,26 +31,26 @@ describe('SC-2: LeaveRepository CRUD Operations', () => {
 
   it('should find a leave request by ID', async () => {
     mockDb.query.mockResolvedValueOnce({ rows: [leaveRequest] });
-    const result = await leaveRepo.findById('1');
+    const result = await leaveRepository.findById('1');
     expect(result).toEqual(leaveRequest);
   });
 
   it('should return null if leave request not found', async () => {
     mockDb.query.mockResolvedValueOnce({ rows: [] });
-    const result = await leaveRepo.findById('non-existent-id');
+    const result = await leaveRepository.findById('non-existent-id');
     expect(result).toBeNull();
   });
 
   it('should update an existing leave request', async () => {
     const updatedLeaveRequest = { ...leaveRequest, status: 'approved' };
     mockDb.query.mockResolvedValueOnce({ rows: [updatedLeaveRequest] });
-    const result = await leaveRepo.update('1', updatedLeaveRequest);
+    const result = await leaveRepository.update('1', updatedLeaveRequest);
     expect(result).toEqual(updatedLeaveRequest);
   });
 
   it('should delete a leave request by ID', async () => {
     mockDb.query.mockResolvedValueOnce({ rows: [leaveRequest] });
-    const result = await leaveRepo.delete('1'); // Assuming delete method exists
+    const result = await leaveRepository.delete('1');
     expect(result).toEqual(leaveRequest);
   });
 });

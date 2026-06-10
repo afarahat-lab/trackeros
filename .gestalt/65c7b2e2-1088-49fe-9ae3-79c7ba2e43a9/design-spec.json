@@ -117,7 +117,8 @@
       "responseBody": {},
       "authRequired": true,
       "roles": [
-        "admin"
+        "admin",
+        "operator"
       ]
     }
   ],
