@@ -160,3 +160,32 @@ No reverse dependencies into the leave module are permitted. This preserves modu
 - src/modules/leave -> src/modules/notification
 
 No reverse dependencies are permitted. The modular-monolith structure must remain acyclic with the leave module orchestrating cross-module workflow operations.
+
+## Leave Management Module
+
+### Domain Entities
+- LeaveRequest: id, employeeId, leaveType, startDate, endDate, status.
+- LeaveBalance: employeeId, leaveType, availableDays.
+- Employee: id, managerId, status.
+- LeavePolicy: id, leaveType, annualEntitlement.
+- Notification: id, recipientEmployeeId, type, status.
+
+### Modules
+- src/modules/employee owns Employee and manager relationships.
+- src/modules/policy owns LeavePolicy and entitlement rules.
+- src/modules/balance owns LeaveBalance, balance initialization, balance updates, and balance queries.
+- src/modules/leave owns LeaveRequest submission and approval lifecycle.
+- src/modules/notification owns Notification creation and delivery status tracking.
+
+### Dependency Direction
+- leave -> employee
+- leave -> policy
+- leave -> balance
+- leave -> notification
+
+No reverse dependencies are permitted to avoid circular module relationships.
+
+### Lifecycle Coverage
+- LeaveRequest state transitions: submitLeaveRequest() creates PENDING requests; approveLeaveRequest() transitions to APPROVED; rejectLeaveRequest() transitions to REJECTED.
+- LeaveBalance mutations: initialize balance records and update balances during leave approval processing.
+- Notification lifecycle: createNotification() creates notifications; markNotificationDelivered() updates notification status.
