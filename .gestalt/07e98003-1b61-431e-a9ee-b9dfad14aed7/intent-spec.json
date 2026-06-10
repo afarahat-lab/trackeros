@@ -1,0 +1,35 @@
+{
+  "id": "90f41a74-4f14-4adb-88aa-7e9fbd6edb99",
+  "correlationId": "07e98003-1b61-431e-a9ee-b9dfad14aed7",
+  "rawIntent": "[Feature: Build the leave management module — Phase 1: Create leave model]\n\nCreate src/modules/leave/leave.model.ts. Define LeaveRequest, CreateLeaveRequestDto. Import LeaveType from src/shared/types/index.ts.\n\nPhase architecture notes:\nThis phase establishes the core data structure for leave requests.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"interface LeaveRequest { id: string; employeeId: string; leaveType: string; startDate: Date; endDate: Date; status: string; }\"],\"importStatements\":[\"import { Pool } from \\\"src/shared/db/connection\\\"\"],\"successCriteria\":[\"src/modules/leave/leave.model.ts exists and exports LeaveRequest\"]}",
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "domain"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/leave/leave.model.ts exists and exports LeaveRequest",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Audit records: All state-changing operations write an audit record.",
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "RBAC enforcement: All API endpoints enforce role-based access control.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "Everything outside src/modules/leave/leave.model.ts"
+  ],
+  "ambiguities": []
+}
