@@ -227,3 +227,43 @@ Architecture Style: modular-monolith using TypeScript, Node.js 20, Fastify, Post
 - RBAC is enforced on every API endpoint.
 - All asynchronous operations handle errors explicitly.
 - React Native frontend consumes Fastify APIs.
+
+## Leave Management Module
+
+### Domain Entities
+- LeaveRequest: id, employeeId, leaveType, startDate, endDate, status.
+- LeaveBalance: employeeId, leaveType, remainingDays.
+- Employee: id, managerId, role.
+- LeavePolicy: id, leaveType, annualEntitlement.
+- Notification: id, recipientEmployeeId, type, status.
+- AuditRecord: id, entityType, entityId, action, createdAt.
+
+### Modules
+- src/modules/leave owns leave request lifecycle and status transitions.
+- src/modules/balance owns leave entitlement tracking and adjustments.
+- src/modules/employee owns employee hierarchy and role data.
+- src/modules/policy owns leave eligibility and entitlement rules.
+- src/modules/notification owns workflow notifications.
+- src/modules/audit owns audit record persistence.
+
+### Dependency Direction
+- leave -> employee
+- leave -> policy
+- leave -> balance
+- leave -> notification
+- leave -> audit
+- balance -> audit
+- notification -> audit
+
+### Required State Transitions
+- LeaveRequest: create -> approved, create -> rejected, create -> cancelled.
+- Approval consumes leave balance.
+- Rejection and cancellation restore reserved or consumed balance as applicable.
+- Every state-changing operation writes an AuditRecord.
+
+### Architectural Constraints
+- Use repository interfaces with PostgreSQL-backed implementations for all database access.
+- Enforce RBAC on all API endpoints.
+- Validate all API inputs before processing.
+- Catch and handle all async errors.
+- Do not log sensitive data.
