@@ -48,3 +48,27 @@ This module handles leave requests, approvals, and leave balance tracking for em
 This module handles leave requests, approvals, and leave balance tracking for employees.
 
 ## Leave Management Feature\n\n### Domain entities\n- LeaveRequest: leave applications submitted by employees and processed by managers.\n- LeaveBalance: remaining entitlement by employee and leave type.\n- Employee: employee identity and reporting hierarchy.\n- LeavePolicy: entitlement and leave-type rules.\n- Notification: leave workflow notifications.\n\n### Module ownership\n- src/modules/leave owns leave request workflows and approval state transitions.\n- src/modules/balance owns leave balance storage and adjustments.\n- src/modules/employee owns employee and manager relationship data.\n- src/modules/policy owns leave entitlement rules.\n- src/modules/notification owns leave-related notifications.\n\n### Dependency direction\n- leave -> employee\n- leave -> policy\n- leave -> balance\n- leave -> notification\n\nNo reverse dependencies are introduced, preserving an acyclic module graph.
+
+## Leave Management Feature
+
+### Domain entities
+- LeaveRequest: leave applications submitted by employees and processed by managers.
+- LeaveBalance: remaining entitlement by employee and leave type.
+- Employee: employee identity and reporting hierarchy.
+- LeavePolicy: entitlement and leave-type rules.
+- Notification: leave workflow notifications.
+
+### Module ownership
+- src/modules/leave owns leave request workflows and approval state transitions.
+- src/modules/balance owns leave balance storage and adjustments.
+- src/modules/employee owns employee and manager relationship data.
+- src/modules/policy owns leave entitlement rules.
+- src/modules/notification owns leave-related notifications.
+
+### Dependency direction
+- leave -> employee
+- leave -> policy
+- leave -> balance
+- leave -> notification
+
+No reverse dependencies are introduced, preserving an acyclic module graph.
