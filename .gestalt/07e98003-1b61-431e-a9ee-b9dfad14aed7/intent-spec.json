@@ -1,5 +1,5 @@
 {
-  "id": "aecc3351-cf93-400d-b17d-b90d1d9f9f0d",
+  "id": "51791196-f1cc-4a38-aa68-e20908f6a399",
   "correlationId": "07e98003-1b61-431e-a9ee-b9dfad14aed7",
   "rawIntent": "[Feature: Build the leave management module — Phase 1: Create leave model]\n\nCreate src/modules/leave/leave.model.ts. Define LeaveRequest, CreateLeaveRequestDto. Import LeaveType from src/shared/types/index.ts.\n\nPhase architecture notes:\nThis phase establishes the core data structure for leave requests.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"interface LeaveRequest { id: string; employeeId: string; leaveType: string; startDate: Date; endDate: Date; status: string; }\"],\"importStatements\":[\"import { Pool } from \\\"src/shared/db/connection\\\"\"],\"successCriteria\":[\"src/modules/leave/leave.model.ts exists and exports LeaveRequest\"]}",
   "scope": {
@@ -10,7 +10,7 @@
       "domain"
     ],
     "isBreakingChange": false,
-    "estimatedComplexity": "small"
+    "estimatedComplexity": "medium"
   },
   "successCriteria": [
     {
