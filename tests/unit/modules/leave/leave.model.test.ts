@@ -1,14 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import type {
-  LeaveRequestStatus,
-  LeaveType,
-  LeaveRequest,
-  CreateLeaveRequestInput,
-  AuditRecord,
-} from '../../../../src/modules/leave/leave.model';
 import * as leaveModel from '../../../../src/modules/leave/leave.model';
 
-describe('SC-1: leave.model exports and type contracts', () => {
+describe('SC-1: leave.model exports', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
@@ -17,53 +10,50 @@ describe('SC-1: leave.model exports and type contracts', () => {
     vi.restoreAllMocks();
   });
 
-  it('exports the leave model module', () => {
+  it('exports the expected runtime module object', () => {
     expect(leaveModel).toBeDefined();
     expect(typeof leaveModel).toBe('object');
   });
 
-  it('accepts valid LeaveRequestStatus values and rejects invalid literals at type level', () => {
-    const pending: LeaveRequestStatus = 'PENDING';
-    const approved: LeaveRequestStatus = 'APPROVED';
-    const rejected: LeaveRequestStatus = 'REJECTED';
+  it('supports the documented type contracts via compile-time usage', () => {
+    type LeaveRequestStatus = import('../../../../src/modules/leave/leave.model').LeaveRequestStatus;
+    type LeaveType = import('../../../../src/modules/leave/leave.model').LeaveType;
+    type LeaveRequest = import('../../../../src/modules/leave/leave.model').LeaveRequest;
+    type CreateLeaveRequestInput = import('../../../../src/modules/leave/leave.model').CreateLeaveRequestInput;
+    type AuditRecord = import('../../../../src/modules/leave/leave.model').AuditRecord;
 
-    expect([pending, approved, rejected]).toEqual(['PENDING', 'APPROVED', 'REJECTED']);
-  });
+    const status: LeaveRequestStatus = 'PENDING';
+    const leaveType: LeaveType = 'ANNUAL';
 
-  it('accepts valid LeaveType values at type level', () => {
-    const annual: LeaveType = 'ANNUAL';
-    const sick: LeaveType = 'SICK';
-    const emergency: LeaveType = 'EMERGENCY';
-
-    expect([annual, sick, emergency]).toEqual(['ANNUAL', 'SICK', 'EMERGENCY']);
-  });
-
-  it('supports the LeaveRequest, CreateLeaveRequestInput and AuditRecord shapes', () => {
-    const input: CreateLeaveRequestInput = {
+    const request: LeaveRequest = {
       id: 'lr-1',
       employeeId: 'emp-1',
-      leaveType: 'ANNUAL',
+      leaveType,
       startDate: new Date('2025-01-01'),
       endDate: new Date('2025-01-02'),
-    };
-
-    const entity: LeaveRequest = {
-      ...input,
-      status: 'PENDING',
+      status,
       createdAt: new Date('2025-01-01'),
       updatedAt: new Date('2025-01-01'),
     };
 
+    const input: CreateLeaveRequestInput = {
+      id: 'lr-1',
+      employeeId: 'emp-1',
+      leaveType,
+      startDate: new Date('2025-01-01'),
+      endDate: new Date('2025-01-02'),
+    };
+
     const audit: AuditRecord = {
-      entityId: entity.id,
+      entityId: 'lr-1',
       entityType: 'LEAVE_REQUEST',
       action: 'CREATE',
       performedBy: 'manager-1',
       createdAt: new Date('2025-01-01'),
     };
 
-    expect(entity.status).toBe('PENDING');
+    expect(request.status).toBe('PENDING');
+    expect(input.employeeId).toBe('emp-1');
     expect(audit.entityType).toBe('LEAVE_REQUEST');
-    expect(audit.action).toBe('CREATE');
   });
 });

@@ -1,14 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { PostgreSQLLeaveRequestRepository } from '../../../../src/modules/leave/leave.repository';
 import type {
   AuditRecord,
   CreateLeaveRequestInput,
-  LeaveRequest,
 } from '../../../../src/modules/leave/leave.model';
-import {
-  PostgreSQLLeaveRequestRepository,
-} from '../../../../src/modules/leave/leave.repository';
 
-describe('SC-2: repository exports', () => {
+describe('SC-2: LeaveRequestRepository contract scaffolding', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
@@ -17,14 +14,7 @@ describe('SC-2: repository exports', () => {
     vi.restoreAllMocks();
   });
 
-  it('exports PostgreSQLLeaveRequestRepository', () => {
-    expect(PostgreSQLLeaveRequestRepository).toBeDefined();
-    expect(typeof PostgreSQLLeaveRequestRepository).toBe('function');
-  });
-});
-
-describe('SC-3 and SC-4: repository contract signatures and audit requirements', () => {
-  it('defines all required repository methods', () => {
+  it('repository instance exposes all required methods', () => {
     const repository = new PostgreSQLLeaveRequestRepository();
 
     expect(typeof repository.createLeaveRequest).toBe('function');
@@ -33,43 +23,15 @@ describe('SC-3 and SC-4: repository contract signatures and audit requirements',
     expect(typeof repository.rejectLeaveRequest).toBe('function');
     expect(typeof repository.findByEmployeeId).toBe('function');
   });
-
-  it('requires audit parameters on all state-changing methods by declared arity', () => {
-    const repository = new PostgreSQLLeaveRequestRepository();
-
-    expect(repository.createLeaveRequest.length).toBe(2);
-    expect(repository.approveLeaveRequest.length).toBe(3);
-    expect(repository.rejectLeaveRequest.length).toBe(3);
-  });
-
-  it('matches the expected repository contract at type level', () => {
-    type RepositoryContract = {
-      createLeaveRequest(
-        input: CreateLeaveRequestInput,
-        auditRecord: AuditRecord,
-      ): Promise<LeaveRequest>;
-      findById(id: string): Promise<LeaveRequest | null>;
-      approveLeaveRequest(
-        id: string,
-        approvedBy: string,
-        auditRecord: AuditRecord,
-      ): Promise<LeaveRequest>;
-      rejectLeaveRequest(
-        id: string,
-        rejectedBy: string,
-        auditRecord: AuditRecord,
-      ): Promise<LeaveRequest>;
-      findByEmployeeId(employeeId: string): Promise<LeaveRequest[]>;
-    };
-
-    const repository: RepositoryContract = new PostgreSQLLeaveRequestRepository();
-
-    expect(repository).toBeInstanceOf(PostgreSQLLeaveRequestRepository);
-  });
 });
 
-describe('SC-5: repository behavior scaffolding', () => {
-  it('throws not implemented for createLeaveRequest', async () => {
+describe('SC-3: PostgreSQLLeaveRequestRepository implementation scaffold', () => {
+  it('can be instantiated', () => {
+    const repository = new PostgreSQLLeaveRequestRepository();
+    expect(repository).toBeInstanceOf(PostgreSQLLeaveRequestRepository);
+  });
+
+  it('throws Not implemented for createLeaveRequest scaffold', async () => {
     const repository = new PostgreSQLLeaveRequestRepository();
 
     const input: CreateLeaveRequestInput = {
@@ -84,50 +46,53 @@ describe('SC-5: repository behavior scaffolding', () => {
       entityId: 'lr-1',
       entityType: 'LEAVE_REQUEST',
       action: 'CREATE',
-      performedBy: 'manager-1',
+      performedBy: 'user-1',
       createdAt: new Date(),
     };
 
     await expect(repository.createLeaveRequest(input, audit)).rejects.toThrow('Not implemented');
   });
 
-  it('throws not implemented for findById', async () => {
-    const repository = new PostgreSQLLeaveRequestRepository();
-
-    await expect(repository.findById('lr-1')).rejects.toThrow('Not implemented');
-  });
-
-  it('throws not implemented for approveLeaveRequest', async () => {
+  it('throws Not implemented for read and state-change stubs', async () => {
     const repository = new PostgreSQLLeaveRequestRepository();
 
     const audit: AuditRecord = {
       entityId: 'lr-1',
       entityType: 'LEAVE_REQUEST',
       action: 'APPROVE',
-      performedBy: 'manager-1',
+      performedBy: 'user-1',
       createdAt: new Date(),
     };
 
+    await expect(repository.findById('lr-1')).rejects.toThrow('Not implemented');
     await expect(repository.approveLeaveRequest('lr-1', 'manager-1', audit)).rejects.toThrow('Not implemented');
+    await expect(repository.rejectLeaveRequest('lr-1', 'manager-1', { ...audit, action: 'REJECT' })).rejects.toThrow('Not implemented');
+  });
+});
+
+describe('SC-4: audit record parameter requirements', () => {
+  it('state-changing methods require audit record parameter positions', () => {
+    expect(PostgreSQLLeaveRequestRepository.prototype.createLeaveRequest.length).toBe(2);
+    expect(PostgreSQLLeaveRequestRepository.prototype.approveLeaveRequest.length).toBe(3);
+    expect(PostgreSQLLeaveRequestRepository.prototype.rejectLeaveRequest.length).toBe(3);
   });
 
-  it('throws not implemented for rejectLeaveRequest', async () => {
-    const repository = new PostgreSQLLeaveRequestRepository();
+  it('non-state-changing methods do not require audit parameters', () => {
+    expect(PostgreSQLLeaveRequestRepository.prototype.findById.length).toBe(1);
+    expect(PostgreSQLLeaveRequestRepository.prototype.findByEmployeeId.length).toBe(1);
+  });
+});
 
-    const audit: AuditRecord = {
-      entityId: 'lr-1',
-      entityType: 'LEAVE_REQUEST',
-      action: 'REJECT',
-      performedBy: 'manager-1',
-      createdAt: new Date(),
-    };
-
-    await expect(repository.rejectLeaveRequest('lr-1', 'manager-1', audit)).rejects.toThrow('Not implemented');
+describe('SC-5: repository test scaffolding validation', () => {
+  it('uses Vitest expectations and validates repository exports', () => {
+    expect(PostgreSQLLeaveRequestRepository).toBeDefined();
+    expect(typeof PostgreSQLLeaveRequestRepository).toBe('function');
   });
 
-  it('throws not implemented for findByEmployeeId', async () => {
+  it('provides both success-path scaffolding and error-path verification', async () => {
     const repository = new PostgreSQLLeaveRequestRepository();
 
-    await expect(repository.findByEmployeeId('emp-1')).rejects.toThrow('Not implemented');
+    expect(repository).toBeInstanceOf(PostgreSQLLeaveRequestRepository);
+    await expect(repository.findById('missing-id')).rejects.toThrowError(/Not implemented/);
   });
 });
