@@ -1,0 +1,86 @@
+{
+  "id": "2f3a971b-7eb5-4673-b4f6-b3f15696f16f",
+  "correlationId": "bfcf27ec-33b5-4fcd-95b3-df843dbcef22",
+  "rawIntent": "[Feature: Build the leave management module — Phase 1: LeaveRequest and AuditRecord domain models with persistence]\n\nCreate approximately 5 files: src/modules/leave/leave.model.ts, src/modules/leave/leave.repository.ts, src/modules/audit/audit.model.ts, src/modules/audit/audit.repository.ts, and tests/unit/modules/leave/leave.repository.test.ts. Define the canonical LeaveRequest (id, employeeId, leaveType, status) and AuditRecord (id, entityType, entityId, action) types plus DTOs needed by the repositories. Implement repository interfaces and PostgreSQL-backed repository implementations. Add createLeaveRequest() persistence behavior that stores a LeaveRequest in PENDING status and writes an AuditRecord. Include unit tests covering repository behavior.\n\nPhase architecture notes:\n{\"interfaces\":[\"File: src/modules/leave/leave.model.ts\\nexport type LeaveType = 'ANNUAL' | 'SICK' | 'EMERGENCY';\\nexport type LeaveRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED';\\nexport interface LeaveRequest { id: string; employeeId: string; leaveType: LeaveType; status: LeaveRequestStatus; }\\nexport interface CreateLeaveRequestDto { employeeId: string; leaveType: LeaveType; }\",\"File: src/modules/audit/audit.model.ts\\nexport type AuditAction = 'CREATED' | 'APPROVED' | 'REJECTED';\\nexport interface AuditRecord { id: string; entityType: 'LeaveRequest'; entityId: string; action: AuditAction; }\\nexport interface CreateAuditRecordDto { entityType: 'LeaveRequest'; entityId: string; action: AuditAction; }\",\"File: src/modules/audit/audit.repository.ts\\nimport { AuditRecord, CreateAuditRecordDto } from './audit.model';\\nexport interface AuditRepository { createAuditRecord(dto: CreateAuditRecordDto): Promise<AuditRecord>; }\\nexport class PostgreSqlAuditRepository implements AuditRepository {\\n  constructor(private readonly pool: import('pg').Pool) {}\\n  async createAuditRecord(dto: CreateAuditRecordDto): Promise<AuditRecord>;\\n}\",\"File: src/modules/leave/leave.repository.ts\\nimport { Pool } from 'pg';\\nimport { LeaveRequest, CreateLeaveRequestDto, LeaveRequestStatus } from './leave.model';\\nimport { AuditRepository } from '../audit/audit.repository';\\nexport interface LeaveRepository {\\n  createLeaveRequest(dto: CreateLeaveRequestDto): Promise<LeaveRequest>;\\n  findById(id: string): Promise<LeaveRequest | null>;\\n  updateStatus(id: string, status: LeaveRequestStatus): Promise<LeaveRequest>;\\n}\\nexport class PostgreSqlLeaveRepository implements LeaveRepository {\\n  constructor(private readonly pool: Pool, private readonly auditRepository: AuditRepository) {}\\n  async createLeaveRequest(dto: CreateLeaveRequestDto): Promise<LeaveRequest>;\\n  async findById(id: string): Promise<LeaveRequest | null>;\\n  async updateStatus(id: string, status: LeaveRequestStatus): Promise<LeaveRequest>;\\n}\",\"File: tests/unit/modules/leave/leave.repository.test.ts\\nimport { describe, it, expect } from 'vitest';\\nimport { PostgreSqlLeaveRepository } from '../../../../src/modules/leave/leave.repository';\\ndescribe('PostgreSqlLeaveRepository', () => { it('creates a leave request in PENDING status and writes an audit record', async () => {}); });\"],\"importStatements\":[\"import { LeaveRequest, CreateLeaveRequestDto, LeaveRequestStatus } from './leave.model';\",\"import { AuditRecord, CreateAuditRecordDto } from './audit.model';\",\"import { AuditRepository } from '../audit/audit.repository';\",\"import { Pool } from 'pg';\",\"import { describe, it, expect } from 'vitest';\"],\"successCriteria\":[\"src/modules/leave/leave.model.ts exists and exports LeaveType, LeaveRequestStatus, LeaveRequest, and CreateLeaveRequestDto exactly as defined.\",\"src/modules/audit/audit.model.ts exists and exports AuditAction, AuditRecord, and CreateAuditRecordDto exactly as defined.\",\"src/modules/leave/leave.repository.ts exports LeaveRepository and PostgreSqlLeaveRepository; createLeaveRequest(dto) persists a LeaveRequest with status 'PENDING' and invokes AuditRepository.createAuditRecord with action 'CREATED', satisfying GP-001 and GP-002.\",\"src/modules/audit/audit.repository.ts exports AuditRepository and PostgreSqlAuditRepository backed by PostgreSQL using pg Pool and repository-pattern access only.\",\"tests/unit/modules/leave/leave.repository.test.ts uses Vitest and verifies createLeaveRequest() stores a PENDING LeaveRequest, creates a corresponding AuditRecord, and findById() returns the persisted record.\",\"Project documentation update is completed to add the new domain concepts LeaveType values (ANNUAL, SICK, EMERGENCY), LeaveRequestStatus values (PENDING, APPROVED, REJECTED), AuditAction values (CREATED, APPROVED, REJECTED), and the AuditRecord relationship to LeaveRequest.\"],\"sqlSchema\":\"CREATE TABLE leave_requests (id UUID PRIMARY KEY, employee_id UUID NOT NULL, leave_type VARCHAR(32) NOT NULL, status VARCHAR(16) NOT NULL);\\nCREATE TABLE audit_records (id UUID PRIMARY KEY, entity_type VARCHAR(64) NOT NULL, entity_id UUID NOT NULL, action VARCHAR(32) NOT NULL);\"}\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/leave/leave.model.ts\\nexport type LeaveType = 'ANNUAL' | 'SICK' | 'EMERGENCY';\\nexport type LeaveRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED';\\n\\nexport interface LeaveRequest {\\n  id: string;\\n  employeeId: string;\\n  leaveType: LeaveType;\\n  status: LeaveRequestStatus;\\n}\\n\\nexport interface CreateLeaveRequestDto {\\n  employeeId: string;\\n  leaveType: LeaveType;\\n}\",\"File: src/modules/audit/audit.model.ts\\nexport type AuditAction = 'CREATED' | 'APPROVED' | 'REJECTED';\\n\\nexport interface AuditRecord {\\n  id: string;\\n  entityType: 'LeaveRequest';\\n  entityId: string;\\n  action: AuditAction;\\n}\\n\\nexport interface CreateAuditRecordDto {\\n  entityType: 'LeaveRequest';\\n  entityId: string;\\n  action: AuditAction;\\n}\",\"File: src/modules/audit/audit.repository.ts\\nimport { Pool } from 'pg';\\nimport { AuditRecord, CreateAuditRecordDto } from './audit.model';\\n\\nexport interface AuditRepository {\\n  createAuditRecord(dto: CreateAuditRecordDto): Promise<AuditRecord>;\\n}\\n\\nexport class PostgreSqlAuditRepository implements AuditRepository {\\n  constructor(private readonly pool: Pool) {}\\n\\n  async createAuditRecord(dto: CreateAuditRecordDto): Promise<AuditRecord> {\\n    throw new Error('Not implemented');\\n  }\\n}\",\"File: src/modules/leave/leave.repository.ts\\nimport { Pool } from 'pg';\\nimport { LeaveRequest, CreateLeaveRequestDto, LeaveRequestStatus } from './leave.model';\\nimport { AuditRepository } from '../audit/audit.repository';\\n\\nexport interface LeaveRepository {\\n  createLeaveRequest(dto: CreateLeaveRequestDto): Promise<LeaveRequest>;\\n  findById(id: string): Promise<LeaveRequest | null>;\\n  updateStatus(id: string, status: LeaveRequestStatus): Promise<LeaveRequest>;\\n}\\n\\nexport class PostgreSqlLeaveRepository implements LeaveRepository {\\n  constructor(\\n    private readonly pool: Pool,\\n    private readonly auditRepository: AuditRepository\\n  ) {}\\n\\n  async createLeaveRequest(dto: CreateLeaveRequestDto): Promise<LeaveRequest> {\\n    throw new Error('Not implemented');\\n  }\\n\\n  async findById(id: string): Promise<LeaveRequest | null> {\\n    throw new Error('Not implemented');\\n  }\\n\\n  async updateStatus(id: string, status: LeaveRequestStatus): Promise<LeaveRequest> {\\n    throw new Error('Not implemented');\\n  }\\n}\",\"File: tests/unit/modules/leave/leave.repository.test.ts\\nimport { describe, it, expect, vi } from 'vitest';\\nimport { PostgreSqlLeaveRepository } from '../../../../src/modules/leave/leave.repository';\\nimport { AuditRepository } from '../../../../src/modules/audit/audit.repository';\\n\\ndescribe('PostgreSqlLeaveRepository', () => {\\n  it('creates a leave request with PENDING status and writes an audit record', async () => {\\n    expect(true).toBe(true);\\n  });\\n\\n  it('finds a leave request by id', async () => {\\n    expect(true).toBe(true);\\n  });\\n\\n  it('updates leave request status', async () => {\\n    expect(true).toBe(true);\\n  });\\n});\"],\"importStatements\":[\"import { Pool } from 'pg';\",\"import { LeaveRequest, CreateLeaveRequestDto, LeaveRequestStatus } from './leave.model';\",\"import { AuditRepository } from '../audit/audit.repository';\",\"import { AuditRecord, CreateAuditRecordDto } from './audit.model';\",\"import { describe, it, expect, vi } from 'vitest';\",\"import { PostgreSqlLeaveRepository } from '../../../../src/modules/leave/leave.repository';\",\"import { AuditRepository } from '../../../../src/modules/audit/audit.repository';\"],\"successCriteria\":[\"src/modules/leave/leave.model.ts exists and exports LeaveType, LeaveRequestStatus, LeaveRequest, and CreateLeaveRequestDto exactly as defined.\",\"src/modules/audit/audit.model.ts exists and exports AuditAction, AuditRecord, and CreateAuditRecordDto exactly as defined.\",\"src/modules/leave/leave.repository.ts implements PostgreSqlLeaveRepository.createLeaveRequest(dto) that persists a LeaveRequest with status 'PENDING' in PostgreSQL through the repository, then writes an AuditRecord with action 'CREATED' through AuditRepository, satisfying GP-001 and GP-002.\",\"tests/unit/modules/leave/leave.repository.test.ts uses Vitest and contains verifiable tests for createLeaveRequest(), findById(), and updateStatus().\",\"All async repository methods return Promise values and handle errors without unhandled promise rejections, satisfying GP-006.\",\"Project documentation update is created in architectureMdUpdate to record new domain concepts introduced in this phase: LeaveType values ANNUAL/SICK/EMERGENCY, LeaveRequestStatus values PENDING/APPROVED/REJECTED, AuditAction values CREATED/APPROVED/REJECTED, AuditRecord entity, and the LeaveRequest-to-AuditRecord audit relationship.\"],\"sqlSchema\":\"CREATE TABLE leave_requests (\\n  id UUID PRIMARY KEY,\\n  employee_id UUID NOT NULL,\\n  leave_type VARCHAR(32) NOT NULL,\\n  status VARCHAR(32) NOT NULL\\n);\\n\\nCREATE TABLE audit_records (\\n  id UUID PRIMARY KEY,\\n  entity_type VARCHAR(64) NOT NULL,\\n  entity_id UUID NOT NULL,\\n  action VARCHAR(32) NOT NULL\\n);\"}\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 2 — LeaveBalance domain model with persistence: Create approximately 3 files: src/modules/balance/balance.model.ts, src/modules/balance/balance.repo\n- Phase 3 — Employee, LeavePolicy, and Notification persistence foundations: Create approximately 5 files: src/modules/employee/employee.model.ts, src/modules/employee/employee.\n- Phase 4 — Leave application workflow service: This phase depends on src/modules/leave/leave.model.ts, src/modules/leave/leave.repository.ts, src/m\n- Phase 5 — Manager approval and rejection workflow: This phase depends on src/modules/leave/leave.service.ts and all repository/model files created in p\n- Phase 6 — Fastify API endpoints and integration tests: This phase depends on src/modules/leave/leave.service.ts and all prior repository/model files. Creat",
+  "scope": {
+    "affectedDomains": [
+      "leave",
+      "audit"
+    ],
+    "affectedLayers": [
+      "domain",
+      "infra",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/leave/leave.model.ts exists and exports LeaveType, LeaveRequestStatus, LeaveRequest, and CreateLeaveRequestDto exactly as specified.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/audit/audit.model.ts exists and exports AuditAction, AuditRecord, and CreateAuditRecordDto exactly as specified.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "src/modules/audit/audit.repository.ts exports AuditRepository and PostgreSqlAuditRepository backed by PostgreSQL using pg Pool and repository-pattern access.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "src/modules/leave/leave.repository.ts exports LeaveRepository and PostgreSqlLeaveRepository with createLeaveRequest, findById, and updateStatus methods returning Promises.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "createLeaveRequest(dto) persists a LeaveRequest with status 'PENDING' and writes an AuditRecord with action 'CREATED' through AuditRepository.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-006",
+      "description": "Vitest unit tests verify createLeaveRequest stores a PENDING LeaveRequest, creates a corresponding AuditRecord, findById returns the persisted record, and updateStatus behavior is covered.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-007",
+      "description": "Project documentation is updated to record LeaveType, LeaveRequestStatus, AuditAction values, AuditRecord entity, and LeaveRequest-to-AuditRecord audit relationship.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: all database access must go through repository interfaces.",
+    "Audit records: createLeaveRequest must write an AuditRecord when creating a LeaveRequest.",
+    "Implement only the specified leave and audit model/repository files and the leave repository unit test file.",
+    "Use PostgreSQL-backed repository implementations with pg Pool.",
+    "LeaveRequest must be created with status 'PENDING'.",
+    "AuditRepository.createAuditRecord must be invoked with action 'CREATED' for LeaveRequest creation.",
+    "All async repository methods must return Promises and handle errors without unhandled promise rejections.",
+    "Follow the provided type/interface definitions exactly for LeaveRequest, AuditRecord, DTOs, and repository contracts.",
+    "No sensitive data may be logged.",
+    "Do not introduce API endpoints, services, UI components, or cross-module workflow logic in this phase."
+  ],
+  "outOfScope": [
+    "LeaveBalance domain models and persistence.",
+    "Employee persistence changes beyond referencing employeeId on LeaveRequest.",
+    "LeavePolicy persistence or rule evaluation.",
+    "Notification persistence or workflow notifications.",
+    "Leave workflow services (submit, approve, reject business workflows).",
+    "Manager approval and rejection workflows.",
+    "Fastify API endpoints, request validation layers, RBAC endpoint enforcement, and integration/e2e tests.",
+    "Balance deductions and approval-time business logic.",
+    "Any files outside the specified leave/audit model and repository files, unit tests, and required documentation update."
+  ],
+  "ambiguities": []
+}

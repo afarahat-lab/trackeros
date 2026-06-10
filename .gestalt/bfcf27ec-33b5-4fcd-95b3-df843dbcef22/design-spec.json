@@ -1,0 +1,71 @@
+{
+  "correlationId": "bfcf27ec-33b5-4fcd-95b3-df843dbcef22",
+  "domainChanges": [
+    {
+      "entityName": "LeaveRequest",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "employeeId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "leaveType",
+          "type": "'ANNUAL' | 'SICK' | 'EMERGENCY'",
+          "required": true
+        },
+        {
+          "name": "status",
+          "type": "'PENDING' | 'APPROVED' | 'REJECTED'",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "AuditRecord",
+          "type": "one-to-many"
+        }
+      ]
+    },
+    {
+      "entityName": "AuditRecord",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "entityType",
+          "type": "'LeaveRequest'",
+          "required": true
+        },
+        {
+          "name": "entityId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "action",
+          "type": "'CREATED' | 'APPROVED' | 'REJECTED'",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "LeaveRequest",
+          "type": "one-to-one"
+        }
+      ]
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}
