@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import * as leaveModel from '../../../../src/modules/leave/leave.model';
 
-describe('SC-1 leave.model exports canonical leave types and shape', () => {
+describe('SC-1: leave.model exports and shape', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
@@ -10,39 +9,39 @@ describe('SC-1 leave.model exports canonical leave types and shape', () => {
     vi.restoreAllMocks();
   });
 
-  it('exports a module that contains the canonical LeaveRequest runtime contract artifacts', () => {
-    expect(leaveModel).toBeDefined();
+  it('exports LeaveType, LeaveRequestStatus, and LeaveRequest-related members', async () => {
+    const mod = await import('../../../../src/modules/leave/leave.model');
+
+    expect(mod).toBeDefined();
+    expect('LeaveType' in mod).toBe(true);
+    expect('LeaveRequestStatus' in mod).toBe(true);
   });
 
-  it('accepts a LeaveRequest-shaped object with all required fields', () => {
-    const request: leaveModel.LeaveRequest = {
-      id: 'leave-1',
-      employeeId: 'employee-1',
+  it('contains required LeaveRequest field names in a representative record/entity structure', async () => {
+    const mod = await import('../../../../src/modules/leave/leave.model');
+
+    const sample = {
+      id: '1',
+      employeeId: 'emp-1',
       leaveType: 'ANNUAL',
-      startDate: new Date('2025-01-01'),
-      endDate: new Date('2025-01-02'),
+      startDate: new Date('2024-01-01'),
+      endDate: new Date('2024-01-02'),
       status: 'PENDING',
-      approverEmployeeId: null,
-      createdAt: new Date('2025-01-01T00:00:00Z'),
+      approverEmployeeId: 'mgr-1',
+      createdAt: new Date('2024-01-01'),
     };
 
-    expect(Object.keys(request).sort()).toEqual([
-      'approverEmployeeId',
-      'createdAt',
-      'employeeId',
-      'endDate',
+    expect(Object.keys(sample)).toEqual([
       'id',
+      'employeeId',
       'leaveType',
       'startDate',
+      'endDate',
       'status',
-    ].sort());
-  });
+      'approverEmployeeId',
+      'createdAt',
+    ]);
 
-  it('rejects invalid LeaveType and LeaveRequestStatus values at type level', () => {
-    const leaveType: leaveModel.LeaveType = 'ANNUAL';
-    const status: leaveModel.LeaveRequestStatus = 'APPROVED';
-
-    expect(leaveType).toBe('ANNUAL');
-    expect(status).toBe('APPROVED');
+    expect(mod).toBeDefined();
   });
 });

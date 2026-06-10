@@ -20,3 +20,17 @@ Fields:
 
 Relationships:
 - None defined.
+
+### AuditRecord
+
+Represents an audit trail record for actions performed on domain entities.
+
+Fields:
+- `id` (string, required)
+- `entityId` (string, required)
+- `entityType` (string, required)
+- `action` (string, required)
+- `createdAt` (Date, required)
+
+Relationships:
+- `LeaveRequest` (one-to-many)

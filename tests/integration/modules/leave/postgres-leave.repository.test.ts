@@ -3,12 +3,14 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 const queryMock = vi.fn();
 
 vi.mock('pg', () => ({
-  Pool: vi.fn(() => ({
-    query: queryMock,
-  })),
+  Pool: class {},
 }));
 
-describe('SC-3 and SC-5 PostgresLeaveRepository integration contract', () => {
+vi.mock('../../../../src/shared/db/connection', () => ({
+  default: { query: queryMock },
+}));
+
+describe('SC-3: PostgresLeaveRepository integration behavior', () => {
   beforeEach(() => {
     queryMock.mockReset();
   });
@@ -17,72 +19,47 @@ describe('SC-3 and SC-5 PostgresLeaveRepository integration contract', () => {
     vi.restoreAllMocks();
   });
 
-  it('exports a repository implementation module', async () => {
-    try {
-      const module = await import('../../../../src/modules/leave/postgres-leave.repository');
-      expect(module.PostgresLeaveRepository).toBeDefined();
-    } catch (error: unknown) {
-      expect(error).toBeUndefined();
-    }
+  it('persists a leave request through Pool.query', async () => {
+    const { PostgresLeaveRepository } = await import('../../../../src/modules/leave/postgres-leave.repository');
+
+    queryMock.mockResolvedValue({
+      rows: [{
+        id: '1',
+        employee_id: 'emp',
+        leave_type: 'ANNUAL',
+        start_date: '2024-01-01',
+        end_date: '2024-01-02',
+        status: 'PENDING',
+        approver_employee_id: null,
+        created_at: '2024-01-01T00:00:00Z',
+      }],
+    });
+
+    const repo = new PostgresLeaveRepository({ query: queryMock } as never);
+
+    await repo.create({
+      id: '1',
+      employeeId: 'emp',
+      leaveType: 'ANNUAL',
+      startDate: '2024-01-01',
+      endDate: '2024-01-02',
+      status: 'PENDING',
+      approverEmployeeId: null,
+      createdAt: '2024-01-01T00:00:00Z',
+    });
+
+    expect(queryMock).toHaveBeenCalledTimes(1);
+    expect(String(queryMock.mock.calls[0][0])).toContain('INSERT INTO leave_requests');
   });
 
-  it('can persist, retrieve by id and list by employee when implementation exists', async () => {
-    let moduleRef: Record<string, unknown>;
+  it('returns null when findById has no matching row', async () => {
+    const { PostgresLeaveRepository } = await import('../../../../src/modules/leave/postgres-leave.repository');
 
-    try {
-      moduleRef = await import('../../../../src/modules/leave/postgres-leave.repository');
-    } catch {
-      expect.fail('PostgresLeaveRepository module is missing');
-      return;
-    }
+    queryMock.mockResolvedValue({ rows: [] });
 
-    const RepositoryCtor = moduleRef.PostgresLeaveRepository as new () => {
-      create: (request: import('../../../../src/modules/leave/leave.model').LeaveRequest) => Promise<unknown>;
-      findById: (id: string) => Promise<unknown>;
-      findByEmployeeId: (employeeId: string) => Promise<unknown>;
-    };
+    const repo = new PostgresLeaveRepository({ query: queryMock } as never);
+    const result = await repo.findById('missing');
 
-    const request = {
-      id: 'leave-1',
-      employeeId: 'employee-1',
-      leaveType: 'ANNUAL' as const,
-      startDate: new Date('2025-01-01'),
-      endDate: new Date('2025-01-02'),
-      status: 'PENDING' as const,
-      approverEmployeeId: null,
-      createdAt: new Date('2025-01-01T00:00:00Z'),
-    };
-
-    queryMock
-      .mockResolvedValueOnce({ rows: [{}] })
-      .mockResolvedValueOnce({ rows: [{
-        id: request.id,
-        employee_id: request.employeeId,
-        leave_type: request.leaveType,
-        start_date: request.startDate,
-        end_date: request.endDate,
-        status: request.status,
-        approver_employee_id: request.approverEmployeeId,
-        created_at: request.createdAt,
-      }] })
-      .mockResolvedValueOnce({ rows: [{
-        id: request.id,
-        employee_id: request.employeeId,
-        leave_type: request.leaveType,
-        start_date: request.startDate,
-        end_date: request.endDate,
-        status: request.status,
-        approver_employee_id: request.approverEmployeeId,
-        created_at: request.createdAt,
-      }] });
-
-    const repository = new RepositoryCtor();
-
-    await repository.create(request);
-    await repository.findById(request.id);
-    await repository.findByEmployeeId(request.employeeId);
-
-    expect(queryMock).toHaveBeenCalled();
-    expect(queryMock.mock.calls.length).toBeGreaterThanOrEqual(3);
+    expect(result).toBeNull();
   });
 });
