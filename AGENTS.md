@@ -5,20 +5,41 @@ Read this file completely before taking any action.
 
 ## What this project is
 
-A corporate leave management system for a mid-size company.
-Employees can apply for different types of leave: annual, sick, and emergency.
-Managers can approve or reject leave requests with comments.
-HR administrators can configure leave policies, view team calendars, and generate reports.
-The system must enforce leave balance limits and prevent overlapping requests.
-Built with TypeScript, Node.js, Express, PostgreSQL, and npm.
-Uses Jest for testing.
+Trackeros — a corporate operations web and mobile platform for
+  mid-sized companies. Provides employee self-service (leave
+  requests, balances, expense claims), manager workflows
+  (approvals, team views, time-off calendars), and HR admin
+  surfaces (leave policy configuration, balance accruals,
+  audit reports).
+  
+  Backend: TypeScript on Node 20 (Fastify), PostgreSQL via
+  Knex migrations + a thin repository layer, BullMQ for
+  background jobs (accrual schedulers, notification fanout).
+  Module structure: src/modules/<name>/<name>.{model,
+  repository,service,controller,routes}.ts. Domain modules
+  include leave, balance, employee, policy, notification.
+  Shared utilities under src/shared/ (db connection, base
+  repository, error types).
+  
+  Frontend: React + Vite SPA for the web client, React Native
+  for the mobile client (shared @trackeros/contracts package
+  for the typed REST surface). Auth via JWT against the
+  backend's /auth endpoints; identity comes from corporate
+  OIDC in production and from local users in development.
+  
+  Tests: Vitest for unit + integration. CI on GitHub Actions
+  runs lint (ESLint) + typecheck (tsc --noEmit) + unit tests +
+  a Semgrep security pass on every PR. Conventional Commits +
+  squash-merge. Strict TypeScript (no implicit any, strict
+  null checks).
 
 ## Project stack
 
-- Runtime: Node 22 LTS
+- Runtime: Node 20 LTS
 - Package manager: npm
-- Test framework: Jest
-- Backend: Express
+- Test framework: Vitest
+- Backend: Fastify
+- Frontend: React Native
 - Database: PostgreSQL
 
 See `docs/ARCHITECTURE.md` for the full architecture overview and
@@ -80,7 +101,3 @@ See `agents.yaml` for the full schema and a commented-out example.
 Run `gestalt agents list <projectName>` to see the active agents
 for this project; `gestalt agents validate <projectName>` checks
 that your custom-agent definitions parse cleanly.
-
-## What agents must never do
-
-Agents must adhere to all defined principles, including GP-003, GP-004, GP-005, and GP-006, to ensure compliance and integrity within the project framework.

@@ -15,14 +15,17 @@ Flag any violations in your review:
 - REPOSITORY PATTERN — what is a VIOLATION (flag this): A service, route, or controller file calls pool.query(), db.execute(), db.query(), new Pool(), or createConnection() directly. Example violation: a file named leave.service.ts containing pool.query('SELECT...').
 - REPOSITORY PATTERN — what is CORRECT (do NOT flag): A file named *.repository.ts calling pool.query() or db.query() — that IS the repository's job. This is correct and must never be flagged.
 - REPOSITORY PATTERN — what is CORRECT (do NOT flag): A service file importing a repository class or interface (e.g. import LeaveRepository from './leave.repository') and calling methods on it (e.g. this.leaveRepository.createLeaveRequest(req)). This IS the correct pattern.
-- No SQL queries outside *.repository.ts files
+- All database connections must be created in src/shared/db/ only. Importing a database type for use in a type signature is NOT a violation — only instantiating a connection is.
+- No SQL queries outside *.repository.ts files. Services, routes, and controllers must not contain SQL.
 - No console.log/warn/error in business-logic files (services, repositories, controllers, routes, modules). Console statements in entry-point files (index.ts, main.ts, server.ts, app.ts, bootstrap.ts) are ACCEPTABLE for startup logging (e.g. `app.listen(PORT, () => console.log(...))`) and MUST NOT be flagged.
-- All async functions must handle errors
+- All async functions must handle errors — no unhandled promise rejections.
+- No hardcoded credentials or connection strings in source files.
 - Only flag violations for layers explicitly in scope for this intent.
 - Do not flag items as missing if they already exist on the project main branch.
 - REPOSITORY PATTERN — what is CORRECT (do NOT flag): A *.repository.ts file that calls pool.query() or db.query(). That is its purpose.
 - REPOSITORY PATTERN — what is CORRECT (do NOT flag): A service file that imports a repository and delegates to it.
 - REPOSITORY PATTERN — VIOLATION: Any non-repository file calling pool.query() or new Pool() directly.
+- Do not flag golden principle violations for concerns excluded by IntentSpec.outOfScope.
 """
 
 [pr_description]

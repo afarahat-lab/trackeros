@@ -4,9 +4,16 @@
 # change LLM parameters, and add prompt extensions per project without
 # touching framework code.
 #
-# Infrastructure agents (constraint-agent, test-runner-agent,
-# pipeline-agent, promotion-agent, gc-agent) do deterministic work and
-# are NOT configurable here.
+# Infrastructure agents (pipeline-agent, promotion-agent, gc-agent)
+# do deterministic work and are NOT configurable here.
+#
+# constraint-agent and test-runner-agent ARE LLM-driven as of
+# TEST_REPORT_005 (executeScript evolution) — their behaviour is
+# controlled by HARNESS.json's `agentConfig.<agent-name>.rules`
+# (plain-English rules) plus the executeScript tool. They appear
+# in the agents list at the bottom for reference but do not need
+# to be customised here unless an operator wants to override the
+# default tool set or LLM parameters.
 #
 # Key conventions:
 #   role  — short professional title (becomes "You are <role> working on
@@ -61,12 +68,8 @@ agents:
     role: "Senior TypeScript engineer"
     goal: "Generate production-quality TypeScript code that follows the project harness"
     llm:
-      # TR_033 — upgraded from gpt-4o-mini to gpt-5.5. Operator
-      # choice for the verification cycle pushing for full
-      # autonomous feature completion. Temperature dropped from
-      # 0.2 → 0.1 for tighter rule-following.
-      model: gpt-5.5
-      temperature: 0.1
+      model: ~          # Example: set to "gpt-4o" to use a specific model
+      temperature: 0.2
       max_tokens: 8000
     tools:
       builtin:
@@ -74,12 +77,11 @@ agents:
         - listDirectory     # explore the project structure
         - searchFiles       # find where things are defined
         - getFileTree       # understand project layout
-        - executeScript     # TEST_REPORT_010 — verify generated
-                            # code with `tsc --noEmit` / `npm run
-                            # lint` BEFORE emitting the JSON files
-                            # array. Without this, the mandatory-
-                            # pre-emit-verification prompt block
-                            # (TEST_REPORT_008) was advisory only.
+        - executeScript     # verify generated code (compile / lint / etc.)
+                            # The agent picks the command — there are NO
+                            # hardcoded shell strings on the platform.
+                            # Hard blocklist: rm -rf, git push/commit/reset/rebase,
+                            # curl|sh, wget|sh, > /etc/, sudo (never overridable).
       # ADR-039 — MCP (Model Context Protocol) servers extend the
       # agent with external tools (issue trackers, dashboards, docs).
       # Tool names are auto-namespaced as `<serverName>__<toolName>`
@@ -104,18 +106,13 @@ agents:
     # `generateStackConfig` LLM call at `gestalt init` time.
     # Add more project-specific extensions below as needed.
     prompt_extensions:
+      - "Use ES module syntax with resolveJsonModule for JSON imports — never require()"
       - "Use async/await throughout, never callbacks"
-      - "Follow TypeScript strict mode — every function has explicit return types"
-      - "Each module follows the pattern: model.ts → repository.ts → service.ts → routes.ts"
-      - "Repository methods take typed parameters and return typed results — no `any`"
-      - "Services enforce business rules — never put business logic in routes"
-      - "Throw typed AppError from shared/types/index.ts — never throw plain strings"
-      - "Use the pg Pool from shared/db/connection.ts — never create new Pool instances"
-
+      - "Do not use require() for JSON imports — import them using ES module syntax with resolveJsonModule enabled in tsconfig."
 
   test-agent:
     role: "Senior QA engineer"
-    goal: "Generate comprehensive Jest tests mapped to success criteria"
+    goal: "Generate comprehensive Vitest tests mapped to success criteria"
     llm:
       model: ~
       temperature: 0.1
@@ -123,53 +120,21 @@ agents:
     prompt_extensions: []
 
   # ── Gate layer (Amendment 2026-06: tools enabled by default) ──
-  #
-  # TEST_REPORT_016 — gate agents pinned to gpt-4o.
-  # gpt-4o-mini cannot reliably follow rules that contradict its
-  # training bias. TR_015 proved this — the model READS the rule
-  # (the rule's title prefix appears verbatim in 26/28
-  # constraint-agent signals) but REASONS the opposite of the
-  # rule's body (15/28 signals assert "pool.query in a repository
-  # file is not allowed" against the rule that says the same
-  # thing IS the repository's job). The gate's instruction-
-  # following bar is structurally higher than the code-agent's
-  # creative-completion bar, so the two agents need different
-  # models. Aider's code-generation path stays on gpt-4o-mini.
-  # temperature: 0.0 is mandatory — gate verdicts must be
-  # deterministic, the rules give the model no leeway to be
-  # creative.
-  constraint-agent:
-    role: "Architectural constraint evaluator"
-    goal: "Verify generated code satisfies all project architectural rules using executeScript + read-only file tools"
-    llm:
-      model: gpt-5.5    # TR_033 — upgraded from gpt-4o
-      temperature: 0.0
-      max_tokens: 2000
-    tools:
-      builtin: [executeScript, readFile, searchFiles]
-    prompt_extensions: []
-
   review-agent:
     role: "Senior engineer and code reviewer"
-    goal: "Assess generated code quality and architectural correctness"
+    goal: "Assess generated code quality and architectural correctness — verify findings with executeScript before flagging"
     llm:
-      model: gpt-5.5    # TR_033 — upgraded from gpt-4o
-      temperature: 0.0
+      model: ~
+      temperature: 0.1
       max_tokens: 4000
     tools:
-      # TR_020 — executeScript STRIPPED. Under ADR-041 the gate runs
-      # post-CI and CI has already verified compile / test / lint /
-      # security. Re-running `tsc --noEmit` from the gate clone
-      # always fails because the clone has no node_modules (TR_019's
-      # .gitignore fix on trackeros), and the LLM then hallucinates
-      # "TypeScript not installed" — exactly what burned TR_020's
-      # first cycle (4 rounds, 83k review-agent tokens, all four
-      # signals were the same TS-compiler hallucination). Trust CI's
-      # verdict on build correctness; the gate's job is architecture
-      # and intent-spec adherence, not re-running compilers.
-      builtin: [readFile, searchFiles]
-    prompt_extensions:
-      - "CI has already verified build, tests, lint, and security scan before you ran. Do NOT re-run `tsc --noEmit`, `npm test`, `npm run lint`, or any other build/test/lint command — CI is the source of truth for those. Do NOT flag missing tools (TypeScript, etc.) — they are present in CI; the gate's clone is a read-only architectural review environment without node_modules. Focus on architectural review, design-spec adherence, and constraint-rule compliance."
+      # TEST_REPORT_007 — gains executeScript so it can `tsc --noEmit`
+      # to verify import resolution before flagging "Import cannot be
+      # resolved" findings. searchFiles + readFile are the legacy
+      # spot-check toolset. Same hard blocklist as code-agent (no rm
+      # -rf / no git push / no sudo / no curl|bash / etc.) applies.
+      builtin: [executeScript, readFile, searchFiles]
+    prompt_extensions: []
 
   # ── Maintenance layer (Amendment 2026-06: tools enabled) ──────
   drift-agent:
@@ -207,47 +172,30 @@ agents:
       builtin: [readFile, listDirectory]
     prompt_extensions: []
 
-  # TR_024 — self-healing diagnostician. Points at chat-latest
-  # (registered in the platform LLM registry with apiShape:
-  # 'responses') for the most capable reasoning. The
-  # `max_completion_tokens` vs `max_tokens` wire-shape difference
-  # is handled by the registry — agent code is unchanged.
-  self-healing-agent:
-    role: "Autonomous failure analyst and recovery coordinator"
-    goal: "Analyse failures and decide the correct recovery action: retry with fixes, submit a fix intent for systemic gaps, or escalate to human"
-    llm:
-      model: gpt-5.5-pro    # TR_033 — upgraded from chat-latest. Uses responses API shape (registered in platform_llms).
-      temperature: 0.0
-      # gpt-5.5-pro is a heavier reasoning variant — give it room to
-      # think + emit the structured fix-intent JSON.
-      max_tokens: 6000
-    prompt_extensions:
-      - "Always ground your diagnosis in the actual error output — do not infer failures not evidenced in the provided context"
-      - "A fix-intent is only appropriate when retrying the same intent would produce the same failure"
-
-  # ── Planning layer (migration 024) ────────────────────────────
-  # TR_033 — added explicit blocks for the three planning agents.
-  # All three use gpt-5.5 for stronger reasoning during feature
-  # decomposition + per-phase evaluation. Architecture-agent runs
-  # at both the feature level (high-level design) and per-phase
-  # (focused) under ADR-049.
+  # ── Planning layer (migration 024) ──────────────────────────────
+  # architecture-agent is consulted twice per feature:
+  #   1. High-level design (feature-level) — before any code is written
+  #   2. Focused design (phase-level)      — before each phase is submitted
+  # Operator opt-in: HARNESS.json `planner.enabled` controls whether
+  # the planning layer engages at all; `planner.architectureReviewPerPhase`
+  # controls the per-phase pass.
   architecture-agent:
-    role: "Chief software architect"
-    goal: "Design feature-level architecture and per-phase technical specifications"
+    role: "Senior software architect"
+    goal: "Produce high-level architecture designs and focused per-phase technical specifications that fit the existing project structure"
     llm:
-      model: gpt-5.5
+      model: ~
       temperature: 0.1
-      # gpt-5.5 is a reasoning model; reasoning tokens count toward
-      # this budget. 3000 was too tight for the planner's JSON output
-      # (74s + incomplete JSON in the first verification cycle). Bumped
-      # to keep the same headroom on the (faster) architecture-agent.
-      max_tokens: 6000
+      max_tokens: 3000
     prompt_extensions:
-      # TR_034 — scope every per-phase design to exact file paths +
+      - "Always ground your design in the existing ARCHITECTURE.md — extend it, never contradict it"
+      - "High-level designs focus on domain entities, module boundaries, and dependency direction only — not implementation details"
+      - "Per-phase designs focus on exact interfaces, import paths, and success criteria for that specific phase only"
+      - "Domain entities should have minimal attributes at the high level — add detail in per-phase designs"
+      - "Module dependencies must be acyclic — check before recommending"
+      # TR_034 — per-phase designs must be scoped to exact file paths +
       # exports + import statements. Aider's hallucinations in TR_033
       # came from module-name references in the architecture
-      # description; these rules force the agent to emit file paths
-      # only.
+      # description; these rules force file paths only.
       - "For per-phase designs: only describe what EXISTS in the repository right now and what THIS phase is building. Never describe future modules or modules not yet built."
       - "For every dependency this phase needs: provide the exact file path as it exists in the repository, the exact export names, and the exact import statement to use."
       - "Do not use module names as import paths. Use file paths."
@@ -255,26 +203,56 @@ agents:
       - "Example of incorrect output: 'Use the shared/db module'"
 
   planner-agent:
-    role: "Senior engineering planner"
-    goal: "Decompose features into ordered, deployable phases bounded by HARNESS planner limits"
+    role: "Technical project planner"
+    goal: "Decompose a feature into a sequence of small, independently deployable phases that each fit within Aider's effective context window"
     llm:
-      model: gpt-5.5
+      model: ~
       temperature: 0.1
-      # gpt-5.5 reasoning + a multi-phase JSON plan needs significant
-      # headroom — 3000 produced truncated JSON in the first cycle.
-      max_tokens: 12000
-    prompt_extensions: []
+      max_tokens: 3000
+    prompt_extensions:
+      - "Each phase must touch at most 5 files — prefer 2-3 files per phase"
+      - "Each phase must have a single clear concern (model, repository, service, routes — not combined)"
+      - "Phases must be ordered by dependency — a phase can only use files from prior phases or existing files"
+      - "The scope field must be Aider-ready: specific, self-contained, referencing existing files by exact path"
+      - "Maximum 10 phases per feature — if more are needed, the feature is too large and should be split"
 
   phase-evaluator-agent:
-    role: "Senior engineering phase reviewer"
-    goal: "Evaluate completed phases via git diff and adjust remaining phase scopes when necessary"
+    role: "Technical delivery reviewer"
+    goal: "Evaluate what was actually built in a completed phase, assess whether it matches the plan, and recommend adjustments to subsequent phases based on real results"
     llm:
-      model: gpt-5.5
+      model: ~
       temperature: 0.1
-      max_tokens: 8000
+      max_tokens: 2000
     tools:
-      builtin: [executeScript, readFile, searchFiles]
-    prompt_extensions: []
+      # TR_026 — executeScript is mandatory: the agent runs `git diff`
+      # against the phase branch itself to discover what was built.
+      # The platform no longer pre-computes the file list. Read-only
+      # file tools support the agent's evidence-gathering follow-ups.
+      builtin: [executeScript, readFile, searchFiles, listDirectory, getFileTree]
+    prompt_extensions:
+      - "Always run git diff via executeScript before forming a verdict — that is your evidence"
+      - "Base your evaluation on the actual files git reports — not on what was planned"
+      - "If the implementation differs from the plan but is still correct, that is acceptable — adjust the plan, not the verdict"
+      - "Only escalate to human if the phase produced code that is fundamentally incompatible with the remaining phases"
+      - "Adjustments to remaining phases should update file paths, interface names, and import statements to match what was actually built"
+
+  # ── Self-healing diagnostician (TR_024 — migration 020/026) ──
+  # Decides what to do when a cycle fails — retry, submit a fix
+  # intent for a systemic gap, or escalate. Per ADR-050 the
+  # routing decision lives with the LLM, not the platform code.
+  # Operators tune the model (chat-latest recommended for the
+  # best reasoning) + persona; rules live in HARNESS.json's
+  # `agentConfig.self-healing-agent` block.
+  self-healing-agent:
+    role: "Autonomous failure analyst and recovery coordinator"
+    goal: "Analyse failures and decide the correct recovery action: retry with fixes, submit a fix intent for systemic gaps, or escalate to human"
+    llm:
+      model: ~        # set to "chat-latest" (registered in platform LLMs with apiShape: 'responses') for best reasoning
+      temperature: 0.0
+      max_tokens: 2000
+    prompt_extensions:
+      - "Always ground your diagnosis in the actual error output — do not infer failures not evidenced in the provided context"
+      - "A fix-intent is only appropriate when retrying the same intent would produce the same failure"
 
 
 # ─── Custom agents (ADR-037) ─────────────────────────────────────────────────
@@ -297,12 +275,38 @@ agents:
 #   {{goldenPrinciples}}         — bullet list of GP-NNN titles + descriptions
 #   {{intentText}}               — the operator's original intent string
 #   trackeros              — HARNESS.json `name` field
+#   {{evidenceRequirement}}      — TR_013. Drops in the shared "every
+#                                  finding must include quotedLine"
+#                                  prompt section. Strongly recommended
+#                                  for ANY custom agent that emits
+#                                  findings — the platform parser drops
+#                                  unevidenced findings, so omitting this
+#                                  from the prompt leaves the LLM
+#                                  blind to the requirement and EVERY
+#                                  finding it emits will be discarded.
+#   {{quotedLineSchema}}         — TR_013. Drops in the `"quotedLine":
+#                                  "..."` JSON schema field. Include
+#                                  inside the `findings[]` object in the
+#                                  Expected JSON response schema below.
+#
+# Custom agent findings must include "quotedLine" — the exact line from
+# the artifact that constitutes the violation, quoted verbatim. Findings
+# without quotedLine are automatically dropped by the platform before
+# reaching the gate. This prevents hallucinated findings from blocking
+# cycles. Include {{evidenceRequirement}} in your prompt body and
+# {{quotedLineSchema}} inside the findings[] object to surface this
+# contract to the LLM.
 #
 # Expected JSON response from the LLM:
 #   {
 #     "passed": true | false,
 #     "findings": [
-#       { "severity": "high|medium|low", "file": "path", "description": "..." }
+#       {
+#         "severity": "high|medium|low",
+#         "file": "path",
+#         "quotedLine": "the exact violating line copied verbatim",
+#         "description": "..."
+#       }
 #     ],
 #     "summary": "one-line overall verdict"
 #   }
@@ -333,6 +337,8 @@ agents:
 #     prompt: |
 #       You are {{role}}. Goal: {{goal}}.
 #
+#       {{evidenceRequirement}}
+#
 #       Review the following generated code for OWASP Top 10 issues
 #       (SQL injection, XSS, IDOR, missing auth checks, sensitive data
 #       exposure):
@@ -346,7 +352,12 @@ agents:
 #       {
 #         "passed": true|false,
 #         "findings": [
-#           { "severity": "high|medium|low", "file": "path", "description": "..." }
+#           {
+#             "severity": "high|medium|low",
+#             "file": "path",
+#             {{quotedLineSchema}},
+#             "description": "..."
+#           }
 #         ],
 #         "summary": "one line"
 #       }

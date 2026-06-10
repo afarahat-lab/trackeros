@@ -3,44 +3,27 @@
   "version": "0.1.0",
   "tier": "tier1",
   "templateId": "corporate-ops-web-mobile",
-  "description": "A corporate leave management system for a mid-size company.\nEmployees can apply for different types of leave: annual, sick, and emergency.\nManagers can approve or reject leave requests with comments.\nHR administrators can configure leave policies, view team calendars, and generate reports.\nThe system must enforce leave balance limits and prevent overlapping requests.\nBuilt with TypeScript, Node.js, Express, PostgreSQL, and npm.\nUses Jest for testing.",
+  "description": "Trackeros — a corporate operations web and mobile platform for\n  mid-sized companies. Provides employee self-service (leave\n  requests, balances, expense claims), manager workflows\n  (approvals, team views, time-off calendars), and HR admin\n  surfaces (leave policy configuration, balance accruals,\n  audit reports).\n  \n  Backend: TypeScript on Node 20 (Fastify), PostgreSQL via\n  Knex migrations + a thin repository layer, BullMQ for\n  background jobs (accrual schedulers, notification fanout).\n  Module structure: src/modules/<name>/<name>.{model,\n  repository,service,controller,routes}.ts. Domain modules\n  include leave, balance, employee, policy, notification.\n  Shared utilities under src/shared/ (db connection, base\n  repository, error types).\n  \n  Frontend: React + Vite SPA for the web client, React Native\n  for the mobile client (shared @trackeros/contracts package\n  for the typed REST surface). Auth via JWT against the\n  backend's /auth endpoints; identity comes from corporate\n  OIDC in production and from local users in development.\n  \n  Tests: Vitest for unit + integration. CI on GitHub Actions\n  runs lint (ESLint) + typecheck (tsc --noEmit) + unit tests +\n  a Semgrep security pass on every PR. Conventional Commits +\n  squash-merge. Strict TypeScript (no implicit any, strict\n  null checks).",
   "stack": {
     "language": "TypeScript",
-    "nodeVersion": "22",
+    "nodeVersion": "20",
     "packageManager": "npm",
-    "testFramework": "Jest",
-    "framework": "Express",
-    "frontend": "",
+    "testFramework": "Vitest",
+    "framework": "Fastify",
+    "frontend": "React Native",
     "database": "PostgreSQL",
     "architectureStyle": "modular-monolith"
   },
   "adapters": {
-    "database": {
-      "type": "postgres",
-      "configKey": "DATABASE_URL"
-    },
-    "queue": {
-      "type": "bullmq",
-      "configKey": "REDIS_URL"
-    },
-    "llm": {
-      "type": "azure-openai",
-      "configKey": "LLM_BASE_URL"
-    }
+    "database": { "type": "postgres", "configKey": "DATABASE_URL" },
+    "queue":    { "type": "bullmq", "configKey": "REDIS_URL" },
+    "llm":      { "type": "azure-openai", "configKey": "LLM_BASE_URL" }
   },
+  "_comment_gate": "CI (build/tests/lint/security) runs first via pipeline.adapter. The Gestalt LLM gate (constraint-agent + review-agent) runs after CI passes as a pre-merge architectural review.",
   "qualityGate": {
-    "required": [
-      "constraint-check",
-      "design-review"
-    ],
-    "blockingSignals": [
-      "GOLDEN_PRINCIPLE_BREACH",
-      "CONSTRAINT_VIOLATION"
-    ],
-    "autoResolvableSignals": [
-      "LINT_FAILURE",
-      "TEST_FAILURE"
-    ],
+    "required": ["constraint-check", "design-review"],
+    "blockingSignals": ["GOLDEN_PRINCIPLE_BREACH", "CONSTRAINT_VIOLATION"],
+    "autoResolvableSignals": ["LINT_FAILURE", "TEST_FAILURE"],
     "maxRetries": 3
   },
   "constraints": {
@@ -73,9 +56,11 @@
         "REPOSITORY PATTERN — what is a VIOLATION (flag this): A service, route, or controller file calls pool.query(), db.execute(), db.query(), new Pool(), or createConnection() directly. Example violation: a file named leave.service.ts containing pool.query('SELECT...').",
         "REPOSITORY PATTERN — what is CORRECT (do NOT flag): A file named *.repository.ts calling pool.query() or db.query() — that IS the repository's job. This is correct and must never be flagged.",
         "REPOSITORY PATTERN — what is CORRECT (do NOT flag): A service file importing a repository class or interface (e.g. import LeaveRepository from './leave.repository') and calling methods on it (e.g. this.leaveRepository.createLeaveRequest(req)). This IS the correct pattern.",
-        "No SQL queries outside *.repository.ts files",
+        "All database connections must be created in src/shared/db/ only. Importing a database type for use in a type signature is NOT a violation — only instantiating a connection is.",
+        "No SQL queries outside *.repository.ts files. Services, routes, and controllers must not contain SQL.",
         "No console.log/warn/error in business-logic files (services, repositories, controllers, routes, modules). Console statements in entry-point files (index.ts, main.ts, server.ts, app.ts, bootstrap.ts) are ACCEPTABLE for startup logging (e.g. `app.listen(PORT, () => console.log(...))`) and MUST NOT be flagged.",
-        "All async functions must handle errors"
+        "All async functions must handle errors — no unhandled promise rejections.",
+        "No hardcoded credentials or connection strings in source files."
       ],
       "verificationGuidance": [
         "For direct-DB-access findings: run searchFiles with pattern 'pool\\.query|db\\.query|new Pool|createConnection' and confirm matches exist OUTSIDE src/shared/db/ AND outside any *.repository.ts file before flagging. If every match is inside a repository file or shared/db/, emit NO violation.",
@@ -86,8 +71,9 @@
     },
     "code-agent": {
       "rules": [
-        "Generated code must compile without errors.",
-        "All imports must resolve to files that exist in the project.",
+        "Generated code must compile without errors. Verify with executeScript before returning.",
+        "All imports must resolve to files that exist in the project or are declared in package.json.",
+        "You MUST run a compile/lint check via executeScript before emitting the final files. This is not optional.",
         "Do not use require() for JSON imports — import them using ES module syntax with resolveJsonModule enabled in tsconfig.",
         "Before generating any repository, service, or controller code, read the DTO and interface files it will use. Never reference a field on a type without confirming it exists in the type definition.",
         "Before generating code that calls methods on a dependency, read the dependency's source file to confirm which methods exist. Only call methods that are actually defined.",
@@ -101,7 +87,8 @@
         "Do not flag items as missing if they already exist on the project main branch.",
         "REPOSITORY PATTERN — what is CORRECT (do NOT flag): A *.repository.ts file that calls pool.query() or db.query(). That is its purpose.",
         "REPOSITORY PATTERN — what is CORRECT (do NOT flag): A service file that imports a repository and delegates to it.",
-        "REPOSITORY PATTERN — VIOLATION: Any non-repository file calling pool.query() or new Pool() directly."
+        "REPOSITORY PATTERN — VIOLATION: Any non-repository file calling pool.query() or new Pool() directly.",
+        "Do not flag golden principle violations for concerns excluded by IntentSpec.outOfScope."
       ],
       "verificationGuidance": [
         "Trust CI for build correctness. CI ran build / tests / lint / security scan on this exact code BEFORE you were invoked and passed (otherwise you would not be running). Do NOT flag 'TypeScript not installed', 'Import cannot be resolved', 'Type mismatch', missing build tools, missing test runners, or missing linters — the compiler ran in CI and did not complain. Do NOT attempt to run `npx tsc`, `npm test`, or `npm run lint`; the gate's clone has no node_modules and those calls will fail with infrastructure errors that are not actionable.",
@@ -119,24 +106,27 @@
       ],
       "architectureGuidance": [
         "For high-level design: identify domain entities (names + key attributes), module list (name + path + what it owns), dependency direction, and recommended phase sequence. Nothing more.",
-        "For per-phase design: produce exact TypeScript interface signatures, specific import statements using actual file paths, and 3-5 measurable success criteria.",
+        "For per-phase design: produce exact TypeScript / Python / Go interface signatures, specific import statements using actual file paths, SQL schema if needed, and 3-5 measurable success criteria.",
         "Phase designs must reference only files that already exist OR files being created in this phase — never assume future phases exist.",
+        "Keep per-phase designs focused on the phase scope — do not redesign the whole feature.",
         "Per-phase design must include for each dependency: exact file path, exact exported names, exact import statement. Scope: only files that exist now + files being created this phase. Nothing else.",
         "Never reference a module by name alone — always by its exact file path relative to the file being created."
       ]
     },
     "planner-agent": {
       "rules": [
-        "Maximum 3 files per phase",
+        "Maximum 5 files per phase",
         "Each phase must be independently deployable through CI and the gate",
-        "Phases must be ordered by dependency",
+        "Phases must be ordered by dependency — never reference a file from a future phase",
         "Domain model files (*.model.ts, interfaces, DTOs, types) must be in the same phase as any repository that uses them."
       ],
       "phaseScopingRules": [
-        "GOOD scope: 'Create src/health/health.ts exporting a function getHealth(): { status: string }. Single small file.' — specific, concrete.",
-        "BAD scope: 'Build the health module' — too broad.",
-        "Always mention existing files the phase depends on by exact path.",
-        "Include test file expectations in the scope — 'Include a Jest unit test in tests/unit/'.",
+        "GOOD scope: 'Create src/modules/leave/leave.model.ts with TypeScript interfaces for LeaveRequest and CreateLeaveRequestDto. Import LeaveType, LeaveStatus from src/shared/types/index.ts which already exists.' — specific, concrete, references real paths.",
+        "BAD scope: 'Build the leave module' — too broad, Aider will lose context.",
+        "GOOD scope: 'Create src/modules/leave/leave.model.ts AND src/modules/leave/leave.repository.ts together. Define LeaveRequest, CreateLeaveRequestDto in the model file. Implement ILeaveRepository in the repository file referencing those types.' — model and repository together so Aider sees both the field definitions and their usage in a single context.",
+        "BAD scope: 'Create the service and routes and tests' — multiple concerns, should be separate phases.",
+        "Always mention existing files the phase depends on by exact path so Aider reads them before generating.",
+        "Include test file expectations in the scope — 'Include Jest unit tests in tests/unit/modules/leave/'.",
         "Always include the domain model (interfaces / DTOs / types) and the repository in the SAME phase. Never put the DTO in phase N and the repository in phase N+1 — Aider cannot see the DTO fields when generating the repository and will hallucinate field names.",
         "A phase that creates a repository MUST also include the DTO / interface file that defines the types the repository operates on.",
         "Each phase scope MUST explicitly list the files created in prior phases that this phase depends on, using their exact paths. Example: 'This phase depends on src/modules/leave/leave.model.ts from Phase 1 — read it before generating any code that references its types.' Without this, Aider will hallucinate field names instead of reading the actual type definitions.",
@@ -145,12 +135,14 @@
     },
     "phase-evaluator-agent": {
       "rules": [
-        "Before evaluating a phase, run executeScript with 'git diff origin/<defaultBranch>...origin/<phaseBranch> --name-status' to get the actual list of files changed. Use this as your evidence of what was built.",
-        "If the git diff returns empty output, the phase wrote no files. Escalate with reason: 'Aider completed but wrote 0 files (confirmed by git diff)'.",
-        "If the git diff returns files, evaluate them against the phase scope to determine success.",
-        "Never rely on artifact metadata or Aider stdout to determine what files were created — git diff is the only source of truth.",
+        "To detect what files were built in this phase, prefer running: git show --name-only --format= <mergeCommitSha>. This shows exact files from the squash-merge commit. If mergeCommitSha is null, fall back to: git diff origin/<defaultBranch>~1..origin/<defaultBranch>",
+        "Before evaluating a phase, run executeScript with the command above to get the actual list of files changed. Use this as your evidence of what was built.",
+        "If the git command returns empty output, the phase wrote no files. Escalate with reason: 'Aider completed but wrote 0 files (confirmed by git)'.",
+        "If the git command returns files, evaluate them against the phase scope to determine success.",
+        "Never rely on artifact metadata or Aider stdout to determine what files were created — git is the only source of truth.",
         "Evaluate based on actual built files, not planned files.",
-        "Adjust remaining phase scopes to use actual file paths.",
+        "Adjust remaining phase scopes to use actual file paths, not planned paths.",
+        "Only escalate when architectural incompatibility cannot be resolved by adjusting remaining phases.",
         "When adjusting remaining phase scopes after a partial success, always update the scope to include the exact file paths of files created in the completed phase. Replace generic references like 'leave.model.ts' with full paths like 'src/modules/leave/leave.model.ts'.",
         "When adjusting the scope of a routes or controller phase, always cite the service or handler file it depends on so Aider reads it before generating. The scope must make clear which methods are available to call."
       ],
@@ -158,7 +150,8 @@
         "Success: git diff shows files matching the phase scope AND those files meet the success criteria.",
         "Escalate — zero files: git diff is empty despite Aider reporting success.",
         "Escalate — wrong files: git diff shows files unrelated to the phase scope.",
-        "Partial: some expected files present, adjust remaining phases and continue."
+        "Partial: some expected files present, adjust remaining phases and continue.",
+        "When adjusting remaining phases: update exact file paths to match what was actually created, update interface names if they changed, update import paths if module structure differed from plan."
       ]
     },
     "self-healing-agent": {
@@ -169,14 +162,13 @@
         "Choose escalate when: the failure requires human judgment, is caused by external infrastructure, or you cannot determine the root cause with confidence",
         "When choosing fix-intent: write a fixIntent that is specific, Aider-ready, and scoped only to fixing the gap — not rebuilding the feature",
         "resumeAfterFix should be true when the original intent will succeed once the gap is fixed",
-        "For failures of type 'review-requested-changes': the PR-Agent review comment is in technicalDetail. Read it carefully before deciding action. Minor code issues → fix-intent. Architectural concerns → fix-intent with broader scope. Apparent false positives → retry.",
-        "Fix-intent context must end with a preservation statement. For TypeScript projects: 'Do not remove or rename existing exports, types, or interfaces. Only add or modify what is needed to resolve the CI failure.'"
+        "For failures of type 'review-requested-changes': the PR-Agent review comment is in technicalDetail. Read it carefully before deciding action. Minor code issues → fix-intent. Architectural concerns → fix-intent with broader scope. Apparent false positives → retry."
       ]
     }
   },
   "pipeline": {
-    "adapter": "github-actions",
-    "autoMerge": true,
+    "adapter": "noop",
+    "autoMerge": false,
     "mergeMethod": "squash"
   },
   "prAgent": {
@@ -191,25 +183,22 @@
     "architectureReviewPerPhase": true,
     "maxPhaseRetries": 2
   },
+  "tokenManagement": {
+    "promptCompressionThreshold": 6000,
+    "maxRetryBudgetMultiplier": 2.0,
+    "enableDynamicBudget": true,
+    "enableScopeReduction": true
+  },
   "maintenance": {
-    "driftCheck": {
-      "enabled": true,
-      "scheduleUtc": "0 2 * * *"
-    },
-    "alignmentCheck": {
-      "enabled": true,
-      "scheduleUtc": "0 3 * * *"
-    },
-    "gcCheck": {
-      "enabled": true,
-      "scheduleUtc": "0 4 * * 5"
-    },
+    "driftCheck":     { "enabled": true, "scheduleUtc": "0 2 * * *" },
+    "alignmentCheck": { "enabled": true, "scheduleUtc": "0 3 * * *" },
+    "gcCheck":        { "enabled": true, "scheduleUtc": "0 4 * * 5" },
     "monitoring": {
       "adapter": "noop",
       "enabled": true,
       "connectionConfig": {},
       "thresholds": {
-        "errorRatePercent": 5,
+        "errorRatePercent": 5.0,
         "latencyP99Ms": 2000,
         "alertCountWindow": "1h",
         "alertCountThreshold": 10
@@ -218,18 +207,10 @@
   },
   "identity": {
     "providers": [
-      {
-        "type": "local",
-        "enabled": true,
-        "warningBanner": true,
-        "allowedInProduction": false
-      }
+      { "type": "local", "enabled": true, "warningBanner": true, "allowedInProduction": false }
     ],
     "roleMapping": [],
     "defaultRole": null,
     "sessionTtlMinutes": 480
-  },
-  "codeGeneration": {
-    "backend": "aider"
   }
 }
