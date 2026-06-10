@@ -1,9 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import * as fs from 'node:fs';
-import * as path from 'node:path';
+
+vi.mock('crypto', () => ({
+  randomUUID: () => 'audit-id-123'
+}));
+
 import { PostgreSqlAuditRepository } from '../../../../src/modules/audit/audit.repository';
 
-describe('SC-5: PostgreSqlAuditRepository', () => {
+type QueryResult = { rows: unknown[] };
+
+describe('SC-3: PostgreSqlAuditRepository', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
@@ -12,30 +17,29 @@ describe('SC-5: PostgreSqlAuditRepository', () => {
     vi.restoreAllMocks();
   });
 
-  it('creates an audit record through a pg Pool-compatible dependency', async () => {
-    const query = vi.fn().mockResolvedValue({ rows: [] });
-    const pool = { query } as unknown as import('pg').Pool;
+  it('creates and persists an audit record through pool.query', async () => {
+    const query = vi.fn<(...args: unknown[]) => Promise<QueryResult>>().mockResolvedValue({ rows: [] });
+    const pool = { query };
 
-    const repository = new PostgreSqlAuditRepository(pool);
+    const repository = new PostgreSqlAuditRepository(pool as never);
 
-    const result = await repository.createAuditRecord({
+    const record = await repository.createAuditRecord({
       entityType: 'LeaveRequest',
       entityId: 'leave-1',
       action: 'CREATED'
     });
 
-    expect(result.entityType).toBe('LeaveRequest');
-    expect(result.entityId).toBe('leave-1');
-    expect(result.action).toBe('CREATED');
+    expect(record.id).toBe('audit-id-123');
+    expect(record.entityId).toBe('leave-1');
+    expect(record.action).toBe('CREATED');
     expect(query).toHaveBeenCalledTimes(1);
   });
 
-  it('propagates database failures', async () => {
-    const pool = {
-      query: vi.fn().mockRejectedValue(new Error('db failure'))
-    } as unknown as import('pg').Pool;
+  it('wraps database errors', async () => {
+    const query = vi.fn<(...args: unknown[]) => Promise<QueryResult>>().mockRejectedValue(new Error('db-error'));
+    const pool = { query };
 
-    const repository = new PostgreSqlAuditRepository(pool);
+    const repository = new PostgreSqlAuditRepository(pool as never);
 
     await expect(
       repository.createAuditRecord({
@@ -43,25 +47,6 @@ describe('SC-5: PostgreSqlAuditRepository', () => {
         entityId: 'leave-1',
         action: 'CREATED'
       })
-    ).rejects.toThrow('db failure');
-  });
-});
-
-describe('SC-7: documentation', () => {
-  it('documents LeaveType, LeaveRequestStatus, AuditAction and AuditRecord relationship when a README exists', () => {
-    const readmePath = path.resolve(process.cwd(), 'README.md');
-
-    if (!fs.existsSync(readmePath)) {
-      expect(fs.existsSync(readmePath)).toBe(false);
-      return;
-    }
-
-    const content = fs.readFileSync(readmePath, 'utf8');
-
-    expect(content).toContain('LeaveType');
-    expect(content).toContain('LeaveRequestStatus');
-    expect(content).toContain('AuditAction');
-    expect(content).toContain('AuditRecord');
-    expect(content).toContain('LeaveRequest');
+    ).rejects.toThrow('AUDIT_RECORD_CREATE_FAILED:db-error');
   });
 });

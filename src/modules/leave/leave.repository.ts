@@ -24,16 +24,28 @@ export class PostgreSqlLeaveRepository implements LeaveRepository {
       status: 'PENDING'
     };
 
-    await this.pool.query(
-      'INSERT INTO leave_requests (id, employee_id, leave_type, status) VALUES ($1, $2, $3, $4)',
-      [leaveRequest.id, leaveRequest.employeeId, leaveRequest.leaveType, leaveRequest.status]
-    );
+    try {
+      await this.pool.query(
+        'INSERT INTO leave_requests (id, employee_id, leave_type, status) VALUES ($1, $2, $3, $4)',
+        [leaveRequest.id, leaveRequest.employeeId, leaveRequest.leaveType, leaveRequest.status]
+      );
+    } catch (error: unknown) {
+      throw new Error(
+        `LEAVE_REQUEST_CREATE_FAILED:${error instanceof Error ? error.message : 'unknown_error'}`
+      );
+    }
 
-    await this.auditRepository.createAuditRecord({
-      entityType: 'LeaveRequest',
-      entityId: leaveRequest.id,
-      action: 'CREATED'
-    });
+    try {
+      await this.auditRepository.createAuditRecord({
+        entityType: 'LeaveRequest',
+        entityId: leaveRequest.id,
+        action: 'CREATED'
+      });
+    } catch (error: unknown) {
+      throw new Error(
+        `LEAVE_AUDIT_CREATE_FAILED:${error instanceof Error ? error.message : 'unknown_error'}`
+      );
+    }
 
     return leaveRequest;
   }
@@ -78,11 +90,17 @@ export class PostgreSqlLeaveRepository implements LeaveRepository {
       status: LeaveRequestStatus;
     };
 
-    await this.auditRepository.createAuditRecord({
-      entityType: 'LeaveRequest',
-      entityId: id,
-      action: status === 'APPROVED' ? 'APPROVED' : 'REJECTED'
-    });
+    try {
+      await this.auditRepository.createAuditRecord({
+        entityType: 'LeaveRequest',
+        entityId: id,
+        action: status === 'APPROVED' ? 'APPROVED' : 'REJECTED'
+      });
+    } catch (error: unknown) {
+      throw new Error(
+        `LEAVE_AUDIT_UPDATE_FAILED:${error instanceof Error ? error.message : 'unknown_error'}`
+      );
+    }
 
     return {
       id: row.id,

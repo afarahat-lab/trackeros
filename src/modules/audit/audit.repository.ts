@@ -18,10 +18,16 @@ export class PostgreSqlAuditRepository implements AuditRepository {
       action: dto.action
     };
 
-    await this.pool.query(
-      'INSERT INTO audit_records (id, entity_type, entity_id, action) VALUES ($1, $2, $3, $4)',
-      [record.id, record.entityType, record.entityId, record.action]
-    );
+    try {
+      await this.pool.query(
+        'INSERT INTO audit_records (id, entity_type, entity_id, action) VALUES ($1, $2, $3, $4)',
+        [record.id, record.entityType, record.entityId, record.action]
+      );
+    } catch (error: unknown) {
+      throw new Error(
+        `AUDIT_RECORD_CREATE_FAILED:${error instanceof Error ? error.message : 'unknown_error'}`
+      );
+    }
 
     return record;
   }
