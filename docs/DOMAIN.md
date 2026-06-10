@@ -55,6 +55,7 @@ None
 - **Path**: /api/v1/leave-requests/{id}
 - **Description**: Updates an existing leave request.
 - **Request Body**:
+  - employeeId: string
   - leaveType: string
   - startDate: Date
   - endDate: Date

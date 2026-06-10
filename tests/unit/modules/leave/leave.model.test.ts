@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-// Import the LeaveRequest interface to test its existence
+// Importing the LeaveRequest interface to verify its existence
 import { LeaveRequest } from '../../../src/modules/leave/leave.model';
 
 describe('SC-1: LeaveRequest Model', () => {
