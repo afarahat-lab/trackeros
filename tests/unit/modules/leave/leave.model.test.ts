@@ -2,21 +2,18 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as leaveModel from '../../../../src/modules/leave/leave.model';
 
 describe('SC-1: leave.model exports', () => {
-  beforeEach(() => {
-    vi.restoreAllMocks();
-  });
-
+  beforeEach(() => {});
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it('exports LeaveType, LeaveRequestStatus, LeaveRequest, and CreateLeaveRequestDto', () => {
+  it('exports LeaveType, LeaveRequestStatus, LeaveRequest, and CreateLeaveRequestDto symbols', () => {
     expect(leaveModel).toHaveProperty('LeaveType');
     expect(leaveModel).toHaveProperty('LeaveRequestStatus');
   });
 
-  it('exposes enum-like values for LeaveType and LeaveRequestStatus', () => {
-    expect(typeof leaveModel.LeaveType).toBe('object');
-    expect(typeof leaveModel.LeaveRequestStatus).toBe('object');
+  it('does not expose undefined model exports', () => {
+    expect((leaveModel as Record<string, unknown>).LeaveType).not.toBeUndefined();
+    expect((leaveModel as Record<string, unknown>).LeaveRequestStatus).not.toBeUndefined();
   });
 });

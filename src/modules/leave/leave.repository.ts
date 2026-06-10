@@ -29,84 +29,84 @@ export class PostgreSqlLeaveRepository implements LeaveRepository {
         'INSERT INTO leave_requests (id, employee_id, leave_type, status) VALUES ($1, $2, $3, $4)',
         [leaveRequest.id, leaveRequest.employeeId, leaveRequest.leaveType, leaveRequest.status]
       );
-    } catch (error: unknown) {
-      throw new Error(
-        `LEAVE_REQUEST_CREATE_FAILED:${error instanceof Error ? error.message : 'unknown_error'}`
-      );
-    }
 
-    try {
       await this.auditRepository.createAuditRecord({
         entityType: 'LeaveRequest',
         entityId: leaveRequest.id,
         action: 'CREATED'
       });
+
+      return leaveRequest;
     } catch (error: unknown) {
       throw new Error(
-        `LEAVE_AUDIT_CREATE_FAILED:${error instanceof Error ? error.message : 'unknown_error'}`
+        `LEAVE_REQUEST_CREATE_FAILED:${error instanceof Error ? error.message : 'unknown_error'}`
       );
     }
-
-    return leaveRequest;
   }
 
   /** Finds a leave request by id. */
   public async findById(id: string): Promise<LeaveRequest | null> {
-    const result = await this.pool.query(
-      'SELECT id, employee_id, leave_type, status FROM leave_requests WHERE id = $1',
-      [id]
-    );
+    try {
+      const result = await this.pool.query(
+        'SELECT id, employee_id, leave_type, status FROM leave_requests WHERE id = $1',
+        [id]
+      );
 
-    if (result.rows.length === 0) {
-      return null;
+      if (result.rows.length === 0) {
+        return null;
+      }
+
+      const row = result.rows[0] as {
+        id: string;
+        employee_id: string;
+        leave_type: LeaveRequest['leaveType'];
+        status: LeaveRequestStatus;
+      };
+
+      return {
+        id: row.id,
+        employeeId: row.employee_id,
+        leaveType: row.leave_type,
+        status: row.status
+      };
+    } catch (error: unknown) {
+      throw new Error(
+        `LEAVE_REQUEST_FIND_FAILED:${error instanceof Error ? error.message : 'unknown_error'}`
+      );
     }
-
-    const row = result.rows[0] as {
-      id: string;
-      employee_id: string;
-      leave_type: LeaveRequest['leaveType'];
-      status: LeaveRequestStatus;
-    };
-
-    return {
-      id: row.id,
-      employeeId: row.employee_id,
-      leaveType: row.leave_type,
-      status: row.status
-    };
   }
 
   /** Updates leave request status and writes audit. */
   public async updateStatus(id: string, status: LeaveRequestStatus): Promise<LeaveRequest> {
-    const result = await this.pool.query(
-      'UPDATE leave_requests SET status = $2 WHERE id = $1 RETURNING id, employee_id, leave_type, status',
-      [id, status]
-    );
-
-    const row = result.rows[0] as {
-      id: string;
-      employee_id: string;
-      leave_type: LeaveRequest['leaveType'];
-      status: LeaveRequestStatus;
-    };
-
     try {
+      const result = await this.pool.query(
+        'UPDATE leave_requests SET status = $2 WHERE id = $1 RETURNING id, employee_id, leave_type, status',
+        [id, status]
+      );
+
+      const row = result.rows[0] as {
+        id: string;
+        employee_id: string;
+        leave_type: LeaveRequest['leaveType'];
+        status: LeaveRequestStatus;
+      };
+
       await this.auditRepository.createAuditRecord({
         entityType: 'LeaveRequest',
         entityId: id,
         action: status === 'APPROVED' ? 'APPROVED' : 'REJECTED'
       });
+
+      return {
+        id: row.id,
+        employeeId: row.employee_id,
+        leaveType: row.leave_type,
+        status: row.status
+      };
     } catch (error: unknown) {
       throw new Error(
-        `LEAVE_AUDIT_UPDATE_FAILED:${error instanceof Error ? error.message : 'unknown_error'}`
+        `LEAVE_REQUEST_UPDATE_FAILED:${error instanceof Error ? error.message : 'unknown_error'}`
       );
     }
-
-    return {
-      id: row.id,
-      employeeId: row.employee_id,
-      leaveType: row.leave_type,
-      status: row.status
-    };
   }
 }
