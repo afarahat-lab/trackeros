@@ -18,3 +18,18 @@ Represents an employee leave application that can be reviewed and approved or re
 ### Relationships
 
 - None currently defined.
+
+## LeaveRequestAudit
+
+Represents an audit record for actions performed on a leave request.
+
+### Fields
+
+- `id: string` (required)
+- `leaveRequestId: string` (required)
+- `action: string` (required)
+- `createdAt: Date` (required)
+
+### Relationships
+
+- `LeaveRequest` (one-to-many)

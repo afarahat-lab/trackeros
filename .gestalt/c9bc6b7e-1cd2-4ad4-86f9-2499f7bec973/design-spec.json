@@ -47,6 +47,38 @@
         }
       ],
       "relationships": []
+    },
+    {
+      "entityName": "LeaveRequestAudit",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "leaveRequestId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "action",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "LeaveRequest",
+          "type": "one-to-many"
+        }
+      ]
     }
   ],
   "apiContracts": [],

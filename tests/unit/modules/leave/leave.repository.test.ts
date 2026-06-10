@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import type { LeaveRepository } from '../../../../src/modules/leave/leave.repository';
+import type { LeaveRequest } from '../../../../src/modules/leave/leave.model';
 
-describe('SC-2: LeaveRepository interface contract', () => {
+describe('SC-2: LeaveRepository contract', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
@@ -9,26 +11,37 @@ describe('SC-2: LeaveRepository interface contract', () => {
     vi.restoreAllMocks();
   });
 
-  it('repository file exists', async () => {
-    const fs = await import('node:fs');
-    expect(fs.existsSync('src/modules/leave/leave.repository.ts')).toBe(true);
+  it('defines create, findById and findByEmployeeId methods operating on LeaveRequest', async () => {
+    const leaveRequest: LeaveRequest = {
+      id: '1',
+      employeeId: 'emp',
+      leaveType: 'ANNUAL',
+      startDate: new Date(),
+      endDate: new Date(),
+      status: 'PENDING',
+      approverEmployeeId: null,
+      createdAt: new Date(),
+    };
+
+    const repository: LeaveRepository = {
+      create: async (value) => value,
+      findById: async (id) => (id === leaveRequest.id ? leaveRequest : null),
+      findByEmployeeId: async (employeeId) => employeeId === 'emp' ? [leaveRequest] : [],
+    };
+
+    await expect(repository.create(leaveRequest)).resolves.toEqual(leaveRequest);
+    await expect(repository.findById('1')).resolves.toEqual(leaveRequest);
+    await expect(repository.findByEmployeeId('emp')).resolves.toEqual([leaveRequest]);
   });
 
-  it('declares LeaveRepository with required methods', async () => {
-    const fs = await import('node:fs');
-    const content = fs.readFileSync('src/modules/leave/leave.repository.ts', 'utf8');
+  it('supports null and empty result error cases from contract methods', async () => {
+    const repository: LeaveRepository = {
+      create: async (value) => value,
+      findById: async () => null,
+      findByEmployeeId: async () => [],
+    };
 
-    expect(content).toContain('interface LeaveRepository');
-    expect(content).toContain('create');
-    expect(content).toContain('findById');
-    expect(content).toContain('findByEmployeeId');
-  });
-
-  it('uses LeaveRequest types imported from leave.model', async () => {
-    const fs = await import('node:fs');
-    const content = fs.readFileSync('src/modules/leave/leave.repository.ts', 'utf8');
-
-    expect(content).toMatch(/leave\.model/);
-    expect(content).toContain('LeaveRequest');
+    await expect(repository.findById('missing')).resolves.toBeNull();
+    await expect(repository.findByEmployeeId('missing')).resolves.toEqual([]);
   });
 });

@@ -1,5 +1,5 @@
 {
-  "id": "2327504a-fa1e-4887-8df7-723ae488d7cb",
+  "id": "ea7af1c6-6f52-4697-82d9-f411f4039a91",
   "correlationId": "c9bc6b7e-1cd2-4ad4-86f9-2499f7bec973",
   "rawIntent": "[Feature: Build the leave management module — Phase 1: Define leave domain models and repository layer]\n\nCreate src/modules/leave/leave.model.ts defining the canonical LeaveRequest entity shape and DTOs used by persistence (including fields id, employeeId, leaveType, startDate, endDate, status, approverEmployeeId, createdAt). Create src/modules/leave/leave.repository.ts implementing the leave persistence contract and repository methods that operate on LeaveRequest types from src/modules/leave/leave.model.ts. Create tests/unit/modules/leave/leave.repository.spec.ts covering repository behavior and type usage. Keep all LeaveRequest type definitions and repository code in this phase so the repository references the actual model file.\n\nPhase architecture notes:\n{\"interfaces\":[\"File: src/modules/leave/leave.model.ts\\nexport type LeaveType = \\\"ANNUAL\\\" | \\\"SICK\\\" | \\\"EMERGENCY\\\";\\nexport type LeaveRequestStatus = \\\"PENDING\\\" | \\\"APPROVED\\\" | \\\"REJECTED\\\";\\nexport interface LeaveRequest {\\n  id: string;\\n  employeeId: string;\\n  leaveType: LeaveType;\\n  startDate: Date;\\n  endDate: Date;\\n  status: LeaveRequestStatus;\\n  approverEmployeeId: string | null;\\n  createdAt: Date;\\n}\",\"File: src/modules/leave/leave.repository.ts\\nimport { LeaveRequest } from \\\"./leave.model\\\";\\nexport interface LeaveRepository {\\n  create(leaveRequest: LeaveRequest): Promise<LeaveRequest>;\\n  findById(id: string): Promise<LeaveRequest | null>;\\n  findByEmployeeId(employeeId: string): Promise<LeaveRequest[]>;\\n}\",\"File: src/modules/leave/postgres-leave.repository.ts\\nimport { Pool } from \\\"pg\\\";\\nimport { LeaveRepository } from \\\"./leave.repository\\\";\\nimport { LeaveRequest } from \\\"./leave.model\\\";\\nexport class PostgresLeaveRepository implements LeaveRepository {\\n  constructor(private readonly pool: Pool) {}\\n  create(leaveRequest: LeaveRequest): Promise<LeaveRequest>;\\n  findById(id: string): Promise<LeaveRequest | null>;\\n  findByEmployeeId(employeeId: string): Promise<LeaveRequest[]>;\\n}\"],\"importStatements\":[\"import { LeaveRequest } from \\\"./leave.model\\\"\",\"import { LeaveRepository } from \\\"./leave.repository\\\"\",\"import { LeaveRequest } from \\\"./leave.model\\\"\",\"import { Pool } from \\\"pg\\\"\"],\"successCriteria\":[\"src/modules/leave/leave.model.ts exists and exports LeaveType, LeaveRequestStatus, and LeaveRequest\",\"src/modules/leave/leave.repository.ts exists and exports the LeaveRepository interface with create, findById, and findByEmployeeId methods\",\"src/modules/leave/postgres-leave.repository.ts exists and exports PostgresLeaveRepository implementing LeaveRepository using PostgreSQL through pg Pool\",\"A PostgreSQL migration for the leave_requests table exists and creates all columns, constraints, and indexes defined in the schema\",\"Vitest tests verify PostgresLeaveRepository can persist a LeaveRequest, retrieve it by id, and list requests by employeeId\"],\"sqlSchema\":\"CREATE TABLE leave_requests (\\n  id UUID PRIMARY KEY,\\n  employee_id UUID NOT NULL,\\n  leave_type VARCHAR(20) NOT NULL CHECK (leave_type IN ('ANNUAL','SICK','EMERGENCY')),\\n  start_date DATE NOT NULL,\\n  end_date DATE NOT NULL,\\n  status VARCHAR(20) NOT NULL CHECK (status IN ('PENDING','APPROVED','REJECTED')),\\n  approver_employee_id UUID NULL,\\n  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()\\n);\\n\\nCREATE INDEX idx_leave_requests_employee_id ON leave_requests(employee_id);\\nCREATE INDEX idx_leave_requests_status ON leave_requests(status);\"}\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/leave/leave.model.ts\\nexport type LeaveType = \\\"ANNUAL\\\" | \\\"SICK\\\" | \\\"EMERGENCY\\\";\\n\\nexport type LeaveRequestStatus = \\\"PENDING\\\" | \\\"APPROVED\\\" | \\\"REJECTED\\\";\\n\\nexport interface LeaveRequest {\\n  id: string;\\n  employeeId: string;\\n  leaveType: LeaveType;\\n  startDate: Date;\\n  endDate: Date;\\n  status: LeaveRequestStatus;\\n  approverEmployeeId: string | null;\\n  createdAt: Date;\\n}\",\"File: src/modules/leave/leave.repository.ts\\nimport { LeaveRequest } from \\\"./leave.model\\\";\\n\\nexport interface LeaveRepository {\\n  create(leaveRequest: LeaveRequest): Promise<LeaveRequest>;\\n  findById(id: string): Promise<LeaveRequest | null>;\\n  findByEmployeeId(employeeId: string): Promise<LeaveRequest[]>;\\n}\",\"File: src/modules/leave/postgres-leave.repository.ts\\nimport { Pool } from \\\"pg\\\";\\nimport { LeaveRepository } from \\\"./leave.repository\\\";\\nimport { LeaveRequest } from \\\"./leave.model\\\";\\n\\nexport class PostgresLeaveRepository implements LeaveRepository {\\n  constructor(private readonly pool: Pool) {}\\n\\n  create(leaveRequest: LeaveRequest): Promise<LeaveRequest>;\\n\\n  findById(id: string): Promise<LeaveRequest | null>;\\n\\n  findByEmployeeId(employeeId: string): Promise<LeaveRequest[]>;\\n}\\n\\nConcrete implementation: PostgresLeaveRepository is the only implementation of LeaveRepository in this phase and persists data to PostgreSQL using pg.Pool.\",\"File: src/modules/leave/postgres-leave.repository.test.ts\\nVitest repository tests instantiate PostgresLeaveRepository and verify create, findById, and findByEmployeeId behavior against the leave_requests table created by this phase migration.\"],\"importStatements\":[\"In src/modules/leave/leave.repository.ts:\\nimport { LeaveRequest } from \\\"./leave.model\\\";\",\"In src/modules/leave/postgres-leave.repository.ts:\\nimport { Pool } from \\\"pg\\\";\",\"In src/modules/leave/postgres-leave.repository.ts:\\nimport { LeaveRepository } from \\\"./leave.repository\\\";\",\"In src/modules/leave/postgres-leave.repository.ts:\\nimport { LeaveRequest } from \\\"./leave.model\\\";\",\"In src/modules/leave/postgres-leave.repository.test.ts:\\nimport { describe, it, expect } from \\\"vitest\\\";\",\"In src/modules/leave/postgres-leave.repository.test.ts:\\nimport { PostgresLeaveRepository } from \\\"./postgres-leave.repository\\\";\",\"In src/modules/leave/postgres-leave.repository.test.ts:\\nimport { LeaveRequest } from \\\"./leave.model\\\";\"],\"successCriteria\":[\"src/modules/leave/leave.model.ts exists and exports LeaveType, LeaveRequestStatus, and LeaveRequest\",\"src/modules/leave/leave.repository.ts exists and exports the LeaveRepository interface with create, findById, and findByEmployeeId methods\",\"src/modules/leave/postgres-leave.repository.ts exists and exports PostgresLeaveRepository implementing LeaveRepository using PostgreSQL through pg Pool\",\"A PostgreSQL migration for the leave_requests table exists and creates all columns, constraints, and indexes defined in the schema\",\"Vitest tests verify PostgresLeaveRepository can persist a LeaveRequest, retrieve it by id, and list requests by employeeId\"],\"sqlSchema\":\"CREATE TABLE leave_requests (\\n  id UUID PRIMARY KEY,\\n  employee_id UUID NOT NULL,\\n  leave_type VARCHAR(20) NOT NULL CHECK (leave_type IN ('ANNUAL','SICK','EMERGENCY')),\\n  start_date DATE NOT NULL,\\n  end_date DATE NOT NULL,\\n  status VARCHAR(20) NOT NULL CHECK (status IN ('PENDING','APPROVED','REJECTED')),\\n  approver_employee_id UUID NULL,\\n  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()\\n);\\n\\nCREATE INDEX idx_leave_requests_employee_id ON leave_requests(employee_id);\\nCREATE INDEX idx_leave_requests_status ON leave_requests(status);\"}\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 2 — Implement leave application workflow: This phase depends on src/modules/leave/leave.model.ts and src/modules/leave/leave.repository.ts fro\n- Phase 3 — Implement approval and rejection workflow: This phase depends on src/modules/leave/leave.model.ts, src/modules/leave/leave.repository.ts, and s\n- Phase 4 — Expose Fastify API endpoints for leave management: This phase depends on src/modules/leave/leave.model.ts and src/modules/leave/leave.service.ts from p",
   "scope": {
@@ -23,13 +23,13 @@
     },
     {
       "id": "sc-002",
-      "description": "src/modules/leave/leave.repository.ts exists and exports the LeaveRepository interface with create, findById, and findByEmployeeId methods operating on LeaveRequest types imported from leave.model.ts.",
+      "description": "src/modules/leave/leave.repository.ts exists and exports the LeaveRepository interface with create, findById, and findByEmployeeId methods operating on LeaveRequest types from leave.model.ts.",
       "testable": true,
       "layer": "unit"
     },
     {
       "id": "sc-003",
-      "description": "src/modules/leave/postgres-leave.repository.ts exists and exports PostgresLeaveRepository implementing LeaveRepository using PostgreSQL through pg.Pool.",
+      "description": "src/modules/leave/postgres-leave.repository.ts exists and exports PostgresLeaveRepository implementing LeaveRepository using PostgreSQL through pg Pool.",
       "testable": true,
       "layer": "integration"
     },
@@ -41,46 +41,44 @@
     },
     {
       "id": "sc-005",
-      "description": "Vitest repository tests verify create, findById, and findByEmployeeId behavior and validate repository usage of LeaveRequest types.",
+      "description": "Vitest repository tests verify persistence of LeaveRequest records, retrieval by id, and listing by employeeId while referencing the canonical LeaveRequest model types.",
       "testable": true,
       "layer": "integration"
     }
   ],
   "constraints": [
-    "Use the repository pattern: all leave persistence access must be defined through the LeaveRepository interface.",
-    "LeaveRepository methods must operate on LeaveRequest types imported from src/modules/leave/leave.model.ts.",
-    "PostgresLeaveRepository is the only repository implementation in this phase and must use pg.Pool for PostgreSQL persistence.",
-    "The leave_requests schema must match the provided SQL schema, including enum-like constraints and indexes.",
-    "All state-changing operations must write an audit record in accordance with platform standards.",
+    "All database access must go through repository interfaces (Repository pattern).",
+    "PostgresLeaveRepository must implement LeaveRepository and use LeaveRequest types imported from src/modules/leave/leave.model.ts.",
+    "All LeaveRequest type definitions remain centralized in src/modules/leave/leave.model.ts for this phase.",
+    "All state-changing operations must write an audit record.",
     "No sensitive data may be logged.",
-    "No unhandled promise rejections; all asynchronous errors must be caught and handled.",
-    "Keep leave type definitions and repository code within the leave module for this phase."
+    "No unhandled promise rejections; all async errors must be caught and handled.",
+    "Scope is limited to leave domain models, repository contracts/implementation, migration, and repository tests defined for Phase 1."
   ],
   "outOfScope": [
-    "Leave application workflow implementation",
-    "Leave approval and rejection workflow implementation",
-    "Fastify API endpoints",
-    "RBAC endpoint enforcement",
-    "API input validation logic",
-    "UI or frontend functionality",
-    "Service-layer business workflows beyond repository and model definitions"
+    "Leave application workflow implementation (Phase 2).",
+    "Approval and rejection workflow implementation (Phase 3).",
+    "Fastify API endpoints and API-layer concerns for leave management (Phase 4).",
+    "Leave service layer business workflows not described in this phase.",
+    "UI functionality.",
+    "Additional repository methods beyond create, findById, and findByEmployeeId."
   ],
   "ambiguities": [
     {
       "id": "amb-001",
-      "description": "The requested repository test file path differs from the architecture notes.",
+      "description": "The requested test file path differs from the architecture specification.",
       "options": [
-        "Create tests/unit/modules/leave/leave.repository.spec.ts as stated in the intent",
-        "Create src/modules/leave/postgres-leave.repository.test.ts as stated in the architecture notes"
+        "Create tests/unit/modules/leave/leave.repository.spec.ts as stated in the intent.",
+        "Create src/modules/leave/postgres-leave.repository.test.ts as stated in the architecture notes."
       ],
       "impactIfWrong": "medium"
     },
     {
       "id": "amb-002",
-      "description": "The intent mentions DTOs used by persistence, but the architecture only explicitly defines LeaveRequest and related type aliases.",
+      "description": "The intent mentions DTOs used by persistence, but the architecture only defines LeaveType, LeaveRequestStatus, and LeaveRequest.",
       "options": [
-        "Only export LeaveType, LeaveRequestStatus, and LeaveRequest",
-        "Add separate persistence DTO types in leave.model.ts in addition to LeaveRequest"
+        "Define only the types explicitly listed in the architecture.",
+        "Add separate persistence DTO types in leave.model.ts in addition to LeaveRequest."
       ],
       "impactIfWrong": "medium"
     }

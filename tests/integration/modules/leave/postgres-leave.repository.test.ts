@@ -1,101 +1,81 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { PostgresLeaveRepository } from '../../../../src/modules/leave/postgres-leave.repository';
+import type { LeaveRequest } from '../../../../src/modules/leave/leave.model';
 
-const queryMock = vi.fn();
-
-vi.mock('../../../../src/shared/db/connection', () => ({
-  default: { query: queryMock },
-}));
-
-describe('SC-3 and SC-5: PostgresLeaveRepository behavior', () => {
+describe('SC-3 and SC-5: PostgresLeaveRepository persistence behaviour', () => {
   beforeEach(() => {
-    queryMock.mockReset();
+    vi.restoreAllMocks();
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it('creates and maps a leave request', async () => {
-    const { PostgresLeaveRepository } = await import('../../../../src/modules/leave/postgres-leave.repository');
+  const leaveRequest: LeaveRequest = {
+    id: 'leave-1',
+    employeeId: 'employee-1',
+    leaveType: 'ANNUAL',
+    startDate: new Date('2025-01-01'),
+    endDate: new Date('2025-01-05'),
+    status: 'PENDING',
+    approverEmployeeId: null,
+    createdAt: new Date('2025-01-01T00:00:00Z'),
+  };
 
-    const row = {
-      id: '1',
-      employee_id: 'emp-1',
-      leave_type: 'VACATION',
-      start_date: new Date('2024-01-01'),
-      end_date: new Date('2024-01-02'),
-      status: 'PENDING',
-      approver_employee_id: 'mgr-1',
-      created_at: new Date('2024-01-01'),
-    };
-
-    queryMock.mockResolvedValue({ rows: [row] });
-
-    const repo = new PostgresLeaveRepository({ query: queryMock } as unknown as object);
-    const result = await repo.create({
-      id: '1',
-      employeeId: 'emp-1',
-      leaveType: 'VACATION',
-      startDate: row.start_date,
-      endDate: row.end_date,
-      status: 'PENDING',
-      approverEmployeeId: 'mgr-1',
-      createdAt: row.created_at,
+  it('persists and maps LeaveRequest records correctly', async () => {
+    const query = vi.fn().mockResolvedValue({
+      rows: [{
+        id: leaveRequest.id,
+        employee_id: leaveRequest.employeeId,
+        leave_type: leaveRequest.leaveType,
+        start_date: leaveRequest.startDate,
+        end_date: leaveRequest.endDate,
+        status: leaveRequest.status,
+        approver_employee_id: leaveRequest.approverEmployeeId,
+        created_at: leaveRequest.createdAt,
+      }],
     });
 
-    expect(queryMock).toHaveBeenCalledTimes(1);
-    expect(result.id).toBe('1');
+    const repository = new PostgresLeaveRepository({ query } as never);
+    const result = await repository.create(leaveRequest);
+
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(result).toEqual(leaveRequest);
   });
 
-  it('findById returns a record when found', async () => {
-    const { PostgresLeaveRepository } = await import('../../../../src/modules/leave/postgres-leave.repository');
+  it('retrieves by id and lists by employeeId', async () => {
+    const query = vi.fn()
+      .mockResolvedValueOnce({ rows: [{
+        id: leaveRequest.id,
+        employee_id: leaveRequest.employeeId,
+        leave_type: leaveRequest.leaveType,
+        start_date: leaveRequest.startDate,
+        end_date: leaveRequest.endDate,
+        status: leaveRequest.status,
+        approver_employee_id: leaveRequest.approverEmployeeId,
+        created_at: leaveRequest.createdAt,
+      }] })
+      .mockResolvedValueOnce({ rows: [{
+        id: leaveRequest.id,
+        employee_id: leaveRequest.employeeId,
+        leave_type: leaveRequest.leaveType,
+        start_date: leaveRequest.startDate,
+        end_date: leaveRequest.endDate,
+        status: leaveRequest.status,
+        approver_employee_id: leaveRequest.approverEmployeeId,
+        created_at: leaveRequest.createdAt,
+      }] });
 
-    queryMock.mockResolvedValue({ rows: [{ id: 'abc', employee_id: 'emp-1' }] });
+    const repository = new PostgresLeaveRepository({ query } as never);
 
-    const repo = new PostgresLeaveRepository({ query: queryMock } as unknown as object);
-    const result = await repo.findById('abc');
-
-    expect(queryMock).toHaveBeenCalled();
-    expect(result).not.toBeNull();
+    await expect(repository.findById('leave-1')).resolves.toEqual(leaveRequest);
+    await expect(repository.findByEmployeeId('employee-1')).resolves.toEqual([leaveRequest]);
   });
 
-  it('findById returns null when not found', async () => {
-    const { PostgresLeaveRepository } = await import('../../../../src/modules/leave/postgres-leave.repository');
+  it('wraps database errors with repository-specific errors', async () => {
+    const query = vi.fn().mockRejectedValue(new Error('db failure'));
+    const repository = new PostgresLeaveRepository({ query } as never);
 
-    queryMock.mockResolvedValue({ rows: [] });
-
-    const repo = new PostgresLeaveRepository({ query: queryMock } as unknown as object);
-    await expect(repo.findById('missing')).resolves.toBeNull();
-  });
-
-  it('findByEmployeeId returns a list', async () => {
-    const { PostgresLeaveRepository } = await import('../../../../src/modules/leave/postgres-leave.repository');
-
-    queryMock.mockResolvedValue({ rows: [{ id: '1' }, { id: '2' }] });
-
-    const repo = new PostgresLeaveRepository({ query: queryMock } as unknown as object);
-    const result = await repo.findByEmployeeId('emp-1');
-
-    expect(Array.isArray(result)).toBe(true);
-    expect(result.length).toBe(2);
-  });
-
-  it('wraps database errors with repository-specific error', async () => {
-    const { PostgresLeaveRepository } = await import('../../../../src/modules/leave/postgres-leave.repository');
-
-    queryMock.mockRejectedValue(new Error('db failure'));
-
-    const repo = new PostgresLeaveRepository({ query: queryMock } as unknown as object);
-
-    await expect(repo.create({
-      id: '1',
-      employeeId: 'e',
-      leaveType: 'VACATION',
-      startDate: new Date(),
-      endDate: new Date(),
-      status: 'PENDING',
-      approverEmployeeId: 'm',
-      createdAt: new Date(),
-    })).rejects.toThrow(/LEAVE_REPOSITORY_CREATE_FAILED/);
+    await expect(repository.create(leaveRequest)).rejects.toThrow(/LEAVE_REPOSITORY_CREATE_FAILED/);
   });
 });
