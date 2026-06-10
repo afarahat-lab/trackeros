@@ -40,3 +40,6 @@ src/shared/error types.ts
 - All database access goes through a repository layer — no inline SQL
   / ORM calls in route handlers or business logic
 - No circular dependencies between modules
+
+## Leave Management Module
+This module handles leave requests, approvals, and leave balance tracking for employees.
