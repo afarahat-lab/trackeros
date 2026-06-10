@@ -9,39 +9,40 @@ describe('SC-1: leave.model exports and shape', () => {
     vi.restoreAllMocks();
   });
 
-  it('exports LeaveType, LeaveRequestStatus, and LeaveRequest-related symbols', async () => {
+  it('exports LeaveType, LeaveRequestStatus, and LeaveRequest', async () => {
     const mod = await import('../../../../src/modules/leave/leave.model');
 
-    expect(mod).toBeDefined();
-    expect('LeaveType' in mod).toBe(true);
-    expect('LeaveRequestStatus' in mod).toBe(true);
+    expect(mod).toHaveProperty('LeaveType');
+    expect(mod).toHaveProperty('LeaveRequestStatus');
   });
 
-  it('defines leave request fields on a representative object shape', async () => {
-    const mod = await import('../../../../src/modules/leave/leave.model');
+  it('defines LeaveRequest fields in source', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
 
-    const sample: Record<string, unknown> = {
-      id: 'leave-1',
-      employeeId: 'emp-1',
-      leaveType: (mod as Record<string, unknown>).LeaveType,
-      startDate: new Date(),
-      endDate: new Date(),
-      status: (mod as Record<string, unknown>).LeaveRequestStatus,
-      approverEmployeeId: 'manager-1',
-      createdAt: new Date(),
-    };
+    const filePath = path.resolve(process.cwd(), 'src/modules/leave/leave.model.ts');
+    expect(fs.existsSync(filePath)).toBe(true);
 
-    expect(sample).toHaveProperty('id');
-    expect(sample).toHaveProperty('employeeId');
-    expect(sample).toHaveProperty('leaveType');
-    expect(sample).toHaveProperty('startDate');
-    expect(sample).toHaveProperty('endDate');
-    expect(sample).toHaveProperty('status');
-    expect(sample).toHaveProperty('approverEmployeeId');
-    expect(sample).toHaveProperty('createdAt');
+    const content = fs.readFileSync(filePath, 'utf8');
+
+    const requiredFields = [
+      'id',
+      'employeeId',
+      'leaveType',
+      'startDate',
+      'endDate',
+      'status',
+      'approverEmployeeId',
+      'createdAt',
+    ];
+
+    for (const field of requiredFields) {
+      expect(content).toContain(field);
+    }
   });
 
-  it('fails when importing a non-existent model path', async () => {
-    await expect(import('../../../../src/modules/leave/does-not-exist')).rejects.toBeDefined();
+  it('fails when model file is missing', async () => {
+    const fs = await import('node:fs');
+    expect(fs.existsSync('src/modules/leave/leave.model.ts')).toBe(true);
   });
 });
