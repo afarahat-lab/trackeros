@@ -1,6 +1,4 @@
-// Leave Model
-
-import type { LeaveType } from '../../shared/types/index';
+import { LeaveType } from '../../shared/types/index.ts';
 
 /**
  * Interface representing a leave request.

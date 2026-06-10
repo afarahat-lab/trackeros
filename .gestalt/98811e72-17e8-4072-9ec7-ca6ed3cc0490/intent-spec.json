@@ -1,5 +1,5 @@
 {
-  "id": "9f0ddfa2-5674-4d0a-a7fa-4f7c0db0f5b5",
+  "id": "5c64351e-0bd4-48e7-bf60-b73ce53e75a0",
   "correlationId": "98811e72-17e8-4072-9ec7-ca6ed3cc0490",
   "rawIntent": "[Feature: Build the leave management module — Phase 1: Create leave model]\n\nCreate src/modules/leave/leave.model.ts. Define LeaveRequest, CreateLeaveRequestDto. Import LeaveType from src/shared/types/index.ts.\n\nPhase architecture notes:\n{\"interfaces\":[\"interface LeaveRequest { id: string; employeeId: string; leaveType: string; startDate: Date; endDate: Date; status: string; }\"],\"importStatements\":[\"import { Pool } from \\\"src/shared/db/connection\\\"\"],\"successCriteria\":[\"src/modules/leave/leave.model.ts exists and exports LeaveRequest\",\"src/modules/leave/leave.repository.ts exists and contains methods for CRUD operations on LeaveRequest\"]}\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"interface LeaveRequest { id: string; employeeId: string; leaveType: string; startDate: Date; endDate: Date; status: string; }\"],\"importStatements\":[\"import { Pool } from \\\"src/shared/db/connection\\\"\"],\"successCriteria\":[\"src/modules/leave/leave.model.ts exists and exports LeaveRequest\",\"src/modules/leave/leave.repository.ts exists and contains methods for CRUD operations on LeaveRequest\"]}",
   "scope": {

@@ -55,7 +55,6 @@ None
 - **Path**: /api/v1/leave-requests/{id}
 - **Description**: Updates an existing leave request
 - **Request Body**:
-  - employeeId: string
   - leaveType: string
   - startDate: Date
   - endDate: Date
@@ -75,7 +74,6 @@ None
 - **Path**: /api/v1/leave-requests/{id}
 - **Description**: Deletes a specific leave request by ID
 - **Request Body**: {}
-- **Response Body**:
-  - message: "Leave request deleted successfully"
+- **Response Body**: {}
 - **Auth Required**: true
 - **Roles**: admin, operator

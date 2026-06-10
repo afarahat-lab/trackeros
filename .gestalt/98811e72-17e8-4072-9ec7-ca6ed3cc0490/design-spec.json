@@ -89,7 +89,6 @@
       "path": "/api/v1/leave-requests/{id}",
       "description": "Updates an existing leave request",
       "requestBody": {
-        "employeeId": "string",
         "leaveType": "string",
         "startDate": "Date",
         "endDate": "Date",
@@ -114,9 +113,7 @@
       "path": "/api/v1/leave-requests/{id}",
       "description": "Deletes a specific leave request by ID",
       "requestBody": {},
-      "responseBody": {
-        "message": "Leave request deleted successfully"
-      },
+      "responseBody": {},
       "authRequired": true,
       "roles": [
         "admin",
