@@ -1,11 +1,11 @@
 {
-  "id": "65fd11d4-4f5e-4f7f-8d07-cbef01b48a2d",
+  "id": "665a406f-8b97-48f5-b7e7-809d3074994b",
   "correlationId": "b1a244ec-8aa3-4423-9889-8ea9ae1cd876",
   "rawIntent": "[Feature: Build the leave management module — Phase 1: LeaveRequest domain model and repository]\n\nCreate approximately 4-5 files under src/modules/leave and src/modules/audit. Create src/modules/leave/leave.model.ts defining LeaveRequest and DTO/types required by repository operations. Create src/modules/leave/leave.repository.ts implementing PostgreSQL-backed persistence for LeaveRequest. Create src/modules/audit/audit.model.ts defining AuditRecord and src/modules/audit/audit.repository.ts for audit persistence. Include a unit test file under tests/unit/modules/leave/ covering LeaveRequest repository CRUD behavior. Keep domain model files and repositories in the same phase.\n\nPhase architecture notes:\nEstablish core LeaveRequest and AuditRecord persistence boundaries before workflow logic.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/leave/leave.model.ts\\nexport type LeaveRequestStatus = \\\"PENDING\\\" | \\\"APPROVED\\\" | \\\"REJECTED\\\" | \\\"CANCELLED\\\";\\nexport type LeaveType = \\\"ANNUAL\\\" | \\\"SICK\\\" | \\\"EMERGENCY\\\";\\n\\nexport interface LeaveRequest {\\n  id: string;\\n  employeeId: string;\\n  leaveType: LeaveType;\\n  startDate: Date;\\n  endDate: Date;\\n  status: LeaveRequestStatus;\\n  createdAt: Date;\\n  updatedAt: Date;\\n}\\n\\nexport interface CreateLeaveRequestDTO {\\n  employeeId: string;\\n  leaveType: LeaveType;\\n  startDate: Date;\\n  endDate: Date;\\n}\\n\\nexport interface UpdateLeaveRequestStatusDTO {\\n  id: string;\\n  status: LeaveRequestStatus;\\n}\",\"File: src/modules/audit/audit.model.ts\\nexport interface AuditRecord {\\n  id: string;\\n  entityType: string;\\n  entityId: string;\\n  action: string;\\n  createdAt: Date;\\n}\",\"File: src/modules/audit/audit.repository.ts\\nimport { Pool } from \\\"pg\\\";\\nimport { AuditRecord } from \\\"./audit.model\\\";\\n\\nexport interface AuditRecordRepository {\\n  create(record: AuditRecord): Promise<AuditRecord>;\\n}\\n\\nexport class PostgreSqlAuditRecordRepository implements AuditRecordRepository {\\n  constructor(private readonly pool: Pool) {}\\n\\n  async create(record: AuditRecord): Promise<AuditRecord> {\\n    throw new Error(\\\"Not implemented\\\");\\n  }\\n}\",\"File: src/modules/leave/leave.repository.ts\\nimport { Pool } from \\\"pg\\\";\\nimport { AuditRecordRepository } from \\\"../audit/audit.repository\\\";\\nimport { CreateLeaveRequestDTO, LeaveRequest, LeaveRequestStatus } from \\\"./leave.model\\\";\\n\\nexport interface LeaveRequestRepository {\\n  create(data: CreateLeaveRequestDTO): Promise<LeaveRequest>;\\n  findById(id: string): Promise<LeaveRequest | null>;\\n  updateStatus(id: string, status: LeaveRequestStatus): Promise<LeaveRequest>;\\n  delete(id: string): Promise<void>;\\n}\\n\\nexport class PostgreSqlLeaveRequestRepository implements LeaveRequestRepository {\\n  constructor(\\n    private readonly pool: Pool,\\n    private readonly auditRepository: AuditRecordRepository\\n  ) {}\\n\\n  async create(data: CreateLeaveRequestDTO): Promise<LeaveRequest> {\\n    throw new Error(\\\"Not implemented\\\");\\n  }\\n\\n  async findById(id: string): Promise<LeaveRequest | null> {\\n    throw new Error(\\\"Not implemented\\\");\\n  }\\n\\n  async updateStatus(id: string, status: LeaveRequestStatus): Promise<LeaveRequest> {\\n    throw new Error(\\\"Not implemented\\\");\\n  }\\n\\n  async delete(id: string): Promise<void> {\\n    throw new Error(\\\"Not implemented\\\");\\n  }\\n}\",\"File: tests/unit/modules/leave/leave.repository.test.ts\\nimport { describe, it, expect } from \\\"vitest\\\";\\n\\ndescribe(\\\"PostgreSqlLeaveRequestRepository\\\", () => {\\n  it(\\\"creates, reads, updates, and deletes leave requests\\\", async () => {\\n    expect(true).toBe(true);\\n  });\\n});\"],\"importStatements\":[\"import { AuditRecord } from \\\"./audit.model\\\"\",\"import { Pool } from \\\"pg\\\"\",\"import { AuditRecordRepository } from \\\"../audit/audit.repository\\\"\",\"import { CreateLeaveRequestDTO, LeaveRequest, LeaveRequestStatus } from \\\"./leave.model\\\"\",\"import { describe, it, expect } from \\\"vitest\\\"\"],\"successCriteria\":[\"src/modules/leave/leave.model.ts exists and exports LeaveRequest, LeaveRequestStatus, LeaveType, CreateLeaveRequestDTO, and UpdateLeaveRequestStatusDTO.\",\"src/modules/audit/audit.model.ts and src/modules/audit/audit.repository.ts exist and PostgreSqlAuditRecordRepository implements AuditRecordRepository using PostgreSQL persistence.\",\"src/modules/leave/leave.repository.ts exists and exports LeaveRequestRepository and PostgreSqlLeaveRequestRepository with create, findById, updateStatus, and delete method signatures.\",\"All state-changing repository methods in src/modules/leave/leave.repository.ts write an audit record through AuditRecordRepository, satisfying the repository-pattern and audit-record requirements.\",\"tests/unit/modules/leave/leave.repository.test.ts exists and executes with Vitest, verifying create, read, updateStatus, and delete repository behavior.\"],\"sqlSchema\":\"CREATE TABLE leave_requests (\\n  id UUID PRIMARY KEY,\\n  employee_id UUID NOT NULL,\\n  leave_type VARCHAR(32) NOT NULL,\\n  start_date TIMESTAMP NOT NULL,\\n  end_date TIMESTAMP NOT NULL,\\n  status VARCHAR(16) NOT NULL,\\n  created_at TIMESTAMP NOT NULL,\\n  updated_at TIMESTAMP NOT NULL\\n);\\n\\nCREATE TABLE audit_records (\\n  id UUID PRIMARY KEY,\\n  entity_type VARCHAR(64) NOT NULL,\\n  entity_id UUID NOT NULL,\\n  action VARCHAR(64) NOT NULL,\\n  created_at TIMESTAMP NOT NULL\\n);\"}\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 2 — Create and cancel leave requests: This phase depends on src/modules/leave/leave.model.ts, src/modules/leave/leave.repository.ts, src/m\n- Phase 3 — Notification domain model and repository: Create approximately 3-5 files under src/modules/notification. Create src/modules/notification/notif\n- Phase 4 — Leave approval and rejection workflow: This phase depends on src/modules/leave/leave.model.ts, src/modules/leave/leave.repository.ts, src/m\n- Phase 5 — LeaveBalance domain model and repository: Create approximately 4-5 files under src/modules/balance. Create src/modules/balance/leave-balance.m\n- Phase 6 — LeavePolicy domain model and repository: Create approximately 4-5 files under src/modules/policy. Create src/modules/policy/leave-policy.mode\n- Phase 7 — Employee integration, RBAC, balance consumption, and compliance coverage: This phase depends on src/modules/leave/leave.model.ts, src/modules/leave/leave.service.ts, src/modu",
   "scope": {
     "affectedDomains": [
-      "leave",
-      "audit"
+      "LeaveRequest",
+      "AuditRecord"
     ],
     "affectedLayers": [
       "domain",
@@ -18,63 +18,79 @@
   "successCriteria": [
     {
       "id": "sc-001",
-      "description": "src/modules/leave/leave.model.ts exists and exports LeaveRequest, LeaveRequestStatus, LeaveType, CreateLeaveRequestDTO, and UpdateLeaveRequestStatusDTO with the architecture-defined shapes.",
+      "description": "src/modules/leave/leave.model.ts exists and exports LeaveRequest, LeaveRequestStatus, LeaveType, CreateLeaveRequestDTO, and UpdateLeaveRequestStatusDTO matching the specified interfaces.",
       "testable": true,
       "layer": "unit"
     },
     {
       "id": "sc-002",
-      "description": "src/modules/audit/audit.model.ts exists and exports AuditRecord; src/modules/audit/audit.repository.ts exists and exports AuditRecordRepository and PostgreSqlAuditRecordRepository with PostgreSQL-backed create persistence.",
+      "description": "src/modules/audit/audit.model.ts exists and exports the AuditRecord interface with the specified fields.",
       "testable": true,
       "layer": "unit"
     },
     {
       "id": "sc-003",
-      "description": "src/modules/leave/leave.repository.ts exists and exports LeaveRequestRepository and PostgreSqlLeaveRequestRepository with create, findById, updateStatus, and delete methods matching the specified interfaces.",
+      "description": "src/modules/audit/audit.repository.ts exports AuditRecordRepository and PostgreSqlAuditRecordRepository implementing PostgreSQL-backed audit record persistence through a pg Pool.",
       "testable": true,
-      "layer": "unit"
+      "layer": "integration"
     },
     {
       "id": "sc-004",
-      "description": "All state-changing LeaveRequest repository methods (create, updateStatus, delete) write an AuditRecord through AuditRecordRepository.",
+      "description": "src/modules/leave/leave.repository.ts exports LeaveRequestRepository and PostgreSqlLeaveRequestRepository with create, findById, updateStatus, and delete methods using PostgreSQL-backed persistence.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "sc-005",
+      "description": "All state-changing LeaveRequest repository operations (create, updateStatus, delete) write audit records via AuditRecordRepository.",
       "testable": true,
       "layer": "unit"
     },
     {
-      "id": "sc-005",
+      "id": "sc-006",
       "description": "tests/unit/modules/leave/leave.repository.test.ts exists and verifies create, read, updateStatus, and delete repository behavior using Vitest.",
       "testable": true,
       "layer": "unit"
     }
   ],
   "constraints": [
-    "Use the repository pattern: all database access must be encapsulated behind repository interfaces.",
-    "Implement PostgreSQL-backed persistence using the provided SQL schema and pg Pool dependencies.",
-    "All state-changing operations must create an audit record, satisfying the audit-record requirement.",
-    "Keep scope limited to LeaveRequest and AuditRecord domain models, repositories, and the specified unit test.",
-    "Respect module dependency direction: leave may depend on audit, but no reverse dependency from audit to leave.",
-    "No unhandled promise rejections; all async errors must be caught and handled appropriately.",
-    "Do not introduce workflow logic, approval flows, notifications, balances, policies, employee integration, RBAC endpoints, or API layers in this phase.",
-    "Repository interfaces and exported types must match the architecture-defined contracts."
+    "Repository pattern: all database access must go through repository interfaces.",
+    "Audit records: all state-changing operations must write an audit record.",
+    "Use the specified PostgreSQL-backed repository implementations and pg Pool dependency.",
+    "Keep scope limited to LeaveRequest and AuditRecord models, repositories, and the repository unit test.",
+    "Implement repository contracts and persistence boundaries before workflow logic.",
+    "No unhandled promise rejections; all async errors must be caught and handled.",
+    "No sensitive data in logs.",
+    "Do not introduce reverse dependencies that violate the module dependency rules.",
+    "Input validation, API endpoints, and RBAC enforcement are not to be implemented in this phase because no API surface is being added."
   ],
   "outOfScope": [
-    "Leave request submission, approval, rejection, or cancellation workflow services",
-    "Notification domain model, repositories, or event generation",
-    "LeaveBalance domain model, repositories, or balance deduction logic",
-    "LeavePolicy domain model, repositories, or rule evaluation",
-    "Employee integration and manager relationship logic",
-    "API endpoints, request validation layers, and RBAC enforcement implementations",
-    "React Native UI changes",
-    "Database migrations or schema changes beyond assuming the provided schema",
-    "Phase 2 through Phase 7 functionality described as deferred"
+    "Leave request workflow logic such as submit, approve, reject, or cancel operations beyond repository persistence methods.",
+    "Notification domain models, repositories, or workflow integration.",
+    "LeaveBalance domain models, repositories, or balance deduction behavior.",
+    "LeavePolicy domain models, repositories, or rule evaluation.",
+    "Employee integration beyond storing employeeId on LeaveRequest.",
+    "API endpoints, Fastify routes, controllers, request validation, and RBAC implementation.",
+    "React Native UI changes.",
+    "Database migrations or schema changes beyond using the provided schema contract.",
+    "Phase 2 through Phase 7 functionality explicitly deferred in the intent."
   ],
   "ambiguities": [
     {
       "id": "amb-001",
-      "description": "The unit test requirement specifies CRUD verification but does not define whether tests should use a real PostgreSQL instance, a test database, or mocked Pool/AuditRecordRepository dependencies.",
+      "description": "The intent says to create approximately 4-5 files, but the detailed architecture explicitly lists five files including the unit test.",
       "options": [
-        "Use mocked PostgreSQL and audit repository dependencies for isolated unit tests",
-        "Use an integration-style test against a real or ephemeral PostgreSQL database"
+        "Create exactly the five listed files.",
+        "Treat 4-5 as flexible and create only four implementation files without the test."
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "id": "amb-002",
+      "description": "AuditRecordRepository defines only a create method, but the expected persistence behavior and error-handling details are not specified.",
+      "options": [
+        "Implement only the create operation required by the interface.",
+        "Add additional audit repository methods beyond create."
       ],
       "impactIfWrong": "medium"
     }

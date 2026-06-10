@@ -49,7 +49,7 @@
       "relationships": [
         {
           "entity": "Employee",
-          "type": "one-to-many"
+          "type": "one-to-one"
         }
       ]
     },
@@ -83,7 +83,12 @@
           "required": true
         }
       ],
-      "relationships": []
+      "relationships": [
+        {
+          "entity": "LeaveRequest",
+          "type": "one-to-one"
+        }
+      ]
     }
   ],
   "apiContracts": [],

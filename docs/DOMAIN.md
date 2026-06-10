@@ -19,7 +19,7 @@ Fields:
 - updatedAt: Date (required)
 
 Relationships:
-- Employee (one-to-many)
+- Employee (one-to-one)
 
 ### AuditRecord
 
@@ -33,4 +33,4 @@ Fields:
 - createdAt: Date (required)
 
 Relationships:
-- None
+- LeaveRequest (one-to-one)

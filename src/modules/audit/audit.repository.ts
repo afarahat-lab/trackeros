@@ -11,17 +11,23 @@ export class PostgreSqlAuditRecordRepository implements AuditRecordRepository {
 
   /** Creates an audit record. */
   public async create(record: AuditRecord): Promise<AuditRecord> {
-    const persisted: AuditRecord = {
-      ...record,
-      id: record.id || randomUUID()
-    };
+    try {
+      const persisted: AuditRecord = {
+        ...record,
+        id: record.id || randomUUID()
+      };
 
-    await this.pool.query(
-      `INSERT INTO audit_records (id, entity_type, entity_id, action, created_at)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [persisted.id, persisted.entityType, persisted.entityId, persisted.action, persisted.createdAt]
-    );
+      await this.pool.query(
+        `INSERT INTO audit_records (id, entity_type, entity_id, action, created_at)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [persisted.id, persisted.entityType, persisted.entityId, persisted.action, persisted.createdAt]
+      );
 
-    return persisted;
+      return persisted;
+    } catch (error: unknown) {
+      throw new Error(
+        `AUDIT_RECORD_CREATE_FAILED:${error instanceof Error ? error.message : "unknown_error"}`
+      );
+    }
   }
 }
