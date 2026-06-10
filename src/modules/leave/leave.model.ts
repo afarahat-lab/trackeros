@@ -1,8 +1,8 @@
-// Leave model and DTO definitions
+// Leave Model
 import type { LeaveType } from '../../shared/types/index';
 
 /**
- * Represents a leave request.
+ * Interface representing a leave request.
  */
 export interface LeaveRequest {
   id: string;
