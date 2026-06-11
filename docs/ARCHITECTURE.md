@@ -478,3 +478,20 @@ CREATE TABLE audit_records (
   action VARCHAR(100) NOT NULL
 );
 CREATE INDEX idx_audit_records_entity ON audit_records(entity_type, entity_id);
+
+## Leave Management — Extended Domain Concepts
+
+### LeaveRequest state machine
+- **PENDING** → **APPROVED** (via manager approval)
+- **PENDING** → **REJECTED** (via manager rejection)
+
+### Enumerations introduced
+- **LeaveType**: `ANNUAL`, `SICK`, `EMERGENCY`
+- **LeaveStatus**: `PENDING`, `APPROVED`, `REJECTED`
+
+### Cross-module relationships
+- `LeaveRequest` references `Employee` (submitter) and `Employee` (reviewer).
+- `LeaveRequest` references `LeavePolicy` to validate entitlement.
+- An approved `LeaveRequest` causes `LeaveBalance` to be decremented by the `leave` module via the `balance` module's public interface.
+- `LeaveRequest` state changes publish `Notification` events through the `notification` module.
+- All mutating operations on `LeaveRequest` produce an audit record per GP-002.
