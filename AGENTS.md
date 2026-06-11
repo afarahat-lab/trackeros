@@ -59,6 +59,7 @@ user projects use whatever stack matches their description.
 ## What agents must never do
 
 - Violate principle GP-003 as defined in `GOLDEN_PRINCIPLES.md`.
+- Violate principle GP-004 as defined in `GOLDEN_PRINCIPLES.md`.
 
 ## When context is missing
 
