@@ -9,3 +9,7 @@ Represents a leave record managed by the `leave` module, including leave request
 ## balance
 
 Represents leave balance data managed by the `balance` module, including tracked entitlement, accrual, and remaining leave amounts.
+
+## employee
+
+Represents employee data managed by the `employee` module, including employee records and related personnel information.
