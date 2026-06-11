@@ -310,3 +310,46 @@ Architecture Style: modular-monolith using TypeScript, Node.js 20, Fastify, Post
 - leave -> balance
 - leave -> notification
 - leave -> audit
+
+## Leave Management Module
+
+### Domain Entities
+- LeaveRequest(id, employeeId, leaveType, startDate, endDate, status)
+- LeaveBalance(employeeId, leaveType, remainingDays)
+- Employee(id, managerId, role)
+- LeavePolicy(id, leaveType, annualEntitlement)
+- Notification(id, recipientEmployeeId, type, status)
+- AuditRecord(id, entityType, entityId, action, actorEmployeeId, createdAt)
+
+### Leave Types
+- ANNUAL
+- SICK
+- EMERGENCY
+
+### LeaveRequest Lifecycle
+- PENDING: created by submitLeaveRequest
+- APPROVED: reached through approveLeaveRequest
+- REJECTED: reached through rejectLeaveRequest
+
+### Module Ownership
+- src/modules/leave owns leave request lifecycle and workflow coordination.
+- src/modules/balance owns leave balance records and adjustments.
+- src/modules/employee owns reporting relationships and role data.
+- src/modules/policy owns leave entitlement rules.
+- src/modules/notification owns workflow notifications.
+- src/modules/audit owns audit record persistence.
+
+### Dependency Direction
+- leave -> employee
+- leave -> policy
+- leave -> balance
+- leave -> notification
+- leave -> audit
+
+### Cross-Cutting Rules
+- All database access uses repository interfaces with PostgreSQL-backed implementations.
+- Every state-changing operation creates an AuditRecord.
+- API boundaries validate inputs.
+- RBAC is enforced on all leave APIs.
+- Sensitive data is excluded from logs.
+- Async errors are handled explicitly.
