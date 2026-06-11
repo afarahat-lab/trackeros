@@ -35,17 +35,21 @@ agents:
     role: "Senior software architect"
     goal: "Extract a precise, unambiguous specification from a natural language intent"
     llm:
-      model: ~          # null = use platform default. Example: gpt-4o-mini
+      # TR_050 — DeepInfra-hosted DeepSeek-V3.2 (chat-completions
+      # apiShape); reasoning_effort intentionally omitted (not
+      # supported by DeepInfra OpenAI-compatible endpoint).
+      model: deepseek-ai/DeepSeek-V3.2
       temperature: 0.1
-      max_tokens: 2000
+      max_tokens: 4000
     prompt_extensions: []
 
   design-agent:
     role: "Senior software architect"
     goal: "Produce domain model changes, API contracts, and component specs"
     llm:
-      model: ~
-      temperature: 0.2
+      # TR_050 — DeepInfra DeepSeek-V3.2
+      model: deepseek-ai/DeepSeek-V3.2
+      temperature: 0.1
       max_tokens: 4000
     prompt_extensions: []
 
@@ -68,9 +72,17 @@ agents:
     role: "Senior TypeScript engineer"
     goal: "Generate production-quality TypeScript code that follows the project harness"
     llm:
-      model: ~          # Example: set to "gpt-4o" to use a specific model
-      temperature: 0.2
+      # TR_050 — DeepInfra DeepSeek-V3.2. The code-agent's resolved
+      # client also drives Aider (aider-code-agent.ts pulls
+      # client.getModel() + client.getBaseUrl() and forwards them
+      # as Aider's --model + OPENAI_API_BASE). Setting the model
+      # here is what changes Aider's backend — there is no
+      # separate codeGeneration.aiderModel field.
+      model: deepseek-ai/DeepSeek-V3.2
+      temperature: 0.1
       max_tokens: 8000
+      # No reasoning_effort — Aider drives its own reasoning loop;
+      # DeepInfra also does not support reasoning_effort.
     tools:
       builtin:
         - readFile          # read existing files before modifying
@@ -120,12 +132,27 @@ agents:
     prompt_extensions: []
 
   # ── Gate layer (Amendment 2026-06: tools enabled by default) ──
+  constraint-agent:
+    role: "Architectural constraint evaluator"
+    goal: "Verify generated code satisfies all project architectural rules using executeScript + read-only file tools"
+    llm:
+      # TR_050 — DeepInfra DeepSeek-V3.2 (no reasoning_effort —
+      # not supported by DeepInfra).
+      model: deepseek-ai/DeepSeek-V3.2
+      temperature: 0.0
+      max_tokens: 2000
+    tools:
+      builtin: [executeScript, readFile, searchFiles]
+    prompt_extensions: []
+
   review-agent:
     role: "Senior engineer and code reviewer"
     goal: "Assess generated code quality and architectural correctness — verify findings with executeScript before flagging"
     llm:
-      model: ~
-      temperature: 0.1
+      # TR_050 — DeepInfra DeepSeek-V3.2 (no reasoning_effort —
+      # not supported by DeepInfra).
+      model: deepseek-ai/DeepSeek-V3.2
+      temperature: 0.0
       max_tokens: 4000
     tools:
       # TEST_REPORT_007 — gains executeScript so it can `tsc --noEmit`
@@ -183,9 +210,14 @@ agents:
     role: "Senior software architect"
     goal: "Produce high-level architecture designs and focused per-phase technical specifications that fit the existing project structure"
     llm:
-      model: ~
+      # TR_050 — DeepInfra-hosted moonshotai/Kimi-K2.6 for the
+      # highest-stakes design call. reasoning_effort intentionally
+      # omitted (not supported by DeepInfra OpenAI-compatible
+      # endpoint); architecture quality relies on the model's base
+      # behaviour at temperature 0.1.
+      model: moonshotai/Kimi-K2.6
       temperature: 0.1
-      max_tokens: 3000
+      max_tokens: 12000
     prompt_extensions:
       - "Always ground your design in the existing ARCHITECTURE.md — extend it, never contradict it"
       - "High-level designs focus on domain entities, module boundaries, and dependency direction only — not implementation details"
@@ -206,9 +238,10 @@ agents:
     role: "Technical project planner"
     goal: "Decompose a feature into a sequence of small, independently deployable phases that each fit within Aider's effective context window"
     llm:
-      model: ~
+      # TR_050 — DeepInfra DeepSeek-V3.2 (no reasoning_effort).
+      model: deepseek-ai/DeepSeek-V3.2
       temperature: 0.1
-      max_tokens: 3000
+      max_tokens: 12000
     prompt_extensions:
       - "Each phase must touch at most 5 files — prefer 2-3 files per phase"
       - "Each phase must have a single clear concern (model, repository, service, routes — not combined)"
@@ -220,9 +253,10 @@ agents:
     role: "Technical delivery reviewer"
     goal: "Evaluate what was actually built in a completed phase, assess whether it matches the plan, and recommend adjustments to subsequent phases based on real results"
     llm:
-      model: ~
+      # TR_050 — DeepInfra DeepSeek-V3.2 (no reasoning_effort).
+      model: deepseek-ai/DeepSeek-V3.2
       temperature: 0.1
-      max_tokens: 2000
+      max_tokens: 8000
     tools:
       # TR_026 — executeScript is mandatory: the agent runs `git diff`
       # against the phase branch itself to discover what was built.
@@ -247,9 +281,12 @@ agents:
     role: "Autonomous failure analyst and recovery coordinator"
     goal: "Analyse failures and decide the correct recovery action: retry with fixes, submit a fix intent for systemic gaps, or escalate to human"
     llm:
-      model: ~        # set to "chat-latest" (registered in platform LLMs with apiShape: 'responses') for best reasoning
+      # TR_050 — DeepInfra-hosted moonshotai/Kimi-K2.6 for the
+      # routing-quality bar (retry vs fix-intent vs escalate).
+      # reasoning_effort intentionally omitted.
+      model: moonshotai/Kimi-K2.6
       temperature: 0.0
-      max_tokens: 2000
+      max_tokens: 6000
     prompt_extensions:
       - "Always ground your diagnosis in the actual error output — do not infer failures not evidenced in the provided context"
       - "A fix-intent is only appropriate when retrying the same intent would produce the same failure"
