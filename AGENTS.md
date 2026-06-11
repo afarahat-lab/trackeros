@@ -56,6 +56,10 @@ user projects use whatever stack matches their description.
 3. Every state-changing operation produces an audit record (GP-001)
 4. RBAC enforced at middleware, never inline (GP-002)
 
+## What agents must never do
+
+- Violate principle GP-003 as defined in `GOLDEN_PRINCIPLES.md`.
+
 ## When context is missing
 
 Emit a `CONTEXT_GAP` signal with the specific missing information identified.
