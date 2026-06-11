@@ -353,3 +353,45 @@ Architecture Style: modular-monolith using TypeScript, Node.js 20, Fastify, Post
 - RBAC is enforced on all leave APIs.
 - Sensitive data is excluded from logs.
 - Async errors are handled explicitly.
+
+## Leave Management Module
+
+### Domain Entities
+- LeaveRequest: leave application submitted by an employee.
+- LeaveBalance: remaining leave entitlement per employee and leave type.
+- LeavePolicy: entitlement and validation rules for leave types.
+- LeaveAuditRecord: immutable audit history for leave workflow actions.
+- Notification: workflow notification delivered to employees or managers.
+
+### LeaveRequest Status Values
+- PENDING: initial state after submission.
+- APPROVED: manager approved the request.
+- REJECTED: manager rejected the request.
+- CHANGES_REQUESTED: manager requested modifications before approval.
+
+### LeaveAuditRecord Action Values
+- SUBMITTED
+- APPROVED
+- REJECTED
+- CHANGES_REQUESTED
+
+### Module Ownership
+- src/modules/leave owns LeaveRequest, LeaveAuditRecord, workflow state transitions, and approval actions.
+- src/modules/balance owns LeaveBalance and balance adjustments.
+- src/modules/employee owns employee identity, manager relationships, and roles.
+- src/modules/policy owns leave entitlement rules.
+- src/modules/notification owns workflow notifications.
+
+### Dependency Direction
+- leave -> employee
+- leave -> policy
+- leave -> balance
+- leave -> notification
+
+### Workflow Rules
+- Employees submit leave requests.
+- Managers approve, reject, or request changes.
+- Approval decrements LeaveBalance.
+- Every LeaveRequest state change creates a LeaveAuditRecord.
+- All database access follows the repository pattern.
+- API endpoints require validation, RBAC enforcement, and safe error handling.
