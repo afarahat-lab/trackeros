@@ -395,3 +395,86 @@ Architecture Style: modular-monolith using TypeScript, Node.js 20, Fastify, Post
 - Every LeaveRequest state change creates a LeaveAuditRecord.
 - All database access follows the repository pattern.
 - API endpoints require validation, RBAC enforcement, and safe error handling.
+
+Add leave management domain.
+
+Entities:
+- LeaveRequest(id, employeeId, leaveType, status)
+- LeaveBalance(employeeId, leaveType, remainingDays)
+- Employee(id, managerId, role)
+- LeavePolicy(id, leaveType, annualEntitlement)
+- Notification(id, recipientEmployeeId, type, status)
+- AuditRecord(id, entityType, entityId, action)
+
+LeaveRequest statuses:
+- PENDING
+- APPROVED
+- REJECTED
+
+Supported leave types:
+- ANNUAL
+- SICK
+- EMERGENCY
+
+Relationships:
+- Employee submits many LeaveRequest records.
+- Employee may reference a manager through managerId.
+- LeaveBalance belongs to an Employee and leave type.
+- LeavePolicy defines entitlement for a leave type.
+- Notification targets an Employee.
+- AuditRecord tracks mutations across leave management entities.
+
+Repository pattern requirement:
+- All PostgreSQL access must occur through repository interfaces with concrete PostgreSQL repository implementations.
+
+SQL Schema:
+
+CREATE TABLE employees (
+  id UUID PRIMARY KEY,
+  manager_id UUID NULL,
+  role VARCHAR(50) NOT NULL,
+  CONSTRAINT fk_employee_manager FOREIGN KEY (manager_id) REFERENCES employees(id)
+);
+CREATE INDEX idx_employees_manager_id ON employees(manager_id);
+
+CREATE TABLE leave_policies (
+  id UUID PRIMARY KEY,
+  leave_type VARCHAR(20) NOT NULL UNIQUE,
+  annual_entitlement INTEGER NOT NULL CHECK (annual_entitlement >= 0)
+);
+
+CREATE TABLE leave_balances (
+  employee_id UUID NOT NULL,
+  leave_type VARCHAR(20) NOT NULL,
+  remaining_days INTEGER NOT NULL CHECK (remaining_days >= 0),
+  PRIMARY KEY (employee_id, leave_type),
+  CONSTRAINT fk_leave_balances_employee FOREIGN KEY (employee_id) REFERENCES employees(id)
+);
+CREATE INDEX idx_leave_balances_employee ON leave_balances(employee_id);
+
+CREATE TABLE leave_requests (
+  id UUID PRIMARY KEY,
+  employee_id UUID NOT NULL,
+  leave_type VARCHAR(20) NOT NULL,
+  status VARCHAR(20) NOT NULL,
+  CONSTRAINT fk_leave_requests_employee FOREIGN KEY (employee_id) REFERENCES employees(id)
+);
+CREATE INDEX idx_leave_requests_employee ON leave_requests(employee_id);
+CREATE INDEX idx_leave_requests_status ON leave_requests(status);
+
+CREATE TABLE notifications (
+  id UUID PRIMARY KEY,
+  recipient_employee_id UUID NOT NULL,
+  type VARCHAR(50) NOT NULL,
+  status VARCHAR(20) NOT NULL,
+  CONSTRAINT fk_notifications_employee FOREIGN KEY (recipient_employee_id) REFERENCES employees(id)
+);
+CREATE INDEX idx_notifications_recipient ON notifications(recipient_employee_id);
+
+CREATE TABLE audit_records (
+  id UUID PRIMARY KEY,
+  entity_type VARCHAR(100) NOT NULL,
+  entity_id UUID NOT NULL,
+  action VARCHAR(100) NOT NULL
+);
+CREATE INDEX idx_audit_records_entity ON audit_records(entity_type, entity_id);
