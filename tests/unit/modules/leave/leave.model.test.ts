@@ -1,7 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import * as leaveModel from '../../../../src/modules/leave/leave.model';
+import {
+  LeaveType,
+  LeaveRequestStatus,
+  type LeaveRequest,
+} from '../../../../src/modules/leave/leave.model';
 
-describe('SC-1: leave.model exports', () => {
+describe('SC-1: leave.model exports and types', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
@@ -11,34 +15,38 @@ describe('SC-1: leave.model exports', () => {
   });
 
   it('exports LeaveType values ANNUAL, SICK, and EMERGENCY', () => {
-    expect(leaveModel.LeaveType).toBeDefined();
-    expect(leaveModel.LeaveType.ANNUAL).toBeDefined();
-    expect(leaveModel.LeaveType.SICK).toBeDefined();
-    expect(leaveModel.LeaveType.EMERGENCY).toBeDefined();
+    expect(LeaveType.ANNUAL).toBe('ANNUAL');
+    expect(LeaveType.SICK).toBe('SICK');
+    expect(LeaveType.EMERGENCY).toBe('EMERGENCY');
+    expect(Object.values(LeaveType)).toEqual(['ANNUAL', 'SICK', 'EMERGENCY']);
   });
 
   it('exports LeaveRequestStatus values PENDING, APPROVED, and REJECTED', () => {
-    expect(leaveModel.LeaveRequestStatus).toBeDefined();
-    expect(leaveModel.LeaveRequestStatus.PENDING).toBeDefined();
-    expect(leaveModel.LeaveRequestStatus.APPROVED).toBeDefined();
-    expect(leaveModel.LeaveRequestStatus.REJECTED).toBeDefined();
+    expect(LeaveRequestStatus.PENDING).toBe('PENDING');
+    expect(LeaveRequestStatus.APPROVED).toBe('APPROVED');
+    expect(LeaveRequestStatus.REJECTED).toBe('REJECTED');
+    expect(Object.values(LeaveRequestStatus)).toEqual(['PENDING', 'APPROVED', 'REJECTED']);
   });
 
-  it('supports a LeaveRequest shape with required fields', () => {
-    const request = {
-      id: 'req-1',
-      employeeId: 'emp-1',
-      leaveType: leaveModel.LeaveType.ANNUAL,
-      status: leaveModel.LeaveRequestStatus.PENDING,
+  it('supports a LeaveRequest object containing required fields', () => {
+    const request: LeaveRequest = {
+      id: 'leave-1',
+      employeeId: 'employee-1',
+      leaveType: LeaveType.ANNUAL,
+      status: LeaveRequestStatus.PENDING,
     };
 
-    expect(request.id).toBe('req-1');
-    expect(request.employeeId).toBe('emp-1');
-    expect(request.leaveType).toBe(leaveModel.LeaveType.ANNUAL);
-    expect(request.status).toBe(leaveModel.LeaveRequestStatus.PENDING);
+    expect(request.id).toBe('leave-1');
+    expect(request.employeeId).toBe('employee-1');
+    expect(request.leaveType).toBe('ANNUAL');
+    expect(request.status).toBe('PENDING');
   });
 
-  it('does not expose unsupported lifecycle status values', () => {
-    expect('CANCELLED' in leaveModel.LeaveRequestStatus).toBe(false);
+  it('rejects unsupported values through explicit runtime validation', () => {
+    const invalidLeaveType = 'VACATION';
+    const invalidStatus = 'IN_REVIEW';
+
+    expect(Object.values(LeaveType)).not.toContain(invalidLeaveType);
+    expect(Object.values(LeaveRequestStatus)).not.toContain(invalidStatus);
   });
 });

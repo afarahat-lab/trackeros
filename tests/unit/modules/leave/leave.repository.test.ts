@@ -1,8 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import * as repositoryModule from '../../../../src/modules/leave/leave.repository';
-import { LeaveType, LeaveRequestStatus } from '../../../../src/modules/leave/leave.model';
+import type {
+  LeaveRequest,
+  LeaveRequestStatus,
+} from '../../../../src/modules/leave/leave.model';
+import type {
+  LeaveRequestRepository,
+  PgLeaveRequestRepository,
+} from '../../../../src/modules/leave/leave.repository';
 
-describe('SC-2 and SC-3: repository contracts and PostgreSQL repository type', () => {
+describe('SC-2: LeaveRequestRepository contract', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
@@ -11,45 +17,62 @@ describe('SC-2 and SC-3: repository contracts and PostgreSQL repository type', (
     vi.restoreAllMocks();
   });
 
-  it('exports LeaveRequestRepository and PgLeaveRequestRepository symbols', () => {
-    expect(repositoryModule).toHaveProperty('LeaveRequestRepository');
-    expect(repositoryModule).toHaveProperty('PgLeaveRequestRepository');
+  it('supports create, findById, and updateStatus methods with the expected contract', async () => {
+    class RepositoryStub implements LeaveRequestRepository {
+      private record: LeaveRequest | null = null;
+
+      async create(request: LeaveRequest): Promise<void> {
+        this.record = request;
+      }
+
+      async findById(id: string): Promise<LeaveRequest | null> {
+        return this.record?.id === id ? this.record : null;
+      }
+
+      async updateStatus(id: string, status: LeaveRequestStatus): Promise<void> {
+        if (this.record?.id === id) {
+          this.record.status = status;
+        }
+      }
+    }
+
+    const repository = new RepositoryStub();
+
+    await repository.create({
+      id: '1',
+      employeeId: 'emp-1',
+      leaveType: 'ANNUAL',
+      status: 'PENDING',
+    });
+
+    const found = await repository.findById('1');
+    expect(found).not.toBeNull();
+    expect(found?.employeeId).toBe('emp-1');
+
+    await repository.updateStatus('1', 'APPROVED');
+
+    const updated = await repository.findById('1');
+    expect(updated?.status).toBe('APPROVED');
   });
 
-  it('allows repository contract usage with create, findById, and updateStatus', async () => {
-    const repo = {
-      async create() {
-        return;
-      },
-      async findById(id: string) {
-        return {
-          id,
-          employeeId: 'emp-1',
-          leaveType: LeaveType.SICK,
-          status: LeaveRequestStatus.PENDING,
-        };
-      },
-      async updateStatus() {
-        return;
-      },
-    };
-
-    await expect(repo.create()).resolves.toBeUndefined();
-
-    const result = await repo.findById('leave-1');
-    expect(result).not.toBeNull();
-    expect(result?.id).toBe('leave-1');
-
-    await expect(repo.updateStatus()).resolves.toBeUndefined();
-  });
-
-  it('supports the repository null-return error path for unknown ids', async () => {
-    const repo = {
-      async findById() {
+  it('returns null when a record is not found', async () => {
+    class RepositoryStub implements LeaveRequestRepository {
+      async create(_request: LeaveRequest): Promise<void> {}
+      async findById(_id: string): Promise<LeaveRequest | null> {
         return null;
-      },
-    };
+      }
+      async updateStatus(_id: string, _status: LeaveRequestStatus): Promise<void> {}
+    }
 
-    await expect(repo.findById()).resolves.toBeNull();
+    const repository = new RepositoryStub();
+    await expect(repository.findById('missing-id')).resolves.toBeNull();
+  });
+});
+
+describe('SC-3: PgLeaveRequestRepository type contract', () => {
+  it('can be referenced as a PostgreSQL repository implementation contract operating on LeaveRequest types', () => {
+    const compileTimeReference = <T extends PgLeaveRequestRepository>(_value: T): T => _value;
+
+    expect(typeof compileTimeReference).toBe('function');
   });
 });

@@ -1,8 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { LeaveType, LeaveRequestStatus } from '../../../../src/modules/leave/leave.model';
-import * as repositoryModule from '../../../../src/modules/leave/leave.repository';
+import {
+  LeaveType,
+  LeaveRequestStatus,
+  type LeaveRequest,
+} from '../../../../src/modules/leave/leave.model';
+import type {
+  LeaveRequestRepository,
+} from '../../../../src/modules/leave/leave.repository';
 
-describe('SC-4 and SC-5: repository contract compilation and import compatibility', () => {
+describe('SC-4: repository contract usage and type compatibility', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
@@ -11,54 +17,58 @@ describe('SC-4 and SC-5: repository contract compilation and import compatibilit
     vi.restoreAllMocks();
   });
 
-  it('uses LeaveRequest-compatible data across model and repository imports', async () => {
-    const leaveRequest = {
-      id: 'leave-123',
-      employeeId: 'employee-456',
+  it('allows LeaveRequest model types to be used through the repository contract', async () => {
+    class InMemoryRepository implements LeaveRequestRepository {
+      private readonly storage = new Map<string, LeaveRequest>();
+
+      async create(request: LeaveRequest): Promise<void> {
+        this.storage.set(request.id, request);
+      }
+
+      async findById(id: string): Promise<LeaveRequest | null> {
+        return this.storage.get(id) ?? null;
+      }
+
+      async updateStatus(id: string, status: typeof LeaveRequestStatus[keyof typeof LeaveRequestStatus]): Promise<void> {
+        const existing = this.storage.get(id);
+        if (existing) {
+          this.storage.set(id, { ...existing, status });
+        }
+      }
+    }
+
+    const repository = new InMemoryRepository();
+
+    const request: LeaveRequest = {
+      id: 'leave-42',
+      employeeId: 'employee-42',
       leaveType: LeaveType.EMERGENCY,
       status: LeaveRequestStatus.PENDING,
     };
 
-    expect(leaveRequest.id).toBe('leave-123');
-    expect(leaveRequest.employeeId).toBe('employee-456');
-    expect(leaveRequest.leaveType).toBe(LeaveType.EMERGENCY);
-    expect(leaveRequest.status).toBe(LeaveRequestStatus.PENDING);
+    await repository.create(request);
 
-    expect(repositoryModule).toBeDefined();
+    const created = await repository.findById('leave-42');
+    expect(created).toEqual(request);
+
+    await repository.updateStatus('leave-42', LeaveRequestStatus.REJECTED);
+
+    const updated = await repository.findById('leave-42');
+    expect(updated?.status).toBe(LeaveRequestStatus.REJECTED);
   });
 
-  it('validates repository contract usage for approval workflow', async () => {
-    const repository = {
-      async create() {
-        return;
-      },
-      async findById(id: string) {
-        return {
-          id,
-          employeeId: 'employee-456',
-          leaveType: LeaveType.ANNUAL,
-          status: LeaveRequestStatus.APPROVED,
-        };
-      },
-      async updateStatus() {
-        return;
-      },
-    };
-
-    await repository.create();
-    const request = await repository.findById('leave-123');
-
-    expect(request?.status).toBe(LeaveRequestStatus.APPROVED);
-  });
-
-  it('handles rejected lookup path returning null', async () => {
-    const repository = {
-      async findById() {
+  it('handles missing records according to the contract', async () => {
+    class EmptyRepository implements LeaveRequestRepository {
+      async create(_request: LeaveRequest): Promise<void> {}
+      async findById(_id: string): Promise<LeaveRequest | null> {
         return null;
-      },
-    };
+      }
+      async updateStatus(_id: string, _status: typeof LeaveRequestStatus[keyof typeof LeaveRequestStatus]): Promise<void> {}
+    }
 
-    const request = await repository.findById();
-    expect(request).toBeNull();
+    const repository = new EmptyRepository();
+    const result = await repository.findById('does-not-exist');
+
+    expect(result).toBeNull();
   });
 });
