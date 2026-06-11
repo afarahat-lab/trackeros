@@ -21,3 +21,7 @@ Represents leave policy data managed by the `policy` module, including policy de
 ## notification
 
 Represents notification data managed by the `notification` module, including notification records, delivery status, and related messaging information.
+
+## audit
+
+Represents audit data managed by the `audit` module, including audit records, change history, and activity tracking information.
