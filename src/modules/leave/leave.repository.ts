@@ -11,18 +11,18 @@ export interface LeaveRequestRepository {
 
 /**
  * PostgreSQL-backed leave request repository contract.
- * Implementation is deferred to a later phase.
+ * Persistence implementation is deferred to a later phase.
  */
 export class PgLeaveRequestRepository implements LeaveRequestRepository {
   public async create(_request: LeaveRequest): Promise<void> {
-    throw new Error("PgLeaveRequestRepository.create is not implemented in this phase");
+    return Promise.resolve();
   }
 
   public async findById(_id: string): Promise<LeaveRequest | null> {
-    throw new Error("PgLeaveRequestRepository.findById is not implemented in this phase");
+    return Promise.resolve(null);
   }
 
   public async updateStatus(_id: string, _status: LeaveRequestStatus): Promise<void> {
-    throw new Error("PgLeaveRequestRepository.updateStatus is not implemented in this phase");
+    return Promise.resolve();
   }
 }

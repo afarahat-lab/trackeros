@@ -26,7 +26,12 @@
           "required": true
         }
       ],
-      "relationships": []
+      "relationships": [
+        {
+          "entity": "Employee",
+          "type": "one-to-many"
+        }
+      ]
     }
   ],
   "apiContracts": [],
