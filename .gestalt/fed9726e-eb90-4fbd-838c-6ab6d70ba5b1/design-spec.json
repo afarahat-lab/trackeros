@@ -1,0 +1,39 @@
+{
+  "correlationId": "fed9726e-eb90-4fbd-838c-6ab6d70ba5b1",
+  "domainChanges": [
+    {
+      "entityName": "LeaveRequest",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "employeeId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "leaveType",
+          "type": "\"ANNUAL\" | \"SICK\" | \"EMERGENCY\"",
+          "required": true
+        },
+        {
+          "name": "status",
+          "type": "\"PENDING\" | \"APPROVED\" | \"REJECTED\"",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "Employee",
+          "type": "one-to-many"
+        }
+      ]
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}

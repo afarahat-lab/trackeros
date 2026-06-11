@@ -6,6 +6,19 @@ To be populated as the design-agent and context-agent learn the domain.
 
 Represents a leave record managed by the `leave` module, including leave requests and related leave-tracking data.
 
+## LeaveRequest
+
+Represents a leave request submitted by an employee.
+
+Fields:
+- `id` (string, required)
+- `employeeId` (string, required)
+- `leaveType` (`"ANNUAL" | "SICK" | "EMERGENCY"`, required)
+- `status` (`"PENDING" | "APPROVED" | "REJECTED"`, required)
+
+Relationships:
+- Employee (one-to-many)
+
 ## balance
 
 Represents leave balance data managed by the `balance` module, including tracked entitlement, accrual, and remaining leave amounts.
