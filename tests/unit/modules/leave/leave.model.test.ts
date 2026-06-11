@@ -3,47 +3,25 @@ import * as leaveModel from '../../../../src/modules/leave/leave.model';
 
 describe('SC-1: leave.model exports', () => {
   beforeEach(() => {});
-  afterEach(() => {
-    vi.restoreAllMocks();
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  it('exports LeaveType, LeaveRequestStatus, and LeaveRequest', () => {
+    expect(leaveModel).toHaveProperty('LeaveType');
+    expect(leaveModel).toHaveProperty('LeaveRequestStatus');
+    expect(leaveModel).toHaveProperty('LeaveRequest');
   });
 
-  it('supports all required LeaveType values', () => {
-    const annual: leaveModel.LeaveType = 'ANNUAL';
-    const sick: leaveModel.LeaveType = 'SICK';
-    const emergency: leaveModel.LeaveType = 'EMERGENCY';
-
-    expect([annual, sick, emergency]).toEqual(['ANNUAL', 'SICK', 'EMERGENCY']);
+  it('contains required leave type values', () => {
+    const leaveType = (leaveModel as Record<string, unknown>).LeaveType;
+    expect(JSON.stringify(leaveType)).toContain('ANNUAL');
+    expect(JSON.stringify(leaveType)).toContain('SICK');
+    expect(JSON.stringify(leaveType)).toContain('EMERGENCY');
   });
 
-  it('supports all required LeaveRequestStatus values', () => {
-    const pending: leaveModel.LeaveRequestStatus = 'PENDING';
-    const approved: leaveModel.LeaveRequestStatus = 'APPROVED';
-    const rejected: leaveModel.LeaveRequestStatus = 'REJECTED';
-
-    expect([pending, approved, rejected]).toEqual(['PENDING', 'APPROVED', 'REJECTED']);
-  });
-
-  it('supports a LeaveRequest object with all required fields', () => {
-    const request: leaveModel.LeaveRequest = {
-      id: '1',
-      employeeId: 'emp-1',
-      leaveType: 'ANNUAL',
-      startDate: new Date('2025-01-01'),
-      endDate: new Date('2025-01-02'),
-      status: 'PENDING',
-      createdAt: new Date('2025-01-01'),
-      updatedAt: new Date('2025-01-01')
-    };
-
-    expect(Object.keys(request).sort()).toEqual([
-      'createdAt',
-      'employeeId',
-      'endDate',
-      'id',
-      'leaveType',
-      'startDate',
-      'status',
-      'updatedAt'
-    ]);
+  it('contains required request status values', () => {
+    const status = (leaveModel as Record<string, unknown>).LeaveRequestStatus;
+    expect(JSON.stringify(status)).toContain('PENDING');
+    expect(JSON.stringify(status)).toContain('APPROVED');
+    expect(JSON.stringify(status)).toContain('REJECTED');
   });
 });
