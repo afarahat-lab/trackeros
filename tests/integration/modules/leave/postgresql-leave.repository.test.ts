@@ -14,56 +14,72 @@ import path from 'node:path';
 const sample = {
   id: '1',
   employeeId: 'emp-1',
-  leaveType: 'ANNUAL',
+  leaveType: 'ANNUAL' as const,
   startDate: new Date('2025-01-01'),
   endDate: new Date('2025-01-02'),
-  status: 'PENDING',
+  status: 'PENDING' as const,
   createdAt: new Date('2025-01-01'),
   updatedAt: new Date('2025-01-01')
 };
 
-describe('SC-4: leave_requests persistence schema', () => {
-  it('contains required database column names in repository SQL', () => {
-    const filePath = path.resolve(process.cwd(), 'src/modules/leave/postgresql-leave.repository.ts');
-    const content = fs.readFileSync(filePath, 'utf8');
+describe('SC-3: PostgreSqlLeaveRequestRepository implementation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
 
-    expect(content).toContain('leave_requests');
-    expect(content).toContain('id');
-    expect(content).toContain('employee_id');
-    expect(content).toContain('leave_type');
-    expect(content).toContain('start_date');
-    expect(content).toContain('end_date');
-    expect(content).toContain('status');
-    expect(content).toContain('created_at');
-    expect(content).toContain('updated_at');
+  it('can be instantiated and implements repository operations', () => {
+    const repository = new PostgreSqlLeaveRequestRepository();
+    expect(typeof repository.create).toBe('function');
+    expect(typeof repository.findById).toBe('function');
+    expect(typeof repository.findByEmployeeId).toBe('function');
+    expect(typeof repository.update).toBe('function');
+  });
+
+  it('wraps database errors', async () => {
+    const repository = new PostgreSqlLeaveRequestRepository();
+    vi.mocked(pool.query).mockRejectedValueOnce(new Error('db failure'));
+    await expect(repository.findById('bad-id')).rejects.toThrow('LeaveRequestRepository#findById failed');
   });
 });
 
-describe('SC-5: repository behavior coverage', () => {
+describe('SC-4: leave_requests schema definition', () => {
+  it('contains required leave_requests columns in repository SQL', () => {
+    const file = fs.readFileSync(path.resolve(process.cwd(), 'src/modules/leave/postgresql-leave.repository.ts'), 'utf8');
+    expect(file).toContain('leave_requests');
+    expect(file).toContain('id');
+    expect(file).toContain('employee_id');
+    expect(file).toContain('leave_type');
+    expect(file).toContain('start_date');
+    expect(file).toContain('end_date');
+    expect(file).toContain('status');
+    expect(file).toContain('created_at');
+    expect(file).toContain('updated_at');
+  });
+});
+
+describe('SC-5: repository create/find/update behaviour', () => {
   const repository = new PostgreSqlLeaveRequestRepository();
 
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
   it('creates a leave request', async () => {
-    vi.mocked(pool.query).mockResolvedValueOnce({ rows: [{
-      id: sample.id,
-      employee_id: sample.employeeId,
-      leave_type: sample.leaveType,
-      start_date: sample.startDate,
-      end_date: sample.endDate,
-      status: sample.status,
-      created_at: sample.createdAt,
-      updated_at: sample.updatedAt
-    }] } as never);
+    vi.mocked(pool.query).mockResolvedValueOnce({
+      rows: [{
+        id: sample.id,
+        employee_id: sample.employeeId,
+        leave_type: sample.leaveType,
+        start_date: sample.startDate,
+        end_date: sample.endDate,
+        status: sample.status,
+        created_at: sample.createdAt,
+        updated_at: sample.updatedAt
+      }]
+    } as never);
 
     const result = await repository.create(sample);
-    expect(result.id).toBe('1');
+    expect(result.employeeId).toBe('emp-1');
   });
 
   it('finds by id and returns null when not found', async () => {
@@ -72,40 +88,39 @@ describe('SC-5: repository behavior coverage', () => {
   });
 
   it('finds by employee id', async () => {
-    vi.mocked(pool.query).mockResolvedValueOnce({ rows: [{
-      id: sample.id,
-      employee_id: sample.employeeId,
-      leave_type: sample.leaveType,
-      start_date: sample.startDate,
-      end_date: sample.endDate,
-      status: sample.status,
-      created_at: sample.createdAt,
-      updated_at: sample.updatedAt
-    }] } as never);
+    vi.mocked(pool.query).mockResolvedValueOnce({
+      rows: [{
+        id: sample.id,
+        employee_id: sample.employeeId,
+        leave_type: sample.leaveType,
+        start_date: sample.startDate,
+        end_date: sample.endDate,
+        status: sample.status,
+        created_at: sample.createdAt,
+        updated_at: sample.updatedAt
+      }]
+    } as never);
 
-    const result = await repository.findByEmployeeId(sample.employeeId);
-    expect(result).toHaveLength(1);
+    const results = await repository.findByEmployeeId(sample.employeeId);
+    expect(results).toHaveLength(1);
+    expect(results[0].employeeId).toBe(sample.employeeId);
   });
 
   it('updates a leave request', async () => {
-    vi.mocked(pool.query).mockResolvedValueOnce({ rows: [{
-      id: sample.id,
-      employee_id: sample.employeeId,
-      leave_type: sample.leaveType,
-      start_date: sample.startDate,
-      end_date: sample.endDate,
-      status: 'APPROVED',
-      created_at: sample.createdAt,
-      updated_at: sample.updatedAt
-    }] } as never);
+    vi.mocked(pool.query).mockResolvedValueOnce({
+      rows: [{
+        id: sample.id,
+        employee_id: sample.employeeId,
+        leave_type: sample.leaveType,
+        start_date: sample.startDate,
+        end_date: sample.endDate,
+        status: 'APPROVED',
+        created_at: sample.createdAt,
+        updated_at: sample.updatedAt
+      }]
+    } as never);
 
     const result = await repository.update({ ...sample, status: 'APPROVED' });
     expect(result.status).toBe('APPROVED');
-  });
-
-  it('propagates database errors', async () => {
-    vi.mocked(pool.query).mockRejectedValueOnce(new Error('db failure'));
-
-    await expect(repository.findByEmployeeId('emp-1')).rejects.toThrow('db failure');
   });
 });
