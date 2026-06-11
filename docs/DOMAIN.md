@@ -13,3 +13,7 @@ Represents leave balance data managed by the `balance` module, including tracked
 ## employee
 
 Represents employee data managed by the `employee` module, including employee records and related personnel information.
+
+## policy
+
+Represents leave policy data managed by the `policy` module, including policy definitions, rules, and leave entitlement configurations.
