@@ -1,0 +1,53 @@
+{
+  "correlationId": "fab8497b-d26b-4fe2-9b91-c2164c66b0cf",
+  "domainChanges": [
+    {
+      "entityName": "AuditRecord",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "entityType",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "entityId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "action",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": [
+    {
+      "name": "AuditRepository",
+      "type": "service",
+      "description": "Repository contract for audit persistence. Exposes create(input: CreateAuditRecordInput): Promise<AuditRecord> and findByEntity(entityType: string, entityId: string): Promise<AuditRecord[]>. All signatures use types from audit.model.ts and database access must flow through this contract.",
+      "props": {}
+    },
+    {
+      "name": "PostgreSqlAuditRepository",
+      "type": "service",
+      "description": "PostgreSQL-facing repository contract/implementation conforming to AuditRepository. Persistence logic is deferred; methods remain contract-compatible and support separate audit repository operations without introducing multi-entity transactions. Canonical schema: CREATE TABLE audit_records ( id UUID PRIMARY KEY, entity_type VARCHAR(100) NOT NULL, entity_id UUID NOT NULL, action VARCHAR(100) NOT NULL );",
+      "props": {}
+    },
+    {
+      "name": "AuditModel",
+      "type": "service",
+      "description": "Type definitions exported from src/modules/audit/audit.model.ts including AuditRecord and CreateAuditRecordInput.",
+      "props": {}
+    }
+  ]
+}
