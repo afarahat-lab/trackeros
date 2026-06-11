@@ -17,3 +17,7 @@ Represents employee data managed by the `employee` module, including employee re
 ## policy
 
 Represents leave policy data managed by the `policy` module, including policy definitions, rules, and leave entitlement configurations.
+
+## notification
+
+Represents notification data managed by the `notification` module, including notification records, delivery status, and related messaging information.
