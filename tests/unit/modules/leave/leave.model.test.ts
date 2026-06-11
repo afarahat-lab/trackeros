@@ -1,8 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import * as leaveModel from '../../../../src/modules/leave/leave.model';
 
-import type { LeaveRequest } from '../../../../src/modules/leave/leave.model';
-
-describe('SC-1: leave.model exports leave domain types', () => {
+describe('SC-1: leave.model exports', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
@@ -11,52 +10,35 @@ describe('SC-1: leave.model exports leave domain types', () => {
     vi.restoreAllMocks();
   });
 
-  it('supports valid LeaveType and LeaveRequestStatus values in a LeaveRequest', async () => {
-    const model = await import('../../../../src/modules/leave/leave.model');
-
-    const annualRequest: LeaveRequest = {
-      id: '1',
-      employeeId: 'emp-1',
-      leaveType: 'ANNUAL',
-      status: 'PENDING',
-    };
-
-    const sickRequest: LeaveRequest = {
-      id: '2',
-      employeeId: 'emp-2',
-      leaveType: 'SICK',
-      status: 'APPROVED',
-    };
-
-    const emergencyRequest: LeaveRequest = {
-      id: '3',
-      employeeId: 'emp-3',
-      leaveType: 'EMERGENCY',
-      status: 'REJECTED',
-    };
-
-    expect(model).toBeDefined();
-    expect(annualRequest.leaveType).toBe('ANNUAL');
-    expect(sickRequest.leaveType).toBe('SICK');
-    expect(emergencyRequest.leaveType).toBe('EMERGENCY');
-    expect(annualRequest.status).toBe('PENDING');
-    expect(sickRequest.status).toBe('APPROVED');
-    expect(emergencyRequest.status).toBe('REJECTED');
+  it('exports LeaveType values ANNUAL, SICK, and EMERGENCY', () => {
+    expect(leaveModel.LeaveType).toBeDefined();
+    expect(leaveModel.LeaveType.ANNUAL).toBeDefined();
+    expect(leaveModel.LeaveType.SICK).toBeDefined();
+    expect(leaveModel.LeaveType.EMERGENCY).toBeDefined();
   });
 
-  it('contains required LeaveRequest fields', () => {
-    const request: LeaveRequest = {
-      id: 'leave-id',
-      employeeId: 'employee-id',
-      leaveType: 'ANNUAL',
-      status: 'PENDING',
+  it('exports LeaveRequestStatus values PENDING, APPROVED, and REJECTED', () => {
+    expect(leaveModel.LeaveRequestStatus).toBeDefined();
+    expect(leaveModel.LeaveRequestStatus.PENDING).toBeDefined();
+    expect(leaveModel.LeaveRequestStatus.APPROVED).toBeDefined();
+    expect(leaveModel.LeaveRequestStatus.REJECTED).toBeDefined();
+  });
+
+  it('supports a LeaveRequest shape with required fields', () => {
+    const request = {
+      id: 'req-1',
+      employeeId: 'emp-1',
+      leaveType: leaveModel.LeaveType.ANNUAL,
+      status: leaveModel.LeaveRequestStatus.PENDING,
     };
 
-    expect(Object.keys(request).sort()).toEqual([
-      'employeeId',
-      'id',
-      'leaveType',
-      'status',
-    ].sort());
+    expect(request.id).toBe('req-1');
+    expect(request.employeeId).toBe('emp-1');
+    expect(request.leaveType).toBe(leaveModel.LeaveType.ANNUAL);
+    expect(request.status).toBe(leaveModel.LeaveRequestStatus.PENDING);
+  });
+
+  it('does not expose unsupported lifecycle status values', () => {
+    expect('CANCELLED' in leaveModel.LeaveRequestStatus).toBe(false);
   });
 });
