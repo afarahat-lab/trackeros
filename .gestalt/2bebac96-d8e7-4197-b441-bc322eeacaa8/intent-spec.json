@@ -1,0 +1,99 @@
+{
+  "id": "5c74caa9-6280-4ba6-8995-40006a4bd421",
+  "correlationId": "2bebac96-d8e7-4197-b441-bc322eeacaa8",
+  "rawIntent": "[Feature: Build the leave management module — Phase 1: Establish LeaveRequest model and repository]\n\nCreate approximately 4-5 files under src/modules/leave: src/modules/leave/leave.model.ts defining the canonical LeaveRequest entity and DTO/types used by persistence, src/modules/leave/leave.repository.ts defining the repository interface, and a PostgreSQL implementation file for LeaveRequest persistence. Include focused Vitest coverage for repository behavior. Keep this phase limited to persistence and type definitions; do not implement submission, approval, or rejection workflows.\n\nPhase architecture notes:\nOwns LeaveRequest persistence in the leave module. Domain model and repository are introduced together as required.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/leave/leave.model.ts\\nexport type LeaveType = \\\"ANNUAL\\\" | \\\"SICK\\\" | \\\"EMERGENCY\\\";\\n\\nexport type LeaveRequestStatus = \\\"PENDING\\\" | \\\"APPROVED\\\" | \\\"REJECTED\\\";\\n\\nexport interface LeaveRequest {\\n  id: string;\\n  employeeId: string;\\n  leaveType: LeaveType;\\n  startDate: Date;\\n  endDate: Date;\\n  status: LeaveRequestStatus;\\n  createdAt: Date;\\n  updatedAt: Date;\\n}\",\"File: src/modules/leave/leave.repository.ts\\nimport { LeaveRequest } from \\\"./leave.model\\\";\\n\\nexport interface LeaveRequestRepository {\\n  create(leaveRequest: LeaveRequest): Promise<LeaveRequest>;\\n  findById(id: string): Promise<LeaveRequest | null>;\\n  findByEmployeeId(employeeId: string): Promise<LeaveRequest[]>;\\n  update(leaveRequest: LeaveRequest): Promise<LeaveRequest>;\\n}\",\"File: src/modules/leave/postgresql-leave.repository.ts\\nimport { LeaveRequest } from \\\"./leave.model\\\";\\nimport { LeaveRequestRepository } from \\\"./leave.repository\\\";\\n\\nexport class PostgreSqlLeaveRequestRepository implements LeaveRequestRepository {\\n  public async create(leaveRequest: LeaveRequest): Promise<LeaveRequest>;\\n  public async findById(id: string): Promise<LeaveRequest | null>;\\n  public async findByEmployeeId(employeeId: string): Promise<LeaveRequest[]>;\\n  public async update(leaveRequest: LeaveRequest): Promise<LeaveRequest>;\\n}\",\"File: src/modules/leave/postgresql-leave.repository.test.ts\\nimport { describe, it, expect } from \\\"vitest\\\";\\nimport { PostgreSqlLeaveRequestRepository } from \\\"./postgresql-leave.repository\\\";\\n\\ndescribe(\\\"PostgreSqlLeaveRequestRepository\\\", () => {\\n  it(\\\"creates and retrieves leave requests\\\");\\n  it(\\\"retrieves leave requests by employeeId\\\");\\n  it(\\\"updates leave requests\\\");\\n});\"],\"importStatements\":[\"import { LeaveRequest } from \\\"./leave.model\\\";\",\"import { LeaveRequestRepository } from \\\"./leave.repository\\\";\",\"import { PostgreSqlLeaveRequestRepository } from \\\"./postgresql-leave.repository\\\";\",\"import { describe, it, expect } from \\\"vitest\\\";\"],\"successCriteria\":[\"src/modules/leave/leave.model.ts exists and exports LeaveType, LeaveRequestStatus, and LeaveRequest.\",\"src/modules/leave/leave.repository.ts exists and exports the LeaveRequestRepository interface.\",\"src/modules/leave/postgresql-leave.repository.ts exists and exports PostgreSqlLeaveRequestRepository as the concrete PostgreSQL implementation of LeaveRequestRepository.\",\"src/modules/leave/postgresql-leave.repository.test.ts exists and contains Vitest tests covering create, findById, findByEmployeeId, and update repository behavior.\",\"The leave_requests PostgreSQL table exists with columns id, employee_id, leave_type, start_date, end_date, status, created_at, and updated_at.\",\"All LeaveRequest persistence access is defined through LeaveRequestRepository; no direct PostgreSQL access contract is exposed outside the repository implementation.\",\"Project documentation (architectureMdUpdate) is updated to include the new LeaveRequest entity and the LeaveType values ANNUAL, SICK, EMERGENCY and LeaveRequestStatus values PENDING, APPROVED, REJECTED.\"],\"sqlSchema\":\"CREATE TABLE leave_requests (\\n  id UUID PRIMARY KEY,\\n  employee_id UUID NOT NULL,\\n  leave_type VARCHAR(32) NOT NULL,\\n  start_date TIMESTAMP NOT NULL,\\n  end_date TIMESTAMP NOT NULL,\\n  status VARCHAR(32) NOT NULL,\\n  created_at TIMESTAMP NOT NULL,\\n  updated_at TIMESTAMP NOT NULL\\n);\"}\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 2 — Establish AuditRecord model and repository: Create approximately 3-5 files under src/modules/audit: src/modules/audit/audit.model.ts defining th\n- Phase 3 — Implement leave request submission workflow service: Create approximately 3-5 files in src/modules/leave implementing submitLeaveRequest. This phase depe\n- Phase 4 — Implement manager approval workflow service: Create approximately 3-5 files in src/modules/leave implementing approveLeaveRequest. This phase dep\n- Phase 5 — Implement manager rejection workflow service: Create approximately 3-5 files in src/modules/leave implementing rejectLeaveRequest. This phase depe\n- Phase 6 — Expose leave submission API: Create approximately 3-5 files for Fastify integration of leave submission. This phase depends on th\n- Phase 7 — Expose approval and rejection APIs with manager RBAC: Create approximately 3-5 files for Fastify approval and rejection endpoints. This phase depends on t\n- Phase 8 — Expose leave balance query API and finalize coverage: Create approximately 2-5 files to expose leave balance queries through Fastify. This phase depends o",
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "domain",
+      "infra",
+      "test",
+      "config"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/leave/leave.model.ts exists and exports LeaveType (ANNUAL, SICK, EMERGENCY), LeaveRequestStatus (PENDING, APPROVED, REJECTED), and the LeaveRequest interface with the specified fields.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/leave/leave.repository.ts exists and exports the LeaveRequestRepository interface with create, findById, findByEmployeeId, and update methods.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "src/modules/leave/postgresql-leave.repository.ts exists and exports PostgreSqlLeaveRequestRepository implementing LeaveRequestRepository.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "A PostgreSQL persistence schema for leave_requests exists with columns id, employee_id, leave_type, start_date, end_date, status, created_at, and updated_at as defined in the provided SQL schema.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "sc-005",
+      "description": "Vitest coverage exists in src/modules/leave/postgresql-leave.repository.test.ts and verifies create, findById, findByEmployeeId, and update repository behavior.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "sc-006",
+      "description": "All LeaveRequest persistence access is abstracted through LeaveRequestRepository and no direct PostgreSQL access contract is exposed outside the repository implementation.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-007",
+      "description": "Project architecture documentation is updated to describe the LeaveRequest entity and supported LeaveType and LeaveRequestStatus values.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Scope is limited to LeaveRequest persistence and type definitions within the leave module.",
+    "Do not implement submitLeaveRequest, approveLeaveRequest, rejectLeaveRequest, notifications, balance deductions, or other workflow logic.",
+    "Repository pattern: all database access must go through the LeaveRequestRepository interface.",
+    "Implement a PostgreSQL-backed repository conforming to the specified repository interface.",
+    "Maintain modular-monolith dependency rules; this phase must not introduce reverse dependencies from employee, policy, balance, or notification modules into leave.",
+    "Audit records are required for state-changing operations by project standards; however, creation of the audit module or workflow-level audit integration is deferred to later phases and must not expand scope beyond this persistence phase.",
+    "No sensitive data may be logged.",
+    "No unhandled promise rejections; async errors must be handled appropriately.",
+    "Use TypeScript, Node.js 20, PostgreSQL, npm, and Vitest consistent with project standards.",
+    "Input validation, RBAC enforcement, and API boundary concerns are not to be implemented because no API endpoints are introduced in this phase."
+  ],
+  "outOfScope": [
+    "Leave request submission workflow (submitLeaveRequest).",
+    "Leave request approval workflow (approveLeaveRequest).",
+    "Leave request rejection workflow (rejectLeaveRequest).",
+    "Fastify API endpoints.",
+    "RBAC endpoint implementation.",
+    "Notification creation and notification module changes.",
+    "Leave balance calculations, deductions, or balance module changes.",
+    "Employee manager relationship logic.",
+    "Audit module creation and AuditRecord repository implementation.",
+    "Leave balance query APIs.",
+    "UI or React Native changes.",
+    "Any changes outside the leave persistence model, repository, schema, tests, and related architecture documentation required by this phase."
+  ],
+  "ambiguities": [
+    {
+      "id": "amb-001",
+      "description": "The intent specifies approximately 4-5 files but also requires a PostgreSQL table and architecture documentation update, without specifying exact file locations or migration/documentation mechanisms.",
+      "options": [
+        "Create repository/model/test files plus a database migration/schema file and update existing architecture documentation file.",
+        "Implement only the explicitly named leave module files and represent schema/documentation updates through existing project mechanisms if available."
+      ],
+      "impactIfWrong": "medium"
+    }
+  ]
+}
