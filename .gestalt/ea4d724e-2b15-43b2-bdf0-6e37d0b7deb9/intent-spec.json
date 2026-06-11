@@ -1,0 +1,83 @@
+{
+  "id": "6c64c125-1e8d-4594-a850-0d8ed6fc5f1b",
+  "correlationId": "ea4d724e-2b15-43b2-bdf0-6e37d0b7deb9",
+  "rawIntent": "[Feature: Build the leave management module — Phase 2: Create AuditRecord domain model and repository contracts]\n\nCreate approximately 3-5 files: src/modules/audit/audit.model.ts defining AuditRecord with canonical attributes (id, entityType, entityId, action); src/modules/audit/audit.repository.ts defining repository interfaces and PostgreSQL-facing contracts that operate on AuditRecord types from src/modules/audit/audit.model.ts; include a unit test file under tests/unit/modules/audit/. Keep this phase limited to audit persistence contracts.\n\nPhase architecture notes:\nAudit support is isolated and reusable by later leave workflow services.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/audit/audit.model.ts\\nexport interface AuditRecord {\\n  id: string;\\n  entityType: string;\\n  entityId: string;\\n  action: string;\\n}\\n\\nexport interface CreateAuditRecordInput {\\n  entityType: string;\\n  entityId: string;\\n  action: string;\\n}\",\"File: src/modules/audit/audit.repository.ts\\nimport { AuditRecord, CreateAuditRecordInput } from \\\"./audit.model\\\";\\n\\nexport interface AuditRepository {\\n  create(input: CreateAuditRecordInput): Promise<AuditRecord>;\\n  findByEntity(entityType: string, entityId: string): Promise<AuditRecord[]>;\\n}\\n\\nexport abstract class PostgreSqlAuditRepository implements AuditRepository {\\n  abstract create(input: CreateAuditRecordInput): Promise<AuditRecord>;\\n  abstract findByEntity(entityType: string, entityId: string): Promise<AuditRecord[]>;\\n}\",\"File: tests/unit/modules/audit/audit.repository.spec.ts\\nimport { describe, it, expect } from \\\"vitest\\\";\\nimport type { AuditRepository } from \\\"../../../../src/modules/audit/audit.repository\\\";\\nimport type { AuditRecord, CreateAuditRecordInput } from \\\"../../../../src/modules/audit/audit.model\\\";\\n\\ndescribe(\\\"audit repository contracts\\\", () => {\\n  it(\\\"compiles with the declared contract types\\\", () => {\\n    expectTypeOf<AuditRecord>().toBeObject();\\n    expectTypeOf<CreateAuditRecordInput>().toBeObject();\\n    expectTypeOf<AuditRepository>().toBeObject();\\n    expect(true).toBe(true);\\n  });\\n});\"],\"importStatements\":[\"import { AuditRecord, CreateAuditRecordInput } from \\\"./audit.model\\\"\",\"import { describe, it, expect } from \\\"vitest\\\"\",\"import type { AuditRepository } from \\\"../../../../src/modules/audit/audit.repository\\\"\",\"import type { AuditRecord, CreateAuditRecordInput } from \\\"../../../../src/modules/audit/audit.model\\\"\"],\"successCriteria\":[\"src/modules/audit/audit.model.ts exists and exports AuditRecord and CreateAuditRecordInput.\",\"src/modules/audit/audit.repository.ts exists and exports AuditRepository and the PostgreSqlAuditRepository abstract class implementing the AuditRepository contract.\",\"All repository method signatures use AuditRecord types imported from src/modules/audit/audit.model.ts with no circular dependencies.\",\"The audit_records table schema matches the canonical schema exactly.\",\"tests/unit/modules/audit/audit.repository.spec.ts exists, uses Vitest, and verifies the audit module contract exports and TypeScript type compatibility.\"],\"sqlSchema\":\"CREATE TABLE audit_records (\\n  id UUID PRIMARY KEY,\\n  entity_type VARCHAR(100) NOT NULL,\\n  entity_id UUID NOT NULL,\\n  action VARCHAR(100) NOT NULL\\n);\"}\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 3 — Implement leave request submission service: Create approximately 2-5 files centered on service logic, including src/modules/leave/leave.service.\n- Phase 4 — Expose leave submission API with RBAC validation: Create approximately 2-5 files for API delivery, including a Fastify route/controller file under src\n- Phase 5 — Create Employee domain model and repository contracts: Create approximately 3-5 files: src/modules/employee/employee.model.ts defining Employee with canoni\n- Phase 6 — Implement manager approval and rejection service: Create approximately 2-5 files centered on workflow logic, including updates to or creation of servi\n- Phase 7 — Create LeaveBalance and LeavePolicy domain models with repositories: Create approximately 4-5 files: src/modules/balance/leave-balance.model.ts defining LeaveBalance wit\n- Phase 8 — Implement leave balance management on approval: Create approximately 2-5 files centered on balance logic, including a service under src/modules/bala\n- Phase 9 — Create Notification domain model and repository contracts: Create approximately 3-5 files: src/modules/notification/notification.model.ts defining Notification\n- Phase 10 — Implement workflow notification processing: Create approximately 2-5 files centered on notification services. This phase depends on src/modules/",
+  "scope": {
+    "affectedDomains": [
+      "audit"
+    ],
+    "affectedLayers": [
+      "domain",
+      "infra",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/audit/audit.model.ts exists and exports AuditRecord with fields id, entityType, entityId, action and CreateAuditRecordInput with fields entityType, entityId, action.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/audit/audit.repository.ts exists and exports AuditRepository with create and findByEntity methods using AuditRecord and CreateAuditRecordInput types from audit.model.ts.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "src/modules/audit/audit.repository.ts exports an abstract PostgreSqlAuditRepository class implementing the AuditRepository contract with matching method signatures.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "Repository contracts use AuditRecord types imported from src/modules/audit/audit.model.ts and introduce no circular dependencies.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "tests/unit/modules/audit/audit.repository.spec.ts exists, uses Vitest, and verifies audit module contract exports and TypeScript type compatibility.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-006",
+      "description": "The canonical audit_records schema is represented by the contract design with columns id, entity_type, entity_id, and action matching the provided schema definition.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Keep scope limited to audit persistence contracts and related type definitions/tests only.",
+    "Repository pattern: all database access must be expressed through repository interfaces/contracts; no direct database access implementation in this phase.",
+    "Audit support must remain isolated and reusable by later workflow services.",
+    "Use the exact interfaces and method signatures specified in the architecture definition.",
+    "All repository method signatures must use AuditRecord and CreateAuditRecordInput imported from src/modules/audit/audit.model.ts.",
+    "Avoid circular dependencies between audit model and repository contracts.",
+    "Use TypeScript, Node.js 20, npm, and Vitest conventions already established in the project.",
+    "Audit records are a project-wide requirement for future state-changing operations, but this phase defines only the audit domain contracts, not behavior.",
+    "Error handling principle applies to future implementations: no unhandled promise rejections in async code.",
+    "No sensitive data in logs; this phase should not introduce logging.",
+    "RBAC and input validation are API-boundary concerns and should not be implemented in these contract files."
+  ],
+  "outOfScope": [
+    "Implementing leave request submission services.",
+    "Implementing approval or rejection workflow services.",
+    "Creating Fastify routes, controllers, or API endpoints.",
+    "RBAC enforcement implementation.",
+    "Input validation implementation.",
+    "Audit service logic or audit record creation workflows.",
+    "PostgreSQL repository implementation details beyond abstract contracts.",
+    "Database migrations or schema deployment artifacts.",
+    "Employee, LeavePolicy, LeaveBalance, LeaveRequest, or Notification domain models and repositories.",
+    "Balance deduction logic.",
+    "Notification processing.",
+    "Any files outside src/modules/audit/* and tests/unit/modules/audit/* required for the specified contracts and tests."
+  ],
+  "ambiguities": []
+}

@@ -25,3 +25,13 @@ Represents notification data managed by the `notification` module, including not
 ## audit
 
 Represents audit data managed by the `audit` module, including audit records, change history, and activity tracking information.
+
+### AuditRecord
+
+Represents an audit record used to track actions performed on domain entities.
+
+Fields:
+- `id` (string, required): Unique identifier for the audit record.
+- `entityType` (string, required): Type of entity being audited.
+- `entityId` (string, required): Identifier of the audited entity.
+- `action` (string, required): Action performed on the entity.
