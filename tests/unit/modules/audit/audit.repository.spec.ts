@@ -1,4 +1,4 @@
-import { describe, expect, it, expectTypeOf } from "vitest";
+import { describe, it, expectTypeOf, expect } from "vitest";
 import type { AuditRepository } from "../../../../src/modules/audit/audit.repository";
 import type {
   AuditRecord,
@@ -10,6 +10,7 @@ describe("audit repository contracts", () => {
     expectTypeOf<AuditRecord>().toBeObject();
     expectTypeOf<CreateAuditRecordInput>().toBeObject();
     expectTypeOf<AuditRepository>().toBeObject();
+
     expect(true).toBe(true);
   });
 });
