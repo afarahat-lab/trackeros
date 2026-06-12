@@ -736,3 +736,108 @@ CREATE TABLE notifications (
 
 CREATE INDEX idx_notifications_user_id ON notifications(user_id);
 CREATE INDEX idx_notifications_read ON notifications(read);
+
+## Leave Management Module
+
+### Domain Entities
+
+**LeaveRequest** - Represents a leave application submitted by an employee and processed by a manager.
+- **Lifecycle States**: PENDING, APPROVED, REJECTED, CANCELLED
+- **Attributes**: id, employeeId, leaveType, startDate, endDate, status, reason, managerId, createdAt, updatedAt
+
+**LeaveBalance** - Tracks remaining leave entitlement by employee and leave type.
+- **Attributes**: id, employeeId, leaveType, balance, fiscalYear
+
+**Employee** - Employee identity and reporting hierarchy for leave approval workflow.
+- **Attributes**: id, name, email, managerId, department, employmentDate
+
+**LeavePolicy** - Defines entitlement rules and leave-type configurations.
+- **Leave Types**: ANNUAL, SICK, EMERGENCY
+- **Attributes**: id, leaveType, entitlementDays, carryOverLimit, requiresApproval
+
+**Notification** - Leave workflow notifications for employees and managers.
+- **Types**: LEAVE_SUBMITTED, LEAVE_APPROVED, LEAVE_REJECTED, BALANCE_LOW
+- **Statuses**: PENDING, SENT, FAILED
+- **Attributes**: id, recipientId, type, title, body, metadata, status, createdAt
+
+### Module Dependencies
+
+- `leave` module depends on: `employee`, `policy`, `balance`, `notification`
+- All other modules are independent
+
+### Transaction Semantics
+
+1. **Leave Request Creation**: Atomic transaction covering leave request creation, balance deduction, and audit logging.
+2. **Leave Approval/Rejection**: Atomic transaction covering status update, balance restoration (if rejected), and audit logging.
+3. **Balance Adjustments**: Separate transactions with compensating actions for rollback.
+4. **Notifications**: Separate transaction after primary operation commits to ensure eventual delivery.
+
+### Database Schema
+
+sql
+-- Leave Requests
+CREATE TABLE leave_requests (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    employee_id UUID NOT NULL REFERENCES employees(id),
+    leave_type VARCHAR(20) NOT NULL CHECK (leave_type IN ('ANNUAL', 'SICK', 'EMERGENCY')),
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED', 'CANCELLED')),
+    reason TEXT,
+    manager_id UUID REFERENCES employees(id),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_leave_requests_employee_id ON leave_requests(employee_id);
+CREATE INDEX idx_leave_requests_manager_id ON leave_requests(manager_id);
+CREATE INDEX idx_leave_requests_status ON leave_requests(status);
+
+-- Leave Balances
+CREATE TABLE leave_balances (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    employee_id UUID NOT NULL REFERENCES employees(id),
+    leave_type VARCHAR(20) NOT NULL CHECK (leave_type IN ('ANNUAL', 'SICK', 'EMERGENCY')),
+    balance DECIMAL(5,1) NOT NULL DEFAULT 0,
+    fiscal_year INTEGER NOT NULL,
+    UNIQUE(employee_id, leave_type, fiscal_year)
+);
+
+CREATE INDEX idx_leave_balances_employee_id ON leave_balances(employee_id);
+CREATE INDEX idx_leave_balances_fiscal_year ON leave_balances(fiscal_year);
+
+-- Employees
+CREATE TABLE employees (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    manager_id UUID REFERENCES employees(id),
+    department VARCHAR(100),
+    employment_date DATE NOT NULL
+);
+
+CREATE INDEX idx_employees_manager_id ON employees(manager_id);
+
+-- Leave Policies
+CREATE TABLE leave_policies (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    leave_type VARCHAR(20) UNIQUE NOT NULL CHECK (leave_type IN ('ANNUAL', 'SICK', 'EMERGENCY')),
+    entitlement_days INTEGER NOT NULL CHECK (entitlement_days >= 0),
+    carry_over_limit DECIMAL(5,1) NOT NULL DEFAULT 0,
+    requires_approval BOOLEAN NOT NULL DEFAULT true
+);
+
+-- Notifications
+CREATE TABLE notifications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    recipient_id UUID NOT NULL REFERENCES employees(id),
+    type VARCHAR(50) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    body TEXT NOT NULL,
+    metadata JSONB,
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'SENT', 'FAILED')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_notifications_recipient_id ON notifications(recipient_id);
+CREATE INDEX idx_notifications_status ON notifications(status);
