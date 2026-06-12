@@ -2,13 +2,44 @@
 
 To be populated as the design-agent and context-agent learn the domain.
 
-## leave
+## LeaveRequest
 
-Represents a leave record managed by the `leave` module, including leave requests and related leave-tracking data.
+Represents a leave request managed by the `leave` module, including leave requests and related leave-tracking data.
 
-## balance
+### Fields
+
+- **id** (`string`, required)
+- **employeeId** (`string`, required)
+- **leaveType** (`'ANNUAL' | 'SICK' | 'EMERGENCY'`, required)
+- **startDate** (`Date`, required)
+- **endDate** (`Date`, required)
+- **status** (`'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED'`, required)
+- **reason** (`string | null`, optional)
+- **managerId** (`string | null`, optional)
+- **createdAt** (`Date`, required)
+- **updatedAt** (`Date`, required)
+
+### Relationships
+
+- **Employee** — many-to-one
+- **LeaveBalance** — one-to-many
+
+## LeaveBalance
 
 Represents leave balance data managed by the `balance` module, including tracked entitlement, accrual, and remaining leave amounts.
+
+### Fields
+
+- **id** (`string`, required)
+- **employeeId** (`string`, required)
+- **leaveType** (`'ANNUAL' | 'SICK' | 'EMERGENCY'`, required)
+- **balance** (`number`, required)
+- **fiscalYear** (`number`, required)
+
+### Relationships
+
+- **Employee** — many-to-one
+- **LeaveRequest** — one-to-many
 
 ## employee
 

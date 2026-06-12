@@ -1,0 +1,64 @@
+{
+  "id": "f064284d-6901-4c26-8133-c879f50494f4",
+  "correlationId": "5ccc85ab-dcd6-46ed-947f-cb8808e28c91",
+  "rawIntent": "[Feature: Build the leave management module — Phase 1: Create core domain models and shared types]\n\nCreate src/modules/leave/leave.model.ts with TypeScript interfaces for LeaveRequest and CreateLeaveRequestDto. Create src/modules/balance/balance.model.ts with LeaveBalance interface. Create src/shared/types/index.ts with LeaveType, LeaveStatus, FiscalYear enums/types. This phase depends on no prior files.\n\nPhase architecture notes:\n{\"interfaces\":[\"File: src/modules/leave/leave.model.ts\\nexport interface LeaveRequest {\\n  id: string;\\n  employeeId: string;\\n  leaveType: 'ANNUAL' | 'SICK' | 'EMERGENCY';\\n  startDate: Date;\\n  endDate: Date;\\n  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';\\n  reason: string | null;\\n  managerId: string | null;\\n  createdAt: Date;\\n  updatedAt: Date;\\n}\\n\\nexport interface CreateLeaveRequestDto {\\n  employeeId: string;\\n  leaveType: 'ANNUAL' | 'SICK' | 'EMERGENCY';\\n  startDate: Date;\\n  endDate: Date;\\n  reason?: string;\\n}\",\"File: src/modules/balance/balance.model.ts\\nexport interface LeaveBalance {\\n  id: string;\\n  employeeId: string;\\n  leaveType: 'ANNUAL' | 'SICK' | 'EMERGENCY';\\n  balance: number;\\n  fiscalYear: number;\\n}\",\"File: src/shared/types/index.ts\\nexport type LeaveType = 'ANNUAL' | 'SICK' | 'EMERGENCY';\\nexport type LeaveStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';\\nexport type NotificationStatus = 'PENDING' | 'SENT' | 'FAILED';\\nexport type FiscalYear = number;\"],\"importStatements\":[],\"successCriteria\":[\"src/modules/leave/leave.model.ts exists and exports LeaveRequest and CreateLeaveRequestDto interfaces\",\"src/modules/balance/balance.model.ts exists and exports LeaveBalance interface\",\"src/shared/types/index.ts exists and exports LeaveType, LeaveStatus, NotificationStatus, and FiscalYear types\",\"All model files compile with TypeScript without errors\",\"All interfaces match the canonical SQL schema column names and types\",\"ARCHITECTURE.md is updated to include the new domain concepts: LeaveType, LeaveStatus, NotificationStatus, and FiscalYear\"]}\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/leave/leave.model.ts\\nexport interface LeaveRequest {\\n  id: string;\\n  employeeId: string;\\n  leaveType: 'ANNUAL' | 'SICK' | 'EMERGENCY';\\n  startDate: Date;\\n  endDate: Date;\\n  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';\\n  reason: string | null;\\n  managerId: string | null;\\n  createdAt: Date;\\n  updatedAt: Date;\\n}\\n\\nexport interface CreateLeaveRequestDto {\\n  employeeId: string;\\n  leaveType: 'ANNUAL' | 'SICK' | 'EMERGENCY';\\n  startDate: Date;\\n  endDate: Date;\\n  reason?: string;\\n}\",\"File: src/modules/balance/balance.model.ts\\nexport interface LeaveBalance {\\n  id: string;\\n  employeeId: string;\\n  leaveType: 'ANNUAL' | 'SICK' | 'EMERGENCY';\\n  balance: number;\\n  fiscalYear: number;\\n}\",\"File: src/shared/types/index.ts\\nexport type LeaveType = 'ANNUAL' | 'SICK' | 'EMERGENCY';\\nexport type LeaveStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';\\nexport type NotificationStatus = 'PENDING' | 'SENT' | 'FAILED';\\nexport type FiscalYear = number;\"],\"importStatements\":[],\"successCriteria\":[\"src/modules/leave/leave.model.ts exists and exports LeaveRequest and CreateLeaveRequestDto interfaces\",\"src/modules/balance/balance.model.ts exists and exports LeaveBalance interface\",\"src/shared/types/index.ts exists and exports LeaveType, LeaveStatus, NotificationStatus, and FiscalYear types\",\"All interfaces use TypeScript strict typing with no 'any' types\",\"All domain models match the canonical SQL schema column names and types\"]}\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 2 — Create employee and policy domain models: Create src/modules/employee/employee.model.ts with Employee interface. Create src/modules/policy/pol\n- Phase 3 — Create leave repository with transaction support: Create src/modules/leave/leave.repository.ts implementing ILeaveRepository with methods for CRUD ope\n- Phase 4 — Create balance and policy repositories: Create src/modules/balance/balance.repository.ts implementing ILeaveBalanceRepository for LeaveBalan\n- Phase 5 — Create employee repository and notification model: Create src/modules/employee/employee.repository.ts implementing IEmployeeRepository for manager hier\n- Phase 6 — Create leave service with validation: Create src/modules/leave/leave.service.ts implementing ILeaveService with createLeaveRequest method.\n- Phase 7 — Create notification repository and service: Create src/modules/notification/notification.repository.ts implementing INotificationRepository. Cre\n- Phase 8 — Implement leave approval workflow: Create src/modules/leave/leave-approval.service.ts implementing ILeaveApprovalService with approveLe\n- Phase 9 — Create leave balance management service: Create src/modules/balance/balance.service.ts implementing ILeaveBalanceService with methods for bal\n- Phase 10 — Create API routes and integration tests: Create src/modules/leave/leave.routes.ts with Express routes for leave creation and approval. Create",
+  "scope": {
+    "affectedDomains": [
+      "leave",
+      "balance"
+    ],
+    "affectedLayers": [
+      "domain"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/leave/leave.model.ts exists and exports LeaveRequest and CreateLeaveRequestDto interfaces exactly as specified",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/balance/balance.model.ts exists and exports LeaveBalance interface exactly as specified",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "src/shared/types/index.ts exists and exports LeaveType, LeaveStatus, NotificationStatus, and FiscalYear types exactly as specified",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "All three files compile with TypeScript strict mode enabled and no 'any' types",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All interfaces must use TypeScript strict typing with no 'any' types",
+    "All domain models must match the canonical SQL schema column names and types",
+    "Repository pattern: All database access goes through repository interfaces (not applicable for this phase but must be considered for future phases)",
+    "Input validation: Validate all inputs at API boundaries before processing (not applicable for this phase but must be considered for future phases)",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data (not applicable for this phase but must be considered for future phases)"
+  ],
+  "outOfScope": [
+    "Creating repository implementations",
+    "Creating service implementations",
+    "Creating API endpoints",
+    "Creating database migrations or schema",
+    "Creating employee or policy domain models",
+    "Creating notification domain models",
+    "Creating audit records",
+    "Implementing RBAC",
+    "Implementing error handling",
+    "Creating integration or e2e tests",
+    "Updating ARCHITECTURE.md",
+    "Any functionality beyond creating the three specified TypeScript files"
+  ],
+  "ambiguities": []
+}
