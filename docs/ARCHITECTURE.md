@@ -841,3 +841,114 @@ CREATE TABLE notifications (
 
 CREATE INDEX idx_notifications_recipient_id ON notifications(recipient_id);
 CREATE INDEX idx_notifications_status ON notifications(status);
+
+## Leave Management Module
+
+### Domain Entities
+
+**LeaveRequest**
+- Represents a leave application submitted by an employee
+- Status values: `PENDING`, `APPROVED`, `REJECTED`, `CANCELLED`
+- Links to employee, manager, and leave type
+
+**LeaveBalance**
+- Tracks remaining leave entitlement per employee per fiscal year
+- Updated when leave is approved or cancelled
+
+**Employee**
+- Employee identity and reporting hierarchy
+- Used for routing leave requests to managers
+
+**LeavePolicy**
+- Defines rules for each leave type
+- Includes entitlement days, carry-over limits, and approval requirements
+
+**Notification**
+- Leave workflow notifications for employees and managers
+- Types: `LEAVE_SUBMITTED`, `LEAVE_APPROVED`, `LEAVE_REJECTED`, `BALANCE_UPDATED`
+
+### Module Dependencies
+
+- `leave` module depends on: `employee`, `policy`, `balance`, `notification`
+- No circular dependencies between modules
+
+### Lifecycle States
+
+**LeaveRequest Status Transitions**
+1. `PENDING` → `APPROVED` (via manager approval)
+2. `PENDING` → `REJECTED` (via manager rejection)
+3. `PENDING` → `CANCELLED` (via employee cancellation)
+4. `APPROVED` → `CANCELLED` (via employee cancellation)
+
+**Notification States**
+- `read`: boolean flag indicating if notification has been viewed
+
+### Database Schema
+
+sql
+CREATE TABLE leave_requests (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    employee_id UUID NOT NULL REFERENCES employees(id),
+    leave_type VARCHAR(50) NOT NULL,
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    status VARCHAR(20) NOT NULL CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED', 'CANCELLED')),
+    reason TEXT,
+    manager_id UUID NOT NULL REFERENCES employees(id),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE leave_balances (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    employee_id UUID NOT NULL REFERENCES employees(id),
+    leave_type VARCHAR(50) NOT NULL,
+    balance DECIMAL(5,2) NOT NULL,
+    fiscal_year INTEGER NOT NULL,
+    UNIQUE(employee_id, leave_type, fiscal_year)
+);
+
+CREATE TABLE employees (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    manager_id UUID REFERENCES employees(id),
+    department VARCHAR(100)
+);
+
+CREATE TABLE leave_policies (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    leave_type VARCHAR(50) UNIQUE NOT NULL,
+    entitlement_days DECIMAL(5,2) NOT NULL,
+    carry_over_limit DECIMAL(5,2) NOT NULL,
+    requires_approval BOOLEAN DEFAULT TRUE
+);
+
+CREATE TABLE notifications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    recipient_id UUID NOT NULL REFERENCES employees(id),
+    type VARCHAR(50) NOT NULL CHECK (type IN ('LEAVE_SUBMITTED', 'LEAVE_APPROVED', 'LEAVE_REJECTED', 'BALANCE_UPDATED')),
+    title VARCHAR(255) NOT NULL,
+    message TEXT NOT NULL,
+    read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE audit_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    entity_type VARCHAR(50) NOT NULL,
+    entity_id UUID NOT NULL,
+    action VARCHAR(50) NOT NULL,
+    old_values JSONB,
+    new_values JSONB,
+    user_id UUID REFERENCES employees(id),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_leave_requests_employee_id ON leave_requests(employee_id);
+CREATE INDEX idx_leave_requests_manager_id ON leave_requests(manager_id);
+CREATE INDEX idx_leave_requests_status ON leave_requests(status);
+CREATE INDEX idx_leave_balances_employee_id ON leave_balances(employee_id);
+CREATE INDEX idx_notifications_recipient_id ON notifications(recipient_id);
+CREATE INDEX idx_notifications_read ON notifications(read);
+CREATE INDEX idx_audit_logs_entity ON audit_logs(entity_type, entity_id);
