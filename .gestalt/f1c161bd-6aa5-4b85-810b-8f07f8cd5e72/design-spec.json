@@ -68,6 +68,38 @@
       ]
     },
     {
+      "entityName": "CreateLeaveRequestDto",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "employeeId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "leaveType",
+          "type": "'ANNUAL' | 'SICK' | 'EMERGENCY'",
+          "required": true
+        },
+        {
+          "name": "startDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "endDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "reason",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "relationships": []
+    },
+    {
       "entityName": "LeaveBalance",
       "operation": "create",
       "fields": [

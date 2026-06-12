@@ -24,6 +24,17 @@ Represents a leave record managed by the `leave` module, including leave request
 - `Employee`: many-to-one
 - `LeaveBalance`: one-to-many
 
+**DTO:** `CreateLeaveRequestDto`
+
+**Fields:**
+- `employeeId`: string (required)
+- `leaveType`: `'ANNUAL' | 'SICK' | 'EMERGENCY'` (required)
+- `startDate`: Date (required)
+- `endDate`: Date (required)
+- `reason`: string (optional)
+
+**Relationships:** None
+
 ## balance
 
 Represents leave balance data managed by the `balance` module, including tracked entitlement, accrual, and remaining leave amounts.
