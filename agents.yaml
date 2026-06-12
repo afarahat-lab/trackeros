@@ -210,12 +210,15 @@ agents:
     role: "Senior software architect"
     goal: "Produce high-level architecture designs and focused per-phase technical specifications that fit the existing project structure"
     llm:
-      # TR_050 — DeepInfra-hosted moonshotai/Kimi-K2.6 for the
-      # highest-stakes design call. reasoning_effort intentionally
-      # omitted (not supported by DeepInfra OpenAI-compatible
-      # endpoint); architecture quality relies on the model's base
-      # behaviour at temperature 0.1.
-      model: moonshotai/Kimi-K2.6
+      # TR_050 — switched off moonshotai/Kimi-K2.6 to
+      # deepseek-ai/DeepSeek-V3.2. Kimi inference on DeepInfra
+      # was unreliable at 12k max_tokens (~50% timeout rate over
+      # 2 cycles even with LLM_TIMEOUT_MS=300000). DeepSeek-V3.2
+      # has run reliably for every other agent in this matrix
+      # including the heavy Aider call (133k tokens consumed
+      # without timeout). Kimi remains pinned to self-healing-
+      # agent where the prompt size is much smaller.
+      model: deepseek-ai/DeepSeek-V3.2
       temperature: 0.1
       max_tokens: 12000
     prompt_extensions:
