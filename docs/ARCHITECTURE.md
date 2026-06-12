@@ -952,3 +952,122 @@ CREATE INDEX idx_leave_balances_employee_id ON leave_balances(employee_id);
 CREATE INDEX idx_notifications_recipient_id ON notifications(recipient_id);
 CREATE INDEX idx_notifications_read ON notifications(read);
 CREATE INDEX idx_audit_logs_entity ON audit_logs(entity_type, entity_id);
+
+## Leave Management Module
+
+### Domain Entities
+
+**LeaveRequest**
+- Represents a leave application submitted by an employee
+- Status values: PENDING, APPROVED, REJECTED, CANCELLED
+- Links to employee (applicant) and manager (approver)
+
+**LeaveBalance**
+- Tracks remaining leave entitlement by employee and leave type
+- Updated when leave is approved or cancelled
+- Fiscal-year based tracking
+
+**Employee**
+- Employee identity and reporting hierarchy
+- Used for applicant and approver references
+
+**LeavePolicy**
+- Defines entitlement and leave-type rules
+- Leave types: ANNUAL, SICK, EMERGENCY
+- Configures approval requirements and carry-over limits
+
+**Notification**
+- Leave workflow notifications sent to employees and managers
+- Types: LEAVE_SUBMITTED, LEAVE_APPROVED, LEAVE_REJECTED
+
+### Module Dependencies
+
+- `leave` module depends on `employee`, `policy`, `balance`, and `notification` modules
+- All database access follows repository pattern (GP-001)
+- All state-changing operations write audit records (GP-002)
+- Input validation at API boundaries (GP-003)
+- RBAC enforcement on all endpoints (GP-005)
+
+### State Transitions
+
+LeaveRequest status flow:
+1. Created with PENDING status
+2. Manager approves → APPROVED (triggers balance deduction)
+3. Manager rejects → REJECTED
+4. Employee cancels → CANCELLED (triggers balance restoration if approved)
+
+### Transaction Semantics
+
+- Leave creation: Atomic transaction for request creation + audit log
+- Leave approval: Atomic transaction for status update + balance deduction + audit log
+- Leave rejection: Atomic transaction for status update + audit log
+- Leave cancellation: Atomic transaction for status update + balance restoration (if applicable) + audit log
+- Notifications: Separate transaction after primary operation succeeds
+
+### SQL Schema
+
+sql
+-- LeaveRequest table
+CREATE TABLE leave_requests (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    employee_id UUID NOT NULL REFERENCES employees(id),
+    leave_type VARCHAR(20) NOT NULL CHECK (leave_type IN ('ANNUAL', 'SICK', 'EMERGENCY')),
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED', 'CANCELLED')),
+    reason TEXT,
+    manager_id UUID NOT NULL REFERENCES employees(id),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    CHECK (end_date >= start_date)
+);
+
+CREATE INDEX idx_leave_requests_employee_id ON leave_requests(employee_id);
+CREATE INDEX idx_leave_requests_manager_id ON leave_requests(manager_id);
+CREATE INDEX idx_leave_requests_status ON leave_requests(status);
+
+-- LeaveBalance table
+CREATE TABLE leave_balances (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    employee_id UUID NOT NULL REFERENCES employees(id),
+    leave_type VARCHAR(20) NOT NULL CHECK (leave_type IN ('ANNUAL', 'SICK', 'EMERGENCY')),
+    balance DECIMAL(5,1) NOT NULL DEFAULT 0,
+    fiscal_year INTEGER NOT NULL,
+    UNIQUE(employee_id, leave_type, fiscal_year)
+);
+
+CREATE INDEX idx_leave_balances_employee_id ON leave_balances(employee_id);
+CREATE INDEX idx_leave_balances_fiscal_year ON leave_balances(fiscal_year);
+
+-- LeavePolicy table
+CREATE TABLE leave_policies (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    leave_type VARCHAR(20) NOT NULL UNIQUE CHECK (leave_type IN ('ANNUAL', 'SICK', 'EMERGENCY')),
+    entitlement_days DECIMAL(5,1) NOT NULL,
+    carry_over_limit DECIMAL(5,1) NOT NULL DEFAULT 0,
+    requires_approval BOOLEAN NOT NULL DEFAULT true
+);
+
+-- Notification table
+CREATE TABLE notifications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    recipient_id UUID NOT NULL REFERENCES employees(id),
+    type VARCHAR(50) NOT NULL,
+    title VARCHAR(200) NOT NULL,
+    message TEXT NOT NULL,
+    read BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_notifications_recipient_id ON notifications(recipient_id);
+CREATE INDEX idx_notifications_read ON notifications(read);
+
+
+### Audit Logging
+
+All state-changing operations on LeaveRequest and LeaveBalance entities generate audit records with:
+- User ID of the actor
+- Timestamp
+- Operation type (CREATE, UPDATE, DELETE)
+- Before/after state snapshots
+- Reason for change (if applicable)
