@@ -600,3 +600,43 @@ LeaveRequest status progression:
 4. CANCELLED - Employee cancels a pending request
 
 State transitions are managed through dedicated service methods with proper validation and audit logging.
+
+## Leave Management Module
+
+This module handles leave requests, approvals, and leave balance tracking for employees.
+
+### Domain Entities
+- **LeaveRequest**: Represents leave applications with attributes: id, employeeId, leaveType, startDate, endDate, status, reason, managerId, createdAt, updatedAt
+- **LeaveBalance**: Tracks remaining entitlement with attributes: id, employeeId, leaveType, balance, fiscalYear
+- **Employee**: Employee identity and reporting hierarchy (owned by employee module)
+- **LeavePolicy**: Defines entitlement rules (owned by policy module)
+- **Notification**: Leave workflow notifications (owned by notification module)
+
+### Module Dependencies
+- `leave` → `employee` (for employee data and manager relationships)
+- `leave` → `policy` (for leave type validation and entitlement rules)
+- `leave` → `balance` (for balance checks and updates)
+- `leave` → `notification` (for workflow notifications)
+- `balance` → `employee` (for employee references)
+- `balance` → `policy` (for policy references)
+
+### Key Workflows
+1. Employee submits leave request with validation against policy and available balance
+2. Request routes to appropriate manager based on employee's reporting hierarchy
+3. Manager approves/rejects request, triggering balance updates and notifications
+4. All state changes generate audit records
+5. RBAC ensures only authorized users can perform actions
+
+### Database Tables
+See per-phase designs for exact SQL schemas.
+
+### State Transitions
+LeaveRequest.status follows: `PENDING` → `APPROVED`/`REJECTED` → `CANCELLED` (optional)
+
+### Cross-Cutting Concerns
+- All operations follow repository pattern (GP-001)
+- All state changes generate audit records (GP-002)
+- Input validation at API boundaries (GP-003)
+- No sensitive data in logs (GP-004)
+- RBAC enforced on all endpoints (GP-005)
+- Proper error handling (GP-006)
