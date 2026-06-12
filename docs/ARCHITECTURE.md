@@ -640,3 +640,99 @@ LeaveRequest.status follows: `PENDING` → `APPROVED`/`REJECTED` → `CANCELLED`
 - No sensitive data in logs (GP-004)
 - RBAC enforced on all endpoints (GP-005)
 - Proper error handling (GP-006)
+
+## Leave Management Module
+
+### Domain Entities
+
+**LeaveRequest**
+- Represents a leave application submitted by an employee
+- Attributes: id, employeeId, leaveType, startDate, endDate, status, reason, managerId, createdAt, updatedAt
+- Status values: PENDING, APPROVED, REJECTED, CANCELLED
+
+**LeaveBalance**
+- Tracks remaining leave entitlement by employee and leave type
+- Attributes: id, employeeId, leaveType, balance, fiscalYear
+
+**LeavePolicy**
+- Defines entitlement rules and leave-type configurations
+- Attributes: id, leaveType, entitlementDays, carryOverLimit, requiresApproval
+- Leave types: ANNUAL, SICK, EMERGENCY
+
+### Module Dependencies
+
+- `leave` module depends on: `employee`, `policy`, `balance`, `notification`
+- `balance` module depends on: `policy`
+- `notification` module depends on: `employee`
+
+### Lifecycle States
+
+LeaveRequest status transitions:
+1. PENDING → APPROVED (by manager)
+2. PENDING → REJECTED (by manager)
+3. PENDING → CANCELLED (by employee)
+4. APPROVED → CANCELLED (by employee with manager approval)
+
+### Transaction Semantics
+
+- Leave request creation: Atomic transaction creating LeaveRequest and audit record
+- Leave request approval: Atomic transaction updating LeaveRequest status and LeaveBalance
+- Balance adjustments: Always executed within repository transactions
+- Notifications: Sent after successful transaction commit
+
+### SQL Schema
+
+sql
+-- LeaveRequest table
+CREATE TABLE leave_requests (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    employee_id UUID NOT NULL REFERENCES employees(id),
+    leave_type VARCHAR(20) NOT NULL CHECK (leave_type IN ('ANNUAL', 'SICK', 'EMERGENCY')),
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED', 'CANCELLED')),
+    reason TEXT,
+    manager_id UUID REFERENCES employees(id),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_leave_requests_employee_id ON leave_requests(employee_id);
+CREATE INDEX idx_leave_requests_manager_id ON leave_requests(manager_id);
+CREATE INDEX idx_leave_requests_status ON leave_requests(status);
+
+-- LeaveBalance table
+CREATE TABLE leave_balances (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    employee_id UUID NOT NULL REFERENCES employees(id),
+    leave_type VARCHAR(20) NOT NULL CHECK (leave_type IN ('ANNUAL', 'SICK', 'EMERGENCY')),
+    balance DECIMAL(5,2) NOT NULL DEFAULT 0,
+    fiscal_year INTEGER NOT NULL,
+    UNIQUE(employee_id, leave_type, fiscal_year)
+);
+
+CREATE INDEX idx_leave_balances_employee_id ON leave_balances(employee_id);
+CREATE INDEX idx_leave_balances_fiscal_year ON leave_balances(fiscal_year);
+
+-- LeavePolicy table
+CREATE TABLE leave_policies (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    leave_type VARCHAR(20) UNIQUE NOT NULL CHECK (leave_type IN ('ANNUAL', 'SICK', 'EMERGENCY')),
+    entitlement_days DECIMAL(5,2) NOT NULL,
+    carry_over_limit DECIMAL(5,2) NOT NULL DEFAULT 0,
+    requires_approval BOOLEAN NOT NULL DEFAULT true
+);
+
+-- Notification table
+CREATE TABLE notifications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES employees(id),
+    type VARCHAR(50) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    message TEXT NOT NULL,
+    read BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX idx_notifications_read ON notifications(read);
