@@ -1,0 +1,97 @@
+{
+  "id": "1ba423b4-5cfc-48b4-b421-38991b226d4a",
+  "correlationId": "e5963018-a5a7-4a05-af87-28e00fab2a2a",
+  "rawIntent": "[Feature: Build the leave management module — Phase 1: Core leave request data model and repository]\n\nCreate src/modules/leave/leave.model.ts with TypeScript interfaces for LeaveRequest and CreateLeaveRequestDto. Import LeaveType and LeaveStatus from src/shared/types/index.ts which already exists. Create src/modules/leave/leave.repository.ts implementing ILeaveRepository with methods for CRUD operations using the LeaveRequest interface. Include PostgreSQL schema definitions in the repository. Create src/modules/leave/index.ts exporting the repository and types. This phase establishes the foundational data layer.\n\nPhase architecture notes:\nEstablish LeaveRequest entity with PostgreSQL schema and repository layer before adding business logic. All database operations use repository pattern (GP-001).\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/leave/leave.model.ts\\nexport interface LeaveRequest {\\n  id: string;\\n  employeeId: string;\\n  leaveType: 'ANNUAL' | 'SICK' | 'EMERGENCY';\\n  startDate: Date;\\n  endDate: Date;\\n  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';\\n  reason?: string;\\n  managerId?: string;\\n  createdAt: Date;\\n  updatedAt: Date;\\n}\\n\\nexport interface CreateLeaveRequestDto {\\n  employeeId: string;\\n  leaveType: 'ANNUAL' | 'SICK' | 'EMERGENCY';\\n  startDate: Date;\\n  endDate: Date;\\n  reason?: string;\\n}\\n\\nexport interface UpdateLeaveRequestStatusDto {\\n  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';\\n  managerId: string;\\n}\",\"File: src/modules/leave/leave.repository.ts\\nexport interface ILeaveRepository {\\n  create(dto: CreateLeaveRequestDto): Promise<LeaveRequest>;\\n  findById(id: string): Promise<LeaveRequest | null>;\\n  findByEmployeeId(employeeId: string): Promise<LeaveRequest[]>;\\n  updateStatus(id: string, dto: UpdateLeaveRequestStatusDto): Promise<LeaveRequest>;\\n}\\n\\nexport class PgLeaveRequestRepository implements ILeaveRepository {\\n  constructor(private readonly pool: Pool) {}\\n\\n  async create(dto: CreateLeaveRequestDto): Promise<LeaveRequest> {\\n    // Implementation using PostgreSQL pool\\n  }\\n\\n  async findById(id: string): Promise<LeaveRequest | null> {\\n    // Implementation using PostgreSQL pool\\n  }\\n\\n  async findByEmployeeId(employeeId: string): Promise<LeaveRequest[]> {\\n    // Implementation using PostgreSQL pool\\n  }\\n\\n  async updateStatus(id: string, dto: UpdateLeaveRequestStatusDto): Promise<LeaveRequest> {\\n    // Implementation using PostgreSQL pool\\n  }\\n}\"],\"importStatements\":[\"import { Pool } from 'pg';\",\"import { LeaveRequest, CreateLeaveRequestDto, UpdateLeaveRequestStatusDto } from './leave.model';\",\"import { LeaveType, LeaveStatus } from '../../shared/types/index.ts';\"],\"successCriteria\":[\"src/modules/leave/leave.model.ts exists and exports LeaveRequest, CreateLeaveRequestDto, and UpdateLeaveRequestStatusDto interfaces\",\"src/modules/leave/leave.repository.ts exists and exports ILeaveRepository interface and PgLeaveRequestRepository class\",\"PgLeaveRequestRepository implements all repository methods using PostgreSQL pool with proper error handling (GP-006)\",\"All repository methods use the exact SQL schema provided with correct column names and types\",\"Repository tests in src/modules/leave/leave.repository.test.ts pass with Vitest\"],\"sqlSchema\":\"CREATE TABLE leave_requests (\\n    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\\n    employee_id UUID NOT NULL REFERENCES employees(id),\\n    leave_type VARCHAR(20) NOT NULL CHECK (leave_type IN ('ANNUAL', 'SICK', 'EMERGENCY')),\\n    start_date DATE NOT NULL,\\n    end_date DATE NOT NULL,\\n    status VARCHAR(20) NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED', 'CANCELLED')),\\n    reason TEXT,\\n    manager_id UUID REFERENCES employees(id),\\n    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),\\n    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()\\n);\"}\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 2 — Leave request creation service with validation: Create src/modules/leave/leave.service.ts implementing leave request creation with input validation \n- Phase 3 — Leave request approval workflow: Create src/modules/leave/leave.approval.service.ts implementing manager approval/rejection with RBAC\n- Phase 4 — Leave balance tracking and queries: Create src/modules/balance/balance.model.ts with LeaveBalance interface. Create src/modules/balance/\n- Phase 5 — Notification integration: Create src/modules/notification/notification.service.ts integrating notifications for leave request ",
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "domain",
+      "infra",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/leave/leave.model.ts exists and exports LeaveRequest, CreateLeaveRequestDto, and UpdateLeaveRequestStatusDto interfaces",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/leave/leave.repository.ts exists and exports ILeaveRepository interface and PgLeaveRequestRepository class",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "PgLeaveRequestRepository implements all repository methods using PostgreSQL pool with proper error handling",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "sc-004",
+      "description": "All repository methods use the exact SQL schema provided with correct column names and types",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "sc-005",
+      "description": "Repository tests in src/modules/leave/leave.repository.test.ts pass with Vitest",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-006",
+      "description": "src/modules/leave/index.ts exports the repository and types",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "GP-001: All database operations use repository pattern",
+    "GP-006: Error handling - No unhandled promise rejections. All async errors are caught and handled",
+    "Repository pattern must be used for all database access",
+    "PostgreSQL must be used as the database backend",
+    "TypeScript interfaces must match the provided SQL schema",
+    "All repository methods must be implemented with proper error handling"
+  ],
+  "outOfScope": [
+    "Leave request creation service with validation (Phase 2)",
+    "Leave request approval workflow with RBAC (Phase 3)",
+    "Leave balance tracking and queries (Phase 4)",
+    "Notification integration (Phase 5)",
+    "API endpoints or controllers",
+    "Business logic beyond basic CRUD operations",
+    "Input validation at API boundaries",
+    "Audit records for state-changing operations",
+    "RBAC enforcement",
+    "Any changes to employee, policy, balance, or notification modules",
+    "Balance deductions during approval",
+    "Notification creation on workflow events"
+  ],
+  "ambiguities": [
+    {
+      "id": "amb-001",
+      "description": "The architecture-agent specifies LeaveType and LeaveStatus imports from src/shared/types/index.ts, but the provided interfaces use string literals instead of imported types",
+      "options": [
+        "Use the imported LeaveType and LeaveStatus types from shared/types",
+        "Keep string literals as shown in the provided interfaces"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "id": "amb-002",
+      "description": "The SQL schema uses DATE for start_date and end_date, but TypeScript interfaces use Date objects which include time",
+      "options": [
+        "Change TypeScript interfaces to use string or Date for dates",
+        "Keep as Date but handle date-only conversion in repository"
+      ],
+      "impactIfWrong": "medium"
+    }
+  ]
+}
