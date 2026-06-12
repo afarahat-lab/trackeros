@@ -72,13 +72,16 @@ agents:
     role: "Senior TypeScript engineer"
     goal: "Generate production-quality TypeScript code that follows the project harness"
     llm:
-      # TR_050 — DeepInfra DeepSeek-V3.2. The code-agent's resolved
-      # client also drives Aider (aider-code-agent.ts pulls
-      # client.getModel() + client.getBaseUrl() and forwards them
-      # as Aider's --model + OPENAI_API_BASE). Setting the model
-      # here is what changes Aider's backend — there is no
-      # separate codeGeneration.aiderModel field.
-      model: deepseek-ai/DeepSeek-V3.2
+      # TR_050 — switched off deepseek-ai/DeepSeek-V3.2 onto
+      # moonshotai/Kimi-K2.6 for code-agent specifically. DeepSeek
+      # reasons ABOUT Aider's SEARCH/REPLACE protocol but does
+      # not reliably EMIT the blocks — Aider's diff parser sees
+      # zero edits and exits with only metadata changes. Kimi is
+      # better at producing direct structured output and is
+      # already on DeepInfra. The aider-adapter prepends the
+      # `openai/` litellm prefix automatically (TR_050 fix), so
+      # no client-side change is needed.
+      model: moonshotai/Kimi-K2.6
       temperature: 0.1
       max_tokens: 8000
       # No reasoning_effort — Aider drives its own reasoning loop;
