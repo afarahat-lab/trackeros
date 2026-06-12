@@ -1071,3 +1071,121 @@ All state-changing operations on LeaveRequest and LeaveBalance entities generate
 - Operation type (CREATE, UPDATE, DELETE)
 - Before/after state snapshots
 - Reason for change (if applicable)
+
+## Leave Management Module
+
+### Domain Entities
+
+**LeaveRequest**
+- Represents a leave application submitted by an employee
+- States: PENDING, APPROVED, REJECTED, CANCELLED
+- Attributes: id, employeeId, leaveType, startDate, endDate, status, reason, managerId, createdAt, updatedAt
+
+**LeaveBalance**
+- Tracks remaining leave entitlement by employee and leave type
+- Attributes: id, employeeId, leaveType, balance, fiscalYear
+
+**LeavePolicy**
+- Defines entitlement rules and leave-type configurations
+- Attributes: id, leaveType, entitlementDays, carryOverLimit, requiresApproval
+- Leave types: ANNUAL, SICK, EMERGENCY
+
+### Module Dependencies
+
+- `leave` module depends on: `employee`, `policy`, `balance`, `notification`
+- `balance` module depends on: `employee`
+- `notification` module depends on: `employee`
+
+### Database Schema
+
+sql
+-- LeaveRequest table
+CREATE TABLE leave_requests (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    employee_id UUID NOT NULL REFERENCES employees(id),
+    leave_type VARCHAR(20) NOT NULL CHECK (leave_type IN ('ANNUAL', 'SICK', 'EMERGENCY')),
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED', 'CANCELLED')),
+    reason TEXT,
+    manager_id UUID REFERENCES employees(id),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_leave_requests_employee_id ON leave_requests(employee_id);
+CREATE INDEX idx_leave_requests_manager_id ON leave_requests(manager_id);
+CREATE INDEX idx_leave_requests_status ON leave_requests(status);
+
+-- LeaveBalance table
+CREATE TABLE leave_balances (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    employee_id UUID NOT NULL REFERENCES employees(id),
+    leave_type VARCHAR(20) NOT NULL CHECK (leave_type IN ('ANNUAL', 'SICK', 'EMERGENCY')),
+    balance DECIMAL(5,1) NOT NULL DEFAULT 0,
+    fiscal_year INTEGER NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(employee_id, leave_type, fiscal_year)
+);
+
+CREATE INDEX idx_leave_balances_employee_id ON leave_balances(employee_id);
+CREATE INDEX idx_leave_balances_fiscal_year ON leave_balances(fiscal_year);
+
+-- LeavePolicy table
+CREATE TABLE leave_policies (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    leave_type VARCHAR(20) UNIQUE NOT NULL CHECK (leave_type IN ('ANNUAL', 'SICK', 'EMERGENCY')),
+    entitlement_days INTEGER NOT NULL CHECK (entitlement_days > 0),
+    carry_over_limit INTEGER NOT NULL DEFAULT 0,
+    requires_approval BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Notification table
+CREATE TABLE notifications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    recipient_id UUID NOT NULL REFERENCES employees(id),
+    type VARCHAR(50) NOT NULL,
+    title VARCHAR(200) NOT NULL,
+    message TEXT NOT NULL,
+    metadata JSONB,
+    read BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_notifications_recipient_id ON notifications(recipient_id);
+CREATE INDEX idx_notifications_read ON notifications(read);
+
+
+### Lifecycle States
+
+**LeaveRequest Status Transitions:**
+1. PENDING → APPROVED (by manager)
+2. PENDING → REJECTED (by manager)
+3. PENDING → CANCELLED (by employee)
+4. APPROVED → CANCELLED (by employee with manager notification)
+
+**Notification Types:**
+- LEAVE_SUBMITTED (to manager)
+- LEAVE_APPROVED (to employee)
+- LEAVE_REJECTED (to employee)
+- LEAVE_CANCELLED (to manager)
+- BALANCE_ADJUSTED (to employee)
+
+### Transaction Semantics
+
+1. Leave request creation: Atomic transaction creating LeaveRequest + audit record
+2. Leave approval: Atomic transaction updating LeaveRequest status + adjusting LeaveBalance + creating Notification + audit records
+3. Balance adjustment: Atomic transaction updating LeaveBalance + audit record
+4. Policy validation: Read-only transaction checking LeavePolicy rules
+
+### Cross-Cutting Concerns
+
+- All state-changing operations write audit records (GP-002)
+- All inputs validated at API boundaries using Fastify schemas (GP-003)
+- All database access through repository interfaces (GP-001)
+- All API endpoints enforce RBAC (GP-005)
+- No sensitive data in logs (GP-004)
+- All async errors handled with proper error middleware (GP-006)
