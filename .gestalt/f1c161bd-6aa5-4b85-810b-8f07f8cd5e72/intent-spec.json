@@ -1,0 +1,78 @@
+{
+  "id": "ce87e66f-a6b9-4666-a264-1a4707fdd9e0",
+  "correlationId": "f1c161bd-6aa5-4b85-810b-8f07f8cd5e72",
+  "rawIntent": "[Feature: Build the leave management module — Phase 1: Create core domain models and shared types]\n\nCreate src/modules/leave/leave.model.ts with TypeScript interfaces for LeaveRequest and CreateLeaveRequestDto. Create src/modules/balance/balance.model.ts with LeaveBalance interface. Create src/shared/types/index.ts with LeaveType, LeaveStatus, FiscalYear enums/types. This phase depends on no prior files.\n\nPhase architecture notes:\nEstablish foundational data structures before persistence layer\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/leave/leave.model.ts\\nexport interface LeaveRequest {\\n  id: string;\\n  employeeId: string;\\n  leaveType: 'ANNUAL' | 'SICK' | 'EMERGENCY';\\n  startDate: Date;\\n  endDate: Date;\\n  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';\\n  reason: string | null;\\n  managerId: string | null;\\n  createdAt: Date;\\n  updatedAt: Date;\\n}\\n\\nexport interface CreateLeaveRequestDto {\\n  employeeId: string;\\n  leaveType: 'ANNUAL' | 'SICK' | 'EMERGENCY';\\n  startDate: Date;\\n  endDate: Date;\\n  reason?: string;\\n}\",\"File: src/modules/balance/balance.model.ts\\nexport interface LeaveBalance {\\n  id: string;\\n  employeeId: string;\\n  leaveType: 'ANNUAL' | 'SICK' | 'EMERGENCY';\\n  balance: number;\\n  fiscalYear: number;\\n}\",\"File: src/shared/types/index.ts\\nexport type LeaveType = 'ANNUAL' | 'SICK' | 'EMERGENCY';\\nexport type LeaveStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';\\nexport type NotificationStatus = 'PENDING' | 'SENT' | 'FAILED';\\nexport type FiscalYear = number;\"],\"importStatements\":[],\"successCriteria\":[\"src/modules/leave/leave.model.ts exists and exports LeaveRequest and CreateLeaveRequestDto interfaces\",\"src/modules/balance/balance.model.ts exists and exports LeaveBalance interface\",\"src/shared/types/index.ts exists and exports LeaveType, LeaveStatus, NotificationStatus, and FiscalYear types\",\"All model files compile with TypeScript without errors\",\"All interfaces match the canonical SQL schema column names and types\",\"ARCHITECTURE.md is updated to include the new domain concepts: LeaveType, LeaveStatus, NotificationStatus, and FiscalYear\"]}\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 2 — Create employee and policy domain models: Create src/modules/employee/employee.model.ts with Employee interface. Create src/modules/policy/pol\n- Phase 3 — Create leave repository with transaction support: Create src/modules/leave/leave.repository.ts implementing ILeaveRepository with methods for CRUD ope\n- Phase 4 — Create balance and policy repositories: Create src/modules/balance/balance.repository.ts implementing ILeaveBalanceRepository for LeaveBalan\n- Phase 5 — Create employee repository and notification model: Create src/modules/employee/employee.repository.ts implementing IEmployeeRepository for manager hier\n- Phase 6 — Create leave service with validation: Create src/modules/leave/leave.service.ts implementing ILeaveService with createLeaveRequest method.\n- Phase 7 — Create notification repository and service: Create src/modules/notification/notification.repository.ts implementing INotificationRepository. Cre\n- Phase 8 — Implement leave approval workflow: Create src/modules/leave/leave-approval.service.ts implementing ILeaveApprovalService with approveLe\n- Phase 9 — Create leave balance management service: Create src/modules/balance/balance.service.ts implementing ILeaveBalanceService with methods for bal\n- Phase 10 — Create API routes and integration tests: Create src/modules/leave/leave.routes.ts with Express routes for leave creation and approval. Create",
+  "scope": {
+    "affectedDomains": [
+      "leave",
+      "balance"
+    ],
+    "affectedLayers": [
+      "domain"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/leave/leave.model.ts exists and exports LeaveRequest and CreateLeaveRequestDto interfaces",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/balance/balance.model.ts exists and exports LeaveBalance interface",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "src/shared/types/index.ts exists and exports LeaveType, LeaveStatus, NotificationStatus, and FiscalYear types",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "All model files compile with TypeScript without errors",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "All interfaces match the canonical SQL schema column names and types",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-006",
+      "description": "ARCHITECTURE.md is updated to include the new domain concepts: LeaveType, LeaveStatus, NotificationStatus, and FiscalYear",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "Persistence layer implementation (repositories)",
+    "Service layer implementation",
+    "API endpoints and routes",
+    "Employee domain models",
+    "Policy domain models",
+    "Notification domain models",
+    "Database schema creation",
+    "Business logic validation",
+    "Role-based access control",
+    "Audit record creation",
+    "Transaction support",
+    "Integration tests",
+    "Leave approval workflow",
+    "Balance deduction logic",
+    "Notification service implementation"
+  ],
+  "ambiguities": []
+}
