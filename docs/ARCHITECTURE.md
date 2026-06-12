@@ -495,3 +495,108 @@ CREATE INDEX idx_audit_records_entity ON audit_records(entity_type, entity_id);
 - An approved `LeaveRequest` causes `LeaveBalance` to be decremented by the `leave` module via the `balance` module's public interface.
 - `LeaveRequest` state changes publish `Notification` events through the `notification` module.
 - All mutating operations on `LeaveRequest` produce an audit record per GP-002.
+
+## Leave Management Module
+
+### Domain Entities
+
+**LeaveRequest**
+- Represents a leave application submitted by an employee
+- Tracks lifecycle from submission through approval/rejection
+- Attributes: id, employeeId, leaveType, startDate, endDate, status, reason, managerId, createdAt, updatedAt
+- Status values: PENDING, APPROVED, REJECTED, CANCELLED
+
+**LeaveBalance**
+- Tracks remaining leave entitlement for an employee by leave type and fiscal year
+- Attributes: id, employeeId, leaveType, balance, fiscalYear
+
+**Employee**
+- Represents an employee identity and reporting hierarchy
+- Attributes: id, name, email, managerId, department
+
+**LeavePolicy**
+- Defines rules and entitlements for each type of leave
+- Attributes: id, leaveType, entitlementDays, carryOverLimit, requiresApproval
+- Leave types: ANNUAL, SICK, EMERGENCY
+
+**Notification**
+- Represents notifications sent to users about leave workflow events
+- Attributes: id, userId, type, title, message, read, createdAt
+
+### Module Dependencies
+
+- `leave` module depends on: `employee`, `policy`, `balance`, `notification`
+- `balance` module depends on: `employee`, `policy`
+- `notification` module depends on: `employee`
+
+### Database Schema
+
+sql
+CREATE TABLE leave_requests (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    employee_id UUID NOT NULL REFERENCES employees(id),
+    leave_type VARCHAR(20) NOT NULL CHECK (leave_type IN ('ANNUAL', 'SICK', 'EMERGENCY')),
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED', 'CANCELLED')),
+    reason TEXT,
+    manager_id UUID REFERENCES employees(id),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_leave_requests_employee_id ON leave_requests(employee_id);
+CREATE INDEX idx_leave_requests_manager_id ON leave_requests(manager_id);
+CREATE INDEX idx_leave_requests_status ON leave_requests(status);
+
+CREATE TABLE leave_balances (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    employee_id UUID NOT NULL REFERENCES employees(id),
+    leave_type VARCHAR(20) NOT NULL CHECK (leave_type IN ('ANNUAL', 'SICK', 'EMERGENCY')),
+    balance DECIMAL(5,1) NOT NULL DEFAULT 0,
+    fiscal_year INTEGER NOT NULL,
+    UNIQUE(employee_id, leave_type, fiscal_year)
+);
+
+CREATE INDEX idx_leave_balances_employee_id ON leave_balances(employee_id);
+CREATE INDEX idx_leave_balances_fiscal_year ON leave_balances(fiscal_year);
+
+CREATE TABLE leave_policies (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    leave_type VARCHAR(20) UNIQUE NOT NULL CHECK (leave_type IN ('ANNUAL', 'SICK', 'EMERGENCY')),
+    entitlement_days DECIMAL(5,1) NOT NULL,
+    carry_over_limit DECIMAL(5,1) NOT NULL DEFAULT 0,
+    requires_approval BOOLEAN NOT NULL DEFAULT true
+);
+
+CREATE TABLE notifications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES employees(id),
+    type VARCHAR(50) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    message TEXT NOT NULL,
+    read BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX idx_notifications_read ON notifications(read);
+
+
+### Transaction Semantics
+
+All state-changing operations in the leave management module execute atomically within a single database transaction. This includes:
+- Leave request creation with audit record
+- Leave approval/rejection with balance adjustment, notification creation, and audit records
+- Balance adjustments with audit records
+- Notification creation as part of workflow events
+
+### Lifecycle States
+
+LeaveRequest status progression:
+1. PENDING - Initial state when request is submitted
+2. APPROVED - Manager approves the request
+3. REJECTED - Manager rejects the request
+4. CANCELLED - Employee cancels a pending request
+
+State transitions are managed through dedicated service methods with proper validation and audit logging.
