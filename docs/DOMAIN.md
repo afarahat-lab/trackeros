@@ -25,3 +25,25 @@ Represents notification data managed by the `notification` module, including not
 ## audit
 
 Represents audit data managed by the `audit` module, including audit records, change history, and activity tracking information.
+
+## LeaveRequest
+
+Represents a leave request managed by the `leave` module, including leave request records and related leave-tracking data.
+
+### Fields
+
+- `id`: string (required)
+- `employeeId`: string (required)
+- `leaveType`: LeaveType (required)
+- `startDate`: Date (required)
+- `endDate`: Date (required)
+- `status`: LeaveStatus (required)
+- `reason`: string | null
+- `managerId`: string | null
+- `createdAt`: Date (required)
+- `updatedAt`: Date (required)
+
+### Relationships
+
+- Many-to-one with `Employee` (as requester)
+- Many-to-one with `Employee` (as manager)

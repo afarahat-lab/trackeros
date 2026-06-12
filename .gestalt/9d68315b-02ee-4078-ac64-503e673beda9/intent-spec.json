@@ -1,0 +1,85 @@
+{
+  "id": "0ebac2f5-a180-4560-aaf8-5ad68117d8f1",
+  "correlationId": "9d68315b-02ee-4078-ac64-503e673beda9",
+  "rawIntent": "[Feature: Build the leave management module — Phase 1: Core leave request entity and repository]\n\nCreate src/modules/leave/leave.model.ts with TypeScript interfaces for LeaveRequest and CreateLeaveRequestDto. Import LeaveType, LeaveStatus from src/shared/types/index.ts which already exists. Create src/modules/leave/leave.repository.ts implementing ILeaveRepository with PostgreSQL queries referencing LeaveRequest and CreateLeaveRequestDto types. Include src/modules/leave/leave.repository.spec.ts with Jest unit tests for repository methods. This phase establishes the foundational LeaveRequest model with basic CRUD operations.\n\nPhase architecture notes:\nEstablish LeaveRequest entity with repository pattern for single-entity operations before building workflows\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/leave/leave.model.ts\\nexport type LeaveType = 'ANNUAL' | 'SICK' | 'EMERGENCY';\\nexport type LeaveStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';\\n\\nexport interface LeaveRequest {\\n  id: string;\\n  employeeId: string;\\n  leaveType: LeaveType;\\n  startDate: Date;\\n  endDate: Date;\\n  status: LeaveStatus;\\n  reason: string | null;\\n  managerId: string | null;\\n  createdAt: Date;\\n  updatedAt: Date;\\n}\\n\\nexport interface CreateLeaveRequestDto {\\n  employeeId: string;\\n  leaveType: LeaveType;\\n  startDate: Date;\\n  endDate: Date;\\n  reason?: string;\\n  managerId?: string;\\n}\",\"File: src/modules/leave/leave.repository.ts\\nimport { Pool } from 'pg';\\nimport { LeaveRequest, CreateLeaveRequestDto, LeaveStatus } from './leave.model';\\n\\nexport interface ILeaveRepository {\\n  create(dto: CreateLeaveRequestDto): Promise<LeaveRequest>;\\n  findById(id: string): Promise<LeaveRequest | null>;\\n  findByEmployeeId(employeeId: string): Promise<LeaveRequest[]>;\\n  updateStatus(id: string, status: LeaveStatus, managerId: string): Promise<LeaveRequest>;\\n  update(id: string, updates: Partial<Omit<LeaveRequest, 'id' | 'createdAt' | 'updatedAt'>>): Promise<LeaveRequest>;\\n  delete(id: string): Promise<boolean>;\\n}\\n\\nexport class PgLeaveRepository implements ILeaveRepository {\\n  constructor(private readonly pool: Pool) {}\\n\\n  async create(dto: CreateLeaveRequestDto): Promise<LeaveRequest> {\\n    const query = `\\n      INSERT INTO leave_requests (\\n        employee_id, leave_type, start_date, end_date, reason, manager_id\\n      ) VALUES ($1, $2, $3, $4, $5, $6)\\n      RETURNING *\\n    `;\\n    const values = [\\n      dto.employeeId,\\n      dto.leaveType,\\n      dto.startDate,\\n      dto.endDate,\\n      dto.reason || null,\\n      dto.managerId || null\\n    ];\\n    \\n    const result = await this.pool.query<LeaveRequest>(query, values);\\n    return result.rows[0];\\n  }\\n\\n  async findById(id: string): Promise<LeaveRequest | null> {\\n    const query = `SELECT * FROM leave_requests WHERE id = $1`;\\n    const result = await this.pool.query<LeaveRequest>(query, [id]);\\n    return result.rows[0] || null;\\n  }\\n\\n  async findByEmployeeId(employeeId: string): Promise<LeaveRequest[]> {\\n    const query = `SELECT * FROM leave_requests WHERE employee_id = $1 ORDER BY created_at DESC`;\\n    const result = await this.pool.query<LeaveRequest>(query, [employeeId]);\\n    return result.rows;\\n  }\\n\\n  async updateStatus(id: string, status: LeaveStatus, managerId: string): Promise<LeaveRequest> {\\n    const query = `\\n      UPDATE leave_requests \\n      SET status = $1, manager_id = $2, updated_at = NOW()\\n      WHERE id = $3\\n      RETURNING *\\n    `;\\n    const result = await this.pool.query<LeaveRequest>(query, [status, managerId, id]);\\n    if (result.rows.length === 0) {\\n      throw new Error(`Leave request with id ${id} not found`);\\n    }\\n    return result.rows[0];\\n  }\\n\\n  async update(id: string, updates: Partial<Omit<LeaveRequest, 'id' | 'createdAt' | 'updatedAt'>>): Promise<LeaveRequest> {\\n    const setClauses: string[] = [];\\n    const values: any[] = [];\\n    let paramCount = 1;\\n\\n    if (updates.employeeId !== undefined) {\\n      setClauses.push(`employee_id = $${paramCount++}`);\\n      values.push(updates.employeeId);\\n    }\\n    if (updates.leaveType !== undefined) {\\n      setClauses.push(`leave_type = $${paramCount++}`);\\n      values.push(updates.leaveType);\\n    }\\n    if (updates.startDate !== undefined) {\\n      setClauses.push(`start_date = $${paramCount++}`);\\n      values.push(updates.startDate);\\n    }\\n    if (updates.endDate !== undefined) {\\n      setClauses.push(`end_date = $${paramCount++}`);\\n      values.push(updates.endDate);\\n    }\\n    if (updates.status !== undefined) {\\n      setClauses.push(`status = $${paramCount++}`);\\n      values.push(updates.status);\\n    }\\n    if (updates.reason !== undefined) {\\n      setClauses.push(`reason = $${paramCount++}`);\\n      values.push(updates.reason);\\n    }\\n    if (updates.managerId !== undefined) {\\n      setClauses.push(`manager_id = $${paramCount++}`);\\n      values.push(updates.managerId);\\n    }\\n\\n    if (setClauses.length === 0) {\\n      throw new Error('No updates provided');\\n    }\\n\\n    setClauses.push(`updated_at = NOW()`);\\n    values.push(id);\\n\\n    const query = `\\n      UPDATE leave_requests \\n      SET ${setClauses.join(', ')}\\n      WHERE id = $${paramCount}\\n      RETURNING *\\n    `;\\n\\n    const result = await this.pool.query<LeaveRequest>(query, values);\\n    if (result.rows.length === 0) {\\n      throw new Error(`Leave request with id ${id} not found`);\\n    }\\n    return result.rows[0];\\n  }\\n\\n  async delete(id: string): Promise<boolean> {\\n    const query = `DELETE FROM leave_requests WHERE id = $1 RETURNING id`;\\n    const result = await this.pool.query(query, [id]);\\n    return result.rowCount > 0;\\n  }\\n}\",\"File: src/modules/leave/leave.validation.ts\\nimport { z } from 'zod';\\nimport { LeaveType, LeaveStatus } from './leave.model';\\n\\nexport const createLeaveRequestSchema = z.object({\\n  employeeId: z.string().uuid(),\\n  leaveType: z.enum(['ANNUAL', 'SICK', 'EMERGENCY']),\\n  startDate: z.coerce.date(),\\n  endDate: z.coerce.date(),\\n  reason: z.string().optional(),\\n  managerId: z.string().uuid().optional()\\n}).refine(data => data.endDate >= data.startDate, {\\n  message: 'End date must be after or equal to start date',\\n  path: ['endDate']\\n});\\n\\nexport const updateLeaveRequestStatusSchema = z.object({\\n  status: z.enum(['APPROVED', 'REJECTED', 'CANCELLED']),\\n  managerId: z.string().uuid()\\n});\\n\\nexport const updateLeaveRequestSchema = z.object({\\n  employeeId: z.string().uuid().optional(),\\n  leaveType: z.enum(['ANNUAL', 'SICK', 'EMERGENCY']).optional(),\\n  startDate: z.coerce.date().optional(),\\n  endDate: z.coerce.date().optional(),\\n  status: z.enum(['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED']).optional(),\\n  reason: z.string().optional(),\\n  managerId: z.string().uuid().optional()\\n}).refine(data => {\\n  if (data.startDate && data.endDate) {\\n    return data.endDate >= data.startDate;\\n  }\\n  return true;\\n}, {\\n  message: 'End date must be after or equal to start date',\\n  path: ['endDate']\\n});\"],\"importStatements\":[\"import { LeaveType, LeaveStatus, LeaveRequest, CreateLeaveRequestDto } from './leave.model'\",\"import { ILeaveRepository, PgLeaveRepository } from './leave.repository'\",\"import { createLeaveRequestSchema, updateLeaveRequestStatusSchema, updateLeaveRequestSchema } from './leave.validation'\"],\"successCriteria\":[\"src/modules/leave/leave.model.ts exists and exports LeaveType, LeaveStatus, LeaveRequest interface, and CreateLeaveRequestDto interface\",\"src/modules/leave/leave.repository.ts exists and exports ILeaveRepository interface and PgLeaveRepository concrete implementation\",\"src/modules/leave/leave.validation.ts exists and exports createLeaveRequestSchema, updateLeaveRequestStatusSchema, and updateLeaveRequestSchema Zod schemas for input validation\",\"All database access in PgLeaveRepository uses repository pattern (GP-001)\",\"All repository methods use PostgreSQL queries matching the canonical leave_requests schema exactly\",\"Vitest unit tests exist for all PgLeaveRepository methods in leave.repository.spec.ts\",\"Transaction semantics: Each repository method executes in its own database transaction managed by PostgreSQL\"],\"sqlSchema\":\"CREATE TABLE leave_requests (\\n    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\\n    employee_id UUID NOT NULL REFERENCES employees(id),\\n    leave_type VARCHAR(20) NOT NULL CHECK (leave_type IN ('ANNUAL', 'SICK', 'EMERGENCY')),\\n    start_date DATE NOT NULL,\\n    end_date DATE NOT NULL,\\n    status VARCHAR(20) NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED', 'CANCELLED')),\\n    reason TEXT,\\n    manager_id UUID REFERENCES employees(id),\\n    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),\\n    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()\\n);\"}\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 2 — Leave request service with validation: Create src/modules/leave/leave.service.ts implementing ILeaveService with business logic for leave r\n- Phase 3 — Leave balance entity and repository: Create src/modules/balance/balance.model.ts with TypeScript interfaces for LeaveBalance and UpdateLe\n- Phase 4 — Leave balance adjustment service: Create src/modules/balance/balance.service.ts implementing ILeaveBalanceService to adjust balances w\n- Phase 5 — Manager approval workflow with notifications: Create src/modules/leave/approval.service.ts implementing IApprovalService with RBAC enforcement for\n- Phase 6 — Leave policy validation and API endpoints: Create src/modules/policy/policy.repository.ts implementing ILeavePolicyRepository for LeavePolicy e",
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "domain",
+      "infra",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/leave/leave.model.ts exists and exports LeaveType, LeaveStatus, LeaveRequest interface, and CreateLeaveRequestDto interface",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/leave/leave.repository.ts exists and exports ILeaveRepository interface and PgLeaveRepository concrete implementation",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "src/modules/leave/leave.validation.ts exists and exports createLeaveRequestSchema, updateLeaveRequestStatusSchema, and updateLeaveRequestSchema Zod schemas for input validation",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "All database access in PgLeaveRepository uses repository pattern (GP-001)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "All repository methods use PostgreSQL queries matching the canonical leave_requests schema exactly",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-006",
+      "description": "Vitest unit tests exist for all PgLeaveRepository methods in leave.repository.spec.ts",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-007",
+      "description": "Transaction semantics: Each repository method executes in its own database transaction managed by PostgreSQL",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled.",
+    "PostgreSQL must be used for database queries",
+    "TypeScript interfaces must match the provided architecture",
+    "All repository methods must be unit tested with Vitest",
+    "Database schema must match the provided SQL exactly"
+  ],
+  "outOfScope": [
+    "Leave request service with business logic (Phase 2)",
+    "Leave balance entity and repository (Phase 3)",
+    "Leave balance adjustment service (Phase 4)",
+    "Manager approval workflow with notifications (Phase 5)",
+    "Leave policy validation and API endpoints (Phase 6)",
+    "API endpoints or controllers",
+    "RBAC enforcement",
+    "Audit records (GP-002) - this is Phase 1 only, repository layer",
+    "Notification generation",
+    "Business logic validation beyond basic input validation",
+    "Integration with employee, policy, balance, or notification modules",
+    "Any functionality outside src/modules/leave directory"
+  ],
+  "ambiguities": []
+}
