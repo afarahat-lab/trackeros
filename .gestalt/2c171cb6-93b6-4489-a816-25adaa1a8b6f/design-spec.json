@@ -98,6 +98,43 @@
       ]
     },
     {
+      "entityName": "CreateLeaveRequestDto",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "employeeId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "policyId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "startDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "endDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "reason",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "attachmentUrl",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "relationships": []
+    },
+    {
       "entityName": "Notification",
       "operation": "create",
       "fields": [
@@ -159,14 +196,56 @@
       ],
       "relationships": [
         {
-          "entity": "Employee",
+          "entity": "LeaveRequest",
           "type": "many-to-one"
         },
         {
-          "entity": "LeaveRequest",
+          "entity": "Employee",
           "type": "many-to-one"
         }
       ]
+    },
+    {
+      "entityName": "CreateNotificationDto",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "recipientId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "senderId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "type",
+          "type": "'LEAVE_SUBMITTED' | 'LEAVE_APPROVED' | 'LEAVE_REJECTED' | 'LEAVE_CANCELLED'",
+          "required": true
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "body",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "relatedEntityType",
+          "type": "'LEAVE_REQUEST'",
+          "required": true
+        },
+        {
+          "name": "relatedEntityId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "relationships": []
     }
   ],
   "apiContracts": [],

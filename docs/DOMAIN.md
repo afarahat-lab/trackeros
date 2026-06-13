@@ -32,6 +32,18 @@ Represents a leave request submitted by an employee, including dates, status, an
 - `Employee`: many-to-one
 - `LeavePolicy`: many-to-one
 
+## createLeaveRequestDto
+
+Data transfer object used to create a new leave request.
+
+**Fields:**
+- `employeeId`: string (required)
+- `policyId`: string (required)
+- `startDate`: Date (required)
+- `endDate`: Date (required)
+- `reason`: string (optional)
+- `attachmentUrl`: string (optional)
+
 ## balance
 
 Represents leave balance data managed by the `balance` module, including tracked entitlement, accrual, and remaining leave amounts.
@@ -64,6 +76,19 @@ Represents notification data managed by the `notification` module, including not
 **Relationships:**
 - `Employee`: many-to-one
 - `LeaveRequest`: many-to-one
+
+## createNotificationDto
+
+Data transfer object used to create a new notification.
+
+**Fields:**
+- `recipientId`: string (required)
+- `senderId`: string (optional)
+- `type`: `'LEAVE_SUBMITTED' | 'LEAVE_APPROVED' | 'LEAVE_REJECTED' | 'LEAVE_CANCELLED'` (required)
+- `title`: string (required)
+- `body`: string (required)
+- `relatedEntityType`: `'LEAVE_REQUEST'` (required)
+- `relatedEntityId`: string (required)
 
 ## audit
 
