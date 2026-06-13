@@ -1,0 +1,95 @@
+{
+  "id": "9c3ff1dc-43ab-4fa9-b7b5-b4f5cc19585f",
+  "correlationId": "cab48418-3964-43da-839c-69e5f5d5c629",
+  "rawIntent": "Phase 1: Core domain models and repository interfaces for leave management.\n\nGenerate the following domain model files with exact canonical interfaces:\n- src/modules/leave/leave.model.ts exports LeaveRequest and CreateLeaveRequestDto.\n- src/modules/balance/balance.model.ts exports LeaveBalance.\n- src/modules/employee/employee.model.ts exports Employee.\n- src/modules/policy/policy.model.ts exports LeavePolicy.\n\nGenerate the following repository interfaces with these exact method signatures:\n- src/modules/leave/leave.repository.ts exports ILeaveRepository:\n  create(dto: CreateLeaveRequestDto): Promise<LeaveRequest>\n  findById(id: string): Promise<LeaveRequest | null>\n  findByEmployeeId(employeeId: string): Promise<LeaveRequest[]>\n  updateStatus(id: string, status: LeaveRequest['status'], reviewerComments?: string): Promise<LeaveRequest>\n  update(id: string, updates: Partial<LeaveRequest>): Promise<LeaveRequest>\n  delete(id: string): Promise<void>\n- src/modules/balance/balance.repository.ts exports ILeaveBalanceRepository:\n  findByEmployeeId(employeeId: string): Promise<LeaveBalance[]>\n  findByEmployeeIdAndLeaveType(employeeId: string, leaveType: string): Promise<LeaveBalance | null>\n  findByEmployeeIdAndFiscalYear(employeeId: string, fiscalYear: number): Promise<LeaveBalance[]>\n  updateBalance(id: string, usedDays: number, remainingDays: number): Promise<LeaveBalance>\n  create(balance: Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeaveBalance>\n- src/modules/employee/employee.repository.ts exports IEmployeeRepository:\n  findById(id: string): Promise<Employee | null>\n  findByEmployeeId(employeeId: string): Promise<Employee | null>\n  findByManagerId(managerId: string): Promise<Employee[]>\n  findByDepartment(department: string): Promise<Employee[]>\n  updateEmploymentStatus(id: string, status: Employee['employmentStatus']): Promise<Employee>\n- src/modules/policy/policy.repository.ts exports ILeavePolicyRepository:\n  findAll(): Promise<LeavePolicy[]>\n  findByLeaveType(leaveType: string): Promise<LeavePolicy | null>\n  findByStatus(status: LeavePolicy['status']): Promise<LeavePolicy[]>\n  findApplicablePolicies(employmentStatus: string): Promise<LeavePolicy[]>\n  findById(id: string): Promise<LeavePolicy | null>\n\nAll repository files must import their corresponding model types. Do not add create, update, or delete methods to ILeavePolicyRepository in Phase 1. Do not change any return types from the signatures above.",
+  "scope": {
+    "affectedDomains": [
+      "leave",
+      "balance",
+      "employee",
+      "policy"
+    ],
+    "affectedLayers": [
+      "domain"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "All four domain model files (leave.model.ts, balance.model.ts, employee.model.ts, policy.model.ts) are created with correct TypeScript interfaces/types",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "All four repository interface files are created with exact method signatures as specified in the intent",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "Repository interfaces import their corresponding model types from the same module",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "ILeavePolicyRepository does not include create, update, or delete methods as specified",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "Implementation of repository methods (only interfaces required)",
+    "Database schema/migrations",
+    "API endpoints or controllers",
+    "Business logic or service layer",
+    "Test files",
+    "Configuration files",
+    "UI components",
+    "Authentication or RBAC implementation",
+    "Audit record implementation",
+    "LeaveRequest lifecycle state management",
+    "Balance deduction logic",
+    "Notification creation logic",
+    "Any files outside the four specified model files and four repository interface files"
+  ],
+  "ambiguities": [
+    {
+      "id": "amb-001",
+      "description": "The intent specifies 'exact canonical interfaces' for domain models but doesn't define the specific properties for each model",
+      "options": [
+        "Use minimal properties based on context clues",
+        "Create comprehensive models with typical leave management properties"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "id": "amb-002",
+      "description": "The intent mentions 'CreateLeaveRequestDto' but doesn't specify whether this should be a class or interface, or what properties it should contain",
+      "options": [
+        "Create as interface with minimal required fields",
+        "Create as class with validation decorators"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "id": "amb-003",
+      "description": "The intent doesn't specify whether 'id' fields should be string or number types",
+      "options": [
+        "Use string for all IDs",
+        "Use number for all IDs",
+        "Mix based on typical database patterns"
+      ],
+      "impactIfWrong": "medium"
+    }
+  ]
+}
