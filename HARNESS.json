@@ -212,8 +212,8 @@
     "backend": "aider"
   },
   "pipeline": {
-    "adapter": "noop",
-    "autoMerge": false,
+    "adapter": "github-actions",
+    "autoMerge": true,
     "mergeMethod": "squash"
   },
   "prAgent": {
