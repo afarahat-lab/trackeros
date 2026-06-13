@@ -226,7 +226,8 @@
     "maxPhasesPerFeature": 10,
     "maxFilesPerPhase": 5,
     "architectureReviewPerPhase": true,
-    "maxPhaseRetries": 2
+    "maxPhaseRetries": 2,
+    "engine": "langgraph"
   },
   "tokenManagement": {
     "promptCompressionThreshold": 6000,
