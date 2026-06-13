@@ -382,3 +382,413 @@
 +  findByLeaveType(leaveType: string): Promise<LeavePolicy | null>;
 +  findByStatus(status: 'ACTIVE' | 'INACTIVE'): Promise<LeavePolicy[]>;
 +  create(policy: Omit<LeavePolicy, 'id' | 'createdAt' | 'update
+
+# 2026-06-13 22:10:12.937482
++## Task
++Phase 1: Core domain models and repository interfaces for leave management.
++
++Generate the following domain model files with exact canonical interfaces:
++- src/modules/leave/leave.model.ts exports LeaveRequest and CreateLeaveRequestDto.
++- src/modules/balance/balance.model.ts exports LeaveBalance.
++- src/modules/employee/employee.model.ts exports Employee.
++- src/modules/policy/policy.model.ts exports LeavePolicy.
++
++Generate the following repository interfaces with these exact method signatures:
++- src/modules/leave/leave.repository.ts exports ILeaveRepository:
++  create(dto: CreateLeaveRequestDto): Promise<LeaveRequest>
++  findById(id: string): Promise<LeaveRequest | null>
++  findByEmployeeId(employeeId: string): Promise<LeaveRequest[]>
++  updateStatus(id: string, status: LeaveRequest['status'], reviewerComments?: string): Promise<LeaveRequest>
++  update(id: string, updates: Partial<LeaveRequest>): Promise<LeaveRequest>
++  delete(id: string): Promise<void>
++- src/modules/balance/balance.repository.ts exports ILeaveBalanceRepository:
++  findByEmployeeId(employeeId: string): Promise<LeaveBalance[]>
++  findByEmployeeIdAndLeaveType(employeeId: string, leaveType: string): Promise<LeaveBalance | null>
++  findByEmployeeIdAndFiscalYear(employeeId: string, fiscalYear: number): Promise<LeaveBalance[]>
++  updateBalance(id: string, usedDays: number, remainingDays: number): Promise<LeaveBalance>
++  create(balance: Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeaveBalance>
++- src/modules/employee/employee.repository.ts exports IEmployeeRepository:
++  findById(id: string): Promise<Employee | null>
++  findByEmployeeId(employeeId: string): Promise<Employee | null>
++  findByManagerId(managerId: string): Promise<Employee[]>
++  findByDepartment(department: string): Promise<Employee[]>
++  updateEmploymentStatus(id: string, status: Employee['employmentStatus']): Promise<Employee>
++- src/modules/policy/policy.repository.ts exports ILeavePolicyRepository:
++  findAll(): Promise<LeavePolicy[]>
++  findByLeaveType(leaveType: string): Promise<LeavePolicy | null>
++  findByStatus(status: LeavePolicy['status']): Promise<LeavePolicy[]>
++  findApplicablePolicies(employmentStatus: string): Promise<LeavePolicy[]>
++  findById(id: string): Promise<LeavePolicy | null>
++
++All repository files must import their corresponding model types. Do not add create, update, or delete methods to ILeavePolicyRepository in Phase 1. Do not change any return types from the signatures above.
++
++## Success criteria
++- All four domain model files (leave.model.ts, balance.model.ts, employee.model.ts, policy.model.ts) are created with correct TypeScript interfaces/types
++- All four repository interface files are created with exact method signatures as specified in the intent
++- Repository interfaces import their corresponding model types from the same module
++- ILeavePolicyRepository does not include create, update, or delete methods as specified
++
++## Out of scope (do NOT touch these)
++- Implementation of repository methods (only interfaces required)
++- Database schema/migrations
++- API endpoints or controllers
++- Business logic or service layer
++- Test files
++- Configuration files
++- UI components
++- Authentication or RBAC implementation
++- Audit record implementation
++- LeaveRequest lifecycle state management
++- Balance deduction logic
++- Notification creation logic
++- Any files outside the four specified model files and four repository interface files
++
++## Project rules
++- Generated code must compile without errors. Verify with executeScript before returning.
++- All imports must resolve to files that exist in the project or are declared in package.json.
++- You MUST run a compile/lint check via executeScript before emitting the final files. This is not optional.
++- Do not use require() for JSON imports — import them using ES module syntax with resolveJsonModule enabled in tsconfig.
++- Before generating any repository, service, or controller code, read the DTO and interface files it will use. Never reference a field on a type without confirming it exists in the type definition.
++- Before generating code that calls methods on a dependency, read the dependency's source file to confirm which methods exist. Only call methods that are actually defined.
++- Read the project's compiler/linter configuration file (tsconfig.json, mypy.ini, pyproject.toml, .eslintrc etc) before generating code. Follow the strictness settings it defines — do not assume permissive defaults.
++- Read the project's dependency manifest (package.json, requirements.txt, go.mod, pom.xml etc) before importing external packages. Only import packages that are listed as dependencies.
++
++## Scoped architecture for this phase
++The following describes ONLY what exists now and what you
++are building in this phase. Use these exact file paths,
++exact export names, and exact import statements. Do not
++invent paths or imports — if it is not listed here, it
++does not exist.
++
++### Existing dependencies — use these exact imports
++
++import { LeaveRequest, CreateLeaveRequestDto } from './leave.model'
++import { LeaveBalance } from './balance.model'
++import { Employee } from './employee.model'
++import { LeavePolicy } from './policy.model'
++
++### Interfaces / types this phase implements
++
++File: src/modules/leave/leave.model.ts
++export interface LeaveRequest {
++  id: string;
++  employeeId: string;
++  leaveType: string;
++  startDate: Date;
++  endDate: Date;
++  durationDays: number;
++  reason?: string;
++  status: 'DRAFT' | 'SUBMITTED' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
++  managerId?: string;
++  submittedAt?: Date;
++  reviewedAt?: Date;
++  reviewerComments?: string;
++  createdAt: Date;
++  updatedAt: Date;
++}
++
++export interface CreateLeaveRequestDto {
++  employeeId: string;
++  leaveType: string;
++  startDate: Date;
++  endDate: Date;
++  durationDays: number;
++  reason?: string;
++  status?: 'DRAFT' | 'SUBMITTED' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
++  managerId?: string;
++}
++
++File: src/modules/balance/balance.model.ts
++export interface LeaveBalance {
++  id: string;
++  employeeId: string;
++  leaveType: string;
++  entitlementDays: number;
++  usedDays: number;
++  remainingDays: number;
++  accrualRate?: number;
++  accrualFrequency?: string;
++  fiscalYear: number;
++  status: 'ACTIVE' | 'ARCHIVED';
++  createdAt: Date;
++  updatedAt: Date;
++}
++
++File: src/modules/employee/employee.model.ts
++export interface Employee {
++  id: string;
++  employeeId: string;
++  firstName: string;
++  lastName: string;
++  email: string;
++  managerId?: string;
++  department?: string;
++  hireDate: Date;
++  employmentStatus: 'ACTIVE' | 'INACTIVE' | 'TERMINATED';
++  createdAt: Date;
++  updatedAt: Date;
++}
++
++File: src/modules/policy/policy.model.ts
++export interface LeavePolicy {
++  id: string;
++  leaveType: string;
++  entitlementDays: number;
++  accrualMethod?: string;
++  maxAccumulation?: number;
++  advanceLeaveAllowed: boolean;
++  requiresDocumentation: boolean;
++  noticePeriodDays: number;
++  applicableEmploymentTypes: string[];
++  status: 'ACTIVE' | 'INACTIVE';
++  createdAt: Date;
++  updatedAt: Date;
++}
++
++File: src/modules/leave/leave.repository.ts
++import { LeaveRequest, CreateLeaveRequestDto } from './leave.model';
++
++export interface ILeaveRepository {
++  create(dto: CreateLeaveRequestDto): Promise<LeaveRequest>;
++  findById(id: string): Promise<LeaveRequest | null>;
++  findByEmployeeId(employeeId: string): Promise<LeaveRequest[]>;
++  update(id: string, updates: Partial<LeaveRequest>): Promise<LeaveRequest | null>;
++  delete(id: string): Promise<boolean>;
++}
++
++File: src/modules/balance/balance.repository.ts
++import { LeaveBalance } from './balance.model';
++
++export interface ILeaveBalanceRepository {
++  findByEmployeeId(employeeId: string): Promise<LeaveBalance[]>;
++  findByEmployeeIdAndLeaveType(employeeId: string, leaveType: string): Promise<LeaveBalance | null>;
++  findByEmployeeIdAndFiscalYear(employeeId: string, fiscalYear: number): Promise<LeaveBalance[]>;
++  update(id: string, updates: Partial<LeaveBalance>): Promise<LeaveBalance | null>;
++  create(balance: Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeaveBalance>;
++}
++
++File: src/modules/employee/employee.repository.ts
++import { Employee } from './employee.model';
++
++export interface IEmployeeRepository {
++  findById(id: string): Promise<Employee | null>;
++  findByEmployeeId(employeeId: string): Promise<Employee | null>;
++  findByEmail(email: string): Promise<Employee | null>;
++  findByManagerId(managerId: string): Promise<Employee[]>;
++  findByDepartment(department: string): Promise<Employee[]>;
++}
++
++File: src/modules/policy/policy.repository.ts
++import { LeavePolicy } from './policy.model';
++
++export interface ILeavePolicyRepository {
++  findAll(): Promise<LeavePolicy[]>;
++  findById(id: string): Promise<LeavePolicy | null>;
++  findByLeaveType(leaveType: string): Promise<LeavePolicy | null>;
++  findByStatus(status: 'ACTIVE' | 'INACTIVE'): Promise<LeavePolicy[]>;
++  create(policy: Omit<LeavePolicy, 'id' | 'createdAt' | 'update
+
+# 2026-06-13 22:10:12.937567
++## Task
++Phase 1: Core domain models and repository interfaces for leave management.
++
++Generate the following domain model files with exact canonical interfaces:
++- src/modules/leave/leave.model.ts exports LeaveRequest and CreateLeaveRequestDto.
++- src/modules/balance/balance.model.ts exports LeaveBalance.
++- src/modules/employee/employee.model.ts exports Employee.
++- src/modules/policy/policy.model.ts exports LeavePolicy.
++
++Generate the following repository interfaces with these exact method signatures:
++- src/modules/leave/leave.repository.ts exports ILeaveRepository:
++  create(dto: CreateLeaveRequestDto): Promise<LeaveRequest>
++  findById(id: string): Promise<LeaveRequest | null>
++  findByEmployeeId(employeeId: string): Promise<LeaveRequest[]>
++  updateStatus(id: string, status: LeaveRequest['status'], reviewerComments?: string): Promise<LeaveRequest>
++  update(id: string, updates: Partial<LeaveRequest>): Promise<LeaveRequest>
++  delete(id: string): Promise<void>
++- src/modules/balance/balance.repository.ts exports ILeaveBalanceRepository:
++  findByEmployeeId(employeeId: string): Promise<LeaveBalance[]>
++  findByEmployeeIdAndLeaveType(employeeId: string, leaveType: string): Promise<LeaveBalance | null>
++  findByEmployeeIdAndFiscalYear(employeeId: string, fiscalYear: number): Promise<LeaveBalance[]>
++  updateBalance(id: string, usedDays: number, remainingDays: number): Promise<LeaveBalance>
++  create(balance: Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeaveBalance>
++- src/modules/employee/employee.repository.ts exports IEmployeeRepository:
++  findById(id: string): Promise<Employee | null>
++  findByEmployeeId(employeeId: string): Promise<Employee | null>
++  findByManagerId(managerId: string): Promise<Employee[]>
++  findByDepartment(department: string): Promise<Employee[]>
++  updateEmploymentStatus(id: string, status: Employee['employmentStatus']): Promise<Employee>
++- src/modules/policy/policy.repository.ts exports ILeavePolicyRepository:
++  findAll(): Promise<LeavePolicy[]>
++  findByLeaveType(leaveType: string): Promise<LeavePolicy | null>
++  findByStatus(status: LeavePolicy['status']): Promise<LeavePolicy[]>
++  findApplicablePolicies(employmentStatus: string): Promise<LeavePolicy[]>
++  findById(id: string): Promise<LeavePolicy | null>
++
++All repository files must import their corresponding model types. Do not add create, update, or delete methods to ILeavePolicyRepository in Phase 1. Do not change any return types from the signatures above.
++
++## Success criteria
++- All four domain model files (leave.model.ts, balance.model.ts, employee.model.ts, policy.model.ts) are created with correct TypeScript interfaces/types
++- All four repository interface files are created with exact method signatures as specified in the intent
++- Repository interfaces import their corresponding model types from the same module
++- ILeavePolicyRepository does not include create, update, or delete methods as specified
++
++## Out of scope (do NOT touch these)
++- Implementation of repository methods (only interfaces required)
++- Database schema/migrations
++- API endpoints or controllers
++- Business logic or service layer
++- Test files
++- Configuration files
++- UI components
++- Authentication or RBAC implementation
++- Audit record implementation
++- LeaveRequest lifecycle state management
++- Balance deduction logic
++- Notification creation logic
++- Any files outside the four specified model files and four repository interface files
++
++## Project rules
++- Generated code must compile without errors. Verify with executeScript before returning.
++- All imports must resolve to files that exist in the project or are declared in package.json.
++- You MUST run a compile/lint check via executeScript before emitting the final files. This is not optional.
++- Do not use require() for JSON imports — import them using ES module syntax with resolveJsonModule enabled in tsconfig.
++- Before generating any repository, service, or controller code, read the DTO and interface files it will use. Never reference a field on a type without confirming it exists in the type definition.
++- Before generating code that calls methods on a dependency, read the dependency's source file to confirm which methods exist. Only call methods that are actually defined.
++- Read the project's compiler/linter configuration file (tsconfig.json, mypy.ini, pyproject.toml, .eslintrc etc) before generating code. Follow the strictness settings it defines — do not assume permissive defaults.
++- Read the project's dependency manifest (package.json, requirements.txt, go.mod, pom.xml etc) before importing external packages. Only import packages that are listed as dependencies.
++
++## Scoped architecture for this phase
++The following describes ONLY what exists now and what you
++are building in this phase. Use these exact file paths,
++exact export names, and exact import statements. Do not
++invent paths or imports — if it is not listed here, it
++does not exist.
++
++### Existing dependencies — use these exact imports
++
++import { LeaveRequest, CreateLeaveRequestDto } from './leave.model'
++import { LeaveBalance } from './balance.model'
++import { Employee } from './employee.model'
++import { LeavePolicy } from './policy.model'
++
++### Interfaces / types this phase implements
++
++File: src/modules/leave/leave.model.ts
++export interface LeaveRequest {
++  id: string;
++  employeeId: string;
++  leaveType: string;
++  startDate: Date;
++  endDate: Date;
++  durationDays: number;
++  reason?: string;
++  status: 'DRAFT' | 'SUBMITTED' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
++  managerId?: string;
++  submittedAt?: Date;
++  reviewedAt?: Date;
++  reviewerComments?: string;
++  createdAt: Date;
++  updatedAt: Date;
++}
++
++export interface CreateLeaveRequestDto {
++  employeeId: string;
++  leaveType: string;
++  startDate: Date;
++  endDate: Date;
++  durationDays: number;
++  reason?: string;
++  status?: 'DRAFT' | 'SUBMITTED' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
++  managerId?: string;
++}
++
++File: src/modules/balance/balance.model.ts
++export interface LeaveBalance {
++  id: string;
++  employeeId: string;
++  leaveType: string;
++  entitlementDays: number;
++  usedDays: number;
++  remainingDays: number;
++  accrualRate?: number;
++  accrualFrequency?: string;
++  fiscalYear: number;
++  status: 'ACTIVE' | 'ARCHIVED';
++  createdAt: Date;
++  updatedAt: Date;
++}
++
++File: src/modules/employee/employee.model.ts
++export interface Employee {
++  id: string;
++  employeeId: string;
++  firstName: string;
++  lastName: string;
++  email: string;
++  managerId?: string;
++  department?: string;
++  hireDate: Date;
++  employmentStatus: 'ACTIVE' | 'INACTIVE' | 'TERMINATED';
++  createdAt: Date;
++  updatedAt: Date;
++}
++
++File: src/modules/policy/policy.model.ts
++export interface LeavePolicy {
++  id: string;
++  leaveType: string;
++  entitlementDays: number;
++  accrualMethod?: string;
++  maxAccumulation?: number;
++  advanceLeaveAllowed: boolean;
++  requiresDocumentation: boolean;
++  noticePeriodDays: number;
++  applicableEmploymentTypes: string[];
++  status: 'ACTIVE' | 'INACTIVE';
++  createdAt: Date;
++  updatedAt: Date;
++}
++
++File: src/modules/leave/leave.repository.ts
++import { LeaveRequest, CreateLeaveRequestDto } from './leave.model';
++
++export interface ILeaveRepository {
++  create(dto: CreateLeaveRequestDto): Promise<LeaveRequest>;
++  findById(id: string): Promise<LeaveRequest | null>;
++  findByEmployeeId(employeeId: string): Promise<LeaveRequest[]>;
++  update(id: string, updates: Partial<LeaveRequest>): Promise<LeaveRequest | null>;
++  delete(id: string): Promise<boolean>;
++}
++
++File: src/modules/balance/balance.repository.ts
++import { LeaveBalance } from './balance.model';
++
++export interface ILeaveBalanceRepository {
++  findByEmployeeId(employeeId: string): Promise<LeaveBalance[]>;
++  findByEmployeeIdAndLeaveType(employeeId: string, leaveType: string): Promise<LeaveBalance | null>;
++  findByEmployeeIdAndFiscalYear(employeeId: string, fiscalYear: number): Promise<LeaveBalance[]>;
++  update(id: string, updates: Partial<LeaveBalance>): Promise<LeaveBalance | null>;
++  create(balance: Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeaveBalance>;
++}
++
++File: src/modules/employee/employee.repository.ts
++import { Employee } from './employee.model';
++
++export interface IEmployeeRepository {
++  findById(id: string): Promise<Employee | null>;
++  findByEmployeeId(employeeId: string): Promise<Employee | null>;
++  findByEmail(email: string): Promise<Employee | null>;
++  findByManagerId(managerId: string): Promise<Employee[]>;
++  findByDepartment(department: string): Promise<Employee[]>;
++}
++
++File: src/modules/policy/policy.repository.ts
++import { LeavePolicy } from './policy.model';
++
++export interface ILeavePolicyRepository {
++  findAll(): Promise<LeavePolicy[]>;
++  findById(id: string): Promise<LeavePolicy | null>;
++  findByLeaveType(leaveType: string): Promise<LeavePolicy | null>;
++  findByStatus(status: 'ACTIVE' | 'INACTIVE'): Promise<LeavePolicy[]>;
++  create(policy: Omit<LeavePolicy, 'id' | 'createdAt' | 'update

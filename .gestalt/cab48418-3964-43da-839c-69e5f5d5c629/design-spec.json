@@ -31,38 +31,23 @@
           "required": true
         },
         {
-          "name": "durationDays",
+          "name": "totalDays",
           "type": "number",
           "required": true
         },
         {
           "name": "reason",
           "type": "string",
-          "required": false
-        },
-        {
-          "name": "status",
-          "type": "'DRAFT' | 'SUBMITTED' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'CANCELLED'",
           "required": true
         },
         {
-          "name": "managerId",
-          "type": "string",
-          "required": false
-        },
-        {
-          "name": "submittedAt",
-          "type": "Date",
-          "required": false
-        },
-        {
-          "name": "reviewedAt",
-          "type": "Date",
-          "required": false
+          "name": "status",
+          "type": "'Pending' | 'Approved' | 'Rejected'",
+          "required": true
         },
         {
           "name": "reviewerComments",
-          "type": "string",
+          "type": "string | null",
           "required": false
         },
         {
@@ -83,10 +68,6 @@
         },
         {
           "entity": "LeavePolicy",
-          "type": "many-to-one"
-        },
-        {
-          "entity": "LeaveBalance",
           "type": "many-to-one"
         }
       ]
@@ -116,24 +97,9 @@
           "required": true
         },
         {
-          "name": "durationDays",
-          "type": "number",
-          "required": true
-        },
-        {
           "name": "reason",
           "type": "string",
-          "required": false
-        },
-        {
-          "name": "status",
-          "type": "'DRAFT' | 'SUBMITTED' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'CANCELLED'",
-          "required": false
-        },
-        {
-          "name": "managerId",
-          "type": "string",
-          "required": false
+          "required": true
         }
       ],
       "relationships": []
@@ -158,7 +124,12 @@
           "required": true
         },
         {
-          "name": "entitlementDays",
+          "name": "fiscalYear",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "totalDays",
           "type": "number",
           "required": true
         },
@@ -170,26 +141,6 @@
         {
           "name": "remainingDays",
           "type": "number",
-          "required": true
-        },
-        {
-          "name": "accrualRate",
-          "type": "number",
-          "required": false
-        },
-        {
-          "name": "accrualFrequency",
-          "type": "string",
-          "required": false
-        },
-        {
-          "name": "fiscalYear",
-          "type": "number",
-          "required": true
-        },
-        {
-          "name": "status",
-          "type": "'ACTIVE' | 'ARCHIVED'",
           "required": true
         },
         {
@@ -244,24 +195,19 @@
           "required": true
         },
         {
-          "name": "managerId",
-          "type": "string",
-          "required": false
-        },
-        {
           "name": "department",
           "type": "string",
-          "required": false
-        },
-        {
-          "name": "hireDate",
-          "type": "Date",
           "required": true
         },
         {
           "name": "employmentStatus",
-          "type": "'ACTIVE' | 'INACTIVE' | 'TERMINATED'",
+          "type": "'active' | 'inactive' | 'terminated'",
           "required": true
+        },
+        {
+          "name": "managerId",
+          "type": "string | null",
+          "required": false
         },
         {
           "name": "createdAt",
@@ -275,6 +221,10 @@
         }
       ],
       "relationships": [
+        {
+          "entity": "Employee",
+          "type": "one-to-many"
+        },
         {
           "entity": "LeaveRequest",
           "type": "one-to-many"
@@ -300,43 +250,43 @@
           "required": true
         },
         {
-          "name": "entitlementDays",
-          "type": "number",
-          "required": true
-        },
-        {
-          "name": "accrualMethod",
+          "name": "name",
           "type": "string",
-          "required": false
-        },
-        {
-          "name": "maxAccumulation",
-          "type": "number",
-          "required": false
-        },
-        {
-          "name": "advanceLeaveAllowed",
-          "type": "boolean",
           "required": true
         },
         {
-          "name": "requiresDocumentation",
-          "type": "boolean",
+          "name": "description",
+          "type": "string",
           "required": true
         },
         {
-          "name": "noticePeriodDays",
+          "name": "maxDaysPerYear",
           "type": "number",
           "required": true
         },
         {
-          "name": "applicableEmploymentTypes",
+          "name": "carryOverDays",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "minServiceMonths",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "requiresApproval",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "applicableEmploymentStatuses",
           "type": "string[]",
           "required": true
         },
         {
           "name": "status",
-          "type": "'ACTIVE' | 'INACTIVE'",
+          "type": "'active' | 'inactive'",
           "required": true
         },
         {
