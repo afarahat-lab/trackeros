@@ -1,0 +1,101 @@
+{
+  "id": "e499819f-036a-46a0-9600-4c7eb889394d",
+  "correlationId": "13a1b1ec-5f47-45b8-abaa-709a345d5ee4",
+  "rawIntent": "[Feature: Build the leave management module — Phase 1: Core domain models and repository interfaces]\n\nCreate src/modules/leave/leave.model.ts with TypeScript interfaces for LeaveRequest and CreateLeaveRequestDto using canonical attributes. Create src/modules/balance/balance.model.ts with LeaveBalance interface. Create src/modules/employee/employee.model.ts with Employee interface. Create src/modules/policy/policy.model.ts with LeavePolicy interface. Create repository interfaces in src/modules/leave/leave.repository.ts (ILeaveRepository), src/modules/balance/balance.repository.ts (ILeaveBalanceRepository), src/modules/employee/employee.repository.ts (IEmployeeRepository), and src/modules/policy/policy.repository.ts (ILeavePolicyRepository). All interfaces must reference the model types defined in this phase.\n\nPhase architecture notes:\nEstablish foundational domain entities and repository interfaces without implementations. Defines contracts for data access and ensures GP-001 compliance from start.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/leave/leave.model.ts\\nexport interface LeaveRequest {\\n  id: string;\\n  employeeId: string;\\n  leaveType: string;\\n  startDate: Date;\\n  endDate: Date;\\n  durationDays: number;\\n  reason?: string;\\n  status: 'DRAFT' | 'SUBMITTED' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'CANCELLED';\\n  managerId?: string;\\n  submittedAt?: Date;\\n  reviewedAt?: Date;\\n  reviewerComments?: string;\\n  createdAt: Date;\\n  updatedAt: Date;\\n}\\n\\nexport interface CreateLeaveRequestDto {\\n  employeeId: string;\\n  leaveType: string;\\n  startDate: Date;\\n  endDate: Date;\\n  durationDays: number;\\n  reason?: string;\\n  status?: 'DRAFT' | 'SUBMITTED' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'CANCELLED';\\n  managerId?: string;\\n}\",\"File: src/modules/balance/balance.model.ts\\nexport interface LeaveBalance {\\n  id: string;\\n  employeeId: string;\\n  leaveType: string;\\n  entitlementDays: number;\\n  usedDays: number;\\n  remainingDays: number;\\n  accrualRate?: number;\\n  accrualFrequency?: string;\\n  fiscalYear: number;\\n  status: 'ACTIVE' | 'ARCHIVED';\\n  createdAt: Date;\\n  updatedAt: Date;\\n}\",\"File: src/modules/employee/employee.model.ts\\nexport interface Employee {\\n  id: string;\\n  employeeId: string;\\n  firstName: string;\\n  lastName: string;\\n  email: string;\\n  managerId?: string;\\n  department?: string;\\n  hireDate: Date;\\n  employmentStatus: 'ACTIVE' | 'INACTIVE' | 'TERMINATED';\\n  createdAt: Date;\\n  updatedAt: Date;\\n}\",\"File: src/modules/policy/policy.model.ts\\nexport interface LeavePolicy {\\n  id: string;\\n  leaveType: string;\\n  entitlementDays: number;\\n  accrualMethod?: string;\\n  maxAccumulation?: number;\\n  advanceLeaveAllowed: boolean;\\n  requiresDocumentation: boolean;\\n  noticePeriodDays: number;\\n  applicableEmploymentTypes: string[];\\n  status: 'ACTIVE' | 'INACTIVE';\\n  createdAt: Date;\\n  updatedAt: Date;\\n}\",\"File: src/modules/leave/leave.repository.ts\\nimport { LeaveRequest, CreateLeaveRequestDto } from './leave.model';\\n\\nexport interface ILeaveRepository {\\n  create(dto: CreateLeaveRequestDto): Promise<LeaveRequest>;\\n  findById(id: string): Promise<LeaveRequest | null>;\\n  findByEmployeeId(employeeId: string): Promise<LeaveRequest[]>;\\n  updateStatus(id: string, status: LeaveRequest['status'], reviewerComments?: string): Promise<LeaveRequest | null>;\\n  update(id: string, updates: Partial<LeaveRequest>): Promise<LeaveRequest | null>;\\n  delete(id: string): Promise<boolean>;\\n}\",\"File: src/modules/balance/balance.repository.ts\\nimport { LeaveBalance } from './balance.model';\\n\\nexport interface ILeaveBalanceRepository {\\n  findByEmployeeIdAndLeaveType(employeeId: string, leaveType: string, fiscalYear: number): Promise<LeaveBalance | null>;\\n  findByEmployeeId(employeeId: string, fiscalYear?: number): Promise<LeaveBalance[]>;\\n  create(balance: Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeaveBalance>;\\n  update(id: string, updates: Partial<LeaveBalance>): Promise<LeaveBalance | null>;\\n  updateRemainingDays(id: string, usedDaysDelta: number): Promise<LeaveBalance | null>;\\n}\",\"File: src/modules/employee/employee.repository.ts\\nimport { Employee } from './employee.model';\\n\\nexport interface IEmployeeRepository {\\n  findById(id: string): Promise<Employee | null>;\\n  findByEmployeeId(employeeId: string): Promise<Employee | null>;\\n  findByManagerId(managerId: string): Promise<Employee[]>;\\n  findByDepartment(department: string): Promise<Employee[]>;\\n  update(id: string, updates: Partial<Employee>): Promise<Employee | null>;\\n}\",\"File: src/modules/policy/policy.repository.ts\\nimport { LeavePolicy } from './policy.model';\\n\\nexport interface ILeavePolicyRepository {\\n  findByLeaveType(leaveType: string): Promise<LeavePolicy | null>;\\n  findAllActive(): Promise<LeavePolicy[]>;\\n  findById(id: string): Promise<LeavePolicy | null>;\\n  create(policy: Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeavePolicy>;\\n  update(id: string, updates: Partial<LeavePolicy>): Promise<LeavePolicy | null>;\\n  delete(id: string): Promise<boolean>;\\n}\"],\"importStatements\":[\"import { LeaveRequest, CreateLeaveRequestDto } from './leave.model'\",\"import { LeaveBalance } from './balance.model'\",\"import { Employee } from './employee.model'\",\"import { LeavePolicy } from './policy.model'\"],\"successCriteria\":[\"src/modules/leave/leave.model.ts exists and exports LeaveRequest and CreateLeaveRequestDto interfaces with all canonical attributes\",\"src/modules/balance/balance.model.ts exists and exports LeaveBalance interface with all canonical attributes\",\"src/modules/employee/employee.model.ts exists and exports Employee interface with all canonical attributes\",\"src/modules/policy/policy.model.ts exists and exports LeavePolicy interface with all canonical attributes\",\"src/modules/leave/leave.repository.ts exists and exports ILeaveRepository interface with complete method signatures\",\"src/modules/balance/balance.repository.ts exists and exports ILeaveBalanceRepository interface with complete method signatures\",\"src/modules/employee/employee.repository.ts exists and exports IEmployeeRepository interface with complete method signatures\",\"src/modules/policy/policy.repository.ts exists and exports ILeavePolicyRepository interface with complete method signatures\",\"All repository interfaces reference their corresponding model types imported from the same module\",\"All TypeScript interfaces use exact types matching the canonical SQL schema column definitions\"]}\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 2 — Service interfaces and module boundaries: Create service interfaces: src/modules/leave/leave.service.ts (ILeaveService), src/modules/balance/b\n- Phase 3 — Infrastructure layer - PostgreSQL repository implementations: Implement PostgreSQL repositories: src/infrastructure/repositories/leave.repository.ts (LeaveReposit\n- Phase 4 — Service implementations with business logic: Implement service classes: src/modules/leave/leave.service.ts (LeaveService implements ILeaveService\n- Phase 5 — API controllers and input validation: Create Fastify controllers: src/api/controllers/leave.controller.ts, src/api/controllers/balance.con\n- Phase 6 — Notification integration and audit completion: Create src/modules/notification/notification.model.ts with Notification interface. Create src/module",
+  "scope": {
+    "affectedDomains": [
+      "leave",
+      "balance",
+      "employee",
+      "policy"
+    ],
+    "affectedLayers": [
+      "domain"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/leave/leave.model.ts exists and exports LeaveRequest and CreateLeaveRequestDto interfaces with all canonical attributes",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/balance/balance.model.ts exists and exports LeaveBalance interface with all canonical attributes",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "src/modules/employee/employee.model.ts exists and exports Employee interface with all canonical attributes",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "src/modules/policy/policy.model.ts exists and exports LeavePolicy interface with all canonical attributes",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "src/modules/leave/leave.repository.ts exists and exports ILeaveRepository interface with complete method signatures",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-006",
+      "description": "src/modules/balance/balance.repository.ts exists and exports ILeaveBalanceRepository interface with complete method signatures",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-007",
+      "description": "src/modules/employee/employee.repository.ts exists and exports IEmployeeRepository interface with complete method signatures",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-008",
+      "description": "src/modules/policy/policy.repository.ts exists and exports ILeavePolicyRepository interface with complete method signatures",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-009",
+      "description": "All repository interfaces reference their corresponding model types imported from the same module",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-010",
+      "description": "All TypeScript interfaces use exact types matching the canonical SQL schema column definitions",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "GP-001: Repository pattern - All database access goes through repository interfaces",
+    "All interfaces must reference the model types defined in this phase",
+    "No implementations - only interfaces and type definitions",
+    "Dependency direction: leave -> employee, leave -> policy, leave -> balance"
+  ],
+  "outOfScope": [
+    "Service interfaces and implementations",
+    "PostgreSQL repository implementations",
+    "API controllers and input validation",
+    "Notification module creation",
+    "Business logic implementation",
+    "Audit record creation",
+    "RBAC enforcement",
+    "Error handling implementations",
+    "Any code outside the 8 specified files",
+    "Database migrations or schema creation",
+    "Testing files",
+    "Configuration files"
+  ],
+  "ambiguities": []
+}
