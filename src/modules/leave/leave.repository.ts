@@ -1,28 +1,29 @@
 import { Pool, QueryResultRow } from 'pg';
-import { LeaveRequest, CreateLeaveRequestDto, LeaveStatus } from './leave.model';
+import { LeaveRequest, CreateLeaveRequestDto } from './leave.model';
 
 export interface ILeaveRepository {
   create(dto: CreateLeaveRequestDto): Promise<LeaveRequest>;
   findById(id: string): Promise<LeaveRequest | null>;
   findByEmployeeId(employeeId: string): Promise<LeaveRequest[]>;
-  updateStatus(id: string, status: LeaveStatus, managerId: string): Promise<LeaveRequest>;
-  update(id: string, updates: Partial<Omit<LeaveRequest, 'id' | 'createdAt' | 'updatedAt'>>): Promise<LeaveRequest>;
-  delete(id: string): Promise<boolean>;
+  updateStatus(id: string, status: LeaveRequest['status'], managerNotes?: string, approvedBy?: string): Promise<LeaveRequest>;
 }
 
-export class PgLeaveRepository implements ILeaveRepository {
+export class PostgresLeaveRequestRepository implements ILeaveRepository {
   constructor(private readonly pool: Pool) {}
 
   private mapRow(row: QueryResultRow): LeaveRequest {
     return {
       id: row.id,
       employeeId: row.employee_id,
-      leaveType: row.leave_type,
+      leavePolicyId: row.leave_policy_id,
       startDate: row.start_date,
       endDate: row.end_date,
+      totalDays: parseFloat(row.total_days),
       status: row.status,
-      reason: row.reason,
-      managerId: row.manager_id,
+      reason: row.reason ?? undefined,
+      managerNotes: row.manager_notes ?? undefined,
+      approvedBy: row.approved_by ?? undefined,
+      approvedAt: row.approved_at ?? undefined,
       createdAt: row.created_at,
       updatedAt: row.updated_at
     };
@@ -31,17 +32,17 @@ export class PgLeaveRepository implements ILeaveRepository {
   async create(dto: CreateLeaveRequestDto): Promise<LeaveRequest> {
     const query = `
       INSERT INTO leave_requests (
-        employee_id, leave_type, start_date, end_date, reason, manager_id
+        employee_id, leave_policy_id, start_date, end_date, total_days, reason
       ) VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING *
     `;
-    const values: unknown[] = [
+    const values = [
       dto.employeeId,
-      dto.leaveType,
+      dto.leavePolicyId,
       dto.startDate,
       dto.endDate,
-      dto.reason ?? null,
-      dto.managerId ?? null
+      dto.totalDays,
+      dto.reason ?? null
     ];
     
     const result = await this.pool.query(query, values);
@@ -60,78 +61,18 @@ export class PgLeaveRepository implements ILeaveRepository {
     return result.rows.map(r => this.mapRow(r));
   }
 
-  async updateStatus(id: string, status: LeaveStatus, managerId: string): Promise<LeaveRequest> {
+  async updateStatus(id: string, status: LeaveRequest['status'], managerNotes?: string, approvedBy?: string): Promise<LeaveRequest> {
     const query = `
       UPDATE leave_requests 
-      SET status = $1, manager_id = $2, updated_at = NOW()
-      WHERE id = $3
+      SET status = $1, manager_notes = $2, approved_by = $3, approved_at = $4, updated_at = NOW()
+      WHERE id = $5
       RETURNING *
     `;
-    const result = await this.pool.query(query, [status, managerId, id]);
+    const approvedAt = (status === 'APPROVED' || status === 'REJECTED') ? new Date() : null;
+    const result = await this.pool.query(query, [status, managerNotes ?? null, approvedBy ?? null, approvedAt, id]);
     if (result.rows.length === 0) {
       throw new Error(`Leave request with id ${id} not found`);
     }
     return this.mapRow(result.rows[0]);
-  }
-
-  async update(id: string, updates: Partial<Omit<LeaveRequest, 'id' | 'createdAt' | 'updatedAt'>>): Promise<LeaveRequest> {
-    const setClauses: string[] = [];
-    const values: unknown[] = [];
-    let paramCount = 1;
-
-    if (updates.employeeId !== undefined) {
-      setClauses.push(`employee_id = $${paramCount++}`);
-      values.push(updates.employeeId);
-    }
-    if (updates.leaveType !== undefined) {
-      setClauses.push(`leave_type = $${paramCount++}`);
-      values.push(updates.leaveType);
-    }
-    if (updates.startDate !== undefined) {
-      setClauses.push(`start_date = $${paramCount++}`);
-      values.push(updates.startDate);
-    }
-    if (updates.endDate !== undefined) {
-      setClauses.push(`end_date = $${paramCount++}`);
-      values.push(updates.endDate);
-    }
-    if (updates.status !== undefined) {
-      setClauses.push(`status = $${paramCount++}`);
-      values.push(updates.status);
-    }
-    if (updates.reason !== undefined) {
-      setClauses.push(`reason = $${paramCount++}`);
-      values.push(updates.reason);
-    }
-    if (updates.managerId !== undefined) {
-      setClauses.push(`manager_id = $${paramCount++}`);
-      values.push(updates.managerId);
-    }
-
-    if (setClauses.length === 0) {
-      throw new Error('No updates provided');
-    }
-
-    setClauses.push(`updated_at = NOW()`);
-    values.push(id);
-
-    const query = `
-      UPDATE leave_requests 
-      SET ${setClauses.join(', ')}
-      WHERE id = $${paramCount}
-      RETURNING *
-    `;
-
-    const result = await this.pool.query(query, values);
-    if (result.rows.length === 0) {
-      throw new Error(`Leave request with id ${id} not found`);
-    }
-    return this.mapRow(result.rows[0]);
-  }
-
-  async delete(id: string): Promise<boolean> {
-    const query = `DELETE FROM leave_requests WHERE id = $1 RETURNING id`;
-    const result = await this.pool.query(query, [id]);
-    return (result.rowCount ?? 0) > 0;
   }
 }

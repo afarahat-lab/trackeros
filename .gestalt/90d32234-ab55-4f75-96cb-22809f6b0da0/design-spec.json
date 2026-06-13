@@ -1,0 +1,125 @@
+{
+  "correlationId": "90d32234-ab55-4f75-96cb-22809f6b0da0",
+  "domainChanges": [
+    {
+      "entityName": "LeaveRequest",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "employeeId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "leavePolicyId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "startDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "endDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "totalDays",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "status",
+          "type": "'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED'",
+          "required": true
+        },
+        {
+          "name": "reason",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "managerNotes",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "approvedBy",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "approvedAt",
+          "type": "Date",
+          "required": false
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "Employee",
+          "type": "many-to-one"
+        },
+        {
+          "entity": "LeavePolicy",
+          "type": "many-to-one"
+        }
+      ]
+    },
+    {
+      "entityName": "CreateLeaveRequestDto",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "employeeId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "leavePolicyId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "startDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "endDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "totalDays",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "reason",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}

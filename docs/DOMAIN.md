@@ -25,3 +25,7 @@ Represents notification data managed by the `notification` module, including not
 ## audit
 
 Represents audit data managed by the `audit` module, including audit records, change history, and activity tracking information.
+
+## leaveRequest
+
+Represents a leave request record managed by the `leave` module, including employee assignment, leave policy, start and end dates, total days, status, reason, manager notes, approval details, and timestamps. Relates to `Employee` (many-to-one) and `LeavePolicy` (many-to-one).
