@@ -25,3 +25,22 @@ Represents notification data managed by the `notification` module, including not
 ## audit
 
 Represents audit data managed by the `audit` module, including audit records, change history, and activity tracking information.
+
+## LeavePolicy
+
+Represents a leave policy record managed by the `policy` module, including policy definitions, rules, and leave entitlement configurations.
+
+### Fields
+
+| Name | Type | Required |
+|------|------|----------|
+| id | `string` | Yes |
+| policyName | `string` | Yes |
+| leaveType | `LeavePolicyType` | Yes |
+| entitlementDays | `number` | Yes |
+| accrualRate | `number \| null` | No |
+| maxCarryover | `number \| null` | No |
+| requiresApproval | `boolean` | Yes |
+| isActive | `boolean` | Yes |
+| createdAt | `Date` | Yes |
+| updatedAt | `Date` | Yes |

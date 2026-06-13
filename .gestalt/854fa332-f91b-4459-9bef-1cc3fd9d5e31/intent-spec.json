@@ -1,0 +1,90 @@
+{
+  "id": "73eb960e-936e-45db-a64e-ad64499be5c3",
+  "correlationId": "854fa332-f91b-4459-9bef-1cc3fd9d5e31",
+  "rawIntent": "[Feature: Build the leave management module — Phase 2: Phase 2: LeavePolicy domain model and repository]\n\nCreate src/modules/policy/policy.model.ts with LeavePolicy interface containing all attributes from specification. Create src/modules/policy/policy.repository.ts with ILeavePolicyRepository interface. This phase depends on existing shared types from src/shared/types/index.ts. Include Jest tests in tests/unit/modules/policy/policy.repository.test.ts.\n\nPhase architecture notes:\nImplements the LeavePolicy entity and its repository interface, following the same pattern as Phase 1.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/policy/policy.model.ts\\nexport type LeavePolicyType = 'ANNUAL' | 'SICK' | 'EMERGENCY' | 'UNPAID';\\n\\nexport interface LeavePolicy {\\n  id: string;\\n  policyName: string;\\n  leaveType: LeavePolicyType;\\n  entitlementDays: number;\\n  accrualRate: number | null;\\n  maxCarryover: number | null;\\n  requiresApproval: boolean;\\n  isActive: boolean;\\n  createdAt: Date;\\n  updatedAt: Date;\\n}\\n\\nexport interface CreateLeavePolicyDto {\\n  policyName: string;\\n  leaveType: LeavePolicyType;\\n  entitlementDays: number;\\n  accrualRate?: number;\\n  maxCarryover?: number;\\n  requiresApproval?: boolean;\\n  isActive?: boolean;\\n}\\n\\nexport interface UpdateLeavePolicyDto {\\n  policyName?: string;\\n  leaveType?: LeavePolicyType;\\n  entitlementDays?: number;\\n  accrualRate?: number | null;\\n  maxCarryover?: number | null;\\n  requiresApproval?: boolean;\\n  isActive?: boolean;\\n}\",\"File: src/modules/policy/policy.repository.ts\\nimport { LeavePolicy, CreateLeavePolicyDto, UpdateLeavePolicyDto } from './policy.model';\\n\\nexport interface ILeavePolicyRepository {\\n  create(dto: CreateLeavePolicyDto): Promise<LeavePolicy>;\\n  findById(id: string): Promise<LeavePolicy | null>;\\n  findAll(): Promise<LeavePolicy[]>;\\n  findByLeaveType(leaveType: string): Promise<LeavePolicy[]>;\\n  findActivePolicies(): Promise<LeavePolicy[]>;\\n  update(id: string, dto: UpdateLeavePolicyDto): Promise<LeavePolicy>;\\n  deactivate(id: string): Promise<LeavePolicy>;\\n}\",\"File: src/modules/policy/implementations/postgres-leave-policy.repository.ts\\nimport { Pool } from 'pg';\\nimport { ILeavePolicyRepository } from '../policy.repository';\\nimport { LeavePolicy, CreateLeavePolicyDto, UpdateLeavePolicyDto, LeavePolicyType } from '../policy.model';\\n\\nexport class PostgresLeavePolicyRepository implements ILeavePolicyRepository {\\n  constructor(private readonly pool: Pool) {}\\n\\n  async create(dto: CreateLeavePolicyDto): Promise<LeavePolicy> {\\n    const client = await this.pool.connect();\\n    try {\\n      const query = `\\n        INSERT INTO leave_policies (\\n          policy_name, leave_type, entitlement_days, accrual_rate,\\n          max_carryover, requires_approval, is_active\\n        ) VALUES ($1, $2, $3, $4, $5, $6, $7)\\n        RETURNING *\\n      `;\\n      const values = [\\n        dto.policyName,\\n        dto.leaveType,\\n        dto.entitlementDays,\\n        dto.accrualRate ?? null,\\n        dto.maxCarryover ?? null,\\n        dto.requiresApproval ?? true,\\n        dto.isActive ?? true\\n      ];\\n      \\n      const result = await client.query(query, values);\\n      return this.mapRowToLeavePolicy(result.rows[0]);\\n    } finally {\\n      client.release();\\n    }\\n  }\\n\\n  async findById(id: string): Promise<LeavePolicy | null> {\\n    const result = await this.pool.query(\\n      'SELECT * FROM leave_policies WHERE id = $1',\\n      [id]\\n    );\\n    return result.rows.length > 0 ? this.mapRowToLeavePolicy(result.rows[0]) : null;\\n  }\\n\\n  async findAll(): Promise<LeavePolicy[]> {\\n    const result = await this.pool.query('SELECT * FROM leave_policies ORDER BY policy_name');\\n    return result.rows.map(row => this.mapRowToLeavePolicy(row));\\n  }\\n\\n  async findByLeaveType(leaveType: string): Promise<LeavePolicy[]> {\\n    const result = await this.pool.query(\\n      'SELECT * FROM leave_policies WHERE leave_type = $1 ORDER BY policy_name',\\n      [leaveType]\\n    );\\n    return result.rows.map(row => this.mapRowToLeavePolicy(row));\\n  }\\n\\n  async findActivePolicies(): Promise<LeavePolicy[]> {\\n    const result = await this.pool.query(\\n      'SELECT * FROM leave_policies WHERE is_active = true ORDER BY policy_name'\\n    );\\n    return result.rows.map(row => this.mapRowToLeavePolicy(row));\\n  }\\n\\n  async update(id: string, dto: UpdateLeavePolicyDto): Promise<LeavePolicy> {\\n    const client = await this.pool.connect();\\n    try {\\n      const updates: string[] = [];\\n      const values: any[] = [];\\n      let paramCount = 1;\\n\\n      if (dto.policyName !== undefined) {\\n        updates.push(`policy_name = $${paramCount}`);\\n        values.push(dto.policyName);\\n        paramCount++;\\n      }\\n      if (dto.leaveType !== undefined) {\\n        updates.push(`leave_type = $${paramCount}`);\\n        values.push(dto.leaveType);\\n        paramCount++;\\n      }\\n      if (dto.entitlementDays !== undefined) {\\n        updates.push(`entitlement_days = $${paramCount}`);\\n        values.push(dto.entitlementDays);\\n        paramCount++;\\n      }\\n      if (dto.accrualRate !== undefined) {\\n        updates.push(`accrual_rate = $${paramCount}`);\\n        values.push(dto.accrualRate);\\n        paramCount++;\\n      }\\n      if (dto.maxCarryover !== undefined) {\\n        updates.push(`max_carryover = $${paramCount}`);\\n        values.push(dto.maxCarryover);\\n        paramCount++;\\n      }\\n      if (dto.requiresApproval !== undefined) {\\n        updates.push(`requires_approval = $${paramCount}`);\\n        values.push(dto.requiresApproval);\\n        paramCount++;\\n      }\\n      if (dto.isActive !== undefined) {\\n        updates.push(`is_active = $${paramCount}`);\\n        values.push(dto.isActive);\\n        paramCount++;\\n      }\\n\\n      if (updates.length === 0) {\\n        const existing = await this.findById(id);\\n        if (!existing) throw new Error(`Leave policy with id ${id} not found`);\\n        return existing;\\n      }\\n\\n      updates.push(`updated_at = CURRENT_TIMESTAMP`);\\n      values.push(id);\\n      \\n      const query = `\\n        UPDATE leave_policies\\n        SET ${updates.join(', ')}\\n        WHERE id = $${paramCount}\\n        RETURNING *\\n      `;\\n\\n      const result = await client.query(query, values);\\n      if (result.rows.length === 0) {\\n        throw new Error(`Leave policy with id ${id} not found`);\\n      }\\n      return this.mapRowToLeavePolicy(result.rows[0]);\\n    } finally {\\n      client.release();\\n    }\\n  }\\n\\n  async deactivate(id: string): Promise<LeavePolicy> {\\n    const client = await this.pool.connect();\\n    try {\\n      const query = `\\n        UPDATE leave_policies\\n        SET is_active = false, updated_at = CURRENT_TIMESTAMP\\n        WHERE id = $1\\n        RETURNING *\\n      `;\\n      const result = await client.query(query, [id]);\\n      if (result.rows.length === 0) {\\n        throw new Error(`Leave policy with id ${id} not found`);\\n      }\\n      return this.mapRowToLeavePolicy(result.rows[0]);\\n    } finally {\\n      client.release();\\n    }\\n  }\\n\\n  private mapRowToLeavePolicy(row: any): LeavePolicy {\\n    return {\\n      id: row.id,\\n      policyName: row.policy_name,\\n      leaveType: row.leave_type as LeavePolicyType,\\n      entitlementDays: row.entitlement_days,\\n      accrualRate: row.accrual_rate,\\n      maxCarryover: row.max_carryover,\\n      requiresApproval: row.requires_approval,\\n      isActive: row.is_active,\\n      createdAt: row.created_at,\\n      updatedAt: row.updated_at\\n    };\\n  }\\n}\"],\"importStatements\":[\"import { Pool } from 'pg'\",\"import { pool } from '../../shared/db/connection'\"],\"successCriteria\":[\"src/modules/policy/policy.model.ts exists and exports LeavePolicyType, LeavePolicy, CreateLeavePolicyDto, and UpdateLeavePolicyDto interfaces\",\"src/modules/policy/policy.repository.ts exists and exports ILeavePolicyRepository interface\",\"src/modules/policy/implementations/postgres-leave-policy.repository.ts exists and exports PostgresLeavePolicyRepository class implementing ILeavePolicyRepository\",\"PostgresLeavePolicyRepository uses the exact SQL schema from canonical definitions and correctly maps between snake_case columns and camelCase properties\",\"All repository methods are implemented with proper error handling and return types matching the declared stack (TypeScript + PostgreSQL)\",\"ARCHITECTURE.md is updated to include the new LeavePolicyType enum domain concept\"],\"sqlSchema\":\"CREATE TABLE leave_policies (\\n  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\\n  policy_name VARCHAR(100) UNIQUE NOT NULL,\\n  leave_type VARCHAR(50) NOT NULL CHECK (leave_type IN ('ANNUAL', 'SICK', 'EMERGENCY', 'UNPAID')),\\n  entitlement_days INTEGER NOT NULL CHECK (entitlement_days >= 0),\\n  accrual_rate DECIMAL(5,2),\\n  max_carryover INTEGER,\\n  requires_approval BOOLEAN DEFAULT true,\\n  is_active BOOLEAN DEFAULT true,\\n  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,\\n  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP\\n);\"}\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 3 — Phase 3: LeaveBalance domain model and repository: Create src/modules/balance/balance.model.ts with LeaveBalance interface containing all specified att\n- Phase 4 — Phase 4: EmployeeService implementation: Create src/modules/employee/employee.service.ts implementing IEmployeeService. This service depends \n- Phase 5 — Phase 5: PolicyService implementation: Create src/modules/policy/policy.service.ts implementing ILeavePolicyService. This service depends o\n- Phase 6 — Phase 6: BalanceService implementation: Create src/modules/balance/balance.service.ts implementing ILeaveBalanceService. This service depend\n- Phase 7 — Phase 7: LeaveService core implementation: Create src/modules/leave/leave.service.ts implementing ILeaveService. This service depends on ILeave\n- Phase 8 — Phase 8: LeaveService workflow with audit logging: Extend src/modules/leave/leave.service.ts from Phase 7 to add approval workflow methods (approve, re\n- Phase 9 — Phase 9: Leave controllers: Create src/modules/leave/leave.controller.ts with Fastify controller exposing LeaveService methods a\n- Phase 10 — Phase 10: Leave routes and API registration: Create src/modules/leave/leave.routes.ts defining Fastify routes that use the controller from Phase ",
+  "scope": {
+    "affectedDomains": [
+      "policy"
+    ],
+    "affectedLayers": [
+      "domain",
+      "infra",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/policy/policy.model.ts exists and exports LeavePolicyType, LeavePolicy, CreateLeavePolicyDto, and UpdateLeavePolicyDto interfaces",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/policy/policy.repository.ts exists and exports ILeavePolicyRepository interface",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "src/modules/policy/implementations/postgres-leave-policy.repository.ts exists and exports PostgresLeavePolicyRepository class implementing ILeavePolicyRepository",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "PostgresLeavePolicyRepository uses the exact SQL schema from canonical definitions and correctly maps between snake_case columns and camelCase properties",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "All repository methods are implemented with proper error handling and return types matching the declared stack (TypeScript + PostgreSQL)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-006",
+      "description": "ARCHITECTURE.md is updated to include the new LeavePolicyType enum domain concept",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-007",
+      "description": "Jest tests exist in tests/unit/modules/policy/policy.repository.test.ts",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces",
+    "Input validation: Validate all inputs at API boundaries before processing",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled",
+    "Follows modular-monolith architecture with dependency direction: leave -> policy",
+    "Uses TypeScript, Node.js 20, Fastify, PostgreSQL, npm, and Vitest",
+    "All database access must go through ILeavePolicyRepository interface",
+    "PostgreSQL implementation must use the exact SQL schema provided"
+  ],
+  "outOfScope": [
+    "LeaveBalance domain model and repository (Phase 3)",
+    "EmployeeService implementation (Phase 4)",
+    "PolicyService implementation (Phase 5)",
+    "BalanceService implementation (Phase 6)",
+    "LeaveService core implementation (Phase 7)",
+    "LeaveService workflow with audit logging (Phase 8)",
+    "Leave controllers (Phase 9)",
+    "Leave routes and API registration (Phase 10)",
+    "API endpoints or controllers for LeavePolicy",
+    "RBAC enforcement for LeavePolicy endpoints",
+    "Audit records for LeavePolicy operations",
+    "Any functionality outside src/modules/policy domain",
+    "Any changes to existing employee module",
+    "Any changes to existing leave module",
+    "Any UI components or React Native code",
+    "Fastify routes or API endpoints"
+  ],
+  "ambiguities": []
+}
