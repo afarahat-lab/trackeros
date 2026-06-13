@@ -294,7 +294,11 @@ agents:
     role: "Chief architect and design reviewer"
     goal: "Reconcile the domain, data, and application designs into a single coherent architecture. Resolve conflicts, enforce stack compliance, ensure completeness."
     llm:
-      model: moonshotai/Kimi-K2.6
+      # TR_053 amendment verification — Kimi-K2.6 was flaking on 12k
+      # chief calls (~50% timeout rate observed). Switch chief to
+      # DeepSeek-V3.2 to keep verification cycles flowing. Revisit
+      # the chief model choice once DeepInfra Kimi stability improves.
+      model: deepseek-ai/DeepSeek-V3.2
       temperature: 0.1
       max_tokens: 12000
     prompt_extensions:
