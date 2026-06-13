@@ -1189,3 +1189,52 @@ CREATE INDEX idx_notifications_read ON notifications(read);
 - All API endpoints enforce RBAC (GP-005)
 - No sensitive data in logs (GP-004)
 - All async errors handled with proper error middleware (GP-006)
+
+## Leave Management Feature — Reconciled Design
+
+### Domain Entities
+- **Employee**: identity and reporting hierarchy.
+- **LeavePolicy**: entitlement rules and leave-type definitions.
+- **LeaveRequest**: leave applications with lifecycle states `PENDING`, `APPROVED`, `REJECTED`, `CANCELLED`.
+- **LeaveBalance**: remaining entitlement by employee, policy, and year.
+- **Notification**: workflow notifications to employees and managers.
+- **AuditLog**: immutable change history for compliance (GP-002).
+
+### Repository Layer (GP-001)
+All database access is through the following repository interfaces, backed by PostgreSQL concrete implementations using `pg` Pool:
+
+| Interface | Concrete Implementation | Key Methods |
+|-----------|------------------------|-------------|
+| `IEmployeeRepository` | `PostgresEmployeeRepository` | findById, findByEmail, findByEmployeeNumber, findSubordinates, save, update, deactivate |
+| `ILeavePolicyRepository` | `PostgresLeavePolicyRepository` | findById, findByLeaveType, findActivePolicies, save, update, deactivate |
+| `ILeaveRequestRepository` | `PostgresLeaveRequestRepository` | findById, findByEmployeeId, findByManagerId, findByStatus, findOverlappingRequests, save, updateStatus, cancel |
+| `ILeaveBalanceRepository` | `PostgresLeaveBalanceRepository` | findByEmployeeAndPolicy, findByEmployeeId, updateBalance, getAvailableBalance, createYearlyBalance |
+| `INotificationRepository` | `PostgresNotificationRepository` | findById, findByRecipient, findUnreadByRecipient, save, markAsRead, deleteOldNotifications |
+| `IAuditLogRepository` | `PostgresAuditLogRepository` | logChange, findByTableAndRecord, findByPerformer, findByDateRange |
+
+### Module Boundaries and Dependency Direction
+- **leave** owns request lifecycle and approval workflow.
+- **balance** owns balance storage and adjustments.
+- **employee** owns identity and hierarchy.
+- **policy** owns entitlement rules.
+- **notification** owns delivery and templates.
+
+Dependency direction (acyclic):
+- `leave` → `employee`, `policy`, `balance`, `notification`
+- `balance` → `employee`, `policy`
+- `notification` → `employee`
+
+### Golden Principles Compliance
+- **GP-001 (Repository pattern)**: All persistence flows through the interfaces above; no direct SQL in services or controllers.
+- **GP-002 (Audit records)**: `IAuditLogRepository.logChange()` is invoked on every state-changing operation.
+- **GP-003 (Input validation)**: DTO validation occurs at Fastify route boundaries before service invocation.
+- **GP-004 (No sensitive data in logs)**: PII and tokens are redacted by the shared error handler.
+- **GP-005 (RBAC enforcement)**: Fastify preHandlers enforce roles on all leave endpoints.
+- **GP-006 (Error handling)**: All async service calls are wrapped; unhandled rejections are caught by the Fastify error hook.
+
+### Recommended Build Phases
+1. **Phase 1: Core domain models and repositories** — Establish entities, SQL schemas, and repository interfaces/implementations.
+2. **Phase 2: Employee and Policy services** — Inner-most modules with no cross-service dependencies.
+3. **Phase 3: Balance and Notification services** — Build on Employee and Policy contracts.
+4. **Phase 4: LeaveService with full workflow** — Orchestrate all modules; wire audit logging and validation.
+5. **Phase 5: Controllers and API layer** — Fastify routes, RBAC, and input validation at the boundary.
