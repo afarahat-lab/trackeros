@@ -1,24 +1,27 @@
-export type LeaveType = 'ANNUAL' | 'SICK' | 'EMERGENCY';
-export type LeaveStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
-
 export interface LeaveRequest {
   id: string;
   employeeId: string;
-  leaveType: LeaveType;
+  policyId: string;
+  managerId: string | null;
   startDate: Date;
   endDate: Date;
-  status: LeaveStatus;
+  totalDays: number;
   reason: string | null;
-  managerId: string | null;
+  attachmentUrl: string | null;
+  status: 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+  rejectionReason: string | null;
+  submittedAt: Date | null;
+  processedAt: Date | null;
+  processorId: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
 
 export interface CreateLeaveRequestDto {
   employeeId: string;
-  leaveType: LeaveType;
+  policyId: string;
   startDate: Date;
   endDate: Date;
   reason?: string;
-  managerId?: string;
+  attachmentUrl?: string;
 }

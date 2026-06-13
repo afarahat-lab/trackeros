@@ -1,0 +1,368 @@
+
+# 2026-06-13 18:46:36.223751
++## Task
++[Feature: Build the leave management module — Phase 1: Core Domain Models & Repository Interfaces]
++
++Create src/modules/leave/leave.model.ts with TypeScript interfaces for LeaveRequest and CreateLeaveRequestDto using canonical attributes. Create src/modules/leave/leave.repository.ts defining ILeaveRepository interface with CRUD methods referencing those types. Create src/modules/notification/notification.model.ts with Notification interface and src/modules/notification/notification.repository.ts with INotificationRepository. This phase establishes the foundational domain models and repository interfaces for the leave and notification modules.
++
++Phase architecture notes:
++Establishes domain entities and repository interfaces (GP-001) for leave and notification modules. Models and repositories are paired in same phase so Aider sees field definitions when generating repository methods.
++
++Detailed phase architecture (architecture-agent):
++{"interfaces":["File: src/modules/leave/leave.model.ts\nexport interface LeaveRequest {\n  id: string;\n  employeeId: string;\n  policyId: string;\n  managerId: string | null;\n  startDate: Date;\n  endDate: Date;\n  totalDays: number;\n  reason: string | null;\n  attachmentUrl: string | null;\n  status: 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED';\n  rejectionReason: string | null;\n  submittedAt: Date | null;\n  processedAt: Date | null;\n  processorId: string | null;\n  createdAt: Date;\n  updatedAt: Date;\n}\n\nexport interface CreateLeaveRequestDto {\n  employeeId: string;\n  policyId: string;\n  startDate: Date;\n  endDate: Date;\n  reason?: string;\n  attachmentUrl?: string;\n}","File: src/modules/leave/leave.repository.ts\nimport { LeaveRequest, CreateLeaveRequestDto } from './leave.model';\n\nexport interface ILeaveRepository {\n  create(dto: CreateLeaveRequestDto): Promise<LeaveRequest>;\n  findById(id: string): Promise<LeaveRequest | null>;\n  findByEmployeeId(employeeId: string): Promise<LeaveRequest[]>;\n  updateStatus(id: string, status: LeaveRequest['status'], processorId?: string, rejectionReason?: string): Promise<LeaveRequest>;\n  update(leaveRequest: Partial<LeaveRequest> & { id: string }): Promise<LeaveRequest>;\n}\n\nexport class PgLeaveRequestRepository implements ILeaveRepository {\n  constructor(private readonly pool: import('pg').Pool) {}\n\n  async create(dto: CreateLeaveRequestDto): Promise<LeaveRequest> {\n    // Implementation using PostgreSQL pool\n    throw new Error('Not implemented');\n  }\n\n  async findById(id: string): Promise<LeaveRequest | null> {\n    throw new Error('Not implemented');\n  }\n\n  async findByEmployeeId(employeeId: string): Promise<LeaveRequest[]> {\n    throw new Error('Not implemented');\n  }\n\n  async updateStatus(id: string, status: LeaveRequest['status'], processorId?: string, rejectionReason?: string): Promise<LeaveRequest> {\n    throw new Error('Not implemented');\n  }\n\n  async update(leaveRequest: Partial<LeaveRequest> & { id: string }): Promise<LeaveRequest> {\n    throw new Error('Not implemented');\n  }\n}","File: src/modules/notification/notification.model.ts\nexport interface Notification {\n  id: string;\n  recipientId: string;\n  senderId: string | null;\n  type: 'LEAVE_SUBMITTED' | 'LEAVE_APPROVED' | 'LEAVE_REJECTED' | 'LEAVE_CANCELLED';\n  title: string;\n  body: string;\n  relatedEntityType: 'LEAVE_REQUEST';\n  relatedEntityId: string;\n  status: 'CREATED' | 'SENT' | 'READ';\n  readAt: Date | null;\n  createdAt: Date;\n}\n\nexport interface CreateNotificationDto {\n  recipientId: string;\n  senderId?: string;\n  type: Notification['type'];\n  title: string;\n  body: string;\n  relatedEntityType: Notification['relatedEntityType'];\n  relatedEntityId: string;\n}","File: src/modules/notification/notification.repository.ts\nimport { Notification, CreateNotificationDto } from './notification.model';\n\nexport interface INotificationRepository {\n  create(dto: CreateNotificationDto): Promise<Notification>;\n  findByRecipientId(recipientId: string): Promise<Notification[]>;\n  markAsRead(id: string): Promise<Notification>;\n}\n\nexport class PgNotificationRepository implements INotificationRepository {\n  constructor(private readonly pool: import('pg').Pool) {}\n\n  async create(dto: CreateNotificationDto): Promise<Notification> {\n    // Implementation using PostgreSQL pool\n    throw new Error('Not implemented');\n  }\n\n  async findByRecipientId(recipientId: string): Promise<Notification[]> {\n    throw new Error('Not implemented');\n  }\n\n  async markAsRead(id: string): Promise<Notification> {\n    throw new Error('Not implemented');\n  }\n}"],"importStatements":[],"successCriteria":["src/modules/leave/leave.model.ts exists and exports LeaveRequest and CreateLeaveRequestDto interfaces","src/modules/leave/leave.repository.ts exists and exports ILeaveRepository interface and PgLeaveRequestRepository concrete implementation","src/modules/notification/notification.model.ts exists and exports Notification and CreateNotificationDto interfaces","src/modules/notification/notification.repository.ts exists and exports INotificationRepository interface and PgNotificationRepository concrete implementation","All repository interfaces follow GP-001 (Repository pattern) by abstracting database access","ARCHITECTURE.md must be updated to include new domain concepts: LeaveRequest status enum ('DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED', 'CANCELLED') and Notification type enum ('LEAVE_SUBMITTED', 'LEAVE_APPROVED', 'LEAVE_REJECTED', 'LEAVE_CANCELLED')"]}
++
++## Deferred to later phases
++The following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:
++- Phase 2 — Policy & Balance Domain Models: Create src/modules/policy/policy.model.ts with LeavePolicy interface using canonical attributes. Cre
++- Phase 3 — Service Interfaces & Core Business Logic: Create src/modules/policy/policy.service.ts implementing IPolicyService with validation logic for le
++- Phase 4 — Leave Service Implementation: Create src/modules/leave/leave.service.ts implementing ILeaveService. This service integrates depend
++- Phase 5 — Notification Service & Controllers: Create src/modules/notification/notification.service.ts implementing INotificationService. Create sr
++- Phase 6 — Routes & Error Handling: Create src/modules/leave/leave.routes.ts defining Fastify routes for leave operations. Implement com
++
++## Success criteria
++- src/modules/leave/leave.model.ts exists and exports LeaveRequest and CreateLeaveRequestDto interfaces
++- src/modules/leave/leave.repository.ts exists and exports ILeaveRepository interface and PgLeaveRequestRepository concrete implementation
++- src/modules/notification/notification.model.ts exists and exports Notification and CreateNotificationDto interfaces
++- src/modules/notification/notification.repository.ts exists and exports INotificationRepository interface and PgNotificationRepository concrete implementation
++- All repository interfaces follow GP-001 (Repository pattern) by abstracting database access
++- ARCHITECTURE.md must be updated to include new domain concepts: LeaveRequest status enum ('DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED', 'CANCELLED') and Notification type enum ('LEAVE_SUBMITTED', 'LEAVE_APPROVED', 'LEAVE_REJECTED', 'LEAVE_CANCELLED')
++
++## Out of scope (do NOT touch these)
++- Policy module (policy.model.ts, policy.repository.ts)
++- Balance module (balance.model.ts, balance.repository.ts)
++- Service layer implementations (leave.service.ts, notification.service.ts, policy.service.ts)
++- API controllers or routes
++- Business logic validation
++- Database schema migrations
++- Authentication or RBAC implementation
++- Audit record implementations
++- Input validation implementations
++- Error handling implementations
++- Integration with employee module beyond referencing employeeId
++- Actual database query implementations (only interface definitions and stubs)
++- Testing files
++
++## Project rules
++- Generated code must compile without errors. Verify with executeScript before returning.
++- All imports must resolve to files that exist in the project or are declared in package.json.
++- You MUST run a compile/lint check via executeScript before emitting the final files. This is not optional.
++- Do not use require() for JSON imports — import them using ES module syntax with resolveJsonModule enabled in tsconfig.
++- Before generating any repository, service, or controller code, read the DTO and interface files it will use. Never reference a field on a type without confirming it exists in the type definition.
++- Before generating code that calls methods on a dependency, read the dependency's source file to confirm which methods exist. Only call methods that are actually defined.
++- Read the project's compiler/linter configuration file (tsconfig.json, mypy.ini, pyproject.toml, .eslintrc etc) before generating code. Follow the strictness settings it defines — do not assume permissive defaults.
++- Read the project's dependency manifest (package.json, requirements.txt, go.mod, pom.xml etc) before importing external packages. Only import packages that are listed as dependencies.
++
++## Scoped architecture for this phase
++The following describes ONLY what exists now and what you
++are building in this phase. Use these exact file paths,
++exact export names, and exact import statements. Do not
++invent paths or imports — if it is not listed here, it
++does not exist.
++
++### Interfaces / types this phase implements
++
++File: src/modules/leave/leave.model.ts
++export interface LeaveRequest {
++  id: string;
++  employeeId: string;
++  policyId: string;
++  managerId: string | null;
++  startDate: Date;
++  endDate: Date;
++  totalDays: number;
++  reason: string | null;
++  attachmentUrl: string | null;
++  status: 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
++  rejectionReason: string | null;
++  submittedAt: Date | null;
++  processedAt: Date | null;
++  processorId: string | null;
++  createdAt: Date;
++  updatedAt: Date;
++}
++
++export interface CreateLeaveRequestDto {
++  employeeId: string;
++  policyId: string;
++  startDate: Date;
++  endDate: Date;
++  reason?: string;
++  attachmentUrl?: string;
++}
++
++File: src/modules/leave/leave.repository.ts
++import { LeaveRequest, CreateLeaveRequestDto } from './leave.model';
++
++export interface ILeaveRepository {
++  create(dto: CreateLeaveRequestDto): Promise<LeaveRequest>;
++  findById(id: string): Promise<LeaveRequest | null>;
++  findByEmployeeId(employeeId: string): Promise<LeaveRequest[]>;
++  updateStatus(id: string, status: LeaveRequest['status'], processorId?: string, rejectionReason?: string): Promise<LeaveRequest>;
++  update(leaveRequest: Partial<LeaveRequest> & { id: string }): Promise<LeaveRequest>;
++}
++
++export class PgLeaveRequestRepository implements ILeaveRepository {
++  constructor(private readonly pool: import('pg').Pool) {}
++
++  async create(dto: CreateLeaveRequestDto): Promise<LeaveRequest> {
++    // Implementation using PostgreSQL pool
++    throw new Error('Not implemented');
++  }
++
++  async findById(id: string): Promise<LeaveRequest | null> {
++    throw new Error('Not implemented');
++  }
++
++  async findByEmployeeId(employeeId: string): Promise<LeaveRequest[]> {
++    throw new Error('Not implemented');
++  }
++
++  async updateStatus(id: string, status: LeaveRequest['status'], processorId?: string, rejectionReason?: string): Promise<LeaveRequest> {
++    throw new Error('Not implemented');
++  }
++
++  async update(leaveRequest: Partial<LeaveRequest> & { id: string }): Promise<LeaveRequest> {
++    throw new Error('Not implemented');
++  }
++}
++
++File: src/modules/notification/notification.model.ts
++export interface Notification {
++  id: string;
++  recipientId: string;
++  senderId: string | null;
++  type: 'LEAVE_SUBMITTED' | 'LEAVE_APPROVED' | 'LEAVE_REJECTED' | 'LEAVE_CANCELLED';
++  title: string;
++  body: string;
++  relatedEntityType: 'LEAVE_REQUEST';
++  relatedEntityId: string;
++  status: 'CREATED' | 'SENT' | 'READ';
++  readAt: Date | null;
++  createdAt: Date;
++}
++
++export interface CreateNotificationDto {
++  recipientId: string;
++  senderId?: string;
++  type: Notification['type'];
++  title: string;
++  body: string;
++  relatedEntityType: Notification['relatedEntityType'];
++  relatedEntityId: string;
++}
++
++File: src/modules/notification/notification.repository.ts
++import { Notification, CreateNotificationDto } from './notification.model';
++
++export interface INotificationRepository {
++  create(dto: CreateNotificationDto): Promise<Notification>;
++  findByRecipientId(recipientId: string): Promise<Notification[]>;
++  markAsRead(id: string): Promise<Notification>;
++}
++
++export class PgNotificationRepository implements INotificationRepository {
++  constructor(private readonly pool: import('pg').Pool) {}
++
++  async create(dto: CreateNotificationDto): Promise<Notification> {
++    // Implementation using PostgreSQL pool
++    throw new Error('Not implemented');
++  }
++
++  async findByRecipientId(recipientId: string): Promise<Notification[]> {
++    throw new Error('Not implemented');
++  }
++
++  async markAsRead(id: string): Promise<Notification> {
++    throw new Error('Not implemented');
++  }
++}
++
++### Success criteria for this phase
++
++- src/modules/leave/leave.model.ts exists and exports LeaveRequest and CreateLeaveRequestDto interfaces
++- src/modules/leave/leave.repository.ts exists and exports ILeaveRepository interface and PgLeaveRequestRepository concrete implementation
++- src/modules/notification/notification.model.ts exists and exports Notification and CreateNotifica
+
+# 2026-06-13 18:46:36.223863
++## Task
++[Feature: Build the leave management module — Phase 1: Core Domain Models & Repository Interfaces]
++
++Create src/modules/leave/leave.model.ts with TypeScript interfaces for LeaveRequest and CreateLeaveRequestDto using canonical attributes. Create src/modules/leave/leave.repository.ts defining ILeaveRepository interface with CRUD methods referencing those types. Create src/modules/notification/notification.model.ts with Notification interface and src/modules/notification/notification.repository.ts with INotificationRepository. This phase establishes the foundational domain models and repository interfaces for the leave and notification modules.
++
++Phase architecture notes:
++Establishes domain entities and repository interfaces (GP-001) for leave and notification modules. Models and repositories are paired in same phase so Aider sees field definitions when generating repository methods.
++
++Detailed phase architecture (architecture-agent):
++{"interfaces":["File: src/modules/leave/leave.model.ts\nexport interface LeaveRequest {\n  id: string;\n  employeeId: string;\n  policyId: string;\n  managerId: string | null;\n  startDate: Date;\n  endDate: Date;\n  totalDays: number;\n  reason: string | null;\n  attachmentUrl: string | null;\n  status: 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED';\n  rejectionReason: string | null;\n  submittedAt: Date | null;\n  processedAt: Date | null;\n  processorId: string | null;\n  createdAt: Date;\n  updatedAt: Date;\n}\n\nexport interface CreateLeaveRequestDto {\n  employeeId: string;\n  policyId: string;\n  startDate: Date;\n  endDate: Date;\n  reason?: string;\n  attachmentUrl?: string;\n}","File: src/modules/leave/leave.repository.ts\nimport { LeaveRequest, CreateLeaveRequestDto } from './leave.model';\n\nexport interface ILeaveRepository {\n  create(dto: CreateLeaveRequestDto): Promise<LeaveRequest>;\n  findById(id: string): Promise<LeaveRequest | null>;\n  findByEmployeeId(employeeId: string): Promise<LeaveRequest[]>;\n  updateStatus(id: string, status: LeaveRequest['status'], processorId?: string, rejectionReason?: string): Promise<LeaveRequest>;\n  update(leaveRequest: Partial<LeaveRequest> & { id: string }): Promise<LeaveRequest>;\n}\n\nexport class PgLeaveRequestRepository implements ILeaveRepository {\n  constructor(private readonly pool: import('pg').Pool) {}\n\n  async create(dto: CreateLeaveRequestDto): Promise<LeaveRequest> {\n    // Implementation using PostgreSQL pool\n    throw new Error('Not implemented');\n  }\n\n  async findById(id: string): Promise<LeaveRequest | null> {\n    throw new Error('Not implemented');\n  }\n\n  async findByEmployeeId(employeeId: string): Promise<LeaveRequest[]> {\n    throw new Error('Not implemented');\n  }\n\n  async updateStatus(id: string, status: LeaveRequest['status'], processorId?: string, rejectionReason?: string): Promise<LeaveRequest> {\n    throw new Error('Not implemented');\n  }\n\n  async update(leaveRequest: Partial<LeaveRequest> & { id: string }): Promise<LeaveRequest> {\n    throw new Error('Not implemented');\n  }\n}","File: src/modules/notification/notification.model.ts\nexport interface Notification {\n  id: string;\n  recipientId: string;\n  senderId: string | null;\n  type: 'LEAVE_SUBMITTED' | 'LEAVE_APPROVED' | 'LEAVE_REJECTED' | 'LEAVE_CANCELLED';\n  title: string;\n  body: string;\n  relatedEntityType: 'LEAVE_REQUEST';\n  relatedEntityId: string;\n  status: 'CREATED' | 'SENT' | 'READ';\n  readAt: Date | null;\n  createdAt: Date;\n}\n\nexport interface CreateNotificationDto {\n  recipientId: string;\n  senderId?: string;\n  type: Notification['type'];\n  title: string;\n  body: string;\n  relatedEntityType: Notification['relatedEntityType'];\n  relatedEntityId: string;\n}","File: src/modules/notification/notification.repository.ts\nimport { Notification, CreateNotificationDto } from './notification.model';\n\nexport interface INotificationRepository {\n  create(dto: CreateNotificationDto): Promise<Notification>;\n  findByRecipientId(recipientId: string): Promise<Notification[]>;\n  markAsRead(id: string): Promise<Notification>;\n}\n\nexport class PgNotificationRepository implements INotificationRepository {\n  constructor(private readonly pool: import('pg').Pool) {}\n\n  async create(dto: CreateNotificationDto): Promise<Notification> {\n    // Implementation using PostgreSQL pool\n    throw new Error('Not implemented');\n  }\n\n  async findByRecipientId(recipientId: string): Promise<Notification[]> {\n    throw new Error('Not implemented');\n  }\n\n  async markAsRead(id: string): Promise<Notification> {\n    throw new Error('Not implemented');\n  }\n}"],"importStatements":[],"successCriteria":["src/modules/leave/leave.model.ts exists and exports LeaveRequest and CreateLeaveRequestDto interfaces","src/modules/leave/leave.repository.ts exists and exports ILeaveRepository interface and PgLeaveRequestRepository concrete implementation","src/modules/notification/notification.model.ts exists and exports Notification and CreateNotificationDto interfaces","src/modules/notification/notification.repository.ts exists and exports INotificationRepository interface and PgNotificationRepository concrete implementation","All repository interfaces follow GP-001 (Repository pattern) by abstracting database access","ARCHITECTURE.md must be updated to include new domain concepts: LeaveRequest status enum ('DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED', 'CANCELLED') and Notification type enum ('LEAVE_SUBMITTED', 'LEAVE_APPROVED', 'LEAVE_REJECTED', 'LEAVE_CANCELLED')"]}
++
++## Deferred to later phases
++The following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:
++- Phase 2 — Policy & Balance Domain Models: Create src/modules/policy/policy.model.ts with LeavePolicy interface using canonical attributes. Cre
++- Phase 3 — Service Interfaces & Core Business Logic: Create src/modules/policy/policy.service.ts implementing IPolicyService with validation logic for le
++- Phase 4 — Leave Service Implementation: Create src/modules/leave/leave.service.ts implementing ILeaveService. This service integrates depend
++- Phase 5 — Notification Service & Controllers: Create src/modules/notification/notification.service.ts implementing INotificationService. Create sr
++- Phase 6 — Routes & Error Handling: Create src/modules/leave/leave.routes.ts defining Fastify routes for leave operations. Implement com
++
++## Success criteria
++- src/modules/leave/leave.model.ts exists and exports LeaveRequest and CreateLeaveRequestDto interfaces
++- src/modules/leave/leave.repository.ts exists and exports ILeaveRepository interface and PgLeaveRequestRepository concrete implementation
++- src/modules/notification/notification.model.ts exists and exports Notification and CreateNotificationDto interfaces
++- src/modules/notification/notification.repository.ts exists and exports INotificationRepository interface and PgNotificationRepository concrete implementation
++- All repository interfaces follow GP-001 (Repository pattern) by abstracting database access
++- ARCHITECTURE.md must be updated to include new domain concepts: LeaveRequest status enum ('DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED', 'CANCELLED') and Notification type enum ('LEAVE_SUBMITTED', 'LEAVE_APPROVED', 'LEAVE_REJECTED', 'LEAVE_CANCELLED')
++
++## Out of scope (do NOT touch these)
++- Policy module (policy.model.ts, policy.repository.ts)
++- Balance module (balance.model.ts, balance.repository.ts)
++- Service layer implementations (leave.service.ts, notification.service.ts, policy.service.ts)
++- API controllers or routes
++- Business logic validation
++- Database schema migrations
++- Authentication or RBAC implementation
++- Audit record implementations
++- Input validation implementations
++- Error handling implementations
++- Integration with employee module beyond referencing employeeId
++- Actual database query implementations (only interface definitions and stubs)
++- Testing files
++
++## Project rules
++- Generated code must compile without errors. Verify with executeScript before returning.
++- All imports must resolve to files that exist in the project or are declared in package.json.
++- You MUST run a compile/lint check via executeScript before emitting the final files. This is not optional.
++- Do not use require() for JSON imports — import them using ES module syntax with resolveJsonModule enabled in tsconfig.
++- Before generating any repository, service, or controller code, read the DTO and interface files it will use. Never reference a field on a type without confirming it exists in the type definition.
++- Before generating code that calls methods on a dependency, read the dependency's source file to confirm which methods exist. Only call methods that are actually defined.
++- Read the project's compiler/linter configuration file (tsconfig.json, mypy.ini, pyproject.toml, .eslintrc etc) before generating code. Follow the strictness settings it defines — do not assume permissive defaults.
++- Read the project's dependency manifest (package.json, requirements.txt, go.mod, pom.xml etc) before importing external packages. Only import packages that are listed as dependencies.
++
++## Scoped architecture for this phase
++The following describes ONLY what exists now and what you
++are building in this phase. Use these exact file paths,
++exact export names, and exact import statements. Do not
++invent paths or imports — if it is not listed here, it
++does not exist.
++
++### Interfaces / types this phase implements
++
++File: src/modules/leave/leave.model.ts
++export interface LeaveRequest {
++  id: string;
++  employeeId: string;
++  policyId: string;
++  managerId: string | null;
++  startDate: Date;
++  endDate: Date;
++  totalDays: number;
++  reason: string | null;
++  attachmentUrl: string | null;
++  status: 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
++  rejectionReason: string | null;
++  submittedAt: Date | null;
++  processedAt: Date | null;
++  processorId: string | null;
++  createdAt: Date;
++  updatedAt: Date;
++}
++
++export interface CreateLeaveRequestDto {
++  employeeId: string;
++  policyId: string;
++  startDate: Date;
++  endDate: Date;
++  reason?: string;
++  attachmentUrl?: string;
++}
++
++File: src/modules/leave/leave.repository.ts
++import { LeaveRequest, CreateLeaveRequestDto } from './leave.model';
++
++export interface ILeaveRepository {
++  create(dto: CreateLeaveRequestDto): Promise<LeaveRequest>;
++  findById(id: string): Promise<LeaveRequest | null>;
++  findByEmployeeId(employeeId: string): Promise<LeaveRequest[]>;
++  updateStatus(id: string, status: LeaveRequest['status'], processorId?: string, rejectionReason?: string): Promise<LeaveRequest>;
++  update(leaveRequest: Partial<LeaveRequest> & { id: string }): Promise<LeaveRequest>;
++}
++
++export class PgLeaveRequestRepository implements ILeaveRepository {
++  constructor(private readonly pool: import('pg').Pool) {}
++
++  async create(dto: CreateLeaveRequestDto): Promise<LeaveRequest> {
++    // Implementation using PostgreSQL pool
++    throw new Error('Not implemented');
++  }
++
++  async findById(id: string): Promise<LeaveRequest | null> {
++    throw new Error('Not implemented');
++  }
++
++  async findByEmployeeId(employeeId: string): Promise<LeaveRequest[]> {
++    throw new Error('Not implemented');
++  }
++
++  async updateStatus(id: string, status: LeaveRequest['status'], processorId?: string, rejectionReason?: string): Promise<LeaveRequest> {
++    throw new Error('Not implemented');
++  }
++
++  async update(leaveRequest: Partial<LeaveRequest> & { id: string }): Promise<LeaveRequest> {
++    throw new Error('Not implemented');
++  }
++}
++
++File: src/modules/notification/notification.model.ts
++export interface Notification {
++  id: string;
++  recipientId: string;
++  senderId: string | null;
++  type: 'LEAVE_SUBMITTED' | 'LEAVE_APPROVED' | 'LEAVE_REJECTED' | 'LEAVE_CANCELLED';
++  title: string;
++  body: string;
++  relatedEntityType: 'LEAVE_REQUEST';
++  relatedEntityId: string;
++  status: 'CREATED' | 'SENT' | 'READ';
++  readAt: Date | null;
++  createdAt: Date;
++}
++
++export interface CreateNotificationDto {
++  recipientId: string;
++  senderId?: string;
++  type: Notification['type'];
++  title: string;
++  body: string;
++  relatedEntityType: Notification['relatedEntityType'];
++  relatedEntityId: string;
++}
++
++File: src/modules/notification/notification.repository.ts
++import { Notification, CreateNotificationDto } from './notification.model';
++
++export interface INotificationRepository {
++  create(dto: CreateNotificationDto): Promise<Notification>;
++  findByRecipientId(recipientId: string): Promise<Notification[]>;
++  markAsRead(id: string): Promise<Notification>;
++}
++
++export class PgNotificationRepository implements INotificationRepository {
++  constructor(private readonly pool: import('pg').Pool) {}
++
++  async create(dto: CreateNotificationDto): Promise<Notification> {
++    // Implementation using PostgreSQL pool
++    throw new Error('Not implemented');
++  }
++
++  async findByRecipientId(recipientId: string): Promise<Notification[]> {
++    throw new Error('Not implemented');
++  }
++
++  async markAsRead(id: string): Promise<Notification> {
++    throw new Error('Not implemented');
++  }
++}
++
++### Success criteria for this phase
++
++- src/modules/leave/leave.model.ts exists and exports LeaveRequest and CreateLeaveRequestDto interfaces
++- src/modules/leave/leave.repository.ts exists and exports ILeaveRepository interface and PgLeaveRequestRepository concrete implementation
++- src/modules/notification/notification.model.ts exists and exports Notification and CreateNotifica
