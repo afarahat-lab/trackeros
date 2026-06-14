@@ -1,0 +1,71 @@
+{
+  "id": "c2a11495-6559-46c7-8705-0702fb718d33",
+  "correlationId": "01eafc8a-b62b-4829-aa09-29266ab27efc",
+  "rawIntent": "[Feature: Add a /health/detailed GET endpoint that returns the node version, uptime in sec — Phase 1: Create system metrics module with service interface]\n\nCreate src/modules/system/system-metrics.service.ts with a SystemMetricsService class that provides raw system data (nodeVersion, uptimeSeconds, memoryUsageMB). This service should have no external dependencies. Also create src/modules/system/index.ts to export the service. This phase establishes the inner layer following dependency inward rule.\n\nPhase architecture notes:\nInner layer module providing raw system metrics without dependencies on other modules\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/system/system-metrics.service.ts\\nexport interface SystemMetricsService {\\n  getSystemHealth(): SystemHealth;\\n}\\n\\nexport interface SystemHealth {\\n  nodeVersion: string;\\n  uptimeSeconds: number;\\n  memoryUsageMB: number;\\n}\"],\"importStatements\":[],\"successCriteria\":[\"src/modules/system/system-metrics.service.ts exists and exports SystemMetricsService interface and SystemMetricsServiceImpl class\",\"src/modules/system/index.ts exists and exports SystemMetricsService and SystemMetricsServiceImpl\",\"SystemMetricsServiceImpl.getSystemHealth() returns SystemHealth object with correct node version from process.version\",\"SystemMetricsServiceImpl.getSystemHealth() returns SystemHealth object with correct uptime in seconds from process.uptime()\",\"SystemMetricsServiceImpl.getSystemHealth() returns SystemHealth object with correct memory usage in MB calculated from process.memoryUsage().heapUsed\"]}\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 2 — Create health module service with SystemHealth entity: Create src/modules/health/health.service.ts with a HealthService class that depends on SystemMetrics\n- Phase 3 — Create health controller with DTOs: Create src/modules/health/health.controller.ts with a HealthController class that uses HealthService\n- Phase 4 — Add health routes and Fastify integration: Create src/modules/health/health.routes.ts that registers GET /health/detailed endpoint using Health\n- Phase 5 — Add unit tests for system metrics module: Create tests/unit/modules/system/system-metrics.service.test.ts with Jest unit tests for SystemMetri\n- Phase 6 — Add unit tests for health module: Create tests/unit/modules/health/health.service.test.ts with Jest unit tests for HealthService from \n- Phase 7 — Add integration tests for health routes: Create tests/integration/health.routes.test.ts with Fastify integration tests for GET /health/detail",
+  "scope": {
+    "affectedDomains": [
+      "system"
+    ],
+    "affectedLayers": [
+      "domain"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/system/system-metrics.service.ts exists and exports SystemMetricsService interface and SystemMetricsServiceImpl class",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/system/index.ts exists and exports SystemMetricsService and SystemMetricsServiceImpl",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "SystemMetricsServiceImpl.getSystemHealth() returns SystemHealth object with correct node version from process.version",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "SystemMetricsServiceImpl.getSystemHealth() returns SystemHealth object with correct uptime in seconds from process.uptime()",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "SystemMetricsServiceImpl.getSystemHealth() returns SystemHealth object with correct memory usage in MB calculated from process.memoryUsage().heapUsed",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled.",
+    "SystemMetricsService must have no external dependencies",
+    "Follows dependency inward rule (inner layer module)"
+  ],
+  "outOfScope": [
+    "Creating src/modules/health/health.service.ts",
+    "Creating src/modules/health/health.controller.ts",
+    "Creating src/modules/health/health.routes.ts",
+    "Creating GET /health/detailed endpoint",
+    "Creating DTOs for health endpoint",
+    "Creating unit tests for system metrics module",
+    "Creating unit tests for health module",
+    "Creating integration tests for health routes",
+    "Fastify integration",
+    "API endpoints",
+    "RBAC enforcement",
+    "Audit records",
+    "Input validation",
+    "Everything outside src/modules/system/"
+  ],
+  "ambiguities": []
+}
