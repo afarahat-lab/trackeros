@@ -60,7 +60,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - run: npm install --ci
+      # TR_019 follow-up — upstream npm arborist `Link.matches` bug
+      # fails `npm install --ci` with "Cannot read properties of null
+      # (reading 'matches')" on certain dependency trees. `--legacy-peer-deps`
+      # routes around it until the upstream fix lands.
+      - run: npm install --ci --legacy-peer-deps
 
       - name: Compile
         run: |
