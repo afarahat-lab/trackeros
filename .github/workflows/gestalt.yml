@@ -60,11 +60,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      # TR_019 follow-up — upstream npm arborist `Link.matches` bug
-      # fails `npm install --ci` with "Cannot read properties of null
-      # (reading 'matches')" on certain dependency trees. `--legacy-peer-deps`
-      # routes around it until the upstream fix lands.
-      - run: npm install --ci --legacy-peer-deps
+      # TR_019 follow-up — `npm install --ci` requires a committed
+      # package-lock.json and trackeros doesn't have one (Aider
+      # generates source but doesn't run `npm install` to produce
+      # the lockfile). The missing-lockfile path triggers the upstream
+      # arborist `Link.matches` null-pointer bug. Plain `npm install`
+      # works without a lockfile; --legacy-peer-deps as a belt-and-
+      # suspenders against the arborist bug.
+      - run: npm install --legacy-peer-deps
 
       - name: Compile
         run: |
