@@ -1,0 +1,106 @@
+{
+  "id": "98b95ab5-b8d3-4c8c-b35c-55b1e3e05849",
+  "correlationId": "7780698e-9748-418c-b579-78be9d7e9bd0",
+  "rawIntent": "[Feature: Add a /uptime GET endpoint that returns process uptime in seconds — Phase 1: Create health module structure and ProcessUptime entity]\n\nCreate src/modules/health/health.model.ts with TypeScript interfaces for ProcessUptime entity. Define the ProcessUptime interface with startTime, currentTime, and uptimeSeconds attributes. Create src/modules/health/health.service.ts with ProcessUptimeService class that calculates uptime. This phase depends on existing shared types from src/shared/types/index.ts.\n\nThis phase depends on: src/shared/types/index.ts.\n\nPhase architecture notes:\n{\"interfaces\":[\"File: src/modules/health/health.model.ts\\nexport interface ProcessUptime {\\n  startTime: Date;\\n  currentTime: Date;\\n  uptimeSeconds: number;\\n  getUptime(): number;\\n}\",\"File: src/modules/health/health.service.ts\\nexport interface HealthService {\\n  getUptime(): Promise<number>;\\n}\\n\\nexport class HealthServiceImpl implements HealthService {\\n  private readonly processStartTime: Date;\\n\\n  constructor() {\\n    this.processStartTime = new Date();\\n  }\\n\\n  async getUptime(): Promise<number> {\\n    const currentTime = new Date();\\n    const uptimeSeconds = Math.floor((currentTime.getTime() - this.processStartTime.getTime()) / 1000);\\n    return uptimeSeconds;\\n  }\\n}\"],\"importStatements\":[\"import { ProcessUptime } from \\\"./health.model\\\"\",\"import { HealthService, HealthServiceImpl } from \\\"./health.service\\\"\"],\"successCriteria\":[\"src/modules/health/health.model.ts exists and exports ProcessUptime interface with startTime, currentTime, uptimeSeconds properties and getUptime method\",\"src/modules/health/health.service.ts exists and exports HealthService interface and HealthServiceImpl class\",\"HealthServiceImpl implements HealthService interface with getUptime method that returns a Promise<number>\",\"HealthServiceImpl correctly calculates uptime in seconds using Date.now() difference from process start time\",\"All TypeScript interfaces compile without errors using the project's TypeScript configuration\",\"ProcessUptime entity is a transient domain concept (not persisted) - no SQL table needed\"]}\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/health/health.model.ts\\nexport interface ProcessUptime {\\n  startTime: Date;\\n  currentTime: Date;\\n  uptimeSeconds: number;\\n}\\n\\nexport function calculateUptime(startTime: Date): ProcessUptime {\\n  const currentTime = new Date();\\n  const uptimeSeconds = Math.floor((currentTime.getTime() - startTime.getTime()) / 1000);\\n  return { startTime, currentTime, uptimeSeconds };\\n}\",\"File: src/modules/health/health.service.ts\\nexport interface HealthService {\\n  getUptime(): Promise<ProcessUptime>;\\n}\\n\\nexport class HealthServiceImpl implements HealthService {\\n  private readonly processStartTime: Date;\\n\\n  constructor() {\\n    this.processStartTime = new Date();\\n  }\\n\\n  async getUptime(): Promise<ProcessUptime> {\\n    const { calculateUptime } = await import('./health.model');\\n    return calculateUptime(this.processStartTime);\\n  }\\n}\"],\"importStatements\":[\"import { ProcessUptime, calculateUptime } from \\\"./health.model\\\";\",\"import { HealthService, HealthServiceImpl } from \\\"./health.service\\\";\"],\"successCriteria\":[\"src/modules/health/health.model.ts exists and exports ProcessUptime interface with startTime, currentTime, uptimeSeconds properties and calculateUptime function\",\"src/modules/health/health.service.ts exists and exports HealthService interface and HealthServiceImpl class\",\"HealthServiceImpl implements HealthService interface with getUptime method that returns a Promise<ProcessUptime>\",\"HealthServiceImpl correctly calculates uptime in seconds using Date difference from process start time\",\"All TypeScript interfaces compile without errors using the project's TypeScript configuration\",\"ProcessUptime entity is a transient domain concept (not persisted) - no SQL table needed\",\"The new ProcessUptime domain entity is added to ARCHITECTURE.md documentation in the health module section\"]}\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 2 — Implement UptimeAuditRepository for audit logging: Create src/modules/health/uptime-audit.repository.ts with UptimeAuditRepository class implementing a\n- Phase 3 — Implement health controller with RBAC and validation: Create src/modules/health/health.controller.ts with HealthController class containing getUptime meth\n- Phase 4 — Create Fastify route for uptime endpoint: Create src/modules/health/health.routes.ts with Fastify route definition for GET /uptime endpoint. W\n- Phase 5 — Integrate audit logging into uptime endpoint: Update src/modules/health/health.controller.ts to inject and use UptimeAuditRepository for logging a",
+  "scope": {
+    "affectedDomains": [
+      "health"
+    ],
+    "affectedLayers": [
+      "domain"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/health/health.model.ts exists and exports ProcessUptime interface with startTime, currentTime, uptimeSeconds properties and calculateUptime function",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/health/health.service.ts exists and exports HealthService interface and HealthServiceImpl class",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "HealthServiceImpl implements HealthService interface with getUptime method that returns a Promise<ProcessUptime>",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "HealthServiceImpl correctly calculates uptime in seconds using Date difference from process start time",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "All TypeScript interfaces compile without errors using the project's TypeScript configuration",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-006",
+      "description": "ProcessUptime entity is a transient domain concept (not persisted) - no SQL table needed",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-007",
+      "description": "The new ProcessUptime domain entity is added to ARCHITECTURE.md documentation in the health module section",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "Implementation of UptimeAuditRepository for audit logging",
+    "Implementation of health controller with RBAC and validation",
+    "Creation of Fastify route for GET /uptime endpoint",
+    "Integration of audit logging into uptime endpoint",
+    "Any database persistence for ProcessUptime entity",
+    "Any API endpoints or routes",
+    "Any RBAC enforcement",
+    "Any audit logging implementation",
+    "Any changes to existing modules (employee, policy, balance, leave, notification)",
+    "Any changes to shared types beyond potential imports"
+  ],
+  "ambiguities": [
+    {
+      "id": "amb-001",
+      "description": "Should ProcessUptime interface have a getUptime() method (as in first architecture notes) or should calculation be done via separate calculateUptime function (as in detailed architecture)?",
+      "options": [
+        "Include getUptime() method on interface",
+        "Use separate calculateUptime function"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "id": "amb-002",
+      "description": "Should HealthService.getUptime() return Promise<number> (as in first notes) or Promise<ProcessUptime> (as in detailed architecture)?",
+      "options": [
+        "Promise<number>",
+        "Promise<ProcessUptime>"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "id": "amb-003",
+      "description": "Should the calculateUptime function be synchronous or asynchronous?",
+      "options": [
+        "Synchronous function",
+        "Async function returning Promise"
+      ],
+      "impactIfWrong": "low"
+    }
+  ]
+}

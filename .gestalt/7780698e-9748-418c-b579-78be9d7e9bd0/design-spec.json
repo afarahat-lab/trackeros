@@ -1,0 +1,29 @@
+{
+  "correlationId": "7780698e-9748-418c-b579-78be9d7e9bd0",
+  "domainChanges": [
+    {
+      "entityName": "ProcessUptime",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "startTime",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "currentTime",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "uptimeSeconds",
+          "type": "number",
+          "required": true
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}
