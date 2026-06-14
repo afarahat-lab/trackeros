@@ -72,8 +72,14 @@ jobs:
 
       - name: Compile
         run: |
-          if [ -f package.json ] || [ -f requirements.txt ] || [ -f pyproject.toml ] || [ -f go.mod ] || [ -f Cargo.toml ]; then
-            
+          if [ -f package.json ]; then
+            npm run build
+          elif [ -f requirements.txt ] || [ -f pyproject.toml ]; then
+            echo "Python project — no compile step"
+          elif [ -f go.mod ]; then
+            go build ./...
+          elif [ -f Cargo.toml ]; then
+            cargo build
           else
             echo "No project manifest found yet — skipping compile (run 'gestalt run' to scaffold the project)"
           fi
