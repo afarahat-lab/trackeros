@@ -1,0 +1,21 @@
+{
+  "correlationId": "8a9cbf98-0a63-4e17-8892-0ea3a701e44c",
+  "domainChanges": [],
+  "apiContracts": [
+    {
+      "method": "GET",
+      "path": "/api/v1/system/pid",
+      "description": "Returns the current process ID",
+      "requestBody": {},
+      "responseBody": {
+        "pid": "number"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ]
+    }
+  ],
+  "componentSpecs": []
+}
