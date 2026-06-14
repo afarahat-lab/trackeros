@@ -25,3 +25,7 @@ Represents notification data managed by the `notification` module, including not
 ## audit
 
 Represents audit data managed by the `audit` module, including audit records, change history, and activity tracking information.
+
+## systemHealth
+
+Represents system health data managed by the `systemHealth` module, including Node.js version, uptime statistics, and memory utilization metrics.
