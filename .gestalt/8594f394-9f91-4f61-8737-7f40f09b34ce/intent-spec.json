@@ -1,0 +1,69 @@
+{
+  "id": "33ac48ac-fc68-44d9-b21a-a8614040efd6",
+  "correlationId": "8594f394-9f91-4f61-8737-7f40f09b34ce",
+  "rawIntent": "[Feature: Add a /health/detailed GET endpoint that returns the node version, uptime in sec — Phase 1: Create system metrics module with service interface]\n\nCreate src/modules/system/system-metrics.service.ts with a SystemMetricsService class that provides raw system data (nodeVersion, uptimeSeconds, memoryUsageMB). This service should have no external dependencies. Also create src/modules/system/index.ts to export the service. This phase establishes the inner layer following dependency inward rule.\n\nPhase architecture notes:\n{\"interfaces\":[\"File: src/modules/system/system-metrics.service.ts\\nexport interface SystemMetricsService {\\n  getSystemHealth(): SystemHealth;\\n}\\n\\nexport interface SystemHealth {\\n  nodeVersion: string;\\n  uptimeSeconds: number;\\n  memoryUsageMB: number;\\n}\"],\"importStatements\":[],\"successCriteria\":[\"src/modules/system/system-metrics.service.ts exists and exports SystemMetricsService interface and SystemMetricsServiceImpl class\",\"src/modules/system/index.ts exists and exports SystemMetricsService and SystemMetricsServiceImpl\",\"SystemMetricsServiceImpl.getSystemHealth() returns SystemHealth object with correct node version from process.version\",\"SystemMetricsServiceImpl.getSystemHealth() returns SystemHealth object with correct uptime in seconds from process.uptime()\",\"SystemMetricsServiceImpl.getSystemHealth() returns SystemHealth object with correct memory usage in MB calculated from process.memoryUsage().heapUsed\"]}\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/system/system-metrics.service.ts\\nexport interface SystemHealth {\\n  nodeVersion: string;\\n  uptimeSeconds: number;\\n  memoryUsageMB: number;\\n}\\n\\nexport class SystemMetricsService {\\n  getSystemHealth(): SystemHealth {\\n    const nodeVersion = process.version;\\n    const uptimeSeconds = process.uptime();\\n    const memoryUsageMB = process.memoryUsage().heapUsed / (1024 * 1024);\\n    \\n    return {\\n      nodeVersion,\\n      uptimeSeconds,\\n      memoryUsageMB\\n    };\\n  }\\n}\"],\"importStatements\":[],\"successCriteria\":[\"src/modules/system/system-metrics.service.ts exists and exports SystemHealth interface and SystemMetricsService class\",\"src/modules/system/index.ts exists and exports SystemHealth interface and SystemMetricsService class\",\"SystemMetricsService.getSystemHealth() returns SystemHealth object with correct node version from process.version\",\"SystemMetricsService.getSystemHealth() returns SystemHealth object with correct uptime in seconds from process.uptime()\",\"SystemMetricsService.getSystemHealth() returns SystemHealth object with correct memory usage in MB calculated from process.memoryUsage().heapUsed / (1024 * 1024)\"]}\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 2 — Create health module service with SystemHealth entity: Create src/modules/health/health.service.ts with a HealthService class that depends on SystemMetrics\n- Phase 3 — Create health controller with DTOs: Create src/modules/health/health.controller.ts with a HealthController class that uses HealthService\n- Phase 4 — Add health routes and Fastify integration: Create src/modules/health/health.routes.ts that registers GET /health/detailed endpoint using Health\n- Phase 5 — Add unit tests for system metrics module: Create tests/unit/modules/system/system-metrics.service.test.ts with Jest unit tests for SystemMetri\n- Phase 6 — Add unit tests for health module: Create tests/unit/modules/health/health.service.test.ts with Jest unit tests for HealthService from \n- Phase 7 — Add integration tests for health routes: Create tests/integration/health.routes.test.ts with Fastify integration tests for GET /health/detail",
+  "scope": {
+    "affectedDomains": [
+      "system"
+    ],
+    "affectedLayers": [
+      "domain"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/system/system-metrics.service.ts exists and exports SystemHealth interface and SystemMetricsService class",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/system/index.ts exists and exports SystemHealth interface and SystemMetricsService class",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "SystemMetricsService.getSystemHealth() returns SystemHealth object with correct node version from process.version",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "SystemMetricsService.getSystemHealth() returns SystemHealth object with correct uptime in seconds from process.uptime()",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "SystemMetricsService.getSystemHealth() returns SystemHealth object with correct memory usage in MB calculated from process.memoryUsage().heapUsed / (1024 * 1024)",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled.",
+    "Service must have no external dependencies",
+    "Must follow dependency inward rule (inner layer)"
+  ],
+  "outOfScope": [
+    "Phase 2 — Create health module service with SystemHealth entity",
+    "Phase 3 — Create health controller with DTOs",
+    "Phase 4 — Add health routes and Fastify integration",
+    "Phase 5 — Add unit tests for system metrics module",
+    "Phase 6 — Add unit tests for health module",
+    "Phase 7 — Add integration tests for health routes",
+    "Any API endpoints or routes",
+    "Any database access or repository implementations",
+    "Any integration with existing modules (employee, policy, balance, leave, notification)",
+    "RBAC enforcement (no API endpoints in this phase)",
+    "Audit records (no state-changing operations)",
+    "Input validation (no API boundaries in this phase)"
+  ],
+  "ambiguities": []
+}

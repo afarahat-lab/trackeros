@@ -1,0 +1,29 @@
+{
+  "correlationId": "8594f394-9f91-4f61-8737-7f40f09b34ce",
+  "domainChanges": [
+    {
+      "entityName": "SystemHealth",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "nodeVersion",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "uptimeSeconds",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "memoryUsageMB",
+          "type": "number",
+          "required": true
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}
