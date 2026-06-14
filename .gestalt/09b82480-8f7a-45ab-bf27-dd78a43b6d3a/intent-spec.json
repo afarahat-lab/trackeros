@@ -1,0 +1,68 @@
+{
+  "id": "3385456e-a137-46e6-8073-6ae0ef41256c",
+  "correlationId": "09b82480-8f7a-45ab-bf27-dd78a43b6d3a",
+  "rawIntent": "[Feature: Add a /version GET endpoint that returns the package.json version string — Phase 1: Create version module structure and service interface]\n\nCreate src/modules/version/version.service.interface.ts defining IVersionService with getVersion(): Promise<SystemVersion>. Create src/modules/version/version.model.ts defining SystemVersion interface with versionString, packageName, releaseTimestamp attributes. Create src/modules/version/index.ts exporting the module's public API. This phase depends on existing shared types from src/shared/types/index.ts.\n\nThis phase depends on: src/shared/types/index.ts.\n\nPhase architecture notes:\n{\"interfaces\":[\"File: src/modules/version/version.model.ts\\nexport interface SystemVersion {\\n  versionString: string;\\n  packageName: string;\\n  releaseTimestamp: string;\\n}\",\"File: src/modules/version/version.service.interface.ts\\nimport { SystemVersion } from './version.model';\\nexport interface IVersionService {\\n  getVersion(): Promise<SystemVersion>;\\n}\",\"File: src/modules/version/index.ts\\nexport { SystemVersion } from './version.model';\\nexport { IVersionService } from './version.service.interface';\"],\"importStatements\":[\"import { SystemVersion } from './version.model'\"],\"successCriteria\":[\"Directory src/modules/version exists\",\"File src/modules/version/version.model.ts exists and exports interface SystemVersion\",\"File src/modules/version/version.service.interface.ts exists and exports interface IVersionService\",\"File src/modules/version/index.ts exists and exports SystemVersion and IVersionService\",\"All interfaces have no implementation details (abstract contract only)\"]}\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/version/version.model.ts\\nexport interface SystemVersion {\\n  versionString: string;\\n  packageName: string;\\n  releaseTimestamp: string;\\n}\",\"File: src/modules/version/version.service.interface.ts\\nimport { SystemVersion } from './version.model';\\nexport interface IVersionService {\\n  getVersion(): Promise<SystemVersion>;\\n}\"],\"importStatements\":[\"import { SystemVersion } from './version.model'\"],\"successCriteria\":[\"Directory src/modules/version exists\",\"File src/modules/version/version.model.ts exists and exports interface SystemVersion\",\"File src/modules/version/version.service.interface.ts exists and exports interface IVersionService\",\"File src/modules/version/index.ts exists and exports SystemVersion and IVersionService\",\"All interfaces have no implementation details (abstract contract only)\"]}\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 2 — Implement VersionService with package.json reading: Create src/modules/version/version.service.ts implementing IVersionService from phase 1. Implement g\n- Phase 3 — Create version controller and routes: Create src/modules/version/version.controller.ts with Fastify route handler for GET /version endpoin\n- Phase 4 — Add version module to application bootstrap: Update src/app.ts or main application bootstrap file to import and register the version module route",
+  "scope": {
+    "affectedDomains": [
+      "version"
+    ],
+    "affectedLayers": [
+      "domain"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "Directory src/modules/version exists",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "File src/modules/version/version.model.ts exists and exports interface SystemVersion with versionString, packageName, releaseTimestamp attributes",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "File src/modules/version/version.service.interface.ts exists and exports interface IVersionService with getVersion(): Promise<SystemVersion> method",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "File src/modules/version/index.ts exists and exports SystemVersion and IVersionService",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "All interfaces have no implementation details (abstract contract only)",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "RBAC enforcement: All API endpoints enforce role-based access control.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "Implementation of IVersionService interface",
+    "Reading from package.json file",
+    "Creating controller with Fastify route handler",
+    "Registering version module routes in application bootstrap",
+    "Creating any API endpoints",
+    "Adding any dependencies to package.json",
+    "Creating repository implementations",
+    "Creating audit records",
+    "Creating database schemas or migrations",
+    "Adding any functionality beyond interface definitions",
+    "Anything outside src/modules/version directory"
+  ],
+  "ambiguities": []
+}
