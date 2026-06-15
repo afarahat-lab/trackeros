@@ -1,0 +1,50 @@
+{
+  "id": "d841af92-a023-4909-955c-75fde7b19837",
+  "correlationId": "7dd9a789-3b26-4360-a9b1-2653d0ec891e",
+  "rawIntent": "The CI quality gate is failing because src/modules/leave/leave.repository.spec.ts has TypeScript compilation errors. The compiler reports 'Argument of type 'any' is not assignable to parameter of type 'never'' at lines 45, 79, 90, 103, 115, 129, 140, 153, 163, and 179. These errors appear to be caused by the test code passing values to parameters or arrays that TypeScript has inferred as never. This file must compile without errors for the pipeline quality gate to pass. Preserve all existing exports, types, interfaces, and imports. Only add or modify what is needed to resolve the CI failure shown above.",
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/leave/leave.repository.spec.ts compiles without TypeScript errors",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "All existing exports, types, interfaces, and imports in leave.repository.spec.ts are preserved",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "The CI quality gate passes (no TypeScript compilation errors)",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "Changes to any file other than src/modules/leave/leave.repository.spec.ts",
+    "Changes to production code (only test file modifications)",
+    "Refactoring of test logic beyond fixing TypeScript type errors",
+    "Adding new test cases or functionality",
+    "Changes to CI pipeline configuration",
+    "Modifications to package.json or TypeScript configuration"
+  ],
+  "ambiguities": []
+}
