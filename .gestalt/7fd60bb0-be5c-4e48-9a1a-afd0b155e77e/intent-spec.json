@@ -1,0 +1,77 @@
+{
+  "id": "dbd5b2a6-c8d2-4655-b2f1-9255db6675d4",
+  "correlationId": "7fd60bb0-be5c-4e48-9a1a-afd0b155e77e",
+  "rawIntent": "[Feature: Add a /ping GET endpoint at the root path that returns plain text 'pong' — Phase 1: Create health module structure and service interface]\n\nCreate src/modules/health/health.model.ts with TypeScript interfaces for HealthCheck entity using the canonical attributes (timestamp, status, responseTime) and lifecycleStates (initiated, processing, completed, failed). Create src/modules/health/health.service.interface.ts defining IHealthService interface with ping(): Promise<string> method. Create src/modules/health/index.ts exporting the interface and types.\n\nPhase architecture notes:\nEstablish module boundary and service contract before implementation\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/health/health.model.ts\\nexport type HealthCheckStatus = 'initiated' | 'processing' | 'completed' | 'failed';\\n\\nexport interface HealthCheck {\\n  timestamp: Date;\\n  status: HealthCheckStatus;\\n  responseTime?: number;\\n}\",\"File: src/modules/health/health.service.interface.ts\\nimport { HealthCheck } from './health.model';\\n\\nexport interface IHealthService {\\n  ping(): Promise<string>;\\n  getHealthCheck(): Promise<HealthCheck>;\\n}\"],\"importStatements\":[\"import { HealthCheck, HealthCheckStatus } from './health.model'\",\"import { IHealthService } from './health.service.interface'\"],\"successCriteria\":[\"Directory src/modules/health exists\",\"File src/modules/health/health.model.ts exists and exports the HealthCheck interface and HealthCheckStatus type\",\"File src/modules/health/health.service.interface.ts exists and exports the IHealthService interface\",\"File src/modules/health/index.ts exists and exports HealthCheck, HealthCheckStatus, and IHealthService\",\"All exported symbols match the names defined in the high-level architecture\",\"No concrete implementations exist yet (only interfaces)\",\"The new domain concepts 'HealthCheck' entity and 'initiated', 'processing', 'completed', 'failed' lifecycle states are added to ARCHITECTURE.md\"],\"sqlSchema\":\"CREATE TABLE health_checks (\\n  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\\n  timestamp TIMESTAMPTZ NOT NULL,\\n  status VARCHAR(20) NOT NULL CHECK (status IN ('initiated', 'processing', 'completed', 'failed')),\\n  response_time INTEGER,\\n  created_at TIMESTAMPTZ NOT NULL DEFAULT now()\\n);\\n\\nCREATE INDEX idx_health_checks_timestamp ON health_checks(timestamp);\"}\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 2 — Implement HealthService with ping method: Create src/modules/health/health.service.ts implementing IHealthService interface with concrete Heal\n- Phase 3 — Add health controller and routes: Create src/modules/health/health.controller.ts with Fastify route handler for GET /ping endpoint. Cr\n- Phase 4 — Register health routes in main application: Update src/app.ts or main application file to import and register health routes from src/modules/hea",
+  "scope": {
+    "affectedDomains": [
+      "health"
+    ],
+    "affectedLayers": [
+      "domain"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "Directory src/modules/health exists",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "File src/modules/health/health.model.ts exists and exports the HealthCheck interface and HealthCheckStatus type",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "File src/modules/health/health.service.interface.ts exists and exports the IHealthService interface",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "File src/modules/health/index.ts exists and exports HealthCheck, HealthCheckStatus, and IHealthService",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "All exported symbols match the names defined in the high-level architecture",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-006",
+      "description": "No concrete implementations exist yet (only interfaces)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-007",
+      "description": "The new domain concepts 'HealthCheck' entity and 'initiated', 'processing', 'completed', 'failed' lifecycle states are added to ARCHITECTURE.md",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Audit records: All state-changing operations write an audit record.",
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "RBAC enforcement: All API endpoints enforce role-based access control.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "Implementation of HealthService concrete class",
+    "Health controller and routes",
+    "Registration of health routes in main application",
+    "Database schema creation or migration",
+    "API endpoint implementation",
+    "Any changes to existing modules (employee, policy, balance, leave, notification)",
+    "Testing beyond file existence and export verification"
+  ],
+  "ambiguities": []
+}
