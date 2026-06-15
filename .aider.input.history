@@ -1,0 +1,54 @@
+
+# 2026-06-15 05:34:31.855416
++## Task
++The CI quality gate is failing because src/modules/leave/leave.repository.spec.ts has TypeScript compilation errors. The compiler reports 'Argument of type 'any' is not assignable to parameter of type 'never'' at lines 45, 79, 90, 103, 115, 129, 140, 153, 163, and 179. These errors appear to be caused by the test code passing values to parameters or arrays that TypeScript has inferred as never. This file must compile without errors for the pipeline quality gate to pass. Preserve all existing exports, types, interfaces, and imports. Only add or modify what is needed to resolve the CI failure shown above.
++
++## Success criteria
++- src/modules/leave/leave.repository.spec.ts compiles without TypeScript errors
++- All existing exports, types, interfaces, and imports in leave.repository.spec.ts are preserved
++- The CI quality gate passes (no TypeScript compilation errors)
++
++## Out of scope (do NOT touch these)
++- Changes to any file other than src/modules/leave/leave.repository.spec.ts
++- Changes to production code (only test file modifications)
++- Refactoring of test logic beyond fixing TypeScript type errors
++- Adding new test cases or functionality
++- Changes to CI pipeline configuration
++- Modifications to package.json or TypeScript configuration
++
++## Project rules
++- Generated code must compile without errors. Verify with executeScript before returning.
++- All imports must resolve to files that exist in the project or are declared in package.json.
++- You MUST run a compile/lint check via executeScript before emitting the final files. This is not optional.
++- Do not use require() for JSON imports — import them using ES module syntax with resolveJsonModule enabled in tsconfig.
++- Before generating any repository, service, or controller code, read the DTO and interface files it will use. Never reference a field on a type without confirming it exists in the type definition.
++- Before generating code that calls methods on a dependency, read the dependency's source file to confirm which methods exist. Only call methods that are actually defined.
++- Read the project's compiler/linter configuration file (tsconfig.json, mypy.ini, pyproject.toml, .eslintrc etc) before generating code. Follow the strictness settings it defines — do not assume permissive defaults.
++- Read the project's dependency manifest (package.json, requirements.txt, go.mod, pom.xml etc) before importing external packages. Only import packages that are listed as dependencies.
+
+# 2026-06-15 05:34:31.855464
++## Task
++The CI quality gate is failing because src/modules/leave/leave.repository.spec.ts has TypeScript compilation errors. The compiler reports 'Argument of type 'any' is not assignable to parameter of type 'never'' at lines 45, 79, 90, 103, 115, 129, 140, 153, 163, and 179. These errors appear to be caused by the test code passing values to parameters or arrays that TypeScript has inferred as never. This file must compile without errors for the pipeline quality gate to pass. Preserve all existing exports, types, interfaces, and imports. Only add or modify what is needed to resolve the CI failure shown above.
++
++## Success criteria
++- src/modules/leave/leave.repository.spec.ts compiles without TypeScript errors
++- All existing exports, types, interfaces, and imports in leave.repository.spec.ts are preserved
++- The CI quality gate passes (no TypeScript compilation errors)
++
++## Out of scope (do NOT touch these)
++- Changes to any file other than src/modules/leave/leave.repository.spec.ts
++- Changes to production code (only test file modifications)
++- Refactoring of test logic beyond fixing TypeScript type errors
++- Adding new test cases or functionality
++- Changes to CI pipeline configuration
++- Modifications to package.json or TypeScript configuration
++
++## Project rules
++- Generated code must compile without errors. Verify with executeScript before returning.
++- All imports must resolve to files that exist in the project or are declared in package.json.
++- You MUST run a compile/lint check via executeScript before emitting the final files. This is not optional.
++- Do not use require() for JSON imports — import them using ES module syntax with resolveJsonModule enabled in tsconfig.
++- Before generating any repository, service, or controller code, read the DTO and interface files it will use. Never reference a field on a type without confirming it exists in the type definition.
++- Before generating code that calls methods on a dependency, read the dependency's source file to confirm which methods exist. Only call methods that are actually defined.
++- Read the project's compiler/linter configuration file (tsconfig.json, mypy.ini, pyproject.toml, .eslintrc etc) before generating code. Follow the strictness settings it defines — do not assume permissive defaults.
++- Read the project's dependency manifest (package.json, requirements.txt, go.mod, pom.xml etc) before importing external packages. Only import packages that are listed as dependencies.
