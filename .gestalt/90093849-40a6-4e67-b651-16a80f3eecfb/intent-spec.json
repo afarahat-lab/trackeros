@@ -1,0 +1,67 @@
+{
+  "id": "d1d873fd-3d44-4f2e-a83b-ac86786329d6",
+  "correlationId": "90093849-40a6-4e67-b651-16a80f3eecfb",
+  "rawIntent": "[Feature: Add a GET /ping endpoint at src/modules/ping/ping.routes.ts that returns {ok: tr — Phase 1: Create ping module structure and service interface]\n\nCreate src/modules/ping/ping.service.ts with PingService interface and implementation that returns { ok: true }. Create src/modules/ping/index.ts to export the service. Create src/modules/ping/ping.model.ts with PingResponse interface matching the canonical definition. This phase establishes the module boundary and defines the core service interface first.\n\nPhase architecture notes:\nEstablish module boundary and define service interface first to enforce dependency rules\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/ping/ping.model.ts\\nexport interface PingResponse {\\n  ok: boolean;\\n}\",\"File: src/modules/ping/ping.service.ts\\nimport { PingResponse } from './ping.model';\\n\\nexport interface PingService {\\n  getPing(): Promise<PingResponse>;\\n}\\n\\nexport class PingServiceImpl implements PingService {\\n  async getPing(): Promise<PingResponse> {\\n    return { ok: true };\\n  }\\n}\"],\"importStatements\":[\"import { PingResponse } from './ping.model'\",\"import { PingService, PingServiceImpl } from './ping.service'\"],\"successCriteria\":[\"src/modules/ping/ping.model.ts exists and exports PingResponse interface with exactly one property: ok: boolean\",\"src/modules/ping/ping.service.ts exists and exports PingService interface with exactly one method: getPing(): Promise<PingResponse>\",\"src/modules/ping/ping.service.ts exports PingServiceImpl class that implements PingService interface\",\"src/modules/ping/index.ts exists and exports PingService interface and PingServiceImpl class\",\"All files compile with TypeScript without errors\"]}\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 2 — Implement PingService and create controller: Create src/modules/ping/ping.controller.ts with PingController that uses PingService from src/module\n- Phase 3 — Create routes and register in app: Create src/modules/ping/ping.routes.ts with Fastify route definitions for GET /ping endpoint that us",
+  "scope": {
+    "affectedDomains": [
+      "ping"
+    ],
+    "affectedLayers": [
+      "domain"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/ping/ping.model.ts exists and exports PingResponse interface with exactly one property: ok: boolean",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/ping/ping.service.ts exists and exports PingService interface with exactly one method: getPing(): Promise<PingResponse>",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "src/modules/ping/ping.service.ts exports PingServiceImpl class that implements PingService interface",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "src/modules/ping/index.ts exists and exports PingService interface and PingServiceImpl class",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "All files compile with TypeScript without errors",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "RBAC enforcement: All API endpoints enforce role-based access control.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "Creating src/modules/ping/ping.controller.ts",
+    "Creating src/modules/ping/ping.routes.ts",
+    "Implementing Fastify route definitions for GET /ping endpoint",
+    "Registering routes in the application",
+    "Adding any database access or repository interfaces",
+    "Adding audit records (no state-changing operations in this phase)",
+    "Adding RBAC enforcement to endpoints (no endpoints in this phase)",
+    "Adding input validation to API boundaries (no API boundaries in this phase)",
+    "Creating any tests",
+    "Modifying any existing modules outside src/modules/ping"
+  ],
+  "ambiguities": []
+}
