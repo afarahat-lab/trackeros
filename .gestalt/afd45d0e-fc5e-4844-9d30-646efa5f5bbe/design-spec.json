@@ -1,0 +1,18 @@
+{
+  "correlationId": "afd45d0e-fc5e-4844-9d30-646efa5f5bbe",
+  "domainChanges": [],
+  "apiContracts": [
+    {
+      "method": "GET",
+      "path": "/ping",
+      "description": "Health check endpoint that returns a simple status response",
+      "requestBody": {},
+      "responseBody": {
+        "ok": "boolean"
+      },
+      "authRequired": false,
+      "roles": []
+    }
+  ],
+  "componentSpecs": []
+}

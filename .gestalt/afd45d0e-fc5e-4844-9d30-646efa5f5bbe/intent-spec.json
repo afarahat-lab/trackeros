@@ -1,0 +1,64 @@
+{
+  "id": "00ad4e1e-25d1-4143-bb43-1c19a10b4afc",
+  "correlationId": "afd45d0e-fc5e-4844-9d30-646efa5f5bbe",
+  "rawIntent": "[Feature: Add a GET /ping endpoint at src/modules/ping/ping.routes.ts that returns {ok: tr — Phase 3: Create routes and register in app]\n\nCreate src/modules/ping/ping.routes.ts with Fastify route definitions for GET /ping endpoint that uses PingController from src/modules/ping/ping.controller.ts (created in Phase 2). Update src/app.ts to mount the ping routes. Update src/modules/ping/index.ts to export routes.\n\nThis phase depends on: src/modules/ping/ping.controller.ts, src/modules/ping/ping.service.ts, src/modules/ping/ping.model.ts, src/modules/ping/index.ts.\n\nPhase architecture notes:\nDefine Fastify routes and mount them in the main application\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/ping/ping.routes.ts\\nimport { FastifyInstance, FastifyPluginOptions } from \\\"fastify\\\";\\nimport { PingController } from \\\"./ping.controller\\\";\\n\\nexport interface PingRouteOptions {\\n  prefix?: string;\\n}\\n\\nexport default async function pingRoutes(\\n  fastify: FastifyInstance,\\n  options: FastifyPluginOptions & PingRouteOptions\\n): Promise<void> {\\n  const controller = new PingController();\\n\\n  fastify.route({\\n    method: \\\"GET\\\",\\n    url: \\\"/ping\\\",\\n    handler: controller.ping.bind(controller)\\n  });\\n}\"],\"importStatements\":[\"import { FastifyInstance, FastifyPluginOptions } from \\\"fastify\\\";\",\"import { PingController } from \\\"./ping.controller\\\";\"],\"successCriteria\":[\"src/modules/ping/ping.routes.ts exists and exports a Fastify plugin function that registers GET /ping route\",\"src/modules/ping/ping.routes.ts uses PingController from src/modules/ping/ping.controller.ts to handle the route\",\"src/modules/ping/index.ts exports the routes plugin function\",\"src/app.ts imports and registers the ping routes plugin with prefix '/ping'\",\"GET /ping endpoint returns { ok: true } as JSON with 200 status code\"]}",
+  "scope": {
+    "affectedDomains": [
+      "ping"
+    ],
+    "affectedLayers": [
+      "api",
+      "config"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/ping/ping.routes.ts exists and exports a Fastify plugin function that registers GET /ping route",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/ping/ping.routes.ts uses PingController from src/modules/ping/ping.controller.ts to handle the route",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "src/modules/ping/index.ts exports the routes plugin function",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "src/app.ts imports and registers the ping routes plugin with prefix '/ping'",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "sc-005",
+      "description": "GET /ping endpoint returns { ok: true } as JSON with 200 status code",
+      "testable": true,
+      "layer": "e2e"
+    }
+  ],
+  "constraints": [
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "RBAC enforcement: All API endpoints enforce role-based access control.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "Creating PingController, PingService, or PingModel files (these are dependencies)",
+    "Modifying existing modules (employee, policy, balance, leave, notification)",
+    "Adding authentication or authorization to the ping endpoint",
+    "Adding database access or repository pattern implementation",
+    "Adding audit records for ping endpoint",
+    "Creating tests for the ping endpoint",
+    "Adding any business logic beyond returning {ok: true}"
+  ],
+  "ambiguities": []
+}
