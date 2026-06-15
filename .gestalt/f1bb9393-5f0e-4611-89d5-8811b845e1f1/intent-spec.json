@@ -1,0 +1,70 @@
+{
+  "id": "f550d5f6-f6db-4062-a404-2b5aa60b63e2",
+  "correlationId": "f1bb9393-5f0e-4611-89d5-8811b845e1f1",
+  "rawIntent": "[Feature: Add a /ping GET endpoint at the root path that returns plain text 'pong' — Phase 1: Create health module structure and service interface]\n\nCreate src/modules/health/health.service.interface.ts defining IHealthService interface with ping method returning string. Create src/modules/health/health.model.ts defining HealthCheck entity with timestamp, status, responseTime attributes and REQUESTED, PROCESSING, COMPLETED, FAILED lifecycle states. Create src/modules/health/index.ts exporting the interface and model. This establishes the module boundary and defines the service interface first.\n\nPhase architecture notes:\n{\"interfaces\":[\"File: src/modules/health/health.model.ts\\nexport interface HealthCheck {\\n  id: string;\\n  timestamp: Date;\\n  status: 'REQUESTED' | 'PROCESSING' | 'COMPLETED' | 'FAILED';\\n  responseTime?: number;\\n}\",\"File: src/modules/health/health.service.interface.ts\\nexport interface IHealthService {\\n  ping(): Promise<string>;\\n}\"],\"importStatements\":[\"import { HealthCheck } from './health.model';\"],\"successCriteria\":[\"src/modules/health/health.model.ts exists and exports the HealthCheck interface with id, timestamp, status, and optional responseTime fields.\",\"src/modules/health/health.service.interface.ts exists and exports the IHealthService interface with a ping method returning Promise<string>.\",\"src/modules/health/index.ts exists and exports the HealthCheck interface and IHealthService interface.\",\"All TypeScript interfaces match the domain entity specification from the high-level architecture.\",\"ARCHITECTURE.md is updated to include the new 'health' module and the HealthCheck entity lifecycle states (REQUESTED, PROCESSING, COMPLETED, FAILED).\"]}\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/health/health.model.ts\\nexport interface HealthCheck {\\n  id: string;\\n  timestamp: Date;\\n  status: 'REQUESTED' | 'PROCESSING' | 'COMPLETED' | 'FAILED';\\n  responseTime?: number;\\n}\",\"File: src/modules/health/health.service.interface.ts\\nexport interface IHealthService {\\n  ping(): Promise<string>;\\n}\"],\"importStatements\":[\"import { HealthCheck } from './health.model';\"],\"successCriteria\":[\"src/modules/health/health.model.ts exists and exports the HealthCheck interface with id, timestamp, status, and optional responseTime fields.\",\"src/modules/health/health.service.interface.ts exists and exports the IHealthService interface with a ping method returning Promise<string>.\",\"src/modules/health/index.ts exists and exports the HealthCheck interface and IHealthService interface.\",\"All TypeScript interfaces match the domain entity specification from the high-level architecture.\",\"ARCHITECTURE.md is updated to include the new 'health' module and the HealthCheck entity lifecycle states (REQUESTED, PROCESSING, COMPLETED, FAILED).\",\"PostgreSQL schema for health_checks table is created with proper columns, constraints, and indices.\"],\"sqlSchema\":\"CREATE TABLE health_checks (\\n  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\\n  timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),\\n  status VARCHAR(20) NOT NULL CHECK (status IN ('REQUESTED', 'PROCESSING', 'COMPLETED', 'FAILED')),\\n  response_time INTEGER,\\n  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),\\n  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()\\n);\\n\\nCREATE INDEX idx_health_checks_timestamp ON health_checks(timestamp);\\nCREATE INDEX idx_health_checks_status ON health_checks(status);\"}\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 2 — Implement HealthService and create controller: Create src/modules/health/health.service.ts implementing IHealthService interface from Phase 1. Impl\n- Phase 3 — Register routes and integrate with Fastify: Create src/modules/health/health.routes.ts defining GET /ping route using HealthController from Phas\n- Phase 4 — Add input validation and error handling: Update src/modules/health/health.routes.ts to add input validation for any query parameters (GP-003)\n- Phase 5 — Add RBAC enforcement and audit logging: Update src/modules/health/health.routes.ts to add RBAC middleware requiring appropriate permissions ",
+  "scope": {
+    "affectedDomains": [
+      "health"
+    ],
+    "affectedLayers": [
+      "domain",
+      "infra"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/health/health.model.ts exists and exports the HealthCheck interface with id, timestamp, status, and optional responseTime fields.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/health/health.service.interface.ts exists and exports the IHealthService interface with a ping method returning Promise<string>.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "src/modules/health/index.ts exists and exports the HealthCheck interface and IHealthService interface.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "ARCHITECTURE.md is updated to include the new 'health' module and the HealthCheck entity lifecycle states (REQUESTED, PROCESSING, COMPLETED, FAILED).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "PostgreSQL schema for health_checks table is created with proper columns, constraints, and indices as specified in the detailed phase architecture.",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Audit records: All state-changing operations write an audit record.",
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "RBAC enforcement: All API endpoints enforce role-based access control.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled.",
+    "Modular monolith architecture: New health module must follow the established pattern.",
+    "TypeScript: All code must be written in TypeScript.",
+    "PostgreSQL: Database schema must be compatible with PostgreSQL."
+  ],
+  "outOfScope": [
+    "Implementation of HealthService (deferred to Phase 2)",
+    "Creation of controller (deferred to Phase 2)",
+    "Route registration and Fastify integration (deferred to Phase 3)",
+    "Input validation for query parameters (deferred to Phase 4)",
+    "RBAC enforcement and audit logging for endpoints (deferred to Phase 5)",
+    "Any functionality outside the health module creation",
+    "Changes to existing modules (employee, policy, balance, leave, notification)",
+    "Creation of actual /ping endpoint implementation"
+  ],
+  "ambiguities": []
+}
