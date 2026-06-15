@@ -93,9 +93,20 @@ jobs:
           fi
 
       - name: Lint
+        # TR_056-unblock — eslint@10.x (npx default) requires flat
+        # config (eslint.config.js). Projects on legacy .eslintrc.*
+        # break with "ESLint couldn't find an eslint.config file".
+        # Pin to eslint@8 (last release that honours legacy config)
+        # and skip the step entirely when no eslint config is
+        # present anywhere in the tree — matches the project's own
+        # `npm run lint` no-op contract.
         run: |
           if [ -f package.json ] || [ -f requirements.txt ] || [ -f pyproject.toml ] || [ -f go.mod ] || [ -f Cargo.toml ]; then
-            npx eslint src --max-warnings 0
+            if ls eslint.config.js eslint.config.mjs eslint.config.cjs .eslintrc.js .eslintrc.cjs .eslintrc.json .eslintrc.yml .eslintrc.yaml 2>/dev/null | grep -q .; then
+              npx eslint@8 src --max-warnings 0
+            else
+              echo "No eslint config in tree — skipping lint"
+            fi
           else
             echo "No project manifest found yet — skipping lint"
           fi
