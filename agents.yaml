@@ -72,16 +72,27 @@ agents:
     role: "Senior TypeScript engineer"
     goal: "Generate production-quality TypeScript code that follows the project harness"
     llm:
-      # TR_050 — switched off deepseek-ai/DeepSeek-V3.2 onto
-      # moonshotai/Kimi-K2.6 for code-agent specifically. DeepSeek
-      # reasons ABOUT Aider's SEARCH/REPLACE protocol but does
-      # not reliably EMIT the blocks — Aider's diff parser sees
-      # zero edits and exits with only metadata changes. Kimi is
-      # better at producing direct structured output and is
-      # already on DeepInfra. The aider-adapter prepends the
-      # `openai/` litellm prefix automatically (TR_050 fix), so
-      # no client-side change is needed.
-      model: moonshotai/Kimi-K2.6
+      # TR_050 — initially switched off deepseek-ai/DeepSeek-V3.2
+      # onto moonshotai/Kimi-K2.6 for code-agent because DeepSeek
+      # V3.2 reasoned ABOUT Aider's SEARCH/REPLACE protocol but
+      # did not reliably EMIT the blocks — Aider's diff parser
+      # saw zero edits and exited with only metadata changes.
+      #
+      # 2026-06-15 (TR_056-aider-diag) — switched off Kimi-K2.6
+      # onto deepseek-ai/DeepSeek-V4-Pro because Kimi-K2.6 on
+      # DeepInfra now drops chunked-transfer streams mid-response
+      # (litellm.APIConnectionError: peer closed connection
+      # without sending complete message body). Symptom on
+      # platform: code-agent exits 124 after the 15-min
+      # subprocess timeout (executeScript's MAX_SCRIPT_TIMEOUT_MS)
+      # while litellm retries the broken connection.
+      #
+      # V4-Pro is the new bet: improved instruction-following
+      # vs V3.2 means it should emit SEARCH/REPLACE blocks
+      # reliably. If V4-Pro also fails Aider's diff parser
+      # (same failure mode as V3.2), revert to Kimi and find a
+      # different mitigation for the streaming flake.
+      model: deepseek-ai/DeepSeek-V4-Pro
       temperature: 0.1
       max_tokens: 8000
       # No reasoning_effort — Aider drives its own reasoning loop;
