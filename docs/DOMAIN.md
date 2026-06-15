@@ -25,3 +25,15 @@ Represents notification data managed by the `notification` module, including not
 ## audit
 
 Represents audit data managed by the `audit` module, including audit records, change history, and activity tracking information.
+
+## HealthCheck
+
+Represents a health check record, including the timestamp of the check, the current status, and optional response time metrics.
+
+### Fields
+
+| Name | Type | Required |
+|------|------|----------|
+| timestamp | Date | Yes |
+| status | 'initiated' \| 'processing' \| 'completed' \| 'failed' | Yes |
+| responseTime | number | No |
