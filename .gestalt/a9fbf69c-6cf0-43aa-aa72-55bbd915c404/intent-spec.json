@@ -1,0 +1,66 @@
+{
+  "id": "274bd7fb-1f56-4f20-a246-75d5904dec98",
+  "correlationId": "a9fbf69c-6cf0-43aa-aa72-55bbd915c404",
+  "rawIntent": "[Feature: Add a /pid GET endpoint that returns the process pid as JSON {pid: number} — Phase 1: Create system module structure and service interface]\n\nCreate src/modules/system/system.module.ts, src/modules/system/system.service.ts, and src/modules/system/system.interface.ts. In system.interface.ts, define ISystemService interface with getProcessInfo(): Promise<ProcessInfo>. In system.service.ts, implement the interface stub. In system.module.ts, set up the module structure. Include Jest unit tests in tests/unit/modules/system/system.service.spec.ts.\n\nPhase architecture notes:\n{\"interfaces\":[\"File: src/modules/system/system.interface.ts\\nexport interface ProcessInfo {\\n  pid: number;\\n}\\n\\nexport interface ISystemService {\\n  getProcessInfo(): Promise<ProcessInfo>;\\n}\",\"File: src/modules/system/system.service.ts\\nimport { ProcessInfo, ISystemService } from './system.interface';\\n\\nexport class SystemService implements ISystemService {\\n  async getProcessInfo(): Promise<ProcessInfo> {\\n    return { pid: process.pid };\\n  }\\n}\",\"File: src/modules/system/system.module.ts\\nimport { FastifyPluginAsync } from 'fastify';\\nimport { SystemService } from './system.service';\\n\\nexport const systemModule: FastifyPluginAsync = async (fastify) => {\\n  const systemService = new SystemService();\\n  \\n  fastify.get('/pid', async (request, reply) => {\\n    const processInfo = await systemService.getProcessInfo();\\n    return processInfo;\\n  });\\n};\",\"File: src/modules/system/index.ts\\nexport { ISystemService } from './system.interface';\\nexport { SystemService } from './system.service';\\nexport { systemModule } from './system.module';\",\"File: tests/unit/modules/system/system.service.spec.ts\\nimport { describe, it, expect } from 'vitest';\\nimport { SystemService } from '../../../../src/modules/system/system.service';\\n\\ndescribe('SystemService', () => {\\n  const systemService = new SystemService();\\n\\n  describe('getProcessInfo', () => {\\n    it('should return process info with pid', async () => {\\n      const result = await systemService.getProcessInfo();\\n      \\n      expect(result).toHaveProperty('pid');\\n      expect(typeof result.pid).toBe('number');\\n      expect(result.pid).toBeGreaterThan(0);\\n    });\\n  });\\n});\"],\"importStatements\":[\"import { FastifyPluginAsync } from 'fastify';\",\"import { ProcessInfo, ISystemService } from './system.interface';\",\"import { SystemService } from './system.service';\",\"import { describe, it, expect } from 'vitest';\",\"import { SystemService } from '../../../../src/modules/system/system.service';\"],\"successCriteria\":[\"src/modules/system directory exists with system.interface.ts, system.service.ts, system.module.ts, and index.ts files\",\"src/modules/system/system.interface.ts exports ProcessInfo and ISystemService interfaces\",\"src/modules/system/system.service.ts implements ISystemService with getProcessInfo method returning ProcessInfo\",\"src/modules/system/system.module.ts defines Fastify plugin with GET /pid endpoint returning process info\",\"tests/unit/modules/system/system.service.spec.ts exists with Vitest tests verifying SystemService.getProcessInfo returns valid pid\",\"All TypeScript files compile without errors using TypeScript compiler\",\"Module follows established project structure patterns with no circular dependencies\"]}\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 2 — Implement SystemService with process ID retrieval: Update src/modules/system/system.service.ts to implement getProcessInfo() returning ProcessInfo with\n- Phase 3 — Create controller and route with validation: Create src/modules/system/system.controller.ts with getProcessInfo() method calling the service. Cre\n- Phase 4 — Add RBAC enforcement and audit logging: Update src/modules/system/system.controller.ts to add RBAC decorator requiring appropriate permissio",
+  "scope": {
+    "affectedDomains": [
+      "system"
+    ],
+    "affectedLayers": [
+      "domain",
+      "api",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/system directory exists with system.interface.ts, system.service.ts, system.module.ts, and index.ts files",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/system/system.interface.ts exports ProcessInfo and ISystemService interfaces",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "src/modules/system/system.service.ts implements ISystemService with getProcessInfo method returning ProcessInfo",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "src/modules/system/system.module.ts defines Fastify plugin with GET /pid endpoint returning process info",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "tests/unit/modules/system/system.service.spec.ts exists with Vitest tests verifying SystemService.getProcessInfo returns valid pid",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "RBAC enforcement: All API endpoints enforce role-based access control.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "Implementing the actual process ID retrieval logic in SystemService (Phase 2)",
+    "Creating a separate controller file (Phase 3)",
+    "Adding input validation for the /pid endpoint (Phase 3)",
+    "Adding RBAC enforcement for the /pid endpoint (Phase 4)",
+    "Adding audit logging for the /pid endpoint (Phase 4)",
+    "Any changes to existing modules (employee, policy, balance, leave, notification)",
+    "Any database access or repository creation for the system module"
+  ],
+  "ambiguities": []
+}
