@@ -1,0 +1,29 @@
+{
+  "correlationId": "bab915ae-7265-46e5-ae6c-2e332d482181",
+  "domainChanges": [
+    {
+      "entityName": "HealthCheck",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "timestamp",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "status",
+          "type": "HealthCheckStatus",
+          "required": true
+        },
+        {
+          "name": "responseTime",
+          "type": "number",
+          "required": false
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}
