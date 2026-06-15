@@ -25,3 +25,7 @@ Represents notification data managed by the `notification` module, including not
 ## audit
 
 Represents audit data managed by the `audit` module, including audit records, change history, and activity tracking information.
+
+## healthCheck
+
+Represents health check data managed by the `healthCheck` module, including health check records, status, and response time information.

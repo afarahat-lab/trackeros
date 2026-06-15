@@ -1,0 +1,34 @@
+{
+  "correlationId": "f1bb9393-5f0e-4611-89d5-8811b845e1f1",
+  "domainChanges": [
+    {
+      "entityName": "HealthCheck",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "timestamp",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "status",
+          "type": "'REQUESTED' | 'PROCESSING' | 'COMPLETED' | 'FAILED'",
+          "required": true
+        },
+        {
+          "name": "responseTime",
+          "type": "number",
+          "required": false
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}
