@@ -1514,3 +1514,439 @@
 +- BalanceServiceImpl.updateBalance calls ILeaveBalanceRepository.updateWithAtomicIncrement with balanceId and usedDaysDelta, ensuring atomic increment/decrement of usedDays and remainingDays in a single database transaction
 +- All database operations follow GP-001 Repository pattern through injected repository interfaces
 +- All state-changing operations (updateBalance) will trigger audit logging
+
+# 2026-06-16 13:29:49.190576
++## Task
++[Feature: Build the leave management module — Phase 1: Create leave domain models and repository]
++
++Create src/modules/leave/leave.model.ts with TypeScript interfaces for LeaveRequest and CreateLeaveRequestDto using all canonical attributes from the architecture spec. Create src/modules/leave/leave.repository.ts implementing ILeaveRepository interface with methods for CRUD operations referencing the model types. Include Jest unit tests in tests/unit/modules/leave/leave.repository.test.ts. This phase establishes the core domain entity and its persistence contract.
++
++Phase architecture notes:
++Core domain model and repository pattern implementation (GP-001)
++
++Detailed phase architecture (architecture-agent):
++{"interfaces":["File: src/modules/leave/leave.model.ts\nexport interface LeaveRequest {\n  id: string;\n  employeeId: string;\n  policyId: string;\n  startDate: Date;\n  endDate: Date;\n  totalDays: number;\n  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';\n  reason?: string;\n  managerId?: string;\n  approvedAt?: Date;\n  rejectedAt?: Date;\n  rejectionReason?: string;\n  createdAt: Date;\n  updatedAt: Date;\n}\n\nexport interface CreateLeaveRequestDto {\n  employeeId: string;\n  policyId: string;\n  startDate: Date;\n  endDate: Date;\n  totalDays: number;\n  reason?: string;\n}\n\nexport interface LeavePolicy {\n  id: string;\n  policyName: string;\n  leaveType: 'ANNUAL' | 'SICK' | 'EMERGENCY' | 'UNPAID';\n  entitlementDays: number;\n  accrualRate?: number;\n  maxCarryover?: number;\n  requiresApproval: boolean;\n  isActive: boolean;\n  createdAt: Date;\n  updatedAt: Date;\n}\n\nexport interface LeaveBalance {\n  id: string;\n  employeeId: string;\n  policyId: string;\n  balanceDays: number;\n  fiscalYear: number;\n  createdAt: Date;\n  updatedAt: Date;\n}\n\nexport interface Employee {\n  id: string;\n  employeeNumber: string;\n  firstName: string;\n  lastName: string;\n  email: string;\n  managerId?: string;\n  hireDate: Date;\n  terminationDate?: Date;\n  isActive: boolean;\n  createdAt: Date;\n  updatedAt: Date;\n}\n\nexport interface AuditLog {\n  id: string;\n  entityType: string;\n  entityId: string;\n  action: 'CREATE' | 'UPDATE' | 'DELETE' | 'APPROVE' | 'REJECT';\n  oldValues?: Record<string, any>;\n  newValues?: Record<string, any>;\n  performedBy?: string;\n  performedAt: Date;\n}","File: src/modules/leave/leave.repository.ts\nimport { LeaveRequest, CreateLeaveRequestDto } from './leave.model';\n\nexport interface ILeaveRepository {\n  create(request: CreateLeaveRequestDto): Promise<LeaveRequest>;\n  findById(id: string): Promise<LeaveRequest | null>;\n  findByEmployeeId(employeeId: string): Promise<LeaveRequest[]>;\n  updateStatus(id: string, status: LeaveRequest['status'], managerId?: string, rejectionReason?: string): Promise<LeaveRequest>;\n}\n\nexport class LeaveRepository implements ILeaveRepository {\n  constructor(private readonly db: any) {}\n\n  async create(request: CreateLeaveRequestDto): Promise<LeaveRequest> {\n    // Implementation will be added in phase 2\n    throw new Error('Not implemented');\n  }\n\n  async findById(id: string): Promise<LeaveRequest | null> {\n    // Implementation will be added in phase 2\n    throw new Error('Not implemented');\n  }\n\n  async findByEmployeeId(employeeId: string): Promise<LeaveRequest[]> {\n    // Implementation will be added in phase 2\n    throw new Error('Not implemented');\n  }\n\n  async updateStatus(id: string, status: LeaveRequest['status'], managerId?: string, rejectionReason?: string): Promise<LeaveRequest> {\n    // Implementation will be added in phase 2\n    throw new Error('Not implemented');\n  }\n}","File: src/modules/leave/policy.repository.ts\nimport { LeavePolicy } from './leave.model';\n\nexport interface ILeavePolicyRepository {\n  findById(id: string): Promise<LeavePolicy | null>;\n  findByLeaveType(leaveType: LeavePolicy['leaveType']): Promise<LeavePolicy[]>;\n  findActivePolicies(): Promise<LeavePolicy[]>;\n}\n\nexport class LeavePolicyRepository implements ILeavePolicyRepository {\n  constructor(private readonly db: any) {}\n\n  async findById(id: string): Promise<LeavePolicy | null> {\n    // Implementation will be added in phase 2\n    throw new Error('Not implemented');\n  }\n\n  async findByLeaveType(leaveType: LeavePolicy['leaveType']): Promise<LeavePolicy[]> {\n    // Implementation will be added in phase 2\n    throw new Error('Not implemented');\n  }\n\n  async findActivePolicies(): Promise<LeavePolicy[]> {\n    // Implementation will be added in phase 2\n    throw new Error('Not implemented');\n  }\n}","File: src/modules/leave/balance.repository.ts\nimport { LeaveBalance } from './leave.model';\n\nexport interface ILeaveBalanceRepository {\n  findByEmployeeAndPolicy(employeeId: string, policyId: string, fiscalYear: number): Promise<LeaveBalance | null>;\n}\n\nexport class LeaveBalanceRepository implements ILeaveBalanceRepository {\n  constructor(private readonly db: any) {}\n\n  async findByEmployeeAndPolicy(employeeId: string, policyId: string, fiscalYear: number): Promise<LeaveBalance | null> {\n    // Implementation will be added in phase 2\n    throw new Error('Not implemented');\n  }\n}"],"importStatements":["import { LeaveRequest, CreateLeaveRequestDto } from './leave.model'","import { LeavePolicy } from './leave.model'","import { LeaveBalance } from './leave.model'"],"successCriteria":["src/modules/leave/leave.model.ts exists and exports LeaveRequest, CreateLeaveRequestDto, LeavePolicy, LeaveBalance, Employee, and AuditLog interfaces","src/modules/leave/leave.repository.ts exists and exports ILeaveRepository interface and LeaveRepository class implementing it","src/modules/leave/policy.repository.ts exists and exports ILeavePolicyRepository interface and LeavePolicyRepository class implementing it","src/modules/leave/balance.repository.ts exists and exports ILeaveBalanceRepository interface and LeaveBalanceRepository class implementing it","All repository interfaces have concrete implementations (even if methods throw 'Not implemented')","All TypeScript interfaces match the canonical SQL schema column definitions exactly","ARCHITECTURE.md is updated to include the new leave module structure with repository interfaces"]}
++
++## Deferred to later phases
++The following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:
++- Phase 2 — Create leave balance domain models and repository: Create src/modules/balance/balance.model.ts with TypeScript interfaces for LeaveBalance and UpdateLe
++- Phase 3 — Create employee domain models and repository: Create src/modules/employee/employee.model.ts with TypeScript interfaces for Employee and CreateEmpl
++- Phase 4 — Create leave policy domain models and repository: Create src/modules/policy/policy.model.ts with TypeScript interfaces for LeavePolicy and CreateLeave
++- Phase 5 — Create leave service interface and implementation: Create src/modules/leave/leave.service.interface.ts with ILeaveService interface defining method sig
++- Phase 6 — Add validation schemas to leave service: Create src/modules/leave/leave.validation.ts with Zod schemas for CreateLeaveRequestDto and UpdateLe
++- Phase 7 — Add audit logging to leave service: Create src/shared/audit/audit.logger.ts interface and implementation. Update src/modules/leave/leave
++- Phase 8 — Implement RBAC enforcement in leave service: Create src/shared/auth/rbac.ts with role definitions and permission checks. Update src/modules/leave
++- Phase 9 — Add comprehensive error handling and logging: Create src/shared/errors/leave.errors.ts with domain-specific error classes. Update src/modules/leav
++- Phase 10 — Create leave controller and API routes: Create src/modules/leave/leave.controller.ts with Fastify controller implementing REST endpoints for
++
++## Success criteria
++- src/modules/leave/leave.model.ts exists and exports LeaveRequest, CreateLeaveRequestDto, LeavePolicy, LeaveBalance, Employee, and AuditLog interfaces
++- src/modules/leave/leave.repository.ts exists and exports ILeaveRepository interface and LeaveRepository class implementing it
++- src/modules/leave/policy.repository.ts exists and exports ILeavePolicyRepository interface and LeavePolicyRepository class implementing it
++- src/modules/leave/balance.repository.ts exists and exports ILeaveBalanceRepository interface and LeaveBalanceRepository class implementing it
++- All repository interfaces have concrete implementations (even if methods throw 'Not implemented')
++- All TypeScript interfaces match the canonical SQL schema column definitions exactly
++- ARCHITECTURE.md is updated to include the new leave module structure with repository interfaces
++- Jest unit tests exist in tests/unit/modules/leave/leave.repository.test.ts
++
++## Out of scope (do NOT touch these)
++- Database implementation of repository methods (deferred to phase 2)
++- Leave balance domain models and repository in src/modules/balance/ (deferred to phase 2)
++- Employee domain models and repository in src/modules/employee/ (deferred to phase 3)
++- Leave policy domain models and repository in src/modules/policy/ (deferred to phase 4)
++- Leave service interface and implementation (deferred to phase 5)
++- Validation schemas (deferred to phase 6)
++- Audit logging implementation (deferred to phase 7)
++- RBAC enforcement (deferred to phase 8)
++- Comprehensive error handling and logging (deferred to phase 9)
++- Leave controller and API routes (deferred to phase 10)
++- Actual database queries or ORM integration
++- Business logic beyond interface definitions
++- API endpoints or controllers
++- Authentication or authorization logic
++- Input validation beyond TypeScript interfaces
++- Audit record creation
++- Balance deduction logic
++- Notification creation logic
++
++## Project rules
++- Generated code must compile without errors. Verify with executeScript before returning.
++- All imports must resolve to files that exist in the project or are declared in package.json.
++- You MUST run a compile/lint check via executeScript before emitting the final files. This is not optional.
++- Do not use require() for JSON imports — import them using ES module syntax with resolveJsonModule enabled in tsconfig.
++- Before generating any repository, service, or controller code, read the DTO and interface files it will use. Never reference a field on a type without confirming it exists in the type definition.
++- Before generating code that calls methods on a dependency, read the dependency's source file to confirm which methods exist. Only call methods that are actually defined.
++- Read the project's compiler/linter configuration file (tsconfig.json, mypy.ini, pyproject.toml, .eslintrc etc) before generating code. Follow the strictness settings it defines — do not assume permissive defaults.
++- Read the project's dependency manifest (package.json, requirements.txt, go.mod, pom.xml etc) before importing external packages. Only import packages that are listed as dependencies.
++
++## Scoped architecture for this phase
++The following describes ONLY what exists now and what you
++are building in this phase. Use these exact file paths,
++exact export names, and exact import statements. Do not
++invent paths or imports — if it is not listed here, it
++does not exist.
++
++### Existing dependencies — use these exact imports
++
++import { LeaveRequest, CreateLeaveRequestDto } from './leave.model'
++import { LeavePolicy } from './leave.model'
++import { LeaveBalance } from './leave.model'
++
++### Interfaces / types this phase implements
++
++File: src/modules/leave/leave.model.ts
++export interface LeaveRequest {
++  id: string;
++  employeeId: string;
++  policyId: string;
++  startDate: Date;
++  endDate: Date;
++  totalDays: number;
++  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
++  reason?: string;
++  managerId?: string;
++  approvedAt?: Date;
++  rejectedAt?: Date;
++  rejectionReason?: string;
++  createdAt: Date;
++  updatedAt: Date;
++}
++
++export interface CreateLeaveRequestDto {
++  employeeId: string;
++  policyId: string;
++  startDate: Date;
++  endDate: Date;
++  totalDays: number;
++  reason?: string;
++}
++
++export interface LeavePolicy {
++  id: string;
++  policyName: string;
++  leaveType: 'ANNUAL' | 'SICK' | 'EMERGENCY' | 'UNPAID';
++  entitlementDays: number;
++  accrualRate?: number;
++  maxCarryover?: number;
++  requiresApproval: boolean;
++  isActive: boolean;
++  createdAt: Date;
++  updatedAt: Date;
++}
++
++export interface LeaveBalance {
++  id: string;
++  employeeId: string;
++  policyId: string;
++  balanceDays: number;
++  fiscalYear: number;
++  createdAt: Date;
++  updatedAt: Date;
++}
++
++export interface Employee {
++  id: string;
++  employeeNumber: string;
++  firstName: string;
++  lastName: string;
++  email: string;
++  managerId?: string;
++  hireDate: Date;
++  terminationDate?: Date;
++  isActive: boolean;
++  createdAt: Date;
++  updatedAt: Date;
++}
++
++export interface AuditLog {
++  id: string;
++  entityType: string;
++  entityId: string;
++  action: 'CREATE' | 'UPDATE' | 'DELETE' | 'APPROVE' | 'REJECT';
++  oldValues?: Record<string, any>;
++  newValues?: Record<string, any>;
++  performedBy?: string;
++  performedAt: Date;
++}
++
++File: src/modules/leave/leave.repository.ts
++import { LeaveRequest, CreateLeaveRequestDto } from './leave.model';
++
++export interface ILeaveRepository {
++  create(request: CreateLeaveRequestDto): Promise<LeaveRequest>;
++  findById(id: string): Promise<LeaveRequest | null>;
++  findByEmployeeId(employeeId: string): Promise<LeaveRequest[]>;
++  updateStatus(id: string, status: LeaveRequest['status'], managerId?: string, rejectionReason?: string): Promise<LeaveRequest>;
++}
++
++export class LeaveRepository implements ILeaveRepository {
++  constructor(private readonly db: any) {}
++
++  async create(request: CreateLeaveRequestDto): Promise<LeaveRequest> {
++    // Implementation will be added in phase 2
++    throw new Error('Not implemented');
++  }
++
++  async findById(id: string): Promise<LeaveRequest | null> {
++    // Implementation will be added in phase 2
++    throw new Error('Not implemented');
++  }
++
++  async findByEmployeeId(employeeId: string): Promise<LeaveRequest[]> {
++    // Implementation will be added in phase 2
++    throw new Error('Not implemented');
++  }
++
++  async updateStatus(id: string, status: LeaveRequest['status'], managerId?: string, rejectionReason?: string): Promise<LeaveRequest> {
++    // Implementation will be added in phase 2
++    throw new Error('Not implemented');
++  }
++}
++
++File: src/modules/leave/policy.repository.ts
++import { LeavePolicy } from './leave.model';
++
++export interface ILeavePolicyRepository {
++  findById(id: string): Promise<LeavePolicy | null>;
++  findByLeaveType(leaveType: LeavePolicy['leaveType']): Promise<LeavePolicy[]>;
++  findActivePolicies(): Promise<LeavePolicy[]>;
++}
++
++export class LeavePolicyRepository implements ILeavePolicyRepository {
++  constructor(private readonly db: any) {}
++
++  async findById(id: string): Promise<LeavePolicy | null> {
++    // Implementation will be added in phase 2
++    throw new Error('Not implemented');
++  }
++
++  async findByLeaveType(leaveType: LeavePolicy['leaveType']): Promise<LeavePolicy[]> {
++    // Implementation will be added in phase 2
++    throw new Error('Not implemented');
++  }
++
++  async findActivePolicies(): Promise<LeavePolicy[]> {
++    // Implementation will be added in phase 2
++    throw new Error('Not implemented');
++  }
++}
++
++File:
+
+# 2026-06-16 13:29:49.190771
++## Task
++[Feature: Build the leave management module — Phase 1: Create leave domain models and repository]
++
++Create src/modules/leave/leave.model.ts with TypeScript interfaces for LeaveRequest and CreateLeaveRequestDto using all canonical attributes from the architecture spec. Create src/modules/leave/leave.repository.ts implementing ILeaveRepository interface with methods for CRUD operations referencing the model types. Include Jest unit tests in tests/unit/modules/leave/leave.repository.test.ts. This phase establishes the core domain entity and its persistence contract.
++
++Phase architecture notes:
++Core domain model and repository pattern implementation (GP-001)
++
++Detailed phase architecture (architecture-agent):
++{"interfaces":["File: src/modules/leave/leave.model.ts\nexport interface LeaveRequest {\n  id: string;\n  employeeId: string;\n  policyId: string;\n  startDate: Date;\n  endDate: Date;\n  totalDays: number;\n  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';\n  reason?: string;\n  managerId?: string;\n  approvedAt?: Date;\n  rejectedAt?: Date;\n  rejectionReason?: string;\n  createdAt: Date;\n  updatedAt: Date;\n}\n\nexport interface CreateLeaveRequestDto {\n  employeeId: string;\n  policyId: string;\n  startDate: Date;\n  endDate: Date;\n  totalDays: number;\n  reason?: string;\n}\n\nexport interface LeavePolicy {\n  id: string;\n  policyName: string;\n  leaveType: 'ANNUAL' | 'SICK' | 'EMERGENCY' | 'UNPAID';\n  entitlementDays: number;\n  accrualRate?: number;\n  maxCarryover?: number;\n  requiresApproval: boolean;\n  isActive: boolean;\n  createdAt: Date;\n  updatedAt: Date;\n}\n\nexport interface LeaveBalance {\n  id: string;\n  employeeId: string;\n  policyId: string;\n  balanceDays: number;\n  fiscalYear: number;\n  createdAt: Date;\n  updatedAt: Date;\n}\n\nexport interface Employee {\n  id: string;\n  employeeNumber: string;\n  firstName: string;\n  lastName: string;\n  email: string;\n  managerId?: string;\n  hireDate: Date;\n  terminationDate?: Date;\n  isActive: boolean;\n  createdAt: Date;\n  updatedAt: Date;\n}\n\nexport interface AuditLog {\n  id: string;\n  entityType: string;\n  entityId: string;\n  action: 'CREATE' | 'UPDATE' | 'DELETE' | 'APPROVE' | 'REJECT';\n  oldValues?: Record<string, any>;\n  newValues?: Record<string, any>;\n  performedBy?: string;\n  performedAt: Date;\n}","File: src/modules/leave/leave.repository.ts\nimport { LeaveRequest, CreateLeaveRequestDto } from './leave.model';\n\nexport interface ILeaveRepository {\n  create(request: CreateLeaveRequestDto): Promise<LeaveRequest>;\n  findById(id: string): Promise<LeaveRequest | null>;\n  findByEmployeeId(employeeId: string): Promise<LeaveRequest[]>;\n  updateStatus(id: string, status: LeaveRequest['status'], managerId?: string, rejectionReason?: string): Promise<LeaveRequest>;\n}\n\nexport class LeaveRepository implements ILeaveRepository {\n  constructor(private readonly db: any) {}\n\n  async create(request: CreateLeaveRequestDto): Promise<LeaveRequest> {\n    // Implementation will be added in phase 2\n    throw new Error('Not implemented');\n  }\n\n  async findById(id: string): Promise<LeaveRequest | null> {\n    // Implementation will be added in phase 2\n    throw new Error('Not implemented');\n  }\n\n  async findByEmployeeId(employeeId: string): Promise<LeaveRequest[]> {\n    // Implementation will be added in phase 2\n    throw new Error('Not implemented');\n  }\n\n  async updateStatus(id: string, status: LeaveRequest['status'], managerId?: string, rejectionReason?: string): Promise<LeaveRequest> {\n    // Implementation will be added in phase 2\n    throw new Error('Not implemented');\n  }\n}","File: src/modules/leave/policy.repository.ts\nimport { LeavePolicy } from './leave.model';\n\nexport interface ILeavePolicyRepository {\n  findById(id: string): Promise<LeavePolicy | null>;\n  findByLeaveType(leaveType: LeavePolicy['leaveType']): Promise<LeavePolicy[]>;\n  findActivePolicies(): Promise<LeavePolicy[]>;\n}\n\nexport class LeavePolicyRepository implements ILeavePolicyRepository {\n  constructor(private readonly db: any) {}\n\n  async findById(id: string): Promise<LeavePolicy | null> {\n    // Implementation will be added in phase 2\n    throw new Error('Not implemented');\n  }\n\n  async findByLeaveType(leaveType: LeavePolicy['leaveType']): Promise<LeavePolicy[]> {\n    // Implementation will be added in phase 2\n    throw new Error('Not implemented');\n  }\n\n  async findActivePolicies(): Promise<LeavePolicy[]> {\n    // Implementation will be added in phase 2\n    throw new Error('Not implemented');\n  }\n}","File: src/modules/leave/balance.repository.ts\nimport { LeaveBalance } from './leave.model';\n\nexport interface ILeaveBalanceRepository {\n  findByEmployeeAndPolicy(employeeId: string, policyId: string, fiscalYear: number): Promise<LeaveBalance | null>;\n}\n\nexport class LeaveBalanceRepository implements ILeaveBalanceRepository {\n  constructor(private readonly db: any) {}\n\n  async findByEmployeeAndPolicy(employeeId: string, policyId: string, fiscalYear: number): Promise<LeaveBalance | null> {\n    // Implementation will be added in phase 2\n    throw new Error('Not implemented');\n  }\n}"],"importStatements":["import { LeaveRequest, CreateLeaveRequestDto } from './leave.model'","import { LeavePolicy } from './leave.model'","import { LeaveBalance } from './leave.model'"],"successCriteria":["src/modules/leave/leave.model.ts exists and exports LeaveRequest, CreateLeaveRequestDto, LeavePolicy, LeaveBalance, Employee, and AuditLog interfaces","src/modules/leave/leave.repository.ts exists and exports ILeaveRepository interface and LeaveRepository class implementing it","src/modules/leave/policy.repository.ts exists and exports ILeavePolicyRepository interface and LeavePolicyRepository class implementing it","src/modules/leave/balance.repository.ts exists and exports ILeaveBalanceRepository interface and LeaveBalanceRepository class implementing it","All repository interfaces have concrete implementations (even if methods throw 'Not implemented')","All TypeScript interfaces match the canonical SQL schema column definitions exactly","ARCHITECTURE.md is updated to include the new leave module structure with repository interfaces"]}
++
++## Deferred to later phases
++The following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:
++- Phase 2 — Create leave balance domain models and repository: Create src/modules/balance/balance.model.ts with TypeScript interfaces for LeaveBalance and UpdateLe
++- Phase 3 — Create employee domain models and repository: Create src/modules/employee/employee.model.ts with TypeScript interfaces for Employee and CreateEmpl
++- Phase 4 — Create leave policy domain models and repository: Create src/modules/policy/policy.model.ts with TypeScript interfaces for LeavePolicy and CreateLeave
++- Phase 5 — Create leave service interface and implementation: Create src/modules/leave/leave.service.interface.ts with ILeaveService interface defining method sig
++- Phase 6 — Add validation schemas to leave service: Create src/modules/leave/leave.validation.ts with Zod schemas for CreateLeaveRequestDto and UpdateLe
++- Phase 7 — Add audit logging to leave service: Create src/shared/audit/audit.logger.ts interface and implementation. Update src/modules/leave/leave
++- Phase 8 — Implement RBAC enforcement in leave service: Create src/shared/auth/rbac.ts with role definitions and permission checks. Update src/modules/leave
++- Phase 9 — Add comprehensive error handling and logging: Create src/shared/errors/leave.errors.ts with domain-specific error classes. Update src/modules/leav
++- Phase 10 — Create leave controller and API routes: Create src/modules/leave/leave.controller.ts with Fastify controller implementing REST endpoints for
++
++## Success criteria
++- src/modules/leave/leave.model.ts exists and exports LeaveRequest, CreateLeaveRequestDto, LeavePolicy, LeaveBalance, Employee, and AuditLog interfaces
++- src/modules/leave/leave.repository.ts exists and exports ILeaveRepository interface and LeaveRepository class implementing it
++- src/modules/leave/policy.repository.ts exists and exports ILeavePolicyRepository interface and LeavePolicyRepository class implementing it
++- src/modules/leave/balance.repository.ts exists and exports ILeaveBalanceRepository interface and LeaveBalanceRepository class implementing it
++- All repository interfaces have concrete implementations (even if methods throw 'Not implemented')
++- All TypeScript interfaces match the canonical SQL schema column definitions exactly
++- ARCHITECTURE.md is updated to include the new leave module structure with repository interfaces
++- Jest unit tests exist in tests/unit/modules/leave/leave.repository.test.ts
++
++## Out of scope (do NOT touch these)
++- Database implementation of repository methods (deferred to phase 2)
++- Leave balance domain models and repository in src/modules/balance/ (deferred to phase 2)
++- Employee domain models and repository in src/modules/employee/ (deferred to phase 3)
++- Leave policy domain models and repository in src/modules/policy/ (deferred to phase 4)
++- Leave service interface and implementation (deferred to phase 5)
++- Validation schemas (deferred to phase 6)
++- Audit logging implementation (deferred to phase 7)
++- RBAC enforcement (deferred to phase 8)
++- Comprehensive error handling and logging (deferred to phase 9)
++- Leave controller and API routes (deferred to phase 10)
++- Actual database queries or ORM integration
++- Business logic beyond interface definitions
++- API endpoints or controllers
++- Authentication or authorization logic
++- Input validation beyond TypeScript interfaces
++- Audit record creation
++- Balance deduction logic
++- Notification creation logic
++
++## Project rules
++- Generated code must compile without errors. Verify with executeScript before returning.
++- All imports must resolve to files that exist in the project or are declared in package.json.
++- You MUST run a compile/lint check via executeScript before emitting the final files. This is not optional.
++- Do not use require() for JSON imports — import them using ES module syntax with resolveJsonModule enabled in tsconfig.
++- Before generating any repository, service, or controller code, read the DTO and interface files it will use. Never reference a field on a type without confirming it exists in the type definition.
++- Before generating code that calls methods on a dependency, read the dependency's source file to confirm which methods exist. Only call methods that are actually defined.
++- Read the project's compiler/linter configuration file (tsconfig.json, mypy.ini, pyproject.toml, .eslintrc etc) before generating code. Follow the strictness settings it defines — do not assume permissive defaults.
++- Read the project's dependency manifest (package.json, requirements.txt, go.mod, pom.xml etc) before importing external packages. Only import packages that are listed as dependencies.
++
++## Scoped architecture for this phase
++The following describes ONLY what exists now and what you
++are building in this phase. Use these exact file paths,
++exact export names, and exact import statements. Do not
++invent paths or imports — if it is not listed here, it
++does not exist.
++
++### Existing dependencies — use these exact imports
++
++import { LeaveRequest, CreateLeaveRequestDto } from './leave.model'
++import { LeavePolicy } from './leave.model'
++import { LeaveBalance } from './leave.model'
++
++### Interfaces / types this phase implements
++
++File: src/modules/leave/leave.model.ts
++export interface LeaveRequest {
++  id: string;
++  employeeId: string;
++  policyId: string;
++  startDate: Date;
++  endDate: Date;
++  totalDays: number;
++  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
++  reason?: string;
++  managerId?: string;
++  approvedAt?: Date;
++  rejectedAt?: Date;
++  rejectionReason?: string;
++  createdAt: Date;
++  updatedAt: Date;
++}
++
++export interface CreateLeaveRequestDto {
++  employeeId: string;
++  policyId: string;
++  startDate: Date;
++  endDate: Date;
++  totalDays: number;
++  reason?: string;
++}
++
++export interface LeavePolicy {
++  id: string;
++  policyName: string;
++  leaveType: 'ANNUAL' | 'SICK' | 'EMERGENCY' | 'UNPAID';
++  entitlementDays: number;
++  accrualRate?: number;
++  maxCarryover?: number;
++  requiresApproval: boolean;
++  isActive: boolean;
++  createdAt: Date;
++  updatedAt: Date;
++}
++
++export interface LeaveBalance {
++  id: string;
++  employeeId: string;
++  policyId: string;
++  balanceDays: number;
++  fiscalYear: number;
++  createdAt: Date;
++  updatedAt: Date;
++}
++
++export interface Employee {
++  id: string;
++  employeeNumber: string;
++  firstName: string;
++  lastName: string;
++  email: string;
++  managerId?: string;
++  hireDate: Date;
++  terminationDate?: Date;
++  isActive: boolean;
++  createdAt: Date;
++  updatedAt: Date;
++}
++
++export interface AuditLog {
++  id: string;
++  entityType: string;
++  entityId: string;
++  action: 'CREATE' | 'UPDATE' | 'DELETE' | 'APPROVE' | 'REJECT';
++  oldValues?: Record<string, any>;
++  newValues?: Record<string, any>;
++  performedBy?: string;
++  performedAt: Date;
++}
++
++File: src/modules/leave/leave.repository.ts
++import { LeaveRequest, CreateLeaveRequestDto } from './leave.model';
++
++export interface ILeaveRepository {
++  create(request: CreateLeaveRequestDto): Promise<LeaveRequest>;
++  findById(id: string): Promise<LeaveRequest | null>;
++  findByEmployeeId(employeeId: string): Promise<LeaveRequest[]>;
++  updateStatus(id: string, status: LeaveRequest['status'], managerId?: string, rejectionReason?: string): Promise<LeaveRequest>;
++}
++
++export class LeaveRepository implements ILeaveRepository {
++  constructor(private readonly db: any) {}
++
++  async create(request: CreateLeaveRequestDto): Promise<LeaveRequest> {
++    // Implementation will be added in phase 2
++    throw new Error('Not implemented');
++  }
++
++  async findById(id: string): Promise<LeaveRequest | null> {
++    // Implementation will be added in phase 2
++    throw new Error('Not implemented');
++  }
++
++  async findByEmployeeId(employeeId: string): Promise<LeaveRequest[]> {
++    // Implementation will be added in phase 2
++    throw new Error('Not implemented');
++  }
++
++  async updateStatus(id: string, status: LeaveRequest['status'], managerId?: string, rejectionReason?: string): Promise<LeaveRequest> {
++    // Implementation will be added in phase 2
++    throw new Error('Not implemented');
++  }
++}
++
++File: src/modules/leave/policy.repository.ts
++import { LeavePolicy } from './leave.model';
++
++export interface ILeavePolicyRepository {
++  findById(id: string): Promise<LeavePolicy | null>;
++  findByLeaveType(leaveType: LeavePolicy['leaveType']): Promise<LeavePolicy[]>;
++  findActivePolicies(): Promise<LeavePolicy[]>;
++}
++
++export class LeavePolicyRepository implements ILeavePolicyRepository {
++  constructor(private readonly db: any) {}
++
++  async findById(id: string): Promise<LeavePolicy | null> {
++    // Implementation will be added in phase 2
++    throw new Error('Not implemented');
++  }
++
++  async findByLeaveType(leaveType: LeavePolicy['leaveType']): Promise<LeavePolicy[]> {
++    // Implementation will be added in phase 2
++    throw new Error('Not implemented');
++  }
++
++  async findActivePolicies(): Promise<LeavePolicy[]> {
++    // Implementation will be added in phase 2
++    throw new Error('Not implemented');
++  }
++}
++
++File:

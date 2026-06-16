@@ -12,34 +12,33 @@ Represents a leave record managed by the `leave` module, including leave request
 |-------|------|----------|
 | id | string | true |
 | employeeId | string | true |
-| leaveType | string | true |
+| policyId | string | true |
 | startDate | Date | true |
 | endDate | Date | true |
-| durationDays | number | true |
-| reason | string | true |
-| status | 'DRAFT' \| 'SUBMITTED' \| 'PENDING_APPROVAL' \| 'APPROVED' \| 'REJECTED' \| 'CANCELLED' | true |
-| managerId | string | true |
-| submittedAt | Date \| null | false |
-| decidedAt | Date \| null | false |
-| decisionNotes | string \| null | false |
+| totalDays | number | true |
+| status | 'PENDING' \| 'APPROVED' \| 'REJECTED' \| 'CANCELLED' | true |
+| reason | string \| null | false |
+| managerId | string \| null | false |
+| approvedAt | Date \| null | false |
+| rejectedAt | Date \| null | false |
+| rejectionReason | string \| null | false |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
 **Relationships**
 - `Employee` — many-to-one
 - `LeavePolicy` — many-to-one
-- `LeaveBalance` — many-to-one
 
 ### CreateLeaveRequestDto
 
 | Field | Type | Required |
 |-------|------|----------|
 | employeeId | string | true |
-| leaveType | string | true |
+| policyId | string | true |
 | startDate | Date | true |
 | endDate | Date | true |
-| reason | string | true |
-| managerId | string | true |
+| totalDays | number | true |
+| reason | string \| null | false |
 
 ## balance
 
@@ -51,12 +50,9 @@ Represents leave balance data managed by the `balance` module, including tracked
 |-------|------|----------|
 | id | string | true |
 | employeeId | string | true |
-| leaveType | string | true |
-| entitlementDays | number | true |
-| usedDays | number | true |
-| remainingDays | number | true |
+| policyId | string | true |
+| balanceDays | number | true |
 | fiscalYear | number | true |
-| status | 'ACTIVE' \| 'ARCHIVED' | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
@@ -73,12 +69,14 @@ Represents employee data managed by the `employee` module, including employee re
 | Field | Type | Required |
 |-------|------|----------|
 | id | string | true |
-| name | string | true |
+| employeeNumber | string | true |
+| firstName | string | true |
+| lastName | string | true |
 | email | string | true |
-| department | string | true |
 | managerId | string \| null | false |
 | hireDate | Date | true |
-| employmentStatus | 'ACTIVE' \| 'INACTIVE' \| 'TERMINATED' | true |
+| terminationDate | Date \| null | false |
+| isActive | boolean | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
@@ -94,16 +92,13 @@ Represents leave policy data managed by the `policy` module, including policy de
 | Field | Type | Required |
 |-------|------|----------|
 | id | string | true |
-| leaveType | string | true |
-| entitlementRules | Record<string, any> | true |
-| accrualFrequency | string | true |
-| carryOverLimit | number | true |
-| advanceNoticeDays | number | true |
-| maxConsecutiveDays | number | true |
-| requiresManagerApproval | boolean | true |
-| validFrom | Date | true |
-| validTo | Date | true |
-| status | 'DRAFT' \| 'ACTIVE' \| 'EXPIRED' | true |
+| policyName | string | true |
+| leaveType | 'ANNUAL' \| 'SICK' \| 'EMERGENCY' \| 'UNPAID' | true |
+| entitlementDays | number | true |
+| accrualRate | number \| null | false |
+| maxCarryover | number \| null | false |
+| requiresApproval | boolean | true |
+| isActive | boolean | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
@@ -132,3 +127,16 @@ Represents notification data managed by the `notification` module, including not
 ## audit
 
 Represents audit data managed by the `audit` module, including audit records, change history, and activity tracking information.
+
+### AuditLog
+
+| Field | Type | Required |
+|-------|------|----------|
+| id | string | true |
+| entityType | string | true |
+| entityId | string | true |
+| action | 'CREATE' \| 'UPDATE' \| 'DELETE' \| 'APPROVE' \| 'REJECT' | true |
+| oldValues | Record<string, any> \| null | false |
+| newValues | Record<string, any> \| null | false |
+| performedBy | string \| null | false |
+| performedAt | Date | true |
