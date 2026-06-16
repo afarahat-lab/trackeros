@@ -2,6 +2,18 @@
 
 To be populated as the design-agent and context-agent learn the domain.
 
+## base
+
+Base entity providing common fields for domain models.
+
+### BaseEntity
+
+| Field | Type | Required |
+|-------|------|----------|
+| id | string | true |
+| createdAt | Date | true |
+| updatedAt | Date | true |
+
 ## leave
 
 Represents a leave record managed by the `leave` module, including leave requests and related leave-tracking data.
@@ -156,3 +168,16 @@ Represents audit data managed by the `audit` module, including audit records, ch
 | newValues | Record<string, any> \| null | false |
 | performedBy | string \| null | false |
 | performedAt | Date | true |
+
+### AuditRecord
+
+| Field | Type | Required |
+|-------|------|----------|
+| entityType | string | true |
+| entityId | string | true |
+| action | string | true |
+| changedBy | string \| null | true |
+| oldValues | Record<string, any> \| null | true |
+| newValues | Record<string, any> \| null | true |
+| ipAddress | string \| null | true |
+| userAgent | string \| null | true |
