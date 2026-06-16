@@ -1,0 +1,107 @@
+{
+  "id": "9436b50e-01e7-4cb6-b0b2-61229d3f59a6",
+  "correlationId": "9624ccb9-5158-4c55-9a1b-900a3a827c66",
+  "rawIntent": "Create src/modules/employee/employee.model.ts with TypeScript interfaces for Employee and CreateEmployeeDto using all canonical attributes. Create src/modules/employee/employee.repository.ts implementing IEmployeeRepository interface. Include unit tests in tests/unit/modules/employee/employee.repository.test.ts using Vitest (not Jest) with proper mocking of the pg Pool. Ensure all database access follows repository pattern (GP-001) with no direct queries outside repository. Update ARCHITECTURE.md to include the Employee domain entity and its repository interface. This phase depends on existing shared types from src/shared/types/index.ts.",
+  "scope": {
+    "affectedDomains": [
+      "employee"
+    ],
+    "affectedLayers": [
+      "domain",
+      "infra",
+      "test",
+      "config"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/employee/employee.model.ts exists with TypeScript interfaces Employee and CreateEmployeeDto containing all canonical attributes",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/employee/employee.repository.ts exists implementing IEmployeeRepository interface",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "tests/unit/modules/employee/employee.repository.test.ts exists with Vitest tests properly mocking pg Pool",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "ARCHITECTURE.md updated to include Employee domain entity and repository interface",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "All database access follows repository pattern with no direct queries outside repository",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "GP-001: Repository pattern - All database access goes through repository interfaces",
+    "GP-002: Audit records - All state-changing operations write an audit record",
+    "GP-003: Input validation - Validate all inputs at API boundaries before processing",
+    "GP-004: No sensitive data in logs - Never log passwords, tokens, PII, or financial data",
+    "GP-005: RBAC enforcement - All API endpoints enforce role-based access control",
+    "GP-006: Error handling - No unhandled promise rejections. All async errors are caught and handled",
+    "Use TypeScript, Node.js 20, Fastify, PostgreSQL",
+    "Dependency direction: leave -> employee, no reverse dependencies permitted",
+    "Use existing shared types from src/shared/types/index.ts",
+    "Use Vitest for testing, not Jest"
+  ],
+  "outOfScope": [
+    "API endpoints for Employee",
+    "UI components for Employee",
+    "LeaveRequest lifecycle implementation",
+    "Notification system integration",
+    "Policy module integration",
+    "Balance module integration",
+    "Authentication/authorization implementation",
+    "Database migration scripts",
+    "Integration tests",
+    "End-to-end tests",
+    "Any changes outside src/modules/employee/, tests/unit/modules/employee/, and ARCHITECTURE.md"
+  ],
+  "ambiguities": [
+    {
+      "id": "amb-001",
+      "description": "What are 'all canonical attributes' for Employee and CreateEmployeeDto? The intent doesn't specify field names, types, or constraints",
+      "options": [
+        "Use minimal fields like id, name, email, managerId",
+        "Include comprehensive fields like department, hireDate, status, etc.",
+        "Reference existing database schema if available"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "id": "amb-002",
+      "description": "What methods should IEmployeeRepository interface contain? The intent doesn't specify required repository methods",
+      "options": [
+        "Basic CRUD operations only",
+        "Include domain-specific queries like findByManager",
+        "Include pagination and filtering methods"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "id": "amb-003",
+      "description": "What should be included in the ARCHITECTURE.md update? The intent doesn't specify format or detail level",
+      "options": [
+        "Brief mention of Employee domain",
+        "Detailed documentation of entity, repository, and relationships",
+        "Include dependency diagram"
+      ],
+      "impactIfWrong": "low"
+    }
+  ]
+}

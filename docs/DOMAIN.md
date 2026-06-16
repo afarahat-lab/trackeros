@@ -73,15 +73,31 @@ Represents employee data managed by the `employee` module, including employee re
 | firstName | string | true |
 | lastName | string | true |
 | email | string | true |
+| phone | string | false |
+| department | string | false |
+| position | string | false |
+| hireDate | Date | false |
 | managerId | string \| null | false |
-| hireDate | Date | true |
-| terminationDate | Date \| null | false |
 | isActive | boolean | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
 **Relationships**
 - `Employee` — one-to-many
+
+### CreateEmployeeDto
+
+| Field | Type | Required |
+|-------|------|----------|
+| employeeNumber | string | true |
+| firstName | string | true |
+| lastName | string | true |
+| email | string | true |
+| phone | string | false |
+| department | string | false |
+| position | string | false |
+| hireDate | Date | false |
+| managerId | string \| null | false |
 
 ## policy
 

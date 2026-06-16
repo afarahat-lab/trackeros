@@ -11,3 +11,11 @@
 - `src/modules/leave/balance.repository.ts` — `ILeaveBalanceRepository`, `LeaveBalanceRepository`
 
 All repository methods currently throw `Not implemented`; database integration will be added in Phase 2.
+
+## Employee Module
+
+### Domain Models
+- `src/modules/employee/employee.model.ts` — `Employee`, `CreateEmployeeDto`, `UpdateEmployeeDto`
+
+### Repositories
+- `src/modules/employee/employee.repository.ts` — `IEmployeeRepository`, `EmployeeRepository`
