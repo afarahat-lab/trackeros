@@ -1,6 +1,6 @@
 import { Pool } from 'pg';
-import { LeavePolicyRepository, ILeavePolicyRepository } from '../../../src/modules/policy/policy.repository';
-import { CreateLeavePolicyDto, LeavePolicy, UpdateLeavePolicyDto } from '../../../src/modules/policy/policy.model';
+import { LeavePolicyRepository, ILeavePolicyRepository } from '../../../../src/modules/policy/policy.repository';
+import { CreateLeavePolicyDto, LeavePolicy, UpdateLeavePolicyDto } from '../../../../src/modules/policy/policy.model';
 
 // Mock the pg Pool
 jest.mock('pg', () => {
