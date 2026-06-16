@@ -1,0 +1,83 @@
+{
+  "id": "2344816d-2bcd-4a13-ad5b-f04806d7e3ae",
+  "correlationId": "705c0f3c-4824-48f2-80d7-afdef3cb2a16",
+  "rawIntent": "[Feature: Build the leave management module — Phase 1: Create core domain models and repositories]\n\nCreate src/modules/leave/leave.model.ts with TypeScript interfaces for LeaveRequest and CreateLeaveRequestDto. Create src/modules/leave/leave.repository.ts implementing ILeaveRepository referencing those types. Create src/modules/balance/balance.model.ts with LeaveBalance interface and src/modules/balance/balance.repository.ts implementing ILeaveBalanceRepository. Create src/modules/policy/policy.model.ts with LeavePolicy interface. Approximately 5 files total.\n\nPhase architecture notes:\nEstablish foundational domain entities and data access patterns for LeaveRequest, LeaveBalance, and LeavePolicy. Repositories implement the repository pattern (GP-001).\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/leave/leave.model.ts\\nexport interface LeaveRequest {\\n  id: string;\\n  employeeId: string;\\n  leaveType: string;\\n  startDate: Date;\\n  endDate: Date;\\n  durationDays: number;\\n  reason: string;\\n  status: 'DRAFT' | 'SUBMITTED' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'CANCELLED';\\n  managerId: string;\\n  submittedAt: Date | null;\\n  decidedAt: Date | null;\\n  decisionNotes: string | null;\\n  createdAt: Date;\\n  updatedAt: Date;\\n}\\n\\nexport interface CreateLeaveRequestDto {\\n  employeeId: string;\\n  leaveType: string;\\n  startDate: Date;\\n  endDate: Date;\\n  reason: string;\\n  managerId: string;\\n}\",\"File: src/modules/leave/leave.repository.ts\\nimport { LeaveRequest, CreateLeaveRequestDto } from './leave.model';\\n\\nexport interface ILeaveRepository {\\n  create(dto: CreateLeaveRequestDto): Promise<LeaveRequest>;\\n  findById(id: string): Promise<LeaveRequest | null>;\\n  findByEmployeeId(employeeId: string): Promise<LeaveRequest[]>;\\n  updateStatus(id: string, status: LeaveRequest['status'], decidedAt?: Date, decisionNotes?: string): Promise<LeaveRequest>;\\n}\\n\\nexport class LeaveRepository implements ILeaveRepository {\\n  constructor(private readonly pool: import('pg').Pool) {}\\n\\n  async create(dto: CreateLeaveRequestDto): Promise<LeaveRequest> {\\n    const query = `\\n      INSERT INTO leave_requests (\\n        employeeId, leaveType, startDate, endDate, durationDays,\\n        reason, managerId, status\\n      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)\\n      RETURNING *\\n    `;\\n    const durationDays = Math.ceil((dto.endDate.getTime() - dto.startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;\\n    const values = [\\n      dto.employeeId,\\n      dto.leaveType,\\n      dto.startDate,\\n      dto.endDate,\\n      durationDays,\\n      dto.reason,\\n      dto.managerId,\\n      'DRAFT'\\n    ];\\n    const result = await this.pool.query<LeaveRequest>(query, values);\\n    return result.rows[0];\\n  }\\n\\n  async findById(id: string): Promise<LeaveRequest | null> {\\n    const query = 'SELECT * FROM leave_requests WHERE id = $1';\\n    const result = await this.pool.query<LeaveRequest>(query, [id]);\\n    return result.rows[0] || null;\\n  }\\n\\n  async findByEmployeeId(employeeId: string): Promise<LeaveRequest[]> {\\n    const query = 'SELECT * FROM leave_requests WHERE employeeId = $1 ORDER BY createdAt DESC';\\n    const result = await this.pool.query<LeaveRequest>(query, [employeeId]);\\n    return result.rows;\\n  }\\n\\n  async updateStatus(id: string, status: LeaveRequest['status'], decidedAt?: Date, decisionNotes?: string): Promise<LeaveRequest> {\\n    const query = `\\n      UPDATE leave_requests\\n      SET status = $1, decidedAt = $2, decisionNotes = $3, updatedAt = NOW()\\n      WHERE id = $4\\n      RETURNING *\\n    `;\\n    const values = [status, decidedAt || null, decisionNotes || null, id];\\n    const result = await this.pool.query<LeaveRequest>(query, values);\\n    return result.rows[0];\\n  }\\n}\",\"File: src/modules/balance/balance.model.ts\\nexport interface LeaveBalance {\\n  id: string;\\n  employeeId: string;\\n  leaveType: string;\\n  entitlementDays: number;\\n  usedDays: number;\\n  remainingDays: number;\\n  fiscalYear: number;\\n  status: 'ACTIVE' | 'ARCHIVED';\\n  createdAt: Date;\\n  updatedAt: Date;\\n}\",\"File: src/modules/balance/balance.repository.ts\\nimport { LeaveBalance } from './balance.model';\\n\\nexport interface ILeaveBalanceRepository {\\n  findByEmployeeAndType(employeeId: string, leaveType: string, fiscalYear: number): Promise<LeaveBalance | null>;\\n  updateUsedDays(id: string, usedDays: number): Promise<LeaveBalance>;\\n  create(balance: Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeaveBalance>;\\n}\\n\\nexport class LeaveBalanceRepository implements ILeaveBalanceRepository {\\n  constructor(private readonly pool: import('pg').Pool) {}\\n\\n  async findByEmployeeAndType(employeeId: string, leaveType: string, fiscalYear: number): Promise<LeaveBalance | null> {\\n    const query = 'SELECT * FROM leave_balances WHERE employeeId = $1 AND leaveType = $2 AND fiscalYear = $3';\\n    const result = await this.pool.query<LeaveBalance>(query, [employeeId, leaveType, fiscalYear]);\\n    return result.rows[0] || null;\\n  }\\n\\n  async updateUsedDays(id: string, usedDays: number): Promise<LeaveBalance> {\\n    const query = `\\n      UPDATE leave_balances\\n      SET usedDays = $1, remainingDays = entitlementDays - $1, updatedAt = NOW()\\n      WHERE id = $2\\n      RETURNING *\\n    `;\\n    const result = await this.pool.query<LeaveBalance>(query, [usedDays, id]);\\n    return result.rows[0];\\n  }\\n\\n  async create(balance: Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeaveBalance> {\\n    const query = `\\n      INSERT INTO leave_balances (\\n        employeeId, leaveType, entitlementDays, usedDays,\\n        remainingDays, fiscalYear, status\\n      ) VALUES ($1, $2, $3, $4, $5, $6, $7)\\n      RETURNING *\\n    `;\\n    const remainingDays = balance.entitlementDays - balance.usedDays;\\n    const values = [\\n      balance.employeeId,\\n      balance.leaveType,\\n      balance.entitlementDays,\\n      balance.usedDays,\\n      remainingDays,\\n      balance.fiscalYear,\\n      balance.status\\n    ];\\n    const result = await this.pool.query<LeaveBalance>(query, values);\\n    return result.rows[0];\\n  }\\n}\",\"File: src/modules/policy/policy.model.ts\\nexport interface LeavePolicy {\\n  id: string;\\n  leaveType: string;\\n  entitlementRules: Record<string, any>;\\n  accrualFrequency: string;\\n  carryOverLimit: number;\\n  advanceNoticeDays: number;\\n  maxConsecutiveDays: number;\\n  requiresManagerApproval: boolean;\\n  validFrom: Date;\\n  validTo: Date;\\n  status: 'DRAFT' | 'ACTIVE' | 'EXPIRED';\\n  createdAt: Date;\\n  updatedAt: Date;\\n}\"],\"importStatements\":[\"import { Pool } from 'pg';\",\"import { LeaveRequest, CreateLeaveRequestDto } from './leave.model';\",\"import { LeaveBalance } from './balance.model';\",\"import { LeavePolicy } from './policy.model';\"],\"successCriteria\":[\"src/modules/leave/leave.model.ts exists and exports LeaveRequest and CreateLeaveRequestDto interfaces\",\"src/modules/leave/leave.repository.ts exists and exports ILeaveRepository interface and LeaveRepository class implementing it\",\"src/modules/balance/balance.model.ts exists and exports LeaveBalance interface\",\"src/modules/balance/balance.repository.ts exists and exports ILeaveBalanceRepository interface and LeaveBalanceRepository class implementing it\",\"src/modules/policy/policy.model.ts exists and exports LeavePolicy interface\",\"All repository implementations follow GP-001 (Repository pattern) by encapsulating database access\",\"All interfaces match the canonical SQL schema column names, types, and constraints exactly\"]}\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 2 — Create employee and notification models: Create src/modules/employee/employee.model.ts with Employee interface. Create src/modules/notificati\n- Phase 3 — Build policy and balance services: Create src/modules/policy/policy.service.ts implementing IPolicyService with validation logic (GP-00\n- Phase 4 — Implement leave service with validation: Create src/modules/leave/leave.service.ts implementing ILeaveService with submitLeaveRequest, approv\n- Phase 5 — Add notification service integration: Create src/modules/notification/notification.service.ts implementing INotificationService with metho\n- Phase 6 — Implement error handling and RBAC enforcement: Enhance all service methods in leave.service.ts, policy.service.ts, balance.service.ts, and notifica",
+  "scope": {
+    "affectedDomains": [
+      "leave",
+      "balance",
+      "policy"
+    ],
+    "affectedLayers": [
+      "domain"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/leave/leave.model.ts exists and exports LeaveRequest and CreateLeaveRequestDto interfaces",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/leave/leave.repository.ts exists and exports ILeaveRepository interface and LeaveRepository class implementing it",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "src/modules/balance/balance.model.ts exists and exports LeaveBalance interface",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "src/modules/balance/balance.repository.ts exists and exports ILeaveBalanceRepository interface and LeaveBalanceRepository class implementing it",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "src/modules/policy/policy.model.ts exists and exports LeavePolicy interface",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-006",
+      "description": "All repository implementations follow GP-001 (Repository pattern) by encapsulating database access",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-007",
+      "description": "All interfaces match the canonical SQL schema column names, types, and constraints exactly",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "GP-001: Repository pattern - All database access goes through repository interfaces",
+    "All interfaces must match the canonical SQL schema column names, types, and constraints exactly",
+    "Repository implementations must encapsulate database access",
+    "Files must be created in the specified module directories: src/modules/leave/, src/modules/balance/, src/modules/policy/"
+  ],
+  "outOfScope": [
+    "Employee and notification models (Phase 2)",
+    "Policy and balance services (Phase 3)",
+    "Leave service implementation (Phase 4)",
+    "Notification service integration (Phase 5)",
+    "Error handling and RBAC enforcement (Phase 6)",
+    "API endpoints",
+    "UI components",
+    "Infrastructure configuration",
+    "Testing beyond unit tests for the created files",
+    "Audit records implementation",
+    "Input validation at API boundaries",
+    "RBAC enforcement",
+    "Sensitive data logging prevention"
+  ],
+  "ambiguities": []
+}
