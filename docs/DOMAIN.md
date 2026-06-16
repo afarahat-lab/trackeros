@@ -68,6 +68,23 @@ Represents leave balance data managed by the `balance` module, including tracked
 
 Represents employee data managed by the `employee` module, including employee records and related personnel information.
 
+### Employee
+
+| Field | Type | Required |
+|-------|------|----------|
+| id | string | true |
+| name | string | true |
+| email | string | true |
+| department | string | true |
+| managerId | string \| null | false |
+| hireDate | Date | true |
+| employmentStatus | 'ACTIVE' \| 'INACTIVE' \| 'TERMINATED' | true |
+| createdAt | Date | true |
+| updatedAt | Date | true |
+
+**Relationships**
+- `Employee` — one-to-many
+
 ## policy
 
 Represents leave policy data managed by the `policy` module, including policy definitions, rules, and leave entitlement configurations.
@@ -93,6 +110,24 @@ Represents leave policy data managed by the `policy` module, including policy de
 ## notification
 
 Represents notification data managed by the `notification` module, including notification records, delivery status, and related messaging information.
+
+### Notification
+
+| Field | Type | Required |
+|-------|------|----------|
+| id | string | true |
+| recipientId | string | true |
+| type | string | true |
+| title | string | true |
+| body | string | true |
+| relatedEntityType | string | true |
+| relatedEntityId | string | true |
+| status | 'PENDING' \| 'SENT' \| 'READ' \| 'ARCHIVED' | true |
+| createdAt | Date | true |
+| updatedAt | Date | true |
+
+**Relationships**
+- `Employee` — many-to-one
 
 ## audit
 
