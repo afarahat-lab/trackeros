@@ -55,7 +55,8 @@
       "rules": [
         "This intent describes a single phase of a multi-phase feature. If a 'Deferred to later phases' section is present, the items listed there are intentionally out of scope for this phase. Do not flag them as ambiguities or missing functionality.",
         "Evaluate the intent against what this phase explicitly commits to delivering, not against the full feature description.",
-        "Interface method signatures in per-phase architecture specifications are CONTRACTS to be implemented by the code-agent during this phase. They are not stubs. An interface showing method signatures without bodies is correct and complete — do not flag missing method bodies as ambiguity or missing implementation."
+        "Interface method signatures in per-phase architecture specifications are CONTRACTS to be implemented by the code-agent during this phase. They are not stubs. An interface showing method signatures without bodies is correct and complete — do not flag missing method bodies as ambiguity or missing implementation.",
+        "The per-phase architecture is the authoritative source for this phase's dependency list. Do not flag a mismatch between the intent text and the per-phase architecture — the per-phase architecture wins. If a 'Canonical dependencies for this phase' section is present, treat it as the complete list and ignore any partial subsets mentioned in the planner's scope text."
       ]
     },
     "constraint-agent": {
