@@ -1,29 +1,32 @@
 export interface Employee {
   id: string;
-  name: string;
+  employeeNumber: string;
+  firstName: string;
+  lastName: string;
   email: string;
-  department: string;
   managerId: string | null;
   hireDate: Date;
-  employmentStatus: 'ACTIVE' | 'INACTIVE' | 'TERMINATED';
+  terminationDate: Date | null;
+  isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
 
 export interface CreateEmployeeDto {
-  name: string;
+  employeeNumber: string;
+  firstName: string;
+  lastName: string;
   email: string;
-  department: string;
-  managerId?: string;
+  managerId: string | null;
   hireDate: Date;
-  employmentStatus: 'ACTIVE' | 'INACTIVE' | 'TERMINATED';
+  terminationDate: Date | null;
 }
 
 export interface UpdateEmployeeDto {
-  name?: string;
+  firstName?: string;
+  lastName?: string;
   email?: string;
-  department?: string;
   managerId?: string | null;
-  hireDate?: Date;
-  employmentStatus?: 'ACTIVE' | 'INACTIVE' | 'TERMINATED';
+  terminationDate?: Date | null;
+  isActive?: boolean;
 }
