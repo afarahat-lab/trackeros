@@ -1,0 +1,101 @@
+{
+  "id": "843a3eb9-d54c-46a1-8c1c-321016904124",
+  "correlationId": "718ec4f9-9ff3-42d1-bb6f-a1823a5bebd4",
+  "rawIntent": "[Feature: Build the leave management module — Phase 3: Build policy and balance services]\n\nCreate src/modules/policy/policy.service.ts implementing IPolicyService with validation logic (GP-003). Create src/modules/balance/balance.service.ts implementing IBalanceService with balance calculation methods. Include Jest unit tests in tests/unit/modules/policy/ and tests/unit/modules/balance/. Approximately 5 files total.\n\nThis phase depends on: src/modules/policy/policy.model.ts, src/modules/policy/policy.repository.ts, src/modules/balance/balance.model.ts, src/modules/balance/balance.repository.ts.\n\nPhase architecture notes:\nImplement inner services for business rules (leave policy validation) and balance calculations before orchestration layer.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/policy/policy.service.ts\\nimport { LeavePolicy } from './policy.model';\\nimport { Employee } from '../employee/employee.model';\\nimport { CreateLeaveRequestDto } from '../leave/leave.model';\\nimport { ILeavePolicyRepository } from './policy.repository';\\n\\nexport interface ValidationResult {\\n  isValid: boolean;\\n  errors: string[];\\n}\\n\\nexport interface IPolicyService {\\n  validateLeaveRequest(request: CreateLeaveRequestDto, employee: Employee, policy: LeavePolicy): ValidationResult;\\n}\\n\\nexport class PolicyServiceImpl implements IPolicyService {\\n  constructor(private readonly policyRepository: ILeavePolicyRepository) {}\\n\\n  validateLeaveRequest(request: CreateLeaveRequestDto, employee: Employee, policy: LeavePolicy): ValidationResult {\\n    const errors: string[] = [];\\n    \\n    // Validate against policy rules\\n    if (request.startDate < new Date()) {\\n      errors.push('Start date cannot be in the past');\\n    }\\n    \\n    if (request.durationDays > policy.maxConsecutiveDays) {\\n      errors.push(`Leave duration exceeds maximum consecutive days of ${policy.maxConsecutiveDays}`);\\n    }\\n    \\n    const advanceNoticeDays = Math.floor((request.startDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));\\n    if (advanceNoticeDays < policy.advanceNoticeDays) {\\n      errors.push(`Insufficient advance notice. Required: ${policy.advanceNoticeDays} days`);\\n    }\\n    \\n    if (policy.requiresManagerApproval && !employee.managerId) {\\n      errors.push('Manager approval required but no manager assigned');\\n    }\\n    \\n    return {\\n      isValid: errors.length === 0,\\n      errors\\n    };\\n  }\\n}\",\"File: src/modules/balance/balance.service.ts\\nimport { LeaveBalance } from './balance.model';\\nimport { ILeaveBalanceRepository } from './balance.repository';\\n\\nexport interface IBalanceService {\\n  getBalance(employeeId: string, leaveType: string, fiscalYear: number): Promise<LeaveBalance | null>;\\n  updateBalance(balanceId: string, usedDaysDelta: number): Promise<LeaveBalance>;\\n}\\n\\nexport class BalanceServiceImpl implements IBalanceService {\\n  constructor(private readonly balanceRepository: ILeaveBalanceRepository) {}\\n\\n  async getBalance(employeeId: string, leaveType: string, fiscalYear: number): Promise<LeaveBalance | null> {\\n    return this.balanceRepository.findByEmployeeLeaveTypeAndYear(employeeId, leaveType, fiscalYear);\\n  }\\n\\n  async updateBalance(balanceId: string, usedDaysDelta: number): Promise<LeaveBalance> {\\n    // GP-002: Audit record will be created by repository layer\\n    return this.balanceRepository.updateWithAtomicIncrement(balanceId, usedDaysDelta);\\n  }\\n}\"],\"importStatements\":[\"import { LeavePolicy } from '../policy/policy.model'\",\"import { Employee } from '../employee/employee.model'\",\"import { CreateLeaveRequestDto } from '../leave/leave.model'\",\"import { LeaveBalance } from '../balance/balance.model'\",\"import { ILeavePolicyRepository } from '../policy/policy.repository'\",\"import { ILeaveBalanceRepository } from '../balance/balance.repository'\"],\"successCriteria\":[\"src/modules/policy/policy.service.ts exists and exports IPolicyService with concrete implementation PolicyServiceImpl\",\"src/modules/balance/balance.service.ts exists and exports IBalanceService with concrete implementation BalanceServiceImpl\",\"PolicyServiceImpl.validateLeaveRequest returns ValidationResult with isValid boolean and errors array containing validation failure messages\",\"BalanceServiceImpl.getBalance calls ILeaveBalanceRepository.findByEmployeeLeaveTypeAndYear with provided parameters\",\"BalanceServiceImpl.updateBalance calls ILeaveBalanceRepository.updateWithAtomicIncrement with balanceId and usedDaysDelta, ensuring atomic increment/decrement of usedDays and remainingDays in a single database transaction\",\"All database operations follow GP-001 Repository pattern through injected repository interfaces\",\"All state-changing operations (updateBalance) will trigger audit logging (GP-002) via repository layer\",\"Input validation is performed at service boundary (GP-003) in validateLeaveRequest method\",\"No sensitive data is logged (GP-004) - validation errors contain only business rule messages\",\"Error handling follows GP-006 with async/await and try-catch patterns in service methods\"]}\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 4 — Implement leave service with validation: Create src/modules/leave/leave.service.ts implementing ILeaveService with submitLeaveRequest, approv\n- Phase 5 — Add notification service integration: Create src/modules/notification/notification.service.ts implementing INotificationService with metho\n- Phase 6 — Implement error handling and RBAC enforcement: Enhance all service methods in leave.service.ts, policy.service.ts, balance.service.ts, and notifica",
+  "scope": {
+    "affectedDomains": [
+      "policy",
+      "balance"
+    ],
+    "affectedLayers": [
+      "domain",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/policy/policy.service.ts exists and exports IPolicyService with concrete implementation PolicyServiceImpl",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/balance/balance.service.ts exists and exports IBalanceService with concrete implementation BalanceServiceImpl",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "PolicyServiceImpl.validateLeaveRequest returns ValidationResult with isValid boolean and errors array containing validation failure messages",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "BalanceServiceImpl.getBalance calls ILeaveBalanceRepository.findByEmployeeLeaveTypeAndYear with provided parameters",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "BalanceServiceImpl.updateBalance calls ILeaveBalanceRepository.updateWithAtomicIncrement with balanceId and usedDaysDelta, ensuring atomic increment/decrement of usedDays and remainingDays in a single database transaction",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "GP-001 Repository pattern: All database access goes through repository interfaces",
+    "GP-002 Audit records: All state-changing operations write an audit record",
+    "GP-003 Input validation: Validate all inputs at API boundaries before processing",
+    "GP-004 No sensitive data in logs: Never log passwords, tokens, PII, or financial data",
+    "GP-006 Error handling: No unhandled promise rejections. All async errors are caught and handled",
+    "Dependency direction: leave -> policy, leave -> balance (no reverse dependencies permitted)",
+    "Balance deductions occur only during approveLeaveRequest (not in this phase)",
+    "Notifications are created on submission, approval, and rejection events (not in this phase)"
+  ],
+  "outOfScope": [
+    "src/modules/leave/leave.service.ts implementation",
+    "src/modules/notification/notification.service.ts implementation",
+    "RBAC enforcement in API endpoints",
+    "LeaveRequest lifecycle state management (Pending, Approved, Rejected)",
+    "Balance deductions during approveLeaveRequest",
+    "Notification creation on workflow events",
+    "Integration with employee module beyond using Employee model",
+    "Orchestration layer that coordinates policy and balance services",
+    "API endpoints for policy or balance services",
+    "UI components or frontend integration"
+  ],
+  "ambiguities": [
+    {
+      "id": "amb-001",
+      "description": "The intent mentions 'Approximately 5 files total' but only specifies 2 service files and their tests. What are the other 3 files?",
+      "options": [
+        "Only the 2 service files and their test files (4 total)",
+        "Additional test files for repository interfaces",
+        "Additional configuration or index files"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "id": "amb-002",
+      "description": "Should the PolicyServiceImpl constructor accept ILeavePolicyRepository directly, or should it accept a factory/provider?",
+      "options": [
+        "Direct injection of ILeavePolicyRepository",
+        "Injection via a factory/provider pattern"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "id": "amb-003",
+      "description": "Should updateBalance method validate that usedDaysDelta doesn't exceed remainingDays before calling repository?",
+      "options": [
+        "Yes, validate in service layer before repository call",
+        "No, let repository/business logic handle overflow validation"
+      ],
+      "impactIfWrong": "medium"
+    }
+  ]
+}
