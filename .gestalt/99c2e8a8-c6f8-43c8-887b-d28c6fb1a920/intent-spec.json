@@ -1,0 +1,112 @@
+{
+  "id": "8968620f-ea5f-42e1-ac33-90d9cb526774",
+  "correlationId": "99c2e8a8-c6f8-43c8-887b-d28c6fb1a920",
+  "rawIntent": "[Feature: Build the leave management module — Phase 4: Create leave policy domain models and repository]\n\nCreate src/modules/policy/policy.model.ts with TypeScript interfaces for LeavePolicy and CreateLeavePolicyDto using all canonical attributes. Create src/modules/policy/policy.repository.ts implementing ILeavePolicyRepository interface. Include Jest unit tests in tests/unit/modules/policy/policy.repository.test.ts. This phase depends on src/modules/leave/leave.model.ts from Phase 1 for shared types like LeaveType.\n\nThis phase depends on: src/modules/leave/leave.model.ts.\n\nPhase architecture notes:\nLeave policy domain model and repository pattern\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/policy/policy.model.ts\\nexport interface LeavePolicy {\\n  id: string;\\n  policyName: string;\\n  leaveType: 'ANNUAL' | 'SICK' | 'EMERGENCY' | 'UNPAID';\\n  entitlementDays: number;\\n  accrualRate: number | null;\\n  maxCarryover: number | null;\\n  requiresApproval: boolean;\\n  isActive: boolean;\\n  createdAt: Date;\\n  updatedAt: Date;\\n}\\n\\nexport interface CreateLeavePolicyDto {\\n  policyName: string;\\n  leaveType: 'ANNUAL' | 'SICK' | 'EMERGENCY' | 'UNPAID';\\n  entitlementDays: number;\\n  accrualRate?: number;\\n  maxCarryover?: number;\\n  requiresApproval?: boolean;\\n  isActive?: boolean;\\n}\\n\\nexport interface UpdateLeavePolicyDto {\\n  policyName?: string;\\n  leaveType?: 'ANNUAL' | 'SICK' | 'EMERGENCY' | 'UNPAID';\\n  entitlementDays?: number;\\n  accrualRate?: number | null;\\n  maxCarryover?: number | null;\\n  requiresApproval?: boolean;\\n  isActive?: boolean;\\n}\",\"File: src/modules/policy/policy.repository.ts\\nexport interface ILeavePolicyRepository {\\n  create(data: CreateLeavePolicyDto): Promise<LeavePolicy>;\\n  findById(id: string): Promise<LeavePolicy | null>;\\n  findAll(): Promise<LeavePolicy[]>;\\n  findByLeaveType(leaveType: string): Promise<LeavePolicy[]>;\\n  update(id: string, data: UpdateLeavePolicyDto): Promise<LeavePolicy>;\\n  delete(id: string): Promise<void>;\\n  findActivePolicies(): Promise<LeavePolicy[]>;\\n}\\n\\nexport class LeavePolicyRepository implements ILeavePolicyRepository {\\n  constructor(private readonly pool: Pool) {}\\n\\n  async create(data: CreateLeavePolicyDto): Promise<LeavePolicy> {\\n    const query = `\\n      INSERT INTO leave_policies (\\n        policy_name, leave_type, entitlement_days, accrual_rate,\\n        max_carryover, requires_approval, is_active\\n      ) VALUES ($1, $2, $3, $4, $5, $6, $7)\\n      RETURNING *\\n    `;\\n    const values = [\\n      data.policyName,\\n      data.leaveType,\\n      data.entitlementDays,\\n      data.accrualRate ?? null,\\n      data.maxCarryover ?? null,\\n      data.requiresApproval ?? true,\\n      data.isActive ?? true\\n    ];\\n    const result = await this.pool.query<LeavePolicy>(query, values);\\n    return result.rows[0];\\n  }\\n\\n  async findById(id: string): Promise<LeavePolicy | null> {\\n    const query = `SELECT * FROM leave_policies WHERE id = $1`;\\n    const result = await this.pool.query<LeavePolicy>(query, [id]);\\n    return result.rows[0] || null;\\n  }\\n\\n  async findAll(): Promise<LeavePolicy[]> {\\n    const query = `SELECT * FROM leave_policies ORDER BY policy_name`;\\n    const result = await this.pool.query<LeavePolicy>(query);\\n    return result.rows;\\n  }\\n\\n  async findByLeaveType(leaveType: string): Promise<LeavePolicy[]> {\\n    const query = `SELECT * FROM leave_policies WHERE leave_type = $1 ORDER BY policy_name`;\\n    const result = await this.pool.query<LeavePolicy>(query, [leaveType]);\\n    return result.rows;\\n  }\\n\\n  async update(id: string, data: UpdateLeavePolicyDto): Promise<LeavePolicy> {\\n    const updates: string[] = [];\\n    const values: any[] = [];\\n    let paramCount = 1;\\n\\n    if (data.policyName !== undefined) {\\n      updates.push(`policy_name = $${paramCount}`);\\n      values.push(data.policyName);\\n      paramCount++;\\n    }\\n    if (data.leaveType !== undefined) {\\n      updates.push(`leave_type = $${paramCount}`);\\n      values.push(data.leaveType);\\n      paramCount++;\\n    }\\n    if (data.entitlementDays !== undefined) {\\n      updates.push(`entitlement_days = $${paramCount}`);\\n      values.push(data.entitlementDays);\\n      paramCount++;\\n    }\\n    if (data.accrualRate !== undefined) {\\n      updates.push(`accrual_rate = $${paramCount}`);\\n      values.push(data.accrualRate);\\n      paramCount++;\\n    }\\n    if (data.maxCarryover !== undefined) {\\n      updates.push(`max_carryover = $${paramCount}`);\\n      values.push(data.maxCarryover);\\n      paramCount++;\\n    }\\n    if (data.requiresApproval !== undefined) {\\n      updates.push(`requires_approval = $${paramCount}`);\\n      values.push(data.requiresApproval);\\n      paramCount++;\\n    }\\n    if (data.isActive !== undefined) {\\n      updates.push(`is_active = $${paramCount}`);\\n      values.push(data.isActive);\\n      paramCount++;\\n    }\\n\\n    if (updates.length === 0) {\\n      throw new Error('No fields to update');\\n    }\\n\\n    updates.push(`updated_at = CURRENT_TIMESTAMP`);\\n    values.push(id);\\n    const query = `\\n      UPDATE leave_policies\\n      SET ${updates.join(', ')}\\n      WHERE id = $${paramCount}\\n      RETURNING *\\n    `;\\n    const result = await this.pool.query<LeavePolicy>(query, values);\\n    if (result.rows.length === 0) {\\n      throw new Error(`Leave policy with id ${id} not found`);\\n    }\\n    return result.rows[0];\\n  }\\n\\n  async delete(id: string): Promise<void> {\\n    const query = `DELETE FROM leave_policies WHERE id = $1`;\\n    const result = await this.pool.query(query, [id]);\\n    if (result.rowCount === 0) {\\n      throw new Error(`Leave policy with id ${id} not found`);\\n    }\\n  }\\n\\n  async findActivePolicies(): Promise<LeavePolicy[]> {\\n    const query = `SELECT * FROM leave_policies WHERE is_active = true ORDER BY policy_name`;\\n    const result = await this.pool.query<LeavePolicy>(query);\\n    return result.rows;\\n  }\\n}\"],\"importStatements\":[\"import { Pool } from \\\"pg\\\";\",\"import { pool } from \\\"../../shared/db/connection\\\";\",\"import { CreateLeavePolicyDto, LeavePolicy, UpdateLeavePolicyDto } from \\\"./policy.model\\\";\"],\"successCriteria\":[\"src/modules/policy/policy.model.ts exists and exports LeavePolicy, CreateLeavePolicyDto, UpdateLeavePolicyDto interfaces\",\"src/modules/policy/policy.repository.ts exists and exports LeavePolicyRepository class implementing ILeavePolicyRepository\",\"tests/unit/modules/policy/policy.repository.test.ts exists with Vitest tests covering all repository methods\",\"All repository methods use the PostgreSQL pool from src/shared/db/connection.ts\",\"All SQL queries use parameterized queries to prevent SQL injection\",\"The SQL schema for leave_policies matches the canonical definition exactly\",\"All repository methods follow the repository pattern (GP-001) and do not query the database directly from services\"],\"sqlSchema\":\"CREATE TABLE leave_policies (\\n  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\\n  policy_name VARCHAR(100) UNIQUE NOT NULL,\\n  leave_type VARCHAR(50) NOT NULL CHECK (leave_type IN ('ANNUAL', 'SICK', 'EMERGENCY', 'UNPAID')),\\n  entitlement_days INTEGER NOT NULL CHECK (entitlement_days >= 0),\\n  accrual_rate DECIMAL(5,2),\\n  max_carryover INTEGER,\\n  requires_approval BOOLEAN DEFAULT true,\\n  is_active BOOLEAN DEFAULT true,\\n  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,\\n  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP\\n);\"}\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 5 — Create leave service interface and implementation: Create src/modules/leave/leave.service.interface.ts with ILeaveService interface defining method sig\n- Phase 6 — Add validation schemas to leave service: Create src/modules/leave/leave.validation.ts with Zod schemas for CreateLeaveRequestDto and UpdateLe\n- Phase 7 — Add audit logging to leave service: Create src/shared/audit/audit.logger.ts interface and implementation. Update src/modules/leave/leave\n- Phase 8 — Implement RBAC enforcement in leave service: Create src/shared/auth/rbac.ts with role definitions and permission checks. Update src/modules/leave\n- Phase 9 — Add comprehensive error handling and logging: Create src/shared/errors/leave.errors.ts with domain-specific error classes. Update src/modules/leav\n- Phase 10 — Create leave controller and API routes: Create src/modules/leave/leave.controller.ts with Fastify controller implementing REST endpoints for",
+  "scope": {
+    "affectedDomains": [
+      "policy"
+    ],
+    "affectedLayers": [
+      "domain",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/policy/policy.model.ts exists and exports LeavePolicy, CreateLeavePolicyDto, UpdateLeavePolicyDto interfaces",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/policy/policy.repository.ts exists and exports LeavePolicyRepository class implementing ILeavePolicyRepository",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "tests/unit/modules/policy/policy.repository.test.ts exists with Vitest tests covering all repository methods",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "All repository methods use the PostgreSQL pool from src/shared/db/connection.ts",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "All SQL queries use parameterized queries to prevent SQL injection",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-006",
+      "description": "The SQL schema for leave_policies matches the canonical definition exactly",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "sc-007",
+      "description": "All repository methods follow the repository pattern (GP-001) and do not query the database directly from services",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces (GP-001)",
+    "Input validation: Validate all inputs at API boundaries before processing (GP-003)",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data (GP-004)",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled (GP-006)",
+    "Modular monolith architecture: policy module must be self-contained",
+    "Dependency direction: policy module must not depend on leave, employee, balance, or notification modules",
+    "LeaveType must be imported from src/modules/leave/leave.model.ts"
+  ],
+  "outOfScope": [
+    "Service layer implementation (Phase 5)",
+    "Validation schemas (Phase 6)",
+    "Audit logging (Phase 7)",
+    "RBAC enforcement (Phase 8)",
+    "Comprehensive error handling and logging (Phase 9)",
+    "Controller and API routes (Phase 10)",
+    "Any changes to existing modules outside src/modules/policy/",
+    "Database migration scripts",
+    "API endpoints",
+    "UI components",
+    "Configuration files",
+    "Integration tests beyond unit tests"
+  ],
+  "ambiguities": [
+    {
+      "id": "amb-001",
+      "description": "The intent mentions 'Jest unit tests' but the project uses Vitest. Should tests use Jest syntax or Vitest syntax?",
+      "options": [
+        "Use Vitest syntax (project standard)",
+        "Use Jest syntax (as mentioned in intent)"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "id": "amb-002",
+      "description": "Should the repository throw errors when entities are not found (findById returns null vs throws)?",
+      "options": [
+        "Return null when not found",
+        "Throw NotFoundError when not found"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "id": "amb-003",
+      "description": "Should the repository use the shared pool import or receive Pool via dependency injection?",
+      "options": [
+        "Import pool directly from src/shared/db/connection",
+        "Receive Pool instance via constructor"
+      ],
+      "impactIfWrong": "low"
+    }
+  ]
+}

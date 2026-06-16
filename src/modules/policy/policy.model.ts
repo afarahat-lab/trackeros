@@ -1,15 +1,32 @@
 export interface LeavePolicy {
   id: string;
-  leaveType: string;
-  entitlementRules: Record<string, any>;
-  accrualFrequency: string;
-  carryOverLimit: number;
-  advanceNoticeDays: number;
-  maxConsecutiveDays: number;
-  requiresManagerApproval: boolean;
-  validFrom: Date;
-  validTo: Date;
-  status: 'DRAFT' | 'ACTIVE' | 'EXPIRED';
+  policyName: string;
+  leaveType: 'ANNUAL' | 'SICK' | 'EMERGENCY' | 'UNPAID';
+  entitlementDays: number;
+  accrualRate: number | null;
+  maxCarryover: number | null;
+  requiresApproval: boolean;
+  isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface CreateLeavePolicyDto {
+  policyName: string;
+  leaveType: 'ANNUAL' | 'SICK' | 'EMERGENCY' | 'UNPAID';
+  entitlementDays: number;
+  accrualRate?: number;
+  maxCarryover?: number;
+  requiresApproval?: boolean;
+  isActive?: boolean;
+}
+
+export interface UpdateLeavePolicyDto {
+  policyName?: string;
+  leaveType?: 'ANNUAL' | 'SICK' | 'EMERGENCY' | 'UNPAID';
+  entitlementDays?: number;
+  accrualRate?: number | null;
+  maxCarryover?: number | null;
+  requiresApproval?: boolean;
+  isActive?: boolean;
 }
