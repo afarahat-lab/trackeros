@@ -1,12 +1,13 @@
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Pool } from 'pg';
 import { EmployeeRepository } from '../../../../src/modules/employee/employee.repository';
 import { Employee, CreateEmployeeDto, UpdateEmployeeDto } from '../../../../src/modules/employee/employee.model';
 
-jest.mock('pg', () => {
+vi.mock('pg', () => {
   const mPool = {
-    query: jest.fn(),
+    query: vi.fn(),
   };
-  return { Pool: jest.fn(() => mPool) };
+  return { Pool: vi.fn(() => mPool) };
 });
 
 describe('EmployeeRepository', () => {
@@ -44,7 +45,7 @@ describe('EmployeeRepository', () => {
   beforeEach(() => {
     pool = new Pool();
     repository = new EmployeeRepository(pool);
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe('create', () => {

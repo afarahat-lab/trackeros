@@ -99,6 +99,9 @@ export class EmployeeRepository implements IEmployeeRepository {
       RETURNING *
     `;
     const result = await this.pool.query(query, values);
+    if (result.rows.length === 0) {
+      throw new Error('Employee not found');
+    }
     return this.mapRowToEmployee(result.rows[0]);
   }
 

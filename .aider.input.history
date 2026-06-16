@@ -2666,3 +2666,343 @@
 +    if (updates.length === 0) {
 +      const existing = await this.findById(id);
 +      if (!existin
+
+# 2026-06-16 14:24:36.137858
++## Task
++Create src/modules/employee/employee.model.ts with TypeScript interfaces for Employee and CreateEmployeeDto using all canonical attributes. Create src/modules/employee/employee.repository.ts implementing IEmployeeRepository interface. Include unit tests in tests/unit/modules/employee/employee.repository.test.ts using Vitest (not Jest) with proper mocking of the pg Pool. Ensure all database access follows repository pattern (GP-001) with no direct queries outside repository. Update ARCHITECTURE.md to include the Employee domain entity and its repository interface. This phase depends on existing shared types from src/shared/types/index.ts.
++
++## Success criteria
++- src/modules/employee/employee.model.ts exists with TypeScript interfaces Employee and CreateEmployeeDto containing all canonical attributes
++- src/modules/employee/employee.repository.ts exists implementing IEmployeeRepository interface
++- tests/unit/modules/employee/employee.repository.test.ts exists with Vitest tests properly mocking pg Pool
++- ARCHITECTURE.md updated to include Employee domain entity and repository interface
++- All database access follows repository pattern with no direct queries outside repository
++
++## Out of scope (do NOT touch these)
++- API endpoints for Employee
++- UI components for Employee
++- LeaveRequest lifecycle implementation
++- Notification system integration
++- Policy module integration
++- Balance module integration
++- Authentication/authorization implementation
++- Database migration scripts
++- Integration tests
++- End-to-end tests
++- Any changes outside src/modules/employee/, tests/unit/modules/employee/, and ARCHITECTURE.md
++
++## Project rules
++- Generated code must compile without errors. Verify with executeScript before returning.
++- All imports must resolve to files that exist in the project or are declared in package.json.
++- You MUST run a compile/lint check via executeScript before emitting the final files. This is not optional.
++- Do not use require() for JSON imports — import them using ES module syntax with resolveJsonModule enabled in tsconfig.
++- Before generating any repository, service, or controller code, read the DTO and interface files it will use. Never reference a field on a type without confirming it exists in the type definition.
++- Before generating code that calls methods on a dependency, read the dependency's source file to confirm which methods exist. Only call methods that are actually defined.
++- Read the project's compiler/linter configuration file (tsconfig.json, mypy.ini, pyproject.toml, .eslintrc etc) before generating code. Follow the strictness settings it defines — do not assume permissive defaults.
++- Read the project's dependency manifest (package.json, requirements.txt, go.mod, pom.xml etc) before importing external packages. Only import packages that are listed as dependencies.
++
++## Scoped architecture for this phase
++The following describes ONLY what exists now and what you
++are building in this phase. Use these exact file paths,
++exact export names, and exact import statements. Do not
++invent paths or imports — if it is not listed here, it
++does not exist.
++
++### Existing dependencies — use these exact imports
++
++import { Pool } from 'pg';
++import { Employee, CreateEmployeeDto, UpdateEmployeeDto } from './employee.model';
++
++### Interfaces / types this phase implements
++
++File: src/modules/employee/employee.model.ts
++export interface Employee {
++  id: string;
++  employeeNumber: string;
++  firstName: string;
++  lastName: string;
++  email: string;
++  managerId: string | null;
++  hireDate: Date;
++  terminationDate: Date | null;
++  isActive: boolean;
++  createdAt: Date;
++  updatedAt: Date;
++}
++
++export interface CreateEmployeeDto {
++  employeeNumber: string;
++  firstName: string;
++  lastName: string;
++  email: string;
++  managerId: string | null;
++  hireDate: Date;
++  terminationDate: Date | null;
++}
++
++export interface UpdateEmployeeDto {
++  firstName?: string;
++  lastName?: string;
++  email?: string;
++  managerId?: string | null;
++  terminationDate?: Date | null;
++  isActive?: boolean;
++}
++
++File: src/modules/employee/employee.repository.ts
++export interface IEmployeeRepository {
++  create(dto: CreateEmployeeDto): Promise<Employee>;
++  findById(id: string): Promise<Employee | null>;
++  findByEmployeeNumber(employeeNumber: string): Promise<Employee | null>;
++  findByEmail(email: string): Promise<Employee | null>;
++  update(id: string, dto: UpdateEmployeeDto): Promise<Employee>;
++  delete(id: string): Promise<void>;
++  findActiveEmployees(): Promise<Employee[]>;
++  findSubordinates(managerId: string): Promise<Employee[]>;
++}
++
++export class EmployeeRepository implements IEmployeeRepository {
++  constructor(private readonly pool: Pool) {}
++
++  async create(dto: CreateEmployeeDto): Promise<Employee> {
++    const query = `
++      INSERT INTO employees (
++        employee_number, first_name, last_name, email,
++        manager_id, hire_date, termination_date
++      ) VALUES ($1, $2, $3, $4, $5, $6, $7)
++      RETURNING *
++    `;
++    const values = [
++      dto.employeeNumber,
++      dto.firstName,
++      dto.lastName,
++      dto.email,
++      dto.managerId,
++      dto.hireDate,
++      dto.terminationDate
++    ];
++    const result = await this.pool.query(query, values);
++    return this.mapRowToEmployee(result.rows[0]);
++  }
++
++  async findById(id: string): Promise<Employee | null> {
++    const query = 'SELECT * FROM employees WHERE id = $1';
++    const result = await this.pool.query(query, [id]);
++    return result.rows.length ? this.mapRowToEmployee(result.rows[0]) : null;
++  }
++
++  async findByEmployeeNumber(employeeNumber: string): Promise<Employee | null> {
++    const query = 'SELECT * FROM employees WHERE employee_number = $1';
++    const result = await this.pool.query(query, [employeeNumber]);
++    return result.rows.length ? this.mapRowToEmployee(result.rows[0]) : null;
++  }
++
++  async findByEmail(email: string): Promise<Employee | null> {
++    const query = 'SELECT * FROM employees WHERE email = $1';
++    const result = await this.pool.query(query, [email]);
++    return result.rows.length ? this.mapRowToEmployee(result.rows[0]) : null;
++  }
++
++  async update(id: string, dto: UpdateEmployeeDto): Promise<Employee> {
++    const updates: string[] = [];
++    const values: any[] = [];
++    let paramCount = 1;
++
++    if (dto.firstName !== undefined) {
++      updates.push(`first_name = $${paramCount++}`);
++      values.push(dto.firstName);
++    }
++    if (dto.lastName !== undefined) {
++      updates.push(`last_name = $${paramCount++}`);
++      values.push(dto.lastName);
++    }
++    if (dto.email !== undefined) {
++      updates.push(`email = $${paramCount++}`);
++      values.push(dto.email);
++    }
++    if (dto.managerId !== undefined) {
++      updates.push(`manager_id = $${paramCount++}`);
++      values.push(dto.managerId);
++    }
++    if (dto.terminationDate !== undefined) {
++      updates.push(`termination_date = $${paramCount++}`);
++      values.push(dto.terminationDate);
++    }
++    if (dto.isActive !== undefined) {
++      updates.push(`is_active = $${paramCount++}`);
++      values.push(dto.isActive);
++    }
++
++    if (updates.length === 0) {
++      const existing = await this.findById(id);
++      if (!existin
+
+# 2026-06-16 14:24:36.140725
++## Task
++Create src/modules/employee/employee.model.ts with TypeScript interfaces for Employee and CreateEmployeeDto using all canonical attributes. Create src/modules/employee/employee.repository.ts implementing IEmployeeRepository interface. Include unit tests in tests/unit/modules/employee/employee.repository.test.ts using Vitest (not Jest) with proper mocking of the pg Pool. Ensure all database access follows repository pattern (GP-001) with no direct queries outside repository. Update ARCHITECTURE.md to include the Employee domain entity and its repository interface. This phase depends on existing shared types from src/shared/types/index.ts.
++
++## Success criteria
++- src/modules/employee/employee.model.ts exists with TypeScript interfaces Employee and CreateEmployeeDto containing all canonical attributes
++- src/modules/employee/employee.repository.ts exists implementing IEmployeeRepository interface
++- tests/unit/modules/employee/employee.repository.test.ts exists with Vitest tests properly mocking pg Pool
++- ARCHITECTURE.md updated to include Employee domain entity and repository interface
++- All database access follows repository pattern with no direct queries outside repository
++
++## Out of scope (do NOT touch these)
++- API endpoints for Employee
++- UI components for Employee
++- LeaveRequest lifecycle implementation
++- Notification system integration
++- Policy module integration
++- Balance module integration
++- Authentication/authorization implementation
++- Database migration scripts
++- Integration tests
++- End-to-end tests
++- Any changes outside src/modules/employee/, tests/unit/modules/employee/, and ARCHITECTURE.md
++
++## Project rules
++- Generated code must compile without errors. Verify with executeScript before returning.
++- All imports must resolve to files that exist in the project or are declared in package.json.
++- You MUST run a compile/lint check via executeScript before emitting the final files. This is not optional.
++- Do not use require() for JSON imports — import them using ES module syntax with resolveJsonModule enabled in tsconfig.
++- Before generating any repository, service, or controller code, read the DTO and interface files it will use. Never reference a field on a type without confirming it exists in the type definition.
++- Before generating code that calls methods on a dependency, read the dependency's source file to confirm which methods exist. Only call methods that are actually defined.
++- Read the project's compiler/linter configuration file (tsconfig.json, mypy.ini, pyproject.toml, .eslintrc etc) before generating code. Follow the strictness settings it defines — do not assume permissive defaults.
++- Read the project's dependency manifest (package.json, requirements.txt, go.mod, pom.xml etc) before importing external packages. Only import packages that are listed as dependencies.
++
++## Scoped architecture for this phase
++The following describes ONLY what exists now and what you
++are building in this phase. Use these exact file paths,
++exact export names, and exact import statements. Do not
++invent paths or imports — if it is not listed here, it
++does not exist.
++
++### Existing dependencies — use these exact imports
++
++import { Pool } from 'pg';
++import { Employee, CreateEmployeeDto, UpdateEmployeeDto } from './employee.model';
++
++### Interfaces / types this phase implements
++
++File: src/modules/employee/employee.model.ts
++export interface Employee {
++  id: string;
++  employeeNumber: string;
++  firstName: string;
++  lastName: string;
++  email: string;
++  managerId: string | null;
++  hireDate: Date;
++  terminationDate: Date | null;
++  isActive: boolean;
++  createdAt: Date;
++  updatedAt: Date;
++}
++
++export interface CreateEmployeeDto {
++  employeeNumber: string;
++  firstName: string;
++  lastName: string;
++  email: string;
++  managerId: string | null;
++  hireDate: Date;
++  terminationDate: Date | null;
++}
++
++export interface UpdateEmployeeDto {
++  firstName?: string;
++  lastName?: string;
++  email?: string;
++  managerId?: string | null;
++  terminationDate?: Date | null;
++  isActive?: boolean;
++}
++
++File: src/modules/employee/employee.repository.ts
++export interface IEmployeeRepository {
++  create(dto: CreateEmployeeDto): Promise<Employee>;
++  findById(id: string): Promise<Employee | null>;
++  findByEmployeeNumber(employeeNumber: string): Promise<Employee | null>;
++  findByEmail(email: string): Promise<Employee | null>;
++  update(id: string, dto: UpdateEmployeeDto): Promise<Employee>;
++  delete(id: string): Promise<void>;
++  findActiveEmployees(): Promise<Employee[]>;
++  findSubordinates(managerId: string): Promise<Employee[]>;
++}
++
++export class EmployeeRepository implements IEmployeeRepository {
++  constructor(private readonly pool: Pool) {}
++
++  async create(dto: CreateEmployeeDto): Promise<Employee> {
++    const query = `
++      INSERT INTO employees (
++        employee_number, first_name, last_name, email,
++        manager_id, hire_date, termination_date
++      ) VALUES ($1, $2, $3, $4, $5, $6, $7)
++      RETURNING *
++    `;
++    const values = [
++      dto.employeeNumber,
++      dto.firstName,
++      dto.lastName,
++      dto.email,
++      dto.managerId,
++      dto.hireDate,
++      dto.terminationDate
++    ];
++    const result = await this.pool.query(query, values);
++    return this.mapRowToEmployee(result.rows[0]);
++  }
++
++  async findById(id: string): Promise<Employee | null> {
++    const query = 'SELECT * FROM employees WHERE id = $1';
++    const result = await this.pool.query(query, [id]);
++    return result.rows.length ? this.mapRowToEmployee(result.rows[0]) : null;
++  }
++
++  async findByEmployeeNumber(employeeNumber: string): Promise<Employee | null> {
++    const query = 'SELECT * FROM employees WHERE employee_number = $1';
++    const result = await this.pool.query(query, [employeeNumber]);
++    return result.rows.length ? this.mapRowToEmployee(result.rows[0]) : null;
++  }
++
++  async findByEmail(email: string): Promise<Employee | null> {
++    const query = 'SELECT * FROM employees WHERE email = $1';
++    const result = await this.pool.query(query, [email]);
++    return result.rows.length ? this.mapRowToEmployee(result.rows[0]) : null;
++  }
++
++  async update(id: string, dto: UpdateEmployeeDto): Promise<Employee> {
++    const updates: string[] = [];
++    const values: any[] = [];
++    let paramCount = 1;
++
++    if (dto.firstName !== undefined) {
++      updates.push(`first_name = $${paramCount++}`);
++      values.push(dto.firstName);
++    }
++    if (dto.lastName !== undefined) {
++      updates.push(`last_name = $${paramCount++}`);
++      values.push(dto.lastName);
++    }
++    if (dto.email !== undefined) {
++      updates.push(`email = $${paramCount++}`);
++      values.push(dto.email);
++    }
++    if (dto.managerId !== undefined) {
++      updates.push(`manager_id = $${paramCount++}`);
++      values.push(dto.managerId);
++    }
++    if (dto.terminationDate !== undefined) {
++      updates.push(`termination_date = $${paramCount++}`);
++      values.push(dto.terminationDate);
++    }
++    if (dto.isActive !== undefined) {
++      updates.push(`is_active = $${paramCount++}`);
++      values.push(dto.isActive);
++    }
++
++    if (updates.length === 0) {
++      const existing = await this.findById(id);
++      if (!existin

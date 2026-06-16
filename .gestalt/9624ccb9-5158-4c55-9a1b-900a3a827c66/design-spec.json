@@ -31,18 +31,28 @@
           "required": true
         },
         {
-          "name": "managerId",
-          "type": "string | null",
+          "name": "phone",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "department",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "position",
+          "type": "string",
           "required": false
         },
         {
           "name": "hireDate",
           "type": "Date",
-          "required": true
+          "required": false
         },
         {
-          "name": "terminationDate",
-          "type": "Date | null",
+          "name": "managerId",
+          "type": "string | null",
           "required": false
         },
         {
@@ -67,6 +77,58 @@
           "type": "one-to-many"
         }
       ]
+    },
+    {
+      "entityName": "CreateEmployeeDto",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "employeeNumber",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "firstName",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "lastName",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "email",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "phone",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "department",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "position",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "hireDate",
+          "type": "Date",
+          "required": false
+        },
+        {
+          "name": "managerId",
+          "type": "string | null",
+          "required": false
+        }
+      ],
+      "relationships": []
     }
   ],
   "apiContracts": [],
