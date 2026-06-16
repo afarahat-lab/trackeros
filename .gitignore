@@ -1,2 +1,9 @@
 # Claude Code runtime artifacts
 .claude/
+
+# Aider runtime artifacts
+.aider*
+.aider/*
+
+# Node Modules
+node_modules/
