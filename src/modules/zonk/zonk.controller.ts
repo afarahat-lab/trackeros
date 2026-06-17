@@ -1,5 +1,5 @@
 export class ZonkController {
-  public getGreeting(): string {
-    return 'Hey there!';
+  public getMessage(): string {
+    return 'zonk';
   }
 }

@@ -15,7 +15,7 @@
     "jsonwebtoken": "^8.5.1",
     "bcrypt": "^5.0.1",
     "dotenv": "^10.0.0",
-    "fastify": "^4.26.2"
+    "fastify": "^4.0.0"
   },
   "devDependencies": {
     "typescript": "^5.0.0",
@@ -27,7 +27,6 @@
     "@types/jsonwebtoken": "^8.5.5",
     "@types/bcrypt": "^5.0.0",
     "@types/node": "^16.0.0",
-    "@types/jest": "^29.0.0",
-    "@types/fastify": "^4.0.0"
+    "@types/jest": "^29.0.0"
   }
 }
