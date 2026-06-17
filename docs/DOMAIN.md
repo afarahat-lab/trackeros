@@ -40,6 +40,35 @@ Represents a leave record managed by the `leave` module, including leave request
 - `Employee` — many-to-one
 - `LeavePolicy` — many-to-one
 
+### CreateLeaveRequestDto
+
+| Field | Type | Required |
+|-------|------|----------|
+| startDate | Date | true |
+| endDate | Date | true |
+| reason | string | true |
+| leaveType | string | true |
+
+### UpdateLeaveRequestDto
+
+| Field | Type | Required |
+|-------|------|----------|
+| startDate | Date | false |
+| endDate | Date | false |
+| reason | string | false |
+| leaveType | string | false |
+
+### LeaveRequestQuery
+
+| Field | Type | Required |
+|-------|------|----------|
+| employeeId | string | false |
+| status | string | false |
+| startDateFrom | Date | false |
+| startDateTo | Date | false |
+| limit | number | false |
+| offset | number | false |
+
 ## balance
 
 Represents leave balance data managed by the `balance` module, including tracked entitlement, accrual, and remaining leave amounts.
