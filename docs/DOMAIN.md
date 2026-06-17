@@ -18,17 +18,6 @@ Base entity providing common fields for domain models.
 
 Represents a leave record managed by the `leave` module, including leave requests and related leave-tracking data.
 
-### LeaveStatus
-
-| Value | Description |
-|-------|-------------|
-| DRAFT | Draft leave request |
-| SUBMITTED | Submitted for approval |
-| PENDING_APPROVAL | Awaiting manager approval |
-| APPROVED | Approved by manager |
-| REJECTED | Rejected by manager |
-| CANCELLED | Cancelled by employee |
-
 ### LeaveRequest
 
 | Field | Type | Required |
@@ -40,27 +29,16 @@ Represents a leave record managed by the `leave` module, including leave request
 | endDate | Date | true |
 | totalDays | number | true |
 | reason | string \| null | false |
-| status | LeaveStatus | true |
-| managerId | string \| null | false |
-| approvedAt | Date \| null | false |
-| rejectionReason | string \| null | false |
+| status | 'pending' \| 'approved' \| 'rejected' \| 'cancelled' | true |
+| reviewedBy | string \| null | false |
+| reviewedAt | Date \| null | false |
+| reviewNotes | string \| null | false |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
 **Relationships**
 - `Employee` — many-to-one
 - `LeavePolicy` — many-to-one
-
-### CreateLeaveRequestDto
-
-| Field | Type | Required |
-|-------|------|----------|
-| employeeId | string | true |
-| policyId | string | true |
-| startDate | Date | true |
-| endDate | Date | true |
-| totalDays | number | true |
-| reason | string \| null | false |
 
 ## balance
 
@@ -74,8 +52,7 @@ Represents leave balance data managed by the `balance` module, including tracked
 | employeeId | string | true |
 | policyId | string | true |
 | balanceDays | number | true |
-| accrualDate | Date | true |
-| expiryDate | Date | true |
+| fiscalYear | number | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
@@ -97,27 +74,13 @@ Represents employee data managed by the `employee` module, including employee re
 | lastName | string | true |
 | email | string | true |
 | managerId | string \| null | false |
-| department | string \| null | false |
 | hireDate | Date | true |
-| employmentStatus | 'active' \| 'inactive' \| 'terminated' | true |
+| isActive | boolean | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
 **Relationships**
 - `Employee` — one-to-many
-
-### CreateEmployeeDto
-
-| Field | Type | Required |
-|-------|------|----------|
-| employeeNumber | string | true |
-| firstName | string | true |
-| lastName | string | true |
-| email | string | true |
-| managerId | string \| null | false |
-| department | string \| null | false |
-| hireDate | Date | true |
-| employmentStatus | 'active' \| 'inactive' \| 'terminated' | true |
 
 ## policy
 
@@ -127,9 +90,12 @@ Represents leave policy data managed by the `policy` module, including policy de
 
 | Value | Description |
 |-------|-------------|
-| Annual | Annual leave |
-| Sick | Sick leave |
-| Emergency | Emergency leave |
+| annual | Annual leave |
+| sick | Sick leave |
+| emergency | Emergency leave |
+| unpaid | Unpaid leave |
+| maternity | Maternity leave |
+| paternity | Paternity leave |
 
 ### LeavePolicy
 
@@ -139,10 +105,10 @@ Represents leave policy data managed by the `policy` module, including policy de
 | policyName | string | true |
 | leaveType | LeaveType | true |
 | entitlementDays | number | true |
-| accrualRate | number \| null | false |
-| maxCarryover | number \| null | false |
-| validityStart | Date | true |
-| validityEnd | Date \| null | false |
+| maxConsecutiveDays | number \| null | false |
+| advanceNoticeDays | number | true |
+| requiresApproval | boolean | true |
+| isActive | boolean | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
