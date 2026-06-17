@@ -24,21 +24,51 @@ Represents a leave record managed by the `leave` module, including leave request
 |-------|------|----------|
 | id | string | true |
 | employeeId | string | true |
-| policyId | string | true |
 | startDate | Date | true |
 | endDate | Date | true |
 | totalDays | number | true |
+| leaveType | string | true |
 | reason | string \| null | false |
-| status | 'pending' \| 'approved' \| 'rejected' \| 'cancelled' | true |
-| reviewedBy | string \| null | false |
-| reviewedAt | Date \| null | false |
-| reviewNotes | string \| null | false |
+| status | 'Pending' \| 'Approved' \| 'Rejected' | true |
+| approvedBy | string \| null | false |
+| rejectedBy | string \| null | false |
+| approvalDate | Date \| null | false |
+| rejectionDate | Date \| null | false |
+| rejectionReason | string \| null | false |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
 **Relationships**
 - `Employee` — many-to-one
 - `LeavePolicy` — many-to-one
+
+### CreateLeaveRequestDto
+
+| Field | Type | Required |
+|-------|------|----------|
+| employeeId | string | true |
+| startDate | Date | true |
+| endDate | Date | true |
+| leaveType | string | true |
+| reason | string | false |
+
+### UpdateLeaveRequestDto
+
+| Field | Type | Required |
+|-------|------|----------|
+| status | 'Approved' \| 'Rejected' | true |
+| rejectionReason | string | false |
+
+### LeaveRequestQuery
+
+| Field | Type | Required |
+|-------|------|----------|
+| employeeId | string | false |
+| status | string | false |
+| startDateFrom | Date | false |
+| startDateTo | Date | false |
+| limit | number | false |
+| offset | number | false |
 
 ## balance
 

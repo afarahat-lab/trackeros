@@ -24,6 +24,15 @@ export interface CreateLeaveRequestDto {
   managerId?: string;
 }
 
+export interface UpdateLeaveRequestDto {
+  leaveType?: LeaveType;
+  startDate?: string;
+  endDate?: string;
+  reason?: string;
+  managerId?: string;
+  status?: LeaveStatus;
+}
+
 export interface LeaveRequestQuery {
   employeeId?: string;
   status?: LeaveStatus;

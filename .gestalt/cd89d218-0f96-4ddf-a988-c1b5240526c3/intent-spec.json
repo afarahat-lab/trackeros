@@ -1,0 +1,92 @@
+{
+  "id": "844aa0c8-9cb5-41f1-a9a8-aa6ecbd6458f",
+  "correlationId": "cd89d218-0f96-4ddf-a988-c1b5240526c3",
+  "rawIntent": "Implement LeaveService class in src/modules/leave/leave.service.ts that implements ILeaveService interface. IMPORTANT: class-validator decorators (@IsDate, @IsString, @MinDate, @IsNotEmpty, etc.) must ONLY be applied to DTO class properties inside src/modules/leave/leave.model.ts. Do NOT place decorators inside leave.service.ts or on constructor parameters. In LeaveService, validate inputs imperatively by instantiating CreateLeaveRequestDto/UpdateLeaveRequestDto and calling validate() from class-validator. Enforce business rules in service methods: startDate >= current date, endDate >= startDate, totalDays > 0. Check leave balance via ILeaveBalanceService before creating requests. Write audit records via IAuditService and send notifications via INotificationService for all state-changing operations. Create src/modules/leave/leave.service.spec.ts with Vitest unit tests covering validation logic, business rules, balance checks, audit logging, and notification sending.",
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "domain",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "LeaveService class exists in src/modules/leave/leave.service.ts and implements ILeaveService interface",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "All class-validator decorators are exclusively on CreateLeaveRequestDto and UpdateLeaveRequestDto properties in leave.model.ts",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "LeaveService validates inputs imperatively by instantiating DTOs and calling validate() method",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "LeaveService enforces business rules: startDate >= current date, endDate >= startDate, totalDays > 0",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "LeaveService checks leave balance via ILeaveBalanceService before creating requests",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-006",
+      "description": "LeaveService writes audit records via IAuditService for all state-changing operations",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-007",
+      "description": "LeaveService sends notifications via INotificationService for submission, approval, and rejection events",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-008",
+      "description": "Unit tests exist in src/modules/leave/leave.service.spec.ts covering validation, business rules, balance checks, audit logging, and notification sending",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces",
+    "Audit records: All state-changing operations write an audit record",
+    "Input validation: Validate all inputs at API boundaries before processing",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data",
+    "RBAC enforcement: All API endpoints enforce role-based access control",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled",
+    "Modular monolith architecture with dependency direction: leave -> employee, leave -> policy, leave -> balance, leave -> notification",
+    "No reverse dependencies permitted",
+    "LeaveRequest lifecycle states: Pending, Approved, Rejected",
+    "Balance deductions occur only during approveLeaveRequest",
+    "Notifications created on submission, approval, and rejection events"
+  ],
+  "outOfScope": [
+    "Changes to existing DTO definitions in leave.model.ts (only adding decorators)",
+    "Changes to ILeaveService interface definition",
+    "Changes to employee, policy, balance, or notification modules",
+    "API endpoint implementations",
+    "Repository implementations",
+    "Database schema changes",
+    "Integration tests",
+    "E2E tests",
+    "UI components",
+    "Configuration files"
+  ],
+  "ambiguities": []
+}
