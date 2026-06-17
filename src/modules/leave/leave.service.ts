@@ -1,47 +1,46 @@
+import { CreateLeaveRequestDto, LeaveRequest, LeaveRequestQuery, LeaveRequestStatus } from './leave.model';
 import { ILeaveRepository } from './leave.repository';
 import { ILeaveBalanceRepository } from '../balance/balance.repository';
 import { ILeavePolicyRepository } from '../policy/policy.repository';
 import { IEmployeeRepository } from '../employee/employee.repository';
 import { IAuditLogRepository } from '../../shared/audit/audit.repository';
 import { INotificationRepository } from '../../shared/notification/notification.repository';
-import { LeaveRequest, CreateLeaveRequestDto, LeaveRequestQuery, LeaveStatus } from './leave.model';
 
-export class LeaveService {
+export interface ILeaveService {
+  createLeaveRequest(dto: CreateLeaveRequestDto): Promise<LeaveRequest>;
+  getLeaveRequestById(id: string): Promise<LeaveRequest | null>;
+  getLeaveRequestsByEmployee(employeeId: string, query?: LeaveRequestQuery): Promise<LeaveRequest[]>;
+  updateLeaveRequestStatus(id: string, status: LeaveRequestStatus, reviewedBy: string, reviewNotes?: string): Promise<LeaveRequest>;
+  cancelLeaveRequest(id: string, employeeId: string): Promise<LeaveRequest>;
+}
+
+export class LeaveService implements ILeaveService {
   constructor(
-    private readonly leaveRepo: ILeaveRepository,
-    private readonly balanceRepo: ILeaveBalanceRepository,
-    private readonly policyRepo: ILeavePolicyRepository,
-    private readonly employeeRepo: IEmployeeRepository,
-    private readonly auditRepo: IAuditLogRepository,
-    private readonly notificationRepo: INotificationRepository,
+    private readonly leaveRepository: ILeaveRepository,
+    private readonly leaveBalanceRepository: ILeaveBalanceRepository,
+    private readonly leavePolicyRepository: ILeavePolicyRepository,
+    private readonly employeeRepository: IEmployeeRepository,
+    private readonly auditLogRepository: IAuditLogRepository,
+    private readonly notificationRepository: INotificationRepository
   ) {}
 
-  async findAll(query: LeaveRequestQuery): Promise<LeaveRequest[]> {
-    return this.leaveRepo.findAll(query);
+  async createLeaveRequest(dto: CreateLeaveRequestDto): Promise<LeaveRequest> {
+    throw new Error('Not implemented');
   }
 
-  async findById(id: string): Promise<LeaveRequest | null> {
-    return this.leaveRepo.findById(id);
+  async getLeaveRequestById(id: string): Promise<LeaveRequest | null> {
+    throw new Error('Not implemented');
   }
 
-  async create(dto: CreateLeaveRequestDto): Promise<LeaveRequest> {
-    // placeholder
-    return this.leaveRepo.create(dto);
+  async getLeaveRequestsByEmployee(employeeId: string, query?: LeaveRequestQuery): Promise<LeaveRequest[]> {
+    throw new Error('Not implemented');
   }
 
-  async approve(id: string, managerId: string): Promise<LeaveRequest | null> {
-    // placeholder
-    const leave = await this.leaveRepo.findById(id);
-    if (!leave) return null;
-    const updated = await this.leaveRepo.update(id, { managerId });
-    return updated;
+  async updateLeaveRequestStatus(id: string, status: LeaveRequestStatus, reviewedBy: string, reviewNotes?: string): Promise<LeaveRequest> {
+    throw new Error('Not implemented');
   }
 
-  async reject(id: string, managerId: string): Promise<LeaveRequest | null> {
-    // placeholder
-    const leave = await this.leaveRepo.findById(id);
-    if (!leave) return null;
-    const updated = await this.leaveRepo.update(id, { managerId });
-    return updated;
+  async cancelLeaveRequest(id: string, employeeId: string): Promise<LeaveRequest> {
+    throw new Error('Not implemented');
   }
 }

@@ -1,8 +1,9 @@
 import { LeaveBalance } from './balance.model';
 
 export interface ILeaveBalanceRepository {
-  findByEmployeeId(employeeId: string): Promise<LeaveBalance[]>;
-  findByEmployeeIdAndType(employeeId: string, leaveType: string): Promise<LeaveBalance | null>;
-  create(balance: Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeaveBalance>;
-  update(id: string, balance: Partial<Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt'>>): Promise<LeaveBalance | null>;
+  findByEmployee(employeeId: string, fiscalYear?: number): Promise<LeaveBalance[]>;
+  findById(id: string): Promise<LeaveBalance | null>;
+  update(id: string, data: Partial<LeaveBalance>): Promise<LeaveBalance>;
+  deduct(employeeId: string, policyId: string, fiscalYear: number, days: number): Promise<LeaveBalance>;
+  add(employeeId: string, policyId: string, fiscalYear: number, days: number): Promise<LeaveBalance>;
 }
