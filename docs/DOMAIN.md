@@ -112,18 +112,26 @@ Represents employee data managed by the `employee` module, including employee re
 
 Represents leave policy data managed by the `policy` module, including policy definitions, rules, and leave entitlement configurations.
 
+### LeaveType
+
+| Value | Description |
+|-------|-------------|
+| Annual | Annual leave |
+| Sick | Sick leave |
+| Emergency | Emergency leave |
+
 ### LeavePolicy
 
 | Field | Type | Required |
 |-------|------|----------|
 | id | string | true |
 | policyName | string | true |
-| leaveType | 'ANNUAL' \| 'SICK' \| 'EMERGENCY' \| 'UNPAID' | true |
+| leaveType | LeaveType | true |
 | entitlementDays | number | true |
 | accrualRate | number \| null | false |
 | maxCarryover | number \| null | false |
-| requiresApproval | boolean | true |
-| isActive | boolean | true |
+| validityStart | Date | true |
+| validityEnd | Date \| null | false |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
