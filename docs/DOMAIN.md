@@ -11,8 +11,8 @@ Base entity providing common fields for domain models.
 | Field | Type | Required |
 |-------|------|----------|
 | id | string | true |
-| createdAt | Date | true |
-| updatedAt | Date | true |
+| created_at | Date | true |
+| updated_at | Date | true |
 
 ## leave
 
@@ -173,11 +173,11 @@ Represents audit data managed by the `audit` module, including audit records, ch
 
 | Field | Type | Required |
 |-------|------|----------|
-| entityType | string | true |
-| entityId | string | true |
+| entity_type | string | true |
+| entity_id | string | true |
 | action | string | true |
-| changedBy | string \| null | true |
-| oldValues | Record<string, any> \| null | true |
-| newValues | Record<string, any> \| null | true |
-| ipAddress | string \| null | true |
-| userAgent | string \| null | true |
+| changed_by | string \| null | false |
+| old_values | Record<string, any> \| null | false |
+| new_values | Record<string, any> \| null | false |
+| ip_address | string \| null | false |
+| user_agent | string \| null | false |
