@@ -1,0 +1,71 @@
+{
+  "id": "6f15fb92-15e4-4672-a8ac-6f94e4f5fccb",
+  "correlationId": "1824ac9d-9a63-46aa-8d9d-77c55419b327",
+  "rawIntent": "[Feature: Build the leave management module — Phase 3: Policy module core]\n\nCreate src/modules/policy/policy.model.ts with LeavePolicy interface matching canonical attributes and lifecycle states. Create src/modules/policy/policy.repository.ts implementing ILeavePolicyRepository extending IBaseRepository. This phase depends on src/shared/types/index.ts from Phase 1 for shared types and src/shared/database/base.repository.ts for base repository pattern.\n\nThis phase depends on: src/shared/types/index.ts, src/shared/database/base.repository.ts.\n\nPhase architecture notes:\nBuild policy module which defines leave rules and entitlements needed by leave and balance modules.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/policy/policy.model.ts\\nexport enum LeaveType {\\n  ANNUAL = 'annual',\\n  SICK = 'sick',\\n  EMERGENCY = 'emergency'\\n}\\n\\nexport interface LeavePolicy {\\n  id: string;\\n  policyName: string;\\n  leaveType: LeaveType;\\n  entitlementDays: number;\\n  accrualRate: number | null;\\n  maxCarryover: number | null;\\n  validityStart: Date;\\n  validityEnd: Date | null;\\n  createdAt: Date;\\n  updatedAt: Date;\\n}\",\"File: src/modules/policy/policy.repository.ts\\nimport { IBaseRepository } from '../../shared/database/base.repository';\\nimport { LeavePolicy, LeaveType } from './policy.model';\\n\\nexport interface ILeavePolicyRepository extends IBaseRepository<LeavePolicy> {\\n  findByLeaveType(leaveType: LeaveType): Promise<LeavePolicy[]>;\\n  findActivePolicies(asOfDate?: Date): Promise<LeavePolicy[]>;\\n  findByPolicyName(policyName: string): Promise<LeavePolicy | null>;\\n}\\n\\nexport class LeavePolicyRepository implements ILeavePolicyRepository {\\n  constructor(private readonly db: any) {}\\n  \\n  async create(data: Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeavePolicy> {\\n    throw new Error('Method not implemented');\\n  }\\n  \\n  async findById(id: string): Promise<LeavePolicy | null> {\\n    throw new Error('Method not implemented');\\n  }\\n  \\n  async findAll(): Promise<LeavePolicy[]> {\\n    throw new Error('Method not implemented');\\n  }\\n  \\n  async update(id: string, data: Partial<LeavePolicy>): Promise<LeavePolicy> {\\n    throw new Error('Method not implemented');\\n  }\\n  \\n  async delete(id: string): Promise<void> {\\n    throw new Error('Method not implemented');\\n  }\\n  \\n  async findByLeaveType(leaveType: LeaveType): Promise<LeavePolicy[]> {\\n    throw new Error('Method not implemented');\\n  }\\n  \\n  async findActivePolicies(asOfDate?: Date): Promise<LeavePolicy[]> {\\n    throw new Error('Method not implemented');\\n  }\\n  \\n  async findByPolicyName(policyName: string): Promise<LeavePolicy | null> {\\n    throw new Error('Method not implemented');\\n  }\\n}\"],\"importStatements\":[\"import { IBaseRepository } from '../../shared/database/base.repository'\",\"import { LeavePolicy, LeaveType } from './policy.model'\"],\"successCriteria\":[\"src/modules/policy/policy.model.ts exists and exports LeaveType enum and LeavePolicy interface\",\"src/modules/policy/policy.repository.ts exists and exports ILeavePolicyRepository interface and LeavePolicyRepository class\",\"LeavePolicyRepository implements all methods from ILeavePolicyRepository and IBaseRepository\",\"All repository method signatures include proper error handling with appropriate error types\",\"LeaveType enum values match canonical schema leave_type column constraints\",\"ARCHITECTURE.md must be updated to include the new LeaveType enum domain concept\"],\"sqlSchema\":\"CREATE TABLE leave_policies (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), policy_name VARCHAR(100) UNIQUE NOT NULL, leave_type VARCHAR(50) NOT NULL, entitlement_days INTEGER NOT NULL CHECK (entitlement_days >= 0), accrual_rate DECIMAL(5,2), max_carryover INTEGER, validity_start DATE NOT NULL, validity_end DATE, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP);\"}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- LeavePolicy\n- ILeavePolicyRepository\n- IBaseRepository\n- LeaveType\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Canonical entity fields for this phase\n\nNote: these field names supersede any attribute names in the\nintent text above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the field names of each entity this phase defines. The\nexact attribute / column / property set per entity is:\n\n- `LeavePolicy`: `id`, `policyName`, `leaveType`, `entitlementDays`, `accrualRate`, `maxCarryover`, `validityStart`, `validityEnd`, `createdAt`, `updatedAt`\n\nTreat each entity's field list as complete. If the\nintent text or planner scope mentions different field\nnames than the architecture, do NOT flag this as\nambiguity — the per-phase architecture wins.\n\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 4 — Balance module core: Create src/modules/balance/balance.model.ts with LeaveBalance interface matching canonical attribute\n- Phase 5 — Notification module core: Create src/modules/notification/notification.model.ts with Notification interface matching canonical\n- Phase 6 — Leave module core models and repository: Create src/modules/leave/leave.model.ts with LeaveRequest interface matching canonical attributes an\n- Phase 7 — Leave module service with business logic: Create src/modules/leave/leave.service.ts with LeaveService class implementing ILeaveService interfa\n- Phase 8 — Leave controllers and routes: Create src/modules/leave/leave.controller.ts with LeaveController class implementing Fastify route h",
+  "scope": {
+    "affectedDomains": [
+      "policy"
+    ],
+    "affectedLayers": [
+      "domain"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/policy/policy.model.ts exists and exports LeaveType enum and LeavePolicy interface with all canonical attributes",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/policy/policy.repository.ts exists and exports ILeavePolicyRepository interface extending IBaseRepository<LeavePolicy> with findByLeaveType, findActivePolicies, and findByPolicyName methods",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "LeavePolicyRepository class implements all methods from ILeavePolicyRepository and IBaseRepository with proper TypeScript signatures",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "LeaveType enum values match canonical schema leave_type column constraints (ANNUAL, SICK, EMERGENCY)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "ARCHITECTURE.md is updated to include LeaveType enum as a domain concept",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces",
+    "Input validation: Validate all inputs at API boundaries before processing",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled",
+    "Dependency direction: policy module has no dependencies on other modules (leave -> policy, not policy -> leave)",
+    "TypeScript strict mode compliance"
+  ],
+  "outOfScope": [
+    "Implementation of repository methods (only signatures required)",
+    "Database migrations or SQL schema creation",
+    "API endpoints, controllers, or routes",
+    "Business logic or service layer",
+    "Balance module (Phase 4)",
+    "Notification module (Phase 5)",
+    "Leave module models and repository (Phase 6)",
+    "Leave service with business logic (Phase 7)",
+    "Leave controllers and routes (Phase 8)",
+    "Employee module integration",
+    "Audit records for policy operations",
+    "RBAC enforcement for policy operations",
+    "Testing beyond TypeScript compilation"
+  ],
+  "ambiguities": []
+}
