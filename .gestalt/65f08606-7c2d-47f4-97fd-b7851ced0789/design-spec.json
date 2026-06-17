@@ -1,0 +1,18 @@
+{
+  "correlationId": "65f08606-7c2d-47f4-97fd-b7851ced0789",
+  "domainChanges": [],
+  "apiContracts": [
+    {
+      "method": "GET",
+      "path": "/qux",
+      "description": "Returns a simple qux message",
+      "requestBody": {},
+      "responseBody": {
+        "message": "string"
+      },
+      "authRequired": false,
+      "roles": []
+    }
+  ],
+  "componentSpecs": []
+}
