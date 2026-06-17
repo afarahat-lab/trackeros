@@ -1,0 +1,18 @@
+{
+  "correlationId": "7fb8a26f-bfc6-46b1-9dc2-987e53aeee9e",
+  "domainChanges": [],
+  "apiContracts": [
+    {
+      "method": "GET",
+      "path": "/zonk",
+      "description": "Returns a simple test message",
+      "requestBody": {},
+      "responseBody": {
+        "message": "string"
+      },
+      "authRequired": false,
+      "roles": []
+    }
+  ],
+  "componentSpecs": []
+}
