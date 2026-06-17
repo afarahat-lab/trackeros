@@ -4708,3 +4708,345 @@
 +export class ValidationError extends ApplicationError {
 +  constructor(message: string, details?: Record<string, string[]>) {
 +    super(message, 'VALIDATION_ERROR', 400);
+
+# 2026-06-17 05:19:22.940653
++## Task
++[Feature: Build the leave management module — Phase 2: Employee module core]
++
++Create src/modules/employee/employee.model.ts with Employee interface matching canonical attributes and lifecycle states. Create src/modules/employee/employee.repository.ts implementing IEmployeeRepository extending IBaseRepository. This phase depends on src/shared/types/index.ts from Phase 1 for shared types and src/shared/database/base.repository.ts for base repository pattern.
++
++This phase depends on: src/shared/types/index.ts, src/shared/database/base.repository.ts.
++
++Phase architecture notes:
++Build employee module which provides essential employee hierarchy data needed by leave and balance modules.
++
++Detailed phase architecture (architecture-agent):
++{"interfaces":["File: src/modules/employee/employee.model.ts\nexport type EmploymentStatus = 'active' | 'inactive' | 'terminated';\n\nexport interface Employee {\n  id: string;\n  employeeNumber: string;\n  firstName: string;\n  lastName: string;\n  email: string;\n  managerId: string | null;\n  department: string | null;\n  hireDate: Date;\n  employmentStatus: EmploymentStatus;\n  createdAt: Date;\n  updatedAt: Date;\n}","File: src/modules/employee/repositories/employee.repository.ts\nimport { Employee } from '../employee.model';\nimport { IBaseRepository } from '../../../shared/types/base.repository';\n\nexport interface IEmployeeRepository extends IBaseRepository<Employee> {\n  findById(id: string): Promise<Employee | null>;\n  findByEmployeeNumber(employeeNumber: string): Promise<Employee | null>;\n  findByEmail(email: string): Promise<Employee | null>;\n  findSubordinates(managerId: string): Promise<Employee[]>;\n  findActiveEmployees(): Promise<Employee[]>;\n  update(employee: Employee): Promise<Employee>;\n}","File: src/modules/employee/services/employee.service.ts\nimport { Employee, EmploymentStatus } from '../employee.model';\nimport { NotFoundError, ValidationError } from '../../../shared/errors/application.error';\n\nexport interface IEmployeeService {\n  getEmployeeById(id: string): Promise<Employee>;\n  getEmployeeByEmployeeNumber(employeeNumber: string): Promise<Employee>;\n  getEmployeeByEmail(email: string): Promise<Employee>;\n  getSubordinates(managerId: string): Promise<Employee[]>;\n  getActiveEmployees(): Promise<Employee[]>;\n  updateEmployeeStatus(id: string, status: EmploymentStatus): Promise<Employee>;\n}"],"importStatements":["import { Pool } from 'pg';","import { BaseRepository } from '../../../shared/database/base.repository';","import { NotFoundError, ValidationError } from '../../../shared/errors/application.error';","import { DatabaseService } from '../../../shared/database/database.service';","import { Employee, EmploymentStatus } from './employee.model';","import { IEmployeeRepository } from './repositories/employee.repository';","import { IEmployeeService } from './services/employee.service';"],"successCriteria":["src/modules/employee/employee.model.ts exists and exports Employee interface and EmploymentStatus type","src/modules/employee/repositories/employee.repository.ts exists and exports EmployeeRepository implementing IEmployeeRepository","src/modules/employee/services/employee.service.ts exists and exports EmployeeService implementing IEmployeeService","EmployeeRepository extends BaseRepository<Employee> and uses DatabaseService for queries","EmployeeService validates inputs and throws NotFoundError when employee not found","All database access goes through EmployeeRepository (GP-001 compliance)","EmploymentStatus type with values 'active', 'inactive', 'terminated' is documented in ARCHITECTURE.md"]}
++
++## Canonical dependencies for this phase
++
++Note: this list supersedes any dependency names in the intent
++text above. Do not emit ambiguity for mismatches.
++
++The per-phase architecture above is the AUTHORITATIVE source
++for the dependency list this phase must implement. The exact
++set of types, abstractions, and references defined or used by
++this phase is:
++
++- Employee
++- IEmployeeRepository
++- IEmployeeService
++- Pool
++- BaseRepository
++- NotFoundError
++- ValidationError
++- DatabaseService
++- EmploymentStatus
++
++Treat this list as complete. If additional dependencies appear
++in the architecture but the planner's scope text mentions a
++partial subset, do NOT flag this as ambiguity — the per-phase
++architecture wins.
++
++
++## Canonical entity fields for this phase
++
++Note: these field names supersede any attribute names in the
++intent text above. Do not emit ambiguity for mismatches.
++
++The per-phase architecture above is the AUTHORITATIVE source
++for the field names of each entity this phase defines. The
++exact attribute / column / property set per entity is:
++
++- `Employee`: `id`, `employeeNumber`, `firstName`, `lastName`, `email`, `managerId`, `department`, `hireDate`, `employmentStatus`, `createdAt`, `updatedAt`
++
++Treat each entity's field list as complete. If the
++intent text or planner scope mentions different field
++names than the architecture, do NOT flag this as
++ambiguity — the per-phase architecture wins.
++
++
++## Deferred to later phases
++The following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:
++- Phase 3 — Policy module core: Create src/modules/policy/policy.model.ts with LeavePolicy interface matching canonical attributes a
++- Phase 4 — Balance module core: Create src/modules/balance/balance.model.ts with LeaveBalance interface matching canonical attribute
++- Phase 5 — Notification module core: Create src/modules/notification/notification.model.ts with Notification interface matching canonical
++- Phase 6 — Leave module core models and repository: Create src/modules/leave/leave.model.ts with LeaveRequest interface matching canonical attributes an
++- Phase 7 — Leave module service with business logic: Create src/modules/leave/leave.service.ts with LeaveService class implementing ILeaveService interfa
++- Phase 8 — Leave controllers and routes: Create src/modules/leave/leave.controller.ts with LeaveController class implementing Fastify route h
++
++## Success criteria
++- src/modules/employee/employee.model.ts exists and exports Employee interface and EmploymentStatus type
++- src/modules/employee/repositories/employee.repository.ts exists and exports EmployeeRepository implementing IEmployeeRepository
++- src/modules/employee/services/employee.service.ts exists and exports EmployeeService implementing IEmployeeService
++- EmployeeRepository extends BaseRepository<Employee> and uses DatabaseService for queries
++- EmployeeService validates inputs and throws NotFoundError when employee not found
++- All database access goes through EmployeeRepository
++
++## Out of scope (do NOT touch these)
++- Policy module core (Phase 3)
++- Balance module core (Phase 4)
++- Notification module core (Phase 5)
++- Leave module core models and repository (Phase 6)
++- Leave module service with business logic (Phase 7)
++- Leave controllers and routes (Phase 8)
++- API endpoints for employee module
++- UI components
++- Authentication or authorization implementation
++- Database migrations
++- LeaveRequest lifecycle implementation
++- Balance deductions
++- Notification generation
++
++## Project rules
++- Generated code must compile without errors. Verify with executeScript before returning.
++- All imports must resolve to files that exist in the project or are declared in package.json.
++- You MUST run a compile/lint check via executeScript before emitting the final files. This is not optional.
++- Do not use require() for JSON imports — import them using ES module syntax with resolveJsonModule enabled in tsconfig.
++- Before generating any repository, service, or controller code, read the DTO and interface files it will use. Never reference a field on a type without confirming it exists in the type definition.
++- Before generating code that calls methods on a dependency, read the dependency's source file to confirm which methods exist. Only call methods that are actually defined.
++- Read the project's compiler/linter configuration file (tsconfig.json, mypy.ini, pyproject.toml, .eslintrc etc) before generating code. Follow the strictness settings it defines — do not assume permissive defaults.
++- Read the project's dependency manifest (package.json, requirements.txt, go.mod, pom.xml etc) before importing external packages. Only import packages that are listed as dependencies.
++
++## Scoped architecture for this phase
++The following describes ONLY what exists now and what you
++are building in this phase. Use these exact file paths,
++exact export names, and exact import statements. Do not
++invent paths or imports — if it is not listed here, it
++does not exist.
++
++### Existing dependencies — use these exact imports
++
++import { Pool } from 'pg';
++import { BaseRepository } from '../../../shared/database/base.repository';
++import { NotFoundError, ValidationError } from '../../../shared/errors/application.error';
++import { DatabaseService } from '../../../shared/database/database.service';
++import { Employee, EmploymentStatus } from './employee.model';
++import { IEmployeeRepository } from './repositories/employee.repository';
++import { IEmployeeService } from './services/employee.service';
++
++### Interfaces / types this phase implements
++
++File: src/modules/employee/employee.model.ts
++export type EmploymentStatus = 'active' | 'inactive' | 'terminated';
++
++export interface Employee {
++  id: string;
++  employeeNumber: string;
++  firstName: string;
++  lastName: string;
++  email: string;
++  managerId: string | null;
++  department: string | null;
++  hireDate: Date;
++  employmentStatus: EmploymentStatus;
++  createdAt: Date;
++  updatedAt: Date;
++}
++
++File: src/modules/employee/repositories/employee.repository.ts
++import { Employee } from '../employee.model';
++import { IBaseRepository } from '../../../shared/types/base.repository';
++
++export interface IEmployeeRepository extends IBaseRepository<Employee> {
++  findById(id: string): Promise<Employee | null>;
++  findByEmployeeNumber(employeeNumber: string): Promise<Employee | null>;
++  findByEmail(email: string): Promise<Employee | null>;
++  findSubordinates(managerId: string): Promise<Employee[]>;
++  findActiveEmployees(): Promise<Employee[]>;
++  update(employee: Employee): Promise<Employee>;
++}
++
++File: src/modules/employee/services/employee.service.ts
++import { Employee, EmploymentStatus } from '../employee.model';
++import { NotFoundError, ValidationError } from '../../../shared/errors/application.error';
++
++export interface IEmployeeService {
++  getEmployeeById(id: string): Promise<Employee>;
++  getEmployeeByEmployeeNumber(employeeNumber: string): Promise<Employee>;
++  getEmployeeByEmail(email: string): Promise<Employee>;
++  getSubordinates(managerId: string): Promise<Employee[]>;
++  getActiveEmployees(): Promise<Employee[]>;
++  updateEmployeeStatus(id: string, status: EmploymentStatus): Promise<Employee>;
++}
++
++### Success criteria for this phase
++
++- src/modules/employee/employee.model.ts exists and exports Employee interface and EmploymentStatus type
++- src/modules/employee/repositories/employee.repository.ts exists and exports EmployeeRepository implementing IEmployeeRepository
++- src/modules/employee/services/employee.service.ts exists and exports EmployeeService implementing IEmployeeService
++- EmployeeRepository extends BaseRepository<Employee> and uses DatabaseService for queries
++- EmployeeService validates inputs and throws NotFoundError when employee not found
++- All database access goes through EmployeeRepository (GP-001 compliance)
++- EmploymentStatus type with values 'active', 'inactive', 'terminated' is documented in ARCHITECTURE.md
+
+# 2026-06-17 05:19:22.940785
++## Task
++[Feature: Build the leave management module — Phase 2: Employee module core]
++
++Create src/modules/employee/employee.model.ts with Employee interface matching canonical attributes and lifecycle states. Create src/modules/employee/employee.repository.ts implementing IEmployeeRepository extending IBaseRepository. This phase depends on src/shared/types/index.ts from Phase 1 for shared types and src/shared/database/base.repository.ts for base repository pattern.
++
++This phase depends on: src/shared/types/index.ts, src/shared/database/base.repository.ts.
++
++Phase architecture notes:
++Build employee module which provides essential employee hierarchy data needed by leave and balance modules.
++
++Detailed phase architecture (architecture-agent):
++{"interfaces":["File: src/modules/employee/employee.model.ts\nexport type EmploymentStatus = 'active' | 'inactive' | 'terminated';\n\nexport interface Employee {\n  id: string;\n  employeeNumber: string;\n  firstName: string;\n  lastName: string;\n  email: string;\n  managerId: string | null;\n  department: string | null;\n  hireDate: Date;\n  employmentStatus: EmploymentStatus;\n  createdAt: Date;\n  updatedAt: Date;\n}","File: src/modules/employee/repositories/employee.repository.ts\nimport { Employee } from '../employee.model';\nimport { IBaseRepository } from '../../../shared/types/base.repository';\n\nexport interface IEmployeeRepository extends IBaseRepository<Employee> {\n  findById(id: string): Promise<Employee | null>;\n  findByEmployeeNumber(employeeNumber: string): Promise<Employee | null>;\n  findByEmail(email: string): Promise<Employee | null>;\n  findSubordinates(managerId: string): Promise<Employee[]>;\n  findActiveEmployees(): Promise<Employee[]>;\n  update(employee: Employee): Promise<Employee>;\n}","File: src/modules/employee/services/employee.service.ts\nimport { Employee, EmploymentStatus } from '../employee.model';\nimport { NotFoundError, ValidationError } from '../../../shared/errors/application.error';\n\nexport interface IEmployeeService {\n  getEmployeeById(id: string): Promise<Employee>;\n  getEmployeeByEmployeeNumber(employeeNumber: string): Promise<Employee>;\n  getEmployeeByEmail(email: string): Promise<Employee>;\n  getSubordinates(managerId: string): Promise<Employee[]>;\n  getActiveEmployees(): Promise<Employee[]>;\n  updateEmployeeStatus(id: string, status: EmploymentStatus): Promise<Employee>;\n}"],"importStatements":["import { Pool } from 'pg';","import { BaseRepository } from '../../../shared/database/base.repository';","import { NotFoundError, ValidationError } from '../../../shared/errors/application.error';","import { DatabaseService } from '../../../shared/database/database.service';","import { Employee, EmploymentStatus } from './employee.model';","import { IEmployeeRepository } from './repositories/employee.repository';","import { IEmployeeService } from './services/employee.service';"],"successCriteria":["src/modules/employee/employee.model.ts exists and exports Employee interface and EmploymentStatus type","src/modules/employee/repositories/employee.repository.ts exists and exports EmployeeRepository implementing IEmployeeRepository","src/modules/employee/services/employee.service.ts exists and exports EmployeeService implementing IEmployeeService","EmployeeRepository extends BaseRepository<Employee> and uses DatabaseService for queries","EmployeeService validates inputs and throws NotFoundError when employee not found","All database access goes through EmployeeRepository (GP-001 compliance)","EmploymentStatus type with values 'active', 'inactive', 'terminated' is documented in ARCHITECTURE.md"]}
++
++## Canonical dependencies for this phase
++
++Note: this list supersedes any dependency names in the intent
++text above. Do not emit ambiguity for mismatches.
++
++The per-phase architecture above is the AUTHORITATIVE source
++for the dependency list this phase must implement. The exact
++set of types, abstractions, and references defined or used by
++this phase is:
++
++- Employee
++- IEmployeeRepository
++- IEmployeeService
++- Pool
++- BaseRepository
++- NotFoundError
++- ValidationError
++- DatabaseService
++- EmploymentStatus
++
++Treat this list as complete. If additional dependencies appear
++in the architecture but the planner's scope text mentions a
++partial subset, do NOT flag this as ambiguity — the per-phase
++architecture wins.
++
++
++## Canonical entity fields for this phase
++
++Note: these field names supersede any attribute names in the
++intent text above. Do not emit ambiguity for mismatches.
++
++The per-phase architecture above is the AUTHORITATIVE source
++for the field names of each entity this phase defines. The
++exact attribute / column / property set per entity is:
++
++- `Employee`: `id`, `employeeNumber`, `firstName`, `lastName`, `email`, `managerId`, `department`, `hireDate`, `employmentStatus`, `createdAt`, `updatedAt`
++
++Treat each entity's field list as complete. If the
++intent text or planner scope mentions different field
++names than the architecture, do NOT flag this as
++ambiguity — the per-phase architecture wins.
++
++
++## Deferred to later phases
++The following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:
++- Phase 3 — Policy module core: Create src/modules/policy/policy.model.ts with LeavePolicy interface matching canonical attributes a
++- Phase 4 — Balance module core: Create src/modules/balance/balance.model.ts with LeaveBalance interface matching canonical attribute
++- Phase 5 — Notification module core: Create src/modules/notification/notification.model.ts with Notification interface matching canonical
++- Phase 6 — Leave module core models and repository: Create src/modules/leave/leave.model.ts with LeaveRequest interface matching canonical attributes an
++- Phase 7 — Leave module service with business logic: Create src/modules/leave/leave.service.ts with LeaveService class implementing ILeaveService interfa
++- Phase 8 — Leave controllers and routes: Create src/modules/leave/leave.controller.ts with LeaveController class implementing Fastify route h
++
++## Success criteria
++- src/modules/employee/employee.model.ts exists and exports Employee interface and EmploymentStatus type
++- src/modules/employee/repositories/employee.repository.ts exists and exports EmployeeRepository implementing IEmployeeRepository
++- src/modules/employee/services/employee.service.ts exists and exports EmployeeService implementing IEmployeeService
++- EmployeeRepository extends BaseRepository<Employee> and uses DatabaseService for queries
++- EmployeeService validates inputs and throws NotFoundError when employee not found
++- All database access goes through EmployeeRepository
++
++## Out of scope (do NOT touch these)
++- Policy module core (Phase 3)
++- Balance module core (Phase 4)
++- Notification module core (Phase 5)
++- Leave module core models and repository (Phase 6)
++- Leave module service with business logic (Phase 7)
++- Leave controllers and routes (Phase 8)
++- API endpoints for employee module
++- UI components
++- Authentication or authorization implementation
++- Database migrations
++- LeaveRequest lifecycle implementation
++- Balance deductions
++- Notification generation
++
++## Project rules
++- Generated code must compile without errors. Verify with executeScript before returning.
++- All imports must resolve to files that exist in the project or are declared in package.json.
++- You MUST run a compile/lint check via executeScript before emitting the final files. This is not optional.
++- Do not use require() for JSON imports — import them using ES module syntax with resolveJsonModule enabled in tsconfig.
++- Before generating any repository, service, or controller code, read the DTO and interface files it will use. Never reference a field on a type without confirming it exists in the type definition.
++- Before generating code that calls methods on a dependency, read the dependency's source file to confirm which methods exist. Only call methods that are actually defined.
++- Read the project's compiler/linter configuration file (tsconfig.json, mypy.ini, pyproject.toml, .eslintrc etc) before generating code. Follow the strictness settings it defines — do not assume permissive defaults.
++- Read the project's dependency manifest (package.json, requirements.txt, go.mod, pom.xml etc) before importing external packages. Only import packages that are listed as dependencies.
++
++## Scoped architecture for this phase
++The following describes ONLY what exists now and what you
++are building in this phase. Use these exact file paths,
++exact export names, and exact import statements. Do not
++invent paths or imports — if it is not listed here, it
++does not exist.
++
++### Existing dependencies — use these exact imports
++
++import { Pool } from 'pg';
++import { BaseRepository } from '../../../shared/database/base.repository';
++import { NotFoundError, ValidationError } from '../../../shared/errors/application.error';
++import { DatabaseService } from '../../../shared/database/database.service';
++import { Employee, EmploymentStatus } from './employee.model';
++import { IEmployeeRepository } from './repositories/employee.repository';
++import { IEmployeeService } from './services/employee.service';
++
++### Interfaces / types this phase implements
++
++File: src/modules/employee/employee.model.ts
++export type EmploymentStatus = 'active' | 'inactive' | 'terminated';
++
++export interface Employee {
++  id: string;
++  employeeNumber: string;
++  firstName: string;
++  lastName: string;
++  email: string;
++  managerId: string | null;
++  department: string | null;
++  hireDate: Date;
++  employmentStatus: EmploymentStatus;
++  createdAt: Date;
++  updatedAt: Date;
++}
++
++File: src/modules/employee/repositories/employee.repository.ts
++import { Employee } from '../employee.model';
++import { IBaseRepository } from '../../../shared/types/base.repository';
++
++export interface IEmployeeRepository extends IBaseRepository<Employee> {
++  findById(id: string): Promise<Employee | null>;
++  findByEmployeeNumber(employeeNumber: string): Promise<Employee | null>;
++  findByEmail(email: string): Promise<Employee | null>;
++  findSubordinates(managerId: string): Promise<Employee[]>;
++  findActiveEmployees(): Promise<Employee[]>;
++  update(employee: Employee): Promise<Employee>;
++}
++
++File: src/modules/employee/services/employee.service.ts
++import { Employee, EmploymentStatus } from '../employee.model';
++import { NotFoundError, ValidationError } from '../../../shared/errors/application.error';
++
++export interface IEmployeeService {
++  getEmployeeById(id: string): Promise<Employee>;
++  getEmployeeByEmployeeNumber(employeeNumber: string): Promise<Employee>;
++  getEmployeeByEmail(email: string): Promise<Employee>;
++  getSubordinates(managerId: string): Promise<Employee[]>;
++  getActiveEmployees(): Promise<Employee[]>;
++  updateEmployeeStatus(id: string, status: EmploymentStatus): Promise<Employee>;
++}
++
++### Success criteria for this phase
++
++- src/modules/employee/employee.model.ts exists and exports Employee interface and EmploymentStatus type
++- src/modules/employee/repositories/employee.repository.ts exists and exports EmployeeRepository implementing IEmployeeRepository
++- src/modules/employee/services/employee.service.ts exists and exports EmployeeService implementing IEmployeeService
++- EmployeeRepository extends BaseRepository<Employee> and uses DatabaseService for queries
++- EmployeeService validates inputs and throws NotFoundError when employee not found
++- All database access goes through EmployeeRepository (GP-001 compliance)
++- EmploymentStatus type with values 'active', 'inactive', 'terminated' is documented in ARCHITECTURE.md
