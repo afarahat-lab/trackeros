@@ -1,0 +1,21 @@
+{
+  "correlationId": "c04a8a10-f878-46dc-97e4-a8e92903f234",
+  "domainChanges": [],
+  "apiContracts": [
+    {
+      "method": "GET",
+      "path": "/api/v1/zonk",
+      "description": "Example GET endpoint for zonk module",
+      "requestBody": {},
+      "responseBody": {
+        "message": "string"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "manager"
+      ]
+    }
+  ],
+  "componentSpecs": []
+}

@@ -1,0 +1,53 @@
+{
+  "id": "b81c1c22-e216-4947-82bc-1f092ac72ed7",
+  "correlationId": "c04a8a10-f878-46dc-97e4-a8e92903f234",
+  "rawIntent": "The zonk module imports { FastifyInstance } from 'fastify' in src/modules/zonk/zonk.routes.ts and defines a GET route handler with request and reply parameters. The CI quality job fails because TypeScript reports 'Cannot find module fastify or its corresponding type declarations' at the import statement, and the request/reply parameters implicitly have 'any' type. The 'fastify' import path is unresolvable in the current project configuration. Preserve all existing exports, types, interfaces, and imports. Only add or modify what is needed to resolve the CI failure shown above.",
+  "scope": {
+    "affectedDomains": [
+      "zonk"
+    ],
+    "affectedLayers": [
+      "api",
+      "config"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "TypeScript compilation succeeds for src/modules/zonk/zonk.routes.ts with no 'Cannot find module fastify' errors",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "Request and reply parameters in the GET route handler have explicit types instead of implicit 'any'",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "All existing exports, types, interfaces, and imports in src/modules/zonk/zonk.routes.ts are preserved",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Audit records: All state-changing operations write an audit record.",
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "RBAC enforcement: All API endpoints enforce role-based access control.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "Changes to any other module besides zonk",
+    "Changes to any other file besides src/modules/zonk/zonk.routes.ts",
+    "Adding new functionality or features to the zonk module",
+    "Modifying existing exports, types, or interfaces beyond fixing the import issue",
+    "Changes to package.json dependencies for modules other than zonk",
+    "Changes to CI/CD pipeline configuration"
+  ],
+  "ambiguities": []
+}
