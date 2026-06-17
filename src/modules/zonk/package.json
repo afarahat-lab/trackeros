@@ -1,0 +1,33 @@
+{
+  "name": "leave-management",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "scripts": {
+    "start": "ts-node src/index.ts",
+    "build": "./node_modules/.bin/tsc --noEmit",
+    "test": "jest --passWithNoTests",
+    "lint": "echo \"No lint configured\""
+  },
+  "dependencies": {
+    "express": "^4.17.1",
+    "pg": "^8.7.1",
+    "jsonwebtoken": "^8.5.1",
+    "bcrypt": "^5.0.1",
+    "dotenv": "^10.0.0",
+    "fastify": "^4.26.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "ts-node": "^10.0.0",
+    "ts-jest": "^29.0.0",
+    "jest": "^29.0.0",
+    "@types/express": "^4.17.13",
+    "@types/pg": "^8.6.1",
+    "@types/jsonwebtoken": "^8.5.5",
+    "@types/bcrypt": "^5.0.0",
+    "@types/node": "^16.0.0",
+    "@types/jest": "^29.0.0",
+    "@types/fastify": "^4.0.0"
+  }
+}

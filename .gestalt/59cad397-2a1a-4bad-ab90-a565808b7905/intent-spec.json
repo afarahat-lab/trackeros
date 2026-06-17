@@ -1,0 +1,82 @@
+{
+  "id": "0d0ffbce-3845-47ca-966f-06d786b5f8cf",
+  "correlationId": "59cad397-2a1a-4bad-ab90-a565808b7905",
+  "rawIntent": "The project already has an API framework using fastify. Add the zonk module under src/modules/zonk. In src/modules/zonk/zonk.routes.ts, the FastifyInstance type must be imported from a path that the CI TypeScript compiler can resolve with the existing project setup (do not assume 'fastify' is directly resolvable if the module has its own package.json; use the project's conventional import or ensure dependencies are correct). In src/modules/zonk/index.ts, use correct relative imports that point to actual files within src/modules/zonk (e.g., ./zonk.routes, ./zonk.controller). Preserve all existing exports, types, interfaces, and imports. Only add or modify what is needed to resolve the CI failure shown above.",
+  "scope": {
+    "affectedDomains": [
+      "zonk"
+    ],
+    "affectedLayers": [
+      "api",
+      "domain"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/zonk/zonk.routes.ts imports FastifyInstance from a path that resolves under the existing project setup (e.g., from a project re-export or internal module)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/zonk/index.ts uses correct relative imports pointing to actual files within src/modules/zonk (e.g., ./zonk.routes, ./zonk.controller)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "All existing exports, types, interfaces, and imports in the zonk module are preserved",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "TypeScript compilation passes in CI for the zonk module",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces",
+    "Input validation: Validate all inputs at API boundaries before processing",
+    "RBAC enforcement: All API endpoints enforce role-based access control",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled",
+    "Modular monolith architecture: New module must follow existing module patterns",
+    "Dependency direction: No reverse dependencies from existing modules to zonk module"
+  ],
+  "outOfScope": [
+    "Adding business logic to the zonk module",
+    "Creating database schemas or migrations",
+    "Adding new API endpoints beyond route registration",
+    "Modifying existing modules outside src/modules/zonk",
+    "Adding new dependencies to package.json",
+    "Creating UI components",
+    "Writing tests for the zonk module",
+    "Implementing notification or audit functionality",
+    "Adding authentication or authorization logic"
+  ],
+  "ambiguities": [
+    {
+      "id": "amb-001",
+      "description": "The exact import path for FastifyInstance is unclear - whether to use a project re-export (e.g., from '@trackeros/fastify' or similar) or ensure fastify is available in module context",
+      "options": [
+        "Use project's internal re-export path",
+        "Add fastify dependency to module's package.json",
+        "Import from parent module's fastify instance"
+      ],
+      "impactIfWrong": "high"
+    },
+    {
+      "id": "amb-002",
+      "description": "Whether zonk module should have its own package.json or inherit from root package.json",
+      "options": [
+        "Module has its own package.json",
+        "Module uses root package.json dependencies"
+      ],
+      "impactIfWrong": "medium"
+    }
+  ]
+}
