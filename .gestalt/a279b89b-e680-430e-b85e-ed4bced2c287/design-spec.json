@@ -1,0 +1,49 @@
+{
+  "correlationId": "a279b89b-e680-430e-b85e-ed4bced2c287",
+  "domainChanges": [
+    {
+      "entityName": "AuditServiceInterface",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "action",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "resourceType",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "resourceId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "actorId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "timestamp",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "metadata",
+          "type": "Record<string, unknown>",
+          "required": false
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}

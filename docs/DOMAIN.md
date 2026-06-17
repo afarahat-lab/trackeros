@@ -197,3 +197,15 @@ Represents audit data managed by the `audit` module, including audit records, ch
 | new_values | Record<string, any> \| null | false |
 | ip_address | string \| null | false |
 | user_agent | string \| null | false |
+
+### AuditServiceInterface
+
+| Field | Type | Required |
+|-------|------|----------|
+| id | string | true |
+| action | string | true |
+| resourceType | string | true |
+| resourceId | string | true |
+| actorId | string | true |
+| timestamp | Date | true |
+| metadata | Record<string, unknown> \| null | false |

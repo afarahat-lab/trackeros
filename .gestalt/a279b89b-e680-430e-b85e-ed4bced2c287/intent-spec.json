@@ -1,0 +1,56 @@
+{
+  "id": "2706d800-6cdc-4c73-bb5a-3ff1b443335e",
+  "correlationId": "a279b89b-e680-430e-b85e-ed4bced2c287",
+  "rawIntent": "The Phase 2 architecture specifies creating src/shared/container/index.ts with static imports of concrete service classes (LeaveService, LeaveBalanceService, NotificationService, AuditService) from modules that currently only export service interfaces in this phase; the concrete implementations are deferred to Phases 3 and 4. The container therefore references exports that are unavailable in the current project state. Additionally, src/shared/audit/audit.service.interface.ts imports Employee from ../../modules/employee/employee.model, which is not among the Phase 1 artifacts this phase depends on. Because the requested files contain imports pointing to unavailable exports, the generation phase emits no source files under src/. Preserve all existing exports, types, interfaces, and imports. Only add or modify what is needed to resolve the CI failure shown above.",
+  "scope": {
+    "affectedDomains": [
+      "shared"
+    ],
+    "affectedLayers": [
+      "infra"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/shared/container/index.ts can be created without importing unavailable concrete service implementations",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/shared/audit/audit.service.interface.ts can be created without importing Employee from unavailable module",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "All existing exports, types, interfaces, and imports are preserved",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "Generation phase emits source files under src/ without errors",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled",
+    "Preserve all existing exports, types, interfaces, and imports",
+    "Only add or modify what is needed to resolve the CI failure"
+  ],
+  "outOfScope": [
+    "Implementing concrete service classes (LeaveService, LeaveBalanceService, NotificationService, AuditService)",
+    "Creating or modifying domain modules (employee, policy, balance, leave, notification)",
+    "Changing existing module exports or interfaces",
+    "Adding new functionality beyond resolving import issues",
+    "Modifying CI/CD pipeline configuration",
+    "Changing database schemas or repositories"
+  ],
+  "ambiguities": []
+}
