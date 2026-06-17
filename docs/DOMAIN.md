@@ -209,3 +209,24 @@ Represents audit data managed by the `audit` module, including audit records, ch
 | actorId | string | true |
 | timestamp | Date | true |
 | metadata | Record<string, unknown> \| null | false |
+
+## yong
+
+Represents yong data managed by the `yong` module, including yong records and related messaging information.
+
+### YongStatus
+
+| Value | Description |
+|-------|-------------|
+| INITIALIZED | Initialized yong record |
+| ACTIVE | Active yong record |
+| ARCHIVED | Archived yong record |
+
+### Yong
+
+| Field | Type | Required |
+|-------|------|----------|
+| id | string | true |
+| message | string | true |
+| createdAt | Date | true |
+| status | YongStatus | true |
