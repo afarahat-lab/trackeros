@@ -4,6 +4,6 @@ export interface Employee {
   email: string;
   department: string;
   managerId?: string;
-  createdAt: string;
-  updatedAt: string;
+  createdAt: Date;
+  updatedAt: Date;
 }

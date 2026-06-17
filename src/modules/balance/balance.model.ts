@@ -1,11 +1,17 @@
 export interface LeaveBalance {
   id: string;
   employeeId: string;
-  leaveType: string;
+  policyId: string;
+  fiscalYear: number;
   totalDays: number;
   usedDays: number;
   remainingDays: number;
-  year: number;
-  createdAt: string;
-  updatedAt: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface LeaveBalanceQuery {
+  employeeId?: string;
+  policyId?: string;
+  fiscalYear?: number;
 }
