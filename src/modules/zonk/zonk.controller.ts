@@ -1,5 +1,5 @@
 export class ZonkController {
-  public getGreeting(): string {
-    return 'Hey there!';
+  async getZonk(): Promise<{ message: string }> {
+    return { message: 'zonk' };
   }
 }

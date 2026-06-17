@@ -1,14 +1,13 @@
 {
-  "id": "0d0ffbce-3845-47ca-966f-06d786b5f8cf",
+  "id": "ad257167-2664-44f3-a60b-89a834bc2d1d",
   "correlationId": "59cad397-2a1a-4bad-ab90-a565808b7905",
-  "rawIntent": "The project already has an API framework using fastify. Add the zonk module under src/modules/zonk. In src/modules/zonk/zonk.routes.ts, the FastifyInstance type must be imported from a path that the CI TypeScript compiler can resolve with the existing project setup (do not assume 'fastify' is directly resolvable if the module has its own package.json; use the project's conventional import or ensure dependencies are correct). In src/modules/zonk/index.ts, use correct relative imports that point to actual files within src/modules/zonk (e.g., ./zonk.routes, ./zonk.controller). Preserve all existing exports, types, interfaces, and imports. Only add or modify what is needed to resolve the CI failure shown above.",
+  "rawIntent": "[Feature: Add a /zonk endpoint to the API — Phase 1: Create zonk module with controller and route]\n\nCreate src/modules/zonk/zonk.controller.ts with a Fastify route handler that returns JSON {message: 'zonk'} on GET /zonk. Create src/modules/zonk/zonk.routes.ts to register the route. Create src/modules/zonk/index.ts to export the route registration function. This phase depends on existing Fastify framework setup.\n\nPhase architecture notes:\nCreates minimal module structure with Fastify route handler only, no service layer or database dependencies needed.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/zonk/zonk.controller.ts\\nexport class ZonkController {\\n  async getZonk(): Promise<{ message: string }> {\\n    return { message: 'zonk' };\\n  }\\n}\",\"File: src/modules/zonk/zonk.routes.ts\\nimport { FastifyInstance } from 'fastify';\\nimport { ZonkController } from './zonk.controller';\\n\\nexport function registerZonkRoutes(app: FastifyInstance): void {\\n  const controller = new ZonkController();\\n  app.get('/zonk', async (request, reply) => {\\n    const result = await controller.getZonk();\\n    reply.status(200).send(result);\\n  });\\n}\",\"File: src/modules/zonk/index.ts\\nexport { registerZonkRoutes } from './zonk.routes';\"],\"importStatements\":[\"import { FastifyInstance } from 'fastify';\",\"import { ZonkController } from './zonk.controller';\",\"import { registerZonkRoutes } from './zonk.routes';\"],\"successCriteria\":[\"src/modules/zonk/zonk.controller.ts exists with a Fastify-compatible controller class that has a getZonk method returning {message: 'zonk'}\",\"src/modules/zonk/zonk.routes.ts exists and registers a GET /zonk route using Fastify's route registration\",\"src/modules/zonk/index.ts exists and exports the registerZonkRoutes function\",\"The zonk module is properly integrated into the main application router by importing and calling registerZonkRoutes\",\"GET /zonk endpoint returns HTTP 200 status with correct JSON response {message: 'zonk'} when tested\"]}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- FastifyInstance\n- ZonkController\n- registerZonkRoutes\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n",
   "scope": {
     "affectedDomains": [
       "zonk"
     ],
     "affectedLayers": [
-      "api",
-      "domain"
+      "api"
     ],
     "isBreakingChange": false,
     "estimatedComplexity": "small"
@@ -16,67 +15,50 @@
   "successCriteria": [
     {
       "id": "sc-001",
-      "description": "src/modules/zonk/zonk.routes.ts imports FastifyInstance from a path that resolves under the existing project setup (e.g., from a project re-export or internal module)",
+      "description": "src/modules/zonk/zonk.controller.ts exists with a Fastify-compatible controller class that has a getZonk method returning {message: 'zonk'}",
       "testable": true,
       "layer": "unit"
     },
     {
       "id": "sc-002",
-      "description": "src/modules/zonk/index.ts uses correct relative imports pointing to actual files within src/modules/zonk (e.g., ./zonk.routes, ./zonk.controller)",
+      "description": "src/modules/zonk/zonk.routes.ts exists and registers a GET /zonk route using Fastify's route registration",
       "testable": true,
       "layer": "unit"
     },
     {
       "id": "sc-003",
-      "description": "All existing exports, types, interfaces, and imports in the zonk module are preserved",
+      "description": "src/modules/zonk/index.ts exists and exports the registerZonkRoutes function",
       "testable": true,
       "layer": "unit"
     },
     {
       "id": "sc-004",
-      "description": "TypeScript compilation passes in CI for the zonk module",
+      "description": "The zonk module is properly integrated into the main application router by importing and calling registerZonkRoutes",
       "testable": true,
       "layer": "integration"
+    },
+    {
+      "id": "sc-005",
+      "description": "GET /zonk endpoint returns HTTP 200 status with correct JSON response {message: 'zonk'} when tested",
+      "testable": true,
+      "layer": "e2e"
     }
   ],
   "constraints": [
-    "Repository pattern: All database access goes through repository interfaces",
-    "Input validation: Validate all inputs at API boundaries before processing",
-    "RBAC enforcement: All API endpoints enforce role-based access control",
-    "Error handling: No unhandled promise rejections. All async errors are caught and handled",
-    "Modular monolith architecture: New module must follow existing module patterns",
-    "Dependency direction: No reverse dependencies from existing modules to zonk module"
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "RBAC enforcement: All API endpoints enforce role-based access control.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
   ],
   "outOfScope": [
-    "Adding business logic to the zonk module",
-    "Creating database schemas or migrations",
-    "Adding new API endpoints beyond route registration",
-    "Modifying existing modules outside src/modules/zonk",
-    "Adding new dependencies to package.json",
-    "Creating UI components",
-    "Writing tests for the zonk module",
-    "Implementing notification or audit functionality",
-    "Adding authentication or authorization logic"
+    "Service layer implementation",
+    "Database dependencies",
+    "Repository pattern implementation",
+    "Audit records for this endpoint",
+    "UI/React Native changes",
+    "Policy, employee, balance, leave, or notification module changes",
+    "Authentication/authorization logic beyond RBAC enforcement",
+    "Logging implementation",
+    "Testing beyond the specified success criteria"
   ],
-  "ambiguities": [
-    {
-      "id": "amb-001",
-      "description": "The exact import path for FastifyInstance is unclear - whether to use a project re-export (e.g., from '@trackeros/fastify' or similar) or ensure fastify is available in module context",
-      "options": [
-        "Use project's internal re-export path",
-        "Add fastify dependency to module's package.json",
-        "Import from parent module's fastify instance"
-      ],
-      "impactIfWrong": "high"
-    },
-    {
-      "id": "amb-002",
-      "description": "Whether zonk module should have its own package.json or inherit from root package.json",
-      "options": [
-        "Module has its own package.json",
-        "Module uses root package.json dependencies"
-      ],
-      "impactIfWrong": "medium"
-    }
-  ]
+  "ambiguities": []
 }
