@@ -18,38 +18,48 @@ Base entity providing common fields for domain models.
 
 Represents a leave record managed by the `leave` module, including leave requests and related leave-tracking data.
 
+### LeaveStatus
+
+| Value | Description |
+|-------|-------------|
+| DRAFT | Draft leave request |
+| SUBMITTED | Submitted for approval |
+| PENDING_APPROVAL | Awaiting manager approval |
+| APPROVED | Approved by manager |
+| REJECTED | Rejected by manager |
+| CANCELLED | Cancelled by employee |
+
 ### LeaveRequest
 
 | Field | Type | Required |
 |-------|------|----------|
 | id | string | true |
 | employeeId | string | true |
-| leaveType | string | true |
+| policyId | string | true |
 | startDate | Date | true |
 | endDate | Date | true |
-| durationDays | number | true |
+| totalDays | number | true |
 | reason | string \| null | false |
-| status | 'DRAFT' \| 'SUBMITTED' \| 'PENDING_APPROVAL' \| 'APPROVED' \| 'REJECTED' \| 'CANCELLED' | true |
-| approverId | string \| null | false |
-| submittedAt | Date \| null | false |
+| status | LeaveStatus | true |
+| managerId | string \| null | false |
 | approvedAt | Date \| null | false |
-| rejectedAt | Date \| null | false |
-| cancelledAt | Date \| null | false |
+| rejectionReason | string \| null | false |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
 **Relationships**
 - `Employee` — many-to-one
+- `LeavePolicy` — many-to-one
 
 ### CreateLeaveRequestDto
 
 | Field | Type | Required |
 |-------|------|----------|
 | employeeId | string | true |
-| leaveType | string | true |
+| policyId | string | true |
 | startDate | Date | true |
 | endDate | Date | true |
-| durationDays | number | true |
+| totalDays | number | true |
 | reason | string \| null | false |
 
 ## balance
@@ -64,7 +74,8 @@ Represents leave balance data managed by the `balance` module, including tracked
 | employeeId | string | true |
 | policyId | string | true |
 | balanceDays | number | true |
-| fiscalYear | number | true |
+| accrualDate | Date | true |
+| expiryDate | Date | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
