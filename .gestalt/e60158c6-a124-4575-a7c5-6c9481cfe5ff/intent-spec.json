@@ -1,0 +1,60 @@
+{
+  "id": "e335c968-a01d-4866-a8d9-5888faab20a5",
+  "correlationId": "e60158c6-a124-4575-a7c5-6c9481cfe5ff",
+  "rawIntent": "The CI pipeline failed with TypeScript error: File '...' is not a module. The failures occur on every file imported by src/modules/leave/leave.service.ts and src/modules/balance/balance.service.ts. Specifically, src/modules/leave/leave.service.ts imports from src/modules/leave/leave.model.ts, src/modules/leave/leave.repository.ts, src/modules/balance/balance.repository.ts, src/modules/policy/policy.repository.ts, src/modules/employee/employee.repository.ts, src/shared/audit/audit.repository.ts, and src/shared/notification/notification.repository.ts. src/modules/balance/balance.service.ts imports from src/modules/balance/balance.model.ts, src/modules/balance/balance.repository.ts, and src/shared/audit/audit.repository.ts. All of these imported files exist at their respective paths, but the TypeScript compiler treats each one as a non-module script because they do not export anything. The service files expect these dependency files to be valid TypeScript modules that export interfaces and types such as ILeaveRepository, ILeaveBalanceRepository, ILeavePolicyRepository, IEmployeeRepository, IAuditLogRepository, INotificationRepository, LeaveRequest, CreateLeaveRequestDto, LeaveRequestQuery, LeaveRequestStatus, LeaveBalance, etc. Preserve all existing exports, types, interfaces, and imports. Only add or modify what is needed to resolve the CI failure shown above.",
+  "scope": {
+    "affectedDomains": [
+      "leave",
+      "balance",
+      "policy",
+      "employee",
+      "shared"
+    ],
+    "affectedLayers": [
+      "domain"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "TypeScript compilation succeeds without 'File is not a module' errors for all files imported by leave.service.ts and balance.service.ts",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "All existing exports, types, interfaces, and imports in the affected files are preserved",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "CI pipeline passes TypeScript compilation step",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Audit records: All state-changing operations write an audit record.",
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "RBAC enforcement: All API endpoints enforce role-based access control.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled.",
+    "Dependency direction is leave -> employee, leave -> policy, leave -> balance, and leave -> notification. No reverse dependencies are permitted.",
+    "Only add or modify what is needed to resolve the CI failure"
+  ],
+  "outOfScope": [
+    "Changing business logic in service files",
+    "Adding new functionality",
+    "Modifying API endpoints",
+    "Changing database schemas",
+    "Modifying UI components",
+    "Adding new dependencies",
+    "Changing existing test logic",
+    "Modifying files not explicitly listed in the intent"
+  ],
+  "ambiguities": []
+}
