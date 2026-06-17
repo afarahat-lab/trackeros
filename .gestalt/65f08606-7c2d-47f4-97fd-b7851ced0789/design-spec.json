@@ -6,15 +6,12 @@
       "method": "GET",
       "path": "/api/v1/qux",
       "description": "Returns a simple qux message",
-      "requestBody": null,
+      "requestBody": {},
       "responseBody": {
         "message": "string"
       },
-      "authRequired": true,
-      "roles": [
-        "admin",
-        "operator"
-      ]
+      "authRequired": false,
+      "roles": []
     }
   ],
   "componentSpecs": []
