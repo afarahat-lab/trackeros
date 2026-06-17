@@ -85,12 +85,10 @@ Represents employee data managed by the `employee` module, including employee re
 | firstName | string | true |
 | lastName | string | true |
 | email | string | true |
-| phone | string | false |
-| department | string | false |
-| position | string | false |
-| hireDate | Date | false |
 | managerId | string \| null | false |
-| isActive | boolean | true |
+| department | string \| null | false |
+| hireDate | Date | true |
+| employmentStatus | 'active' \| 'inactive' \| 'terminated' | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
@@ -105,11 +103,10 @@ Represents employee data managed by the `employee` module, including employee re
 | firstName | string | true |
 | lastName | string | true |
 | email | string | true |
-| phone | string | false |
-| department | string | false |
-| position | string | false |
-| hireDate | Date | false |
 | managerId | string \| null | false |
+| department | string \| null | false |
+| hireDate | Date | true |
+| employmentStatus | 'active' \| 'inactive' \| 'terminated' | true |
 
 ## policy
 

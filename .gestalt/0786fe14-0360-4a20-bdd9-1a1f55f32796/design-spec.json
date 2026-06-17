@@ -1,0 +1,75 @@
+{
+  "correlationId": "0786fe14-0360-4a20-bdd9-1a1f55f32796",
+  "domainChanges": [
+    {
+      "entityName": "Employee",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "employeeNumber",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "firstName",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "lastName",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "email",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "managerId",
+          "type": "string | null",
+          "required": false
+        },
+        {
+          "name": "department",
+          "type": "string | null",
+          "required": false
+        },
+        {
+          "name": "hireDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "employmentStatus",
+          "type": "'active' | 'inactive' | 'terminated'",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "Employee",
+          "type": "one-to-many",
+          "description": "Manager-subordinate relationship via managerId"
+        }
+      ]
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}

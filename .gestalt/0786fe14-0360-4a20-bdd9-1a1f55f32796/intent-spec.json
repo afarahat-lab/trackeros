@@ -1,0 +1,81 @@
+{
+  "id": "e02e3707-56a7-4c37-b393-514ad58de777",
+  "correlationId": "0786fe14-0360-4a20-bdd9-1a1f55f32796",
+  "rawIntent": "[Feature: Build the leave management module — Phase 2: Employee module core]\n\nCreate src/modules/employee/employee.model.ts with Employee interface matching canonical attributes and lifecycle states. Create src/modules/employee/employee.repository.ts implementing IEmployeeRepository extending IBaseRepository. This phase depends on src/shared/types/index.ts from Phase 1 for shared types and src/shared/database/base.repository.ts for base repository pattern.\n\nThis phase depends on: src/shared/types/index.ts, src/shared/database/base.repository.ts.\n\nPhase architecture notes:\nBuild employee module which provides essential employee hierarchy data needed by leave and balance modules.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/employee/employee.model.ts\\nexport type EmploymentStatus = 'active' | 'inactive' | 'terminated';\\n\\nexport interface Employee {\\n  id: string;\\n  employeeNumber: string;\\n  firstName: string;\\n  lastName: string;\\n  email: string;\\n  managerId: string | null;\\n  department: string | null;\\n  hireDate: Date;\\n  employmentStatus: EmploymentStatus;\\n  createdAt: Date;\\n  updatedAt: Date;\\n}\",\"File: src/modules/employee/repositories/employee.repository.ts\\nimport { Employee } from '../employee.model';\\nimport { IBaseRepository } from '../../../shared/types/base.repository';\\n\\nexport interface IEmployeeRepository extends IBaseRepository<Employee> {\\n  findById(id: string): Promise<Employee | null>;\\n  findByEmployeeNumber(employeeNumber: string): Promise<Employee | null>;\\n  findByEmail(email: string): Promise<Employee | null>;\\n  findSubordinates(managerId: string): Promise<Employee[]>;\\n  findActiveEmployees(): Promise<Employee[]>;\\n  update(employee: Employee): Promise<Employee>;\\n}\",\"File: src/modules/employee/services/employee.service.ts\\nimport { Employee, EmploymentStatus } from '../employee.model';\\nimport { NotFoundError, ValidationError } from '../../../shared/errors/application.error';\\n\\nexport interface IEmployeeService {\\n  getEmployeeById(id: string): Promise<Employee>;\\n  getEmployeeByEmployeeNumber(employeeNumber: string): Promise<Employee>;\\n  getEmployeeByEmail(email: string): Promise<Employee>;\\n  getSubordinates(managerId: string): Promise<Employee[]>;\\n  getActiveEmployees(): Promise<Employee[]>;\\n  updateEmployeeStatus(id: string, status: EmploymentStatus): Promise<Employee>;\\n}\"],\"importStatements\":[\"import { Pool } from 'pg';\",\"import { BaseRepository } from '../../../shared/database/base.repository';\",\"import { NotFoundError, ValidationError } from '../../../shared/errors/application.error';\",\"import { DatabaseService } from '../../../shared/database/database.service';\",\"import { Employee, EmploymentStatus } from './employee.model';\",\"import { IEmployeeRepository } from './repositories/employee.repository';\",\"import { IEmployeeService } from './services/employee.service';\"],\"successCriteria\":[\"src/modules/employee/employee.model.ts exists and exports Employee interface and EmploymentStatus type\",\"src/modules/employee/repositories/employee.repository.ts exists and exports EmployeeRepository implementing IEmployeeRepository\",\"src/modules/employee/services/employee.service.ts exists and exports EmployeeService implementing IEmployeeService\",\"EmployeeRepository extends BaseRepository<Employee> and uses DatabaseService for queries\",\"EmployeeService validates inputs and throws NotFoundError when employee not found\",\"All database access goes through EmployeeRepository (GP-001 compliance)\",\"EmploymentStatus type with values 'active', 'inactive', 'terminated' is documented in ARCHITECTURE.md\"]}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- Employee\n- IEmployeeRepository\n- IEmployeeService\n- Pool\n- BaseRepository\n- NotFoundError\n- ValidationError\n- DatabaseService\n- EmploymentStatus\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Canonical entity fields for this phase\n\nNote: these field names supersede any attribute names in the\nintent text above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the field names of each entity this phase defines. The\nexact attribute / column / property set per entity is:\n\n- `Employee`: `id`, `employeeNumber`, `firstName`, `lastName`, `email`, `managerId`, `department`, `hireDate`, `employmentStatus`, `createdAt`, `updatedAt`\n\nTreat each entity's field list as complete. If the\nintent text or planner scope mentions different field\nnames than the architecture, do NOT flag this as\nambiguity — the per-phase architecture wins.\n\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 3 — Policy module core: Create src/modules/policy/policy.model.ts with LeavePolicy interface matching canonical attributes a\n- Phase 4 — Balance module core: Create src/modules/balance/balance.model.ts with LeaveBalance interface matching canonical attribute\n- Phase 5 — Notification module core: Create src/modules/notification/notification.model.ts with Notification interface matching canonical\n- Phase 6 — Leave module core models and repository: Create src/modules/leave/leave.model.ts with LeaveRequest interface matching canonical attributes an\n- Phase 7 — Leave module service with business logic: Create src/modules/leave/leave.service.ts with LeaveService class implementing ILeaveService interfa\n- Phase 8 — Leave controllers and routes: Create src/modules/leave/leave.controller.ts with LeaveController class implementing Fastify route h",
+  "scope": {
+    "affectedDomains": [
+      "employee"
+    ],
+    "affectedLayers": [
+      "domain"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/employee/employee.model.ts exists and exports Employee interface and EmploymentStatus type",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/employee/repositories/employee.repository.ts exists and exports EmployeeRepository implementing IEmployeeRepository",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "src/modules/employee/services/employee.service.ts exists and exports EmployeeService implementing IEmployeeService",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "EmployeeRepository extends BaseRepository<Employee> and uses DatabaseService for queries",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "EmployeeService validates inputs and throws NotFoundError when employee not found",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-006",
+      "description": "All database access goes through EmployeeRepository",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "GP-001: Repository pattern - All database access goes through repository interfaces",
+    "GP-002: Audit records - All state-changing operations write an audit record",
+    "GP-003: Input validation - Validate all inputs at API boundaries before processing",
+    "GP-004: No sensitive data in logs - Never log passwords, tokens, PII, or financial data",
+    "GP-005: RBAC enforcement - All API endpoints enforce role-based access control",
+    "GP-006: Error handling - No unhandled promise rejections. All async errors are caught and handled",
+    "Modular monolith architecture with clear module boundaries",
+    "Dependency direction: leave -> employee, leave -> policy, leave -> balance, leave -> notification",
+    "No reverse dependencies permitted",
+    "TypeScript with Node.js 20 and Fastify"
+  ],
+  "outOfScope": [
+    "Policy module core (Phase 3)",
+    "Balance module core (Phase 4)",
+    "Notification module core (Phase 5)",
+    "Leave module core models and repository (Phase 6)",
+    "Leave module service with business logic (Phase 7)",
+    "Leave controllers and routes (Phase 8)",
+    "API endpoints for employee module",
+    "UI components",
+    "Authentication or authorization implementation",
+    "Database migrations",
+    "LeaveRequest lifecycle implementation",
+    "Balance deductions",
+    "Notification generation"
+  ],
+  "ambiguities": []
+}
