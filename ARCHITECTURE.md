@@ -3,14 +3,22 @@
 ## Leave Management Module
 
 ### Domain Models
-- `src/modules/leave/leave.model.ts` — `LeaveRequest`, `CreateLeaveRequestDto`, `LeavePolicy`, `LeaveBalance`, `Employee`, `AuditLog`
+- `src/modules/leave/leave.model.ts` — `LeaveRequest`, `CreateLeaveRequestDto`, `UpdateLeaveRequestDto`, `LeaveRequestQuery`
+- `src/modules/balance/balance.model.ts` — `LeaveBalance`, `LeaveBalanceQuery`
 
 ### Repositories
-- `src/modules/leave/leave.repository.ts` — `ILeaveRepository`, `LeaveRepository`
-- `src/modules/leave/policy.repository.ts` — `ILeavePolicyRepository`, `LeavePolicyRepository`
-- `src/modules/leave/balance.repository.ts` — `ILeaveBalanceRepository`, `LeaveBalanceRepository`
+- `src/modules/leave/leave.repository.ts` — `ILeaveRepository`
+- `src/modules/balance/balance.repository.ts` — `ILeaveBalanceRepository`
 
-All repository methods currently throw `Not implemented`; database integration will be added in Phase 2.
+### Shared Types
+- `src/shared/types/leave.types.ts` — `LeaveType`, `LeaveStatus`, `NotificationType`, `AuditAction`, `EntityType`
+
+### Enums
+- `LeaveType`: `ANNUAL`, `SICK`, `MATERNITY`, `PATERNITY`, `UNPAID`, `OTHER`
+- `LeaveStatus`: `PENDING`, `APPROVED`, `REJECTED`, `CANCELLED`
+- `NotificationType`: `LEAVE_REQUEST_CREATED`, `LEAVE_REQUEST_APPROVED`, `LEAVE_REQUEST_REJECTED`, `LEAVE_REQUEST_CANCELLED`, `LEAVE_BALANCE_LOW`, `LEAVE_BALANCE_EXPIRING`
+- `AuditAction`: `CREATE`, `UPDATE`, `DELETE`
+- `EntityType`: `LEAVE_REQUEST`, `LEAVE_BALANCE`, `LEAVE_POLICY`, `EMPLOYEE`, `NOTIFICATION`
 
 ## Employee Module
 
