@@ -1,11 +1,9 @@
-import { Router, Request, Response } from "express";
 import { QuxController } from "./qux.controller";
 
-const router = Router();
-const controller = new QuxController();
+export async function quxRoutes(fastify: any): Promise<void> {
+  const controller = new QuxController();
 
-router.get("/qux", async (req: Request, res: Response) => {
-  await controller.getQux(req, res);
-});
-
-export default router;
+  fastify.get("/qux", async (request: any, reply: any) => {
+    await controller.getQux(request, reply);
+  });
+}

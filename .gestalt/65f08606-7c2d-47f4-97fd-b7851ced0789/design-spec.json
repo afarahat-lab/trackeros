@@ -4,7 +4,7 @@
   "apiContracts": [
     {
       "method": "GET",
-      "path": "/api/v1/qux",
+      "path": "/qux",
       "description": "Returns a simple qux message",
       "requestBody": {},
       "responseBody": {

@@ -1,7 +1,7 @@
 {
-  "id": "6107d1a6-8ba6-473c-93bd-f2dafe29ecde",
+  "id": "07a753e2-1160-4b14-95ab-28eeec35874e",
   "correlationId": "65f08606-7c2d-47f4-97fd-b7851ced0789",
-  "rawIntent": "Create src/modules/qux/qux.controller.ts with a Fastify route handler that responds with JSON {message: 'qux'} on GET /qux. Create src/modules/qux/qux.routes.ts in the SAME src/modules/qux/ directory to register the route. Create src/modules/qux/index.ts in the SAME src/modules/qux/ directory to export the controller. No service layer needed. All three files must reside directly in src/modules/qux/; do NOT nest them under additional src/modules/qux/ subdirectories. Imports must use './qux.controller' from that single directory.",
+  "rawIntent": "[Feature: Add a /qux endpoint to the API — Phase 1: Create qux controller with Fastify route]\n\nCreate src/modules/qux/qux.controller.ts with a Fastify route handler that responds with JSON {message: 'qux'} on GET /qux. Create src/modules/qux/qux.routes.ts to register the route. No service layer needed per requirements. This is a single-phase feature.\n\nPhase architecture notes:\nImplements the qux endpoint as per architecture specification. No database or service layer required for this demonstration endpoint.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/qux/qux.controller.ts\\nexport class QuxController {\\n  async getQux(request: FastifyRequest, reply: FastifyReply): Promise<void> {\\n    reply.status(200).send({ message: 'qux' });\\n  }\\n}\"],\"importStatements\":[\"import { FastifyRequest, FastifyReply } from \\\"fastify\\\";\"],\"successCriteria\":[\"src/modules/qux/qux.controller.ts exists and exports QuxController class with getQux method\",\"GET /qux endpoint responds with JSON {message: 'qux'} and 200 status code\",\"No database dependencies or service layer present in controller\",\"Controller follows Fastify route handler signature with proper typing\",\"Module exports controller via src/modules/qux/index.ts\"]}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- FastifyRequest\n- FastifyReply\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n",
   "scope": {
     "affectedDomains": [
       "qux"
@@ -15,51 +15,59 @@
   "successCriteria": [
     {
       "id": "sc-001",
-      "description": "src/modules/qux/qux.controller.ts exists with a Fastify route handler that returns JSON {message: 'qux'} on GET /qux",
+      "description": "src/modules/qux/qux.controller.ts exists and exports QuxController class with getQux method",
       "testable": true,
       "layer": "unit"
     },
     {
       "id": "sc-002",
-      "description": "src/modules/qux/qux.routes.ts exists and registers the GET /qux route using the controller",
+      "description": "src/modules/qux/qux.routes.ts exists and registers a GET /qux route using the QuxController",
       "testable": true,
       "layer": "unit"
     },
     {
       "id": "sc-003",
-      "description": "src/modules/qux/index.ts exists and exports the controller",
+      "description": "src/modules/qux/index.ts exists and exports the QuxController",
       "testable": true,
       "layer": "unit"
     },
     {
       "id": "sc-004",
-      "description": "All three files are placed directly in src/modules/qux/ directory (not nested in subdirectories)",
+      "description": "GET /qux endpoint responds with JSON {message: 'qux'} and 200 status code",
       "testable": true,
       "layer": "integration"
     },
     {
       "id": "sc-005",
-      "description": "qux.routes.ts and index.ts use relative import './qux.controller' (not absolute or nested paths)",
+      "description": "No database dependencies or service layer present in controller",
       "testable": true,
-      "layer": "integration"
+      "layer": "unit"
+    },
+    {
+      "id": "sc-006",
+      "description": "All files are placed directly under src/modules/qux/ (not nested incorrectly)",
+      "testable": true,
+      "layer": "unit"
     }
   ],
   "constraints": [
-    "Repository pattern: All database access goes through repository interfaces.",
-    "Input validation: Validate all inputs at API boundaries before processing.",
-    "RBAC enforcement: All API endpoints enforce role-based access control.",
-    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
+    "Repository pattern: All database access goes through repository interfaces. (Not applicable here as no database access is required)",
+    "Audit records: All state-changing operations write an audit record. (Not applicable here as this is a read-only endpoint)",
+    "Input validation: Validate all inputs at API boundaries before processing. (Not applicable here as endpoint has no inputs)",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "RBAC enforcement: All API endpoints enforce role-based access control. (Must be considered for future phases; this endpoint may be public)",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled.",
+    "Dependency direction: No reverse dependencies are permitted.",
+    "Use FastifyRequest and FastifyReply types as per canonical dependencies."
   ],
   "outOfScope": [
-    "Service layer creation",
-    "Database access or repositories",
-    "Audit records for this simple endpoint",
-    "Authentication or authorization implementation",
-    "Testing files",
-    "Configuration files",
-    "UI components",
-    "Any changes outside src/modules/qux/ directory",
-    "Package.json dependencies"
+    "Database access or repository layer",
+    "Service layer for qux module",
+    "Authentication or authorization for the /qux endpoint",
+    "Any changes to existing modules (employee, policy, balance, leave, notification)",
+    "Any UI changes",
+    "Configuration changes outside src/modules/qux/",
+    "Package.json updates"
   ],
   "ambiguities": []
 }
