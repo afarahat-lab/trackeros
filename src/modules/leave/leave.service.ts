@@ -1,61 +1,11 @@
 import 'reflect-metadata';
-import { plainToInstance } from 'class-transformer';
-import { validate, IsString, IsOptional, IsDateString, IsIn } from 'class-validator';
 import { ILeaveRepository } from './leave.repository';
-import { LeaveRequest, CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveRequestQuery, LeaveType, LeaveStatus } from './leave.model';
+import { LeaveRequest, CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveRequestQuery } from './leave.model';
 import { ILeavePolicyService } from '../policy/policy.service';
 import { ILeaveBalanceService } from '../balance/balance.service';
 import { IEmployeeService } from '../employee/employee.service';
 import { IAuditService } from '../../shared/audit/audit.service';
 import { INotificationService } from '../../shared/notification/notification.service';
-
-class CreateLeaveRequestDtoClass {
-  @IsString()
-  employeeId!: string;
-
-  @IsIn(['annual', 'sick', 'personal', 'maternity', 'paternity'])
-  leaveType!: LeaveType;
-
-  @IsDateString()
-  startDate!: string;
-
-  @IsDateString()
-  endDate!: string;
-
-  @IsOptional()
-  @IsString()
-  reason?: string;
-
-  @IsOptional()
-  @IsString()
-  managerId?: string;
-}
-
-class UpdateLeaveRequestDtoClass {
-  @IsOptional()
-  @IsIn(['annual', 'sick', 'personal', 'maternity', 'paternity'])
-  leaveType?: LeaveType;
-
-  @IsOptional()
-  @IsDateString()
-  startDate?: string;
-
-  @IsOptional()
-  @IsDateString()
-  endDate?: string;
-
-  @IsOptional()
-  @IsString()
-  reason?: string;
-
-  @IsOptional()
-  @IsString()
-  managerId?: string;
-
-  @IsOptional()
-  @IsIn(['pending', 'approved', 'rejected', 'cancelled'])
-  status?: LeaveStatus;
-}
 
 export class InsufficientBalanceError extends Error {
   constructor(message: string) {
@@ -82,12 +32,35 @@ export class LeaveService implements ILeaveService {
     private readonly notificationService: INotificationService
   ) {}
 
-  async createLeaveRequest(dto: CreateLeaveRequestDto, employeeId: string): Promise<LeaveRequest> {
-    const instance = plainToInstance(CreateLeaveRequestDtoClass, dto);
-    const errors = await validate(instance);
-    if (errors.length > 0) {
-      throw new Error(`Validation failed: ${JSON.stringify(errors)}`);
+  private validateCreateDto(dto: CreateLeaveRequestDto): void {
+    if (!dto.employeeId || typeof dto.employeeId !== 'string') {
+      throw new Error('Validation failed: employeeId must be a non-empty string');
     }
+    if (!dto.leaveType || !['annual', 'sick', 'personal', 'maternity', 'paternity'].includes(dto.leaveType)) {
+      throw new Error('Validation failed: leaveType must be one of annual, sick, personal, maternity, paternity');
+    }
+    if (!dto.startDate || isNaN(Date.parse(dto.startDate))) {
+      throw new Error('Validation failed: startDate must be a valid date string');
+    }
+    if (!dto.endDate || isNaN(Date.parse(dto.endDate))) {
+      throw new Error('Validation failed: endDate must be a valid date string');
+    }
+  }
+
+  private validateUpdateDto(dto: UpdateLeaveRequestDto): void {
+    if (dto.leaveType !== undefined && !['annual', 'sick', 'personal', 'maternity', 'paternity'].includes(dto.leaveType)) {
+      throw new Error('Validation failed: leaveType must be one of annual, sick, personal, maternity, paternity');
+    }
+    if (dto.startDate !== undefined && isNaN(Date.parse(dto.startDate))) {
+      throw new Error('Validation failed: startDate must be a valid date string');
+    }
+    if (dto.endDate !== undefined && isNaN(Date.parse(dto.endDate))) {
+      throw new Error('Validation failed: endDate must be a valid date string');
+    }
+  }
+
+  async createLeaveRequest(dto: CreateLeaveRequestDto, employeeId: string): Promise<LeaveRequest> {
+    this.validateCreateDto(dto);
 
     const start = new Date(dto.startDate);
     const end = new Date(dto.endDate);
@@ -142,11 +115,7 @@ export class LeaveService implements ILeaveService {
   }
 
   async updateLeaveRequest(id: string, dto: UpdateLeaveRequestDto, employeeId: string): Promise<LeaveRequest> {
-    const instance = plainToInstance(UpdateLeaveRequestDtoClass, dto);
-    const errors = await validate(instance);
-    if (errors.length > 0) {
-      throw new Error(`Validation failed: ${JSON.stringify(errors)}`);
-    }
+    this.validateUpdateDto(dto);
 
     const existing = await this.leaveRepository.findById(id);
     if (!existing) {

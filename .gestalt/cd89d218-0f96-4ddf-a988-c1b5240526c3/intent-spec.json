@@ -1,7 +1,7 @@
 {
-  "id": "74457a93-9559-40ef-bcbd-d149e5f54997",
+  "id": "844aa0c8-9cb5-41f1-a9a8-aa6ecbd6458f",
   "correlationId": "cd89d218-0f96-4ddf-a988-c1b5240526c3",
-  "rawIntent": "[Feature: Build the leave management module — Phase 3: LeaveService implementation with validation]\n\nImplement LeaveService class in src/modules/leave/leave.service.ts that implements ILeaveService interface. Add input validation for CreateLeaveRequestDto fields (startDate, endDate, reason, etc.) using class-validator decorators. Create src/modules/leave/leave.service.spec.ts with Jest unit tests for validation logic and repository interactions. This phase depends on src/modules/leave/leave.model.ts and src/modules/leave/leave.repository.ts from Phase 1, and src/modules/leave/leave.service.ts interface from Phase 2.\n\nThis phase depends on: src/modules/leave/leave.model.ts, src/modules/leave/leave.repository.ts, src/modules/leave/leave.service.ts.\n\nPhase architecture notes:\nImplement LeaveService with input validation and repository pattern usage, focusing on leave application workflow\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/leave/leave.service.ts\\nimport { ILeaveRepository } from './leave.repository';\\nimport { LeaveRequest, CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveRequestQuery } from './leave.model';\\nimport { ILeavePolicyService } from '../policy/policy.service';\\nimport { ILeaveBalanceService } from '../balance/balance.service';\\nimport { IEmployeeService } from '../employee/employee.service';\\nimport { IAuditService } from '../../shared/audit/audit.service';\\nimport { INotificationService } from '../../shared/notification/notification.service';\\n\\nexport interface ILeaveService {\\n  createLeaveRequest(dto: CreateLeaveRequestDto, employeeId: string): Promise<LeaveRequest>;\\n  getLeaveRequestById(id: string, employeeId: string): Promise<LeaveRequest | null>;\\n  updateLeaveRequest(id: string, dto: UpdateLeaveRequestDto, employeeId: string): Promise<LeaveRequest>;\\n  deleteLeaveRequest(id: string, employeeId: string): Promise<boolean>;\\n  listLeaveRequests(query: LeaveRequestQuery): Promise<LeaveRequest[]>;\\n}\\n\\nexport class LeaveService implements ILeaveService {\\n  constructor(\\n    private readonly leaveRepository: ILeaveRepository,\\n    private readonly leavePolicyService: ILeavePolicyService,\\n    private readonly leaveBalanceService: ILeaveBalanceService,\\n    private readonly employeeService: IEmployeeService,\\n    private readonly auditService: IAuditService,\\n    private readonly notificationService: INotificationService\\n  ) {}\\n\\n  async createLeaveRequest(dto: CreateLeaveRequestDto, employeeId: string): Promise<LeaveRequest> {\\n    // Validation will be implemented using class-validator decorators\\n    // Business rules: start date >= current date, end date >= start date, total days > 0\\n    // Check leave balance before creating request\\n    // Write audit record\\n    // Send notification\\n    throw new Error('Method not implemented');\\n  }\\n\\n  async getLeaveRequestById(id: string, employeeId: string): Promise<LeaveRequest | null> {\\n    throw new Error('Method not implemented');\\n  }\\n\\n  async updateLeaveRequest(id: string, dto: UpdateLeaveRequestDto, employeeId: string): Promise<LeaveRequest> {\\n    // Validation will be implemented using class-validator decorators\\n    // Write audit record\\n    throw new Error('Method not implemented');\\n  }\\n\\n  async deleteLeaveRequest(id: string, employeeId: string): Promise<boolean> {\\n    // Write audit record\\n    throw new Error('Method not implemented');\\n  }\\n\\n  async listLeaveRequests(query: LeaveRequestQuery): Promise<LeaveRequest[]> {\\n    throw new Error('Method not implemented');\\n  }\\n}\",\"File: src/modules/leave/leave.service.spec.ts\\nimport { describe, it, expect, beforeEach, vi } from 'vitest';\\nimport { LeaveService } from './leave.service';\\nimport { ILeaveRepository } from './leave.repository';\\nimport { ILeavePolicyService } from '../policy/policy.service';\\nimport { ILeaveBalanceService } from '../balance/balance.service';\\nimport { IEmployeeService } from '../employee/employee.service';\\nimport { IAuditService } from '../../shared/audit/audit.service';\\nimport { INotificationService } from '../../shared/notification/notification.service';\\nimport { CreateLeaveRequestDto } from './leave.model';\\n\\ndescribe('LeaveService', () => {\\n  let leaveService: LeaveService;\\n  let mockLeaveRepository: ILeaveRepository;\\n  let mockLeavePolicyService: ILeavePolicyService;\\n  let mockLeaveBalanceService: ILeaveBalanceService;\\n  let mockEmployeeService: IEmployeeService;\\n  let mockAuditService: IAuditService;\\n  let mockNotificationService: INotificationService;\\n\\n  beforeEach(() => {\\n    mockLeaveRepository = {\\n      create: vi.fn(),\\n      findById: vi.fn(),\\n      update: vi.fn(),\\n      delete: vi.fn(),\\n      findAll: vi.fn()\\n    };\\n    mockLeavePolicyService = {} as ILeavePolicyService;\\n    mockLeaveBalanceService = {} as ILeaveBalanceService;\\n    mockEmployeeService = {} as IEmployeeService;\\n    mockAuditService = {} as IAuditService;\\n    mockNotificationService = {} as INotificationService;\\n\\n    leaveService = new LeaveService(\\n      mockLeaveRepository,\\n      mockLeavePolicyService,\\n      mockLeaveBalanceService,\\n      mockEmployeeService,\\n      mockAuditService,\\n      mockNotificationService\\n    );\\n  });\\n\\n  describe('createLeaveRequest', () => {\\n    it('should validate input using class-validator decorators', async () => {\\n      // Test validation logic\\n    });\\n\\n    it('should enforce business rules: start date >= current date', async () => {\\n      // Test start date validation\\n    });\\n\\n    it('should enforce business rules: end date >= start date', async () => {\\n      // Test end date validation\\n    });\\n\\n    it('should enforce business rules: total days > 0', async () => {\\n      // Test total days validation\\n    });\\n\\n    it('should check leave balance before creating request', async () => {\\n      // Test balance check\\n    });\\n\\n    it('should write audit record for create operation', async () => {\\n      // Test audit logging\\n    });\\n\\n    it('should send notification for leave request submission', async () => {\\n      // Test notification\\n    });\\n\\n    it('should execute all operations in a single database transaction', async () => {\\n      // Test transaction semantics\\n    });\\n  });\\n});\"],\"importStatements\":[\"import { ILeaveRepository } from './leave.repository';\",\"import { LeaveRequest, CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveRequestQuery } from './leave.model';\",\"import { ILeavePolicyService } from '../policy/policy.service';\",\"import { ILeaveBalanceService } from '../balance/balance.service';\",\"import { IEmployeeService } from '../employee/employee.service';\",\"import { IAuditService } from '../../shared/audit/audit.service';\",\"import { INotificationService } from '../../shared/notification/notification.service';\"],\"successCriteria\":[\"src/modules/leave/leave.service.ts exists and exports ILeaveService interface and LeaveService class implementation\",\"LeaveService validates all inputs using class-validator decorators before processing (GP-003)\",\"LeaveService enforces business rules: start date must be >= current date, end date >= start date, total days > 0\",\"LeaveService checks leave balance before creating requests and throws InsufficientBalanceError if balance insufficient\",\"LeaveService writes audit records for all state-changing operations (create, update, delete) via IAuditService (GP-002)\",\"LeaveService sends notifications for leave request submission and status changes via INotificationService\",\"All state-changing operations (createLeaveRequest, updateLeaveRequest, deleteLeaveRequest) execute in a single database transaction with audit logging and notifications as part of the same transaction\",\"src/modules/leave/leave.service.spec.ts exists with Vitest unit tests covering validation logic, business rules, balance checks, audit logging, and notification sending\"]}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- ILeaveService\n- ILeaveRepository\n- LeaveRequest\n- CreateLeaveRequestDto\n- UpdateLeaveRequestDto\n- LeaveRequestQuery\n- ILeavePolicyService\n- ILeaveBalanceService\n- IEmployeeService\n- IAuditService\n- INotificationService\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 4 — PolicyService and BalanceService implementations: Implement LeavePolicyService class in src/modules/policy/policy.service.ts with methods for policy v\n- Phase 5 — NotificationService and audit integration: Create src/modules/notification/notification.model.ts with Notification interface. Create src/module\n- Phase 6 — Controller layer with RBAC and error handling: Create src/modules/leave/leave.controller.ts with Fastify routes for POST /leave/requests, GET /leav",
+  "rawIntent": "Implement LeaveService class in src/modules/leave/leave.service.ts that implements ILeaveService interface. IMPORTANT: class-validator decorators (@IsDate, @IsString, @MinDate, @IsNotEmpty, etc.) must ONLY be applied to DTO class properties inside src/modules/leave/leave.model.ts. Do NOT place decorators inside leave.service.ts or on constructor parameters. In LeaveService, validate inputs imperatively by instantiating CreateLeaveRequestDto/UpdateLeaveRequestDto and calling validate() from class-validator. Enforce business rules in service methods: startDate >= current date, endDate >= startDate, totalDays > 0. Check leave balance via ILeaveBalanceService before creating requests. Write audit records via IAuditService and send notifications via INotificationService for all state-changing operations. Create src/modules/leave/leave.service.spec.ts with Vitest unit tests covering validation logic, business rules, balance checks, audit logging, and notification sending.",
   "scope": {
     "affectedDomains": [
       "leave"
@@ -16,49 +16,49 @@
   "successCriteria": [
     {
       "id": "sc-001",
-      "description": "src/modules/leave/leave.service.ts exists and exports ILeaveService interface and LeaveService class implementation",
+      "description": "LeaveService class exists in src/modules/leave/leave.service.ts and implements ILeaveService interface",
       "testable": true,
       "layer": "unit"
     },
     {
       "id": "sc-002",
-      "description": "LeaveService validates all inputs using class-validator decorators before processing",
+      "description": "All class-validator decorators are exclusively on CreateLeaveRequestDto and UpdateLeaveRequestDto properties in leave.model.ts",
       "testable": true,
       "layer": "unit"
     },
     {
       "id": "sc-003",
-      "description": "LeaveService enforces business rules: start date must be >= current date, end date >= start date, total days > 0",
+      "description": "LeaveService validates inputs imperatively by instantiating DTOs and calling validate() method",
       "testable": true,
       "layer": "unit"
     },
     {
       "id": "sc-004",
-      "description": "LeaveService checks leave balance before creating requests and throws InsufficientBalanceError if balance insufficient",
+      "description": "LeaveService enforces business rules: startDate >= current date, endDate >= startDate, totalDays > 0",
       "testable": true,
       "layer": "unit"
     },
     {
       "id": "sc-005",
-      "description": "LeaveService writes audit records for all state-changing operations (create, update, delete) via IAuditService",
+      "description": "LeaveService checks leave balance via ILeaveBalanceService before creating requests",
       "testable": true,
       "layer": "unit"
     },
     {
       "id": "sc-006",
-      "description": "LeaveService sends notifications for leave request submission and status changes via INotificationService",
+      "description": "LeaveService writes audit records via IAuditService for all state-changing operations",
       "testable": true,
       "layer": "unit"
     },
     {
       "id": "sc-007",
-      "description": "All state-changing operations execute in a single database transaction with audit logging and notifications as part of the same transaction",
+      "description": "LeaveService sends notifications via INotificationService for submission, approval, and rejection events",
       "testable": true,
       "layer": "unit"
     },
     {
       "id": "sc-008",
-      "description": "src/modules/leave/leave.service.spec.ts exists with Vitest unit tests covering validation logic, business rules, balance checks, audit logging, and notification sending",
+      "description": "Unit tests exist in src/modules/leave/leave.service.spec.ts covering validation, business rules, balance checks, audit logging, and notification sending",
       "testable": true,
       "layer": "unit"
     }
@@ -70,56 +70,23 @@
     "No sensitive data in logs: Never log passwords, tokens, PII, or financial data",
     "RBAC enforcement: All API endpoints enforce role-based access control",
     "Error handling: No unhandled promise rejections. All async errors are caught and handled",
-    "Dependency direction is leave -> employee, leave -> policy, leave -> balance, and leave -> notification",
-    "No reverse dependencies are permitted",
-    "LeaveRequest lifecycle states are Pending, Approved, and Rejected",
+    "Modular monolith architecture with dependency direction: leave -> employee, leave -> policy, leave -> balance, leave -> notification",
+    "No reverse dependencies permitted",
+    "LeaveRequest lifecycle states: Pending, Approved, Rejected",
     "Balance deductions occur only during approveLeaveRequest",
-    "Notifications are created on submission, approval, and rejection events",
-    "Must implement ILeaveService interface with all methods defined",
-    "Must use class-validator decorators for input validation",
-    "Must use Vitest for unit testing (not Jest as mentioned in intent)"
+    "Notifications created on submission, approval, and rejection events"
   ],
   "outOfScope": [
-    "PolicyService implementation (Phase 4)",
-    "BalanceService implementation (Phase 4)",
-    "NotificationService implementation (Phase 5)",
-    "AuditService implementation (Phase 5)",
-    "Controller layer with RBAC and error handling (Phase 6)",
-    "Fastify routes implementation",
-    "API endpoint implementation",
-    "UI components",
+    "Changes to existing DTO definitions in leave.model.ts (only adding decorators)",
+    "Changes to ILeaveService interface definition",
+    "Changes to employee, policy, balance, or notification modules",
+    "API endpoint implementations",
+    "Repository implementations",
     "Database schema changes",
-    "Infrastructure configuration"
+    "Integration tests",
+    "E2E tests",
+    "UI components",
+    "Configuration files"
   ],
-  "ambiguities": [
-    {
-      "id": "amb-001",
-      "description": "Intent mentions 'Jest unit tests' but project uses Vitest per architecture. Should tests be written with Vitest or Jest?",
-      "options": [
-        "Use Vitest as per project architecture",
-        "Use Jest as mentioned in intent"
-      ],
-      "impactIfWrong": "medium"
-    },
-    {
-      "id": "amb-002",
-      "description": "Should the InsufficientBalanceError be defined in this phase or imported from another module?",
-      "options": [
-        "Define new custom error class in leave module",
-        "Import from balance module",
-        "Use generic Error with specific message"
-      ],
-      "impactIfWrong": "medium"
-    },
-    {
-      "id": "amb-003",
-      "description": "Should database transaction management be handled within LeaveService or delegated to repository?",
-      "options": [
-        "LeaveService should manage transactions",
-        "Repository should manage transactions",
-        "Use a separate transaction service"
-      ],
-      "impactIfWrong": "medium"
-    }
-  ]
+  "ambiguities": []
 }

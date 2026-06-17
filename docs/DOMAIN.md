@@ -24,15 +24,17 @@ Represents a leave record managed by the `leave` module, including leave request
 |-------|------|----------|
 | id | string | true |
 | employeeId | string | true |
-| policyId | string | true |
 | startDate | Date | true |
 | endDate | Date | true |
 | totalDays | number | true |
+| leaveType | string | true |
 | reason | string \| null | false |
-| status | 'pending' \| 'approved' \| 'rejected' \| 'cancelled' | true |
-| reviewedBy | string \| null | false |
-| reviewedAt | Date \| null | false |
-| reviewNotes | string \| null | false |
+| status | 'Pending' \| 'Approved' \| 'Rejected' | true |
+| approvedBy | string \| null | false |
+| rejectedBy | string \| null | false |
+| approvalDate | Date \| null | false |
+| rejectionDate | Date \| null | false |
+| rejectionReason | string \| null | false |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
@@ -44,19 +46,18 @@ Represents a leave record managed by the `leave` module, including leave request
 
 | Field | Type | Required |
 |-------|------|----------|
+| employeeId | string | true |
 | startDate | Date | true |
 | endDate | Date | true |
-| reason | string | true |
 | leaveType | string | true |
+| reason | string | false |
 
 ### UpdateLeaveRequestDto
 
 | Field | Type | Required |
 |-------|------|----------|
-| startDate | Date | false |
-| endDate | Date | false |
-| reason | string | false |
-| leaveType | string | false |
+| status | 'Approved' \| 'Rejected' | true |
+| rejectionReason | string | false |
 
 ### LeaveRequestQuery
 

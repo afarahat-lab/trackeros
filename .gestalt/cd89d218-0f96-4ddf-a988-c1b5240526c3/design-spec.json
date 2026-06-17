@@ -2,9 +2,19 @@
   "correlationId": "cd89d218-0f96-4ddf-a988-c1b5240526c3",
   "domainChanges": [
     {
-      "entityName": "CreateLeaveRequestDto",
+      "entityName": "LeaveRequest",
       "operation": "create",
       "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "employeeId",
+          "type": "string",
+          "required": true
+        },
         {
           "name": "startDate",
           "type": "Date",
@@ -16,14 +26,100 @@
           "required": true
         },
         {
-          "name": "reason",
-          "type": "string",
+          "name": "totalDays",
+          "type": "number",
           "required": true
         },
         {
           "name": "leaveType",
           "type": "string",
           "required": true
+        },
+        {
+          "name": "reason",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "status",
+          "type": "'Pending' | 'Approved' | 'Rejected'",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "approvedBy",
+          "type": "string | null",
+          "required": false
+        },
+        {
+          "name": "rejectedBy",
+          "type": "string | null",
+          "required": false
+        },
+        {
+          "name": "approvalDate",
+          "type": "Date | null",
+          "required": false
+        },
+        {
+          "name": "rejectionDate",
+          "type": "Date | null",
+          "required": false
+        },
+        {
+          "name": "rejectionReason",
+          "type": "string | null",
+          "required": false
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "Employee",
+          "type": "many-to-one"
+        },
+        {
+          "entity": "LeavePolicy",
+          "type": "many-to-one"
+        }
+      ]
+    },
+    {
+      "entityName": "CreateLeaveRequestDto",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "employeeId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "startDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "endDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "leaveType",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "reason",
+          "type": "string",
+          "required": false
         }
       ],
       "relationships": []
@@ -33,66 +129,65 @@
       "operation": "create",
       "fields": [
         {
-          "name": "startDate",
-          "type": "Date",
-          "required": false
-        },
-        {
-          "name": "endDate",
-          "type": "Date",
-          "required": false
-        },
-        {
-          "name": "reason",
-          "type": "string",
-          "required": false
-        },
-        {
-          "name": "leaveType",
-          "type": "string",
-          "required": false
-        }
-      ],
-      "relationships": []
-    },
-    {
-      "entityName": "LeaveRequestQuery",
-      "operation": "create",
-      "fields": [
-        {
-          "name": "employeeId",
-          "type": "string",
-          "required": false
-        },
-        {
           "name": "status",
+          "type": "'Approved' | 'Rejected'",
+          "required": true
+        },
+        {
+          "name": "rejectionReason",
           "type": "string",
-          "required": false
-        },
-        {
-          "name": "startDateFrom",
-          "type": "Date",
-          "required": false
-        },
-        {
-          "name": "startDateTo",
-          "type": "Date",
-          "required": false
-        },
-        {
-          "name": "limit",
-          "type": "number",
-          "required": false
-        },
-        {
-          "name": "offset",
-          "type": "number",
           "required": false
         }
       ],
       "relationships": []
     }
   ],
-  "apiContracts": [],
+  "apiContracts": [
+    {
+      "method": "POST",
+      "path": "/api/v1/leave-requests",
+      "description": "Submit a new leave request",
+      "requestBody": {
+        "leaveRequest": "CreateLeaveRequestDto"
+      },
+      "responseBody": {
+        "leaveRequest": "LeaveRequest"
+      },
+      "authRequired": true,
+      "roles": [
+        "employee",
+        "manager"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/leave-requests/:id",
+      "description": "Approve or reject a leave request",
+      "requestBody": {
+        "update": "UpdateLeaveRequestDto"
+      },
+      "responseBody": {
+        "leaveRequest": "LeaveRequest"
+      },
+      "authRequired": true,
+      "roles": [
+        "manager"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/leave-requests",
+      "description": "Get leave requests for current user or team",
+      "requestBody": {},
+      "responseBody": {
+        "leaveRequests": "LeaveRequest[]"
+      },
+      "authRequired": true,
+      "roles": [
+        "employee",
+        "manager"
+      ]
+    }
+  ],
   "componentSpecs": []
 }
