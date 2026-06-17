@@ -1,0 +1,70 @@
+{
+  "id": "b30ad3a1-ddef-40e9-80f0-5fb01db4d68b",
+  "correlationId": "71cd592b-b8e7-4769-a1b9-0bc6086ae92e",
+  "rawIntent": "[Feature: Build the leave management module — Phase 4: Balance module core]\n\nCreate src/modules/balance/balance.model.ts with LeaveBalance interface matching canonical attributes and lifecycle states. Create src/modules/balance/balance.repository.ts implementing ILeaveBalanceRepository extending IBaseRepository. This phase depends on src/shared/types/index.ts from Phase 1, src/shared/database/base.repository.ts from Phase 1, src/modules/employee/employee.model.ts from Phase 2, and src/modules/policy/policy.model.ts from Phase 3.\n\nThis phase depends on: src/shared/types/index.ts, src/shared/database/base.repository.ts, src/modules/employee/employee.model.ts, src/modules/policy/policy.model.ts.\n\nPhase architecture notes:\nImplement balance module which depends on employee and policy modules for leave balance calculations.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/balance/balance.model.ts\\nexport interface LeaveBalance {\\n  id: string;\\n  employeeId: string;\\n  policyId: string;\\n  balanceDays: number;\\n  fiscalYear: number;\\n  createdAt: Date;\\n  updatedAt: Date;\\n}\",\"File: src/modules/balance/balance.repository.ts\\nimport { IBaseRepository } from \\\"../../shared/database/base.repository\\\";\\nimport { LeaveBalance } from \\\"./balance.model\\\";\\n\\nexport interface ILeaveBalanceRepository extends IBaseRepository<LeaveBalance> {\\n  findByEmployeeAndFiscalYear(employeeId: string, fiscalYear: number): Promise<LeaveBalance[]>;\\n  findByEmployeePolicyAndFiscalYear(employeeId: string, policyId: string, fiscalYear: number): Promise<LeaveBalance | null>;\\n  updateBalance(id: string, balanceDays: number): Promise<LeaveBalance>;\\n}\\n\\nexport class LeaveBalanceRepository implements ILeaveBalanceRepository {\\n  constructor(private readonly pool: import(\\\"pg\\\").Pool) {}\\n  \\n  async create(data: Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeaveBalance> {\\n    const query = `\\n      INSERT INTO leave_balances (employee_id, policy_id, balance_days, fiscal_year)\\n      VALUES ($1, $2, $3, $4)\\n      RETURNING id, employee_id AS \\\"employeeId\\\", policy_id AS \\\"policyId\\\", \\n                balance_days AS \\\"balanceDays\\\", fiscal_year AS \\\"fiscalYear\\\",\\n                created_at AS \\\"createdAt\\\", updated_at AS \\\"updatedAt\\\"\\n    `;\\n    const values = [data.employeeId, data.policyId, data.balanceDays, data.fiscalYear];\\n    const result = await this.pool.query(query, values);\\n    return result.rows[0];\\n  }\\n  \\n  async findById(id: string): Promise<LeaveBalance | null> {\\n    const query = `\\n      SELECT id, employee_id AS \\\"employeeId\\\", policy_id AS \\\"policyId\\\",\\n             balance_days AS \\\"balanceDays\\\", fiscal_year AS \\\"fiscalYear\\\",\\n             created_at AS \\\"createdAt\\\", updated_at AS \\\"updatedAt\\\"\\n      FROM leave_balances\\n      WHERE id = $1\\n    `;\\n    const result = await this.pool.query(query, [id]);\\n    return result.rows[0] || null;\\n  }\\n  \\n  async findAll(): Promise<LeaveBalance[]> {\\n    const query = `\\n      SELECT id, employee_id AS \\\"employeeId\\\", policy_id AS \\\"policyId\\\",\\n             balance_days AS \\\"balanceDays\\\", fiscal_year AS \\\"fiscalYear\\\",\\n             created_at AS \\\"createdAt\\\", updated_at AS \\\"updatedAt\\\"\\n      FROM leave_balances\\n    `;\\n    const result = await this.pool.query(query);\\n    return result.rows;\\n  }\\n  \\n  async update(id: string, data: Partial<LeaveBalance>): Promise<LeaveBalance> {\\n    const updates: string[] = [];\\n    const values: any[] = [];\\n    let paramCount = 1;\\n    \\n    if (data.employeeId !== undefined) {\\n      updates.push(`employee_id = $${paramCount}`);\\n      values.push(data.employeeId);\\n      paramCount++;\\n    }\\n    if (data.policyId !== undefined) {\\n      updates.push(`policy_id = $${paramCount}`);\\n      values.push(data.policyId);\\n      paramCount++;\\n    }\\n    if (data.balanceDays !== undefined) {\\n      updates.push(`balance_days = $${paramCount}`);\\n      values.push(data.balanceDays);\\n      paramCount++;\\n    }\\n    if (data.fiscalYear !== undefined) {\\n      updates.push(`fiscal_year = $${paramCount}`);\\n      values.push(data.fiscalYear);\\n      paramCount++;\\n    }\\n    \\n    if (updates.length === 0) {\\n      return this.findById(id) as Promise<LeaveBalance>;\\n    }\\n    \\n    updates.push(`updated_at = CURRENT_TIMESTAMP`);\\n    values.push(id);\\n    \\n    const query = `\\n      UPDATE leave_balances\\n      SET ${updates.join(', ')}\\n      WHERE id = $${paramCount}\\n      RETURNING id, employee_id AS \\\"employeeId\\\", policy_id AS \\\"policyId\\\",\\n                balance_days AS \\\"balanceDays\\\", fiscal_year AS \\\"fiscalYear\\\",\\n                created_at AS \\\"createdAt\\\", updated_at AS \\\"updatedAt\\\"\\n    `;\\n    \\n    const result = await this.pool.query(query, values);\\n    return result.rows[0];\\n  }\\n  \\n  async delete(id: string): Promise<void> {\\n    const query = `DELETE FROM leave_balances WHERE id = $1`;\\n    await this.pool.query(query, [id]);\\n  }\\n  \\n  async findByEmployeeAndFiscalYear(employeeId: string, fiscalYear: number): Promise<LeaveBalance[]> {\\n    const query = `\\n      SELECT id, employee_id AS \\\"employeeId\\\", policy_id AS \\\"policyId\\\",\\n             balance_days AS \\\"balanceDays\\\", fiscal_year AS \\\"fiscalYear\\\",\\n             created_at AS \\\"createdAt\\\", updated_at AS \\\"updatedAt\\\"\\n      FROM leave_balances\\n      WHERE employee_id = $1 AND fiscal_year = $2\\n    `;\\n    const result = await this.pool.query(query, [employeeId, fiscalYear]);\\n    return result.rows;\\n  }\\n  \\n  async findByEmployeePolicyAndFiscalYear(employeeId: string, policyId: string, fiscalYear: number): Promise<LeaveBalance | null> {\\n    const query = `\\n      SELECT id, employee_id AS \\\"employeeId\\\", policy_id AS \\\"policyId\\\",\\n             balance_days AS \\\"balanceDays\\\", fiscal_year AS \\\"fiscalYear\\\",\\n             created_at AS \\\"createdAt\\\", updated_at AS \\\"updatedAt\\\"\\n      FROM leave_balances\\n      WHERE employee_id = $1 AND policy_id = $2 AND fiscal_year = $3\\n    `;\\n    const result = await this.pool.query(query, [employeeId, policyId, fiscalYear]);\\n    return result.rows[0] || null;\\n  }\\n  \\n  async updateBalance(id: string, balanceDays: number): Promise<LeaveBalance> {\\n    const query = `\\n      UPDATE leave_balances\\n      SET balance_days = $1, updated_at = CURRENT_TIMESTAMP\\n      WHERE id = $2\\n      RETURNING id, employee_id AS \\\"employeeId\\\", policy_id AS \\\"policyId\\\",\\n                balance_days AS \\\"balanceDays\\\", fiscal_year AS \\\"fiscalYear\\\",\\n                created_at AS \\\"createdAt\\\", updated_at AS \\\"updatedAt\\\"\\n    `;\\n    const result = await this.pool.query(query, [balanceDays, id]);\\n    return result.rows[0];\\n  }\\n}\"],\"importStatements\":[\"import { IBaseRepository } from \\\"../../shared/database/base.repository\\\"\",\"import { LeaveBalance } from \\\"./balance.model\\\"\",\"import { Pool } from \\\"pg\\\"\"],\"successCriteria\":[\"src/modules/balance/balance.model.ts exists and exports LeaveBalance interface\",\"src/modules/balance/balance.repository.ts exists and exports LeaveBalanceRepository implementing ILeaveBalanceRepository\",\"LeaveBalanceRepository methods findByEmployeeAndFiscalYear, findByEmployeePolicyAndFiscalYear, and updateBalance are implemented with proper SQL queries\",\"All database access follows repository pattern (GP-001)\",\"Repository tests in src/modules/balance/balance.repository.test.ts pass with Vitest\"],\"sqlSchema\":\"CREATE TABLE leave_balances (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), employee_id UUID NOT NULL REFERENCES employees(id) ON DELETE CASCADE, policy_id UUID NOT NULL REFERENCES leave_policies(id) ON DELETE CASCADE, balance_days DECIMAL(5,2) NOT NULL DEFAULT 0, fiscal_year INTEGER NOT NULL, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, UNIQUE(employee_id, policy_id, fiscal_year));\"}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- LeaveBalance\n- ILeaveBalanceRepository\n- IBaseRepository\n- Pool\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Canonical entity fields for this phase\n\nNote: these field names supersede any attribute names in the\nintent text above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the field names of each entity this phase defines. The\nexact attribute / column / property set per entity is:\n\n- `LeaveBalance`: `id`, `employeeId`, `policyId`, `balanceDays`, `fiscalYear`, `createdAt`, `updatedAt`\n\nTreat each entity's field list as complete. If the\nintent text or planner scope mentions different field\nnames than the architecture, do NOT flag this as\nambiguity — the per-phase architecture wins.\n\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 5 — Notification module core: Create src/modules/notification/notification.model.ts with Notification interface matching canonical\n- Phase 6 — Leave module core models and repository: Create src/modules/leave/leave.model.ts with LeaveRequest interface matching canonical attributes an\n- Phase 7 — Leave module service with business logic: Create src/modules/leave/leave.service.ts with LeaveService class implementing ILeaveService interfa\n- Phase 8 — Leave controllers and routes: Create src/modules/leave/leave.controller.ts with LeaveController class implementing Fastify route h",
+  "scope": {
+    "affectedDomains": [
+      "balance"
+    ],
+    "affectedLayers": [
+      "domain",
+      "infra"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/balance/balance.model.ts exists and exports LeaveBalance interface with id, employeeId, policyId, balanceDays, fiscalYear, createdAt, updatedAt fields",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/balance/balance.repository.ts exists and exports LeaveBalanceRepository implementing ILeaveBalanceRepository extending IBaseRepository",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "LeaveBalanceRepository implements findByEmployeeAndFiscalYear, findByEmployeePolicyAndFiscalYear, and updateBalance methods with proper SQL queries",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "Repository tests in src/modules/balance/balance.repository.test.ts pass with Vitest",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "GP-001: All database access goes through repository interfaces",
+    "GP-002: All state-changing operations write an audit record",
+    "GP-003: Validate all inputs at API boundaries before processing",
+    "GP-004: Never log passwords, tokens, PII, or financial data",
+    "GP-005: All API endpoints enforce role-based access control",
+    "GP-006: No unhandled promise rejections. All async errors are caught and handled",
+    "Repository must extend IBaseRepository<LeaveBalance>",
+    "Repository must accept Pool constructor dependency",
+    "LeaveBalance interface must match canonical attributes: id, employeeId, policyId, balanceDays, fiscalYear, createdAt, updatedAt",
+    "SQL schema must match provided CREATE TABLE statement"
+  ],
+  "outOfScope": [
+    "Notification module core (Phase 5)",
+    "Leave module core models and repository (Phase 6)",
+    "Leave module service with business logic (Phase 7)",
+    "Leave controllers and routes (Phase 8)",
+    "API endpoints for balance module",
+    "Business logic for balance calculations",
+    "Balance service layer",
+    "Balance controllers or routes",
+    "UI components",
+    "Authentication or authorization logic",
+    "Audit record implementation for repository methods",
+    "Input validation for repository methods",
+    "Anything outside src/modules/balance/ directory except for specified dependencies"
+  ],
+  "ambiguities": []
+}
