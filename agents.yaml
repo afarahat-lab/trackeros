@@ -57,7 +57,12 @@ agents:
     role: "Technical writer"
     goal: "Keep project context files accurate and up to date"
     llm:
-      model: ~
+      # TR_061-followup — was `model: ~` (platform default). The TR_061
+      # second run hit a moonshotai/Kimi-K2.6 timeout in context-agent's
+      # tool-loop because the env LLM_MODEL fallback resolved to Kimi
+      # before the registry default could take over. Pin to V4-Pro
+      # explicitly to bypass the env-fallthrough.
+      model: deepseek-ai/DeepSeek-V4-Pro
       temperature: 0.1
       max_tokens: 8000
     tools:
@@ -140,7 +145,10 @@ agents:
     role: "Senior QA engineer"
     goal: "Generate comprehensive Jest tests mapped to success criteria"
     llm:
-      model: ~
+      # TR_061-followup — pin off env-default fallthrough to Kimi-K2.6.
+      # test-agent is skipped under Aider backend (ADR-043) but the pin
+      # is harmless and consistent.
+      model: deepseek-ai/DeepSeek-V4-Pro
       temperature: 0.1
       max_tokens: 6000
     prompt_extensions: []
@@ -182,7 +190,8 @@ agents:
     role: "Technical documentation specialist"
     goal: "Detect when project documentation has fallen behind the codebase"
     llm:
-      model: ~
+      # TR_061-followup — pin off env-default Kimi-K2.6 fallthrough.
+      model: deepseek-ai/DeepSeek-V4-Pro
       temperature: 0.1
       max_tokens: 2000
     tools:
@@ -193,7 +202,8 @@ agents:
     role: "Technical documentation specialist"
     goal: "Ensure project context files are internally consistent"
     llm:
-      model: ~
+      # TR_061-followup — pin off env-default Kimi-K2.6 fallthrough.
+      model: deepseek-ai/DeepSeek-V4-Pro
       temperature: 0.1
       max_tokens: 2000
     tools:
@@ -204,7 +214,8 @@ agents:
     role: "Technical writer"
     goal: "Apply additive context-file edits that resolve maintenance findings"
     llm:
-      model: ~
+      # TR_061-followup — pin off env-default Kimi-K2.6 fallthrough.
+      model: deepseek-ai/DeepSeek-V4-Pro
       temperature: 0.2
       max_tokens: 8192
     tools:
