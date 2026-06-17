@@ -1,41 +1,42 @@
-export type LeaveType = 'annual' | 'sick' | 'personal' | 'maternity' | 'paternity';
-
-export type LeaveStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
+export type LeaveType = 'annual' | 'sick' | 'emergency' | 'unpaid' | 'maternity' | 'paternity';
 
 export interface LeaveRequest {
   id: string;
   employeeId: string;
-  leaveType: LeaveType;
-  startDate: string;
-  endDate: string;
-  status: LeaveStatus;
+  policyId: string;
+  startDate: Date;
+  endDate: Date;
+  totalDays: number;
   reason?: string;
+  status: 'draft' | 'submitted' | 'pending_approval' | 'approved' | 'rejected' | 'cancelled';
   managerId?: string;
-  createdAt: string;
-  updatedAt: string;
+  managerNotes?: string;
+  submittedAt?: Date;
+  decidedAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface CreateLeaveRequestDto {
   employeeId: string;
+  policyId: string;
   leaveType: LeaveType;
-  startDate: string;
-  endDate: string;
+  startDate: Date;
+  endDate: Date;
+  totalDays: number;
   reason?: string;
-  managerId?: string;
 }
 
 export interface UpdateLeaveRequestDto {
-  leaveType?: LeaveType;
-  startDate?: string;
-  endDate?: string;
-  reason?: string;
-  managerId?: string;
-  status?: LeaveStatus;
+  status?: LeaveRequest['status'];
+  managerNotes?: string;
+  decidedAt?: Date;
 }
 
 export interface LeaveRequestQuery {
   employeeId?: string;
-  status?: LeaveStatus;
-  startDate?: string;
-  endDate?: string;
+  status?: LeaveRequest['status'];
+  startDate?: Date;
+  endDate?: Date;
+  managerId?: string;
 }
