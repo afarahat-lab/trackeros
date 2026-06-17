@@ -5420,3 +5420,369 @@
 +- All repository method signatures include proper error handling with appropriate error types
 +- LeaveType enum values match canonical schema leave_type column constraints
 +- ARCHITECTURE.md must be updated to include the new LeaveType enum domain concept
+
+# 2026-06-17 07:10:33.183698
++## Task
++[Feature: Build the leave management module — Phase 1: Core domain models and repositories for leave module]
++
++Create src/modules/leave/leave.model.ts with TypeScript interfaces for LeaveRequest and CreateLeaveRequestDto using canonical attributes. Create src/modules/leave/leave.repository.ts implementing ILeaveRepository with methods like create, findById, update, findByEmployeeId. Include Jest unit tests in tests/unit/modules/leave/leave.repository.test.ts. This phase establishes the foundational domain entity and repository interface.
++
++Phase architecture notes:
++Establish LeaveRequest domain entity and repository interface first to satisfy GP-001 (Repository pattern). Model and repository must be in same phase so Aider sees field definitions when generating repository methods.
++
++Detailed phase architecture (architecture-agent):
++{"interfaces":["File: src/modules/leave/leave.model.ts\nexport interface LeaveRequest {\n  id: string;\n  employeeId: string;\n  leaveType: string;\n  startDate: Date;\n  endDate: Date;\n  durationDays: number;\n  reason?: string;\n  status: 'DRAFT' | 'SUBMITTED' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'CANCELLED';\n  approverId?: string;\n  submittedAt?: Date;\n  approvedAt?: Date;\n  rejectedAt?: Date;\n  cancelledAt?: Date;\n  createdAt: Date;\n  updatedAt: Date;\n}\n\nexport interface CreateLeaveRequestDto {\n  employeeId: string;\n  leaveType: string;\n  startDate: Date;\n  endDate: Date;\n  durationDays: number;\n  reason?: string;\n}\n\nexport type LeaveRequestModel = LeaveRequest;","File: src/modules/leave/leave.repository.ts\nexport interface ILeaveRepository {\n  create(leaveRequest: CreateLeaveRequestDto): Promise<LeaveRequest>;\n  findById(id: string): Promise<LeaveRequest | null>;\n  findByEmployeeId(employeeId: string): Promise<LeaveRequest[]>;\n  updateStatus(id: string, status: LeaveRequest['status'], approverId?: string): Promise<LeaveRequest>;\n  update(id: string, updates: Partial<LeaveRequest>): Promise<LeaveRequest>;\n  delete(id: string): Promise<void>;\n}\n\nexport class PostgresLeaveRequestRepository implements ILeaveRepository {\n  constructor(private readonly pool: Pool) {}\n\n  async create(leaveRequest: CreateLeaveRequestDto): Promise<LeaveRequest> {\n    // Implementation will be added in tests\n  }\n\n  async findById(id: string): Promise<LeaveRequest | null> {\n    // Implementation will be added in tests\n  }\n\n  async findByEmployeeId(employeeId: string): Promise<LeaveRequest[]> {\n    // Implementation will be added in tests\n  }\n\n  async updateStatus(id: string, status: LeaveRequest['status'], approverId?: string): Promise<LeaveRequest> {\n    // Implementation will be added in tests\n  }\n\n  async update(id: string, updates: Partial<LeaveRequest>): Promise<LeaveRequest> {\n    // Implementation will be added in tests\n  }\n\n  async delete(id: string): Promise<void> {\n    // Implementation will be added in tests\n  }\n}"],"importStatements":["import { Pool } from 'pg';","import { pool } from '../../shared/db/connection';"],"successCriteria":["src/modules/leave/leave.model.ts exists and exports LeaveRequest interface, CreateLeaveRequestDto interface, and LeaveRequestModel type","src/modules/leave/leave.repository.ts exists and exports ILeaveRepository interface and PostgresLeaveRequestRepository class","PostgresLeaveRequestRepository implements all repository methods using the PostgreSQL pool from src/shared/db/connection.ts","All repository methods execute SQL queries matching the canonical leave_requests schema exactly","Repository methods handle database errors and return appropriate Promise rejections","ARCHITECTURE.md is updated to include the new LeaveRequest entity and its lifecycle states: DRAFT, SUBMITTED, PENDING_APPROVAL, APPROVED, REJECTED, CANCELLED"],"sqlSchema":"CREATE TABLE leave_requests (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), employee_id UUID NOT NULL REFERENCES employees(id) ON DELETE CASCADE, leave_type VARCHAR(50) NOT NULL, start_date DATE NOT NULL, end_date DATE NOT NULL, duration_days DECIMAL(5,2) NOT NULL CHECK (duration_days > 0), reason TEXT, status VARCHAR(20) DEFAULT 'DRAFT' CHECK (status IN ('DRAFT', 'SUBMITTED', 'PENDING_APPROVAL', 'APPROVED', 'REJECTED', 'CANCELLED')), approver_id UUID REFERENCES employees(id), submitted_at TIMESTAMP WITH TIME ZONE, approved_at TIMESTAMP WITH TIME ZONE, rejected_at TIMESTAMP WITH TIME ZONE, cancelled_at TIMESTAMP WITH TIME ZONE, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, CHECK (start_date <= end_date));"}
++
++## Canonical dependencies for this phase
++
++Note: this list supersedes any dependency names in the intent
++text above. Do not emit ambiguity for mismatches.
++
++The per-phase architecture above is the AUTHORITATIVE source
++for the dependency list this phase must implement. The exact
++set of types, abstractions, and references defined or used by
++this phase is:
++
++- LeaveRequest
++- CreateLeaveRequestDto
++- ILeaveRepository
++- Pool
++- pool
++
++Treat this list as complete. If additional dependencies appear
++in the architecture but the planner's scope text mentions a
++partial subset, do NOT flag this as ambiguity — the per-phase
++architecture wins.
++
++
++## Canonical entity fields for this phase
++
++Note: these field names supersede any attribute names in the
++intent text above. Do not emit ambiguity for mismatches.
++
++The per-phase architecture above is the AUTHORITATIVE source
++for the field names of each entity this phase defines. The
++exact attribute / column / property set per entity is:
++
++- `LeaveRequest`: `id`, `employeeId`, `leaveType`, `startDate`, `endDate`, `durationDays`, `reason`, `status`, `approverId`, `submittedAt`, `approvedAt`, `rejectedAt`, `cancelledAt`, `createdAt`, `updatedAt`
++- `CreateLeaveRequestDto`: `employeeId`, `leaveType`, `startDate`, `endDate`, `durationDays`, `reason`
++
++Treat each entity's field list as complete. If the
++intent text or planner scope mentions different field
++names than the architecture, do NOT flag this as
++ambiguity — the per-phase architecture wins.
++
++
++## Deferred to later phases
++The following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:
++- Phase 2 — Core domain models and repositories for balance module: Create src/modules/balance/balance.model.ts with TypeScript interface for LeaveBalance using canonic
++- Phase 3 — Service interfaces for leave and balance modules: Create src/modules/leave/leave.service.interface.ts with ILeaveService interface defining methods li
++- Phase 4 — Service implementations for leave and balance: Create src/modules/leave/leave.service.ts implementing ILeaveService using ILeaveRepository and ILea
++- Phase 5 — Input validation and audit integration for leave service: Add validation decorators to CreateLeaveRequestDto in src/modules/leave/leave.model.ts (GP-003). Cre
++- Phase 6 — Controller layer with RBAC for leave module: Create src/modules/leave/leave.controller.ts with LeaveController class implementing methods like su
++- Phase 7 — Route definitions and integration for leave module: Create src/modules/leave/leave.routes.ts defining Fastify routes that connect LeaveController method
++
++## Success criteria
++- src/modules/leave/leave.model.ts exists and exports LeaveRequest interface, CreateLeaveRequestDto interface, and LeaveRequestModel type as defined in the authoritative architecture.
++- src/modules/leave/leave.repository.ts exists and exports ILeaveRepository interface and PostgresLeaveRequestRepository class as defined in the authoritative architecture.
++- Jest unit tests exist in tests/unit/modules/leave/leave.repository.test.ts covering the repository methods.
++- ARCHITECTURE.md is updated to include the new LeaveRequest entity and its lifecycle states: DRAFT, SUBMITTED, PENDING_APPROVAL, APPROVED, REJECTED, CANCELLED.
++
++## Out of scope (do NOT touch these)
++- Service layer (ILeaveService, leave.service.ts)
++- Controller layer (LeaveController)
++- Route definitions (leave.routes.ts)
++- Input validation decorators
++- Audit record creation
++- RBAC enforcement
++- Integration with balance, policy, notification, or employee modules beyond the defined repository interface.
++- Implementation of repository methods beyond the skeleton provided in the authoritative architecture.
++- Any functionality related to Phase 2 (balance module) and beyond.
++
++## Project rules
++- Generated code must compile without errors. Verify with executeScript before returning.
++- All imports must resolve to files that exist in the project or are declared in package.json.
++- You MUST run a compile/lint check via executeScript before emitting the final files. This is not optional.
++- Do not use require() for JSON imports — import them using ES module syntax with resolveJsonModule enabled in tsconfig.
++- Before generating any repository, service, or controller code, read the DTO and interface files it will use. Never reference a field on a type without confirming it exists in the type definition.
++- Before generating code that calls methods on a dependency, read the dependency's source file to confirm which methods exist. Only call methods that are actually defined.
++- Read the project's compiler/linter configuration file (tsconfig.json, mypy.ini, pyproject.toml, .eslintrc etc) before generating code. Follow the strictness settings it defines — do not assume permissive defaults.
++- Read the project's dependency manifest (package.json, requirements.txt, go.mod, pom.xml etc) before importing external packages. Only import packages that are listed as dependencies.
++
++## Scoped architecture for this phase
++The following describes ONLY what exists now and what you
++are building in this phase. Use these exact file paths,
++exact export names, and exact import statements. Do not
++invent paths or imports — if it is not listed here, it
++does not exist.
++
++### Existing dependencies — use these exact imports
++
++import { Pool } from 'pg';
++import { pool } from '../../shared/db/connection';
++
++### Interfaces / types this phase implements
++
++File: src/modules/leave/leave.model.ts
++export interface LeaveRequest {
++  id: string;
++  employeeId: string;
++  leaveType: string;
++  startDate: Date;
++  endDate: Date;
++  durationDays: number;
++  reason?: string;
++  status: 'DRAFT' | 'SUBMITTED' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
++  approverId?: string;
++  submittedAt?: Date;
++  approvedAt?: Date;
++  rejectedAt?: Date;
++  cancelledAt?: Date;
++  createdAt: Date;
++  updatedAt: Date;
++}
++
++export interface CreateLeaveRequestDto {
++  employeeId: string;
++  leaveType: string;
++  startDate: Date;
++  endDate: Date;
++  durationDays: number;
++  reason?: string;
++}
++
++export type LeaveRequestModel = LeaveRequest;
++
++File: src/modules/leave/leave.repository.ts
++export interface ILeaveRepository {
++  create(leaveRequest: CreateLeaveRequestDto): Promise<LeaveRequest>;
++  findById(id: string): Promise<LeaveRequest | null>;
++  findByEmployeeId(employeeId: string): Promise<LeaveRequest[]>;
++  updateStatus(id: string, status: LeaveRequest['status'], approverId?: string): Promise<LeaveRequest>;
++  update(id: string, updates: Partial<LeaveRequest>): Promise<LeaveRequest>;
++  delete(id: string): Promise<void>;
++}
++
++export class PostgresLeaveRequestRepository implements ILeaveRepository {
++  constructor(private readonly pool: Pool) {}
++
++  async create(leaveRequest: CreateLeaveRequestDto): Promise<LeaveRequest> {
++    // Implementation will be added in tests
++  }
++
++  async findById(id: string): Promise<LeaveRequest | null> {
++    // Implementation will be added in tests
++  }
++
++  async findByEmployeeId(employeeId: string): Promise<LeaveRequest[]> {
++    // Implementation will be added in tests
++  }
++
++  async updateStatus(id: string, status: LeaveRequest['status'], approverId?: string): Promise<LeaveRequest> {
++    // Implementation will be added in tests
++  }
++
++  async update(id: string, updates: Partial<LeaveRequest>): Promise<LeaveRequest> {
++    // Implementation will be added in tests
++  }
++
++  async delete(id: string): Promise<void> {
++    // Implementation will be added in tests
++  }
++}
++
++### SQL schema this phase introduces
++
++CREATE TABLE leave_requests (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), employee_id UUID NOT NULL REFERENCES employees(id) ON DELETE CASCADE, leave_type VARCHAR(50) NOT NULL, start_date DATE NOT NULL, end_date DATE NOT NULL, duration_days DECIMAL(5,2) NOT NULL CHECK (duration_days > 0), reason TEXT, status VARCHAR(20) DEFAULT 'DRAFT' CHECK (status IN ('DRAFT', 'SUBMITTED', 'PENDING_APPROVAL', 'APPROVED', 'REJECTED', 'CANCELLED')), approver_id UUID REFERENCES employees(id), submitted_at TIMESTAMP WITH TIME ZONE, approved_at TIMESTAMP WITH TIME ZONE, rejected_at TIMESTAMP WITH TIME ZONE, cancelled_at TIMESTAMP WITH TIME ZONE, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, CHECK (start_date <= end_date));
++
++### Success criteria for this phase
++
++- src/modules/leave/leave.model.ts exists and exports LeaveRequest interface, CreateLeaveRequestDto interface, and LeaveRequestModel type
++- src/modules/leave/leave.repository.ts exists and exports ILeaveRepository interface and PostgresLeaveRequestRepository class
++- PostgresLeaveRequestRepository implements all repository methods using the PostgreSQL pool from src/shared/db/connection.ts
++- All repository methods execute SQL queries matching the canonical leave_requests schema exactly
++- Repository methods handle database errors and return appropriate Promise rejections
++- ARCHITECTURE.md is updated to include the new LeaveRequest entity and its lifecycle states: DRAFT, SUBMITTED, PENDING_APPROVAL, APPROVED, REJECTED, CANCELLED
+
+# 2026-06-17 07:10:33.183811
++## Task
++[Feature: Build the leave management module — Phase 1: Core domain models and repositories for leave module]
++
++Create src/modules/leave/leave.model.ts with TypeScript interfaces for LeaveRequest and CreateLeaveRequestDto using canonical attributes. Create src/modules/leave/leave.repository.ts implementing ILeaveRepository with methods like create, findById, update, findByEmployeeId. Include Jest unit tests in tests/unit/modules/leave/leave.repository.test.ts. This phase establishes the foundational domain entity and repository interface.
++
++Phase architecture notes:
++Establish LeaveRequest domain entity and repository interface first to satisfy GP-001 (Repository pattern). Model and repository must be in same phase so Aider sees field definitions when generating repository methods.
++
++Detailed phase architecture (architecture-agent):
++{"interfaces":["File: src/modules/leave/leave.model.ts\nexport interface LeaveRequest {\n  id: string;\n  employeeId: string;\n  leaveType: string;\n  startDate: Date;\n  endDate: Date;\n  durationDays: number;\n  reason?: string;\n  status: 'DRAFT' | 'SUBMITTED' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'CANCELLED';\n  approverId?: string;\n  submittedAt?: Date;\n  approvedAt?: Date;\n  rejectedAt?: Date;\n  cancelledAt?: Date;\n  createdAt: Date;\n  updatedAt: Date;\n}\n\nexport interface CreateLeaveRequestDto {\n  employeeId: string;\n  leaveType: string;\n  startDate: Date;\n  endDate: Date;\n  durationDays: number;\n  reason?: string;\n}\n\nexport type LeaveRequestModel = LeaveRequest;","File: src/modules/leave/leave.repository.ts\nexport interface ILeaveRepository {\n  create(leaveRequest: CreateLeaveRequestDto): Promise<LeaveRequest>;\n  findById(id: string): Promise<LeaveRequest | null>;\n  findByEmployeeId(employeeId: string): Promise<LeaveRequest[]>;\n  updateStatus(id: string, status: LeaveRequest['status'], approverId?: string): Promise<LeaveRequest>;\n  update(id: string, updates: Partial<LeaveRequest>): Promise<LeaveRequest>;\n  delete(id: string): Promise<void>;\n}\n\nexport class PostgresLeaveRequestRepository implements ILeaveRepository {\n  constructor(private readonly pool: Pool) {}\n\n  async create(leaveRequest: CreateLeaveRequestDto): Promise<LeaveRequest> {\n    // Implementation will be added in tests\n  }\n\n  async findById(id: string): Promise<LeaveRequest | null> {\n    // Implementation will be added in tests\n  }\n\n  async findByEmployeeId(employeeId: string): Promise<LeaveRequest[]> {\n    // Implementation will be added in tests\n  }\n\n  async updateStatus(id: string, status: LeaveRequest['status'], approverId?: string): Promise<LeaveRequest> {\n    // Implementation will be added in tests\n  }\n\n  async update(id: string, updates: Partial<LeaveRequest>): Promise<LeaveRequest> {\n    // Implementation will be added in tests\n  }\n\n  async delete(id: string): Promise<void> {\n    // Implementation will be added in tests\n  }\n}"],"importStatements":["import { Pool } from 'pg';","import { pool } from '../../shared/db/connection';"],"successCriteria":["src/modules/leave/leave.model.ts exists and exports LeaveRequest interface, CreateLeaveRequestDto interface, and LeaveRequestModel type","src/modules/leave/leave.repository.ts exists and exports ILeaveRepository interface and PostgresLeaveRequestRepository class","PostgresLeaveRequestRepository implements all repository methods using the PostgreSQL pool from src/shared/db/connection.ts","All repository methods execute SQL queries matching the canonical leave_requests schema exactly","Repository methods handle database errors and return appropriate Promise rejections","ARCHITECTURE.md is updated to include the new LeaveRequest entity and its lifecycle states: DRAFT, SUBMITTED, PENDING_APPROVAL, APPROVED, REJECTED, CANCELLED"],"sqlSchema":"CREATE TABLE leave_requests (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), employee_id UUID NOT NULL REFERENCES employees(id) ON DELETE CASCADE, leave_type VARCHAR(50) NOT NULL, start_date DATE NOT NULL, end_date DATE NOT NULL, duration_days DECIMAL(5,2) NOT NULL CHECK (duration_days > 0), reason TEXT, status VARCHAR(20) DEFAULT 'DRAFT' CHECK (status IN ('DRAFT', 'SUBMITTED', 'PENDING_APPROVAL', 'APPROVED', 'REJECTED', 'CANCELLED')), approver_id UUID REFERENCES employees(id), submitted_at TIMESTAMP WITH TIME ZONE, approved_at TIMESTAMP WITH TIME ZONE, rejected_at TIMESTAMP WITH TIME ZONE, cancelled_at TIMESTAMP WITH TIME ZONE, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, CHECK (start_date <= end_date));"}
++
++## Canonical dependencies for this phase
++
++Note: this list supersedes any dependency names in the intent
++text above. Do not emit ambiguity for mismatches.
++
++The per-phase architecture above is the AUTHORITATIVE source
++for the dependency list this phase must implement. The exact
++set of types, abstractions, and references defined or used by
++this phase is:
++
++- LeaveRequest
++- CreateLeaveRequestDto
++- ILeaveRepository
++- Pool
++- pool
++
++Treat this list as complete. If additional dependencies appear
++in the architecture but the planner's scope text mentions a
++partial subset, do NOT flag this as ambiguity — the per-phase
++architecture wins.
++
++
++## Canonical entity fields for this phase
++
++Note: these field names supersede any attribute names in the
++intent text above. Do not emit ambiguity for mismatches.
++
++The per-phase architecture above is the AUTHORITATIVE source
++for the field names of each entity this phase defines. The
++exact attribute / column / property set per entity is:
++
++- `LeaveRequest`: `id`, `employeeId`, `leaveType`, `startDate`, `endDate`, `durationDays`, `reason`, `status`, `approverId`, `submittedAt`, `approvedAt`, `rejectedAt`, `cancelledAt`, `createdAt`, `updatedAt`
++- `CreateLeaveRequestDto`: `employeeId`, `leaveType`, `startDate`, `endDate`, `durationDays`, `reason`
++
++Treat each entity's field list as complete. If the
++intent text or planner scope mentions different field
++names than the architecture, do NOT flag this as
++ambiguity — the per-phase architecture wins.
++
++
++## Deferred to later phases
++The following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:
++- Phase 2 — Core domain models and repositories for balance module: Create src/modules/balance/balance.model.ts with TypeScript interface for LeaveBalance using canonic
++- Phase 3 — Service interfaces for leave and balance modules: Create src/modules/leave/leave.service.interface.ts with ILeaveService interface defining methods li
++- Phase 4 — Service implementations for leave and balance: Create src/modules/leave/leave.service.ts implementing ILeaveService using ILeaveRepository and ILea
++- Phase 5 — Input validation and audit integration for leave service: Add validation decorators to CreateLeaveRequestDto in src/modules/leave/leave.model.ts (GP-003). Cre
++- Phase 6 — Controller layer with RBAC for leave module: Create src/modules/leave/leave.controller.ts with LeaveController class implementing methods like su
++- Phase 7 — Route definitions and integration for leave module: Create src/modules/leave/leave.routes.ts defining Fastify routes that connect LeaveController method
++
++## Success criteria
++- src/modules/leave/leave.model.ts exists and exports LeaveRequest interface, CreateLeaveRequestDto interface, and LeaveRequestModel type as defined in the authoritative architecture.
++- src/modules/leave/leave.repository.ts exists and exports ILeaveRepository interface and PostgresLeaveRequestRepository class as defined in the authoritative architecture.
++- Jest unit tests exist in tests/unit/modules/leave/leave.repository.test.ts covering the repository methods.
++- ARCHITECTURE.md is updated to include the new LeaveRequest entity and its lifecycle states: DRAFT, SUBMITTED, PENDING_APPROVAL, APPROVED, REJECTED, CANCELLED.
++
++## Out of scope (do NOT touch these)
++- Service layer (ILeaveService, leave.service.ts)
++- Controller layer (LeaveController)
++- Route definitions (leave.routes.ts)
++- Input validation decorators
++- Audit record creation
++- RBAC enforcement
++- Integration with balance, policy, notification, or employee modules beyond the defined repository interface.
++- Implementation of repository methods beyond the skeleton provided in the authoritative architecture.
++- Any functionality related to Phase 2 (balance module) and beyond.
++
++## Project rules
++- Generated code must compile without errors. Verify with executeScript before returning.
++- All imports must resolve to files that exist in the project or are declared in package.json.
++- You MUST run a compile/lint check via executeScript before emitting the final files. This is not optional.
++- Do not use require() for JSON imports — import them using ES module syntax with resolveJsonModule enabled in tsconfig.
++- Before generating any repository, service, or controller code, read the DTO and interface files it will use. Never reference a field on a type without confirming it exists in the type definition.
++- Before generating code that calls methods on a dependency, read the dependency's source file to confirm which methods exist. Only call methods that are actually defined.
++- Read the project's compiler/linter configuration file (tsconfig.json, mypy.ini, pyproject.toml, .eslintrc etc) before generating code. Follow the strictness settings it defines — do not assume permissive defaults.
++- Read the project's dependency manifest (package.json, requirements.txt, go.mod, pom.xml etc) before importing external packages. Only import packages that are listed as dependencies.
++
++## Scoped architecture for this phase
++The following describes ONLY what exists now and what you
++are building in this phase. Use these exact file paths,
++exact export names, and exact import statements. Do not
++invent paths or imports — if it is not listed here, it
++does not exist.
++
++### Existing dependencies — use these exact imports
++
++import { Pool } from 'pg';
++import { pool } from '../../shared/db/connection';
++
++### Interfaces / types this phase implements
++
++File: src/modules/leave/leave.model.ts
++export interface LeaveRequest {
++  id: string;
++  employeeId: string;
++  leaveType: string;
++  startDate: Date;
++  endDate: Date;
++  durationDays: number;
++  reason?: string;
++  status: 'DRAFT' | 'SUBMITTED' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
++  approverId?: string;
++  submittedAt?: Date;
++  approvedAt?: Date;
++  rejectedAt?: Date;
++  cancelledAt?: Date;
++  createdAt: Date;
++  updatedAt: Date;
++}
++
++export interface CreateLeaveRequestDto {
++  employeeId: string;
++  leaveType: string;
++  startDate: Date;
++  endDate: Date;
++  durationDays: number;
++  reason?: string;
++}
++
++export type LeaveRequestModel = LeaveRequest;
++
++File: src/modules/leave/leave.repository.ts
++export interface ILeaveRepository {
++  create(leaveRequest: CreateLeaveRequestDto): Promise<LeaveRequest>;
++  findById(id: string): Promise<LeaveRequest | null>;
++  findByEmployeeId(employeeId: string): Promise<LeaveRequest[]>;
++  updateStatus(id: string, status: LeaveRequest['status'], approverId?: string): Promise<LeaveRequest>;
++  update(id: string, updates: Partial<LeaveRequest>): Promise<LeaveRequest>;
++  delete(id: string): Promise<void>;
++}
++
++export class PostgresLeaveRequestRepository implements ILeaveRepository {
++  constructor(private readonly pool: Pool) {}
++
++  async create(leaveRequest: CreateLeaveRequestDto): Promise<LeaveRequest> {
++    // Implementation will be added in tests
++  }
++
++  async findById(id: string): Promise<LeaveRequest | null> {
++    // Implementation will be added in tests
++  }
++
++  async findByEmployeeId(employeeId: string): Promise<LeaveRequest[]> {
++    // Implementation will be added in tests
++  }
++
++  async updateStatus(id: string, status: LeaveRequest['status'], approverId?: string): Promise<LeaveRequest> {
++    // Implementation will be added in tests
++  }
++
++  async update(id: string, updates: Partial<LeaveRequest>): Promise<LeaveRequest> {
++    // Implementation will be added in tests
++  }
++
++  async delete(id: string): Promise<void> {
++    // Implementation will be added in tests
++  }
++}
++
++### SQL schema this phase introduces
++
++CREATE TABLE leave_requests (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), employee_id UUID NOT NULL REFERENCES employees(id) ON DELETE CASCADE, leave_type VARCHAR(50) NOT NULL, start_date DATE NOT NULL, end_date DATE NOT NULL, duration_days DECIMAL(5,2) NOT NULL CHECK (duration_days > 0), reason TEXT, status VARCHAR(20) DEFAULT 'DRAFT' CHECK (status IN ('DRAFT', 'SUBMITTED', 'PENDING_APPROVAL', 'APPROVED', 'REJECTED', 'CANCELLED')), approver_id UUID REFERENCES employees(id), submitted_at TIMESTAMP WITH TIME ZONE, approved_at TIMESTAMP WITH TIME ZONE, rejected_at TIMESTAMP WITH TIME ZONE, cancelled_at TIMESTAMP WITH TIME ZONE, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, CHECK (start_date <= end_date));
++
++### Success criteria for this phase
++
++- src/modules/leave/leave.model.ts exists and exports LeaveRequest interface, CreateLeaveRequestDto interface, and LeaveRequestModel type
++- src/modules/leave/leave.repository.ts exists and exports ILeaveRepository interface and PostgresLeaveRequestRepository class
++- PostgresLeaveRequestRepository implements all repository methods using the PostgreSQL pool from src/shared/db/connection.ts
++- All repository methods execute SQL queries matching the canonical leave_requests schema exactly
++- Repository methods handle database errors and return appropriate Promise rejections
++- ARCHITECTURE.md is updated to include the new LeaveRequest entity and its lifecycle states: DRAFT, SUBMITTED, PENDING_APPROVAL, APPROVED, REJECTED, CANCELLED
