@@ -1,0 +1,65 @@
+{
+  "id": "0d4604fa-2cf3-44db-836a-b7c2b4dcc496",
+  "correlationId": "7797e95c-b578-458a-98b8-4f4f702cba20",
+  "rawIntent": "[Feature: Add a /zonk endpoint to the API — Phase 1: Create zonk module with controller and route]\n\nCreate src/modules/zonk/zonk.controller.ts with a Fastify route handler that returns JSON {message: 'zonk'} on GET /zonk. Create src/modules/zonk/zonk.routes.ts to register the route. Create src/modules/zonk/index.ts to export the route registration function. This phase depends on existing Fastify framework setup.\n\nPhase architecture notes:\nCreates minimal module structure with Fastify route handler only, no service layer or database dependencies needed.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/zonk/zonk.controller.ts\\nexport class ZonkController {\\n  async getZonk(): Promise<{ message: string }> {\\n    return { message: 'zonk' };\\n  }\\n}\",\"File: src/modules/zonk/zonk.routes.ts\\nimport { FastifyInstance } from 'fastify';\\nimport { ZonkController } from './zonk.controller';\\n\\nexport function registerZonkRoutes(app: FastifyInstance): void {\\n  const controller = new ZonkController();\\n  app.get('/zonk', async (request, reply) => {\\n    const result = await controller.getZonk();\\n    reply.status(200).send(result);\\n  });\\n}\",\"File: src/modules/zonk/index.ts\\nexport { registerZonkRoutes } from './zonk.routes';\"],\"importStatements\":[\"import { FastifyInstance } from 'fastify';\",\"import { ZonkController } from './zonk.controller';\",\"import { registerZonkRoutes } from './zonk.routes';\"],\"successCriteria\":[\"src/modules/zonk/zonk.controller.ts exists with a Fastify-compatible controller class that has a getZonk method returning {message: 'zonk'}\",\"src/modules/zonk/zonk.routes.ts exists and registers a GET /zonk route using Fastify's route registration\",\"src/modules/zonk/index.ts exists and exports the registerZonkRoutes function\",\"The zonk module is properly integrated into the main application router by importing and calling registerZonkRoutes\",\"GET /zonk endpoint returns HTTP 200 status with correct JSON response {message: 'zonk'} when tested\"]}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- FastifyInstance\n- ZonkController\n- registerZonkRoutes\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n",
+  "scope": {
+    "affectedDomains": [
+      "zonk"
+    ],
+    "affectedLayers": [
+      "api"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/zonk/zonk.controller.ts exists with a Fastify-compatible controller class that has a getZonk method returning {message: 'zonk'}",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/zonk/zonk.routes.ts exists and registers a GET /zonk route using Fastify's route registration",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "src/modules/zonk/index.ts exists and exports the registerZonkRoutes function",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "The zonk module is properly integrated into the main application router by importing and calling registerZonkRoutes",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "sc-005",
+      "description": "GET /zonk endpoint returns HTTP 200 status with correct JSON response {message: 'zonk'} when tested",
+      "testable": true,
+      "layer": "e2e"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "RBAC enforcement: All API endpoints enforce role-based access control.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "Service layer implementation",
+    "Database dependencies",
+    "Audit records (no state-changing operations)",
+    "Integration with existing modules (employee, policy, balance, leave, notification)",
+    "Reverse dependencies from other modules",
+    "Authentication/authorization implementation",
+    "Input validation beyond what's required by Fastify",
+    "Testing beyond the specified success criteria"
+  ],
+  "ambiguities": []
+}
