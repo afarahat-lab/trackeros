@@ -158,9 +158,14 @@ agents:
     role: "Architectural constraint evaluator"
     goal: "Verify generated code satisfies all project architectural rules using executeScript + read-only file tools"
     llm:
-      # TR_050 — DeepInfra DeepSeek-V3.2 (no reasoning_effort —
-      # not supported by DeepInfra).
-      model: deepseek-ai/DeepSeek-V3.2
+      # TR_067 §3 — DeepSeek-V4-Pro at reasoning_effort: low. The
+      # V3.2 default produced 21-tool-call 164k-token 203s runs on
+      # Phase 1 of leave-management. ADR-043 specifies low reasoning
+      # effort for deterministic gate checks; V4-Pro's higher
+      # per-turn throughput + the §1 cap raise + the §2 git-diff
+      # scoping should bring constraint-agent under 90s typical.
+      model: deepseek-ai/DeepSeek-V4-Pro
+      reasoning_effort: low
       temperature: 0.0
       max_tokens: 2000
     tools:

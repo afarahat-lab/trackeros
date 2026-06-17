@@ -69,7 +69,8 @@
       ],
       "verificationGuidance": [
         "Before evaluating any finding, read ARCHITECTURE.md to understand this project's specific layer names, boundaries, and directory structure. Use this to determine what constitutes the data access layer, business logic layer, and routing layer for this project.",
-        "A finding is only valid if it violates a rule given the actual structure of this project as described in ARCHITECTURE.md."
+        "A finding is only valid if it violates a rule given the actual structure of this project as described in ARCHITECTURE.md.",
+        "When a 'Phase scope' block is present with a defaultBranch value, scope your evaluation to the files changed in this phase only. Run `git diff origin/<defaultBranch>...HEAD --name-only` via executeScript at the start of your evaluation to identify those files. Files not in that diff were passing before this phase — do not re-evaluate them. If the diff command fails or returns empty, fall through to evaluating the artifact files inlined above."
       ]
     },
     "code-agent": {
