@@ -368,7 +368,7 @@ agents:
       # TR_050 — DeepInfra-hosted moonshotai/Kimi-K2.6 for the
       # routing-quality bar (retry vs fix-intent vs escalate).
       # reasoning_effort intentionally omitted.
-      model: moonshotai/Kimi-K2.6
+      model: deepseek-ai/DeepSeek-V4-Pro
       temperature: 0.0
       max_tokens: 6000
     prompt_extensions:
