@@ -1,0 +1,46 @@
+{
+  "correlationId": "2268e2f6-cba0-4a5d-8d92-8aa50dfd7512",
+  "domainChanges": [
+    {
+      "entityName": "Yong",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "message",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "status",
+          "type": "'INITIALIZED' | 'ACTIVE' | 'ARCHIVED'",
+          "required": true
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [
+    {
+      "method": "GET",
+      "path": "/yong",
+      "description": "Returns a simple JSON response with a 'yong' message",
+      "requestBody": {},
+      "responseBody": {
+        "message": "string"
+      },
+      "authRequired": false,
+      "roles": []
+    }
+  ],
+  "componentSpecs": []
+}

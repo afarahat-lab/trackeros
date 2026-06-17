@@ -1,0 +1,70 @@
+{
+  "id": "2e0fcb70-0b2b-4219-8c17-1c7f2fee009f",
+  "correlationId": "2268e2f6-cba0-4a5d-8d92-8aa50dfd7512",
+  "rawIntent": "[Feature: Add a /yong endpoint to the API — Phase 1: Create yong module with minimal endpoint]\n\nCreate src/modules/yong/yong.model.ts with the Yong domain entity definition including id, message, createdAt, status attributes and lifecycle states. Create src/modules/yong/yong.controller.ts with a Fastify route handler for GET /yong that returns JSON {message: 'yong'}. Create src/modules/yong/yong.routes.ts to register the route. No service layer, database, or tests required.\n\nPhase architecture notes:\nImplements the minimal Yong module structure with domain entity definition and basic GET endpoint as specified in the architecture documentation.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/yong/yong.model.ts\\nexport interface Yong {\\n  id: string;\\n  message: string;\\n  createdAt: Date;\\n  status: 'INITIALIZED' | 'ACTIVE' | 'ARCHIVED';\\n}\",\"File: src/modules/yong/yong.controller.ts\\nimport { FastifyRequest, FastifyReply } from 'fastify';\\n\\nexport async function getYongHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {\\n  reply.status(200).send({ message: 'yong' });\\n}\",\"File: src/modules/yong/yong.routes.ts\\nimport { FastifyInstance } from 'fastify';\\nimport { getYongHandler } from './yong.controller';\\n\\nexport function registerYongRoutes(app: FastifyInstance): void {\\n  app.get('/yong', getYongHandler);\\n}\"],\"importStatements\":[\"import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'\",\"import { getYongHandler } from './yong.controller'\",\"import { registerYongRoutes } from './yong.routes'\"],\"successCriteria\":[\"src/modules/yong/yong.model.ts exists and exports Yong interface with id, message, createdAt, and status attributes\",\"src/modules/yong/yong.controller.ts exists and exports getYongHandler function that accepts FastifyRequest and FastifyReply\",\"src/modules/yong/yong.routes.ts exists and exports registerYongRoutes function that accepts FastifyInstance\",\"GET /yong endpoint returns JSON {message: 'yong'} with 200 status code\",\"All files follow TypeScript conventions with proper type annotations and no any types\",\"ARCHITECTURE.md must be updated to include the new 'yong' module and the Yong entity lifecycle states (INITIALIZED, ACTIVE, ARCHIVED)\"]}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- Yong\n- FastifyInstance\n- FastifyRequest\n- FastifyReply\n- getYongHandler\n- registerYongRoutes\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Canonical entity fields for this phase\n\nNote: these field names supersede any attribute names in the\nintent text above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the field names of each entity this phase defines. The\nexact attribute / column / property set per entity is:\n\n- `Yong`: `id`, `message`, `createdAt`, `status`\n\nTreat each entity's field list as complete. If the\nintent text or planner scope mentions different field\nnames than the architecture, do NOT flag this as\nambiguity — the per-phase architecture wins.\n",
+  "scope": {
+    "affectedDomains": [
+      "yong"
+    ],
+    "affectedLayers": [
+      "domain",
+      "api"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/yong/yong.model.ts exists and exports Yong interface with id, message, createdAt, and status attributes",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/yong/yong.controller.ts exists and exports getYongHandler function that accepts FastifyRequest and FastifyReply",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "src/modules/yong/yong.routes.ts exists and exports registerYongRoutes function that accepts FastifyInstance",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "GET /yong endpoint returns JSON {message: 'yong'} with 200 status code",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "sc-005",
+      "description": "All files follow TypeScript conventions with proper type annotations and no any types",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-006",
+      "description": "ARCHITECTURE.md must be updated to include the new 'yong' module and the Yong entity lifecycle states (INITIALIZED, ACTIVE, ARCHIVED)",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Input validation: Validate all inputs at API boundaries before processing",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled"
+  ],
+  "outOfScope": [
+    "Service layer implementation",
+    "Database integration or repository pattern",
+    "Tests (unit, integration, or e2e)",
+    "RBAC enforcement for the endpoint",
+    "Audit records for the endpoint",
+    "Any functionality beyond the three specified files",
+    "Integration with existing modules (employee, policy, balance, leave, notification)",
+    "Reverse dependencies from other modules to yong"
+  ],
+  "ambiguities": []
+}

@@ -27,3 +27,17 @@
 
 ### Repositories
 - `src/modules/employee/employee.repository.ts` — `IEmployeeRepository`, `EmployeeRepository`
+
+## Yong Module
+
+### Domain Models
+- `src/modules/yong/yong.model.ts` — `Yong`
+
+### Lifecycle States
+- `INITIALIZED`
+- `ACTIVE`
+- `ARCHIVED`
+
+### Routes
+- `src/modules/yong/yong.routes.ts` — `registerYongRoutes`
+- `src/modules/yong/yong.controller.ts` — `getYongHandler`
