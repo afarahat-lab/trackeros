@@ -1,0 +1,18 @@
+{
+  "correlationId": "5f59a280-a481-4fec-b734-5e49a524895d",
+  "domainChanges": [],
+  "apiContracts": [
+    {
+      "method": "GET",
+      "path": "/pong",
+      "description": "Returns a simple pong response",
+      "requestBody": {},
+      "responseBody": {
+        "message": "string"
+      },
+      "authRequired": false,
+      "roles": []
+    }
+  ],
+  "componentSpecs": []
+}
