@@ -1,0 +1,58 @@
+{
+  "id": "aac450bb-96a8-479c-9359-6a0e004a3027",
+  "correlationId": "59cad397-2a1a-4bad-ab90-a565808b7905",
+  "rawIntent": "The project has an existing API framework setup, but the CI TypeScript compiler cannot resolve the 'fastify' module import. In src/modules/zonk/zonk.routes.ts, the line `import { FastifyInstance } from 'fastify';` produces the error 'Cannot find module 'fastify' or its corresponding type declarations.' Because FastifyInstance cannot be resolved, the `app.get` route registration at line 6 has handler parameters 'request' and 'reply' that implicitly have 'any' type, triggering additional TypeScript errors. Preserve all existing exports, types, interfaces, and imports. Only add or modify what is needed to resolve the CI failure shown above.",
+  "scope": {
+    "affectedDomains": [
+      "zonk"
+    ],
+    "affectedLayers": [
+      "config",
+      "api"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "TypeScript compilation succeeds without 'Cannot find module 'fastify'' error",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "FastifyInstance type is properly resolved in src/modules/zonk/zonk.routes.ts",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "Route handler parameters 'request' and 'reply' have proper TypeScript types instead of 'any'",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "All existing exports, types, interfaces, and imports in the project are preserved",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Preserve all existing exports, types, interfaces, and imports",
+    "Only add or modify what is needed to resolve the CI failure",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled"
+  ],
+  "outOfScope": [
+    "Changes to other modules besides zonk",
+    "Adding new features or functionality",
+    "Modifying business logic",
+    "Changing API endpoints or routes",
+    "Adding new dependencies unrelated to resolving the TypeScript compilation error",
+    "Modifying existing types or interfaces beyond fixing the import issue",
+    "Changes to package.json beyond adding missing fastify dependency"
+  ],
+  "ambiguities": []
+}
