@@ -1,0 +1,76 @@
+{
+  "correlationId": "9742ae73-4909-41d4-881e-c7e8d6e75fb4",
+  "domainChanges": [
+    {
+      "entityName": "BaseEntity",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "created_at",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "updated_at",
+          "type": "Date",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "AuditRecord",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "entity_type",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "entity_id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "action",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "changed_by",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "old_values",
+          "type": "Record<string, any>",
+          "required": false
+        },
+        {
+          "name": "new_values",
+          "type": "Record<string, any>",
+          "required": false
+        },
+        {
+          "name": "ip_address",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "user_agent",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}
