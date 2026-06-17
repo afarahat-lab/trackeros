@@ -3766,3 +3766,483 @@
 +      updates.push(`max_carryover = $${paramCount}`);
 +      values.push(data.maxCarryover);
 +      para
+
+# 2026-06-16 20:58:17.399460
++## Task
++[Feature: Build the leave management module — Phase 1: Core domain models and shared infrastructure]
++
++Create src/shared/types/index.ts with LeaveType, LeaveStatus, NotificationType enums. Create src/shared/database/base.repository.ts with IBaseRepository interface and BaseRepository abstract class. Create src/shared/errors/application.error.ts with ApplicationError, NotFoundError, ValidationError classes. Create src/shared/database/database.service.ts with DatabaseService class. Create src/shared/audit/audit.service.ts with AuditService class. This establishes foundational types and services that all modules will depend on.
++
++Phase architecture notes:
++Establish foundational domain enums, base repository pattern, error hierarchy, database connection, and audit service that all modules depend on.
++
++Detailed phase architecture (architecture-agent):
++{"interfaces":["File: src/shared/types/index.ts\nexport enum LeaveType {\n  ANNUAL = 'annual',\n  SICK = 'sick',\n  EMERGENCY = 'emergency'\n}\n\nexport enum LeaveStatus {\n  PENDING = 'pending',\n  APPROVED = 'approved',\n  REJECTED = 'rejected',\n  CANCELLED = 'cancelled'\n}\n\nexport enum NotificationType {\n  LEAVE_REQUEST_CREATED = 'leave_request_created',\n  LEAVE_REQUEST_APPROVED = 'leave_request_approved',\n  LEAVE_REQUEST_REJECTED = 'leave_request_rejected',\n  LEAVE_REQUEST_CANCELLED = 'leave_request_cancelled'\n}\n\nexport interface BaseEntity {\n  id: string;\n  created_at: Date;\n  updated_at: Date;\n}","File: src/shared/database/base.repository.ts\nimport { BaseEntity } from '../types';\n\nexport interface IBaseRepository<T extends BaseEntity> {\n  findById(id: string): Promise<T | null>;\n  findAll(): Promise<T[]>;\n  create(entity: Omit<T, 'id' | 'created_at' | 'updated_at'>): Promise<T>;\n  update(id: string, updates: Partial<Omit<T, 'id' | 'created_at' | 'updated_at'>>): Promise<T | null>;\n  delete(id: string): Promise<boolean>;\n}\n\nexport abstract class BaseRepository<T extends BaseEntity> implements IBaseRepository<T> {\n  protected abstract tableName: string;\n  protected abstract db: any;\n\n  async findById(id: string): Promise<T | null> {\n    const result = await this.db.query(\n      `SELECT * FROM ${this.tableName} WHERE id = $1`,\n      [id]\n    );\n    return result.rows[0] || null;\n  }\n\n  async findAll(): Promise<T[]> {\n    const result = await this.db.query(`SELECT * FROM ${this.tableName}`);\n    return result.rows;\n  }\n\n  async create(entity: Omit<T, 'id' | 'created_at' | 'updated_at'>): Promise<T> {\n    const now = new Date();\n    const result = await this.db.query(\n      `INSERT INTO ${this.tableName} (${Object.keys(entity).join(', ')}, created_at, updated_at) VALUES (${Object.keys(entity).map((_, i) => `$${i + 1}`).join(', ')}, $${Object.keys(entity).length + 1}, $${Object.keys(entity).length + 2}) RETURNING *`,\n      [...Object.values(entity), now, now]\n    );\n    return result.rows[0];\n  }\n\n  async update(id: string, updates: Partial<Omit<T, 'id' | 'created_at' | 'updated_at'>>): Promise<T | null> {\n    const setClause = Object.keys(updates).map((key, i) => `${key} = $${i + 1}`).join(', ');\n    const values = Object.values(updates);\n    values.push(new Date()); // updated_at\n    values.push(id);\n\n    const result = await this.db.query(\n      `UPDATE ${this.tableName} SET ${setClause}, updated_at = $${values.length - 1} WHERE id = $${values.length} RETURNING *`,\n      values\n    );\n    return result.rows[0] || null;\n  }\n\n  async delete(id: string): Promise<boolean> {\n    const result = await this.db.query(\n      `DELETE FROM ${this.tableName} WHERE id = $1 RETURNING id`,\n      [id]\n    );\n    return result.rowCount > 0;\n  }\n}","File: src/shared/errors/application.error.ts\nexport class ApplicationError extends Error {\n  constructor(\n    message: string,\n    public readonly code: string,\n    public readonly statusCode: number = 500\n  ) {\n    super(message);\n    this.name = 'ApplicationError';\n  }\n}\n\nexport class ValidationError extends ApplicationError {\n  constructor(message: string) {\n    super(message, 'VALIDATION_ERROR', 400);\n    this.name = 'ValidationError';\n  }\n}\n\nexport class NotFoundError extends ApplicationError {\n  constructor(message: string) {\n    super(message, 'NOT_FOUND', 404);\n    this.name = 'NotFoundError';\n  }\n}\n\nexport class AuthorizationError extends ApplicationError {\n  constructor(message: string) {\n    super(message, 'AUTHORIZATION_ERROR', 403);\n    this.name = 'AuthorizationError';\n  }\n}","File: src/shared/database/database.service.ts\nimport { Pool } from 'pg';\n\nexport class DatabaseService {\n  private pool: Pool;\n\n  constructor() {\n    this.pool = new Pool({\n      connectionString: process.env.DATABASE_URL,\n      max: 20,\n      idleTimeoutMillis: 30000,\n      connectionTimeoutMillis: 2000,\n    });\n  }\n\n  async query(text: string, params?: any[]): Promise<any> {\n    return this.pool.query(text, params);\n  }\n\n  async getClient(): Promise<any> {\n    return this.pool.connect();\n  }\n\n  async close(): Promise<void> {\n    await this.pool.end();\n  }\n}","File: src/shared/audit/audit.service.ts\nimport { DatabaseService } from '../database/database.service';\n\nexport interface AuditRecord {\n  entity_type: string;\n  entity_id: string;\n  action: string;\n  changed_by: string | null;\n  old_values: Record<string, any> | null;\n  new_values: Record<string, any> | null;\n  ip_address: string | null;\n  user_agent: string | null;\n}\n\nexport class AuditService {\n  constructor(private readonly db: DatabaseService) {}\n\n  async log(record: Omit<AuditRecord, 'created_at'>): Promise<void> {\n    await this.db.query(\n      `INSERT INTO audit_logs (entity_type, entity_id, action, changed_by, old_values, new_values, ip_address, user_agent) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,\n      [\n        record.entity_type,\n        record.entity_id,\n        record.action,\n        record.changed_by,\n        record.old_values,\n        record.new_values,\n        record.ip_address,\n        record.user_agent\n      ]\n    );\n  }\n}"],"importStatements":[],"successCriteria":["src/shared/types/index.ts exists and exports LeaveType, LeaveStatus, NotificationType enums and BaseEntity interface","src/shared/database/base.repository.ts exists and exports IBaseRepository interface and BaseRepository abstract class","src/shared/errors/application.error.ts exists and exports ApplicationError, ValidationError, NotFoundError, AuthorizationError classes","src/shared/database/database.service.ts exists and exports DatabaseService class using PostgreSQL pg client","src/shared/audit/audit.service.ts exists and exports AuditRecord interface and AuditService class","All enums and interfaces match the canonical SQL schema definitions for leave_requests.status and notifications.notification_type","ARCHITECTURE.md must be updated to include new shared modules: types, database, errors, audit"]}
++
++## Canonical dependencies for this phase
++
++Note: this list supersedes any dependency names in the intent
++text above. Do not emit ambiguity for mismatches.
++
++The per-phase architecture above is the AUTHORITATIVE source
++for the dependency list this phase must implement. The exact
++set of types, abstractions, and references defined or used by
++this phase is:
++
++- BaseEntity
++- IBaseRepository
++- AuditRecord
++
++Treat this list as complete. If additional dependencies appear
++in the architecture but the planner's scope text mentions a
++partial subset, do NOT flag this as ambiguity — the per-phase
++architecture wins.
++
++
++## Canonical entity fields for this phase
++
++Note: these field names supersede any attribute names in the
++intent text above. Do not emit ambiguity for mismatches.
++
++The per-phase architecture above is the AUTHORITATIVE source
++for the field names of each entity this phase defines. The
++exact attribute / column / property set per entity is:
++
++- `BaseEntity`: `id`, `created_at`, `updated_at`
++- `AuditRecord`: `entity_type`, `entity_id`, `action`, `changed_by`, `old_values`, `new_values`, `ip_address`, `user_agent`
++
++Treat each entity's field list as complete. If the
++intent text or planner scope mentions different field
++names than the architecture, do NOT flag this as
++ambiguity — the per-phase architecture wins.
++
++
++## Deferred to later phases
++The following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:
++- Phase 2 — Employee module core: Create src/modules/employee/employee.model.ts with Employee interface matching canonical attributes 
++- Phase 3 — Policy module core: Create src/modules/policy/policy.model.ts with LeavePolicy interface matching canonical attributes a
++- Phase 4 — Balance module core: Create src/modules/balance/balance.model.ts with LeaveBalance interface matching canonical attribute
++- Phase 5 — Notification module core: Create src/modules/notification/notification.model.ts with Notification interface matching canonical
++- Phase 6 — Leave module core models and repository: Create src/modules/leave/leave.model.ts with LeaveRequest interface matching canonical attributes an
++- Phase 7 — Leave module service with business logic: Create src/modules/leave/leave.service.ts with LeaveService class implementing ILeaveService interfa
++- Phase 8 — Leave controllers and routes: Create src/modules/leave/leave.controller.ts with LeaveController class implementing Fastify route h
++
++## Success criteria
++- src/shared/types/index.ts exists and exports LeaveType, LeaveStatus, NotificationType enums and BaseEntity interface
++- src/shared/database/base.repository.ts exists and exports IBaseRepository interface and BaseRepository abstract class
++- src/shared/errors/application.error.ts exists and exports ApplicationError, ValidationError, NotFoundError, AuthorizationError classes
++- src/shared/database/database.service.ts exists and exports DatabaseService class using PostgreSQL pg client
++- src/shared/audit/audit.service.ts exists and exports AuditRecord interface and AuditService class
++- All enums and interfaces match the canonical SQL schema definitions for leave_requests.status and notifications.notification_type
++- ARCHITECTURE.md must be updated to include new shared modules: types, database, errors, audit
++
++## Out of scope (do NOT touch these)
++- Employee module implementation (Phase 2)
++- Policy module implementation (Phase 3)
++- Balance module implementation (Phase 4)
++- Notification module implementation (Phase 5)
++- Leave module core models and repository (Phase 6)
++- Leave module service with business logic (Phase 7)
++- Leave controllers and routes (Phase 8)
++- Module-specific business logic
++- API endpoints
++- UI components
++- Authentication/authorization implementation
++- Configuration files outside ARCHITECTURE.md
++- Testing infrastructure beyond unit tests for shared components
++
++## Project rules
++- Generated code must compile without errors. Verify with executeScript before returning.
++- All imports must resolve to files that exist in the project or are declared in package.json.
++- You MUST run a compile/lint check via executeScript before emitting the final files. This is not optional.
++- Do not use require() for JSON imports — import them using ES module syntax with resolveJsonModule enabled in tsconfig.
++- Before generating any repository, service, or controller code, read the DTO and interface files it will use. Never reference a field on a type without confirming it exists in the type definition.
++- Before generating code that calls methods on a dependency, read the dependency's source file to confirm which methods exist. Only call methods that are actually defined.
++- Read the project's compiler/linter configuration file (tsconfig.json, mypy.ini, pyproject.toml, .eslintrc etc) before generating code. Follow the strictness settings it defines — do not assume permissive defaults.
++- Read the project's dependency manifest (package.json, requirements.txt, go.mod, pom.xml etc) before importing external packages. Only import packages that are listed as dependencies.
++
++## Scoped architecture for this phase
++The following describes ONLY what exists now and what you
++are building in this phase. Use these exact file paths,
++exact export names, and exact import statements. Do not
++invent paths or imports — if it is not listed here, it
++does not exist.
++
++### Interfaces / types this phase implements
++
++File: src/shared/types/index.ts
++export enum LeaveType {
++  ANNUAL = 'annual',
++  SICK = 'sick',
++  EMERGENCY = 'emergency'
++}
++
++export enum LeaveStatus {
++  PENDING = 'pending',
++  APPROVED = 'approved',
++  REJECTED = 'rejected',
++  CANCELLED = 'cancelled'
++}
++
++export enum NotificationType {
++  LEAVE_REQUEST_CREATED = 'leave_request_created',
++  LEAVE_REQUEST_APPROVED = 'leave_request_approved',
++  LEAVE_REQUEST_REJECTED = 'leave_request_rejected',
++  LEAVE_REQUEST_CANCELLED = 'leave_request_cancelled'
++}
++
++export interface BaseEntity {
++  id: string;
++  created_at: Date;
++  updated_at: Date;
++}
++
++File: src/shared/database/base.repository.ts
++import { BaseEntity } from '../types';
++
++export interface IBaseRepository<T extends BaseEntity> {
++  findById(id: string): Promise<T | null>;
++  findAll(): Promise<T[]>;
++  create(entity: Omit<T, 'id' | 'created_at' | 'updated_at'>): Promise<T>;
++  update(id: string, updates: Partial<Omit<T, 'id' | 'created_at' | 'updated_at'>>): Promise<T | null>;
++  delete(id: string): Promise<boolean>;
++}
++
++export abstract class BaseRepository<T extends BaseEntity> implements IBaseRepository<T> {
++  protected abstract tableName: string;
++  protected abstract db: any;
++
++  async findById(id: string): Promise<T | null> {
++    const result = await this.db.query(
++      `SELECT * FROM ${this.tableName} WHERE id = $1`,
++      [id]
++    );
++    return result.rows[0] || null;
++  }
++
++  async findAll(): Promise<T[]> {
++    const result = await this.db.query(`SELECT * FROM ${this.tableName}`);
++    return result.rows;
++  }
++
++  async create(entity: Omit<T, 'id' | 'created_at' | 'updated_at'>): Promise<T> {
++    const now = new Date();
++    const result = await this.db.query(
++      `INSERT INTO ${this.tableName} (${Object.keys(entity).join(', ')}, created_at, updated_at) VALUES (${Object.keys(entity).map((_, i) => `$${i + 1}`).join(', ')}, $${Object.keys(entity).length + 1}, $${Object.keys(entity).length + 2}) RETURNING *`,
++      [...Object.values(entity), now, now]
++    );
++    return result.rows[0];
++  }
++
++  async update(id: string, updates: Partial<Omit<T, 'id' | 'created_at' | 'updated_at'>>): Promise<T | null> {
++    const setClause = Object.keys(updates).map((key, i) => `${key} = $${i + 1}`).join(', ');
++    const values = Object.values(updates);
++    values.push(new Date()); // updated_at
++    values.push(id);
++
++    const result = await this.db.query(
++      `UPDATE ${this.tableName} SET ${setClause}, updated_at = $${values.length - 1} WHERE id = $${values.length} RETURNING *`,
++      values
++    );
++    return result.rows[0] || null;
++  }
++
++  async delete(id: string): Promise<boolean> {
++    const result = await this.db.query(
++      `DELETE FROM ${this.tableName} WHERE id = $1 RETURNING id`,
++      [id]
++    );
++    return result.rowCount > 0;
++  }
++}
++
++File: src/shared/errors/application.error.ts
++export class ApplicationError extends Error {
++  constructor(
++    message: string,
++    public readonly code: string,
++    public readonly statusCode: number = 500
++  ) {
++    super(message);
++    this.name = 'ApplicationError';
++  }
++}
++
++export class ValidationError extends ApplicationError {
++  constructor(message: string) {
++    super(message, 'VALIDATION_ERROR', 400);
++    this.name = 'ValidationError';
++  }
++}
++
++export class NotFoundError extends ApplicationError {
++  constructor(message: string) {
++    super(message, 'NOT_FOUND', 404);
++    this.name = 'NotFoundError';
++  }
++}
++
++export class AuthorizationError extends ApplicationError {
++  constructor(message: string) {
++    super(message, 'AUTHORIZATION_ERROR', 403);
++    this.name = 'AuthorizationError';
++  }
++}
++
++File: src/shared/database/database.service.ts
++import { Pool } from 'pg';
++
++export class DatabaseService {
++  private pool: Pool;
++
++  constructor() {
++    this.pool = new Pool({
++      connectionString: process.env.DATABASE_URL,
++      max: 20,
++      idleTimeoutMillis: 30000,
++      connectionTimeoutMillis: 2000,
++    });
++  }
++
++  async query(text: string, params?: any[]): Promise<any> {
++    return this.po
+
+# 2026-06-16 20:58:17.399558
++## Task
++[Feature: Build the leave management module — Phase 1: Core domain models and shared infrastructure]
++
++Create src/shared/types/index.ts with LeaveType, LeaveStatus, NotificationType enums. Create src/shared/database/base.repository.ts with IBaseRepository interface and BaseRepository abstract class. Create src/shared/errors/application.error.ts with ApplicationError, NotFoundError, ValidationError classes. Create src/shared/database/database.service.ts with DatabaseService class. Create src/shared/audit/audit.service.ts with AuditService class. This establishes foundational types and services that all modules will depend on.
++
++Phase architecture notes:
++Establish foundational domain enums, base repository pattern, error hierarchy, database connection, and audit service that all modules depend on.
++
++Detailed phase architecture (architecture-agent):
++{"interfaces":["File: src/shared/types/index.ts\nexport enum LeaveType {\n  ANNUAL = 'annual',\n  SICK = 'sick',\n  EMERGENCY = 'emergency'\n}\n\nexport enum LeaveStatus {\n  PENDING = 'pending',\n  APPROVED = 'approved',\n  REJECTED = 'rejected',\n  CANCELLED = 'cancelled'\n}\n\nexport enum NotificationType {\n  LEAVE_REQUEST_CREATED = 'leave_request_created',\n  LEAVE_REQUEST_APPROVED = 'leave_request_approved',\n  LEAVE_REQUEST_REJECTED = 'leave_request_rejected',\n  LEAVE_REQUEST_CANCELLED = 'leave_request_cancelled'\n}\n\nexport interface BaseEntity {\n  id: string;\n  created_at: Date;\n  updated_at: Date;\n}","File: src/shared/database/base.repository.ts\nimport { BaseEntity } from '../types';\n\nexport interface IBaseRepository<T extends BaseEntity> {\n  findById(id: string): Promise<T | null>;\n  findAll(): Promise<T[]>;\n  create(entity: Omit<T, 'id' | 'created_at' | 'updated_at'>): Promise<T>;\n  update(id: string, updates: Partial<Omit<T, 'id' | 'created_at' | 'updated_at'>>): Promise<T | null>;\n  delete(id: string): Promise<boolean>;\n}\n\nexport abstract class BaseRepository<T extends BaseEntity> implements IBaseRepository<T> {\n  protected abstract tableName: string;\n  protected abstract db: any;\n\n  async findById(id: string): Promise<T | null> {\n    const result = await this.db.query(\n      `SELECT * FROM ${this.tableName} WHERE id = $1`,\n      [id]\n    );\n    return result.rows[0] || null;\n  }\n\n  async findAll(): Promise<T[]> {\n    const result = await this.db.query(`SELECT * FROM ${this.tableName}`);\n    return result.rows;\n  }\n\n  async create(entity: Omit<T, 'id' | 'created_at' | 'updated_at'>): Promise<T> {\n    const now = new Date();\n    const result = await this.db.query(\n      `INSERT INTO ${this.tableName} (${Object.keys(entity).join(', ')}, created_at, updated_at) VALUES (${Object.keys(entity).map((_, i) => `$${i + 1}`).join(', ')}, $${Object.keys(entity).length + 1}, $${Object.keys(entity).length + 2}) RETURNING *`,\n      [...Object.values(entity), now, now]\n    );\n    return result.rows[0];\n  }\n\n  async update(id: string, updates: Partial<Omit<T, 'id' | 'created_at' | 'updated_at'>>): Promise<T | null> {\n    const setClause = Object.keys(updates).map((key, i) => `${key} = $${i + 1}`).join(', ');\n    const values = Object.values(updates);\n    values.push(new Date()); // updated_at\n    values.push(id);\n\n    const result = await this.db.query(\n      `UPDATE ${this.tableName} SET ${setClause}, updated_at = $${values.length - 1} WHERE id = $${values.length} RETURNING *`,\n      values\n    );\n    return result.rows[0] || null;\n  }\n\n  async delete(id: string): Promise<boolean> {\n    const result = await this.db.query(\n      `DELETE FROM ${this.tableName} WHERE id = $1 RETURNING id`,\n      [id]\n    );\n    return result.rowCount > 0;\n  }\n}","File: src/shared/errors/application.error.ts\nexport class ApplicationError extends Error {\n  constructor(\n    message: string,\n    public readonly code: string,\n    public readonly statusCode: number = 500\n  ) {\n    super(message);\n    this.name = 'ApplicationError';\n  }\n}\n\nexport class ValidationError extends ApplicationError {\n  constructor(message: string) {\n    super(message, 'VALIDATION_ERROR', 400);\n    this.name = 'ValidationError';\n  }\n}\n\nexport class NotFoundError extends ApplicationError {\n  constructor(message: string) {\n    super(message, 'NOT_FOUND', 404);\n    this.name = 'NotFoundError';\n  }\n}\n\nexport class AuthorizationError extends ApplicationError {\n  constructor(message: string) {\n    super(message, 'AUTHORIZATION_ERROR', 403);\n    this.name = 'AuthorizationError';\n  }\n}","File: src/shared/database/database.service.ts\nimport { Pool } from 'pg';\n\nexport class DatabaseService {\n  private pool: Pool;\n\n  constructor() {\n    this.pool = new Pool({\n      connectionString: process.env.DATABASE_URL,\n      max: 20,\n      idleTimeoutMillis: 30000,\n      connectionTimeoutMillis: 2000,\n    });\n  }\n\n  async query(text: string, params?: any[]): Promise<any> {\n    return this.pool.query(text, params);\n  }\n\n  async getClient(): Promise<any> {\n    return this.pool.connect();\n  }\n\n  async close(): Promise<void> {\n    await this.pool.end();\n  }\n}","File: src/shared/audit/audit.service.ts\nimport { DatabaseService } from '../database/database.service';\n\nexport interface AuditRecord {\n  entity_type: string;\n  entity_id: string;\n  action: string;\n  changed_by: string | null;\n  old_values: Record<string, any> | null;\n  new_values: Record<string, any> | null;\n  ip_address: string | null;\n  user_agent: string | null;\n}\n\nexport class AuditService {\n  constructor(private readonly db: DatabaseService) {}\n\n  async log(record: Omit<AuditRecord, 'created_at'>): Promise<void> {\n    await this.db.query(\n      `INSERT INTO audit_logs (entity_type, entity_id, action, changed_by, old_values, new_values, ip_address, user_agent) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,\n      [\n        record.entity_type,\n        record.entity_id,\n        record.action,\n        record.changed_by,\n        record.old_values,\n        record.new_values,\n        record.ip_address,\n        record.user_agent\n      ]\n    );\n  }\n}"],"importStatements":[],"successCriteria":["src/shared/types/index.ts exists and exports LeaveType, LeaveStatus, NotificationType enums and BaseEntity interface","src/shared/database/base.repository.ts exists and exports IBaseRepository interface and BaseRepository abstract class","src/shared/errors/application.error.ts exists and exports ApplicationError, ValidationError, NotFoundError, AuthorizationError classes","src/shared/database/database.service.ts exists and exports DatabaseService class using PostgreSQL pg client","src/shared/audit/audit.service.ts exists and exports AuditRecord interface and AuditService class","All enums and interfaces match the canonical SQL schema definitions for leave_requests.status and notifications.notification_type","ARCHITECTURE.md must be updated to include new shared modules: types, database, errors, audit"]}
++
++## Canonical dependencies for this phase
++
++Note: this list supersedes any dependency names in the intent
++text above. Do not emit ambiguity for mismatches.
++
++The per-phase architecture above is the AUTHORITATIVE source
++for the dependency list this phase must implement. The exact
++set of types, abstractions, and references defined or used by
++this phase is:
++
++- BaseEntity
++- IBaseRepository
++- AuditRecord
++
++Treat this list as complete. If additional dependencies appear
++in the architecture but the planner's scope text mentions a
++partial subset, do NOT flag this as ambiguity — the per-phase
++architecture wins.
++
++
++## Canonical entity fields for this phase
++
++Note: these field names supersede any attribute names in the
++intent text above. Do not emit ambiguity for mismatches.
++
++The per-phase architecture above is the AUTHORITATIVE source
++for the field names of each entity this phase defines. The
++exact attribute / column / property set per entity is:
++
++- `BaseEntity`: `id`, `created_at`, `updated_at`
++- `AuditRecord`: `entity_type`, `entity_id`, `action`, `changed_by`, `old_values`, `new_values`, `ip_address`, `user_agent`
++
++Treat each entity's field list as complete. If the
++intent text or planner scope mentions different field
++names than the architecture, do NOT flag this as
++ambiguity — the per-phase architecture wins.
++
++
++## Deferred to later phases
++The following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:
++- Phase 2 — Employee module core: Create src/modules/employee/employee.model.ts with Employee interface matching canonical attributes 
++- Phase 3 — Policy module core: Create src/modules/policy/policy.model.ts with LeavePolicy interface matching canonical attributes a
++- Phase 4 — Balance module core: Create src/modules/balance/balance.model.ts with LeaveBalance interface matching canonical attribute
++- Phase 5 — Notification module core: Create src/modules/notification/notification.model.ts with Notification interface matching canonical
++- Phase 6 — Leave module core models and repository: Create src/modules/leave/leave.model.ts with LeaveRequest interface matching canonical attributes an
++- Phase 7 — Leave module service with business logic: Create src/modules/leave/leave.service.ts with LeaveService class implementing ILeaveService interfa
++- Phase 8 — Leave controllers and routes: Create src/modules/leave/leave.controller.ts with LeaveController class implementing Fastify route h
++
++## Success criteria
++- src/shared/types/index.ts exists and exports LeaveType, LeaveStatus, NotificationType enums and BaseEntity interface
++- src/shared/database/base.repository.ts exists and exports IBaseRepository interface and BaseRepository abstract class
++- src/shared/errors/application.error.ts exists and exports ApplicationError, ValidationError, NotFoundError, AuthorizationError classes
++- src/shared/database/database.service.ts exists and exports DatabaseService class using PostgreSQL pg client
++- src/shared/audit/audit.service.ts exists and exports AuditRecord interface and AuditService class
++- All enums and interfaces match the canonical SQL schema definitions for leave_requests.status and notifications.notification_type
++- ARCHITECTURE.md must be updated to include new shared modules: types, database, errors, audit
++
++## Out of scope (do NOT touch these)
++- Employee module implementation (Phase 2)
++- Policy module implementation (Phase 3)
++- Balance module implementation (Phase 4)
++- Notification module implementation (Phase 5)
++- Leave module core models and repository (Phase 6)
++- Leave module service with business logic (Phase 7)
++- Leave controllers and routes (Phase 8)
++- Module-specific business logic
++- API endpoints
++- UI components
++- Authentication/authorization implementation
++- Configuration files outside ARCHITECTURE.md
++- Testing infrastructure beyond unit tests for shared components
++
++## Project rules
++- Generated code must compile without errors. Verify with executeScript before returning.
++- All imports must resolve to files that exist in the project or are declared in package.json.
++- You MUST run a compile/lint check via executeScript before emitting the final files. This is not optional.
++- Do not use require() for JSON imports — import them using ES module syntax with resolveJsonModule enabled in tsconfig.
++- Before generating any repository, service, or controller code, read the DTO and interface files it will use. Never reference a field on a type without confirming it exists in the type definition.
++- Before generating code that calls methods on a dependency, read the dependency's source file to confirm which methods exist. Only call methods that are actually defined.
++- Read the project's compiler/linter configuration file (tsconfig.json, mypy.ini, pyproject.toml, .eslintrc etc) before generating code. Follow the strictness settings it defines — do not assume permissive defaults.
++- Read the project's dependency manifest (package.json, requirements.txt, go.mod, pom.xml etc) before importing external packages. Only import packages that are listed as dependencies.
++
++## Scoped architecture for this phase
++The following describes ONLY what exists now and what you
++are building in this phase. Use these exact file paths,
++exact export names, and exact import statements. Do not
++invent paths or imports — if it is not listed here, it
++does not exist.
++
++### Interfaces / types this phase implements
++
++File: src/shared/types/index.ts
++export enum LeaveType {
++  ANNUAL = 'annual',
++  SICK = 'sick',
++  EMERGENCY = 'emergency'
++}
++
++export enum LeaveStatus {
++  PENDING = 'pending',
++  APPROVED = 'approved',
++  REJECTED = 'rejected',
++  CANCELLED = 'cancelled'
++}
++
++export enum NotificationType {
++  LEAVE_REQUEST_CREATED = 'leave_request_created',
++  LEAVE_REQUEST_APPROVED = 'leave_request_approved',
++  LEAVE_REQUEST_REJECTED = 'leave_request_rejected',
++  LEAVE_REQUEST_CANCELLED = 'leave_request_cancelled'
++}
++
++export interface BaseEntity {
++  id: string;
++  created_at: Date;
++  updated_at: Date;
++}
++
++File: src/shared/database/base.repository.ts
++import { BaseEntity } from '../types';
++
++export interface IBaseRepository<T extends BaseEntity> {
++  findById(id: string): Promise<T | null>;
++  findAll(): Promise<T[]>;
++  create(entity: Omit<T, 'id' | 'created_at' | 'updated_at'>): Promise<T>;
++  update(id: string, updates: Partial<Omit<T, 'id' | 'created_at' | 'updated_at'>>): Promise<T | null>;
++  delete(id: string): Promise<boolean>;
++}
++
++export abstract class BaseRepository<T extends BaseEntity> implements IBaseRepository<T> {
++  protected abstract tableName: string;
++  protected abstract db: any;
++
++  async findById(id: string): Promise<T | null> {
++    const result = await this.db.query(
++      `SELECT * FROM ${this.tableName} WHERE id = $1`,
++      [id]
++    );
++    return result.rows[0] || null;
++  }
++
++  async findAll(): Promise<T[]> {
++    const result = await this.db.query(`SELECT * FROM ${this.tableName}`);
++    return result.rows;
++  }
++
++  async create(entity: Omit<T, 'id' | 'created_at' | 'updated_at'>): Promise<T> {
++    const now = new Date();
++    const result = await this.db.query(
++      `INSERT INTO ${this.tableName} (${Object.keys(entity).join(', ')}, created_at, updated_at) VALUES (${Object.keys(entity).map((_, i) => `$${i + 1}`).join(', ')}, $${Object.keys(entity).length + 1}, $${Object.keys(entity).length + 2}) RETURNING *`,
++      [...Object.values(entity), now, now]
++    );
++    return result.rows[0];
++  }
++
++  async update(id: string, updates: Partial<Omit<T, 'id' | 'created_at' | 'updated_at'>>): Promise<T | null> {
++    const setClause = Object.keys(updates).map((key, i) => `${key} = $${i + 1}`).join(', ');
++    const values = Object.values(updates);
++    values.push(new Date()); // updated_at
++    values.push(id);
++
++    const result = await this.db.query(
++      `UPDATE ${this.tableName} SET ${setClause}, updated_at = $${values.length - 1} WHERE id = $${values.length} RETURNING *`,
++      values
++    );
++    return result.rows[0] || null;
++  }
++
++  async delete(id: string): Promise<boolean> {
++    const result = await this.db.query(
++      `DELETE FROM ${this.tableName} WHERE id = $1 RETURNING id`,
++      [id]
++    );
++    return result.rowCount > 0;
++  }
++}
++
++File: src/shared/errors/application.error.ts
++export class ApplicationError extends Error {
++  constructor(
++    message: string,
++    public readonly code: string,
++    public readonly statusCode: number = 500
++  ) {
++    super(message);
++    this.name = 'ApplicationError';
++  }
++}
++
++export class ValidationError extends ApplicationError {
++  constructor(message: string) {
++    super(message, 'VALIDATION_ERROR', 400);
++    this.name = 'ValidationError';
++  }
++}
++
++export class NotFoundError extends ApplicationError {
++  constructor(message: string) {
++    super(message, 'NOT_FOUND', 404);
++    this.name = 'NotFoundError';
++  }
++}
++
++export class AuthorizationError extends ApplicationError {
++  constructor(message: string) {
++    super(message, 'AUTHORIZATION_ERROR', 403);
++    this.name = 'AuthorizationError';
++  }
++}
++
++File: src/shared/database/database.service.ts
++import { Pool } from 'pg';
++
++export class DatabaseService {
++  private pool: Pool;
++
++  constructor() {
++    this.pool = new Pool({
++      connectionString: process.env.DATABASE_URL,
++      max: 20,
++      idleTimeoutMillis: 30000,
++      connectionTimeoutMillis: 2000,
++    });
++  }
++
++  async query(text: string, params?: any[]): Promise<any> {
++    return this.po
