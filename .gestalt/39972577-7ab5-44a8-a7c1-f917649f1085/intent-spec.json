@@ -1,0 +1,47 @@
+{
+  "id": "41569973-d51b-449d-a30e-7214afaa416a",
+  "correlationId": "39972577-7ab5-44a8-a7c1-f917649f1085",
+  "rawIntent": "The service at src/modules/zonk/zonk.routes.ts imports { FastifyInstance } from 'fastify', but the project's package.json dependency list causes TypeScript to reject that import with the error 'Cannot find module fastify or its corresponding type declarations'. The same file references 'fastify' in an augmentation at line 1, which also fails with 'Invalid module name in augmentation, module fastify cannot be found'. The project configuration is inconsistent with the import because the dependency list does not include the 'fastify' package. Preserve all existing exports, types, interfaces, and imports. Only add or modify what is needed to resolve the CI failure shown above.",
+  "scope": {
+    "affectedDomains": [
+      "package.json"
+    ],
+    "affectedLayers": [
+      "config"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "The 'fastify' package is added as a dependency in package.json.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "TypeScript compilation for src/modules/zonk/zonk.routes.ts succeeds without 'Cannot find module' errors for 'fastify'.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "All existing exports, types, interfaces, and imports in src/modules/zonk/zonk.routes.ts are preserved.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "Modifying any source code files other than package.json.",
+    "Adding or modifying any other dependencies.",
+    "Changing the version of any existing dependency.",
+    "Modifying the structure or logic within src/modules/zonk/zonk.routes.ts.",
+    "Adding @gestalt/* packages."
+  ],
+  "ambiguities": []
+}

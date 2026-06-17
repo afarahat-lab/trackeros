@@ -1,6 +1,17 @@
-// Minimal entry point for the application
-import zonkRoutes from './zonk.routes';
+import fastify from 'fastify';
 
-// This file exists to satisfy the TypeScript compiler
-// and can be extended later to start a Fastify server.
-export { zonkRoutes };
+const server = fastify({ logger: true });
+
+server.get('/', async (_request, _reply) => {
+  return { hello: 'world' };
+});
+
+const start = async () => {
+  try {
+    await server.listen({ port: 3000 });
+  } catch (err) {
+    server.log.error(err);
+    process.exit(1);
+  }
+};
+start();
