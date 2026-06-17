@@ -1,0 +1,65 @@
+{
+  "id": "d70fd2b7-528c-44de-90cc-a0307a99d6c2",
+  "correlationId": "d29b2d91-ce87-4b0d-8907-443a1d7c602d",
+  "rawIntent": "[Feature: Add a /pong endpoint to the API — Phase 1: Create pong module with controller and routes]\n\nCreate src/modules/pong/pong.controller.ts with a Fastify route handler that returns JSON {message: 'pong'} on GET /pong. Create src/modules/pong/pong.routes.ts to define the route. No service layer, database, or tests needed.\n\nPhase architecture notes:\n{\"interfaces\":[\"File: src/modules/pong/pong.controller.ts\\nexport interface PongController {\\n  getPong: () => Promise<{ message: string }>;\\n}\\n\\nexport const pongController: PongController = {\\n  getPong: async () => ({ message: 'pong' })\\n};\",\"File: src/modules/pong/pong.routes.ts\\nimport { FastifyInstance } from 'fastify';\\nimport { pongController } from './pong.controller';\\n\\nexport async function pongRoutes(fastify: FastifyInstance) {\\n  fastify.get('/pong', async () => {\\n    return pongController.getPong();\\n  });\\n}\"],\"importStatements\":[\"import { FastifyInstance } from 'fastify';\",\"import { pongController } from './pong.controller';\"],\"successCriteria\":[\"src/modules/pong/pong.controller.ts exists and exports a Fastify route handler that responds with JSON {message: 'pong'} on GET /pong\",\"src/modules/pong/pong.routes.ts exists and registers the GET /pong route using the controller\",\"The /pong endpoint is accessible via HTTP GET request and returns status 200 with correct JSON structure\",\"All TypeScript files compile without errors using the project's TypeScript configuration\",\"The pong module follows the project's established Fastify controller pattern\"]}\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/pong/pong.controller.ts\\nexport interface PongController {\\n  getPong: () => Promise<{ message: string }>;\\n}\\n\\nexport const pongController: PongController = {\\n  getPong: async () => ({ message: 'pong' })\\n};\",\"File: src/modules/pong/pong.routes.ts\\nimport { FastifyInstance } from 'fastify';\\nimport { pongController } from './pong.controller';\\n\\nexport async function pongRoutes(fastify: FastifyInstance) {\\n  fastify.get('/pong', async () => {\\n    return pongController.getPong();\\n  });\\n}\"],\"importStatements\":[\"import { FastifyInstance } from 'fastify';\",\"import { pongController } from './pong.controller';\"],\"successCriteria\":[\"src/modules/pong/pong.controller.ts exists and exports a Fastify route handler that responds with JSON {message: 'pong'} on GET /pong\",\"src/modules/pong/pong.routes.ts exists and registers the GET /pong route using the controller\",\"The /pong endpoint is accessible via HTTP GET request and returns status 200 with correct JSON structure\",\"All TypeScript files compile without errors using the project's TypeScript configuration\",\"The pong module follows the project's established Fastify controller pattern\"]}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- PongController\n- FastifyInstance\n- pongController\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Canonical entity fields for this phase\n\nNote: these field names supersede any attribute names in the\nintent text above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the field names of each entity this phase defines. The\nexact attribute / column / property set per entity is:\n\n- `PongController`: `getPong`\n\nTreat each entity's field list as complete. If the\nintent text or planner scope mentions different field\nnames than the architecture, do NOT flag this as\nambiguity — the per-phase architecture wins.\n",
+  "scope": {
+    "affectedDomains": [
+      "pong"
+    ],
+    "affectedLayers": [
+      "api"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/pong/pong.controller.ts exists and exports a Fastify route handler that responds with JSON {message: 'pong'} on GET /pong",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/pong/pong.routes.ts exists and registers the GET /pong route using the controller",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "The /pong endpoint is accessible via HTTP GET request and returns status 200 with correct JSON structure",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "sc-004",
+      "description": "All TypeScript files compile without errors using the project's TypeScript configuration",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "The pong module follows the project's established Fastify controller pattern",
+      "testable": false,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "RBAC enforcement: All API endpoints enforce role-based access control.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "Service layer for pong module",
+    "Database integration",
+    "Tests",
+    "Audit records (no state-changing operations)",
+    "Integration with existing modules (employee, policy, balance, leave, notification)",
+    "Authentication or authorization logic",
+    "Input validation (no inputs to validate)",
+    "Logging beyond standard Fastify error handling"
+  ],
+  "ambiguities": []
+}
