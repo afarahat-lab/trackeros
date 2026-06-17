@@ -1,0 +1,310 @@
+{
+  "correlationId": "a67bc369-29e7-4e70-b847-0b621f66bf8f",
+  "domainChanges": [
+    {
+      "entityName": "LeaveRequest",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "employeeId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "policyId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "startDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "endDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "totalDays",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "reason",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "status",
+          "type": "'draft' | 'submitted' | 'pending_approval' | 'approved' | 'rejected' | 'cancelled'",
+          "required": true
+        },
+        {
+          "name": "managerId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "managerNotes",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "submittedAt",
+          "type": "Date",
+          "required": false
+        },
+        {
+          "name": "decidedAt",
+          "type": "Date",
+          "required": false
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "Employee",
+          "type": "many-to-one"
+        },
+        {
+          "entity": "LeavePolicy",
+          "type": "many-to-one"
+        }
+      ]
+    },
+    {
+      "entityName": "CreateLeaveRequestDto",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "employeeId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "policyId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "startDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "endDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "totalDays",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "reason",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "LeaveBalance",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "employeeId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "policyId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "balanceDays",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "fiscalYear",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "Employee",
+          "type": "many-to-one"
+        },
+        {
+          "entity": "LeavePolicy",
+          "type": "many-to-one"
+        }
+      ]
+    },
+    {
+      "entityName": "Employee",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "employeeNumber",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "firstName",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "lastName",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "email",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "managerId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "department",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "hireDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "status",
+          "type": "'active' | 'on_leave' | 'terminated'",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "Employee",
+          "type": "one-to-many"
+        }
+      ]
+    },
+    {
+      "entityName": "LeavePolicy",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "policyName",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "leaveType",
+          "type": "'annual' | 'sick' | 'emergency' | 'unpaid' | 'maternity' | 'paternity'",
+          "required": true
+        },
+        {
+          "name": "entitlementDays",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "accrualRate",
+          "type": "number",
+          "required": false
+        },
+        {
+          "name": "maxCarryover",
+          "type": "number",
+          "required": false
+        },
+        {
+          "name": "validityStart",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "validityEnd",
+          "type": "Date",
+          "required": false
+        },
+        {
+          "name": "isActive",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": true
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}

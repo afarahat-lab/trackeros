@@ -24,17 +24,16 @@ Represents a leave record managed by the `leave` module, including leave request
 |-------|------|----------|
 | id | string | true |
 | employeeId | string | true |
+| policyId | string | true |
 | startDate | Date | true |
 | endDate | Date | true |
 | totalDays | number | true |
-| leaveType | string | true |
 | reason | string \| null | false |
-| status | 'Pending' \| 'Approved' \| 'Rejected' | true |
-| approvedBy | string \| null | false |
-| rejectedBy | string \| null | false |
-| approvalDate | Date \| null | false |
-| rejectionDate | Date \| null | false |
-| rejectionReason | string \| null | false |
+| status | 'draft' \| 'submitted' \| 'pending_approval' \| 'approved' \| 'rejected' \| 'cancelled' | true |
+| managerId | string \| null | false |
+| managerNotes | string \| null | false |
+| submittedAt | Date \| null | false |
+| decidedAt | Date \| null | false |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
@@ -47,28 +46,11 @@ Represents a leave record managed by the `leave` module, including leave request
 | Field | Type | Required |
 |-------|------|----------|
 | employeeId | string | true |
+| policyId | string | true |
 | startDate | Date | true |
 | endDate | Date | true |
-| leaveType | string | true |
+| totalDays | number | true |
 | reason | string | false |
-
-### UpdateLeaveRequestDto
-
-| Field | Type | Required |
-|-------|------|----------|
-| status | 'Approved' \| 'Rejected' | true |
-| rejectionReason | string | false |
-
-### LeaveRequestQuery
-
-| Field | Type | Required |
-|-------|------|----------|
-| employeeId | string | false |
-| status | string | false |
-| startDateFrom | Date | false |
-| startDateTo | Date | false |
-| limit | number | false |
-| offset | number | false |
 
 ## balance
 
@@ -104,8 +86,9 @@ Represents employee data managed by the `employee` module, including employee re
 | lastName | string | true |
 | email | string | true |
 | managerId | string \| null | false |
+| department | string \| null | false |
 | hireDate | Date | true |
-| isActive | boolean | true |
+| status | 'active' \| 'on_leave' \| 'terminated' | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
@@ -135,9 +118,10 @@ Represents leave policy data managed by the `policy` module, including policy de
 | policyName | string | true |
 | leaveType | LeaveType | true |
 | entitlementDays | number | true |
-| maxConsecutiveDays | number \| null | false |
-| advanceNoticeDays | number | true |
-| requiresApproval | boolean | true |
+| accrualRate | number \| null | false |
+| maxCarryover | number \| null | false |
+| validityStart | Date | true |
+| validityEnd | Date \| null | false |
 | isActive | boolean | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |

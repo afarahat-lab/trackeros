@@ -1,9 +1,13 @@
 export interface LeavePolicy {
   id: string;
-  name: string;
-  leaveType: string;
-  maxDays: number;
+  policyName: string;
+  leaveType: 'annual' | 'sick' | 'emergency' | 'unpaid' | 'maternity' | 'paternity';
+  entitlementDays: number;
+  accrualRate?: number;
+  maxCarryover?: number;
+  validityStart: Date;
+  validityEnd?: Date;
   isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
+  createdAt: Date;
+  updatedAt: Date;
 }

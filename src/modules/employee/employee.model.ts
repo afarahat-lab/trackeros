@@ -1,9 +1,13 @@
 export interface Employee {
   id: string;
-  name: string;
+  employeeNumber: string;
+  firstName: string;
+  lastName: string;
   email: string;
-  department: string;
   managerId?: string;
-  createdAt: string;
-  updatedAt: string;
+  department?: string;
+  hireDate: Date;
+  status: 'active' | 'on_leave' | 'terminated';
+  createdAt: Date;
+  updatedAt: Date;
 }
