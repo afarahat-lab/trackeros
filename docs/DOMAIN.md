@@ -229,3 +229,14 @@ Represents audit data managed by the `audit` module, including audit records, ch
 | actorId | string | true |
 | timestamp | Date | true |
 | metadata | Record<string, unknown> \| null | false |
+
+## validation
+
+Represents validation result data managed by the `validation` module, including validation checks and error reporting.
+
+### ValidationResult
+
+| Field | Type | Required |
+|-------|------|----------|
+| isValid | boolean | true |
+| errors | string[] | true |
