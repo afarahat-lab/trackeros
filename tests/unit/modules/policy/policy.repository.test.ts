@@ -1,13 +1,20 @@
-import { ILeavePolicyRepository, PgLeavePolicyRepository } from '../../../../src/modules/policy/policy.repository';
-import { LeavePolicy, CreateLeavePolicyDto } from '../../../../src/modules/policy/policy.model';
+import { PolicyRepository } from '../../../../src/modules/policy/policy.repository';
+import { LeavePolicy } from '../../../../src/modules/policy/policy.model';
 
-describe('ILeavePolicyRepository interface', () => {
+describe('PolicyRepository interface', () => {
   it('should define the expected methods', () => {
-    const repo: ILeavePolicyRepository = new PgLeavePolicyRepository();
-    expect(repo.create).toBeDefined();
+    const repo: PolicyRepository = {
+      findById: async () => null,
+      findActiveByLeaveType: async () => [],
+      save: async () => ({} as LeavePolicy),
+      update: async () => null,
+      softDelete: async () => {},
+    };
+
     expect(repo.findById).toBeDefined();
-    expect(repo.findAll).toBeDefined();
+    expect(repo.findActiveByLeaveType).toBeDefined();
+    expect(repo.save).toBeDefined();
     expect(repo.update).toBeDefined();
-    expect(repo.delete).toBeDefined();
+    expect(repo.softDelete).toBeDefined();
   });
 });

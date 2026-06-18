@@ -38,7 +38,7 @@ Represents a leave record managed by the `leave` module, including leave request
 | endDate | Date | true |
 | totalDays | number | true |
 | status | LeaveRequestStatus | true |
-| reason | string \| null | false |
+| reason | string | true |
 | managerId | string \| null | false |
 | managerNotes | string \| null | false |
 | reviewedAt | Date \| null | false |
@@ -49,7 +49,6 @@ Represents a leave record managed by the `leave` module, including leave request
 **Relationships**
 - `Employee` — many-to-one
 - `LeavePolicy` — many-to-one
-- `LeaveBalance` — many-to-one
 
 ### CreateLeaveRequestDto
 
@@ -146,12 +145,12 @@ Represents leave policy data managed by the `policy` module, including policy de
 | policyName | string | true |
 | leaveType | LeaveType | true |
 | entitlementDays | number | true |
-| maxConsecutiveDays | number \| null | false |
+| maxConsecutiveDays | number | true |
 | minNoticeDays | number | true |
 | requiresApproval | boolean | true |
 | carryOverLimit | number | true |
 | validityStart | Date | true |
-| validityEnd | Date \| null | false |
+| validityEnd | Date | true |
 | isActive | boolean | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |

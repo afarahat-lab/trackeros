@@ -1,13 +1,13 @@
 {
-  "id": "46525c67-538d-40dc-9ca3-d2148ae93637",
+  "id": "08226f07-b173-4ede-a756-89ba542ffdd5",
   "correlationId": "5e600ea5-daf6-44b7-8ee7-061dee6feedd",
-  "rawIntent": "[Feature: Build the leave management module — Phase 1: Core domain models and repository interfaces]\n\nCreate src/modules/leave/leave.model.ts with TypeScript interfaces for LeaveRequest, CreateLeaveRequestDto, UpdateLeaveRequestDto, and LeaveRequestStatus. Create src/modules/leave/leave.repository.ts with ILeaveRepository interface defining CRUD methods that reference the model types. Create src/modules/policy/policy.model.ts with LeavePolicy interface. Create src/modules/balance/balance.model.ts with LeaveBalance interface. Create src/modules/employee/employee.model.ts with Employee interface. All interfaces must use exact attribute names from canonical definitions. Include Jest unit tests in tests/unit/modules/leave/leave.model.test.ts and tests/unit/modules/leave/leave.repository.test.ts.\n\nPhase architecture notes:\nEstablish foundational domain entities and repository interfaces without implementations. This satisfies GP-001 by defining repository patterns early and creates clear contracts for subsequent phases.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/employee/employee.model.ts\\nexport interface Employee {\\n  id: string;\\n  employeeNumber: string;\\n  firstName: string;\\n  lastName: string;\\n  email: string;\\n  managerId: string | null;\\n  department: string;\\n  hireDate: Date;\\n  isActive: boolean;\\n  createdAt: Date;\\n  updatedAt: Date;\\n  deletedAt: Date | null;\\n}\",\"File: src/modules/policy/policy.model.ts\\nexport interface LeavePolicy {\\n  id: string;\\n  policyName: string;\\n  leaveType: 'annual' | 'sick' | 'emergency' | 'unpaid' | 'maternity' | 'paternity';\\n  entitlementDays: number;\\n  maxConsecutiveDays: number | null;\\n  minNoticeDays: number;\\n  requiresApproval: boolean;\\n  carryOverLimit: number;\\n  validityStart: Date;\\n  validityEnd: Date | null;\\n  isActive: boolean;\\n  createdAt: Date;\\n  updatedAt: Date;\\n  deletedAt: Date | null;\\n}\",\"File: src/modules/balance/balance.model.ts\\nexport interface LeaveBalance {\\n  id: string;\\n  employeeId: string;\\n  policyId: string;\\n  balanceYear: number;\\n  availableDays: number;\\n  usedDays: number;\\n  pendingDays: number;\\n  carriedOverDays: number;\\n  createdAt: Date;\\n  updatedAt: Date;\\n}\",\"File: src/modules/leave/leave.model.ts\\nexport type LeaveRequestStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';\\nexport interface LeaveRequest {\\n  id: string;\\n  employeeId: string;\\n  policyId: string;\\n  startDate: Date;\\n  endDate: Date;\\n  totalDays: number;\\n  status: LeaveRequestStatus;\\n  reason: string | null;\\n  managerId: string | null;\\n  managerNotes: string | null;\\n  reviewedAt: Date | null;\\n  createdAt: Date;\\n  updatedAt: Date;\\n  deletedAt: Date | null;\\n}\\nexport interface CreateLeaveRequestDto {\\n  employeeId: string;\\n  policyId: string;\\n  startDate: Date;\\n  endDate: Date;\\n  reason: string | null;\\n}\\nexport interface UpdateLeaveRequestDto {\\n  status?: LeaveRequestStatus;\\n  managerNotes?: string | null;\\n}\",\"File: src/modules/notification/notification.model.ts\\nexport type NotificationType = 'leave_submitted' | 'leave_approved' | 'leave_rejected' | 'leave_cancelled' | 'balance_low' | 'balance_expiring';\\nexport interface Notification {\\n  id: string;\\n  recipientId: string;\\n  senderId: string | null;\\n  type: NotificationType;\\n  title: string;\\n  body: string;\\n  metadata: Record<string, any> | null;\\n  isRead: boolean;\\n  readAt: Date | null;\\n  createdAt: Date;\\n}\",\"File: src/modules/employee/employee.repository.ts\\nimport { Employee } from './employee.model';\\nexport interface EmployeeRepository {\\n  findById(id: string): Promise<Employee | null>;\\n  findByEmail(email: string): Promise<Employee | null>;\\n  save(employee: Omit<Employee, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt'>): Promise<Employee>;\\n  update(id: string, updates: Partial<Omit<Employee, 'id' | 'createdAt' | 'updatedAt'>>): Promise<Employee | null>;\\n  softDelete(id: string): Promise<void>;\\n}\",\"File: src/modules/policy/policy.repository.ts\\nimport { LeavePolicy } from './policy.model';\\nexport interface PolicyRepository {\\n  findById(id: string): Promise<LeavePolicy | null>;\\n  findActiveByLeaveType(leaveType: LeavePolicy['leaveType']): Promise<LeavePolicy[]>;\\n  save(policy: Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt'>): Promise<LeavePolicy>;\\n  update(id: string, updates: Partial<Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>>): Promise<LeavePolicy | null>;\\n  softDelete(id: string): Promise<void>;\\n}\",\"File: src/modules/balance/balance.repository.ts\\nimport { LeaveBalance } from './balance.model';\\nexport interface BalanceRepository {\\n  findByEmployeeAndYear(employeeId: string, balanceYear: number): Promise<LeaveBalance[]>;\\n  findByEmployeePolicyAndYear(employeeId: string, policyId: string, balanceYear: number): Promise<LeaveBalance | null>;\\n  save(balance: Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeaveBalance>;\\n  update(id: string, updates: Partial<Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt'>>): Promise<LeaveBalance | null>;\\n}\",\"File: src/modules/leave/leave.repository.ts\\nimport { LeaveRequest, CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveRequestStatus } from './leave.model';\\nexport interface LeaveRepository {\\n  findById(id: string): Promise<LeaveRequest | null>;\\n  findByEmployee(employeeId: string, status?: LeaveRequestStatus): Promise<LeaveRequest[]>;\\n  findByManager(managerId: string, status?: LeaveRequestStatus): Promise<LeaveRequest[]>;\\n  save(request: CreateLeaveRequestDto): Promise<LeaveRequest>;\\n  update(id: string, updates: UpdateLeaveRequestDto): Promise<LeaveRequest | null>;\\n  softDelete(id: string): Promise<void>;\\n}\",\"File: src/modules/notification/notification.repository.ts\\nimport { Notification } from './notification.model';\\nexport interface NotificationRepository {\\n  findByRecipient(recipientId: string, isRead?: boolean): Promise<Notification[]>;\\n  save(notification: Omit<Notification, 'id' | 'createdAt'>): Promise<Notification>;\\n  markAsRead(id: string): Promise<void>;\\n}\"],\"importStatements\":[\"import { Employee } from './employee.model'\",\"import { LeavePolicy } from './policy.model'\",\"import { LeaveBalance } from './balance.model'\",\"import { LeaveRequest, CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveRequestStatus } from './leave.model'\",\"import { Notification, NotificationType } from './notification.model'\",\"import { EmployeeRepository } from './employee.repository'\",\"import { PolicyRepository } from './policy.repository'\",\"import { BalanceRepository } from './balance.repository'\",\"import { LeaveRepository } from './leave.repository'\",\"import { NotificationRepository } from './notification.repository'\"],\"successCriteria\":[\"src/modules/employee/employee.model.ts exists and exports Employee interface with all attributes matching canonical SQL schema\",\"src/modules/policy/policy.model.ts exists and exports LeavePolicy interface with all attributes matching canonical SQL schema\",\"src/modules/balance/balance.model.ts exists and exports LeaveBalance interface with all attributes matching canonical SQL schema\",\"src/modules/leave/leave.model.ts exists and exports LeaveRequest, CreateLeaveRequestDto, UpdateLeaveRequestDto interfaces and LeaveRequestStatus type\",\"src/modules/notification/notification.model.ts exists and exports Notification interface and NotificationType type\",\"src/modules/employee/employee.repository.ts exists and exports EmployeeRepository interface with findById, findByEmail, save, update, softDelete methods\",\"src/modules/policy/policy.repository.ts exists and exports PolicyRepository interface with findById, findActiveByLeaveType, save, update, softDelete methods\",\"src/modules/balance/balance.repository.ts exists and exports BalanceRepository interface with findByEmployeeAndYear, findByEmployeePolicyAndYear, save, update methods\",\"src/modules/leave/leave.repository.ts exists and exports LeaveRepository interface with findById, findByEmployee, findByManager, save, update, softDelete methods\",\"src/modules/notification/notification.repository.ts exists and exports NotificationRepository interface with findByRecipient, save, markAsRead methods\",\"All repository interfaces follow GP-001 (Repository pattern) by abstracting database access\",\"All model interfaces use exact attribute names and types from canonical SQL schema definitions\",\"Vitest unit tests exist at tests/unit/modules/leave/leave.model.test.ts and tests/unit/modules/leave/leave.repository.test.ts\"]}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- Employee\n- LeavePolicy\n- LeaveBalance\n- LeaveRequest\n- CreateLeaveRequestDto\n- UpdateLeaveRequestDto\n- Notification\n- EmployeeRepository\n- PolicyRepository\n- BalanceRepository\n- LeaveRepository\n- NotificationRepository\n- LeaveRequestStatus\n- NotificationType\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Canonical entity fields for this phase\n\nNote: these field names supersede any attribute names in the\nintent text above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the field names of each entity this phase defines. The\nexact attribute / column / property set per entity is:\n\n- `Employee`: `id`, `employeeNumber`, `firstName`, `lastName`, `email`, `managerId`, `department`, `hireDate`, `isActive`, `createdAt`, `updatedAt`, `deletedAt`\n- `LeavePolicy`: `id`, `policyName`, `leaveType`, `entitlementDays`, `maxConsecutiveDays`, `minNoticeDays`, `requiresApproval`, `carryOverLimit`, `validityStart`, `validityEnd`, `isActive`, `createdAt`, `updatedAt`, `deletedAt`\n- `LeaveBalance`: `id`, `employeeId`, `policyId`, `balanceYear`, `availableDays`, `usedDays`, `pendingDays`, `carriedOverDays`, `createdAt`, `updatedAt`\n- `LeaveRequest`: `id`, `employeeId`, `policyId`, `startDate`, `endDate`, `totalDays`, `status`, `reason`, `managerId`, `managerNotes`, `reviewedAt`, `createdAt`, `updatedAt`, `deletedAt`\n- `CreateLeaveRequestDto`: `employeeId`, `policyId`, `startDate`, `endDate`, `reason`\n- `UpdateLeaveRequestDto`: `status`, `managerNotes`\n- `Notification`: `id`, `recipientId`, `senderId`, `type`, `title`, `body`, `metadata`, `isRead`, `readAt`, `createdAt`\n\nTreat each entity's field list as complete. If the\nintent text or planner scope mentions different field\nnames than the architecture, do NOT flag this as\nambiguity — the per-phase architecture wins.\n\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 2 — Service interfaces and dependency wiring: Create src/modules/leave/leave.service.ts with ILeaveService interface defining applyLeave, getLeave\n- Phase 3 — Repository implementations and database integration: Implement src/modules/leave/leave.repository.ts with LeaveRepository class implementing ILeaveReposi\n- Phase 4 — Service implementations with audit logging: Implement src/modules/leave/leave.service.ts with LeaveService class implementing ILeaveService. Imp\n- Phase 5 — Input validation and error handling: Create src/modules/leave/leave.validator.ts with Joi schemas for CreateLeaveRequestDto and UpdateLea\n- Phase 6 — Controller layer with RBAC enforcement: Create src/modules/leave/leave.controller.ts with LeaveController class implementing Fastify control\n- Phase 7 — Route definitions and API integration: Create src/modules/leave/leave.routes.ts defining Fastify routes for POST /leave/apply, GET /leave/r",
+  "rawIntent": "Phase 1: Core domain models and repository interfaces. Generate ONLY TypeScript interfaces and types — no classes, no implementations, no database imports, no SQL queries. All model interfaces must use exact attribute names and types from the canonical definitions: Employee (id, employeeNumber, firstName, lastName, email, managerId, department, hireDate, isActive, createdAt, updatedAt, deletedAt), LeavePolicy (id, policyName, leaveType: 'annual'|'sick'|'emergency'|'unpaid'|'maternity'|'paternity', entitlementDays, maxConsecutiveDays, minNoticeDays, requiresApproval, carryOverLimit, validityStart, validityEnd, isActive, createdAt, updatedAt, deletedAt), LeaveBalance (id, employeeId, policyId, balanceYear, availableDays, usedDays, pendingDays, carriedOverDays, createdAt, updatedAt), LeaveRequest (id, employeeId, policyId, startDate, endDate, totalDays, status: LeaveRequestStatus, reason, managerId, managerNotes, reviewedAt, createdAt, updatedAt, deletedAt), CreateLeaveRequestDto (employeeId, policyId, startDate, endDate, reason), UpdateLeaveRequestDto (status, managerNotes), Notification (id, recipientId, senderId, type: NotificationType, title, body, metadata, isRead, readAt, createdAt). Repository interfaces must define ONLY method signatures: EmployeeRepository (findById, findByEmail, save, update, softDelete), PolicyRepository (findById, findActiveByLeaveType, save, update, softDelete), BalanceRepository (findByEmployeeAndYear, findByEmployeePolicyAndYear, save, update), LeaveRepository (findById, findByEmployee, findByManager, save, update, softDelete), NotificationRepository (findByRecipient, save, markAsRead). Do NOT emit any concrete classes, constructors, pg/Pool imports, query strings, or implementation logic. Include unit tests at tests/unit/modules/leave/leave.model.test.ts and tests/unit/modules/leave/leave.repository.test.ts.",
   "scope": {
     "affectedDomains": [
-      "leave",
+      "employee",
       "policy",
       "balance",
-      "employee",
+      "leave",
       "notification"
     ],
     "affectedLayers": [
@@ -20,98 +20,51 @@
   "successCriteria": [
     {
       "id": "sc-001",
-      "description": "src/modules/leave/leave.model.ts exists and exports LeaveRequest, CreateLeaveRequestDto, UpdateLeaveRequestDto interfaces and LeaveRequestStatus type with exact canonical attribute names",
+      "description": "All domain model interfaces (Employee, LeavePolicy, LeaveBalance, LeaveRequest, CreateLeaveRequestDto, UpdateLeaveRequestDto, Notification) are created with exact field names and types from canonical definitions",
       "testable": true,
       "layer": "unit"
     },
     {
       "id": "sc-002",
-      "description": "src/modules/leave/leave.repository.ts exists and exports LeaveRepository interface with findById, findByEmployee, findByManager, save, update, softDelete methods",
+      "description": "All repository interfaces (EmployeeRepository, PolicyRepository, BalanceRepository, LeaveRepository, NotificationRepository) are created with exact method signatures specified",
       "testable": true,
       "layer": "unit"
     },
     {
       "id": "sc-003",
-      "description": "src/modules/policy/policy.model.ts exists and exports LeavePolicy interface with exact canonical attribute names",
+      "description": "No concrete classes, constructors, database imports (pg/Pool), SQL queries, or implementation logic are generated",
       "testable": true,
       "layer": "unit"
     },
     {
       "id": "sc-004",
-      "description": "src/modules/balance/balance.model.ts exists and exports LeaveBalance interface with exact canonical attribute names",
-      "testable": true,
-      "layer": "unit"
-    },
-    {
-      "id": "sc-005",
-      "description": "src/modules/employee/employee.model.ts exists and exports Employee interface with exact canonical attribute names",
-      "testable": true,
-      "layer": "unit"
-    },
-    {
-      "id": "sc-006",
-      "description": "src/modules/notification/notification.model.ts exists and exports Notification interface and NotificationType type with exact canonical attribute names",
-      "testable": true,
-      "layer": "unit"
-    },
-    {
-      "id": "sc-007",
-      "description": "src/modules/employee/employee.repository.ts exists and exports EmployeeRepository interface with findById, findByEmail, save, update, softDelete methods",
-      "testable": true,
-      "layer": "unit"
-    },
-    {
-      "id": "sc-008",
-      "description": "src/modules/policy/policy.repository.ts exists and exports PolicyRepository interface with findById, findActiveByLeaveType, save, update, softDelete methods",
-      "testable": true,
-      "layer": "unit"
-    },
-    {
-      "id": "sc-009",
-      "description": "src/modules/balance/balance.repository.ts exists and exports BalanceRepository interface with findByEmployeeAndYear, findByEmployeePolicyAndYear, save, update methods",
-      "testable": true,
-      "layer": "unit"
-    },
-    {
-      "id": "sc-010",
-      "description": "src/modules/notification/notification.repository.ts exists and exports NotificationRepository interface with findByRecipient, save, markAsRead methods",
-      "testable": true,
-      "layer": "unit"
-    },
-    {
-      "id": "sc-011",
-      "description": "tests/unit/modules/leave/leave.model.test.ts exists with Jest unit tests for leave model interfaces",
-      "testable": true,
-      "layer": "unit"
-    },
-    {
-      "id": "sc-012",
-      "description": "tests/unit/modules/leave/leave.repository.test.ts exists with Jest unit tests for leave repository interface",
+      "description": "Unit test files are created at tests/unit/modules/leave/leave.model.test.ts and tests/unit/modules/leave/leave.repository.test.ts",
       "testable": true,
       "layer": "unit"
     }
   ],
   "constraints": [
-    "GP-001: Repository pattern - All repository interfaces must abstract database access",
-    "All model interfaces must use exact attribute names from canonical definitions",
-    "All repository interfaces must reference model types from their respective modules",
-    "No implementations - only interfaces and types should be created in this phase",
-    "Dependency direction must be respected: leave -> employee, leave -> policy, leave -> balance, leave -> notification"
+    "Repository pattern: All database access goes through repository interfaces",
+    "Input validation: Validate all inputs at API boundaries before processing",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled",
+    "Modular monolith architecture with strict dependency direction",
+    "LeaveRequest lifecycle states are Pending, Approved, and Rejected",
+    "Balance deductions occur only during approveLeaveRequest",
+    "Notifications are created on submission, approval, and rejection events"
   ],
   "outOfScope": [
-    "Implementation of repository interfaces (deferred to Phase 3)",
-    "Service interfaces and dependency wiring (deferred to Phase 2)",
-    "Service implementations with audit logging (deferred to Phase 4)",
-    "Input validation and error handling (deferred to Phase 5)",
-    "Controller layer with RBAC enforcement (deferred to Phase 6)",
-    "Route definitions and API integration (deferred to Phase 7)",
-    "Database schema creation or migrations",
-    "Actual business logic for leave management",
-    "Authentication or authorization logic",
-    "Audit record implementations",
-    "Input validation implementations",
-    "Error handling implementations",
-    "RBAC enforcement implementations"
+    "Concrete repository implementations",
+    "Database schema/SQL migrations",
+    "API endpoints/controllers",
+    "Service layer implementations",
+    "Business logic",
+    "Database connection configuration",
+    "Authentication/authorization logic",
+    "Any files outside the specified domain interfaces, repository interfaces, and the two test files",
+    "LeaveRequest workflow implementation",
+    "Balance adjustment logic",
+    "Notification sending logic"
   ],
   "ambiguities": []
 }

@@ -94,8 +94,8 @@
         },
         {
           "name": "maxConsecutiveDays",
-          "type": "number | null",
-          "required": false
+          "type": "number",
+          "required": true
         },
         {
           "name": "minNoticeDays",
@@ -119,8 +119,8 @@
         },
         {
           "name": "validityEnd",
-          "type": "Date | null",
-          "required": false
+          "type": "Date",
+          "required": true
         },
         {
           "name": "isActive",
@@ -252,8 +252,8 @@
         },
         {
           "name": "reason",
-          "type": "string | null",
-          "required": false
+          "type": "string",
+          "required": true
         },
         {
           "name": "managerId",
@@ -293,10 +293,6 @@
         },
         {
           "entity": "LeavePolicy",
-          "type": "many-to-one"
-        },
-        {
-          "entity": "LeaveBalance",
           "type": "many-to-one"
         }
       ]
