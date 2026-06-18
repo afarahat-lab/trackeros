@@ -1,0 +1,51 @@
+{
+  "correlationId": "c98a5ae7-6602-41c6-bd28-ad65c7dcbe24",
+  "domainChanges": [
+    {
+      "entityName": "BaseEntity",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "AppError",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "code",
+          "type": "ErrorCode",
+          "required": true
+        },
+        {
+          "name": "statusCode",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "details",
+          "type": "Record<string, any>",
+          "required": false
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}

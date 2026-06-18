@@ -230,3 +230,21 @@ Represents audit data managed by the `audit` module, including audit records, ch
 | actorId | string | true |
 | timestamp | Date | true |
 | metadata | Record<string, unknown> \| null | false |
+
+## error
+
+Represents application error data managed by the `error` module, including error codes, status codes, and diagnostic details.
+
+### ErrorCode
+
+| Value | Description |
+|-------|-------------|
+| *enum* | Application error codes |
+
+### AppError
+
+| Field | Type | Required |
+|-------|------|----------|
+| code | ErrorCode | true |
+| statusCode | number | true |
+| details | Record<string, any> \| null | false |

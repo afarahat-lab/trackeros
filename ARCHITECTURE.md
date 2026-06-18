@@ -27,3 +27,18 @@
 
 ### Repositories
 - `src/modules/employee/employee.repository.ts` — `IEmployeeRepository`, `EmployeeRepository`
+
+## Shared Module
+
+### Enums
+- `LeaveType`: `ANNUAL`, `SICK`, `EMERGENCY`, `UNPAID`
+- `LeaveStatus`: `DRAFT`, `SUBMITTED`, `PENDING_APPROVAL`, `APPROVED`, `REJECTED`, `CANCELLED`
+
+### Database
+- `src/shared/database/database.service.ts` — `DatabaseConnection`, `DatabaseService`
+
+### Repositories
+- `src/shared/repositories/base.repository.ts` — `BaseEntity`, `IRepository<T>`, `BaseRepository<T>`
+
+### Errors
+- `src/shared/errors/app-error.ts` — `AppError`, `ErrorCode`
