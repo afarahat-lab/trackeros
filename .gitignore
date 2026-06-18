@@ -8,3 +8,5 @@
 
 # Node Modules
 node_modules/
+# TR_059 §3 — Aider history files (added by Gestalt)
+.aider*
