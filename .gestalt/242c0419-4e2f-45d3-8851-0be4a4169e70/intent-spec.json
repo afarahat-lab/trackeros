@@ -1,0 +1,99 @@
+{
+  "id": "3bd2af4b-b50d-4604-9b99-2cca9b46e47e",
+  "correlationId": "242c0419-4e2f-45d3-8851-0be4a4169e70",
+  "rawIntent": "[Feature: Build the leave management module — Phase 3: Policy and Balance services]\n\nCreate src/modules/policy/policy.service.ts implementing PolicyService that depends on ILeavePolicyRepository from Phase 2. Create src/modules/balance/balance.service.ts implementing BalanceService that depends on ILeaveBalanceRepository from Phase 2. Include input validation (GP-003) and audit records (GP-002). Include Jest unit tests in tests/unit/modules/policy/ and tests/unit/modules/balance/.\n\nThis phase depends on: src/modules/policy/policy.repository.ts, src/modules/balance/balance.repository.ts.\n\nPhase architecture notes:\nImplement foundational services that don't depend on leave workflows. Required by LeaveApplicationService in next phase.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/policy/policy.service.ts\\nimport { LeavePolicy } from \\\"./policy.model\\\";\\nimport { ILeavePolicyRepository } from \\\"./policy.repository\\\";\\nimport { CreateLeaveRequestDto } from \\\"../leave/leave.model\\\";\\nimport { AuditLogService } from \\\"../../shared/audit/audit.service\\\";\\nimport { ValidationResult } from \\\"../../shared/types/validation.types\\\";\\n\\nexport interface ILeavePolicyService {\\n  getActivePolicies(): Promise<LeavePolicy[]>;\\n  getPolicyById(id: string): Promise<LeavePolicy | null>;\\n  getPolicyByLeaveType(leaveType: string): Promise<LeavePolicy | null>;\\n  validateLeaveRequestAgainstPolicy(request: CreateLeaveRequestDto): Promise<ValidationResult>;\\n}\\n\\nexport class LeavePolicyService implements ILeavePolicyService {\\n  constructor(\\n    private readonly policyRepository: ILeavePolicyRepository,\\n    private readonly auditLogService: AuditLogService\\n  ) {}\\n\\n  async getActivePolicies(): Promise<LeavePolicy[]> {\\n    return this.policyRepository.findActive();\\n  }\\n\\n  async getPolicyById(id: string): Promise<LeavePolicy | null> {\\n    return this.policyRepository.findById(id);\\n  }\\n\\n  async getPolicyByLeaveType(leaveType: string): Promise<LeavePolicy | null> {\\n    return this.policyRepository.findByLeaveType(leaveType);\\n  }\\n\\n  async validateLeaveRequestAgainstPolicy(request: CreateLeaveRequestDto): Promise<ValidationResult> {\\n    const errors: string[] = [];\\n    const policy = await this.policyRepository.findById(request.policyId);\\n    \\n    if (!policy) {\\n      errors.push(`Policy with ID ${request.policyId} not found`);\\n      return { isValid: false, errors };\\n    }\\n    \\n    if (!policy.isActive) {\\n      errors.push(`Policy ${policy.policyName} is not active`);\\n    }\\n    \\n    if (policy.advanceNoticeDays > 0) {\\n      const noticeDays = Math.floor((request.startDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));\\n      if (noticeDays < policy.advanceNoticeDays) {\\n        errors.push(`Requires ${policy.advanceNoticeDays} days advance notice, only ${noticeDays} days given`);\\n      }\\n    }\\n    \\n    return {\\n      isValid: errors.length === 0,\\n      errors\\n    };\\n  }\\n}\",\"File: src/modules/balance/balance.service.ts\\nimport { LeaveBalance } from \\\"./balance.model\\\";\\nimport { ILeaveBalanceRepository } from \\\"./balance.repository\\\";\\nimport { AuditLogService } from \\\"../../shared/audit/audit.service\\\";\\nimport { ValidationResult } from \\\"../../shared/types/validation.types\\\";\\n\\nexport interface ILeaveBalanceService {\\n  getEmployeeBalance(employeeId: string, policyId: string, year: number): Promise<LeaveBalance | null>;\\n  getEmployeeBalancesForYear(employeeId: string, year: number): Promise<LeaveBalance[]>;\\n  calculateAvailableDays(balance: LeaveBalance): number;\\n  validateSufficientBalance(balance: LeaveBalance, requestedDays: number): ValidationResult;\\n}\\n\\nexport class LeaveBalanceService implements ILeaveBalanceService {\\n  constructor(\\n    private readonly balanceRepository: ILeaveBalanceRepository,\\n    private readonly auditLogService: AuditLogService\\n  ) {}\\n\\n  async getEmployeeBalance(employeeId: string, policyId: string, year: number): Promise<LeaveBalance | null> {\\n    return this.balanceRepository.findByEmployeeAndPolicyAndYear(employeeId, policyId, year);\\n  }\\n\\n  async getEmployeeBalancesForYear(employeeId: string, year: number): Promise<LeaveBalance[]> {\\n    return this.balanceRepository.findByEmployeeAndYear(employeeId, year);\\n  }\\n\\n  calculateAvailableDays(balance: LeaveBalance): number {\\n    return Number(balance.balanceDays) + Number(balance.accruedDays) - Number(balance.usedDays);\\n  }\\n\\n  validateSufficientBalance(balance: LeaveBalance, requestedDays: number): ValidationResult {\\n    const errors: string[] = [];\\n    const availableDays = this.calculateAvailableDays(balance);\\n    \\n    if (requestedDays > availableDays) {\\n      errors.push(`Insufficient balance: requested ${requestedDays} days, available ${availableDays.toFixed(2)} days`);\\n    }\\n    \\n    return {\\n      isValid: errors.length === 0,\\n      errors\\n    };\\n  }\\n}\",\"File: src/shared/types/validation.types.ts\\nexport interface ValidationResult {\\n  isValid: boolean;\\n  errors: string[];\\n}\"],\"importStatements\":[\"import { LeavePolicy } from \\\"../policy/policy.model\\\";\",\"import { ILeavePolicyRepository } from \\\"../policy/policy.repository\\\";\",\"import { LeaveBalance } from \\\"../balance/balance.model\\\";\",\"import { ILeaveBalanceRepository } from \\\"../balance/balance.repository\\\";\",\"import { CreateLeaveRequestDto } from \\\"../leave/leave.model\\\";\",\"import { AuditLogService } from \\\"../../shared/audit/audit.service\\\";\",\"import { ValidationResult } from \\\"../../shared/types/validation.types\\\";\"],\"successCriteria\":[\"src/modules/policy/policy.service.ts exists and exports class LeavePolicyService implementing ILeavePolicyService\",\"src/modules/balance/balance.service.ts exists and exports class LeaveBalanceService implementing ILeaveBalanceService\",\"Both services are unit tested with Vitest with 100% branch coverage\",\"LeavePolicyService.validateLeaveRequestAgainstPolicy returns ValidationResult with specific error messages for policy violations\",\"LeaveBalanceService.calculateAvailableDays correctly computes remaining days from balance_days, accrued_days, and used_days\",\"Both services implement input validation (GP-003) at method boundaries\",\"Both services write audit records (GP-002) for state-changing operations via AuditLogService dependency\",\"Transaction behavior: Audit logging occurs in the same transaction as the primary operation when both are performed within a single service method\",\"src/shared/types/validation.types.ts exists and exports ValidationResult interface\"]}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- ILeavePolicyService\n- ILeaveBalanceService\n- ValidationResult\n- LeavePolicy\n- ILeavePolicyRepository\n- LeaveBalance\n- ILeaveBalanceRepository\n- CreateLeaveRequestDto\n- AuditLogService\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Canonical entity fields for this phase\n\nNote: these field names supersede any attribute names in the\nintent text above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the field names of each entity this phase defines. The\nexact attribute / column / property set per entity is:\n\n- `ValidationResult`: `isValid`, `errors`\n\nTreat each entity's field list as complete. If the\nintent text or planner scope mentions different field\nnames than the architecture, do NOT flag this as\nambiguity — the per-phase architecture wins.\n\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 4 — Leave application service: Create src/modules/leave/leave.service.ts implementing LeaveApplicationService that depends on ILeav\n- Phase 5 — Notification service: Create src/modules/notification/notification.service.ts implementing NotificationService that depend\n- Phase 6 — Leave controllers and API endpoints: Create src/modules/leave/leave.controller.ts with Fastify controllers for leave management endpoints\n- Phase 7 — Notification integration and final workflow: Update src/modules/leave/leave.service.ts to integrate NotificationService (Phase 5) for sending not",
+  "scope": {
+    "affectedDomains": [
+      "policy",
+      "balance"
+    ],
+    "affectedLayers": [
+      "domain",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/policy/policy.service.ts exists and exports class LeavePolicyService implementing ILeavePolicyService with all methods from the architecture specification",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/balance/balance.service.ts exists and exports class LeaveBalanceService implementing ILeaveBalanceService with all methods from the architecture specification",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "src/shared/types/validation.types.ts exists and exports ValidationResult interface with isValid: boolean and errors: string[] properties",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "Unit tests exist in tests/unit/modules/policy/policy.service.test.ts with 100% branch coverage for LeavePolicyService",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "Unit tests exist in tests/unit/modules/balance/balance.service.test.ts with 100% branch coverage for LeaveBalanceService",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-006",
+      "description": "LeavePolicyService.validateLeaveRequestAgainstPolicy returns ValidationResult with specific error messages for policy violations (policy not found, policy inactive, insufficient advance notice)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-007",
+      "description": "LeaveBalanceService.calculateAvailableDays correctly computes remaining days from balance_days, accrued_days, and used_days",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-008",
+      "description": "Both services implement input validation (GP-003) at method boundaries",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-009",
+      "description": "Both services write audit records (GP-002) for state-changing operations via AuditLogService dependency",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "GP-002: Audit records - All state-changing operations write an audit record",
+    "GP-003: Input validation - Validate all inputs at API boundaries before processing",
+    "GP-005: Error handling - No unhandled promise rejections. All async errors are caught and handled",
+    "Repository pattern: All database access goes through repository interfaces",
+    "Dependency direction: leave -> policy, leave -> balance (no reverse dependencies)",
+    "Transaction behavior: Audit logging occurs in the same transaction as the primary operation when both are performed within a single service method",
+    "Use TypeScript, Node.js 20, Fastify, PostgreSQL, React Native, npm, and Vitest",
+    "Modular monolith architecture with clear module boundaries"
+  ],
+  "outOfScope": [
+    "Leave application service (Phase 4)",
+    "Notification service (Phase 5)",
+    "Leave controllers and API endpoints (Phase 6)",
+    "Notification integration and final workflow (Phase 7)",
+    "Employee module implementation",
+    "Leave module implementation",
+    "Notification module implementation",
+    "Database schema changes",
+    "API endpoints",
+    "UI components",
+    "Authentication or authorization logic",
+    "Integration tests",
+    "End-to-end tests"
+  ],
+  "ambiguities": []
+}
