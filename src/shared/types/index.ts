@@ -1,27 +1,15 @@
-export class AppError extends Error {
-  public readonly statusCode: number;
-
-  constructor(message: string, statusCode: number) {
-    super(message);
-    this.statusCode = statusCode;
-    Object.setPrototypeOf(this, new.target.prototype);
-  }
-}
-
 export enum LeaveType {
-  Annual = 'annual',
-  Sick = 'sick',
-  Emergency = 'emergency'
+  ANNUAL = 'ANNUAL',
+  SICK = 'SICK',
+  EMERGENCY = 'EMERGENCY',
+  UNPAID = 'UNPAID'
 }
 
 export enum LeaveStatus {
-  Pending = 'pending',
-  Approved = 'approved',
-  Rejected = 'rejected'
-}
-
-export enum UserRole {
-  Employee = 'employee',
-  Manager = 'manager',
-  HR = 'hr'
+  DRAFT = 'DRAFT',
+  SUBMITTED = 'SUBMITTED',
+  PENDING_APPROVAL = 'PENDING_APPROVAL',
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED',
+  CANCELLED = 'CANCELLED'
 }

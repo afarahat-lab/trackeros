@@ -1,0 +1,86 @@
+{
+  "id": "f36a2e57-4527-4542-a4b7-7c8e20500066",
+  "correlationId": "c98a5ae7-6602-41c6-bd28-ad65c7dcbe24",
+  "rawIntent": "[Feature: Build the leave management module — Phase 1: Core Infrastructure & Shared Module]\n\nCreate src/shared/database/database.service.ts with database connection and src/shared/repositories/base.repository.ts with abstract BaseRepository implementing IRepository pattern. Create src/shared/errors/app-error.ts with AppError class and error types. Create src/shared/types/index.ts with LeaveType enum (ANNUAL, SICK, EMERGENCY) and LeaveStatus enum (PENDING, APPROVED, REJECTED). Include Jest unit tests in tests/unit/shared/.\n\nPhase architecture notes:\nEstablishes foundation for all modules: database connection, repository pattern (GP-001), error handling (GP-006), and shared types.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/shared/database/database.service.ts\\nimport { Pool, PoolClient, QueryResult } from 'pg';\\n\\nexport interface DatabaseConnection {\\n  query<T = any>(sql: string, params?: any[]): Promise<QueryResult<T>>;\\n  getClient(): Promise<PoolClient>;\\n  close(): Promise<void>;\\n}\\n\\nexport class DatabaseService implements DatabaseConnection {\\n  private pool: Pool;\\n  constructor(config: { connectionString: string; ssl?: boolean }) {\\n    this.pool = new Pool(config);\\n  }\\n  async query<T = any>(sql: string, params?: any[]): Promise<QueryResult<T>> {\\n    return this.pool.query<T>(sql, params);\\n  }\\n  async getClient(): Promise<PoolClient> {\\n    return this.pool.connect();\\n  }\\n  async close(): Promise<void> {\\n    await this.pool.end();\\n  }\\n}\",\"File: src/shared/repositories/base.repository.ts\\nimport { DatabaseConnection } from '../database/database.service';\\n\\nexport interface BaseEntity {\\n  id: string;\\n  created_at: Date;\\n  updated_at: Date;\\n}\\n\\nexport interface IRepository<T extends BaseEntity> {\\n  create(entity: Omit<T, 'id' | 'created_at' | 'updated_at'>): Promise<T>;\\n  findById(id: string): Promise<T | null>;\\n  update(id: string, updates: Partial<Omit<T, 'id' | 'created_at' | 'updated_at'>>): Promise<T | null>;\\n  delete(id: string): Promise<boolean>;\\n  findAll(filter?: Record<string, any>): Promise<T[]>;\\n}\\n\\nexport abstract class BaseRepository<T extends BaseEntity> implements IRepository<T> {\\n  constructor(\\n    protected readonly db: DatabaseConnection,\\n    protected readonly tableName: string,\\n    protected readonly entityName: string\\n  ) {}\\n  async create(entity: Omit<T, 'id' | 'created_at' | 'updated_at'>): Promise<T> {\\n    const now = new Date();\\n    const result = await this.db.query<T>(`\\n      INSERT INTO ${this.tableName} (${Object.keys(entity).join(', ')}, created_at, updated_at)\\n      VALUES (${Object.keys(entity).map((_, i) => `$${i + 1}`).join(', ')}, $${Object.keys(entity).length + 1}, $${Object.keys(entity).length + 2})\\n      RETURNING *\\n    `, [...Object.values(entity), now, now]);\\n    return result.rows[0];\\n  }\\n  async findById(id: string): Promise<T | null> {\\n    const result = await this.db.query<T>(`SELECT * FROM ${this.tableName} WHERE id = $1`, [id]);\\n    return result.rows[0] || null;\\n  }\\n  async update(id: string, updates: Partial<Omit<T, 'id' | 'created_at' | 'updated_at'>>): Promise<T | null> {\\n    const setClause = Object.keys(updates).map((key, i) => `${key} = $${i + 1}`).join(', ');\\n    const values = Object.values(updates);\\n    const result = await this.db.query<T>(`\\n      UPDATE ${this.tableName}\\n      SET ${setClause}, updated_at = $${values.length + 1}\\n      WHERE id = $${values.length + 2}\\n      RETURNING *\\n    `, [...values, new Date(), id]);\\n    return result.rows[0] || null;\\n  }\\n  async delete(id: string): Promise<boolean> {\\n    const result = await this.db.query(`DELETE FROM ${this.tableName} WHERE id = $1`, [id]);\\n    return result.rowCount > 0;\\n  }\\n  async findAll(filter?: Record<string, any>): Promise<T[]> {\\n    let query = `SELECT * FROM ${this.tableName}`;\\n    const values: any[] = [];\\n    if (filter && Object.keys(filter).length > 0) {\\n      const conditions = Object.keys(filter).map((key, i) => `${key} = $${i + 1}`);\\n      query += ` WHERE ${conditions.join(' AND ')}`;\\n      values.push(...Object.values(filter));\\n    }\\n    const result = await this.db.query<T>(query, values);\\n    return result.rows;\\n  }\\n}\",\"File: src/shared/errors/app-error.ts\\nexport type ErrorCode = 'VALIDATION_ERROR' | 'NOT_FOUND' | 'UNAUTHORIZED' | 'FORBIDDEN' | 'CONFLICT' | 'INTERNAL_SERVER_ERROR';\\n\\nexport interface AppError extends Error {\\n  code: ErrorCode;\\n  statusCode: number;\\n  details?: Record<string, any>;\\n}\\n\\nexport class AppError extends Error implements AppError {\\n  constructor(\\n    message: string,\\n    public readonly code: ErrorCode,\\n    public readonly statusCode: number,\\n    public readonly details?: Record<string, any>\\n  ) {\\n    super(message);\\n    this.name = 'AppError';\\n  }\\n}\",\"File: src/shared/types/index.ts\\nexport enum LeaveType {\\n  ANNUAL = 'ANNUAL',\\n  SICK = 'SICK',\\n  EMERGENCY = 'EMERGENCY',\\n  UNPAID = 'UNPAID'\\n}\\n\\nexport enum LeaveStatus {\\n  DRAFT = 'DRAFT',\\n  SUBMITTED = 'SUBMITTED',\\n  PENDING_APPROVAL = 'PENDING_APPROVAL',\\n  APPROVED = 'APPROVED',\\n  REJECTED = 'REJECTED',\\n  CANCELLED = 'CANCELLED'\\n}\"],\"importStatements\":[\"import { Pool, PoolClient, QueryResult } from 'pg';\",\"import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';\",\"import { ZodSchema } from 'zod';\"],\"successCriteria\":[\"src/shared/database/database.service.ts exists and exports DatabaseService implementing DatabaseConnection using pg Pool.\",\"src/shared/repositories/base.repository.ts exists and exports BaseRepository abstract class implementing IRepository<T> interface.\",\"src/shared/errors/app-error.ts exists and exports AppError class with code, statusCode, and details properties.\",\"src/shared/types/index.ts exists and exports LeaveType enum (ANNUAL, SICK, EMERGENCY, UNPAID) and LeaveStatus enum (DRAFT, SUBMITTED, PENDING_APPROVAL, APPROVED, REJECTED, CANCELLED) matching canonical SQL schema.\",\"All TypeScript interfaces compile without errors and have concrete implementations using the declared stack (Fastify, PostgreSQL).\",\"ARCHITECTURE.md is updated to include new domain concepts: LeaveType enum values (ANNUAL, SICK, EMERGENCY, UNPAID) and LeaveStatus enum values (DRAFT, SUBMITTED, PENDING_APPROVAL, APPROVED, REJECTED, CANCELLED).\"]}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- DatabaseConnection\n- BaseEntity\n- IRepository\n- AppError\n- Pool\n- PoolClient\n- QueryResult\n- FastifyInstance\n- FastifyRequest\n- FastifyReply\n- ZodSchema\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Canonical entity fields for this phase\n\nNote: these field names supersede any attribute names in the\nintent text above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the field names of each entity this phase defines. The\nexact attribute / column / property set per entity is:\n\n- `BaseEntity`: `id`, `created_at`, `updated_at`\n- `AppError`: `code`, `statusCode`, `details`\n\nTreat each entity's field list as complete. If the\nintent text or planner scope mentions different field\nnames than the architecture, do NOT flag this as\nambiguity — the per-phase architecture wins.\n\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 2 — Employee Module: Create src/modules/employee/employee.model.ts with Employee interface matching canonical attributes.\n- Phase 3 — Policy Module: Create src/modules/policy/policy.model.ts with LeavePolicy interface matching canonical attributes. \n- Phase 4 — Balance Module: Create src/modules/balance/balance.model.ts with LeaveBalance interface matching canonical attribute\n- Phase 5 — Notification Module: Create src/modules/notification/notification.model.ts with Notification interface matching canonical\n- Phase 6 — Leave Module Core: Create src/modules/leave/leave.model.ts with LeaveRequest interface matching canonical attributes an\n- Phase 7 — Leave Workflow & API Layer: Create src/modules/leave/leave.controller.ts with POST /leave/requests endpoint using CreateLeaveReq",
+  "scope": {
+    "affectedDomains": [
+      "shared"
+    ],
+    "affectedLayers": [
+      "infra",
+      "domain",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/shared/database/database.service.ts exists and exports DatabaseService implementing DatabaseConnection using pg Pool",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/shared/repositories/base.repository.ts exists and exports BaseRepository abstract class implementing IRepository<T> interface",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "src/shared/errors/app-error.ts exists and exports AppError class with code, statusCode, and details properties",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "src/shared/types/index.ts exists and exports LeaveType enum (ANNUAL, SICK, EMERGENCY, UNPAID) and LeaveStatus enum (DRAFT, SUBMITTED, PENDING_APPROVAL, APPROVED, REJECTED, CANCELLED) matching canonical SQL schema",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "All TypeScript interfaces compile without errors and have concrete implementations using the declared stack (Fastify, PostgreSQL)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-006",
+      "description": "ARCHITECTURE.md is updated to include new domain concepts: LeaveType enum values (ANNUAL, SICK, EMERGENCY, UNPAID) and LeaveStatus enum values (DRAFT, SUBMITTED, PENDING_APPROVAL, APPROVED, REJECTED, CANCELLED)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-007",
+      "description": "Jest unit tests exist in tests/unit/shared/ for all shared components",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces (GP-001)",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled (GP-006)",
+    "Input validation: Validate all inputs at API boundaries before processing (GP-003)",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data (GP-004)",
+    "Use TypeScript, Node.js 20, Fastify, PostgreSQL, React Native, npm, and Vitest as per project context",
+    "Dependency direction must be respected: leave -> employee, leave -> policy, leave -> balance, and leave -> notification",
+    "No reverse dependencies are permitted",
+    "All state-changing operations write an audit record (GP-002)",
+    "All API endpoints enforce role-based access control (GP-005)"
+  ],
+  "outOfScope": [
+    "Phase 2 — Employee Module: Create src/modules/employee/employee.model.ts with Employee interface matching canonical attributes",
+    "Phase 3 — Policy Module: Create src/modules/policy/policy.model.ts with LeavePolicy interface matching canonical attributes",
+    "Phase 4 — Balance Module: Create src/modules/balance/balance.model.ts with LeaveBalance interface matching canonical attributes",
+    "Phase 5 — Notification Module: Create src/modules/notification/notification.model.ts with Notification interface matching canonical",
+    "Phase 6 — Leave Module Core: Create src/modules/leave/leave.model.ts with LeaveRequest interface matching canonical attributes",
+    "Phase 7 — Leave Workflow & API Layer: Create src/modules/leave/leave.controller.ts with POST /leave/requests endpoint using CreateLeaveReq",
+    "Implementation of specific business modules (employee, policy, balance, notification, leave)",
+    "API endpoint implementations",
+    "Database migrations or schema creation",
+    "Authentication or authorization implementations beyond interface definitions",
+    "UI components or React Native implementations"
+  ],
+  "ambiguities": []
+}
