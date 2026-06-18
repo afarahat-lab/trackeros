@@ -1,108 +1,94 @@
 import { LeaveRequest, CreateLeaveRequestDto } from './leave.model';
-import { LeaveStatus } from '../../shared/types';
+import { LeaveRequestStatus } from '../../shared/types';
 
 export interface ILeaveRepository {
-  findAll(): Promise<LeaveRequest[]>;
-  findById(id: string): Promise<LeaveRequest | null>;
-  create(dto: CreateLeaveRequestDto): Promise<LeaveRequest>;
-  update(id: string, dto: Partial<CreateLeaveRequestDto>): Promise<LeaveRequest | null>;
-  delete(id: string): Promise<boolean>;
   createLeaveRequest(leaveRequest: Omit<LeaveRequest, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeaveRequest>;
-  updateLeaveRequestStatus(id: string, status: LeaveStatus, updatedAt: Date): Promise<LeaveRequest>;
+  updateLeaveRequestStatus(id: string, status: LeaveRequestStatus, reviewedAt?: Date, reviewNotes?: string, managerId?: string): Promise<LeaveRequest>;
   findLeaveRequestById(id: string): Promise<LeaveRequest | null>;
-  findLeaveRequestsByEmployeeId(employeeId: string, status?: LeaveStatus): Promise<LeaveRequest[]>;
+  findLeaveRequestsByEmployeeId(employeeId: string, status?: LeaveRequestStatus): Promise<LeaveRequest[]>;
+  updateLeaveRequest(id: string, updates: Partial<LeaveRequest>): Promise<LeaveRequest>;
 }
 
 export class PgLeaveRepository implements ILeaveRepository {
-  // In-memory store for demonstration/testing
-  private leaveRequests: LeaveRequest[] = [];
+  private store: Map<string, LeaveRequest> = new Map();
 
   async findAll(): Promise<LeaveRequest[]> {
-    return this.leaveRequests;
+    return Array.from(this.store.values());
   }
 
   async findById(id: string): Promise<LeaveRequest | null> {
-    return this.leaveRequests.find((req) => req.id === id) || null;
+    return this.store.get(id) ?? null;
+  }
+
+  async findByEmployeeId(employeeId: string, status?: LeaveRequestStatus): Promise<LeaveRequest[]> {
+    const all = Array.from(this.store.values()).filter(r => r.employeeId === employeeId);
+    if (status) {
+      return all.filter(r => r.requestStatus === status);
+    }
+    return all;
   }
 
   async create(dto: CreateLeaveRequestDto): Promise<LeaveRequest> {
+    const id = this.generateId();
     const now = new Date();
-    const newRequest: LeaveRequest = {
-      id: this.generateId(),
+    const leaveRequest: LeaveRequest = {
+      id,
       employeeId: dto.employeeId,
       leaveType: dto.leaveType,
       startDate: dto.startDate,
       endDate: dto.endDate,
       status: 'pending' as any,
+      requestStatus: LeaveRequestStatus.Draft,
       reason: dto.reason,
       managerId: dto.managerId,
       createdAt: now,
       updatedAt: now,
     };
-    this.leaveRequests.push(newRequest);
-    return newRequest;
+    this.store.set(id, leaveRequest);
+    return leaveRequest;
   }
 
   async update(id: string, dto: Partial<CreateLeaveRequestDto>): Promise<LeaveRequest | null> {
-    const index = this.leaveRequests.findIndex((req) => req.id === id);
-    if (index === -1) return null;
-    const existing = this.leaveRequests[index];
+    const existing = this.store.get(id);
+    if (!existing) {
+      return null;
+    }
     const updated: LeaveRequest = {
       ...existing,
       ...dto,
       updatedAt: new Date(),
     };
-    this.leaveRequests[index] = updated;
+    this.store.set(id, updated);
     return updated;
   }
 
   async delete(id: string): Promise<boolean> {
-    const index = this.leaveRequests.findIndex((req) => req.id === id);
-    if (index === -1) return false;
-    this.leaveRequests.splice(index, 1);
-    return true;
-  }
-
-  async createLeaveRequest(leaveRequest: Omit<LeaveRequest, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeaveRequest> {
-    const now = new Date();
-    const newRequest: LeaveRequest = {
-      id: this.generateId(),
-      ...leaveRequest,
-      createdAt: now,
-      updatedAt: now,
-    };
-    this.leaveRequests.push(newRequest);
-    return newRequest;
-  }
-
-  async updateLeaveRequestStatus(id: string, status: LeaveStatus, updatedAt: Date): Promise<LeaveRequest> {
-    const index = this.leaveRequests.findIndex((req) => req.id === id);
-    if (index === -1) {
-      throw new Error(`Leave request with id ${id} not found`);
-    }
-    const existing = this.leaveRequests[index];
-    const updated: LeaveRequest = {
-      ...existing,
-      status,
-      updatedAt,
-    };
-    this.leaveRequests[index] = updated;
-    return updated;
-  }
-
-  async findLeaveRequestById(id: string): Promise<LeaveRequest | null> {
-    return this.findById(id);
-  }
-
-  async findLeaveRequestsByEmployeeId(employeeId: string, status?: LeaveStatus): Promise<LeaveRequest[]> {
-    return this.leaveRequests.filter((req) => {
-      if (req.employeeId !== employeeId) return false;
-      if (status !== undefined && req.status !== status) return false;
-      return true;
-    });
+    return this.store.delete(id);
   }
 
   private generateId(): string {
-    return Math.random().toString(36).substring(2, 15);
+    return Math.random().toString(36).substring(2, 10);
+  }
+
+  // Stub methods to satisfy ILeaveRepository (will be implemented in later phases)
+
+  async createLeaveRequest(leaveRequest: Omit<LeaveRequest, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeaveRequest> {
+    throw new Error('Method not implemented.');
+  }
+
+  async updateLeaveRequestStatus(id: string, status: LeaveRequestStatus, reviewedAt?: Date, reviewNotes?: string, managerId?: string): Promise<LeaveRequest> {
+    throw new Error('Method not implemented.');
+  }
+
+  async findLeaveRequestById(id: string): Promise<LeaveRequest | null> {
+    throw new Error('Method not implemented.');
+  }
+
+  async findLeaveRequestsByEmployeeId(employeeId: string, status?: LeaveRequestStatus): Promise<LeaveRequest[]> {
+    throw new Error('Method not implemented.');
+  }
+
+  async updateLeaveRequest(id: string, updates: Partial<LeaveRequest>): Promise<LeaveRequest> {
+    throw new Error('Method not implemented.');
   }
 }
