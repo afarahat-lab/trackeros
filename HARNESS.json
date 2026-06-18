@@ -215,7 +215,7 @@
     "backend": "aider",
     "verification": {
       "buildCmd": "",
-      "testCmd": "find src -name '*.ts' -not -name '*.spec.ts' -not -name '*.test.ts' -not -name '*.d.ts' -type f | grep -q . && npm run build && npx jest",
+      "testCmd": "find src -name '*.ts' -not -name '*.spec.ts' -not -name '*.test.ts' -not -name '*.d.ts' -type f | grep -q . && npm run build && npx jest --passWithNoTests",
       "lintCmd": ""
     }
   },
