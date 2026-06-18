@@ -1,0 +1,77 @@
+{
+  "id": "83f412a3-03e6-4081-994c-3e3073dce4de",
+  "correlationId": "958c76ff-8824-49d2-be62-49a1d9ac787a",
+  "rawIntent": "[Feature: Build the leave management module — Phase 1: Core Infrastructure and Employee Module]\n\nCreate src/modules/employee/employee.model.ts with TypeScript interfaces for Employee and CreateEmployeeDto. Create src/modules/employee/employee.repository.ts implementing IEmployeeRepository referencing those types. Include Jest unit tests in tests/unit/modules/employee/. This phase establishes the foundational employee module required by all other modules.\n\nPhase architecture notes:\nEstablish foundational modules with no external dependencies. Employee module is required by all other modules.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/employee/employee.model.ts\\nexport interface Employee {\\n  id: string;\\n  employeeNumber: string;\\n  firstName: string;\\n  lastName: string;\\n  email: string;\\n  managerId: string | null;\\n  department: string | null;\\n  hireDate: Date;\\n  isActive: boolean;\\n  createdAt: Date;\\n  updatedAt: Date;\\n}\\n\\nexport interface CreateEmployeeDto {\\n  employeeNumber: string;\\n  firstName: string;\\n  lastName: string;\\n  email: string;\\n  managerId?: string | null;\\n  department?: string | null;\\n  hireDate: Date;\\n  isActive?: boolean;\\n}\",\"File: src/modules/employee/employee.repository.ts\\nimport { Employee, CreateEmployeeDto } from './employee.model';\\n\\nexport interface IEmployeeRepository {\\n  findById(id: string): Promise<Employee | null>;\\n  findByEmail(email: string): Promise<Employee | null>;\\n  findByManagerId(managerId: string): Promise<Employee[]>;\\n  save(employee: CreateEmployeeDto): Promise<Employee>;\\n  update(employee: Employee): Promise<Employee>;\\n}\\n\\nexport class PostgresEmployeeRepository implements IEmployeeRepository {\\n  constructor(private readonly pool: any) {}\\n\\n  async findById(id: string): Promise<Employee | null> {\\n    // Implementation using pg pool\\n    throw new Error('Method not implemented');\\n  }\\n\\n  async findByEmail(email: string): Promise<Employee | null> {\\n    // Implementation using pg pool\\n    throw new Error('Method not implemented');\\n  }\\n\\n  async findByManagerId(managerId: string): Promise<Employee[]> {\\n    // Implementation using pg pool\\n    throw new Error('Method not implemented');\\n  }\\n\\n  async save(employee: CreateEmployeeDto): Promise<Employee> {\\n    // Implementation using pg pool\\n    throw new Error('Method not implemented');\\n  }\\n\\n  async update(employee: Employee): Promise<Employee> {\\n    // Implementation using pg pool\\n    throw new Error('Method not implemented');\\n  }\\n}\",\"File: src/modules/employee/employee.service.ts\\nimport { Employee } from './employee.model';\\nimport { IEmployeeRepository } from './employee.repository';\\n\\nexport class EmployeeService {\\n  constructor(private readonly employeeRepository: IEmployeeRepository) {}\\n\\n  async getEmployeeById(id: string): Promise<Employee> {\\n    const employee = await this.employeeRepository.findById(id);\\n    if (!employee) {\\n      throw new Error(`Employee with id ${id} not found`);\\n    }\\n    return employee;\\n  }\\n\\n  async getEmployeesByManager(managerId: string): Promise<Employee[]> {\\n    return this.employeeRepository.findByManagerId(managerId);\\n  }\\n}\"],\"importStatements\":[\"import { Pool } from 'pg';\",\"import { FastifyRequest, FastifyReply } from 'fastify';\"],\"successCriteria\":[\"src/modules/employee/employee.model.ts exists and exports Employee and CreateEmployeeDto interfaces\",\"src/modules/employee/employee.repository.ts exists and exports IEmployeeRepository interface and PostgresEmployeeRepository class implementing it\",\"src/modules/employee/employee.service.ts exists and exports EmployeeService class with getEmployeeById and getEmployeesByManager methods\",\"All database access in PostgresEmployeeRepository goes through the repository interface (GP-001)\",\"All state-changing operations (save, update) in PostgresEmployeeRepository write audit records via a transaction that includes both the employee operation and audit log insertion (GP-002)\",\"All async errors in EmployeeService and PostgresEmployeeRepository are caught and handled with proper error types (GP-006)\",\"Vitest unit tests exist in tests/unit/modules/employee/employee.repository.test.ts covering all repository methods\",\"Vitest unit tests exist in tests/unit/modules/employee/employee.service.test.ts covering all service methods\",\"ARCHITECTURE.md is updated to include the new employee module with its interfaces and repository pattern implementation\"],\"sqlSchema\":\"CREATE TABLE employees (\\n  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\\n  employee_number VARCHAR(50) UNIQUE NOT NULL,\\n  first_name VARCHAR(100) NOT NULL,\\n  last_name VARCHAR(100) NOT NULL,\\n  email VARCHAR(255) UNIQUE NOT NULL,\\n  manager_id UUID REFERENCES employees(id),\\n  department VARCHAR(100),\\n  hire_date DATE NOT NULL,\\n  is_active BOOLEAN DEFAULT true,\\n  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,\\n  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP\\n);\"}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- Employee\n- CreateEmployeeDto\n- IEmployeeRepository\n- Pool\n- FastifyRequest\n- FastifyReply\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Canonical entity fields for this phase\n\nNote: these field names supersede any attribute names in the\nintent text above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the field names of each entity this phase defines. The\nexact attribute / column / property set per entity is:\n\n- `Employee`: `id`, `employeeNumber`, `firstName`, `lastName`, `email`, `managerId`, `department`, `hireDate`, `isActive`, `createdAt`, `updatedAt`\n- `CreateEmployeeDto`: `employeeNumber`, `firstName`, `lastName`, `email`, `managerId`, `department`, `hireDate`, `isActive`\n\nTreat each entity's field list as complete. If the\nintent text or planner scope mentions different field\nnames than the architecture, do NOT flag this as\nambiguity — the per-phase architecture wins.\n\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 2 — Policy Module Implementation: Create src/modules/policy/policy.model.ts with TypeScript interfaces for LeavePolicy and CreateLeave\n- Phase 3 — Balance Module Implementation: Create src/modules/balance/balance.model.ts with TypeScript interfaces for LeaveBalance and CreateLe\n- Phase 4 — Notification Module Implementation: Create src/modules/notification/notification.model.ts with TypeScript interfaces for Notification an\n- Phase 5 — Leave Module Core Models and Repository: Create src/modules/leave/leave.model.ts with TypeScript interfaces for LeaveRequest and CreateLeaveR\n- Phase 6 — Leave Service Implementation: Create src/modules/leave/leave.service.ts implementing ILeaveService with business logic for leave a\n- Phase 7 — API Controllers and Routes: Create src/modules/leave/leave.controller.ts with Fastify controller methods for leave CRUD operatio",
+  "scope": {
+    "affectedDomains": [
+      "employee"
+    ],
+    "affectedLayers": [
+      "domain",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/employee/employee.model.ts exists and exports Employee and CreateEmployeeDto interfaces",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/employee/employee.repository.ts exists and exports IEmployeeRepository interface and PostgresEmployeeRepository class implementing it",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "src/modules/employee/employee.service.ts exists and exports EmployeeService class with getEmployeeById and getEmployeesByManager methods",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "Vitest unit tests exist in tests/unit/modules/employee/employee.repository.test.ts covering all repository methods",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "Vitest unit tests exist in tests/unit/modules/employee/employee.service.test.ts covering all service methods",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-006",
+      "description": "ARCHITECTURE.md is updated to include the new employee module with its interfaces and repository pattern implementation",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "GP-001: Repository pattern - All database access goes through repository interfaces.",
+    "GP-002: Audit records - All state-changing operations write an audit record.",
+    "GP-006: Error handling - No unhandled promise rejections. All async errors are caught and handled.",
+    "Modular monolith architecture - Employee module must have no external dependencies.",
+    "TypeScript interfaces must match canonical entity fields exactly.",
+    "PostgreSQL database schema must match provided SQL.",
+    "Dependency direction must be respected (no reverse dependencies)."
+  ],
+  "outOfScope": [
+    "Policy module (Phase 2)",
+    "Balance module (Phase 3)",
+    "Notification module (Phase 4)",
+    "Leave module core models and repository (Phase 5)",
+    "Leave service implementation (Phase 6)",
+    "API controllers and routes (Phase 7)",
+    "RBAC enforcement (not yet implemented)",
+    "Input validation at API boundaries (no API layer in this phase)",
+    "Logging of sensitive data (no API layer in this phase)",
+    "Fastify controllers or routes",
+    "Any functionality outside the employee module"
+  ],
+  "ambiguities": []
+}

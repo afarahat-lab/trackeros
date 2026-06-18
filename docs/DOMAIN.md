@@ -104,6 +104,7 @@ Represents employee data managed by the `employee` module, including employee re
 | lastName | string | true |
 | email | string | true |
 | managerId | string \| null | false |
+| department | string \| null | false |
 | hireDate | Date | true |
 | isActive | boolean | true |
 | createdAt | Date | true |

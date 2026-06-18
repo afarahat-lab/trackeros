@@ -23,7 +23,10 @@
 ## Employee Module
 
 ### Domain Models
-- `src/modules/employee/employee.model.ts` — `Employee`, `CreateEmployeeDto`, `UpdateEmployeeDto`
+- `src/modules/employee/employee.model.ts` — `Employee`, `CreateEmployeeDto`
 
 ### Repositories
-- `src/modules/employee/employee.repository.ts` — `IEmployeeRepository`, `EmployeeRepository`
+- `src/modules/employee/employee.repository.ts` — `IEmployeeRepository`, `PostgresEmployeeRepository`
+
+### Services
+- `src/modules/employee/employee.service.ts` — `EmployeeService`
