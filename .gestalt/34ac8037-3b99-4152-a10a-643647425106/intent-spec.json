@@ -1,0 +1,67 @@
+{
+  "id": "41b401f0-e4b7-4d69-b826-11317af89a13",
+  "correlationId": "34ac8037-3b99-4152-a10a-643647425106",
+  "rawIntent": "[Feature: Build the leave management module — Phase 4: Leave service skeleton and repository interface]\n\nCreate the leave-application.service.ts file with the ILeaveApplicationService interface and the LeaveApplicationService class skeleton (method signatures and constructor). Also create the ILeaveRepository interface stub that the service depends on. This sub-phase establishes the core file and its primary dependency.\n\nPhase architecture notes:\n{\"interfaces\":[\"File: src/modules/leave/leave-application.service.ts\\nexport interface ILeaveApplicationService {\\n  createLeaveRequest(employeeId: string, createLeaveRequestDto: CreateLeaveRequestDto): Promise<LeaveRequest>;\\n  submitLeaveRequest(leaveRequestId: string, employeeId: string): Promise<LeaveRequest>;\\n  cancelLeaveRequest(leaveRequestId: string, employeeId: string): Promise<LeaveRequest>;\\n  getLeaveRequestById(leaveRequestId: string): Promise<LeaveRequest | null>;\\n  getLeaveRequestsByEmployee(employeeId: string, status?: LeaveRequestStatus): Promise<LeaveRequest[]>;\\n}\\n\\nexport class LeaveApplicationService implements ILeaveApplicationService {\\n  constructor(\\n    private readonly leaveRepository: ILeaveRepository,\\n    private readonly policyService: PolicyService,\\n    private readonly balanceService: BalanceService,\\n    private readonly auditLogger: AuditLogger,\\n    private readonly eventPublisher: EventPublisher\\n  ) {}\\n\\n  async createLeaveRequest(employeeId: string, createLeaveRequestDto: CreateLeaveRequestDto): Promise<LeaveRequest> {\\n    // Transaction semantics: All operations execute atomically in a single database transaction\\n    // 1. Validate input using validateCreateLeaveRequestDto (GP-003)\\n    // 2. Check employee exists via employee module (dependency)\\n    // 3. Validate leave policy via policyService\\n    // 4. Check leave balance via balanceService\\n    // 5. Create leave request with status 'draft' via leaveRepository\\n    // 6. Write audit log via auditLogger (GP-002)\\n    // 7. Return created leave request\\n    throw new Error('Method not implemented');\\n  }\\n\\n  async submitLeaveRequest(leaveRequestId: string, employeeId: string): Promise<LeaveRequest> {\\n    // Transaction semantics: All operations execute atomically in a single database transaction\\n    // 1. Retrieve leave request by ID via leaveRepository\\n    // 2. Validate ownership (employeeId matches)\\n    // 3. Validate current status is 'draft'\\n    // 4. Validate leave policy requirements via policyService\\n    // 5. Check leave balance via balanceService\\n    // 6. Update status to 'pending_approval' via leaveRepository\\n    // 7. Write audit log via auditLogger (GP-002)\\n    // 8. Publish event via eventPublisher\\n    // 9. Return updated leave request\\n    throw new Error('Method not implemented');\\n  }\\n\\n  async cancelLeaveRequest(leaveRequestId: string, employeeId: string): Promise<LeaveRequest> {\\n    // Transaction semantics: All operations execute atomically in a single database transaction\\n    // 1. Retrieve leave request by ID via leaveRepository\\n    // 2. Validate ownership (employeeId matches)\\n    // 3. Validate current status is 'draft' or 'pending_approval'\\n    // 4. Update status to 'cancelled' via leaveRepository\\n    // 5. Write audit log via auditLogger (GP-002)\\n    // 6. Return updated leave request\\n    throw new Error('Method not implemented');\\n  }\\n\\n  async getLeaveRequestById(leaveRequestId: string): Promise<LeaveRequest | null> {\\n    return this.leaveRepository.findById(leaveRequestId);\\n  }\\n\\n  async getLeaveRequestsByEmployee(employeeId: string, status?: LeaveRequestStatus): Promise<LeaveRequest[]> {\\n    return this.leaveRepository.findByEmployeeId(employeeId, status);\\n  }\\n}\"],\"importStatements\":[\"import { CreateLeaveRequestDto } from '../shared/dtos/leave.dto'\",\"import { LeaveRequest, LeaveRequestStatus } from '../shared/models/leave.model'\",\"import { ILeaveRepository } from './leave.repository'\",\"import { PolicyService } from '../policy/policy.service'\",\"import { BalanceService } from '../balance/balance.service'\",\"import { AuditLogger } from '../../shared/audit/audit.logger'\",\"import { EventPublisher } from '../../shared/events/event.publisher'\"],\"successCriteria\":[\"src/modules/leave/leave-application.service.ts exists and exports ILeaveApplicationService interface and LeaveApplicationService class with all method signatures\",\"src/modules/leave/leave.repository.ts exists and exports ILeaveRepository interface with findById and findByEmployeeId method signatures\",\"LeaveApplicationService constructor properly declares dependency on ILeaveRepository\",\"The getLeaveRequestById and getLeaveRequestsByEmployee methods are implemented using the repository stub\"]}\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/leave/leave-application.service.ts\\nexport interface ILeaveApplicationService {\\n  createLeaveRequest(employeeId: string, createLeaveRequestDto: CreateLeaveRequestDto): Promise<LeaveRequest>;\\n  submitLeaveRequest(leaveRequestId: string, employeeId: string): Promise<LeaveRequest>;\\n  cancelLeaveRequest(leaveRequestId: string, employeeId: string): Promise<LeaveRequest>;\\n  getLeaveRequestById(leaveRequestId: string): Promise<LeaveRequest | null>;\\n  getLeaveRequestsByEmployee(employeeId: string, status?: LeaveRequestStatus): Promise<LeaveRequest[]>;\\n}\\n\\nexport class LeaveApplicationService implements ILeaveApplicationService {\\n  constructor(\\n    private readonly leaveRepository: ILeaveRepository,\\n    private readonly policyService: PolicyService,\\n    private readonly balanceService: BalanceService,\\n    private readonly auditLogger: AuditLogger,\\n    private readonly eventPublisher: EventPublisher\\n  ) {}\\n\\n  async createLeaveRequest(employeeId: string, createLeaveRequestDto: CreateLeaveRequestDto): Promise<LeaveRequest> {\\n    // Transaction semantics: All operations execute atomically in a single database transaction\\n    // 1. Validate input using validateCreateLeaveRequestDto (GP-003)\\n    // 2. Check employee exists via employee module (dependency)\\n    // 3. Validate leave policy via policyService\\n    // 4. Check leave balance via balanceService\\n    // 5. Create leave request with status 'draft' via leaveRepository\\n    // 6. Write audit log via auditLogger (GP-002)\\n    // 7. Return created leave request\\n    throw new Error('Method not implemented');\\n  }\\n\\n  async submitLeaveRequest(leaveRequestId: string, employeeId: string): Promise<LeaveRequest> {\\n    // Transaction semantics: All operations execute atomically in a single database transaction\\n    // 1. Retrieve leave request by ID via leaveRepository\\n    // 2. Validate ownership (employeeId matches)\\n    // 3. Validate current status is 'draft'\\n    // 4. Validate leave policy requirements via policyService\\n    // 5. Check leave balance via balanceService\\n    // 6. Update status to 'pending_approval' via leaveRepository\\n    // 7. Write audit log via auditLogger (GP-002)\\n    // 8. Publish event via eventPublisher\\n    // 9. Return updated leave request\\n    throw new Error('Method not implemented');\\n  }\\n\\n  async cancelLeaveRequest(leaveRequestId: string, employeeId: string): Promise<LeaveRequest> {\\n    // Transaction semantics: All operations execute atomically in a single database transaction\\n    // 1. Retrieve leave request by ID via leaveRepository\\n    // 2. Validate ownership (employeeId matches)\\n    // 3. Validate current status is 'draft' or 'pending_approval'\\n    // 4. Update status to 'cancelled' via leaveRepository\\n    // 5. Write audit log via auditLogger (GP-002)\\n    // 6. Return updated leave request\\n    throw new Error('Method not implemented');\\n  }\\n\\n  async getLeaveRequestById(leaveRequestId: string): Promise<LeaveRequest | null> {\\n    return this.leaveRepository.findById(leaveRequestId);\\n  }\\n\\n  async getLeaveRequestsByEmployee(employeeId: string, status?: LeaveRequestStatus): Promise<LeaveRequest[]> {\\n    return this.leaveRepository.findByEmployeeId(employeeId, status);\\n  }\\n}\"],\"importStatements\":[\"import { CreateLeaveRequestDto } from '../shared/dtos/leave.dto'\",\"import { LeaveRequest, LeaveRequestStatus } from '../shared/models/leave.model'\",\"import { ILeaveRepository } from './leave.repository'\",\"import { PolicyService } from '../policy/policy.service'\",\"import { BalanceService } from '../balance/balance.service'\",\"import { AuditLogger } from '../../shared/audit/audit.logger'\",\"import { EventPublisher } from '../../shared/events/event.publisher'\"],\"successCriteria\":[\"src/modules/leave/leave-application.service.ts exists and exports ILeaveApplicationService interface and LeaveApplicationService class with all method signatures\",\"src/modules/leave/leave.repository.ts exists and exports ILeaveRepository interface with findById and findByEmployeeId method signatures\",\"LeaveApplicationService constructor properly declares dependency on ILeaveRepository\",\"The getLeaveRequestById and getLeaveRequestsByEmployee methods are implemented using the repository stub\"]}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- ILeaveApplicationService\n- CreateLeaveRequestDto\n- LeaveRequest\n- LeaveRequestStatus\n- ILeaveRepository\n- PolicyService\n- BalanceService\n- AuditLogger\n- EventPublisher\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 5 — Leave service core logic implementation: Implement the state-changing methods (createLeaveRequest, submitLeaveRequest, cancelLeaveRequest) in\n- Phase 6 — Leave service unit tests: Create comprehensive Vitest unit tests for the LeaveApplicationService, mocking all dependencies (IL\n- Phase 7 — Notification service: Create src/modules/notification/notification.service.ts implementing NotificationService that depend\n- Phase 8 — Leave controllers and API endpoints: Create src/modules/leave/leave.controller.ts with Fastify controllers for leave management endpoints\n- Phase 9 — Notification integration and final workflow: Update src/modules/leave/leave.service.ts to integrate NotificationService (Phase 5) for sending not",
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "domain"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/leave/leave-application.service.ts exists and exports ILeaveApplicationService interface and LeaveApplicationService class with all method signatures",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/leave/leave.repository.ts exists and exports ILeaveRepository interface with findById and findByEmployeeId method signatures",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "LeaveApplicationService constructor properly declares dependency on ILeaveRepository",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "The getLeaveRequestById and getLeaveRequestsByEmployee methods are implemented using the repository stub",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces",
+    "Input validation: Validate all inputs at API boundaries before processing",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled",
+    "Modular monolith architecture with dependency direction: leave -> employee, leave -> policy, leave -> balance, leave -> notification",
+    "TypeScript with Node.js 20 and Fastify",
+    "LeaveRequest lifecycle states are Pending, Approved, and Rejected",
+    "Balance deductions occur only during approveLeaveRequest",
+    "Notifications are created on submission, approval, and rejection events"
+  ],
+  "outOfScope": [
+    "Implementation of state-changing methods (createLeaveRequest, submitLeaveRequest, cancelLeaveRequest)",
+    "Unit tests for LeaveApplicationService",
+    "Notification service implementation",
+    "Leave controllers and API endpoints",
+    "Notification integration and final workflow",
+    "Audit logging implementation",
+    "Event publishing implementation",
+    "PolicyService implementation",
+    "BalanceService implementation",
+    "Employee module implementation",
+    "Database schema creation",
+    "Data migration scripts"
+  ],
+  "ambiguities": []
+}
