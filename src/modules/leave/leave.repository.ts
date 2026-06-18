@@ -1,8 +1,10 @@
 import { LeaveRequest, CreateLeaveRequestDto } from './leave.model';
+import { LeaveRequestStatus } from '../../shared/types';
 
 export interface ILeaveRepository {
   findAll(): Promise<LeaveRequest[]>;
   findById(id: string): Promise<LeaveRequest | null>;
+  findByEmployeeId(employeeId: string, status?: LeaveRequestStatus): Promise<LeaveRequest[]>;
   create(dto: CreateLeaveRequestDto): Promise<LeaveRequest>;
   update(id: string, dto: Partial<CreateLeaveRequestDto>): Promise<LeaveRequest | null>;
   delete(id: string): Promise<boolean>;
@@ -18,6 +20,14 @@ export class PgLeaveRepository implements ILeaveRepository {
 
   async findById(id: string): Promise<LeaveRequest | null> {
     return this.leaveRequests.find((req) => req.id === id) || null;
+  }
+
+  async findByEmployeeId(employeeId: string, status?: LeaveRequestStatus): Promise<LeaveRequest[]> {
+    return this.leaveRequests.filter((req) => {
+      if (req.employeeId !== employeeId) return false;
+      if (status !== undefined && req.requestStatus !== status) return false;
+      return true;
+    });
   }
 
   async create(dto: CreateLeaveRequestDto): Promise<LeaveRequest> {

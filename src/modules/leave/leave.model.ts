@@ -1,4 +1,4 @@
-import { LeaveType, LeaveStatus } from '../../shared/types';
+import { LeaveType, LeaveStatus, LeaveRequestStatus } from '../../shared/types';
 
 export interface LeaveRequest {
   id: string;
@@ -7,6 +7,7 @@ export interface LeaveRequest {
   startDate: Date;
   endDate: Date;
   status: LeaveStatus;
+  requestStatus?: LeaveRequestStatus;
   reason?: string;
   managerId?: string;
   createdAt: Date;
