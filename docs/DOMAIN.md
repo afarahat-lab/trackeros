@@ -28,8 +28,6 @@ Represents a leave record managed by the `leave` module, including leave request
 | approved | Leave request has been approved |
 | rejected | Leave request has been rejected |
 | cancelled | Leave request has been cancelled |
-| in_progress | Leave is currently in progress |
-| completed | Leave has been completed |
 
 ### LeaveRequest
 
@@ -37,16 +35,11 @@ Represents a leave record managed by the `leave` module, including leave request
 |-------|------|----------|
 | id | string | true |
 | employeeId | string | true |
-| policyId | string | true |
+| status | LeaveRequestStatus | true |
 | startDate | Date | true |
 | endDate | Date | true |
-| totalDays | number | true |
 | leaveType | string | true |
-| status | LeaveRequestStatus | true |
 | reason | string | false |
-| managerId | string \| null | false |
-| reviewNotes | string \| null | false |
-| reviewedAt | Date \| null | false |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
@@ -58,10 +51,9 @@ Represents a leave record managed by the `leave` module, including leave request
 | Field | Type | Required |
 |-------|------|----------|
 | employeeId | string | true |
-| policyId | string | true |
 | startDate | Date | true |
 | endDate | Date | true |
-| totalDays | number | true |
+| leaveType | string | true |
 | reason | string | false |
 
 ### UpdateLeaveRequestDto
@@ -69,7 +61,6 @@ Represents a leave record managed by the `leave` module, including leave request
 | Field | Type | Required |
 |-------|------|----------|
 | status | LeaveRequestStatus | true |
-| reviewNotes | string | false |
 
 ### LeaveRequestQuery
 
