@@ -1,8 +1,9 @@
 # Claude Code runtime artifacts
 .claude/
 
-# Aider runtime artifacts
-.aider*
+# Aider runtime artifacts (TR_068 §3 — pattern tightened from
+# .aider* to .aider.* so .aiderignore is preserved alongside it).
+.aider.*
 .aider/*
 
 # Node Modules
