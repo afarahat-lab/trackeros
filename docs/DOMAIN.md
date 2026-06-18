@@ -37,31 +37,27 @@ Represents a leave record managed by the `leave` module, including leave request
 |-------|------|----------|
 | id | string | true |
 | employeeId | string | true |
-| policyId | string | true |
+| status | LeaveRequestStatus | true |
 | startDate | Date | true |
 | endDate | Date | true |
-| totalDays | number | true |
-| status | LeaveRequestStatus | true |
+| leaveType | string | true |
 | reason | string | false |
-| managerId | string \| null | false |
-| reviewNotes | string \| null | false |
-| reviewedAt | Date \| null | false |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
 **Relationships**
 - `Employee` — many-to-one
 - `LeavePolicy` — many-to-one
+- `LeaveBalance` — many-to-one
 
 ### CreateLeaveRequestDto
 
 | Field | Type | Required |
 |-------|------|----------|
 | employeeId | string | true |
-| policyId | string | true |
 | startDate | Date | true |
 | endDate | Date | true |
-| totalDays | number | true |
+| leaveType | string | true |
 | reason | string | false |
 
 ### UpdateLeaveRequestDto
@@ -69,7 +65,6 @@ Represents a leave record managed by the `leave` module, including leave request
 | Field | Type | Required |
 |-------|------|----------|
 | status | LeaveRequestStatus | true |
-| reviewNotes | string | false |
 
 ### LeaveRequestQuery
 

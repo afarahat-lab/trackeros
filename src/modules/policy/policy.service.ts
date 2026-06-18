@@ -1,6 +1,3 @@
 export class PolicyService {
-  // Stub implementation for compilation
-  async validateLeavePolicy(employeeId: string, leaveType: string, startDate: Date, endDate: Date): Promise<boolean> {
-    return true;
-  }
+  // Stub - will be implemented in a later phase
 }
