@@ -1,16 +1,11 @@
 import { LeaveRequest, CreateLeaveRequestDto } from './leave.model';
-import { LeaveStatus } from '../../shared/types';
+import { LeaveRequestStatus } from '../../shared/types';
 
 export interface ILeaveRepository {
-  findAll(): Promise<LeaveRequest[]>;
+  create(leaveRequest: Omit<LeaveRequest, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeaveRequest>;
+  update(id: string, updates: Partial<LeaveRequest>): Promise<LeaveRequest | null>;
   findById(id: string): Promise<LeaveRequest | null>;
-  create(dto: CreateLeaveRequestDto): Promise<LeaveRequest>;
-  update(id: string, dto: Partial<CreateLeaveRequestDto>): Promise<LeaveRequest | null>;
-  delete(id: string): Promise<boolean>;
-  createLeaveRequest(leaveRequest: Omit<LeaveRequest, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeaveRequest>;
-  updateLeaveRequestStatus(id: string, status: LeaveStatus, updatedAt: Date): Promise<LeaveRequest>;
-  findLeaveRequestById(id: string): Promise<LeaveRequest | null>;
-  findLeaveRequestsByEmployeeId(employeeId: string, status?: LeaveStatus): Promise<LeaveRequest[]>;
+  findByEmployeeId(employeeId: string, status?: LeaveRequestStatus): Promise<LeaveRequest[]>;
 }
 
 export class PgLeaveRepository implements ILeaveRepository {
@@ -23,6 +18,14 @@ export class PgLeaveRepository implements ILeaveRepository {
 
   async findById(id: string): Promise<LeaveRequest | null> {
     return this.leaveRequests.find((req) => req.id === id) || null;
+  }
+
+  async findByEmployeeId(employeeId: string, status?: LeaveRequestStatus): Promise<LeaveRequest[]> {
+    return this.leaveRequests.filter((req) => {
+      if (req.employeeId !== employeeId) return false;
+      if (status !== undefined && req.requestStatus !== status) return false;
+      return true;
+    });
   }
 
   async create(dto: CreateLeaveRequestDto): Promise<LeaveRequest> {
@@ -43,13 +46,15 @@ export class PgLeaveRepository implements ILeaveRepository {
     return newRequest;
   }
 
-  async update(id: string, dto: Partial<CreateLeaveRequestDto>): Promise<LeaveRequest | null> {
+  async update(id: string, updates: Partial<LeaveRequest>): Promise<LeaveRequest | null> {
     const index = this.leaveRequests.findIndex((req) => req.id === id);
-    if (index === -1) return null;
+    if (index === -1) {
+      return null;
+    }
     const existing = this.leaveRequests[index];
     const updated: LeaveRequest = {
       ...existing,
-      ...dto,
+      ...updates,
       updatedAt: new Date(),
     };
     this.leaveRequests[index] = updated;
@@ -61,45 +66,6 @@ export class PgLeaveRepository implements ILeaveRepository {
     if (index === -1) return false;
     this.leaveRequests.splice(index, 1);
     return true;
-  }
-
-  async createLeaveRequest(leaveRequest: Omit<LeaveRequest, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeaveRequest> {
-    const now = new Date();
-    const newRequest: LeaveRequest = {
-      id: this.generateId(),
-      ...leaveRequest,
-      createdAt: now,
-      updatedAt: now,
-    };
-    this.leaveRequests.push(newRequest);
-    return newRequest;
-  }
-
-  async updateLeaveRequestStatus(id: string, status: LeaveStatus, updatedAt: Date): Promise<LeaveRequest> {
-    const index = this.leaveRequests.findIndex((req) => req.id === id);
-    if (index === -1) {
-      throw new Error(`Leave request with id ${id} not found`);
-    }
-    const existing = this.leaveRequests[index];
-    const updated: LeaveRequest = {
-      ...existing,
-      status,
-      updatedAt,
-    };
-    this.leaveRequests[index] = updated;
-    return updated;
-  }
-
-  async findLeaveRequestById(id: string): Promise<LeaveRequest | null> {
-    return this.findById(id);
-  }
-
-  async findLeaveRequestsByEmployeeId(employeeId: string, status?: LeaveStatus): Promise<LeaveRequest[]> {
-    return this.leaveRequests.filter((req) => {
-      if (req.employeeId !== employeeId) return false;
-      if (status !== undefined && req.status !== status) return false;
-      return true;
-    });
   }
 
   private generateId(): string {
