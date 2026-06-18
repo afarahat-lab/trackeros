@@ -2,12 +2,11 @@ import { LeaveRequest, CreateLeaveRequestDto } from './leave.model';
 import { LeaveRequestStatus } from '../../shared/types';
 
 export interface ILeaveRepository {
-  findAll(): Promise<LeaveRequest[]>;
-  findById(id: string): Promise<LeaveRequest | null>;
-  findByEmployeeId(employeeId: string, status?: LeaveRequestStatus): Promise<LeaveRequest[]>;
-  create(dto: CreateLeaveRequestDto): Promise<LeaveRequest>;
-  update(id: string, dto: Partial<CreateLeaveRequestDto>): Promise<LeaveRequest | null>;
-  delete(id: string): Promise<boolean>;
+  createLeaveRequest(leaveRequest: Omit<LeaveRequest, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeaveRequest>;
+  updateLeaveRequestStatus(id: string, status: LeaveRequestStatus, reviewedAt?: Date, reviewNotes?: string, managerId?: string): Promise<LeaveRequest>;
+  findLeaveRequestById(id: string): Promise<LeaveRequest | null>;
+  findLeaveRequestsByEmployeeId(employeeId: string, status?: LeaveRequestStatus): Promise<LeaveRequest[]>;
+  updateLeaveRequest(id: string, updates: Partial<LeaveRequest>): Promise<LeaveRequest>;
 }
 
 export class PgLeaveRepository implements ILeaveRepository {
@@ -69,5 +68,27 @@ export class PgLeaveRepository implements ILeaveRepository {
 
   private generateId(): string {
     return Math.random().toString(36).substring(2, 10);
+  }
+
+  // Stub methods to satisfy ILeaveRepository (will be implemented in later phases)
+
+  async createLeaveRequest(leaveRequest: Omit<LeaveRequest, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeaveRequest> {
+    throw new Error('Method not implemented.');
+  }
+
+  async updateLeaveRequestStatus(id: string, status: LeaveRequestStatus, reviewedAt?: Date, reviewNotes?: string, managerId?: string): Promise<LeaveRequest> {
+    throw new Error('Method not implemented.');
+  }
+
+  async findLeaveRequestById(id: string): Promise<LeaveRequest | null> {
+    throw new Error('Method not implemented.');
+  }
+
+  async findLeaveRequestsByEmployeeId(employeeId: string, status?: LeaveRequestStatus): Promise<LeaveRequest[]> {
+    throw new Error('Method not implemented.');
+  }
+
+  async updateLeaveRequest(id: string, updates: Partial<LeaveRequest>): Promise<LeaveRequest> {
+    throw new Error('Method not implemented.');
   }
 }

@@ -21,26 +21,6 @@
           "required": true
         },
         {
-          "name": "startDate",
-          "type": "Date",
-          "required": true
-        },
-        {
-          "name": "endDate",
-          "type": "Date",
-          "required": true
-        },
-        {
-          "name": "leaveType",
-          "type": "string",
-          "required": true
-        },
-        {
-          "name": "reason",
-          "type": "string",
-          "required": false
-        },
-        {
           "name": "createdAt",
           "type": "Date",
           "required": true
