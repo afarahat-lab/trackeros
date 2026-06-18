@@ -18,25 +18,33 @@ Base entity providing common fields for domain models.
 
 Represents a leave record managed by the `leave` module, including leave requests and related leave-tracking data.
 
+### LeaveRequestStatus
+
+| Value | Description |
+|-------|-------------|
+| Pending | Leave request is pending review |
+| Approved | Leave request has been approved |
+| Rejected | Leave request has been rejected |
+| Cancelled | Leave request has been cancelled |
+
 ### LeaveRequest
 
 | Field | Type | Required |
 |-------|------|----------|
 | id | string | true |
 | employeeId | string | true |
+| policyId | string | true |
 | startDate | Date | true |
 | endDate | Date | true |
 | totalDays | number | true |
-| leaveType | string | true |
-| reason | string \| null | false |
-| status | 'Pending' \| 'Approved' \| 'Rejected' | true |
-| approvedBy | string \| null | false |
-| rejectedBy | string \| null | false |
-| approvalDate | Date \| null | false |
-| rejectionDate | Date \| null | false |
-| rejectionReason | string \| null | false |
+| status | LeaveRequestStatus | true |
+| reason | string | true |
+| managerId | string \| null | false |
+| managerNotes | string \| null | false |
+| reviewedAt | Date \| null | false |
 | createdAt | Date | true |
 | updatedAt | Date | true |
+| deletedAt | Date \| null | false |
 
 **Relationships**
 - `Employee` — many-to-one
@@ -47,17 +55,17 @@ Represents a leave record managed by the `leave` module, including leave request
 | Field | Type | Required |
 |-------|------|----------|
 | employeeId | string | true |
+| policyId | string | true |
 | startDate | Date | true |
 | endDate | Date | true |
-| leaveType | string | true |
 | reason | string | false |
 
 ### UpdateLeaveRequestDto
 
 | Field | Type | Required |
 |-------|------|----------|
-| status | 'Approved' \| 'Rejected' | true |
-| rejectionReason | string | false |
+| status | LeaveRequestStatus | true |
+| managerNotes | string | false |
 
 ### LeaveRequestQuery
 
@@ -81,8 +89,11 @@ Represents leave balance data managed by the `balance` module, including tracked
 | id | string | true |
 | employeeId | string | true |
 | policyId | string | true |
-| balanceDays | number | true |
-| fiscalYear | number | true |
+| balanceYear | number | true |
+| availableDays | number | true |
+| usedDays | number | true |
+| pendingDays | number | true |
+| carriedOverDays | number | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
@@ -104,13 +115,12 @@ Represents employee data managed by the `employee` module, including employee re
 | lastName | string | true |
 | email | string | true |
 | managerId | string \| null | false |
+| department | string | true |
 | hireDate | Date | true |
 | isActive | boolean | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
-
-**Relationships**
-- `Employee` — one-to-many
+| deletedAt | Date \| null | false |
 
 ## policy
 
@@ -135,16 +145,31 @@ Represents leave policy data managed by the `policy` module, including policy de
 | policyName | string | true |
 | leaveType | LeaveType | true |
 | entitlementDays | number | true |
-| maxConsecutiveDays | number \| null | false |
-| advanceNoticeDays | number | true |
+| maxConsecutiveDays | number | true |
+| minNoticeDays | number | true |
 | requiresApproval | boolean | true |
+| carryOverLimit | number | true |
+| validityStart | Date | true |
+| validityEnd | Date | true |
 | isActive | boolean | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
+| deletedAt | Date \| null | false |
 
 ## notification
 
 Represents notification data managed by the `notification` module, including notification records, delivery status, and related messaging information.
+
+### NotificationType
+
+| Value | Description |
+|-------|-------------|
+| LEAVE_REQUESTED | A new leave request has been submitted |
+| LEAVE_APPROVED | A leave request has been approved |
+| LEAVE_REJECTED | A leave request has been rejected |
+| LEAVE_CANCELLED | A leave request has been cancelled |
+| BALANCE_UPDATED | Leave balance has been updated |
+| POLICY_UPDATED | Leave policy has been updated |
 
 ### Notification
 
@@ -152,14 +177,14 @@ Represents notification data managed by the `notification` module, including not
 |-------|------|----------|
 | id | string | true |
 | recipientId | string | true |
-| type | string | true |
+| senderId | string \| null | false |
+| type | NotificationType | true |
 | title | string | true |
 | body | string | true |
-| relatedEntityType | string | true |
-| relatedEntityId | string | true |
-| status | 'PENDING' \| 'SENT' \| 'READ' \| 'ARCHIVED' | true |
+| metadata | Record<string, any> \| null | false |
+| isRead | boolean | true |
+| readAt | Date \| null | false |
 | createdAt | Date | true |
-| updatedAt | Date | true |
 
 **Relationships**
 - `Employee` — many-to-one

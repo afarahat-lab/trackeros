@@ -1,25 +1,14 @@
+export type NotificationType = 'leave_submitted' | 'leave_approved' | 'leave_rejected' | 'leave_cancelled' | 'balance_low' | 'balance_expiring';
+
 export interface Notification {
   id: string;
   recipientId: string;
-  type: string;
+  senderId: string | null;
+  type: NotificationType;
   title: string;
   body: string;
-  relatedEntityType: string;
-  relatedEntityId: string;
-  status: 'PENDING' | 'SENT' | 'READ' | 'ARCHIVED';
+  metadata: Record<string, any> | null;
+  isRead: boolean;
+  readAt: Date | null;
   createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface CreateNotificationDto {
-  recipientId: string;
-  type: string;
-  title: string;
-  body: string;
-  relatedEntityType: string;
-  relatedEntityId: string;
-}
-
-export interface UpdateNotificationDto {
-  status: 'PENDING' | 'SENT' | 'READ' | 'ARCHIVED';
 }

@@ -8,3 +8,4 @@
 
 # Node Modules
 node_modules/
+.aider*

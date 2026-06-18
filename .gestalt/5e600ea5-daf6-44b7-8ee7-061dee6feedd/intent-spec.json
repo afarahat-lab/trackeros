@@ -1,0 +1,70 @@
+{
+  "id": "08226f07-b173-4ede-a756-89ba542ffdd5",
+  "correlationId": "5e600ea5-daf6-44b7-8ee7-061dee6feedd",
+  "rawIntent": "Phase 1: Core domain models and repository interfaces. Generate ONLY TypeScript interfaces and types — no classes, no implementations, no database imports, no SQL queries. All model interfaces must use exact attribute names and types from the canonical definitions: Employee (id, employeeNumber, firstName, lastName, email, managerId, department, hireDate, isActive, createdAt, updatedAt, deletedAt), LeavePolicy (id, policyName, leaveType: 'annual'|'sick'|'emergency'|'unpaid'|'maternity'|'paternity', entitlementDays, maxConsecutiveDays, minNoticeDays, requiresApproval, carryOverLimit, validityStart, validityEnd, isActive, createdAt, updatedAt, deletedAt), LeaveBalance (id, employeeId, policyId, balanceYear, availableDays, usedDays, pendingDays, carriedOverDays, createdAt, updatedAt), LeaveRequest (id, employeeId, policyId, startDate, endDate, totalDays, status: LeaveRequestStatus, reason, managerId, managerNotes, reviewedAt, createdAt, updatedAt, deletedAt), CreateLeaveRequestDto (employeeId, policyId, startDate, endDate, reason), UpdateLeaveRequestDto (status, managerNotes), Notification (id, recipientId, senderId, type: NotificationType, title, body, metadata, isRead, readAt, createdAt). Repository interfaces must define ONLY method signatures: EmployeeRepository (findById, findByEmail, save, update, softDelete), PolicyRepository (findById, findActiveByLeaveType, save, update, softDelete), BalanceRepository (findByEmployeeAndYear, findByEmployeePolicyAndYear, save, update), LeaveRepository (findById, findByEmployee, findByManager, save, update, softDelete), NotificationRepository (findByRecipient, save, markAsRead). Do NOT emit any concrete classes, constructors, pg/Pool imports, query strings, or implementation logic. Include unit tests at tests/unit/modules/leave/leave.model.test.ts and tests/unit/modules/leave/leave.repository.test.ts.",
+  "scope": {
+    "affectedDomains": [
+      "employee",
+      "policy",
+      "balance",
+      "leave",
+      "notification"
+    ],
+    "affectedLayers": [
+      "domain",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "All domain model interfaces (Employee, LeavePolicy, LeaveBalance, LeaveRequest, CreateLeaveRequestDto, UpdateLeaveRequestDto, Notification) are created with exact field names and types from canonical definitions",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "All repository interfaces (EmployeeRepository, PolicyRepository, BalanceRepository, LeaveRepository, NotificationRepository) are created with exact method signatures specified",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "No concrete classes, constructors, database imports (pg/Pool), SQL queries, or implementation logic are generated",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "Unit test files are created at tests/unit/modules/leave/leave.model.test.ts and tests/unit/modules/leave/leave.repository.test.ts",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces",
+    "Input validation: Validate all inputs at API boundaries before processing",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled",
+    "Modular monolith architecture with strict dependency direction",
+    "LeaveRequest lifecycle states are Pending, Approved, and Rejected",
+    "Balance deductions occur only during approveLeaveRequest",
+    "Notifications are created on submission, approval, and rejection events"
+  ],
+  "outOfScope": [
+    "Concrete repository implementations",
+    "Database schema/SQL migrations",
+    "API endpoints/controllers",
+    "Service layer implementations",
+    "Business logic",
+    "Database connection configuration",
+    "Authentication/authorization logic",
+    "Any files outside the specified domain interfaces, repository interfaces, and the two test files",
+    "LeaveRequest workflow implementation",
+    "Balance adjustment logic",
+    "Notification sending logic"
+  ],
+  "ambiguities": []
+}
