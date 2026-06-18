@@ -1,0 +1,69 @@
+{
+  "id": "0f0c2e45-829d-4716-9609-4d2bbdddbebe",
+  "correlationId": "b9bb7f18-2317-41a6-984a-c4b9fdce260c",
+  "rawIntent": "[Feature: Add a /healthz endpoint to the API — Phase 1: Create healthz module with controller and routes]\n\nCreate src/modules/healthz/healthz.controller.ts with a Fastify route handler that returns a SystemHealth object with status 'healthy', uptime from process.uptime(), and current timestamp. Create src/modules/healthz/healthz.routes.ts that registers GET /healthz route using the controller. No service layer needed as this endpoint has no business logic.\n\nPhase architecture notes:\nImplements the healthz module as a single-phase feature with no external dependencies. Creates minimal module structure adhering to project conventions.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/healthz/healthz.controller.ts\\nexport interface HealthzResponse {\\n  status: 'healthy' | 'degraded' | 'unhealthy';\\n  uptime: number;\\n  timestamp: string;\\n}\\n\\nexport function getHealthz(): HealthzResponse {\\n  return {\\n    status: 'healthy',\\n    uptime: process.uptime(),\\n    timestamp: new Date().toISOString()\\n  };\\n}\",\"File: src/modules/healthz/healthz.routes.ts\\nimport { FastifyInstance } from 'fastify';\\nimport { getHealthz } from './healthz.controller';\\n\\nexport function registerHealthzRoutes(app: FastifyInstance): void {\\n  app.get('/healthz', async (request, reply) => {\\n    const health = getHealthz();\\n    return reply.code(200).send(health);\\n  });\\n}\"],\"importStatements\":[],\"successCriteria\":[\"src/modules/healthz/healthz.controller.ts exists and exports a Fastify route handler that returns HealthzResponse\",\"src/modules/healthz/healthz.routes.ts exists and registers GET /healthz route using the controller\",\"GET /healthz endpoint returns 200 status code with JSON {status: 'healthy', uptime: number, timestamp: string}\",\"Uptime value matches process.uptime()\",\"Timestamp is valid ISO 8601 string\"]}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- HealthzResponse\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Canonical entity fields for this phase\n\nNote: these field names supersede any attribute names in the\nintent text above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the field names of each entity this phase defines. The\nexact attribute / column / property set per entity is:\n\n- `HealthzResponse`: `status`, `uptime`, `timestamp`\n\nTreat each entity's field list as complete. If the\nintent text or planner scope mentions different field\nnames than the architecture, do NOT flag this as\nambiguity — the per-phase architecture wins.\n",
+  "scope": {
+    "affectedDomains": [
+      "healthz"
+    ],
+    "affectedLayers": [
+      "api"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/healthz/healthz.controller.ts exists and exports a Fastify route handler that returns HealthzResponse",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/healthz/healthz.routes.ts exists and registers GET /healthz route using the controller",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "GET /healthz endpoint returns 200 status code with JSON {status: 'healthy', uptime: number, timestamp: string}",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "sc-004",
+      "description": "Uptime value matches process.uptime()",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "Timestamp is valid ISO 8601 string",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "RBAC enforcement: All API endpoints enforce role-based access control.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled.",
+    "Adhere to project conventions for module structure",
+    "No service layer needed for this endpoint",
+    "No external dependencies"
+  ],
+  "outOfScope": [
+    "Database connectivity checks",
+    "External service health checks",
+    "Service layer",
+    "Authentication/authorization for health endpoint",
+    "Any changes to existing modules (employee, policy, balance, leave, notification)",
+    "Audit records for health endpoint",
+    "UI changes",
+    "Configuration changes",
+    "Infrastructure changes"
+  ],
+  "ambiguities": []
+}

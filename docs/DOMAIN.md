@@ -14,6 +14,18 @@ Base entity providing common fields for domain models.
 | created_at | Date | true |
 | updated_at | Date | true |
 
+## health
+
+Represents system health data managed by the `health` module, including health check responses and uptime information.
+
+### HealthzResponse
+
+| Field | Type | Required |
+|-------|------|----------|
+| status | 'healthy' \| 'degraded' \| 'unhealthy' | true |
+| uptime | number | true |
+| timestamp | string | true |
+
 ## leave
 
 Represents a leave record managed by the `leave` module, including leave requests and related leave-tracking data.

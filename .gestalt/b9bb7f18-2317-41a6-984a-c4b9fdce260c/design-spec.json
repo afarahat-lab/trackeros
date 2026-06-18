@@ -1,0 +1,43 @@
+{
+  "correlationId": "b9bb7f18-2317-41a6-984a-c4b9fdce260c",
+  "domainChanges": [
+    {
+      "entityName": "HealthzResponse",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "status",
+          "type": "'healthy' | 'degraded' | 'unhealthy'",
+          "required": true
+        },
+        {
+          "name": "uptime",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "timestamp",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [
+    {
+      "method": "GET",
+      "path": "/healthz",
+      "description": "Returns system health status with uptime and timestamp",
+      "requestBody": {},
+      "responseBody": {
+        "status": "'healthy' | 'degraded' | 'unhealthy'",
+        "uptime": "number",
+        "timestamp": "string"
+      },
+      "authRequired": false,
+      "roles": []
+    }
+  ],
+  "componentSpecs": []
+}
