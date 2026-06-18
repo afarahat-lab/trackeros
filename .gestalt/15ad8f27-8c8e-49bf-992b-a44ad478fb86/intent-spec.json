@@ -1,0 +1,105 @@
+{
+  "id": "57d58d08-3474-40af-b4cb-ac7cf0e1f123",
+  "correlationId": "15ad8f27-8c8e-49bf-992b-a44ad478fb86",
+  "rawIntent": "[Feature: Build the leave management module — Phase 1: Core domain models and repository interfaces]\n\nCreate src/modules/leave/leave.model.ts with TypeScript interfaces for LeaveRequest and CreateLeaveRequestDto. Create src/modules/balance/balance.model.ts with LeaveBalance interface. Create src/modules/policy/policy.model.ts with LeavePolicy interface. Create src/modules/notification/notification.model.ts with Notification interface. Import existing shared types from src/shared/types/index.ts. Include Jest unit tests in tests/unit/modules/ for each model.\n\nPhase architecture notes:\nEstablish domain entities as foundation for all other layers. Satisfies GP-001 (Repository pattern).\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/leave/leave.model.ts\\nexport interface LeaveRequest {\\n  id: string;\\n  employeeId: string;\\n  policyId: string;\\n  startDate: Date;\\n  endDate: Date;\\n  totalDays: number;\\n  reason?: string;\\n  status: 'draft' | 'submitted' | 'pending_approval' | 'approved' | 'rejected' | 'cancelled' | 'in_progress' | 'completed';\\n  managerId?: string;\\n  reviewedAt?: Date;\\n  reviewNotes?: string;\\n  createdAt: Date;\\n  updatedAt: Date;\\n}\\n\\nexport interface CreateLeaveRequestDto {\\n  employeeId: string;\\n  policyId: string;\\n  startDate: Date;\\n  endDate: Date;\\n  totalDays: number;\\n  reason?: string;\\n}\",\"File: src/modules/balance/balance.model.ts\\nexport interface LeaveBalance {\\n  id: string;\\n  employeeId: string;\\n  policyId: string;\\n  balanceDays: number;\\n  accruedDays: number;\\n  usedDays: number;\\n  year: number;\\n  createdAt: Date;\\n  updatedAt: Date;\\n}\",\"File: src/modules/policy/policy.model.ts\\nexport interface LeavePolicy {\\n  id: string;\\n  policyName: string;\\n  leaveType: 'annual' | 'sick' | 'emergency' | 'unpaid' | 'maternity' | 'paternity';\\n  entitlementDays: number;\\n  accrualRate: number;\\n  maxCarryover: number;\\n  requiresApproval: boolean;\\n  advanceNoticeDays: number;\\n  isActive: boolean;\\n  createdAt: Date;\\n  updatedAt: Date;\\n}\",\"File: src/modules/notification/notification.model.ts\\nexport interface Notification {\\n  id: string;\\n  recipientId: string;\\n  senderId?: string;\\n  type: 'leave_request' | 'leave_approval' | 'leave_rejection' | 'balance_update' | 'policy_change';\\n  title: string;\\n  message: string;\\n  metadata?: Record<string, any>;\\n  isRead: boolean;\\n  readAt?: Date;\\n  createdAt: Date;\\n}\",\"File: src/modules/leave/leave.repository.ts\\nimport { LeaveRequest, CreateLeaveRequestDto } from './leave.model';\\n\\nexport interface LeaveRequestRepository {\\n  create(data: CreateLeaveRequestDto): Promise<LeaveRequest>;\\n  findById(id: string): Promise<LeaveRequest | null>;\\n  findByEmployeeId(employeeId: string): Promise<LeaveRequest[]>;\\n  findByManagerId(managerId: string): Promise<LeaveRequest[]>;\\n  updateStatus(id: string, status: LeaveRequest['status'], reviewNotes?: string): Promise<LeaveRequest>;\\n}\",\"File: src/modules/balance/balance.repository.ts\\nimport { LeaveBalance } from './balance.model';\\n\\nexport interface LeaveBalanceRepository {\\n  findByEmployeeIdAndYear(employeeId: string, year: number): Promise<LeaveBalance[]>;\\n  findByEmployeeIdPolicyIdAndYear(employeeId: string, policyId: string, year: number): Promise<LeaveBalance | null>;\\n  updateBalance(id: string, updates: { balanceDays?: number; accruedDays?: number; usedDays?: number }): Promise<LeaveBalance>;\\n}\",\"File: src/modules/policy/policy.repository.ts\\nimport { LeavePolicy } from './policy.model';\\n\\nexport interface LeavePolicyRepository {\\n  findById(id: string): Promise<LeavePolicy | null>;\\n  findByLeaveType(leaveType: LeavePolicy['leaveType']): Promise<LeavePolicy[]>;\\n  findAllActive(): Promise<LeavePolicy[]>;\\n}\",\"File: src/modules/notification/notification.repository.ts\\nimport { Notification } from './notification.model';\\n\\nexport interface NotificationRepository {\\n  create(data: Omit<Notification, 'id' | 'createdAt'>): Promise<Notification>;\\n  findByRecipientId(recipientId: string): Promise<Notification[]>;\\n  markAsRead(id: string): Promise<Notification>;\\n}\"],\"importStatements\":[\"import { LeaveRequest, CreateLeaveRequestDto } from './leave.model'\",\"import { LeaveBalance } from './balance.model'\",\"import { LeavePolicy } from './policy.model'\",\"import { Notification } from './notification.model'\"],\"successCriteria\":[\"src/modules/leave/leave.model.ts exists and exports LeaveRequest and CreateLeaveRequestDto interfaces\",\"src/modules/balance/balance.model.ts exists and exports LeaveBalance interface\",\"src/modules/policy/policy.model.ts exists and exports LeavePolicy interface\",\"src/modules/notification/notification.model.ts exists and exports Notification interface\",\"src/modules/leave/leave.repository.ts exists and exports LeaveRequestRepository interface with complete method signatures\",\"src/modules/balance/balance.repository.ts exists and exports LeaveBalanceRepository interface with complete method signatures\",\"src/modules/policy/policy.repository.ts exists and exports LeavePolicyRepository interface with complete method signatures\",\"src/modules/notification/notification.repository.ts exists and exports NotificationRepository interface with complete method signatures\",\"All model interfaces match the canonical SQL schema column names and types\",\"All repository interfaces follow the repository pattern (GP-001) and return Promises\",\"All new domain concepts (status enums, type enums) are documented in ARCHITECTURE.md\"]}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- LeaveRequest\n- CreateLeaveRequestDto\n- LeaveBalance\n- LeavePolicy\n- Notification\n- LeaveRequestRepository\n- LeaveBalanceRepository\n- LeavePolicyRepository\n- NotificationRepository\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Canonical entity fields for this phase\n\nNote: these field names supersede any attribute names in the\nintent text above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the field names of each entity this phase defines. The\nexact attribute / column / property set per entity is:\n\n- `LeaveRequest`: `id`, `employeeId`, `policyId`, `startDate`, `endDate`, `totalDays`, `reason`, `status`, `managerId`, `reviewedAt`, `reviewNotes`, `createdAt`, `updatedAt`\n- `CreateLeaveRequestDto`: `employeeId`, `policyId`, `startDate`, `endDate`, `totalDays`, `reason`\n- `LeaveBalance`: `id`, `employeeId`, `policyId`, `balanceDays`, `accruedDays`, `usedDays`, `year`, `createdAt`, `updatedAt`\n- `LeavePolicy`: `id`, `policyName`, `leaveType`, `entitlementDays`, `accrualRate`, `maxCarryover`, `requiresApproval`, `advanceNoticeDays`, `isActive`, `createdAt`, `updatedAt`\n- `Notification`: `id`, `recipientId`, `senderId`, `type`, `title`, `message`, `metadata`, `isRead`, `readAt`, `createdAt`\n- `LeaveBalanceRepository`: `accruedDays`, `usedDays`\n\nTreat each entity's field list as complete. If the\nintent text or planner scope mentions different field\nnames than the architecture, do NOT flag this as\nambiguity — the per-phase architecture wins.\n\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 2 — Repository implementations for core entities: Create src/modules/leave/leave.repository.ts implementing ILeaveRepository referencing LeaveRequest \n- Phase 3 — Policy and Balance services: Create src/modules/policy/policy.service.ts implementing PolicyService that depends on ILeavePolicyR\n- Phase 4 — Leave application service: Create src/modules/leave/leave.service.ts implementing LeaveApplicationService that depends on ILeav\n- Phase 5 — Notification service: Create src/modules/notification/notification.service.ts implementing NotificationService that depend\n- Phase 6 — Leave controllers and API endpoints: Create src/modules/leave/leave.controller.ts with Fastify controllers for leave management endpoints\n- Phase 7 — Notification integration and final workflow: Update src/modules/leave/leave.service.ts to integrate NotificationService (Phase 5) for sending not",
+  "scope": {
+    "affectedDomains": [
+      "leave",
+      "balance",
+      "policy",
+      "notification"
+    ],
+    "affectedLayers": [
+      "domain",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/leave/leave.model.ts exists and exports LeaveRequest and CreateLeaveRequestDto interfaces with exact canonical field definitions",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/balance/balance.model.ts exists and exports LeaveBalance interface with exact canonical field definitions",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "src/modules/policy/policy.model.ts exists and exports LeavePolicy interface with exact canonical field definitions",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "src/modules/notification/notification.model.ts exists and exports Notification interface with exact canonical field definitions",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "src/modules/leave/leave.repository.ts exists and exports LeaveRequestRepository interface with create, findById, findByEmployeeId, findByManagerId, and updateStatus methods",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-006",
+      "description": "src/modules/balance/balance.repository.ts exists and exports LeaveBalanceRepository interface with findByEmployeeIdAndYear, findByEmployeeIdPolicyIdAndYear, and updateBalance methods",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-007",
+      "description": "src/modules/policy/policy.repository.ts exists and exports LeavePolicyRepository interface with findById, findByLeaveType, and findAllActive methods",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-008",
+      "description": "src/modules/notification/notification.repository.ts exists and exports NotificationRepository interface with create, findByRecipientId, and markAsRead methods",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-009",
+      "description": "Jest unit tests exist in tests/unit/modules/ for each model interface",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-010",
+      "description": "All new domain concepts (status enums, type enums) are documented in ARCHITECTURE.md",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "GP-001: Repository pattern - All database access goes through repository interfaces",
+    "All model interfaces must match the canonical SQL schema column names and types",
+    "All repository interfaces must follow the repository pattern and return Promises",
+    "Import existing shared types from src/shared/types/index.ts",
+    "Use TypeScript interfaces for all domain models",
+    "Include Jest unit tests in tests/unit/modules/ for each model"
+  ],
+  "outOfScope": [
+    "Repository implementations (deferred to Phase 2)",
+    "Policy and Balance services (deferred to Phase 3)",
+    "Leave application service (deferred to Phase 4)",
+    "Notification service (deferred to Phase 5)",
+    "Leave controllers and API endpoints (deferred to Phase 6)",
+    "Notification integration and final workflow (deferred to Phase 7)",
+    "Actual database schema creation",
+    "Service layer implementations",
+    "API endpoints",
+    "UI components",
+    "Infrastructure configuration",
+    "Integration tests",
+    "End-to-end tests"
+  ],
+  "ambiguities": []
+}
