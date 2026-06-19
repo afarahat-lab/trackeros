@@ -38,7 +38,7 @@ agents:
       # TR_050 — DeepInfra-hosted DeepSeek-V3.2 (chat-completions
       # apiShape); reasoning_effort intentionally omitted (not
       # supported by DeepInfra OpenAI-compatible endpoint).
-      model: accounts/fireworks/models/deepseek-v4-pro
+      model: FireworkAI-Deepseek-v4-pro
       temperature: 0.1
       max_tokens: 4000
     prompt_extensions: []
@@ -48,7 +48,7 @@ agents:
     goal: "Produce domain model changes, API contracts, and component specs"
     llm:
       # TR_050 — DeepInfra DeepSeek-V3.2
-      model: accounts/fireworks/models/deepseek-v4-pro
+      model: FireworkAI-Deepseek-v4-pro
       temperature: 0.1
       max_tokens: 4000
     prompt_extensions: []
@@ -62,7 +62,7 @@ agents:
       # tool-loop because the env LLM_MODEL fallback resolved to Kimi
       # before the registry default could take over. Pin to V4-Pro
       # explicitly to bypass the env-fallthrough.
-      model: accounts/fireworks/models/deepseek-v4-pro
+      model: FireworkAI-Deepseek-v4-pro
       temperature: 0.1
       max_tokens: 8000
     tools:
@@ -105,7 +105,7 @@ agents:
       # https://api.deepinfra.com/v1/openai/models (Qwen/Qwen3.6-27B).
       # Unregistered model string → resolves via the env DeepInfra
       # default (LLM_BASE_URL/LLM_API_KEY) per llm/index.ts fallback.
-      model: accounts/fireworks/models/deepseek-v4-pro
+      model: FireworkAI-Deepseek-v4-pro
       temperature: 0.1
       max_tokens: 8000
       # No reasoning_effort — Aider drives its own reasoning loop;
@@ -156,7 +156,7 @@ agents:
       # TR_061-followup — pin off env-default fallthrough to Kimi-K2.6.
       # test-agent is skipped under Aider backend (ADR-043) but the pin
       # is harmless and consistent.
-      model: accounts/fireworks/models/deepseek-v4-pro
+      model: FireworkAI-Deepseek-v4-pro
       temperature: 0.1
       max_tokens: 6000
     prompt_extensions: []
@@ -172,7 +172,7 @@ agents:
       # effort for deterministic gate checks; V4-Pro's higher
       # per-turn throughput + the §1 cap raise + the §2 git-diff
       # scoping should bring constraint-agent under 90s typical.
-      model: accounts/fireworks/models/deepseek-v4-pro
+      model: FireworkAI-Deepseek-v4-pro
       reasoning_effort: low
       temperature: 0.0
       max_tokens: 2000
@@ -186,7 +186,7 @@ agents:
     llm:
       # TR_050 — DeepInfra DeepSeek-V3.2 (no reasoning_effort —
       # not supported by DeepInfra).
-      model: deepseek-ai/DeepSeek-V3.2
+      model: FireworkAI-Deepseek-v4-pro
       temperature: 0.0
       max_tokens: 4000
     tools:
@@ -204,7 +204,7 @@ agents:
     goal: "Detect when project documentation has fallen behind the codebase"
     llm:
       # TR_061-followup — pin off env-default Kimi-K2.6 fallthrough.
-      model: accounts/fireworks/models/deepseek-v4-pro
+      model: FireworkAI-Deepseek-v4-pro
       temperature: 0.1
       max_tokens: 2000
     tools:
@@ -216,7 +216,7 @@ agents:
     goal: "Ensure project context files are internally consistent"
     llm:
       # TR_061-followup — pin off env-default Kimi-K2.6 fallthrough.
-      model: accounts/fireworks/models/deepseek-v4-pro
+      model: FireworkAI-Deepseek-v4-pro
       temperature: 0.1
       max_tokens: 2000
     tools:
@@ -228,7 +228,7 @@ agents:
     goal: "Apply additive context-file edits that resolve maintenance findings"
     llm:
       # TR_061-followup — pin off env-default Kimi-K2.6 fallthrough.
-      model: accounts/fireworks/models/deepseek-v4-pro
+      model: FireworkAI-Deepseek-v4-pro
       temperature: 0.2
       max_tokens: 8192
     tools:
@@ -256,7 +256,7 @@ agents:
       # including the heavy Aider call (133k tokens consumed
       # without timeout). Kimi remains pinned to self-healing-
       # agent where the prompt size is much smaller.
-      model: accounts/fireworks/models/deepseek-v4-pro
+      model: FireworkAI-Deepseek-v4-pro
       temperature: 0.1
       max_tokens: 12000
     prompt_extensions:
@@ -293,7 +293,7 @@ agents:
     role: "Domain architect"
     goal: "Define the domain model: entities, relationships, lifecycle states, and business rules for this feature"
     llm:
-      model: accounts/fireworks/models/deepseek-v4-pro
+      model: FireworkAI-Deepseek-v4-pro
       temperature: 0.1
       max_tokens: 6000
     prompt_extensions:
@@ -305,7 +305,7 @@ agents:
     role: "Data architect"
     goal: "Define the persistence layer: SQL schema, indices, constraints, repository interfaces, and concrete implementations for this feature"
     llm:
-      model: accounts/fireworks/models/deepseek-v4-pro
+      model: FireworkAI-Deepseek-v4-pro
       temperature: 0.1
       max_tokens: 6000
     prompt_extensions:
@@ -317,7 +317,7 @@ agents:
     role: "Application architect"
     goal: "Define the application layer: module boundaries, service interfaces, dependency direction, and recommended phase decomposition"
     llm:
-      model: accounts/fireworks/models/deepseek-v4-pro
+      model: FireworkAI-Deepseek-v4-pro
       temperature: 0.1
       max_tokens: 6000
     prompt_extensions:
@@ -333,7 +333,7 @@ agents:
       # chief calls (~50% timeout rate observed). Switch chief to
       # DeepSeek-V3.2 to keep verification cycles flowing. Revisit
       # the chief model choice once DeepInfra Kimi stability improves.
-      model: accounts/fireworks/models/deepseek-v4-pro
+      model: FireworkAI-Deepseek-v4-pro
       temperature: 0.1
       max_tokens: 12000
     prompt_extensions:
@@ -347,7 +347,7 @@ agents:
     goal: "Decompose a feature into a sequence of small, independently deployable phases that each fit within Aider's effective context window"
     llm:
       # TR_050 — DeepInfra DeepSeek-V3.2 (no reasoning_effort).
-      model: accounts/fireworks/models/deepseek-v4-pro
+      model: FireworkAI-Deepseek-v4-pro
       temperature: 0.1
       max_tokens: 12000
     prompt_extensions:
@@ -362,7 +362,7 @@ agents:
     goal: "Evaluate what was actually built in a completed phase, assess whether it matches the plan, and recommend adjustments to subsequent phases based on real results"
     llm:
       # TR_050 — DeepInfra DeepSeek-V3.2 (no reasoning_effort).
-      model: accounts/fireworks/models/deepseek-v4-pro
+      model: FireworkAI-Deepseek-v4-pro
       temperature: 0.1
       max_tokens: 8000
     tools:
@@ -392,7 +392,7 @@ agents:
       # TR_050 — DeepInfra-hosted moonshotai/Kimi-K2.6 for the
       # routing-quality bar (retry vs fix-intent vs escalate).
       # reasoning_effort intentionally omitted.
-      model: accounts/fireworks/models/deepseek-v4-pro
+      model: FireworkAI-Deepseek-v4-pro
       temperature: 0.0
       max_tokens: 6000
     prompt_extensions:
