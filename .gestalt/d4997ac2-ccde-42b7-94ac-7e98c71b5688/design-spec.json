@@ -1,0 +1,240 @@
+{
+  "correlationId": "d4997ac2-ccde-42b7-94ac-7e98c71b5688",
+  "domainChanges": [
+    {
+      "entityName": "LeaveRequest",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "employeeId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "managerId",
+          "type": "string | null",
+          "required": true
+        },
+        {
+          "name": "leaveType",
+          "type": "LeaveType",
+          "required": true
+        },
+        {
+          "name": "startDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "endDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "totalDays",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "reason",
+          "type": "string | null",
+          "required": true
+        },
+        {
+          "name": "attachmentUrl",
+          "type": "string | null",
+          "required": true
+        },
+        {
+          "name": "submittedAt",
+          "type": "Date | null",
+          "required": true
+        },
+        {
+          "name": "status",
+          "type": "LeaveStatus",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "Employee",
+          "type": "many-to-one"
+        }
+      ]
+    },
+    {
+      "entityName": "CreateLeaveRequestDto",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "employeeId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "managerId",
+          "type": "string | null",
+          "required": true
+        },
+        {
+          "name": "leaveType",
+          "type": "LeaveType",
+          "required": true
+        },
+        {
+          "name": "startDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "endDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "totalDays",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "reason",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "attachmentUrl",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "UpdateLeaveRequestDto",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "managerId",
+          "type": "string | null",
+          "required": false
+        },
+        {
+          "name": "leaveType",
+          "type": "LeaveType",
+          "required": false
+        },
+        {
+          "name": "startDate",
+          "type": "Date",
+          "required": false
+        },
+        {
+          "name": "endDate",
+          "type": "Date",
+          "required": false
+        },
+        {
+          "name": "totalDays",
+          "type": "number",
+          "required": false
+        },
+        {
+          "name": "reason",
+          "type": "string | null",
+          "required": false
+        },
+        {
+          "name": "attachmentUrl",
+          "type": "string | null",
+          "required": false
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "LeaveQueryParams",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "employeeId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "managerId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "leaveType",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "status",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "startDateFrom",
+          "type": "Date",
+          "required": false
+        },
+        {
+          "name": "startDateTo",
+          "type": "Date",
+          "required": false
+        },
+        {
+          "name": "endDateFrom",
+          "type": "Date",
+          "required": false
+        },
+        {
+          "name": "endDateTo",
+          "type": "Date",
+          "required": false
+        },
+        {
+          "name": "page",
+          "type": "number",
+          "required": false
+        },
+        {
+          "name": "limit",
+          "type": "number",
+          "required": false
+        },
+        {
+          "name": "sortBy",
+          "type": "'startDate' | 'endDate' | 'submittedAt' | 'createdAt'",
+          "required": false
+        },
+        {
+          "name": "sortOrder",
+          "type": "'asc' | 'desc'",
+          "required": false
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}
