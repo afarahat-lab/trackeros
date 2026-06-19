@@ -1,0 +1,81 @@
+{
+  "id": "8ff87a64-fb95-4980-97d2-e2ef784d36ff",
+  "correlationId": "e795f78e-aa9b-401c-9423-bc1181d19a0e",
+  "rawIntent": "[Feature: Build the leave management module — Phase 1: Create Leave model and repository]\n\nCreate src/modules/leave/leave.model.ts with TypeScript interfaces for LeaveRequest and CreateLeaveRequestDto. Import LeaveType, LeaveStatus from src/shared/types/index.ts which already exists. Create src/modules/leave/leave.repository.ts implementing ILeaveRepository with methods for CRUD operations on LeaveRequest. Include Jest unit tests in tests/unit/modules/leave/leave.repository.test.ts.\n\nPhase architecture notes:\n{\"interfaces\":[\"File: src/modules/leave/leave.model.ts\\nimport { LeaveType, LeaveStatus } from '../../shared/types/index';\\n\\nexport interface LeaveRequest {\\n  id: number;\\n  employeeId: number;\\n  leaveType: LeaveType;\\n  startDate: Date;\\n  endDate: Date;\\n  reason: string;\\n  status: LeaveStatus;\\n  submittedAt: Date | null;\\n  reviewedBy: number | null;\\n  reviewedAt: Date | null;\\n  comments: string | null;\\n  managerId: number | null;\\n  createdAt: Date;\\n  updatedAt: Date;\\n}\\n\\nexport interface CreateLeaveRequestDto {\\n  employeeId: number;\\n  leaveType: LeaveType;\\n  startDate: Date;\\n  endDate: Date;\\n  reason: string;\\n  managerId?: number;\\n}\",\"File: src/modules/leave/leave.repository.ts\\nimport { LeaveType, LeaveStatus } from '../../shared/types/index';\\nimport { LeaveRequest, CreateLeaveRequestDto } from './leave.model';\\nimport { pool } from '../../shared/db/connection';\\n\\nexport interface ILeaveRepository {\\n  create(data: CreateLeaveRequestDto, changedBy: number): Promise<LeaveRequest>;\\n  findById(id: number): Promise<LeaveRequest | null>;\\n  update(id: number, updates: Partial<Omit<LeaveRequest, 'id' | 'createdAt'>>, changedBy: number): Promise<LeaveRequest>;\\n  delete(id: number, changedBy: number): Promise<void>;\\n  findByEmployeeId(employeeId: number): Promise<LeaveRequest[]>;\\n  findByManagerId(managerId: number): Promise<LeaveRequest[]>;\\n  findByStatus(status: LeaveStatus): Promise<LeaveRequest[]>;\\n}\\n\\nexport class PostgresLeaveRepository implements ILeaveRepository {\\n  async create(data: CreateLeaveRequestDto, changedBy: number): Promise<LeaveRequest> {\\n    // implementation using pool.query, inserts into leave_requests and audit_log in a transaction\\n  }\\n  async findById(id: number): Promise<LeaveRequest | null> {\\n    // implementation\\n  }\\n  async update(id: number, updates: Partial<Omit<LeaveRequest, 'id' | 'createdAt'>>, changedBy: number): Promise<LeaveRequest> {\\n    // implementation with audit\\n  }\\n  async delete(id: number, changedBy: number): Promise<void> {\\n    // implementation with audit\\n  }\\n  async findByEmployeeId(employeeId: number): Promise<LeaveRequest[]> {\\n    // implementation\\n  }\\n  async findByManagerId(managerId: number): Promise<LeaveRequest[]> {\\n    // implementation\\n  }\\n  async findByStatus(status: LeaveStatus): Promise<LeaveRequest[]> {\\n    // implementation\\n  }\\n}\",\"File: tests/unit/modules/leave/leave.repository.test.ts\\nimport { PostgresLeaveRepository, ILeaveRepository } from '../../../src/modules/leave/leave.repository';\\nimport { LeaveRequest, CreateLeaveRequestDto } from '../../../src/modules/leave/leave.model';\\nimport { pool } from '../../../src/shared/db/connection';\\n\\n// Jest unit tests for all ILeaveRepository methods, mocking pool.query\"],\"importStatements\":[\"import { LeaveType, LeaveStatus } from '../../shared/types/index';\",\"import { pool } from '../../shared/db/connection';\",\"import { LeaveRequest, CreateLeaveRequestDto } from './leave.model';\",\"import { PostgresLeaveRepository, ILeaveRepository } from '../../../src/modules/leave/leave.repository';\",\"import { LeaveRequest, CreateLeaveRequestDto } from '../../../src/modules/leave/leave.model';\",\"import { pool } from '../../../src/shared/db/connection';\"],\"successCriteria\":[\"src/modules/leave/leave.model.ts exists and exports LeaveRequest and CreateLeaveRequestDto interfaces with all fields matching the canonical leave_requests table.\",\"src/modules/leave/leave.repository.ts exists and exports ILeaveRepository interface with methods: create, findById, update, delete, findByEmployeeId, findByManagerId, findByStatus.\",\"src/modules/leave/leave.repository.ts also exports PostgresLeaveRepository class that implements ILeaveRepository and uses the shared database connection pool from src/shared/db/connection.\",\"tests/unit/modules/leave/leave.repository.test.ts exists and contains Jest unit tests for all ILeaveRepository methods, mocking the database pool.\",\"The PostgresLeaveRepository.create, update, and delete methods insert corresponding audit records into the audit_log table within the same database transaction (atomic).\",\"All async operations in the repository are wrapped with try/catch and reject with meaningful errors (no unhandled promise rejections).\",\"The repository implementation does not log any sensitive data (passwords, tokens, PII) as per GP-004.\"]}\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/leave/leave.model.ts\\nimport { LeaveType, LeaveStatus } from '../../shared/types/index';\\n\\nexport interface LeaveRequest {\\n  id: number;\\n  employeeId: number;\\n  leaveType: LeaveType;\\n  startDate: Date;\\n  endDate: Date;\\n  reason: string;\\n  status: LeaveStatus;\\n  submittedAt: Date | null;\\n  reviewedBy: number | null;\\n  reviewedAt: Date | null;\\n  comments: string | null;\\n  managerId: number | null;\\n  createdAt: Date;\\n  updatedAt: Date;\\n}\\n\\nexport interface CreateLeaveRequestDto {\\n  employeeId: number;\\n  leaveType: LeaveType;\\n  startDate: Date;\\n  endDate: Date;\\n  reason: string;\\n  managerId?: number;\\n}\",\"File: src/modules/leave/leave.repository.ts\\nimport { LeaveType, LeaveStatus } from '../../shared/types/index';\\nimport { LeaveRequest, CreateLeaveRequestDto } from './leave.model';\\nimport { pool } from '../../shared/db/connection';\\n\\nexport interface ILeaveRepository {\\n  create(data: CreateLeaveRequestDto, changedBy: number): Promise<LeaveRequest>;\\n  findById(id: number): Promise<LeaveRequest | null>;\\n  update(id: number, updates: Partial<Omit<LeaveRequest, 'id' | 'createdAt'>>, changedBy: number): Promise<LeaveRequest>;\\n  delete(id: number, changedBy: number): Promise<void>;\\n  findByEmployeeId(employeeId: number): Promise<LeaveRequest[]>;\\n  findByManagerId(managerId: number): Promise<LeaveRequest[]>;\\n  findByStatus(status: LeaveStatus): Promise<LeaveRequest[]>;\\n}\\n\\nexport class PostgresLeaveRepository implements ILeaveRepository {\\n  async create(data: CreateLeaveRequestDto, changedBy: number): Promise<LeaveRequest> {\\n    // implementation using pool.query, inserts into leave_requests and audit_log in a transaction\\n  }\\n  async findById(id: number): Promise<LeaveRequest | null> {\\n    // implementation: SELECT * FROM leave_requests WHERE id = $1\\n  }\\n  async update(id: number, updates: Partial<Omit<LeaveRequest, 'id' | 'createdAt'>>, changedBy: number): Promise<LeaveRequest> {\\n    // implementation: UPDATE leave_requests SET ... WHERE id = $1, and insert audit_log record in a transaction\\n  }\\n  async delete(id: number, changedBy: number): Promise<void> {\\n    // implementation: DELETE FROM leave_requests WHERE id = $1, and insert audit_log record in a transaction\\n  }\\n  async findByEmployeeId(employeeId: number): Promise<LeaveRequest[]> {\\n    // implementation: SELECT * FROM leave_requests WHERE employee_id = $1\\n  }\\n  async findByManagerId(managerId: number): Promise<LeaveRequest[]> {\\n    // implementation: SELECT * FROM leave_requests WHERE manager_id = $1\\n  }\\n  async findByStatus(status: LeaveStatus): Promise<LeaveRequest[]> {\\n    // implementation: SELECT * FROM leave_requests WHERE status = $1\\n  }\\n}\"],\"importStatements\":[\"import { LeaveType, LeaveStatus } from '../../shared/types/index'\",\"import { LeaveRequest, CreateLeaveRequestDto } from './leave.model'\",\"import { pool } from '../../shared/db/connection'\"],\"successCriteria\":[\"src/modules/leave/leave.model.ts exists and exports LeaveRequest and CreateLeaveRequestDto interfaces\",\"src/modules/leave/leave.repository.ts exists and exports ILeaveRepository interface and PostgresLeaveRepository class\",\"tests/unit/modules/leave/leave.repository.test.ts exists and contains Jest tests for all ILeaveRepository methods\",\"All repository methods are covered by unit tests using an in-memory database or mock\",\"Create method inserts into leave_requests and audit_log in a single transaction\",\"Update method inserts audit record for changed fields\",\"Delete method inserts audit record and removes the leave request\",\"No sensitive data is logged (GP-004)\",\"All async errors are caught and handled (GP-006)\"],\"sqlSchema\":\"CREATE TABLE leave_requests (\\n  id SERIAL PRIMARY KEY,\\n  employee_id INT NOT NULL REFERENCES employees(id),\\n  leave_type VARCHAR(50) NOT NULL REFERENCES leave_policies(leave_type),\\n  start_date DATE NOT NULL,\\n  end_date DATE NOT NULL,\\n  status VARCHAR(20) NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','submitted','under_review','approved','rejected','cancelled')),\\n  reason TEXT,\\n  submitted_at TIMESTAMPTZ,\\n  reviewed_by INT REFERENCES employees(id),\\n  reviewed_at TIMESTAMPTZ,\\n  comments TEXT,\\n  manager_id INT REFERENCES employees(id),\\n  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),\\n  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()\\n);\\nCREATE INDEX idx_leave_requests_employee ON leave_requests(employee_id);\\nCREATE INDEX idx_leave_requests_manager ON leave_requests(manager_id);\\nCREATE INDEX idx_leave_requests_status ON leave_requests(status);\\nCREATE INDEX idx_leave_requests_dates ON leave_requests(start_date, end_date);\\nCREATE INDEX idx_leave_requests_employee_status ON leave_requests(employee_id, status);\\nCREATE INDEX idx_leave_requests_manager_status ON leave_requests(manager_id, status);\"}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- LeaveRequest\n- CreateLeaveRequestDto\n- ILeaveRepository\n- LeaveType\n- LeaveStatus\n- pool\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Canonical entity fields for this phase\n\nNote: these field names supersede any attribute names in the\nintent text above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the field names of each entity this phase defines. The\nexact attribute / column / property set per entity is:\n\n- `LeaveRequest`: `id`, `employeeId`, `leaveType`, `startDate`, `endDate`, `reason`, `status`, `submittedAt`, `reviewedBy`, `reviewedAt`, `comments`, `managerId`, `createdAt`, `updatedAt`\n- `CreateLeaveRequestDto`: `employeeId`, `leaveType`, `startDate`, `endDate`, `reason`, `managerId`\n\nTreat each entity's field list as complete. If the\nintent text or planner scope mentions different field\nnames than the architecture, do NOT flag this as\nambiguity — the per-phase architecture wins.\n\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 2 — Create Employee model and repository: Create src/modules/employee/employee.model.ts with TypeScript interface for Employee. Create src/mod\n- Phase 3 — Create Policy model and repository: Create src/modules/policy/policy.model.ts with TypeScript interface for LeavePolicy. Create src/modu\n- Phase 4 — Create Balance model and repository: Create src/modules/balance/balance.model.ts with TypeScript interface for LeaveBalance. Create src/m\n- Phase 5 — Create Notification model and repository: Create src/modules/notification/notification.model.ts with TypeScript interface for Notification. Cr\n- Phase 6 — Define service interfaces: Create src/modules/employee/employee.service.interface.ts with IEmployeeService interface, referenci\n- Phase 7 — Implement Employee and Policy services: Implement src/modules/employee/employee.service.ts implementing IEmployeeService from Phase 6, using\n- Phase 8 — Implement Balance and Notification services: Implement src/modules/balance/balance.service.ts implementing IBalanceService from Phase 6, using Ba\n- Phase 9 — Implement Leave orchestration service: Create src/modules/leave/leave.service.interface.ts with ILeaveService interface defining methods fo\n- Phase 10 — Create API layer for leave endpoints: Create src/modules/leave/leave.controller.ts with Fastify request handlers for leave endpoints (subm",
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "domain",
+      "infra",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/leave/leave.model.ts exists and exports LeaveRequest and CreateLeaveRequestDto interfaces with all fields matching the canonical leave_requests table.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/leave/leave.repository.ts exists and exports ILeaveRepository interface with methods: create, findById, update, delete, findByEmployeeId, findByManagerId, findByStatus.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "src/modules/leave/leave.repository.ts exports PostgresLeaveRepository class that implements ILeaveRepository and uses the shared database connection pool from src/shared/db/connection.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "tests/unit/modules/leave/leave.repository.test.ts exists and contains Jest unit tests for all ILeaveRepository methods, mocking the database pool.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "The PostgresLeaveRepository.create, update, and delete methods insert corresponding audit records into the audit_log table within the same database transaction (atomic).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-006",
+      "description": "All async operations in the repository are wrapped with try/catch and reject with meaningful errors (no unhandled promise rejections).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-007",
+      "description": "The repository implementation does not log any sensitive data (passwords, tokens, PII) as per GP-004.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Audit records: All state-changing operations write an audit record.",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "Phase 2: Employee model and repository",
+    "Phase 3: Policy model and repository",
+    "Phase 4: Balance model and repository",
+    "Phase 5: Notification model and repository",
+    "Phase 6: Service interfaces",
+    "Phase 7: Employee and Policy services",
+    "Phase 8: Balance and Notification services",
+    "Phase 9: Leave orchestration service",
+    "Phase 10: API layer for leave endpoints",
+    "Any other modules outside src/modules/leave/leave.model.ts, src/modules/leave/leave.repository.ts, and tests/unit/modules/leave/leave.repository.test.ts",
+    "Leave request lifecycle operations (submit, approve, reject) and any service/API layer"
+  ],
+  "ambiguities": []
+}
