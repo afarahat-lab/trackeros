@@ -32,30 +32,36 @@ Represents a leave record managed by the `leave` module, including leave request
 
 | Field | Type | Required |
 |-------|------|----------|
-| id | string | true |
-| employeeId | string | true |
-| policyId | string | true |
+| id | number | true |
+| employeeId | number | true |
+| leaveType | LeaveType | true |
 | startDate | Date | true |
 | endDate | Date | true |
-| status | 'DRAFT' \| 'SUBMITTED' \| 'APPROVED' \| 'REJECTED' \| 'CANCELLED' | true |
-| reason | string | false |
+| reason | string | true |
+| status | LeaveStatus | true |
+| submittedAt | Date \| null | false |
+| reviewedBy | number \| null | false |
+| reviewedAt | Date \| null | false |
+| comments | string \| null | false |
+| managerId | number \| null | false |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
 **Relationships**
 - `Employee` — many-to-one
 - `LeavePolicy` — many-to-one
-- `LeaveBalance` — many-to-one
 
 ### CreateLeaveRequestDto
 
 | Field | Type | Required |
 |-------|------|----------|
-| employeeId | string | true |
-| policyId | string | true |
+| employeeId | number | true |
+| leaveType | LeaveType | true |
 | startDate | Date | true |
 | endDate | Date | true |
-| reason | string | false |
+| reason | string | true |
+| managerId | number \| null | false |
+| comments | string \| null | false |
 
 ### UpdateLeaveRequestDto
 
@@ -64,16 +70,20 @@ Represents a leave record managed by the `leave` module, including leave request
 | startDate | Date | false |
 | endDate | Date | false |
 | reason | string | false |
+| comments | string \| null | false |
 
 ### LeaveRequestQueryParams
 
 | Field | Type | Required |
 |-------|------|----------|
-| status | 'DRAFT' \| 'SUBMITTED' \| 'APPROVED' \| 'REJECTED' \| 'CANCELLED' | false |
+| status | LeaveStatus | false |
+| leaveType | LeaveType | false |
 | startDateFrom | Date | false |
 | startDateTo | Date | false |
 | endDateFrom | Date | false |
 | endDateTo | Date | false |
+| submittedAtFrom | Date | false |
+| submittedAtTo | Date | false |
 | limit | number | false |
 | offset | number | false |
 
