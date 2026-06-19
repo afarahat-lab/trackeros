@@ -1,0 +1,123 @@
+{
+  "id": "0861e41e-b842-4c14-9a88-51c0508e5c7f",
+  "correlationId": "1f684775-2fda-499e-8522-e6216208deb2",
+  "rawIntent": "[Feature: Build the leave management module — Phase 1: Core domain models and repository interfaces]\n\nCreate approximately 8 files: src/modules/leave/leave.model.ts, src/modules/balance/balance.model.ts, src/modules/employee/employee.model.ts, src/modules/policy/policy.model.ts, src/modules/notification/notification.model.ts with TypeScript interfaces for all domain entities (Employee, LeavePolicy, LeaveBalance, LeaveRequest, Notification). Create repository interfaces in src/modules/*/*.repository.ts files referencing these domain models. Use exact canonical names from architecture specification. Include Jest unit tests in tests/unit/modules/*/model.repository.test.ts.\n\nPhase architecture notes:\nEstablish foundational domain entities and repository contracts without implementations. Defines data contracts ensuring all modules agree on core types before service logic.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/employee/employee.model.ts\\nexport interface Employee {\\n  id: string;\\n  employeeNumber: string;\\n  firstName: string;\\n  lastName: string;\\n  email: string;\\n  managerId: string | null;\\n  department: string | null;\\n  hireDate: Date;\\n  employmentStatus: 'active' | 'inactive' | 'terminated';\\n  createdAt: Date;\\n  updatedAt: Date;\\n}\",\"File: src/modules/policy/policy.model.ts\\nexport interface LeavePolicy {\\n  id: string;\\n  policyName: string;\\n  leaveType: 'annual' | 'sick' | 'emergency' | 'unpaid' | 'maternity' | 'paternity';\\n  entitlementDays: number;\\n  accrualRate: number;\\n  maxCarryover: number;\\n  requiresApproval: boolean;\\n  minServiceDays: number;\\n  isActive: boolean;\\n  createdAt: Date;\\n  updatedAt: Date;\\n}\",\"File: src/modules/balance/balance.model.ts\\nexport interface LeaveBalance {\\n  id: string;\\n  employeeId: string;\\n  policyId: string;\\n  fiscalYear: number;\\n  accruedDays: number;\\n  usedDays: number;\\n  carriedOver: number;\\n  balanceDays: number;\\n  createdAt: Date;\\n  updatedAt: Date;\\n}\",\"File: src/modules/leave/leave.model.ts\\nexport interface LeaveRequest {\\n  id: string;\\n  employeeId: string;\\n  policyId: string;\\n  startDate: Date;\\n  endDate: Date;\\n  totalDays: number;\\n  status: 'draft' | 'submitted' | 'pending_approval' | 'approved' | 'rejected' | 'cancelled';\\n  reason: string | null;\\n  managerId: string | null;\\n  reviewedAt: Date | null;\\n  reviewNotes: string | null;\\n  createdAt: Date;\\n  updatedAt: Date;\\n}\",\"File: src/modules/notification/notification.model.ts\\nexport interface Notification {\\n  id: string;\\n  recipientId: string;\\n  senderId: string | null;\\n  type: 'leave_submitted' | 'leave_approved' | 'leave_rejected' | 'balance_low' | 'system_alert';\\n  title: string;\\n  message: string;\\n  metadata: Record<string, any> | null;\\n  isRead: boolean;\\n  createdAt: Date;\\n  readAt: Date | null;\\n}\",\"File: src/modules/employee/employee.repository.ts\\nimport { Employee } from './employee.model';\\n\\nexport interface EmployeeRepository {\\n  findById(id: string): Promise<Employee | null>;\\n  findByEmployeeNumber(employeeNumber: string): Promise<Employee | null>;\\n  findByManagerId(managerId: string): Promise<Employee[]>;\\n  save(employee: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'>): Promise<Employee>;\\n  update(id: string, updates: Partial<Omit<Employee, 'id' | 'createdAt' | 'updatedAt'>>): Promise<Employee | null>;\\n}\",\"File: src/modules/policy/policy.repository.ts\\nimport { LeavePolicy } from './policy.model';\\n\\nexport interface LeavePolicyRepository {\\n  findById(id: string): Promise<LeavePolicy | null>;\\n  findByPolicyName(policyName: string): Promise<LeavePolicy | null>;\\n  findByLeaveType(leaveType: string): Promise<LeavePolicy[]>;\\n  findAllActive(): Promise<LeavePolicy[]>;\\n  save(policy: Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeavePolicy>;\\n  update(id: string, updates: Partial<Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>>): Promise<LeavePolicy | null>;\\n}\",\"File: src/modules/balance/balance.repository.ts\\nimport { LeaveBalance } from './balance.model';\\n\\nexport interface LeaveBalanceRepository {\\n  findById(id: string): Promise<LeaveBalance | null>;\\n  findByEmployeeAndPolicy(employeeId: string, policyId: string, fiscalYear: number): Promise<LeaveBalance | null>;\\n  findByEmployeeId(employeeId: string): Promise<LeaveBalance[]>;\\n  save(balance: Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeaveBalance>;\\n  update(id: string, updates: Partial<Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt'>>): Promise<LeaveBalance | null>;\\n}\",\"File: src/modules/leave/leave.repository.ts\\nimport { LeaveRequest } from './leave.model';\\n\\nexport interface LeaveRequestRepository {\\n  findById(id: string): Promise<LeaveRequest | null>;\\n  findByEmployeeId(employeeId: string): Promise<LeaveRequest[]>;\\n  findByManagerId(managerId: string): Promise<LeaveRequest[]>;\\n  findByStatus(status: string): Promise<LeaveRequest[]>;\\n  save(request: Omit<LeaveRequest, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeaveRequest>;\\n  update(id: string, updates: Partial<Omit<LeaveRequest, 'id' | 'createdAt' | 'updatedAt'>>): Promise<LeaveRequest | null>;\\n}\",\"File: src/modules/notification/notification.repository.ts\\nimport { Notification } from './notification.model';\\n\\nexport interface NotificationRepository {\\n  findById(id: string): Promise<Notification | null>;\\n  findByRecipientId(recipientId: string): Promise<Notification[]>;\\n  findUnreadByRecipientId(recipientId: string): Promise<Notification[]>;\\n  save(notification: Omit<Notification, 'id' | 'createdAt' | 'updatedAt'>): Promise<Notification>;\\n  markAsRead(id: string): Promise<Notification | null>;\\n}\"],\"importStatements\":[\"import { Employee } from './employee.model'\",\"import { LeavePolicy } from './policy.model'\",\"import { LeaveBalance } from './balance.model'\",\"import { LeaveRequest } from './leave.model'\",\"import { Notification } from './notification.model'\"],\"successCriteria\":[\"src/modules/employee/employee.model.ts exists and exports Employee interface with all fields matching canonical SQL schema\",\"src/modules/policy/policy.model.ts exists and exports LeavePolicy interface with all fields matching canonical SQL schema\",\"src/modules/balance/balance.model.ts exists and exports LeaveBalance interface with all fields matching canonical SQL schema\",\"src/modules/leave/leave.model.ts exists and exports LeaveRequest interface with all fields matching canonical SQL schema\",\"src/modules/notification/notification.model.ts exists and exports Notification interface with all fields matching canonical SQL schema\",\"src/modules/employee/employee.repository.ts exists and exports EmployeeRepository interface with findById, findByEmployeeNumber, findByManagerId, save, and update methods\",\"src/modules/policy/policy.repository.ts exists and exports LeavePolicyRepository interface with findById, findByPolicyName, findByLeaveType, findAllActive, save, and update methods\",\"src/modules/balance/balance.repository.ts exists and exports LeaveBalanceRepository interface with findById, findByEmployeeAndPolicy, findByEmployeeId, save, and update methods\",\"src/modules/leave/leave.repository.ts exists and exports LeaveRequestRepository interface with findById, findByEmployeeId, findByManagerId, findByStatus, save, and update methods\",\"src/modules/notification/notification.repository.ts exists and exports NotificationRepository interface with findById, findByRecipientId, findUnreadByRecipientId, save, and markAsRead methods\",\"All repository interfaces follow GP-001 (Repository pattern) by abstracting database access\",\"All TypeScript interfaces use exact enum values from canonical SQL CHECK constraints\",\"ARCHITECTURE.md must be updated to include the new domain entities: Employee, LeavePolicy, LeaveBalance, LeaveRequest, Notification and their repository interfaces\"],\"sqlSchema\":\"CREATE TABLE employees (\\n  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\\n  employee_number VARCHAR(50) UNIQUE NOT NULL,\\n  first_name VARCHAR(100) NOT NULL,\\n  last_name VARCHAR(100) NOT NULL,\\n  email VARCHAR(255) UNIQUE NOT NULL,\\n  manager_id UUID REFERENCES employees(id),\\n  department VARCHAR(100),\\n  hire_date DATE NOT NULL,\\n  employment_status VARCHAR(50) NOT NULL CHECK (employment_status IN ('active', 'inactive', 'terminated')),\\n  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,\\n  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP\\n);\\n\\nCREATE TABLE leave_policies (\\n  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\\n  policy_name VARCHAR(100) UNIQUE NOT NULL,\\n  leave_type VARCHAR(50) NOT NULL CHECK (leave_type IN ('annual', 'sick', 'emergency', 'unpaid', 'maternity', 'paternity')),\\n  entitlement_days INTEGER NOT NULL CHECK (entitlement_days >= 0),\\n  accrual_rate DECIMAL(5,2) DEFAULT 0.0,\\n  max_carryover INTEGER DEFAULT 0,\\n  requires_approval BOOLEAN DEFAULT true,\\n  min_service_days INTEGER DEFAULT 0,\\n  is_active BOOLEAN DEFAULT true,\\n  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,\\n  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP\\n);\\n\\nCREATE TABLE leave_balances (\\n  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\\n  employee_id UUID NOT NULL REFERENCES employees(id) ON DELETE CASCADE,\\n  policy_id UUID NOT NULL REFERENCES leave_policies(id),\\n  fiscal_year INTEGER NOT NULL,\\n  accrued_days DECIMAL(5,2) DEFAULT 0.0,\\n  used_days DECIMAL(5,2) DEFAULT 0.0,\\n  carried_over DECIMAL(5,2) DEFAULT 0.0,\\n  balance_days DECIMAL(5,2) GENERATED ALWAYS AS (accrued_days + carried_over - used_days) STORED,\\n  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,\\n  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,\\n  UNIQUE(employee_id, policy_id, fiscal_year)\\n);\\n\\nCREATE TABLE leave_requests (\\n  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\\n  employee_id UUID NOT NULL REFERENCES employees(id) ON DELETE CASCADE,\\n  policy_id UUID NOT NULL REFERENCES leave_policies(id),\\n  start_date DATE NOT NULL,\\n  end_date DATE NOT NULL,\\n  total_days DECIMAL(5,2) NOT NULL CHECK (total_days > 0),\\n  status VARCHAR(50) NOT NULL DEFAULT 'pending' CHECK (status IN ('draft', 'submitted', 'pending_approval', 'approved', 'rejected', 'cancelled')),\\n  reason TEXT,\\n  manager_id UUID REFERENCES employees(id),\\n  reviewed_at TIMESTAMP WITH TIME ZONE,\\n  review_notes TEXT,\\n  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,\\n  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,\\n  CHECK (end_date >= start_date)\\n);\\n\\nCREATE TABLE notifications (\\n  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\\n  recipient_id UUID NOT NULL REFERENCES employees(id) ON DELETE CASCADE,\\n  sender_id UUID REFERENCES employees(id),\\n  type VARCHAR(50) NOT NULL CHECK (type IN ('leave_submitted', 'leave_approved', 'leave_rejected', 'balance_low', 'system_alert')),\\n  title VARCHAR(200) NOT NULL,\\n  message TEXT NOT NULL,\\n  metadata JSONB,\\n  is_read BOOLEAN DEFAULT false,\\n  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,\\n  read_at TIMESTAMP WITH TIME ZONE\\n);\"}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- Employee\n- LeavePolicy\n- LeaveBalance\n- LeaveRequest\n- Notification\n- EmployeeRepository\n- LeavePolicyRepository\n- LeaveBalanceRepository\n- LeaveRequestRepository\n- NotificationRepository\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Canonical entity fields for this phase\n\nNote: these field names supersede any attribute names in the\nintent text above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the field names of each entity this phase defines. The\nexact attribute / column / property set per entity is:\n\n- `Employee`: `id`, `employeeNumber`, `firstName`, `lastName`, `email`, `managerId`, `department`, `hireDate`, `employmentStatus`, `createdAt`, `updatedAt`\n- `LeavePolicy`: `id`, `policyName`, `leaveType`, `entitlementDays`, `accrualRate`, `maxCarryover`, `requiresApproval`, `minServiceDays`, `isActive`, `createdAt`, `updatedAt`\n- `LeaveBalance`: `id`, `employeeId`, `policyId`, `fiscalYear`, `accruedDays`, `usedDays`, `carriedOver`, `balanceDays`, `createdAt`, `updatedAt`\n- `LeaveRequest`: `id`, `employeeId`, `policyId`, `startDate`, `endDate`, `totalDays`, `status`, `reason`, `managerId`, `reviewedAt`, `reviewNotes`, `createdAt`, `updatedAt`\n- `Notification`: `id`, `recipientId`, `senderId`, `type`, `title`, `message`, `metadata`, `isRead`, `createdAt`, `readAt`\n\nTreat each entity's field list as complete. If the\nintent text or planner scope mentions different field\nnames than the architecture, do NOT flag this as\nambiguity — the per-phase architecture wins.\n\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 2 — Service interfaces and DTO definitions: Create approximately 6 files: src/modules/leave/leave.service.ts, src/modules/balance/balance.servic\n- Phase 3 — Employee and Policy module implementations: Create approximately 5 files: Implement src/modules/employee/employee.repository.ts and src/modules/\n- Phase 4 — Balance module implementation: Create approximately 4 files: Implement src/modules/balance/balance.repository.ts and src/modules/ba\n- Phase 5 — Notification module implementation: Create approximately 3 files: Implement src/modules/notification/notification.repository.ts and src/\n- Phase 6 — Leave module implementation: Create approximately 5 files: Implement src/modules/leave/leave.repository.ts and src/modules/leave/\n- Phase 7 — Controllers and API routes: Create approximately 4 files: src/modules/leave/leave.controller.ts, src/modules/leave/leave.routes.\n- Phase 8 — Audit integration and RBAC enforcement: Create approximately 3 files: Add audit logging decorators in src/shared/decorators/audit.decorator.",
+  "scope": {
+    "affectedDomains": [
+      "employee",
+      "policy",
+      "balance",
+      "leave",
+      "notification"
+    ],
+    "affectedLayers": [
+      "domain",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/employee/employee.model.ts exists and exports Employee interface with all fields matching canonical SQL schema",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/policy/policy.model.ts exists and exports LeavePolicy interface with all fields matching canonical SQL schema",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "src/modules/balance/balance.model.ts exists and exports LeaveBalance interface with all fields matching canonical SQL schema",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "src/modules/leave/leave.model.ts exists and exports LeaveRequest interface with all fields matching canonical SQL schema",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "src/modules/notification/notification.model.ts exists and exports Notification interface with all fields matching canonical SQL schema",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-006",
+      "description": "src/modules/employee/employee.repository.ts exists and exports EmployeeRepository interface with findById, findByEmployeeNumber, findByManagerId, save, and update methods",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-007",
+      "description": "src/modules/policy/policy.repository.ts exists and exports LeavePolicyRepository interface with findById, findByPolicyName, findByLeaveType, findAllActive, save, and update methods",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-008",
+      "description": "src/modules/balance/balance.repository.ts exists and exports LeaveBalanceRepository interface with findById, findByEmployeeAndPolicy, findByEmployeeId, save, and update methods",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-009",
+      "description": "src/modules/leave/leave.repository.ts exists and exports LeaveRequestRepository interface with findById, findByEmployeeId, findByManagerId, findByStatus, save, and update methods",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-010",
+      "description": "src/modules/notification/notification.repository.ts exists and exports NotificationRepository interface with findById, findByRecipientId, findUnreadByRecipientId, save, and markAsRead methods",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-011",
+      "description": "All repository interfaces follow GP-001 (Repository pattern) by abstracting database access",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-012",
+      "description": "All TypeScript interfaces use exact enum values from canonical SQL CHECK constraints",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-013",
+      "description": "Jest unit tests exist in tests/unit/modules/*/model.repository.test.ts for each repository interface",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "GP-001: Repository pattern - All database access goes through repository interfaces",
+    "GP-002: Input validation - Validate all inputs at API boundaries before processing",
+    "GP-003: No sensitive data in logs - Never log passwords, tokens, PII, or financial data",
+    "GP-004: RBAC enforcement - All API endpoints enforce role-based access control",
+    "GP-005: Error handling - No unhandled promise rejections. All async errors are caught and handled",
+    "Use exact canonical names from architecture specification",
+    "All domain entities must match the SQL schema field names exactly",
+    "Repository interfaces must reference domain models from their respective modules",
+    "TypeScript interfaces must use exact enum values from canonical SQL CHECK constraints"
+  ],
+  "outOfScope": [
+    "Service implementations",
+    "Controller implementations",
+    "API route definitions",
+    "Database implementations of repository interfaces",
+    "Audit logging integration",
+    "RBAC implementation",
+    "DTO definitions",
+    "Any business logic beyond interface definitions",
+    "Phase 2-8 concerns (service interfaces, DTOs, implementations, controllers, audit integration)"
+  ],
+  "ambiguities": []
+}
