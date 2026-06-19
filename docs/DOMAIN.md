@@ -177,7 +177,25 @@ Represents notification data managed by the `notification` module, including not
 | createdAt | Date | true |
 
 **Relationships**
-- `Employee` — many-to-one
+- `Employee` — one-to-one
+
+### CreateNotificationDto
+
+| Field | Type | Required |
+|-------|------|----------|
+| recipientId | string | true |
+| senderId | string | false |
+| type | NotificationType | true |
+| title | string | true |
+| message | string | true |
+| metadata | Record<string, any> | false |
+
+### UpdateNotificationDto
+
+| Field | Type | Required |
+|-------|------|----------|
+| isRead | boolean | false |
+| readAt | Date | false |
 
 ## audit
 
