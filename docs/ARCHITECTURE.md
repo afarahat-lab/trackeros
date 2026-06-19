@@ -26,6 +26,7 @@ src/modules/CreateLeaveRequestDto/    — CreateLeaveRequestDto module
 src/modules/UpdateLeaveRequestDto/    — UpdateLeaveRequestDto module
 src/modules/LeaveRequestQuery/    — LeaveRequestQuery module
 src/modules/LeaveBalance/    — LeaveBalance module
+src/modules/LeaveType/    — LeaveType module
 src/shared/db connection.ts
 src/shared/base repository.ts
 src/shared/error types.ts
