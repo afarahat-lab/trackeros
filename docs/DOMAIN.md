@@ -177,7 +177,8 @@ Represents notification data managed by the `notification` module, including not
 | createdAt | Date | true |
 
 **Relationships**
-- `Employee` — many-to-one
+- `Employee` — many-to-one (via `recipientId`)
+- `Employee` — many-to-one (via `senderId`)
 
 ## audit
 
