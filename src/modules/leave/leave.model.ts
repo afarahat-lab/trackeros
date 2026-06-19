@@ -1,3 +1,5 @@
+export type LeaveRequestStatus = 'draft' | 'submitted' | 'pending_approval' | 'approved' | 'rejected' | 'cancelled';
+
 export interface LeaveRequest {
   id: string;
   employeeId: string;
@@ -5,7 +7,7 @@ export interface LeaveRequest {
   startDate: Date;
   endDate: Date;
   totalDays: number;
-  status: 'draft' | 'submitted' | 'pending_approval' | 'approved' | 'rejected' | 'cancelled';
+  status: LeaveRequestStatus;
   reason: string | null;
   managerId: string | null;
   reviewedAt: Date | null;

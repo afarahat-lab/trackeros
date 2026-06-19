@@ -19,6 +19,7 @@
 - `NotificationType`: `LEAVE_REQUEST_CREATED`, `LEAVE_REQUEST_APPROVED`, `LEAVE_REQUEST_REJECTED`, `LEAVE_REQUEST_CANCELLED`, `LEAVE_BALANCE_LOW`, `LEAVE_BALANCE_EXPIRING`
 - `AuditAction`: `CREATE`, `UPDATE`, `DELETE`
 - `EntityType`: `LEAVE_REQUEST`, `LEAVE_BALANCE`, `LEAVE_POLICY`, `EMPLOYEE`, `NOTIFICATION`
+- `AdjustmentType`: `accrual`, `usage`, `correction`
 
 ## Employee Module
 
@@ -27,3 +28,20 @@
 
 ### Repositories
 - `src/modules/employee/employee.repository.ts` — `IEmployeeRepository`, `EmployeeRepository`
+
+## Services
+
+### Leave Service
+- `src/modules/leave/leave.service.ts` — `LeaveRequestService`, `LeaveRequestServiceImpl`
+- `src/modules/leave/leave.dto.ts` — `CreateLeaveRequestDto`, `SubmitLeaveRequestDto`, `ReviewLeaveRequestDto`, `CancelLeaveRequestDto`, `LeaveRequestQueryDto`
+
+### Balance Service
+- `src/modules/balance/balance.service.ts` — `LeaveBalanceService`, `LeaveBalanceServiceImpl`
+- `src/modules/balance/balance.dto.ts` — `BalanceAdjustmentDto`, `LeaveBalanceDto`
+
+### Notification Service
+- `src/modules/notification/notification.service.ts` — `NotificationService`, `NotificationServiceImpl`
+- `src/modules/notification/notification.dto.ts` — `CreateNotificationDto`, `MarkAsReadDto`, `NotificationQueryDto`
+
+### Audit Service
+- `src/modules/audit/audit.service.ts` — `AuditLogService`, `AuditLogServiceImpl`
