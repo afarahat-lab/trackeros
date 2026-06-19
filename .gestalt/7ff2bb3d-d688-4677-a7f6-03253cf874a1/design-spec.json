@@ -1,0 +1,69 @@
+{
+  "correlationId": "7ff2bb3d-d688-4677-a7f6-03253cf874a1",
+  "domainChanges": [
+    {
+      "entityName": "Notification",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "recipientId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "senderId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "type",
+          "type": "'leave_request' | 'leave_approval' | 'leave_rejection' | 'balance_update' | 'policy_change'",
+          "required": true
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "message",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "metadata",
+          "type": "Record<string, any>",
+          "required": false
+        },
+        {
+          "name": "isRead",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "readAt",
+          "type": "Date",
+          "required": false
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "Employee",
+          "type": "many-to-one"
+        }
+      ]
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}
