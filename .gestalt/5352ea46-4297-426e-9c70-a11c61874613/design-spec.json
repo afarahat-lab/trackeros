@@ -1,0 +1,75 @@
+{
+  "correlationId": "5352ea46-4297-426e-9c70-a11c61874613",
+  "domainChanges": [
+    {
+      "entityName": "Notification",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "recipientId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "senderId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "type",
+          "type": "'leave_request' | 'leave_approval' | 'leave_rejection' | 'balance_update' | 'policy_change'",
+          "required": true
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "message",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "metadata",
+          "type": "Record<string, any>",
+          "required": false
+        },
+        {
+          "name": "isRead",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "readAt",
+          "type": "Date",
+          "required": false
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "Employee",
+          "type": "many-to-one",
+          "foreignKey": "recipientId"
+        },
+        {
+          "entity": "Employee",
+          "type": "many-to-one",
+          "foreignKey": "senderId"
+        }
+      ]
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}

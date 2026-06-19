@@ -1,4 +1,4 @@
-import pool from '../../shared/db/connection';
+import { Pool } from 'pg';
 import { Notification, CreateNotificationDto, UpdateNotificationDto } from './notification.model';
 
 export interface INotificationRepository {
@@ -9,11 +9,17 @@ export interface INotificationRepository {
 }
 
 export class NotificationRepository implements INotificationRepository {
+  private pool: Pool;
+
+  constructor(pool: Pool) {
+    this.pool = pool;
+  }
+
   async create(data: CreateNotificationDto): Promise<Notification> {
     const query = `
       INSERT INTO notifications (recipient_id, sender_id, type, title, message, metadata)
       VALUES ($1, $2, $3, $4, $5, $6)
-      RETURNING *
+      RETURNING id, recipient_id AS "recipientId", sender_id AS "senderId", type, title, message, metadata, is_read AS "isRead", read_at AS "readAt", created_at AS "createdAt"
     `;
     const values = [
       data.recipientId,
@@ -21,85 +27,69 @@ export class NotificationRepository implements INotificationRepository {
       data.type,
       data.title,
       data.message,
-      data.metadata ? JSON.stringify(data.metadata) : null,
+      data.metadata || null,
     ];
 
-    const result = await pool.query(query, values);
-    return this.mapRowToNotification(result.rows[0]);
+    const result = await this.pool.query(query, values);
+    return result.rows[0];
   }
 
   async findById(id: string): Promise<Notification | null> {
-    const query = 'SELECT * FROM notifications WHERE id = $1';
-    const result = await pool.query(query, [id]);
-
-    if (result.rows.length === 0) {
-      return null;
-    }
-
-    return this.mapRowToNotification(result.rows[0]);
+    const query = `
+      SELECT id, recipient_id AS "recipientId", sender_id AS "senderId", type, title, message, metadata, is_read AS "isRead", read_at AS "readAt", created_at AS "createdAt"
+      FROM notifications
+      WHERE id = $1
+    `;
+    const result = await this.pool.query(query, [id]);
+    return result.rows[0] || null;
   }
 
   async update(id: string, data: UpdateNotificationDto): Promise<Notification> {
-    const setClauses: string[] = [];
+    const updates: string[] = [];
     const values: any[] = [];
-    let paramIndex = 1;
+    let paramCount = 1;
 
     if (data.isRead !== undefined) {
-      setClauses.push(`is_read = $${paramIndex}`);
+      updates.push(`is_read = $${paramCount}`);
       values.push(data.isRead);
-      paramIndex++;
+      paramCount++;
     }
 
     if (data.readAt !== undefined) {
-      setClauses.push(`read_at = $${paramIndex}`);
+      updates.push(`read_at = $${paramCount}`);
       values.push(data.readAt);
-      paramIndex++;
+      paramCount++;
     }
 
-    if (setClauses.length === 0) {
-      const notification = await this.findById(id);
-      if (!notification) {
-        throw new Error(`Notification with ID ${id} not found`);
-      }
-      return notification;
+    if (updates.length === 0) {
+      throw new Error('No fields to update');
     }
 
     values.push(id);
     const query = `
       UPDATE notifications
-      SET ${setClauses.join(', ')}
-      WHERE id = $${paramIndex}
-      RETURNING *
+      SET ${updates.join(', ')}
+      WHERE id = $${paramCount}
+      RETURNING id, recipient_id AS "recipientId", sender_id AS "senderId", type, title, message, metadata, is_read AS "isRead", read_at AS "readAt", created_at AS "createdAt"
     `;
 
-    const result = await pool.query(query, values);
+    const result = await this.pool.query(query, values);
 
     if (result.rows.length === 0) {
-      throw new Error(`Notification with ID ${id} not found`);
+      throw new Error(`Notification with id ${id} not found`);
     }
 
-    return this.mapRowToNotification(result.rows[0]);
+    return result.rows[0];
   }
 
   async findUnreadByRecipient(recipientId: string): Promise<Notification[]> {
-    const query = 'SELECT * FROM notifications WHERE recipient_id = $1 AND is_read = false ORDER BY created_at DESC';
-    const result = await pool.query(query, [recipientId]);
-
-    return result.rows.map((row: any) => this.mapRowToNotification(row));
-  }
-
-  private mapRowToNotification(row: any): Notification {
-    return {
-      id: row.id,
-      recipientId: row.recipient_id,
-      senderId: row.sender_id,
-      type: row.type,
-      title: row.title,
-      message: row.message,
-      metadata: row.metadata,
-      isRead: row.is_read,
-      readAt: row.read_at,
-      createdAt: row.created_at,
-    };
+    const query = `
+      SELECT id, recipient_id AS "recipientId", sender_id AS "senderId", type, title, message, metadata, is_read AS "isRead", read_at AS "readAt", created_at AS "createdAt"
+      FROM notifications
+      WHERE recipient_id = $1 AND is_read = false
+      ORDER BY created_at DESC
+    `;
+    const result = await this.pool.query(query, [recipientId]);
+    return result.rows;
   }
 }
