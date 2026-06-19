@@ -20,14 +20,6 @@ export enum LeaveStatus {
   Rejected = 'rejected'
 }
 
-export enum LeaveRequestStatus {
-  Draft = 'draft',
-  PendingApproval = 'pending_approval',
-  Approved = 'approved',
-  Rejected = 'rejected',
-  Cancelled = 'cancelled'
-}
-
 export enum UserRole {
   Employee = 'employee',
   Manager = 'manager',

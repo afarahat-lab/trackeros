@@ -21,19 +21,6 @@ src/modules/balance/balance.{model,repository,service,controller,routes}.ts
 src/modules/employee/employee.{model,repository,service,controller,routes}.ts
 src/modules/policy/policy.{model,repository,service,controller,routes}.ts
 src/modules/notification/notification.{model,repository,service,controller,routes}.ts
-src/modules/BaseEntity/    — BaseEntity module
-src/modules/CreateLeaveRequestDto/    — CreateLeaveRequestDto module
-src/modules/UpdateLeaveRequestDto/    — UpdateLeaveRequestDto module
-src/modules/LeaveRequestQuery/    — LeaveRequestQuery module
-src/modules/LeaveBalance/    — LeaveBalance module
-src/modules/LeaveType/    — LeaveType module
-src/modules/LeavePolicy/    — LeavePolicy module
-src/modules/NotificationType/    — NotificationType module
-src/modules/UpdateNotificationDto/    — UpdateNotificationDto module
-src/modules/AuditLog/    — AuditLog module
-src/modules/AuditRecord/    — AuditRecord module
-src/modules/AuditServiceInterface/    — AuditServiceInterface module
-src/modules/ValidationResult/    — ValidationResult module
 src/shared/db connection.ts
 src/shared/base repository.ts
 src/shared/error types.ts
@@ -924,4 +911,330 @@ CREATE TABLE leave_balances (
 CREATE TABLE employees (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL,
-    email VARCHAR(255)
+    email VARCHAR(255) UNIQUE NOT NULL,
+    manager_id UUID REFERENCES employees(id),
+    department VARCHAR(100)
+);
+
+CREATE TABLE leave_policies (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    leave_type VARCHAR(50) UNIQUE NOT NULL,
+    entitlement_days DECIMAL(5,2) NOT NULL,
+    carry_over_limit DECIMAL(5,2) NOT NULL,
+    requires_approval BOOLEAN DEFAULT TRUE
+);
+
+CREATE TABLE notifications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    recipient_id UUID NOT NULL REFERENCES employees(id),
+    type VARCHAR(50) NOT NULL CHECK (type IN ('LEAVE_SUBMITTED', 'LEAVE_APPROVED', 'LEAVE_REJECTED', 'BALANCE_UPDATED')),
+    title VARCHAR(255) NOT NULL,
+    message TEXT NOT NULL,
+    read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE audit_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    entity_type VARCHAR(50) NOT NULL,
+    entity_id UUID NOT NULL,
+    action VARCHAR(50) NOT NULL,
+    old_values JSONB,
+    new_values JSONB,
+    user_id UUID REFERENCES employees(id),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_leave_requests_employee_id ON leave_requests(employee_id);
+CREATE INDEX idx_leave_requests_manager_id ON leave_requests(manager_id);
+CREATE INDEX idx_leave_requests_status ON leave_requests(status);
+CREATE INDEX idx_leave_balances_employee_id ON leave_balances(employee_id);
+CREATE INDEX idx_notifications_recipient_id ON notifications(recipient_id);
+CREATE INDEX idx_notifications_read ON notifications(read);
+CREATE INDEX idx_audit_logs_entity ON audit_logs(entity_type, entity_id);
+
+## Leave Management Module
+
+### Domain Entities
+
+**LeaveRequest**
+- Represents a leave application submitted by an employee
+- Status values: PENDING, APPROVED, REJECTED, CANCELLED
+- Links to employee (applicant) and manager (approver)
+
+**LeaveBalance**
+- Tracks remaining leave entitlement by employee and leave type
+- Updated when leave is approved or cancelled
+- Fiscal-year based tracking
+
+**Employee**
+- Employee identity and reporting hierarchy
+- Used for applicant and approver references
+
+**LeavePolicy**
+- Defines entitlement and leave-type rules
+- Leave types: ANNUAL, SICK, EMERGENCY
+- Configures approval requirements and carry-over limits
+
+**Notification**
+- Leave workflow notifications sent to employees and managers
+- Types: LEAVE_SUBMITTED, LEAVE_APPROVED, LEAVE_REJECTED
+
+### Module Dependencies
+
+- `leave` module depends on `employee`, `policy`, `balance`, and `notification` modules
+- All database access follows repository pattern (GP-001)
+- All state-changing operations write audit records (GP-002)
+- Input validation at API boundaries (GP-003)
+- RBAC enforcement on all endpoints (GP-005)
+
+### State Transitions
+
+LeaveRequest status flow:
+1. Created with PENDING status
+2. Manager approves → APPROVED (triggers balance deduction)
+3. Manager rejects → REJECTED
+4. Employee cancels → CANCELLED (triggers balance restoration if approved)
+
+### Transaction Semantics
+
+- Leave creation: Atomic transaction for request creation + audit log
+- Leave approval: Atomic transaction for status update + balance deduction + audit log
+- Leave rejection: Atomic transaction for status update + audit log
+- Leave cancellation: Atomic transaction for status update + balance restoration (if applicable) + audit log
+- Notifications: Separate transaction after primary operation succeeds
+
+### SQL Schema
+
+sql
+-- LeaveRequest table
+CREATE TABLE leave_requests (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    employee_id UUID NOT NULL REFERENCES employees(id),
+    leave_type VARCHAR(20) NOT NULL CHECK (leave_type IN ('ANNUAL', 'SICK', 'EMERGENCY')),
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED', 'CANCELLED')),
+    reason TEXT,
+    manager_id UUID NOT NULL REFERENCES employees(id),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    CHECK (end_date >= start_date)
+);
+
+CREATE INDEX idx_leave_requests_employee_id ON leave_requests(employee_id);
+CREATE INDEX idx_leave_requests_manager_id ON leave_requests(manager_id);
+CREATE INDEX idx_leave_requests_status ON leave_requests(status);
+
+-- LeaveBalance table
+CREATE TABLE leave_balances (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    employee_id UUID NOT NULL REFERENCES employees(id),
+    leave_type VARCHAR(20) NOT NULL CHECK (leave_type IN ('ANNUAL', 'SICK', 'EMERGENCY')),
+    balance DECIMAL(5,1) NOT NULL DEFAULT 0,
+    fiscal_year INTEGER NOT NULL,
+    UNIQUE(employee_id, leave_type, fiscal_year)
+);
+
+CREATE INDEX idx_leave_balances_employee_id ON leave_balances(employee_id);
+CREATE INDEX idx_leave_balances_fiscal_year ON leave_balances(fiscal_year);
+
+-- LeavePolicy table
+CREATE TABLE leave_policies (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    leave_type VARCHAR(20) NOT NULL UNIQUE CHECK (leave_type IN ('ANNUAL', 'SICK', 'EMERGENCY')),
+    entitlement_days DECIMAL(5,1) NOT NULL,
+    carry_over_limit DECIMAL(5,1) NOT NULL DEFAULT 0,
+    requires_approval BOOLEAN NOT NULL DEFAULT true
+);
+
+-- Notification table
+CREATE TABLE notifications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    recipient_id UUID NOT NULL REFERENCES employees(id),
+    type VARCHAR(50) NOT NULL,
+    title VARCHAR(200) NOT NULL,
+    message TEXT NOT NULL,
+    read BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_notifications_recipient_id ON notifications(recipient_id);
+CREATE INDEX idx_notifications_read ON notifications(read);
+
+
+### Audit Logging
+
+All state-changing operations on LeaveRequest and LeaveBalance entities generate audit records with:
+- User ID of the actor
+- Timestamp
+- Operation type (CREATE, UPDATE, DELETE)
+- Before/after state snapshots
+- Reason for change (if applicable)
+
+## Leave Management Module
+
+### Domain Entities
+
+**LeaveRequest**
+- Represents a leave application submitted by an employee
+- States: PENDING, APPROVED, REJECTED, CANCELLED
+- Attributes: id, employeeId, leaveType, startDate, endDate, status, reason, managerId, createdAt, updatedAt
+
+**LeaveBalance**
+- Tracks remaining leave entitlement by employee and leave type
+- Attributes: id, employeeId, leaveType, balance, fiscalYear
+
+**LeavePolicy**
+- Defines entitlement rules and leave-type configurations
+- Attributes: id, leaveType, entitlementDays, carryOverLimit, requiresApproval
+- Leave types: ANNUAL, SICK, EMERGENCY
+
+### Module Dependencies
+
+- `leave` module depends on: `employee`, `policy`, `balance`, `notification`
+- `balance` module depends on: `employee`
+- `notification` module depends on: `employee`
+
+### Database Schema
+
+sql
+-- LeaveRequest table
+CREATE TABLE leave_requests (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    employee_id UUID NOT NULL REFERENCES employees(id),
+    leave_type VARCHAR(20) NOT NULL CHECK (leave_type IN ('ANNUAL', 'SICK', 'EMERGENCY')),
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED', 'CANCELLED')),
+    reason TEXT,
+    manager_id UUID REFERENCES employees(id),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_leave_requests_employee_id ON leave_requests(employee_id);
+CREATE INDEX idx_leave_requests_manager_id ON leave_requests(manager_id);
+CREATE INDEX idx_leave_requests_status ON leave_requests(status);
+
+-- LeaveBalance table
+CREATE TABLE leave_balances (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    employee_id UUID NOT NULL REFERENCES employees(id),
+    leave_type VARCHAR(20) NOT NULL CHECK (leave_type IN ('ANNUAL', 'SICK', 'EMERGENCY')),
+    balance DECIMAL(5,1) NOT NULL DEFAULT 0,
+    fiscal_year INTEGER NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(employee_id, leave_type, fiscal_year)
+);
+
+CREATE INDEX idx_leave_balances_employee_id ON leave_balances(employee_id);
+CREATE INDEX idx_leave_balances_fiscal_year ON leave_balances(fiscal_year);
+
+-- LeavePolicy table
+CREATE TABLE leave_policies (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    leave_type VARCHAR(20) UNIQUE NOT NULL CHECK (leave_type IN ('ANNUAL', 'SICK', 'EMERGENCY')),
+    entitlement_days INTEGER NOT NULL CHECK (entitlement_days > 0),
+    carry_over_limit INTEGER NOT NULL DEFAULT 0,
+    requires_approval BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Notification table
+CREATE TABLE notifications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    recipient_id UUID NOT NULL REFERENCES employees(id),
+    type VARCHAR(50) NOT NULL,
+    title VARCHAR(200) NOT NULL,
+    message TEXT NOT NULL,
+    metadata JSONB,
+    read BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_notifications_recipient_id ON notifications(recipient_id);
+CREATE INDEX idx_notifications_read ON notifications(read);
+
+
+### Lifecycle States
+
+**LeaveRequest Status Transitions:**
+1. PENDING → APPROVED (by manager)
+2. PENDING → REJECTED (by manager)
+3. PENDING → CANCELLED (by employee)
+4. APPROVED → CANCELLED (by employee with manager notification)
+
+**Notification Types:**
+- LEAVE_SUBMITTED (to manager)
+- LEAVE_APPROVED (to employee)
+- LEAVE_REJECTED (to employee)
+- LEAVE_CANCELLED (to manager)
+- BALANCE_ADJUSTED (to employee)
+
+### Transaction Semantics
+
+1. Leave request creation: Atomic transaction creating LeaveRequest + audit record
+2. Leave approval: Atomic transaction updating LeaveRequest status + adjusting LeaveBalance + creating Notification + audit records
+3. Balance adjustment: Atomic transaction updating LeaveBalance + audit record
+4. Policy validation: Read-only transaction checking LeavePolicy rules
+
+### Cross-Cutting Concerns
+
+- All state-changing operations write audit records (GP-002)
+- All inputs validated at API boundaries using Fastify schemas (GP-003)
+- All database access through repository interfaces (GP-001)
+- All API endpoints enforce RBAC (GP-005)
+- No sensitive data in logs (GP-004)
+- All async errors handled with proper error middleware (GP-006)
+
+## Leave Management Feature — Reconciled Design
+
+### Domain Entities
+- **Employee**: identity and reporting hierarchy.
+- **LeavePolicy**: entitlement rules and leave-type definitions.
+- **LeaveRequest**: leave applications with lifecycle states `PENDING`, `APPROVED`, `REJECTED`, `CANCELLED`.
+- **LeaveBalance**: remaining entitlement by employee, policy, and year.
+- **Notification**: workflow notifications to employees and managers.
+- **AuditLog**: immutable change history for compliance (GP-002).
+
+### Repository Layer (GP-001)
+All database access is through the following repository interfaces, backed by PostgreSQL concrete implementations using `pg` Pool:
+
+| Interface | Concrete Implementation | Key Methods |
+|-----------|------------------------|-------------|
+| `IEmployeeRepository` | `PostgresEmployeeRepository` | findById, findByEmail, findByEmployeeNumber, findSubordinates, save, update, deactivate |
+| `ILeavePolicyRepository` | `PostgresLeavePolicyRepository` | findById, findByLeaveType, findActivePolicies, save, update, deactivate |
+| `ILeaveRequestRepository` | `PostgresLeaveRequestRepository` | findById, findByEmployeeId, findByManagerId, findByStatus, findOverlappingRequests, save, updateStatus, cancel |
+| `ILeaveBalanceRepository` | `PostgresLeaveBalanceRepository` | findByEmployeeAndPolicy, findByEmployeeId, updateBalance, getAvailableBalance, createYearlyBalance |
+| `INotificationRepository` | `PostgresNotificationRepository` | findById, findByRecipient, findUnreadByRecipient, save, markAsRead, deleteOldNotifications |
+| `IAuditLogRepository` | `PostgresAuditLogRepository` | logChange, findByTableAndRecord, findByPerformer, findByDateRange |
+
+### Module Boundaries and Dependency Direction
+- **leave** owns request lifecycle and approval workflow.
+- **balance** owns balance storage and adjustments.
+- **employee** owns identity and hierarchy.
+- **policy** owns entitlement rules.
+- **notification** owns delivery and templates.
+
+Dependency direction (acyclic):
+- `leave` → `employee`, `policy`, `balance`, `notification`
+- `balance` → `employee`, `policy`
+- `notification` → `employee`
+
+### Golden Principles Compliance
+- **GP-001 (Repository pattern)**: All persistence flows through the interfaces above; no direct SQL in services or controllers.
+- **GP-002 (Audit records)**: `IAuditLogRepository.logChange()` is invoked on every state-changing operation.
+- **GP-003 (Input validation)**: DTO validation occurs at Fastify route boundaries before service invocation.
+- **GP-004 (No sensitive data in logs)**: PII and tokens are redacted by the shared error handler.
+- **GP-005 (RBAC enforcement)**: Fastify preHandlers enforce roles on all leave endpoints.
+- **GP-006 (Error handling)**: All async service calls are wrapped; unhandled rejections are caught by the Fastify error hook.
+
+### Recommended Build Phases
+1. **Phase 1: Core domain models and repositories** — Establish entities, SQL schemas, and repository interfaces/implementations.
+2. **Phase 2: Employee and Policy services** — Inner-most modules with no cross-service dependencies.
+3. **Phase 3: Balance and Notification services** — Build on Employee and Policy contracts.
+4. **Phase 4: LeaveService with full workflow** — Orchestrate all modules; wire audit logging and validation.
+5. **Phase 5: Controllers and API layer** — Fastify routes, RBAC, and input validation at the boundary.
