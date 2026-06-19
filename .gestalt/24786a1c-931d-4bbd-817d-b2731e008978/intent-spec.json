@@ -1,0 +1,79 @@
+{
+  "id": "17b6732b-ed09-4c36-8971-f8df97dd96a0",
+  "correlationId": "24786a1c-931d-4bbd-817d-b2731e008978",
+  "rawIntent": "[Feature: Build the leave management module — Phase 2: Create DTO files for Leave and Balance modules]\n\nCreate the DTO files for the Leave and Balance modules. These files depend only on the model files from Phase 1 and define the data transfer object interfaces needed by the service interfaces.\n\nPhase architecture notes:\n{\"interfaces\":[\"File: src/modules/leave/leave.dto.ts\\nimport { LeaveRequestStatus } from './leave.model';\\n\\nexport interface CreateLeaveRequestDto {\\n  employeeId: string;\\n  policyId: string;\\n  startDate: Date;\\n  endDate: Date;\\n  reason?: string;\\n}\\n\\nexport interface SubmitLeaveRequestDto {\\n  requestId: string;\\n  employeeId: string;\\n}\\n\\nexport interface ReviewLeaveRequestDto {\\n  requestId: string;\\n  managerId: string;\\n  reviewNotes?: string;\\n}\\n\\nexport interface CancelLeaveRequestDto {\\n  requestId: string;\\n  employeeId: string;\\n  reason?: string;\\n}\\n\\nexport interface LeaveRequestDto {\\n  id: string;\\n  employeeId: string;\\n  policyId: string;\\n  startDate: Date;\\n  endDate: Date;\\n  totalDays: number;\\n  status: LeaveRequestStatus;\\n  reason?: string;\\n  managerId?: string;\\n  reviewedAt?: Date;\\n  reviewNotes?: string;\\n  createdAt: Date;\\n  updatedAt: Date;\\n}\",\"File: src/modules/balance/balance.dto.ts\\nexport interface LeaveBalanceDto {\\n  id: string;\\n  employeeId: string;\\n  policyId: string;\\n  fiscalYear: number;\\n  accruedDays: number;\\n  usedDays: number;\\n  carriedOver: number;\\n  balanceDays: number;\\n  createdAt: Date;\\n  updatedAt: Date;\\n}\\n\\nexport interface UpdateLeaveBalanceDto {\\n  balanceId: string;\\n  accruedDays?: number;\\n  usedDays?: number;\\n  carriedOver?: number;\\n}\"],\"importStatements\":[\"import { LeaveRequestRepository } from './leave.repository'\",\"import { LeaveBalanceRepository } from '../balance/balance.repository'\",\"import { NotificationService } from '../notification/notification.service'\",\"import { AuditLogService } from '../audit/audit.service'\",\"import { CreateLeaveRequestDto, SubmitLeaveRequestDto, ReviewLeaveRequestDto, CancelLeaveRequestDto } from './leave.dto'\",\"import { LeaveRequest, LeaveRequestStatus } from './leave.model'\",\"import { LeaveBalance } from '../balance/balance.model'\",\"import { LeaveBalanceDto, UpdateLeaveBalanceDto } from './balance.dto'\",\"import { EmployeeRepository } from './employee.repository'\",\"import { EmployeeDto } from './employee.dto'\",\"import { Employee } from './employee.model'\",\"import { LeavePolicyRepository } from './policy.repository'\",\"import { LeavePolicyDto } from './policy.dto'\",\"import { LeavePolicy } from './policy.model'\"],\"successCriteria\":[\"src/modules/leave/leave.dto.ts exists and exports CreateLeaveRequestDto, SubmitLeaveRequestDto, ReviewLeaveRequestDto, CancelLeaveRequestDto, and LeaveRequestDto interfaces\",\"src/modules/balance/balance.dto.ts exists and exports LeaveBalanceDto and UpdateLeaveBalanceDto interfaces\",\"All DTO interfaces match the corresponding domain model types from Phase 1\"]}\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/leave/leave.dto.ts\\nimport { LeaveRequestStatus } from './leave.model';\\n\\nexport interface CreateLeaveRequestDto {\\n  employeeId: string;\\n  policyId: string;\\n  startDate: Date;\\n  endDate: Date;\\n  reason?: string;\\n}\\n\\nexport interface SubmitLeaveRequestDto {\\n  requestId: string;\\n  employeeId: string;\\n}\\n\\nexport interface ReviewLeaveRequestDto {\\n  requestId: string;\\n  managerId: string;\\n  reviewNotes?: string;\\n}\\n\\nexport interface CancelLeaveRequestDto {\\n  requestId: string;\\n  employeeId: string;\\n  reason?: string;\\n}\\n\\nexport interface LeaveRequestDto {\\n  id: string;\\n  employeeId: string;\\n  policyId: string;\\n  startDate: Date;\\n  endDate: Date;\\n  totalDays: number;\\n  status: LeaveRequestStatus;\\n  reason?: string;\\n  managerId?: string;\\n  reviewedAt?: Date;\\n  reviewNotes?: string;\\n  createdAt: Date;\\n  updatedAt: Date;\\n}\",\"File: src/modules/balance/balance.dto.ts\\nexport interface LeaveBalanceDto {\\n  id: string;\\n  employeeId: string;\\n  policyId: string;\\n  fiscalYear: number;\\n  accruedDays: number;\\n  usedDays: number;\\n  carriedOver: number;\\n  balanceDays: number;\\n  createdAt: Date;\\n  updatedAt: Date;\\n}\\n\\nexport interface UpdateLeaveBalanceDto {\\n  balanceId: string;\\n  accruedDays?: number;\\n  usedDays?: number;\\n  carriedOver?: number;\\n}\"],\"importStatements\":[\"import { LeaveRequestStatus } from './leave.model'\",\"import { LeaveBalance } from './balance.model'\"],\"successCriteria\":[\"src/modules/leave/leave.dto.ts exists and exports CreateLeaveRequestDto, SubmitLeaveRequestDto, ReviewLeaveRequestDto, CancelLeaveRequestDto, and LeaveRequestDto interfaces\",\"src/modules/balance/balance.dto.ts exists and exports LeaveBalanceDto and UpdateLeaveBalanceDto interfaces\",\"All DTO interfaces match the corresponding domain model types from Phase 1\",\"LeaveRequestDto.status type matches LeaveRequestStatus enum from leave.model.ts\",\"LeaveBalanceDto.balanceDays type is number (matching the generated column in canonical schema)\"]}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- CreateLeaveRequestDto\n- SubmitLeaveRequestDto\n- ReviewLeaveRequestDto\n- CancelLeaveRequestDto\n- LeaveRequestDto\n- LeaveBalanceDto\n- UpdateLeaveBalanceDto\n- LeaveRequestStatus\n- LeaveBalance\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Canonical entity fields for this phase\n\nNote: these field names supersede any attribute names in the\nintent text above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the field names of each entity this phase defines. The\nexact attribute / column / property set per entity is:\n\n- `CreateLeaveRequestDto`: `employeeId`, `policyId`, `startDate`, `endDate`, `reason`\n- `SubmitLeaveRequestDto`: `requestId`, `employeeId`\n- `ReviewLeaveRequestDto`: `requestId`, `managerId`, `reviewNotes`\n- `CancelLeaveRequestDto`: `requestId`, `employeeId`, `reason`\n- `LeaveRequestDto`: `id`, `employeeId`, `policyId`, `startDate`, `endDate`, `totalDays`, `status`, `reason`, `managerId`, `reviewedAt`, `reviewNotes`, `createdAt`, `updatedAt`\n- `LeaveBalanceDto`: `id`, `employeeId`, `policyId`, `fiscalYear`, `accruedDays`, `usedDays`, `carriedOver`, `balanceDays`, `createdAt`, `updatedAt`\n- `UpdateLeaveBalanceDto`: `balanceId`, `accruedDays`, `usedDays`, `carriedOver`\n\nTreat each entity's field list as complete. If the\nintent text or planner scope mentions different field\nnames than the architecture, do NOT flag this as\nambiguity — the per-phase architecture wins.\n\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 3 — Create DTO files for Employee and Policy modules: Create the DTO files for the Employee and Policy modules. These files depend only on the model files\n- Phase 4 — Create Service Interface files: Create the four service interface and implementation class files. These files depend on the DTO file\n- Phase 5 — Employee and Policy module implementations: Create approximately 5 files: Implement src/modules/employee/employee.repository.ts and src/modules/\n- Phase 6 — Balance module implementation: Create approximately 4 files: Implement src/modules/balance/balance.repository.ts and src/modules/ba\n- Phase 7 — Notification module implementation: Create approximately 3 files: Implement src/modules/notification/notification.repository.ts and src/\n- Phase 8 — Leave module implementation: Create approximately 5 files: Implement src/modules/leave/leave.repository.ts and src/modules/leave/\n- Phase 9 — Controllers and API routes: Create approximately 4 files: src/modules/leave/leave.controller.ts, src/modules/leave/leave.routes.\n- Phase 10 — Audit integration and RBAC enforcement: Create approximately 3 files: Add audit logging decorators in src/shared/decorators/audit.decorator.",
+  "scope": {
+    "affectedDomains": [
+      "leave",
+      "balance"
+    ],
+    "affectedLayers": [
+      "domain"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/leave/leave.dto.ts exists and exports CreateLeaveRequestDto, SubmitLeaveRequestDto, ReviewLeaveRequestDto, CancelLeaveRequestDto, and LeaveRequestDto interfaces",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/balance/balance.dto.ts exists and exports LeaveBalanceDto and UpdateLeaveBalanceDto interfaces",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "All DTO interfaces match the corresponding domain model types from Phase 1",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "LeaveRequestDto.status type matches LeaveRequestStatus enum from leave.model.ts",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "LeaveBalanceDto.balanceDays type is number (matching the generated column in canonical schema)",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces",
+    "Input validation: Validate all inputs at API boundaries before processing",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled",
+    "DTO files must depend only on model files from Phase 1",
+    "DTO interfaces must define data transfer object interfaces needed by service interfaces",
+    "LeaveRequestDto must include all fields from canonical entity fields specification",
+    "LeaveBalanceDto must include all fields from canonical entity fields specification",
+    "UpdateLeaveBalanceDto must include all fields from canonical entity fields specification"
+  ],
+  "outOfScope": [
+    "Creating DTO files for Employee and Policy modules (Phase 3)",
+    "Creating Service Interface files (Phase 4)",
+    "Employee and Policy module implementations (Phase 5)",
+    "Balance module implementation (Phase 6)",
+    "Notification module implementation (Phase 7)",
+    "Leave module implementation (Phase 8)",
+    "Controllers and API routes (Phase 9)",
+    "Audit integration and RBAC enforcement (Phase 10)",
+    "Implementation of repository interfaces",
+    "Implementation of service interfaces",
+    "Database schema creation or migration",
+    "API endpoint implementation",
+    "Business logic implementation",
+    "Audit logging implementation",
+    "RBAC enforcement implementation",
+    "Notification service implementation",
+    "Any functionality beyond creating the two DTO files with specified interfaces"
+  ],
+  "ambiguities": []
+}
