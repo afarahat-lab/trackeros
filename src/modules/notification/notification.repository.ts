@@ -1,3 +1,4 @@
+import { Pool } from 'pg';
 import pool from '../../shared/db/connection';
 import { Notification, CreateNotificationDto, UpdateNotificationDto } from './notification.model';
 
@@ -9,6 +10,12 @@ export interface INotificationRepository {
 }
 
 export class NotificationRepository implements INotificationRepository {
+  private dbPool: Pool;
+
+  constructor(dbPool?: Pool) {
+    this.dbPool = dbPool || pool;
+  }
+
   async create(data: CreateNotificationDto): Promise<Notification> {
     const query = `
       INSERT INTO notifications (recipient_id, sender_id, type, title, message, metadata)
@@ -24,13 +31,13 @@ export class NotificationRepository implements INotificationRepository {
       data.metadata ? JSON.stringify(data.metadata) : null,
     ];
 
-    const result = await pool.query(query, values);
+    const result = await this.dbPool.query(query, values);
     return this.mapRowToNotification(result.rows[0]);
   }
 
   async findById(id: string): Promise<Notification | null> {
     const query = 'SELECT * FROM notifications WHERE id = $1';
-    const result = await pool.query(query, [id]);
+    const result = await this.dbPool.query(query, [id]);
 
     if (result.rows.length === 0) {
       return null;
@@ -72,7 +79,7 @@ export class NotificationRepository implements INotificationRepository {
       RETURNING *
     `;
 
-    const result = await pool.query(query, values);
+    const result = await this.dbPool.query(query, values);
 
     if (result.rows.length === 0) {
       throw new Error(`Notification with ID ${id} not found`);
@@ -83,7 +90,7 @@ export class NotificationRepository implements INotificationRepository {
 
   async findUnreadByRecipient(recipientId: string): Promise<Notification[]> {
     const query = 'SELECT * FROM notifications WHERE recipient_id = $1 AND is_read = false ORDER BY created_at DESC';
-    const result = await pool.query(query, [recipientId]);
+    const result = await this.dbPool.query(query, [recipientId]);
 
     return result.rows.map((row: any) => this.mapRowToNotification(row));
   }
