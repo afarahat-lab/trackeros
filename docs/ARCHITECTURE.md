@@ -24,6 +24,7 @@ src/modules/notification/notification.{model,repository,service,controller,route
 src/modules/BaseEntity/    — BaseEntity module
 src/modules/CreateLeaveRequestDto/    — CreateLeaveRequestDto module
 src/modules/UpdateLeaveRequestDto/    — UpdateLeaveRequestDto module
+src/modules/LeaveRequestQuery/    — LeaveRequestQuery module
 src/shared/db connection.ts
 src/shared/base repository.ts
 src/shared/error types.ts
