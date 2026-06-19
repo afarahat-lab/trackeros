@@ -33,6 +33,7 @@ src/modules/UpdateNotificationDto/    — UpdateNotificationDto module
 src/modules/AuditLog/    — AuditLog module
 src/modules/AuditRecord/    — AuditRecord module
 src/modules/AuditServiceInterface/    — AuditServiceInterface module
+src/modules/ValidationResult/    — ValidationResult module
 src/shared/db connection.ts
 src/shared/base repository.ts
 src/shared/error types.ts
@@ -923,5 +924,4 @@ CREATE TABLE leave_balances (
 CREATE TABLE employees (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL,
-    email VARCHAR(255) UNIQUE NOT NULL,
-    manager_id UUID REFERENCES employees(id),
+    email VARCHAR(255)
