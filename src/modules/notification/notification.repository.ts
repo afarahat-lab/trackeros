@@ -1,43 +1,60 @@
-import { Pool } from 'pg';
-import { Notification, CreateNotificationDto, UpdateNotificationDto } from './notification.model';
-
-export interface INotificationRepository {
-  create(data: CreateNotificationDto): Promise<Notification>;
-  findById(id: string): Promise<Notification | null>;
-  update(id: string, data: UpdateNotificationDto): Promise<Notification>;
-  findUnreadByRecipient(recipientId: string): Promise<Notification[]>;
-}
+import { Notification, CreateNotificationDto, UpdateNotificationDto, INotificationRepository } from './notification.model';
+import pool from '../../shared/db/connection';
+import { AuditLogger } from '../../shared/audit/audit.logger';
 
 export class NotificationRepository implements INotificationRepository {
-  constructor(private readonly pool: Pool) {}
+  private readonly auditLogger: AuditLogger;
+
+  constructor() {
+    this.auditLogger = new AuditLogger();
+  }
 
   async create(data: CreateNotificationDto): Promise<Notification> {
-    const query = `
-      INSERT INTO notifications (recipient_id, sender_id, type, title, message, metadata)
-      VALUES ($1, $2, $3, $4, $5, $6)
-      RETURNING
-        id,
-        recipient_id AS "recipientId",
-        sender_id AS "senderId",
-        type,
-        title,
-        message,
-        metadata,
-        is_read AS "isRead",
-        read_at AS "readAt",
-        created_at AS "createdAt"
-    `;
-    const values = [
-      data.recipientId,
-      data.senderId || null,
-      data.type,
-      data.title,
-      data.message,
-      data.metadata || null,
-    ];
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
 
-    const result = await this.pool.query(query, values);
-    return result.rows[0];
+      const query = `
+        INSERT INTO notifications (recipient_id, sender_id, type, title, message, metadata)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING
+          id,
+          recipient_id AS "recipientId",
+          sender_id AS "senderId",
+          type,
+          title,
+          message,
+          metadata,
+          is_read AS "isRead",
+          read_at AS "readAt",
+          created_at AS "createdAt"
+      `;
+      const values = [
+        data.recipientId,
+        data.senderId || null,
+        data.type,
+        data.title,
+        data.message,
+        data.metadata || null,
+      ];
+
+      const result = await client.query(query, values);
+      const notification = result.rows[0];
+
+      this.auditLogger.log('NOTIFICATION_CREATED', {
+        notificationId: notification.id,
+        recipientId: notification.recipientId,
+        type: notification.type,
+      });
+
+      await client.query('COMMIT');
+      return notification;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   async findById(id: string): Promise<Notification | null> {
@@ -56,7 +73,7 @@ export class NotificationRepository implements INotificationRepository {
       FROM notifications
       WHERE id = $1
     `;
-    const result = await this.pool.query(query, [id]);
+    const result = await pool.query(query, [id]);
 
     if (result.rows.length === 0) {
       return null;
@@ -65,54 +82,72 @@ export class NotificationRepository implements INotificationRepository {
     return result.rows[0];
   }
 
-  async update(id: string, data: UpdateNotificationDto): Promise<Notification> {
-    const updates: string[] = [];
-    const values: any[] = [];
-    let paramCount = 1;
+  async update(id: string, data: UpdateNotificationDto): Promise<Notification | null> {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
 
-    if (data.isRead !== undefined) {
-      updates.push(`is_read = $${paramCount}`);
-      values.push(data.isRead);
-      paramCount++;
+      const updates: string[] = [];
+      const values: any[] = [];
+      let paramCount = 1;
+
+      if (data.isRead !== undefined) {
+        updates.push(`is_read = $${paramCount}`);
+        values.push(data.isRead);
+        paramCount++;
+      }
+
+      if (data.readAt !== undefined) {
+        updates.push(`read_at = $${paramCount}`);
+        values.push(data.readAt);
+        paramCount++;
+      }
+
+      if (updates.length === 0) {
+        throw new Error('No fields to update');
+      }
+
+      values.push(id);
+      const query = `
+        UPDATE notifications
+        SET ${updates.join(', ')}
+        WHERE id = $${paramCount}
+        RETURNING
+          id,
+          recipient_id AS "recipientId",
+          sender_id AS "senderId",
+          type,
+          title,
+          message,
+          metadata,
+          is_read AS "isRead",
+          read_at AS "readAt",
+          created_at AS "createdAt"
+      `;
+
+      const result = await client.query(query, values);
+
+      if (result.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return null;
+      }
+
+      const notification = result.rows[0];
+
+      this.auditLogger.log('NOTIFICATION_UPDATED', {
+        notificationId: notification.id,
+        recipientId: notification.recipientId,
+        isRead: notification.isRead,
+      });
+
+      await client.query('COMMIT');
+      return notification;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
     }
-
-    if (data.readAt !== undefined) {
-      updates.push(`read_at = $${paramCount}`);
-      values.push(data.readAt);
-      paramCount++;
-    }
-
-    if (updates.length === 0) {
-      throw new Error('No fields to update');
-    }
-
-    updates.push(`updated_at = CURRENT_TIMESTAMP`);
-
-    values.push(id);
-    const query = `
-      UPDATE notifications
-      SET ${updates.join(', ')}
-      WHERE id = $${paramCount}
-      RETURNING
-        id,
-        recipient_id AS "recipientId",
-        sender_id AS "senderId",
-        type,
-        title,
-        message,
-        metadata,
-        is_read AS "isRead",
-        read_at AS "readAt",
-        created_at AS "createdAt"
-    `;
-
-    const result = await this.pool.query(query, values);
-
-    if (result.rows.length === 0) {
-      throw new Error(`Notification with ID ${id} not found`);
-    }
-
-    return result.rows[0];
   }
 
   async findUnreadByRecipient(recipientId: string): Promise<Notification[]> {
@@ -132,7 +167,7 @@ export class NotificationRepository implements INotificationRepository {
       WHERE recipient_id = $1 AND is_read = false
       ORDER BY created_at DESC
     `;
-    const result = await this.pool.query(query, [recipientId]);
+    const result = await pool.query(query, [recipientId]);
 
     return result.rows;
   }

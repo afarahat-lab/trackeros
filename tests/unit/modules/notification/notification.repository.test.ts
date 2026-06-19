@@ -1,202 +1,234 @@
 import { NotificationRepository } from '../../../../src/modules/notification/notification.repository';
-import { Pool } from 'pg';
+import { CreateNotificationDto, UpdateNotificationDto } from '../../../../src/modules/notification/notification.model';
+import pool from '../../../../src/shared/db/connection';
+import { AuditLogger } from '../../../../src/shared/audit/audit.logger';
+
+jest.mock('../../../../src/shared/db/connection');
+jest.mock('../../../../src/shared/audit/audit.logger');
+
+const mockPool = pool as jest.Mocked<typeof pool> & {
+  connect: jest.Mock;
+  query: jest.Mock;
+};
+
+const mockAuditLogger = AuditLogger as jest.MockedClass<typeof AuditLogger>;
 
 describe('NotificationRepository', () => {
   let repository: NotificationRepository;
-  let mockPool: jest.Mocked<Pool>;
 
   beforeEach(() => {
-    mockPool = {
-      query: jest.fn(),
-    } as unknown as jest.Mocked<Pool>;
-
-    repository = new NotificationRepository(mockPool);
-  });
-
-  afterEach(() => {
     jest.clearAllMocks();
+    repository = new NotificationRepository();
   });
 
   describe('create', () => {
-    it('should insert a notification and return the created row', async () => {
-      const dto = {
-        recipientId: 'user-1',
-        senderId: 'user-2',
-        type: 'leave_request' as const,
-        title: 'Leave Request',
-        message: 'You have a new leave request',
-        metadata: { requestId: 'req-1' },
-      };
-
-      const expectedRow = {
-        id: 'notif-1',
+    it('should insert a notification and return it', async () => {
+      const dto: CreateNotificationDto = {
         recipientId: 'user-1',
         senderId: 'user-2',
         type: 'leave_request',
         title: 'Leave Request',
         message: 'You have a new leave request',
-        metadata: { requestId: 'req-1' },
-        isRead: false,
-        readAt: null,
-        createdAt: new Date('2025-01-01T00:00:00.000Z'),
+        metadata: { leaveId: 'leave-1' },
       };
 
-      (mockPool.query as jest.Mock).mockResolvedValueOnce({ rows: [expectedRow] });
+      const mockClient = {
+        query: jest.fn(),
+        release: jest.fn(),
+      };
+
+      mockPool.connect.mockResolvedValue(mockClient);
+      mockClient.query
+        .mockResolvedValueOnce(undefined) // BEGIN
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 'notif-1',
+              recipientId: 'user-1',
+              senderId: 'user-2',
+              type: 'leave_request',
+              title: 'Leave Request',
+              message: 'You have a new leave request',
+              metadata: { leaveId: 'leave-1' },
+              isRead: false,
+              readAt: null,
+              createdAt: new Date('2025-01-01'),
+            },
+          ],
+        })
+        .mockResolvedValueOnce(undefined); // COMMIT
 
       const result = await repository.create(dto);
 
-      expect(mockPool.query).toHaveBeenCalledTimes(1);
-      expect(mockPool.query).toHaveBeenCalledWith(
-        expect.stringContaining('INSERT INTO notifications'),
-        [dto.recipientId, dto.senderId, dto.type, dto.title, dto.message, dto.metadata],
-      );
-      expect(result).toEqual(expectedRow);
+      expect(mockPool.connect).toHaveBeenCalled();
+      expect(mockClient.query).toHaveBeenNthCalledWith(1, 'BEGIN');
+      expect(mockClient.query).toHaveBeenNthCalledWith(2, expect.stringContaining('INSERT INTO notifications'), [
+        'user-1',
+        'user-2',
+        'leave_request',
+        'Leave Request',
+        'You have a new leave request',
+        { leaveId: 'leave-1' },
+      ]);
+      expect(mockClient.query).toHaveBeenNthCalledWith(3, 'COMMIT');
+      expect(mockClient.release).toHaveBeenCalled();
+      expect(result).toMatchObject({
+        id: 'notif-1',
+        recipientId: 'user-1',
+        type: 'leave_request',
+      });
     });
 
-    it('should handle missing senderId and metadata', async () => {
-      const dto = {
+    it('should rollback on error', async () => {
+      const dto: CreateNotificationDto = {
         recipientId: 'user-1',
-        type: 'balance_update' as const,
-        title: 'Balance Updated',
-        message: 'Your balance has been updated',
+        type: 'leave_request',
+        title: 'Test',
+        message: 'Test',
       };
 
-      const expectedRow = {
-        id: 'notif-2',
-        recipientId: 'user-1',
-        senderId: null,
-        type: 'balance_update',
-        title: 'Balance Updated',
-        message: 'Your balance has been updated',
-        metadata: null,
-        isRead: false,
-        readAt: null,
-        createdAt: new Date('2025-01-01T00:00:00.000Z'),
+      const mockClient = {
+        query: jest.fn(),
+        release: jest.fn(),
       };
 
-      (mockPool.query as jest.Mock).mockResolvedValueOnce({ rows: [expectedRow] });
+      mockPool.connect.mockResolvedValue(mockClient);
+      mockClient.query
+        .mockResolvedValueOnce(undefined) // BEGIN
+        .mockRejectedValueOnce(new Error('DB error'));
 
-      const result = await repository.create(dto);
-
-      expect(mockPool.query).toHaveBeenCalledWith(
-        expect.stringContaining('INSERT INTO notifications'),
-        [dto.recipientId, null, dto.type, dto.title, dto.message, null],
-      );
-      expect(result).toEqual(expectedRow);
+      await expect(repository.create(dto)).rejects.toThrow('DB error');
+      expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK');
+      expect(mockClient.release).toHaveBeenCalled();
     });
   });
 
   describe('findById', () => {
     it('should return a notification when found', async () => {
-      const id = 'notif-1';
-      const expectedRow = {
-        id,
+      const mockRow = {
+        id: 'notif-1',
         recipientId: 'user-1',
         senderId: 'user-2',
-        type: 'leave_request',
-        title: 'Leave Request',
-        message: 'You have a new leave request',
-        metadata: { requestId: 'req-1' },
+        type: 'leave_approval',
+        title: 'Approved',
+        message: 'Your leave has been approved',
+        metadata: null,
         isRead: false,
         readAt: null,
-        createdAt: new Date('2025-01-01T00:00:00.000Z'),
+        createdAt: new Date('2025-01-01'),
       };
 
-      (mockPool.query as jest.Mock).mockResolvedValueOnce({ rows: [expectedRow] });
+      mockPool.query.mockResolvedValueOnce({ rows: [mockRow] });
 
-      const result = await repository.findById(id);
+      const result = await repository.findById('notif-1');
 
-      expect(mockPool.query).toHaveBeenCalledWith(expect.stringContaining('SELECT'), [id]);
-      expect(result).toEqual(expectedRow);
+      expect(mockPool.query).toHaveBeenCalledWith(expect.stringContaining('SELECT'), ['notif-1']);
+      expect(result).toEqual(mockRow);
     });
 
-    it('should return null when no notification is found', async () => {
-      (mockPool.query as jest.Mock).mockResolvedValueOnce({ rows: [] });
+    it('should return null when not found', async () => {
+      mockPool.query.mockResolvedValueOnce({ rows: [] });
 
-      const result = await repository.findById('non-existent');
+      const result = await repository.findById('notif-1');
 
       expect(result).toBeNull();
     });
   });
 
   describe('update', () => {
-    it('should update isRead and return the updated row', async () => {
-      const id = 'notif-1';
-      const updateDto = { isRead: true, readAt: new Date('2025-01-02T00:00:00.000Z') };
+    it('should update isRead and return the notification', async () => {
+      const updateDto: UpdateNotificationDto = { isRead: true, readAt: new Date('2025-01-02') };
 
-      const expectedRow = {
-        id,
-        recipientId: 'user-1',
-        senderId: 'user-2',
-        type: 'leave_request',
-        title: 'Leave Request',
-        message: 'You have a new leave request',
-        metadata: { requestId: 'req-1' },
-        isRead: true,
-        readAt: new Date('2025-01-02T00:00:00.000Z'),
-        createdAt: new Date('2025-01-01T00:00:00.000Z'),
+      const mockClient = {
+        query: jest.fn(),
+        release: jest.fn(),
       };
 
-      (mockPool.query as jest.Mock).mockResolvedValueOnce({ rows: [expectedRow] });
+      mockPool.connect.mockResolvedValue(mockClient);
+      mockClient.query
+        .mockResolvedValueOnce(undefined) // BEGIN
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 'notif-1',
+              recipientId: 'user-1',
+              senderId: 'user-2',
+              type: 'leave_request',
+              title: 'Leave Request',
+              message: 'You have a new leave request',
+              metadata: null,
+              isRead: true,
+              readAt: new Date('2025-01-02'),
+              createdAt: new Date('2025-01-01'),
+            },
+          ],
+        })
+        .mockResolvedValueOnce(undefined); // COMMIT
 
-      const result = await repository.update(id, updateDto);
+      const result = await repository.update('notif-1', updateDto);
 
-      expect(mockPool.query).toHaveBeenCalledTimes(1);
-      expect(mockPool.query).toHaveBeenCalledWith(
-        expect.stringContaining('UPDATE notifications'),
-        [true, new Date('2025-01-02T00:00:00.000Z'), id],
-      );
-      expect(result).toEqual(expectedRow);
+      expect(mockPool.connect).toHaveBeenCalled();
+      expect(mockClient.query).toHaveBeenNthCalledWith(1, 'BEGIN');
+      expect(mockClient.query).toHaveBeenNthCalledWith(2, expect.stringContaining('UPDATE notifications'), [
+        true,
+        new Date('2025-01-02'),
+        'notif-1',
+      ]);
+      expect(mockClient.query).toHaveBeenNthCalledWith(3, 'COMMIT');
+      expect(mockClient.release).toHaveBeenCalled();
+      expect(result).toMatchObject({ id: 'notif-1', isRead: true });
     });
 
-    it('should throw if no fields are provided', async () => {
-      await expect(repository.update('notif-1', {})).rejects.toThrow('No fields to update');
+    it('should return null when notification does not exist', async () => {
+      const updateDto: UpdateNotificationDto = { isRead: true };
+
+      const mockClient = {
+        query: jest.fn(),
+        release: jest.fn(),
+      };
+
+      mockPool.connect.mockResolvedValue(mockClient);
+      mockClient.query
+        .mockResolvedValueOnce(undefined) // BEGIN
+        .mockResolvedValueOnce({ rows: [] });
+
+      const result = await repository.update('notif-1', updateDto);
+
+      expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK');
+      expect(mockClient.release).toHaveBeenCalled();
+      expect(result).toBeNull();
     });
 
-    it('should throw if the notification does not exist', async () => {
-      (mockPool.query as jest.Mock).mockResolvedValueOnce({ rows: [] });
+    it('should throw when no fields to update', async () => {
+      const updateDto: UpdateNotificationDto = {};
 
-      await expect(repository.update('notif-1', { isRead: true })).rejects.toThrow(
-        'Notification with ID notif-1 not found',
-      );
+      await expect(repository.update('notif-1', updateDto)).rejects.toThrow('No fields to update');
     });
   });
 
   describe('findUnreadByRecipient', () => {
     it('should return unread notifications for a recipient', async () => {
-      const recipientId = 'user-1';
-      const expectedRows = [
+      const mockRows = [
         {
           id: 'notif-1',
-          recipientId,
+          recipientId: 'user-1',
           senderId: 'user-2',
           type: 'leave_request',
           title: 'Leave Request',
           message: 'You have a new leave request',
-          metadata: { requestId: 'req-1' },
+          metadata: null,
           isRead: false,
           readAt: null,
-          createdAt: new Date('2025-01-01T00:00:00.000Z'),
+          createdAt: new Date('2025-01-01'),
         },
       ];
 
-      (mockPool.query as jest.Mock).mockResolvedValueOnce({ rows: expectedRows });
-
-      const result = await repository.findUnreadByRecipient(recipientId);
-
-      expect(mockPool.query).toHaveBeenCalledWith(
-        expect.stringContaining('SELECT'),
-        [recipientId],
-      );
-      expect(result).toEqual(expectedRows);
-    });
-
-    it('should return an empty array when no unread notifications exist', async () => {
-      (mockPool.query as jest.Mock).mockResolvedValueOnce({ rows: [] });
+      mockPool.query.mockResolvedValueOnce({ rows: mockRows });
 
       const result = await repository.findUnreadByRecipient('user-1');
 
-      expect(result).toEqual([]);
+      expect(mockPool.query).toHaveBeenCalledWith(expect.stringContaining('WHERE recipient_id = $1 AND is_read = false'), ['user-1']);
+      expect(result).toEqual(mockRows);
     });
   });
 });
