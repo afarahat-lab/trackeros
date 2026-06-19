@@ -1,0 +1,126 @@
+{
+  "correlationId": "b40735b8-2172-4f40-8e76-c01b0a73b61f",
+  "domainChanges": [
+    {
+      "entityName": "Employee",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "email",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "managerId",
+          "type": "string | null",
+          "required": false
+        },
+        {
+          "name": "department",
+          "type": "string | null",
+          "required": false
+        },
+        {
+          "name": "status",
+          "type": "'active' | 'inactive'",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "deletedAt",
+          "type": "Date | null",
+          "required": false
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "Employee",
+          "type": "many-to-one"
+        }
+      ]
+    },
+    {
+      "entityName": "LeavePolicy",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "leaveType",
+          "type": "'annual' | 'sick' | 'emergency'",
+          "required": true
+        },
+        {
+          "name": "annualEntitlement",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "maxConsecutiveDays",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "requiresApproval",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "requiresDocumentation",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "documentationThresholdDays",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "carryOverAllowed",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "status",
+          "type": "'active' | 'archived'",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": true
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}
