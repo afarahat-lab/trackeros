@@ -177,7 +177,7 @@ Represents notification data managed by the `notification` module, including not
 | createdAt | Date | true |
 
 **Relationships**
-- `Employee` — many-to-one
+- `Employee` — one-to-one
 
 ### CreateNotificationDto
 
