@@ -32,44 +32,55 @@ Represents a leave record managed by the `leave` module, including leave request
 
 | Field | Type | Required |
 |-------|------|----------|
-| id | string | true |
-| employeeId | string | true |
-| policyId | string | true |
+| id | number | true |
+| employeeId | number | true |
+| leaveType | LeaveType | true |
 | startDate | Date | true |
 | endDate | Date | true |
-| status | 'DRAFT' \| 'SUBMITTED' \| 'APPROVED' \| 'REJECTED' \| 'CANCELLED' | true |
-| reason | string | false |
+| reason | string | true |
+| status | LeaveStatus | true |
+| submittedAt | Date \| null | false |
+| reviewedBy | number \| null | false |
+| reviewedAt | Date \| null | false |
+| comments | string \| null | false |
+| managerId | number \| null | false |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
 **Relationships**
-- `Employee` — many-to-one
+- `Employee` — many-to-one (employeeId)
+- `Employee` — many-to-one (reviewedBy)
+- `Employee` — many-to-one (managerId)
 - `LeavePolicy` — many-to-one
-- `LeaveBalance` — many-to-one
 
 ### CreateLeaveRequestDto
 
 | Field | Type | Required |
 |-------|------|----------|
-| employeeId | string | true |
-| policyId | string | true |
+| employeeId | number | true |
+| leaveType | LeaveType | true |
 | startDate | Date | true |
 | endDate | Date | true |
-| reason | string | false |
+| reason | string | true |
+| managerId | number | false |
 
 ### UpdateLeaveRequestDto
 
 | Field | Type | Required |
 |-------|------|----------|
+| leaveType | LeaveType | false |
 | startDate | Date | false |
 | endDate | Date | false |
 | reason | string | false |
+| comments | string | false |
+| managerId | number | false |
 
 ### LeaveRequestQueryParams
 
 | Field | Type | Required |
 |-------|------|----------|
-| status | 'DRAFT' \| 'SUBMITTED' \| 'APPROVED' \| 'REJECTED' \| 'CANCELLED' | false |
+| status | LeaveStatus | false |
+| leaveType | LeaveType | false |
 | startDateFrom | Date | false |
 | startDateTo | Date | false |
 | endDateFrom | Date | false |
