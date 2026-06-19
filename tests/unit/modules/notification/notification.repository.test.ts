@@ -1,20 +1,22 @@
 import { NotificationRepository } from '../../../../src/modules/notification/notification.repository';
-import pool from '../../../../src/shared/db/connection';
+import { Pool } from 'pg';
 
-jest.mock('../../../../src/shared/db/connection', () => ({
-  __esModule: true,
-  default: {
+jest.mock('pg', () => {
+  const mPool = {
     query: jest.fn(),
-  },
-}));
+    connect: jest.fn(),
+  };
+  return { Pool: jest.fn(() => mPool) };
+});
 
 describe('NotificationRepository', () => {
   let repository: NotificationRepository;
-  const mockQuery = (pool as any).query as jest.Mock;
+  let mockPool: any;
 
   beforeEach(() => {
-    repository = new NotificationRepository();
-    mockQuery.mockClear();
+    mockPool = new Pool();
+    repository = new NotificationRepository(mockPool);
+    jest.clearAllMocks();
   });
 
   describe('create', () => {
@@ -41,14 +43,27 @@ describe('NotificationRepository', () => {
         created_at: new Date('2024-01-01'),
       };
 
-      mockQuery.mockResolvedValueOnce({ rows: [dbRow] });
+      const mockClient = {
+        query: jest.fn(),
+        release: jest.fn(),
+      };
+
+      mockPool.connect.mockResolvedValue(mockClient);
+      mockClient.query
+        .mockResolvedValueOnce(undefined) // BEGIN
+        .mockResolvedValueOnce({ rows: [dbRow] }) // INSERT
+        .mockResolvedValueOnce(undefined); // COMMIT
 
       const result = await repository.create(dto);
 
-      expect(mockQuery).toHaveBeenCalledWith(
+      expect(mockClient.query).toHaveBeenNthCalledWith(1, 'BEGIN');
+      expect(mockClient.query).toHaveBeenNthCalledWith(
+        2,
         expect.stringContaining('INSERT INTO notifications'),
         ['recipient-1', 'sender-1', 'leave_request', 'Test Title', 'Test Message', JSON.stringify({ key: 'value' })]
       );
+      expect(mockClient.query).toHaveBeenNthCalledWith(3, 'COMMIT');
+      expect(mockClient.release).toHaveBeenCalled();
 
       expect(result).toEqual({
         id: 'notif-1',
@@ -85,11 +100,21 @@ describe('NotificationRepository', () => {
         created_at: new Date('2024-01-02'),
       };
 
-      mockQuery.mockResolvedValueOnce({ rows: [dbRow] });
+      const mockClient = {
+        query: jest.fn(),
+        release: jest.fn(),
+      };
+
+      mockPool.connect.mockResolvedValue(mockClient);
+      mockClient.query
+        .mockResolvedValueOnce(undefined) // BEGIN
+        .mockResolvedValueOnce({ rows: [dbRow] }) // INSERT
+        .mockResolvedValueOnce(undefined); // COMMIT
 
       const result = await repository.create(dto);
 
-      expect(mockQuery).toHaveBeenCalledWith(
+      expect(mockClient.query).toHaveBeenNthCalledWith(
+        2,
         expect.stringContaining('INSERT INTO notifications'),
         ['recipient-1', null, 'balance_update', 'Balance Update', 'Your balance was updated', null]
       );
@@ -114,11 +139,11 @@ describe('NotificationRepository', () => {
         created_at: new Date('2024-01-01'),
       };
 
-      mockQuery.mockResolvedValueOnce({ rows: [dbRow] });
+      mockPool.query.mockResolvedValueOnce({ rows: [dbRow] });
 
       const result = await repository.findById('notif-1');
 
-      expect(mockQuery).toHaveBeenCalledWith(
+      expect(mockPool.query).toHaveBeenCalledWith(
         'SELECT * FROM notifications WHERE id = $1',
         ['notif-1']
       );
@@ -138,7 +163,7 @@ describe('NotificationRepository', () => {
     });
 
     it('should return null when notification not found', async () => {
-      mockQuery.mockResolvedValueOnce({ rows: [] });
+      mockPool.query.mockResolvedValueOnce({ rows: [] });
 
       const result = await repository.findById('non-existent');
 
@@ -161,24 +186,28 @@ describe('NotificationRepository', () => {
         created_at: new Date('2024-01-01'),
       };
 
-      mockQuery.mockResolvedValueOnce({ rows: [dbRow] });
+      mockPool.query.mockResolvedValueOnce({ rows: [dbRow] });
 
       const result = await repository.update('notif-1', { isRead: true, readAt: new Date('2024-01-04') });
 
-      expect(mockQuery).toHaveBeenCalledWith(
+      expect(mockPool.query).toHaveBeenCalledWith(
         expect.stringContaining('UPDATE notifications'),
         [true, new Date('2024-01-04'), 'notif-1']
       );
 
-      expect(result.isRead).toBe(true);
-      expect(result.readAt).toEqual(new Date('2024-01-04'));
+      expect(result).not.toBeNull();
+      if (result) {
+        expect(result.isRead).toBe(true);
+        expect(result.readAt).toEqual(new Date('2024-01-04'));
+      }
     });
 
-    it('should throw error when notification not found', async () => {
-      mockQuery.mockResolvedValueOnce({ rows: [] });
+    it('should return null when notification not found', async () => {
+      mockPool.query.mockResolvedValueOnce({ rows: [] });
 
-      await expect(repository.update('non-existent', { isRead: true }))
-        .rejects.toThrow('Notification with ID non-existent not found');
+      const result = await repository.update('non-existent', { isRead: true });
+
+      expect(result).toBeNull();
     });
 
     it('should return current notification when no fields to update', async () => {
@@ -195,12 +224,14 @@ describe('NotificationRepository', () => {
         created_at: new Date('2024-01-01'),
       };
 
-      mockQuery.mockResolvedValueOnce({ rows: [dbRow] });
+      mockPool.query.mockResolvedValueOnce({ rows: [dbRow] });
 
       const result = await repository.update('notif-1', {});
 
-      expect(result).toBeDefined();
-      expect(result.id).toBe('notif-1');
+      expect(result).not.toBeNull();
+      if (result) {
+        expect(result.id).toBe('notif-1');
+      }
     });
   });
 
@@ -233,11 +264,11 @@ describe('NotificationRepository', () => {
         },
       ];
 
-      mockQuery.mockResolvedValueOnce({ rows: dbRows });
+      mockPool.query.mockResolvedValueOnce({ rows: dbRows });
 
       const result = await repository.findUnreadByRecipient('recipient-1');
 
-      expect(mockQuery).toHaveBeenCalledWith(
+      expect(mockPool.query).toHaveBeenCalledWith(
         expect.stringContaining('SELECT * FROM notifications WHERE recipient_id = $1 AND is_read = false'),
         ['recipient-1']
       );
@@ -249,7 +280,7 @@ describe('NotificationRepository', () => {
     });
 
     it('should return empty array when no unread notifications', async () => {
-      mockQuery.mockResolvedValueOnce({ rows: [] });
+      mockPool.query.mockResolvedValueOnce({ rows: [] });
 
       const result = await repository.findUnreadByRecipient('recipient-1');
 

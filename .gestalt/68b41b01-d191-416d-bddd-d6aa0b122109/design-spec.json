@@ -1,0 +1,135 @@
+{
+  "correlationId": "68b41b01-d191-416d-bddd-d6aa0b122109",
+  "domainChanges": [
+    {
+      "entityName": "Notification",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "recipientId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "senderId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "type",
+          "type": "'leave_request' | 'leave_approval' | 'leave_rejection' | 'balance_update' | 'policy_change'",
+          "required": true
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "message",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "metadata",
+          "type": "Record<string, any>",
+          "required": false
+        },
+        {
+          "name": "isRead",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "readAt",
+          "type": "Date",
+          "required": false
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "Employee",
+          "type": "many-to-one",
+          "foreignKey": "recipientId"
+        },
+        {
+          "entity": "Employee",
+          "type": "many-to-one",
+          "foreignKey": "senderId"
+        }
+      ]
+    },
+    {
+      "entityName": "CreateNotificationDto",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "recipientId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "senderId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "type",
+          "type": "'leave_request' | 'leave_approval' | 'leave_rejection' | 'balance_update' | 'policy_change'",
+          "required": true
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "message",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "metadata",
+          "type": "Record<string, any>",
+          "required": false
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "UpdateNotificationDto",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "isRead",
+          "type": "boolean",
+          "required": false
+        },
+        {
+          "name": "readAt",
+          "type": "Date",
+          "required": false
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "INotificationRepository",
+      "operation": "create",
+      "fields": [],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}
