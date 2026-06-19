@@ -2,30 +2,61 @@
   "correlationId": "e1736aec-dfcd-4c83-9a3e-0580e45d3565",
   "domainChanges": [
     {
-      "entityName": "NotificationService",
+      "entityName": "Notification",
       "operation": "create",
       "fields": [
         {
-          "name": "notificationRepository",
-          "type": "INotificationRepository",
+          "name": "id",
+          "type": "string",
           "required": true
         },
         {
-          "name": "auditLogger",
-          "type": "AuditLogger",
+          "name": "recipientId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "senderId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "type",
+          "type": "'leave_request' | 'leave_approval' | 'leave_rejection' | 'balance_update' | 'policy_change'",
+          "required": true
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "message",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "metadata",
+          "type": "Record<string, any>",
+          "required": false
+        },
+        {
+          "name": "isRead",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "readAt",
+          "type": "Date",
+          "required": false
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
           "required": true
         }
       ],
-      "relationships": [
-        {
-          "entity": "Notification",
-          "type": "one-to-many"
-        },
-        {
-          "entity": "INotificationRepository",
-          "type": "one-to-one"
-        }
-      ]
+      "relationships": []
     }
   ],
   "apiContracts": [],

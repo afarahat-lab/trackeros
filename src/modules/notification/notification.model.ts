@@ -1,29 +1,12 @@
-export enum NotificationChannel {
-  Email = 'email',
-  InApp = 'in-app',
-  SMS = 'sms',
-}
-
-export enum NotificationStatus {
-  Pending = 'pending',
-  Sent = 'sent',
-  Failed = 'failed',
-}
-
 export interface Notification {
   id: string;
   recipientId: string;
-  channel: NotificationChannel;
-  subject: string;
-  body: string;
-  status: NotificationStatus;
+  senderId?: string;
+  type: 'leave_request' | 'leave_approval' | 'leave_rejection' | 'balance_update' | 'policy_change';
+  title: string;
+  message: string;
+  metadata?: Record<string, any>;
+  isRead: boolean;
+  readAt?: Date;
   createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface CreateNotificationDto {
-  recipientId: string;
-  channel: NotificationChannel;
-  subject: string;
-  body: string;
 }

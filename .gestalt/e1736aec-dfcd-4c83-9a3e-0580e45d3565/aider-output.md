@@ -1,7 +1,7 @@
 # Aider session
 
 **Exit code:** 0
-**Duration:** 126773ms
+**Duration:** 424442ms
 
 ## Prompt sent to Aider
 
@@ -64,23 +64,22 @@ The following concerns are intentionally OUT OF SCOPE for this phase and will be
 - Phase 10 — Notification integration and final workflow: Update src/modules/leave/leave.service.ts to integrate NotificationService (Phase 5) for sending not
 
 ## Success criteria
-- src/modules/notification/notification.service.ts exists and exports NotificationService class implementing INotificationService interface
-- NotificationService uses INotificationRepository dependency via constructor injection
-- NotificationService uses AuditLogger dependency via constructor injection for audit logging
-- All state-changing operations (create, update) write audit records with sanitized data to satisfy GP-004
-- tests/unit/modules/notification/notification.service.test.ts exists with Vitest tests covering all public methods with >90% coverage
+- src/modules/notification/notification.service.ts exists and exports INotificationService interface and NotificationService class implementing sendLeaveRequestNotification, sendBalanceUpdateNotification, markAsRead, and getUnreadNotifications methods
+- NotificationService uses INotificationRepository (Phase 2) and AuditLogger dependencies via constructor injection
+- All state-changing operations (sendLeaveRequestNotification, sendBalanceUpdateNotification, markAsRead) write audit records via AuditLogger with sanitized data to satisfy GP-004
+- Repository calls are guarded by existence checks and wrapped in explicit error handling so infrastructure exceptions are not leaked to callers
+- tests/unit/modules/notification/notification.service.test.ts exists with Vitest tests covering all public NotificationService methods with >90% coverage
 
 ## Out of scope (do NOT touch these)
-- Notification API endpoints or controllers
-- Notification UI components or frontend integration
-- Real-time notification delivery (email, push, etc.)
+- Notification controllers and API endpoints
+- Integration with leave module workflow
+- Notification UI components
+- Email/SMS notification delivery
 - Notification preferences or settings
-- Notification batch operations
-- Integration with leave module (will be done in Phase 10)
-- Database schema changes or migrations
-- Authentication or authorization for notification access
-- Notification pagination or advanced filtering
-- Notification deletion or archiving
+- Real-time notification delivery (websockets)
+- Notification scheduling or retry logic
+- Any methods beyond sendLeaveRequestNotification, sendBalanceUpdateNotification, markAsRead, and getUnreadNotifications
+- Any repository methods beyond create, update, findByRecipient, and findById
 
 ## Project rules
 - Generated code must compile without errors. Verify with executeScript before returning.
@@ -109,272 +108,278 @@ https://aider.chat/docs/llms/warnings.html
 Aider v0.86.2
 Model: openai/deepseek-ai/DeepSeek-V4-Pro with architect edit format
 Editor model: openai/deepseek-ai/DeepSeek-V4-Pro with editor-whole edit format
-Git repo: .git with 135 files
+Git repo: .git with 142 files
 Repo-map: using 1024 tokens, auto refresh
-Added tsconfig.json to the chat (read-only).
+Added tests/unit/modules/notification/notification.service.test.ts to the chat 
+(read-only).
+Added src/modules/notification/notification.service.ts to the chat (read-only).
+Added src/modules/notification/notification.repository.ts to the chat 
+(read-only).
 Added package.json to the chat (read-only).
 Added PLAN.md to the chat (read-only).
+Added tsconfig.json to the chat (read-only).
 Added src/modules/notification/notification.model.ts to the chat (read-only).
 
 Initial repo scan can be slow in larger repos, but only happens once.
-I'll start by reading the existing files to understand the current state of the 
-codebase, then implement the notification service and tests.                    
+I'll analyze the current state of the codebase and the phase requirements to    
+provide you with clear instructions for implementing Phase 7.                   
 
-Let me first check the existing files I need to reference:                      
+Let me first understand what we're working with by examining the key differences
+between the existing code and the phase architecture requirements.              
 
- 1 The notification model (already provided in the chat)                        
- 2 The notification repository (already provided in the architecture notes)     
- 3 The audit logger (already provided in the chat)                              
- 4 The shared types                                                             
 
-Let me read the key files I need to understand before implementing.             
+Analysis                                                                        
 
-Tokens: 7.1k sent, 94 received.
-I'll create the notification service and its unit tests based on the existing   
-model and repository interfaces. I'll assume the repository interface           
-INotificationRepository and the audit logger interface are already defined in   
-the codebase.                                                                   
+Looking at the provided files, I can see there's a significant mismatch between 
+the existing code and the phase architecture requirements:                      
 
-Here are the new files:                                                         
+Existing Code (already in repo):                                                
 
-src/modules/notification/notification.service.ts                                
+ • notification.model.ts - Uses NotificationChannel, NotificationStatus,        
+   CreateNotificationDto with fields like channel, subject, body, status        
+ • notification.repository.ts - Uses create(data: CreateNotificationDto & {     
+   status: NotificationStatus }), updateStatus(), findByRecipient()             
+ • notification.service.ts - Uses createNotification(), markAsSent(),           
+   markAsFailed(), getNotificationsForRecipient()                               
+ • notification.service.test.ts - Tests the existing service methods            
 
-                                                                                
-import { INotificationRepository } from './notification.repository';            
-                                                                                
-import { IAuditLogger } from '../../shared/audit/audit-logger.interface';       
-                                                                                
-import {                                                                        
-                                                                                
-  Notification,                                                                 
-                                                                                
-  CreateNotificationDto,                                                        
-                                                                                
-  NotificationStatus,                                                           
-                                                                                
-} from './notification.model';                                                  
-                                                                                
-                                                                                
-                                                                                
-export interface INotificationService {                                         
-                                                                                
-  createNotification(dto: CreateNotificationDto): Promise<Notification>;        
-                                                                                
-  markAsSent(notificationId: string): Promise<Notification>;                    
-                                                                                
-  markAsFailed(notificationId: string): Promis
-[... 24174 bytes of stdout truncated (head 4000 + tail 16000 of 44174 kept) ...]
+Phase Architecture Requirements:                                                
+
+ • notification.model.ts - Should have Notification with fields: id,            
+   recipientId, senderId?, type (union type), title, message, metadata?, isRead,
+   readAt?, createdAt                                                           
+ • notification.repository.ts - Should have create(), update(),                 
+   findByRecipient(), findById()                                                
+ • notification.service.ts - Should have sendLeaveRequestNotification(),        
+   sendBalanceUpdateNotification(), markAsRead(), getUnreadNotifications()      
+ • Uses AuditLogger from ../../shared/audit/audit.logger                        
+
+The phase architecture is the AUTHORITATIVE source, so we need to refactor the  
+existing files to match.                                                        
+
+
+Required Changes                                                                
+
+1. Update src/modules/notification/notification.model.ts                        
+
+Replace the entire file content with the new model that matches the phase       
+architecture:                                                                   
 
                                                                                 
-      expect(mockAuditLogger.log).toHaveBeenCalledWith({                        
+export interface Notification {                                                 
+  id: string;                                                                   
+  recipientId: string;                                                          
+  senderId?: string;                                     
+[... 93829 bytes of stdout truncated (head 4000 + tail 16000 of 113829 kept) ...]
+                   
+       entityType: 'notification',                                              
+       entityId: notificationId,                                                
+       action: 'update',                                                        
+       oldValues: this.sanitizeForLogging(notification),                        
+       newValues: this.sanitizeForLogging(updatedNotification)                  
+@@ -103,5 +103,6 @@                                                             
                                                                                 
-        action: 'NOTIFICATION_SENT',                                            
+   async getUnreadNotifications(recipientId: string): Promise<Notification[]> { 
+   }                                                                            
+     switch (type) {                                                            
+requires your attention.`;                                                      
+       case 'leave_approval': return `Your leave request (ID: ${leaveRequestId})
+has been approved.`;                                                            
+       case 'leave_rejection': return `Your leave request (ID:                  
+${leaveRequestId}) has been rejected.`;                                         
++ 121 / 131 lines [███████████████████████████░░░]  92%                         
                                                                                 
-        resource: 'notification',                                               
-                                                                                
-        resourceId: sampleNotification.id,                                      
-                                                                                
-        details: { previousStatus: NotificationStatus.Pending },                
-                                                                                
-      });                                                                       
-                                                                                
-      expect(result).toEqual(sentNotification);                                 
-                                                                                
-    });                                                                         
-                                                                                
-  });                                                                           
-                                                                                
-                                                                                
-                                                                                
-  describe('markAsFailed', () => {                                              
-                                                                                
-    it('should update status to failed and log audit', async () => {            
-                                                                                
-      const failedNotification: Notification = {                                
-                                                                                
-        ...sampleNotification,                                                  
-                                                                                
-        status: NotificationStatus.Failed,                                      
-                                                                                
-        updatedAt: new Date('2026-01-01T12:00:00Z'),                            
-                                                                                
-      };                                                                        
-                                                                                
-                                                                                
-                                                                                
-      mockRepository.updateStatus.mockResolvedValue(failedNotification);        
-                                                                                
-                                                                                
-                                                                                
-      const result = await service.markAsFailed(sampleNotification.id);         
-                                                                                
-                                                                                
-                                                                                
-      expect(mockRepository.updateStatus).toHaveBeenCalledWith(                 
-                                                                                
-        sampleNotification.id,                                                  
-                                                                                
-        NotificationStatus.Failed,                                              
-                                                                                
-      );                                                                        
-                                                                                
-      expect(mockAuditLogger.log).toHaveBeenCalledWith({                        
-                                                                                
-        action: 'NOTIFICATION_FAILED',                                          
-                                                                                
-        resource: 'notification',                                               
-                                                                                
-        resourceId: sampleNotification.id,                                      
-                                                                                
-        details: { previousStatus: NotificationStatus.Pending },                
-                                                                                
-      });                                                                       
-                                                                                
-      expect(result).toEqual(failedNotification);                               
-                                                                                
-    });                                                                         
-                                                                                
-  });                                                                           
-                                                                                
-                                                                                
-                                                                                
-  describe('getNotificationsForRecipient', () => {                              
-                                                                                
-    it('should return notifications for a given recipient', async () => {       
-                                                                                
-      const notifications: Notification[] = [sampleNotification];               
-                                                                                
-      mockRepository.findByRecipient.mockResolvedValue(notifications);          
-                                                                                
-                                                                                
-                                                                                
-      const result = await service.getNotificationsForRecipient('user-1');      
-                                                                                
-                                                                                
-                                                                                
-      expect(mockRepository.findByRecipient).toHaveBeenCalledWith('user-1');    
-                                                                                
-      expect(result).toEqual(notifications);                                    
-                                                                                
-    });                                                                         
-                                                                                
-  });                                                                           
-                                                                                
-});                                                                             
-                                                                                
-
-Tokens: 2.0k sent, 1.4k received.
-
-src/modules/notification/notification.service.ts
-
-tests/unit/modules/notification/notification.service.test.ts
+Tokens: 15k sent, 1.1k received.
 Applied edit to src/modules/notification/notification.service.ts
-Applied edit to tests/unit/modules/notification/notification.service.test.ts
 
 > leave-management@1.0.0 build
 > ./node_modules/.bin/tsc --noEmit
 
-src/modules/notification/notification.service.ts(1,41): error TS2307: Cannot find module './notification.repository' or its corresponding type declarations.
-src/modules/notification/notification.service.ts(2,30): error TS2307: Cannot find module '../../shared/audit/audit-logger.interface' or its corresponding type declarations.
-Added 5 lines of output to the chat.
-We need to fix the missing module errors. The service imports                   
-./notification.repository and ../../shared/audit/audit-logger.interface, but    
-those files don't exist yet. We'll create the required interfaces and a minimal 
-repository interface so the build passes. We'll also adjust the service to use  
-the correct paths.                                                              
+PASS tests/unit/modules/leave/leave.repository.test.ts
+FAIL tests/unit/modules/notification/notification.service.test.ts
+  ● NotificationService › sendLeaveRequestNotification › should create a leave request notification and log audit
 
-First, create the missing files:                                                
+    expect(jest.fn()).toHaveBeenCalledWith(...expected)
 
- • src/modules/notification/notification.repository.ts – define                 
-   INotificationRepository interface.                                           
- • src/shared/audit/audit-logger.interface.ts – define IAuditLogger interface.  
+    Expected: {"action": "create", "entityId": "notif-1", "entityType": "notification", "newValues": ObjectContaining {"id": "notif-1", "recipientId": "user-1", "type": "leave_request"}, "oldValues": null}
+    Received: "create", {"action": "create", "entityId": "notif-1", "entityType": "notification", "newValues": {"createdAt": 2026-01-01T10:00:00.000Z, "id": "notif-1", "isRead": false, "message": "A new leave request (ID: leave-1) requires your attention.", "metadata": {"leaveRequestId": "leave-1"}, "recipientId": "user-1", "title": "New Leave Request", "type": "leave_request"}, "oldValues": null}
 
-Then update the service import paths accordingly (they already match the new    
-files). The test file already imports from the same paths, so it will work once 
-the files exist.                                                                
+    Number of calls: 1
 
-Let's provide the full content for each new file and the updated service (no    
-changes needed in service except we keep the same imports; we'll just ensure the
-files exist). We'll also keep the test file unchanged.                          
+      50 |       });
+      51 |
+    > 52 |       expect(mockAuditLogger.log).toHaveBeenCalledWith({
+         |                                   ^
+      53 |         entityType: 'notification',
+      54 |         entityId: sampleNotification.id,
+      55 |         action: 'create',
 
-Here are the file listings:                                                     
+      at Object.<anonymous> (tests/unit/modules/notification/notification.service.test.ts:52:35)
 
-src/modules/notification/notification.repository.ts                             
+  ● NotificationService › sendBalanceUpdateNotification › should create a balance update notification and log audit
 
-                                                                                
-import { Notification, CreateNotificationDto, NotificationStatus } from         
-'./notification.model';                                                         
-                                                                                
-                                                                                
-                                                                                
-export interface INotificationRepository {                                      
-                                                                                
-  create(data: CreateNotificationDto & { status: NotificationStatus }):         
-Promise<Notification>;                                                          
-                                                                                
-  updateStatus(notificationId: string, status: NotificationStatus):             
-Promise<Notification>;                                                          
-                                                                                
-  findByRecipient(recipientId: string): Promise<Notification[]>;                
-                                                                                
-}                                                                               
-                                                                                
+    expect(jest.fn()).toHaveBeenCalledWith(...expected)
 
-src/shared/audit/audit-logger.interface.ts                                      
+    Expected: {"action": "create", "entityId": "notif-2", "entityType": "notification", "newValues": ObjectContaining {"id": "notif-2", "recipientId": "user-1", "type": "balance_update"}, "oldValues": null}
+    Received: "create", {"action": "create", "entityId": "notif-2", "entityType": "notification", "newValues": {"createdAt": 2026-01-01T11:00:00.000Z, "id": "notif-2", "isRead": false, "message": "Your leave balance (ID: bal-1) has been updated.", "metadata": {"balanceId": "bal-1"}, "recipientId": "user-1", "title": "Leave Balance Updated", "type": "balance_update"}, "oldValues": null}
 
-                                                                                
-export interface AuditLogEntry {                                                
-                                                                                
-  action: string;                                                               
-                                                                                
-  resource: string;                                                             
-                                                                                
-  resourceId: string;                                                           
-                                                                                
-  details?: Record<string, unknown>;                                            
-                                                                                
-  timestamp?: Date;                                                             
-                                                                                
-}                                                                               
-                                                                                
-                                                                                
-                                                                                
-export interface IAuditLogger {                                                 
-                                                                                
-  log(entry: AuditLogEntry): Promise<void>;                                     
-                                                                                
-}                                                                               
-                                                                                
+    Number of calls: 1
 
-src/modules/notification/notification.service.ts                                
+      129 |       });
+      130 |
+    > 131 |       expect(mockAuditLogger.log).toHaveBeenCalledWith({
+          |                                   ^
+      132 |         entityType: 'notification',
+      133 |         entityId: balanceNotification.id,
+      134 |         action: 'create',
 
-                                                                                
-@@ -1,5 +1,6 @@                                                                 
- import { INotificationRepository } from './notification.repository';           
+      at Object.<anonymous> (tests/unit/modules/notification/notification.service.test.ts:131:35)
+
+  ● NotificationService › markAsRead › should mark notification as read and log audit
+
+    expect(jest.fn()).toHaveBeenCalledWith(...expected)
+
+    Expected: {"action": "update", "entityId": "notif-1", "entityType": "notification", "newValues": ObjectContaining {"id": "notif-1", "isRead": true}, "oldValues": ObjectContaining {"id": "notif-1", "isRead": false}}
+    Received: "update", {"action": "update", "entityId": "notif-1", "entityType": "notification", "newValues": {"createdAt": 2026-01-01T10:00:00.000Z, "id": "notif-1", "isRead": true, "message": "A new leave request (ID: leave-1) requires your attention.", "metadata": {"leaveRequestId": "leave-1"}, "readAt": 2026-01-01T12:00:00.000Z, "recipientId": "user-1", "title": "New Leave Request", "type": "leave_request"}, "oldValues": {"createdAt": 2026-01-01T10:00:00.000Z, "id": "notif-1", "isRead": false, "message": "A new leave request (ID: leave-1) requires your attention.", "metadata": {"leaveRequestId": "leave-1"}, "recipientId": "user-1", "title": "New Leave Request", "type": "leave_request"}}
+
+    Number of calls: 1
+
+      163 |       });
+      164 |
+    > 165 |       expect(mockAuditLogger.log).toHaveBeenCalledWith({
+          |                                   ^
+      166 |         entityType: 'notification',
+      167 |         entityId: 'notif-1',
+      168 |         action: 'update',
+
+      at Object.<anonymous> (tests/unit/modules/notification/notification.service.test.ts:165:35)
+
+Test Suites: 1 failed, 1 passed, 2 total
+Tests:       3 failed, 15 passed, 18 total
+Snapshots:   0 total
+Time:        1.214 s
+Ran all test suites.
+Added 67 lines of output to the chat.
+The test failures show that auditLogger.log is being called with two arguments  
+(a string and an object), but the tests expect a single object. I need to update
+the test expectations to match the actual two‑argument call signature.          
+
+Here's the corrected test file:                                                 
 
 tests/unit/modules/notification/notification.service.test.ts                    
 
                                                                                 
 @@ -1,2 +1,3 @@                                                                 
- import { NotificationService } from                                            
+ import { NotificationService, INotificationService } from                      
 '../../../../src/modules/notification/notification.service';                    
  import { INotificationRepository } from                                        
 '../../../../src/modules/notification/notification.repository';                 
- import { IAuditLogger } from                                                   
-'../../../../src/shared/audit/audit-logger.interface';                          
- import {                                                                       
-   Notification,                                                                
-+   5 / 131 lines [█░░░░░░░░░░░░░░░░░░░░░░░░░░░░░]   4%                         
                                                                                 
-Tokens: 5.2k sent, 1.7k received.
-
-src/modules/notification/notification.repository.ts
-
-src/shared/audit/audit-logger.interface.ts
-Applied edit to src/modules/notification/notification.repository.ts
-Applied edit to src/modules/notification/notification.service.ts
+-      expect(mockAuditLogger.log).toHaveBeenCalledWith({                       
+-        entityType: 'notification',                                            
+-        entityId: sampleNotification.id,                                       
+-        action: 'create',                                                      
+-        oldValues: null,                                                       
+-        newValues: expect.objectContaining({                                   
+-          id: sampleNotification.id,                                           
+-          recipientId: 'user-1',                                               
+-          type: 'leave_request',                                               
+-        }),                                                                    
+-      });                                                                      
+-    });                                                                        
+-                                                                               
+-    it('should handle leave_approval notification type', async () => {         
+-      const approvalNotification: Notification = {                             
+-        ...sampleNotification,                                                 
+-        type: 'leave_approval',                                                
+-        title: 'Leave Request Approved',                                       
+-        message: 'Your leave request (ID: leave-1) has been approved.',        
+-      };                                                                       
+-      mockRepository.create.mockResolvedValue(approvalNotification);           
+-                                                                               
+-      await service.sendLeaveRequestNotification('user-1', 'leave-1',          
+'leave_approval');                                                              
+-                                                                               
+-      expect(mockRepository.create).toHaveBeenCalledWith(                      
++      expect(mockAuditLogger.log).toHaveBeenCalledWith(                        
++        'create',                                                              
+         expect.objectContaining({                                              
++          entityType: 'notification',                                          
++          entityId: sampleNotification.id,                                     
++          action: 'create',                                                    
++          entityType: 'notification',                                          
++          entityId: sampleNotification.id,                                     
++          action: 'create',                                                    
++          oldValues: null,                                                     
++          newValues: expect.objectContaining({                                 
++            id: sampleNotification.id,                                         
++            recipientId: 'user-1',                                             
++            type: 'leave_request',                                             
++          }),                                                                  
+         })                                                                     
++          oldValues: null,                                                     
+-          recipientId: 'user-1',                                               
+-          type: 'balance_update',                                              
+-        }),                                                                    
+-      });                                                                      
+-    });                                                                        
+-  });                                                                          
+-                                                                               
+-  describe('markAsRead', () => {                                               
+-    it('should mark notification as read and log audit', async () => {         
+-      const unreadNotification: Notification = { ...sampleNotification, isRead:
+false };                                                                        
+-      const readNotification: Notification = {                                 
+-        ...sampleNotification,                                                 
+-        isRead: true,                                                          
+-        readAt: new Date('2026-01-01T12:00:00Z'),                              
+-      };                                                                       
+-                                                                               
+-      mockRepository.findById.mockResolvedValue(unreadNotification);           
+-      mockRepository.update.mockResolvedValue(readNotification);               
+-                                                                               
+-      await service.markAsRead('notif-1');                                     
+-                                                                               
+-      expect(mockRepository.findById).toHaveBeenCalledWith('notif-1');         
+-      expect(mockRepository.update).toHaveBeenCalledWith('notif-1', {          
+-        isRead: true,                                                          
+-        readAt: expect.any(Date),                                              
+-      });                                                                      
+-                                                                               
+-      expect(mockAuditLogger.log).toHaveBeenCalledWith({                       
+-        entityType: 'notification',                                            
+-        entityId: 'notif-1',                                                   
+-        action: 'update',                                                      
+-        oldValues: expect.objectContaining({ id: 'notif-1', isRead: false }),  
+-        newValues: expect.objectContaining({ id: 'notif-1', isRead: true }),   
+-      });                                                                      
+-    });                                                                        
+-                                                                               
+-    it('should throw error if notification not found', async () => {           
+-      mockRepository.findById.mockResolvedValue(null);                         
+-                                                                               
+-      await expect(service.markAsRead('nonexistent')).rejects.toThrow(         
+-        'Notification with ID nonexistent not found'                           
++      expect(mockAuditLogger.log).toHaveBeenCalledWith(                        
++        'create',                                                              
++        expect.objectContaining({                                              
++          entityType: 'notification',                                          
++          entityId: balanceNotification.id,                                    
++          action: 'create',                                                    
++          oldValues: null,                                                     
++          newValues: expect.objectContaining({                                 
++            id: balanceNotification.id,                                        
++            recipientId: 'user-1',                                             
+       );                                                                       
+                                                                                
+       const result = await service.getUnreadNotifications('user-1');           
+                                                                                
+       expect(mockRepository.findByRecipient).toHaveBeenCalledWith('user-1', {  
+isRead: false });                                                               
++ 193 / 205 lines [████████████████████████████░░]  94%                         
+                                                                                
+Tokens: 19k sent, 1.7k received.
 Applied edit to tests/unit/modules/notification/notification.service.test.ts
-Applied edit to src/shared/audit/audit-logger.interface.ts
 
 > leave-management@1.0.0 build
 > ./node_modules/.bin/tsc --noEmit
@@ -383,9 +388,9 @@ PASS tests/unit/modules/notification/notification.service.test.ts
 PASS tests/unit/modules/leave/leave.repository.test.ts
 
 Test Suites: 2 passed, 2 total
-Tests:       14 passed, 14 total
+Tests:       18 passed, 18 total
 Snapshots:   0 total
-Time:        1.228 s
+Time:        0.824 s, estimated 1 s
 Ran all test suites.
 Summarization failed for model openai/deepseek-ai/DeepSeek-V4-Pro: cannot schedule new futures after shutdown
 Summarization failed for model openai/deepseek-ai/DeepSeek-V4-Pro: cannot schedule new futures after shutdown

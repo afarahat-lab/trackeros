@@ -1,131 +1,214 @@
-import { NotificationService } from '../../../../src/modules/notification/notification.service';
+import { NotificationService, INotificationService } from '../../../../src/modules/notification/notification.service';
 import { INotificationRepository } from '../../../../src/modules/notification/notification.repository';
-import { IAuditLogger } from '../../../../src/shared/audit/audit-logger.interface';
-import {
-  Notification,
-  CreateNotificationDto,
-  NotificationChannel,
-  NotificationStatus,
-} from '../../../../src/modules/notification/notification.model';
+import { AuditLogger } from '../../../../src/shared/audit/audit.logger';
+import { Notification } from '../../../../src/modules/notification/notification.model';
 
 describe('NotificationService', () => {
   let service: NotificationService;
   let mockRepository: jest.Mocked<INotificationRepository>;
-  let mockAuditLogger: jest.Mocked<IAuditLogger>;
+  let mockAuditLogger: jest.Mocked<AuditLogger>;
 
   const sampleNotification: Notification = {
     id: 'notif-1',
     recipientId: 'user-1',
-    channel: NotificationChannel.Email,
-    subject: 'Leave Approved',
-    body: 'Your leave has been approved.',
-    status: NotificationStatus.Pending,
+    type: 'leave_request',
+    title: 'New Leave Request',
+    message: 'A new leave request (ID: leave-1) requires your attention.',
+    metadata: { leaveRequestId: 'leave-1' },
+    isRead: false,
     createdAt: new Date('2026-01-01T10:00:00Z'),
-    updatedAt: new Date('2026-01-01T10:00:00Z'),
   };
 
   beforeEach(() => {
     mockRepository = {
       create: jest.fn(),
-      updateStatus: jest.fn(),
+      update: jest.fn(),
       findByRecipient: jest.fn(),
+      findById: jest.fn(),
     } as unknown as jest.Mocked<INotificationRepository>;
 
     mockAuditLogger = {
       log: jest.fn(),
-    } as unknown as jest.Mocked<IAuditLogger>;
+    } as unknown as jest.Mocked<AuditLogger>;
 
     service = new NotificationService(mockRepository, mockAuditLogger);
   });
 
-  describe('createNotification', () => {
-    it('should create a notification with pending status and log audit', async () => {
-      const dto: CreateNotificationDto = {
-        recipientId: 'user-1',
-        channel: NotificationChannel.Email,
-        subject: 'Leave Approved',
-        body: 'Your leave has been approved.',
-      };
-
+  describe('sendLeaveRequestNotification', () => {
+    it('should create a leave request notification and log audit', async () => {
       mockRepository.create.mockResolvedValue(sampleNotification);
 
-      const result = await service.createNotification(dto);
+      await service.sendLeaveRequestNotification('user-1', 'leave-1', 'leave_request', { priority: 'high' });
 
       expect(mockRepository.create).toHaveBeenCalledWith({
-        ...dto,
-        status: NotificationStatus.Pending,
+        recipientId: 'user-1',
+        type: 'leave_request',
+        title: 'New Leave Request',
+        message: 'A new leave request (ID: leave-1) requires your attention.',
+        metadata: { priority: 'high', leaveRequestId: 'leave-1' },
+        isRead: false,
       });
-      expect(mockAuditLogger.log).toHaveBeenCalledWith({
-        action: 'NOTIFICATION_CREATED',
-        resource: 'notification',
-        resourceId: sampleNotification.id,
-        details: { channel: dto.channel, recipientId: dto.recipientId },
-      });
-      expect(result).toEqual(sampleNotification);
+
+      expect(mockAuditLogger.log).toHaveBeenCalledWith(
+        'create',
+        expect.objectContaining({
+          entityType: 'notification',
+          entityId: sampleNotification.id,
+          action: 'create',
+          oldValues: null,
+          newValues: expect.objectContaining({
+            id: sampleNotification.id,
+            recipientId: 'user-1',
+            type: 'leave_request',
+          }),
+        })
+      );
+    });
+
+    it('should handle leave_approval notification type', async () => {
+      const approvalNotification: Notification = {
+        ...sampleNotification,
+        type: 'leave_approval',
+        title: 'Leave Request Approved',
+        message: 'Your leave request (ID: leave-1) has been approved.',
+      };
+      mockRepository.create.mockResolvedValue(approvalNotification);
+
+      await service.sendLeaveRequestNotification('user-1', 'leave-1', 'leave_approval');
+
+      expect(mockRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'leave_approval',
+          title: 'Leave Request Approved',
+          message: 'Your leave request (ID: leave-1) has been approved.',
+        })
+      );
+    });
+
+    it('should handle leave_rejection notification type', async () => {
+      const rejectionNotification: Notification = {
+        ...sampleNotification,
+        type: 'leave_rejection',
+        title: 'Leave Request Rejected',
+        message: 'Your leave request (ID: leave-1) has been rejected.',
+      };
+      mockRepository.create.mockResolvedValue(rejectionNotification);
+
+      await service.sendLeaveRequestNotification('user-1', 'leave-1', 'leave_rejection');
+
+      expect(mockRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'leave_rejection',
+          title: 'Leave Request Rejected',
+          message: 'Your leave request (ID: leave-1) has been rejected.',
+        })
+      );
     });
   });
 
-  describe('markAsSent', () => {
-    it('should update status to sent and log audit', async () => {
-      const sentNotification: Notification = {
+  describe('sendBalanceUpdateNotification', () => {
+    it('should create a balance update notification and log audit', async () => {
+      const balanceNotification: Notification = {
+        id: 'notif-2',
+        recipientId: 'user-1',
+        type: 'balance_update',
+        title: 'Leave Balance Updated',
+        message: 'Your leave balance (ID: bal-1) has been updated.',
+        metadata: { balanceId: 'bal-1' },
+        isRead: false,
+        createdAt: new Date('2026-01-01T11:00:00Z'),
+      };
+      mockRepository.create.mockResolvedValue(balanceNotification);
+
+      await service.sendBalanceUpdateNotification('user-1', 'bal-1', { days: 20 });
+
+      expect(mockRepository.create).toHaveBeenCalledWith({
+        recipientId: 'user-1',
+        type: 'balance_update',
+        title: 'Leave Balance Updated',
+        message: 'Your leave balance (ID: bal-1) has been updated.',
+        metadata: { days: 20, balanceId: 'bal-1' },
+        isRead: false,
+      });
+
+      expect(mockAuditLogger.log).toHaveBeenCalledWith(
+        'create',
+        expect.objectContaining({
+          entityType: 'notification',
+          entityId: balanceNotification.id,
+          action: 'create',
+          oldValues: null,
+          newValues: expect.objectContaining({
+            id: balanceNotification.id,
+            recipientId: 'user-1',
+            type: 'balance_update',
+          }),
+        })
+      );
+    });
+  });
+
+  describe('markAsRead', () => {
+    it('should mark notification as read and log audit', async () => {
+      const unreadNotification: Notification = { ...sampleNotification, isRead: false };
+      const readNotification: Notification = {
         ...sampleNotification,
-        status: NotificationStatus.Sent,
-        updatedAt: new Date('2026-01-01T11:00:00Z'),
+        isRead: true,
+        readAt: new Date('2026-01-01T12:00:00Z'),
       };
 
-      mockRepository.updateStatus.mockResolvedValue(sentNotification);
+      mockRepository.findById.mockResolvedValue(unreadNotification);
+      mockRepository.update.mockResolvedValue(readNotification);
 
-      const result = await service.markAsSent(sampleNotification.id);
+      await service.markAsRead('notif-1');
 
-      expect(mockRepository.updateStatus).toHaveBeenCalledWith(
-        sampleNotification.id,
-        NotificationStatus.Sent,
-      );
-      expect(mockAuditLogger.log).toHaveBeenCalledWith({
-        action: 'NOTIFICATION_SENT',
-        resource: 'notification',
-        resourceId: sampleNotification.id,
-        details: { previousStatus: NotificationStatus.Pending },
+      expect(mockRepository.findById).toHaveBeenCalledWith('notif-1');
+      expect(mockRepository.update).toHaveBeenCalledWith('notif-1', {
+        isRead: true,
+        readAt: expect.any(Date),
       });
-      expect(result).toEqual(sentNotification);
+
+      expect(mockAuditLogger.log).toHaveBeenCalledWith(
+        'update',
+        expect.objectContaining({
+          entityType: 'notification',
+          entityId: 'notif-1',
+          action: 'update',
+          oldValues: expect.objectContaining({ id: 'notif-1', isRead: false }),
+          newValues: expect.objectContaining({ id: 'notif-1', isRead: true }),
+        })
+      );
+    });
+
+    it('should throw error if notification not found', async () => {
+      mockRepository.findById.mockResolvedValue(null);
+
+      await expect(service.markAsRead('nonexistent')).rejects.toThrow(
+        'Notification with ID nonexistent not found'
+      );
+
+      expect(mockRepository.update).not.toHaveBeenCalled();
+      expect(mockAuditLogger.log).not.toHaveBeenCalled();
     });
   });
 
-  describe('markAsFailed', () => {
-    it('should update status to failed and log audit', async () => {
-      const failedNotification: Notification = {
-        ...sampleNotification,
-        status: NotificationStatus.Failed,
-        updatedAt: new Date('2026-01-01T12:00:00Z'),
-      };
+  describe('getUnreadNotifications', () => {
+    it('should return unread notifications for recipient', async () => {
+      const unreadNotifications: Notification[] = [sampleNotification];
+      mockRepository.findByRecipient.mockResolvedValue(unreadNotifications);
 
-      mockRepository.updateStatus.mockResolvedValue(failedNotification);
+      const result = await service.getUnreadNotifications('user-1');
 
-      const result = await service.markAsFailed(sampleNotification.id);
-
-      expect(mockRepository.updateStatus).toHaveBeenCalledWith(
-        sampleNotification.id,
-        NotificationStatus.Failed,
-      );
-      expect(mockAuditLogger.log).toHaveBeenCalledWith({
-        action: 'NOTIFICATION_FAILED',
-        resource: 'notification',
-        resourceId: sampleNotification.id,
-        details: { previousStatus: NotificationStatus.Pending },
-      });
-      expect(result).toEqual(failedNotification);
+      expect(mockRepository.findByRecipient).toHaveBeenCalledWith('user-1', { isRead: false });
+      expect(result).toEqual(unreadNotifications);
     });
-  });
 
-  describe('getNotificationsForRecipient', () => {
-    it('should return notifications for a given recipient', async () => {
-      const notifications: Notification[] = [sampleNotification];
-      mockRepository.findByRecipient.mockResolvedValue(notifications);
+    it('should return empty array when no unread notifications', async () => {
+      mockRepository.findByRecipient.mockResolvedValue([]);
 
-      const result = await service.getNotificationsForRecipient('user-1');
+      const result = await service.getUnreadNotifications('user-1');
 
-      expect(mockRepository.findByRecipient).toHaveBeenCalledWith('user-1');
-      expect(result).toEqual(notifications);
+      expect(result).toEqual([]);
     });
   });
 });
