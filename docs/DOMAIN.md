@@ -32,20 +32,25 @@ Represents a leave record managed by the `leave` module, including leave request
 
 | Field | Type | Required |
 |-------|------|----------|
-| id | string | true |
-| employeeId | string | true |
-| policyId | string | true |
+| id | number | true |
+| employeeId | number | true |
+| leaveType | LeaveType | true |
 | startDate | Date | true |
 | endDate | Date | true |
-| status | 'DRAFT' \| 'SUBMITTED' \| 'APPROVED' \| 'REJECTED' \| 'CANCELLED' | true |
-| reason | string | false |
+| reason | string | true |
+| status | LeaveStatus | true |
+| submittedAt | Date \| null | false |
+| reviewedBy | number \| null | false |
+| reviewedAt | Date \| null | false |
+| comments | string \| null | false |
+| managerId | number \| null | false |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
 **Relationships**
-- `Employee` — many-to-one
-- `LeavePolicy` — many-to-one
-- `LeaveBalance` — many-to-one
+- `Employee` — many-to-one (employeeId)
+- `Employee` — many-to-one (reviewedBy)
+- `Employee` — many-to-one (managerId)
 
 ### CreateLeaveRequestDto
 

@@ -1,0 +1,97 @@
+{
+  "correlationId": "67a65fad-c22e-4374-a6db-4fb1196014d5",
+  "domainChanges": [
+    {
+      "entityName": "LeaveRequest",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "employeeId",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "leaveType",
+          "type": "LeaveType",
+          "required": true
+        },
+        {
+          "name": "startDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "endDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "reason",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "status",
+          "type": "LeaveStatus",
+          "required": true
+        },
+        {
+          "name": "submittedAt",
+          "type": "Date | null",
+          "required": false
+        },
+        {
+          "name": "reviewedBy",
+          "type": "number | null",
+          "required": false
+        },
+        {
+          "name": "reviewedAt",
+          "type": "Date | null",
+          "required": false
+        },
+        {
+          "name": "comments",
+          "type": "string | null",
+          "required": false
+        },
+        {
+          "name": "managerId",
+          "type": "number | null",
+          "required": false
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "Employee",
+          "type": "many-to-one"
+        },
+        {
+          "entity": "Employee",
+          "type": "many-to-one"
+        },
+        {
+          "entity": "Employee",
+          "type": "many-to-one"
+        }
+      ]
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}
