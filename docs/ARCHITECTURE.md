@@ -30,6 +30,7 @@ src/modules/LeaveType/    — LeaveType module
 src/modules/LeavePolicy/    — LeavePolicy module
 src/modules/NotificationType/    — NotificationType module
 src/modules/UpdateNotificationDto/    — UpdateNotificationDto module
+src/modules/AuditLog/    — AuditLog module
 src/shared/db connection.ts
 src/shared/base repository.ts
 src/shared/error types.ts
@@ -927,4 +928,4 @@ CREATE TABLE employees (
 
 CREATE TABLE leave_policies (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    leave_type VARCHAR(50) UNIQUE
+    leave_type VARCHAR(50
