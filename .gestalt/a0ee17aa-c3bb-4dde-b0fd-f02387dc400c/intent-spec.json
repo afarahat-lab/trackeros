@@ -1,0 +1,89 @@
+{
+  "id": "3db35335-9fca-4c3c-8ea4-40468c83f08b",
+  "correlationId": "a0ee17aa-c3bb-4dde-b0fd-f02387dc400c",
+  "rawIntent": "[Feature: Build the leave management module — Phase 7: Create Notification Model and Repository]\n\nCreate the Notification interface and the NotificationRepository class implementing INotificationRepository. This establishes the core data structure and data access layer.\n\nPhase architecture notes:\n{\"interfaces\":[\"File: src/modules/notification/notification.model.ts\\nexport interface Notification {\\n  id: string;\\n  recipientId: string;\\n  senderId?: string;\\n  type: 'leave_request' | 'leave_approval' | 'leave_rejection' | 'balance_update' | 'policy_change';\\n  title: string;\\n  message: string;\\n  metadata?: Record<string, any>;\\n  isRead: boolean;\\n  readAt?: Date;\\n  createdAt: Date;\\n}\\n\\nexport interface CreateNotificationDto {\\n  recipientId: string;\\n  senderId?: string;\\n  type: 'leave_request' | 'leave_approval' | 'leave_rejection' | 'balance_update' | 'policy_change';\\n  title: string;\\n  message: string;\\n  metadata?: Record<string, any>;\\n}\\n\\nexport interface UpdateNotificationDto {\\n  isRead?: boolean;\\n  readAt?: Date;\\n}\\n\\nexport interface INotificationRepository {\\n  create(dto: CreateNotificationDto): Promise<Notification>;\\n  findById(id: string): Promise<Notification | null>;\\n  update(id: string, dto: UpdateNotificationDto): Promise<Notification | null>;\\n  findUnreadByRecipient(recipientId: string): Promise<Notification[]>;\\n}\"],\"importStatements\":[\"import { Pool } from 'pg'\",\"import { Notification, CreateNotificationDto, UpdateNotificationDto, INotificationRepository } from './notification.model'\"],\"successCriteria\":[\"src/modules/notification/notification.model.ts exists and exports Notification, CreateNotificationDto, UpdateNotificationDto, and INotificationRepository interfaces\",\"src/modules/notification/notification.repository.ts exists and exports NotificationRepository class implementing INotificationRepository\",\"NotificationRepository implements all methods from INotificationRepository: create, findById, update, findUnreadByRecipient\",\"NotificationRepository methods use PostgreSQL pool for database operations (GP-001 compliance)\",\"All notification types match the canonical SQL schema: 'leave_request', 'leave_approval', 'leave_rejection', 'balance_update', 'policy_change'\",\"NotificationRepository.create method writes an audit log record for the notification creation (GP-002 compliance) within the same database transaction\"],\"sqlSchema\":\"CREATE TABLE notifications (\\n  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\\n  recipient_id UUID NOT NULL REFERENCES employees(id) ON DELETE CASCADE,\\n  sender_id UUID REFERENCES employees(id),\\n  type VARCHAR(50) NOT NULL CHECK (type IN ('leave_request', 'leave_approval', 'leave_rejection', 'balance_update', 'policy_change')),\\n  title VARCHAR(200) NOT NULL,\\n  message TEXT NOT NULL,\\n  metadata JSONB,\\n  is_read BOOLEAN DEFAULT false,\\n  read_at TIMESTAMP WITH TIME ZONE,\\n  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP\\n);\"}\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/notification/notification.model.ts\\nexport interface Notification {\\n  id: string;\\n  recipientId: string;\\n  senderId?: string;\\n  type: 'leave_request' | 'leave_approval' | 'leave_rejection' | 'balance_update' | 'policy_change';\\n  title: string;\\n  message: string;\\n  metadata?: Record<string, any>;\\n  isRead: boolean;\\n  readAt?: Date;\\n  createdAt: Date;\\n}\\n\\nexport interface CreateNotificationDto {\\n  recipientId: string;\\n  senderId?: string;\\n  type: 'leave_request' | 'leave_approval' | 'leave_rejection' | 'balance_update' | 'policy_change';\\n  title: string;\\n  message: string;\\n  metadata?: Record<string, any>;\\n}\\n\\nexport interface UpdateNotificationDto {\\n  isRead?: boolean;\\n  readAt?: Date;\\n}\\n\\nexport interface INotificationRepository {\\n  create(dto: CreateNotificationDto): Promise<Notification>;\\n  findById(id: string): Promise<Notification | null>;\\n  update(id: string, dto: UpdateNotificationDto): Promise<Notification | null>;\\n  findUnreadByRecipient(recipientId: string): Promise<Notification[]>;\\n}\"],\"importStatements\":[\"import { Pool } from 'pg'\",\"import { Notification, CreateNotificationDto, UpdateNotificationDto, INotificationRepository } from './notification.model'\",\"import { pool } from '../../shared/db/connection'\",\"import { AuditLogger } from '../../shared/audit/audit-logger'\"],\"successCriteria\":[\"src/modules/notification/notification.model.ts exists and exports Notification, CreateNotificationDto, UpdateNotificationDto, and INotificationRepository interfaces\",\"src/modules/notification/notification.repository.ts exists and exports NotificationRepository class implementing INotificationRepository\",\"NotificationRepository implements all methods from INotificationRepository: create, findById, update, findUnreadByRecipient\",\"NotificationRepository methods use PostgreSQL pool for database operations (GP-001 compliance)\",\"All notification type values match the canonical SQL schema exactly: 'leave_request', 'leave_approval', 'leave_rejection', 'balance_update', 'policy_change'\",\"NotificationRepository.create method writes an audit log record via AuditLogger (GP-002 compliance)\",\"NotificationRepository.update method writes an audit log record via AuditLogger (GP-002 compliance)\",\"NotificationRepository methods execute database operations and audit logging in a single transaction using BEGIN/COMMIT\"],\"sqlSchema\":\"CREATE TABLE notifications (\\n  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\\n  recipient_id UUID NOT NULL REFERENCES employees(id) ON DELETE CASCADE,\\n  sender_id UUID REFERENCES employees(id),\\n  type VARCHAR(50) NOT NULL CHECK (type IN ('leave_request', 'leave_approval', 'leave_rejection', 'balance_update', 'policy_change')),\\n  title VARCHAR(200) NOT NULL,\\n  message TEXT NOT NULL,\\n  metadata JSONB,\\n  is_read BOOLEAN DEFAULT false,\\n  read_at TIMESTAMP WITH TIME ZONE,\\n  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP\\n);\"}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- Notification\n- CreateNotificationDto\n- UpdateNotificationDto\n- INotificationRepository\n- Pool\n- pool\n- AuditLogger\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Canonical entity fields for this phase\n\nNote: these field names supersede any attribute names in the\nintent text above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the field names of each entity this phase defines. The\nexact attribute / column / property set per entity is:\n\n- `Notification`: `id`, `recipientId`, `senderId`, `type`, `title`, `message`, `metadata`, `isRead`, `readAt`, `createdAt`\n- `CreateNotificationDto`: `recipientId`, `senderId`, `type`, `title`, `message`, `metadata`\n- `UpdateNotificationDto`: `isRead`, `readAt`\n\nTreat each entity's field list as complete. If the\nintent text or planner scope mentions different field\nnames than the architecture, do NOT flag this as\nambiguity — the per-phase architecture wins.\n\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 8 — Create Notification Service and Unit Tests: Create the NotificationService class implementing INotificationService, using the repository and aud\n- Phase 9 — Leave controllers and API endpoints: Create src/modules/leave/leave.controller.ts with Fastify controllers for leave management endpoints\n- Phase 10 — Notification integration and final workflow: Update src/modules/leave/leave.service.ts to integrate NotificationService (Phase 5) for sending not",
+  "scope": {
+    "affectedDomains": [
+      "notification"
+    ],
+    "affectedLayers": [
+      "domain",
+      "infra"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/notification/notification.model.ts exists and exports Notification, CreateNotificationDto, UpdateNotificationDto, and INotificationRepository interfaces",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/notification/notification.repository.ts exists and exports NotificationRepository class implementing INotificationRepository",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "NotificationRepository implements all methods from INotificationRepository: create, findById, update, findUnreadByRecipient",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "NotificationRepository methods use PostgreSQL pool for database operations (GP-001 compliance)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "All notification type values match the canonical SQL schema exactly: 'leave_request', 'leave_approval', 'leave_rejection', 'balance_update', 'policy_change'",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-006",
+      "description": "NotificationRepository.create method writes an audit log record via AuditLogger (GP-002 compliance)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-007",
+      "description": "NotificationRepository.update method writes an audit log record via AuditLogger (GP-002 compliance)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-008",
+      "description": "NotificationRepository methods execute database operations and audit logging in a single transaction using BEGIN/COMMIT",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces (GP-001)",
+    "Audit records: All state-changing operations write an audit record (GP-002)",
+    "Input validation: Validate all inputs at API boundaries before processing",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data",
+    "RBAC enforcement: All API endpoints enforce role-based access control",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled",
+    "Modular monolith architecture with dependency direction: leave -> notification",
+    "TypeScript with Node.js 20 and Fastify",
+    "PostgreSQL database with UUID primary keys",
+    "Notification types must match canonical schema: 'leave_request', 'leave_approval', 'leave_rejection', 'balance_update', 'policy_change'"
+  ],
+  "outOfScope": [
+    "NotificationService class implementation (Phase 8)",
+    "Unit tests for NotificationRepository (Phase 8)",
+    "Leave controllers and API endpoints (Phase 9)",
+    "Notification integration into leave service (Phase 10)",
+    "Any changes to existing modules outside notification",
+    "UI components or React Native code",
+    "API endpoint creation",
+    "Notification consumption or delivery mechanisms"
+  ],
+  "ambiguities": []
+}

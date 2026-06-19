@@ -1,43 +1,60 @@
 import { Pool } from 'pg';
-import { Notification, CreateNotificationDto, UpdateNotificationDto } from './notification.model';
-
-export interface INotificationRepository {
-  create(data: CreateNotificationDto): Promise<Notification>;
-  findById(id: string): Promise<Notification | null>;
-  update(id: string, data: UpdateNotificationDto): Promise<Notification>;
-  findUnreadByRecipient(recipientId: string): Promise<Notification[]>;
-}
+import { Notification, CreateNotificationDto, UpdateNotificationDto, INotificationRepository } from './notification.model';
+import { AuditLogger } from '../../shared/audit/audit.logger';
 
 export class NotificationRepository implements INotificationRepository {
-  constructor(private readonly pool: Pool) {}
+  constructor(
+    private readonly pool: Pool,
+    private readonly auditLogger: AuditLogger
+  ) {}
 
   async create(data: CreateNotificationDto): Promise<Notification> {
-    const query = `
-      INSERT INTO notifications (recipient_id, sender_id, type, title, message, metadata)
-      VALUES ($1, $2, $3, $4, $5, $6)
-      RETURNING
-        id,
-        recipient_id AS "recipientId",
-        sender_id AS "senderId",
-        type,
-        title,
-        message,
-        metadata,
-        is_read AS "isRead",
-        read_at AS "readAt",
-        created_at AS "createdAt"
-    `;
-    const values = [
-      data.recipientId,
-      data.senderId || null,
-      data.type,
-      data.title,
-      data.message,
-      data.metadata || null,
-    ];
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
 
-    const result = await this.pool.query(query, values);
-    return result.rows[0];
+      const query = `
+        INSERT INTO notifications (recipient_id, sender_id, type, title, message, metadata)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING
+          id,
+          recipient_id AS "recipientId",
+          sender_id AS "senderId",
+          type,
+          title,
+          message,
+          metadata,
+          is_read AS "isRead",
+          read_at AS "readAt",
+          created_at AS "createdAt"
+      `;
+      const values = [
+        data.recipientId,
+        data.senderId || null,
+        data.type,
+        data.title,
+        data.message,
+        data.metadata || null,
+      ];
+
+      const result = await client.query(query, values);
+      const notification = result.rows[0];
+
+      this.auditLogger.log('notification.created', {
+        entityType: 'notification',
+        entityId: notification.id,
+        recipientId: data.recipientId,
+        type: data.type,
+      });
+
+      await client.query('COMMIT');
+      return notification;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   async findById(id: string): Promise<Notification | null> {
@@ -65,7 +82,7 @@ export class NotificationRepository implements INotificationRepository {
     return result.rows[0];
   }
 
-  async update(id: string, data: UpdateNotificationDto): Promise<Notification> {
+  async update(id: string, data: UpdateNotificationDto): Promise<Notification | null> {
     const updates: string[] = [];
     const values: any[] = [];
     let paramCount = 1;
@@ -83,36 +100,56 @@ export class NotificationRepository implements INotificationRepository {
     }
 
     if (updates.length === 0) {
-      throw new Error('No fields to update');
+      return null;
     }
 
     updates.push(`updated_at = CURRENT_TIMESTAMP`);
-
     values.push(id);
-    const query = `
-      UPDATE notifications
-      SET ${updates.join(', ')}
-      WHERE id = $${paramCount}
-      RETURNING
-        id,
-        recipient_id AS "recipientId",
-        sender_id AS "senderId",
-        type,
-        title,
-        message,
-        metadata,
-        is_read AS "isRead",
-        read_at AS "readAt",
-        created_at AS "createdAt"
-    `;
 
-    const result = await this.pool.query(query, values);
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
 
-    if (result.rows.length === 0) {
-      throw new Error(`Notification with ID ${id} not found`);
+      const query = `
+        UPDATE notifications
+        SET ${updates.join(', ')}
+        WHERE id = $${paramCount}
+        RETURNING
+          id,
+          recipient_id AS "recipientId",
+          sender_id AS "senderId",
+          type,
+          title,
+          message,
+          metadata,
+          is_read AS "isRead",
+          read_at AS "readAt",
+          created_at AS "createdAt"
+      `;
+
+      const result = await client.query(query, values);
+
+      if (result.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return null;
+      }
+
+      const notification = result.rows[0];
+
+      this.auditLogger.log('notification.updated', {
+        entityType: 'notification',
+        entityId: notification.id,
+        changes: data,
+      });
+
+      await client.query('COMMIT');
+      return notification;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
     }
-
-    return result.rows[0];
   }
 
   async findUnreadByRecipient(recipientId: string): Promise<Notification[]> {
