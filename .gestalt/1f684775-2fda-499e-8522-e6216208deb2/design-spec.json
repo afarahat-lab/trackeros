@@ -1,0 +1,366 @@
+{
+  "correlationId": "1f684775-2fda-499e-8522-e6216208deb2",
+  "domainChanges": [
+    {
+      "entityName": "Employee",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "employeeNumber",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "firstName",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "lastName",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "email",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "managerId",
+          "type": "string | null",
+          "required": false
+        },
+        {
+          "name": "department",
+          "type": "string | null",
+          "required": false
+        },
+        {
+          "name": "hireDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "employmentStatus",
+          "type": "'active' | 'inactive' | 'terminated'",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "Employee",
+          "type": "one-to-many"
+        },
+        {
+          "entity": "LeaveRequest",
+          "type": "one-to-many"
+        },
+        {
+          "entity": "LeaveBalance",
+          "type": "one-to-many"
+        },
+        {
+          "entity": "Notification",
+          "type": "one-to-many"
+        }
+      ]
+    },
+    {
+      "entityName": "LeavePolicy",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "policyName",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "leaveType",
+          "type": "'annual' | 'sick' | 'emergency' | 'unpaid' | 'maternity' | 'paternity'",
+          "required": true
+        },
+        {
+          "name": "entitlementDays",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "accrualRate",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "maxCarryover",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "requiresApproval",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "minServiceDays",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "isActive",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "LeaveRequest",
+          "type": "one-to-many"
+        },
+        {
+          "entity": "LeaveBalance",
+          "type": "one-to-many"
+        }
+      ]
+    },
+    {
+      "entityName": "LeaveBalance",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "employeeId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "policyId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "fiscalYear",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "accruedDays",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "usedDays",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "carriedOver",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "balanceDays",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "Employee",
+          "type": "many-to-one"
+        },
+        {
+          "entity": "LeavePolicy",
+          "type": "many-to-one"
+        }
+      ]
+    },
+    {
+      "entityName": "LeaveRequest",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "employeeId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "policyId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "startDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "endDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "totalDays",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "status",
+          "type": "'draft' | 'submitted' | 'pending_approval' | 'approved' | 'rejected' | 'cancelled'",
+          "required": true
+        },
+        {
+          "name": "reason",
+          "type": "string | null",
+          "required": false
+        },
+        {
+          "name": "managerId",
+          "type": "string | null",
+          "required": false
+        },
+        {
+          "name": "reviewedAt",
+          "type": "Date | null",
+          "required": false
+        },
+        {
+          "name": "reviewNotes",
+          "type": "string | null",
+          "required": false
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "Employee",
+          "type": "many-to-one"
+        },
+        {
+          "entity": "LeavePolicy",
+          "type": "many-to-one"
+        }
+      ]
+    },
+    {
+      "entityName": "Notification",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "recipientId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "senderId",
+          "type": "string | null",
+          "required": false
+        },
+        {
+          "name": "type",
+          "type": "'leave_submitted' | 'leave_approved' | 'leave_rejected' | 'balance_low' | 'system_alert'",
+          "required": true
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "message",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "metadata",
+          "type": "Record<string, any> | null",
+          "required": false
+        },
+        {
+          "name": "isRead",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "readAt",
+          "type": "Date | null",
+          "required": false
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "Employee",
+          "type": "many-to-one"
+        }
+      ]
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}
