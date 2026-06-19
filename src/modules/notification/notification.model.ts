@@ -24,3 +24,10 @@ export interface UpdateNotificationDto {
   isRead?: boolean;
   readAt?: Date;
 }
+
+export interface INotificationRepository {
+  create(dto: CreateNotificationDto): Promise<Notification>;
+  findById(id: string): Promise<Notification | null>;
+  update(id: string, dto: UpdateNotificationDto): Promise<Notification | null>;
+  findUnreadByRecipient(recipientId: string): Promise<Notification[]>;
+}

@@ -5,10 +5,12 @@
 ### Domain Models
 - `src/modules/leave/leave.model.ts` — `LeaveRequest`, `CreateLeaveRequestDto`, `UpdateLeaveRequestDto`, `LeaveRequestQuery`
 - `src/modules/balance/balance.model.ts` — `LeaveBalance`, `LeaveBalanceQuery`
+- `src/modules/notification/notification.model.ts` — `Notification`, `CreateNotificationDto`, `UpdateNotificationDto`, `INotificationRepository`
 
 ### Repositories
 - `src/modules/leave/leave.repository.ts` — `ILeaveRepository`
 - `src/modules/balance/balance.repository.ts` — `ILeaveBalanceRepository`
+- `src/modules/notification/notification.repository.ts` — `INotificationRepository`, `NotificationRepository`
 
 ### Shared Types
 - `src/shared/types/leave.types.ts` — `LeaveType`, `LeaveStatus`, `NotificationType`, `AuditAction`, `EntityType`
