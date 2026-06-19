@@ -32,6 +32,7 @@ src/modules/NotificationType/    — NotificationType module
 src/modules/UpdateNotificationDto/    — UpdateNotificationDto module
 src/modules/AuditLog/    — AuditLog module
 src/modules/AuditRecord/    — AuditRecord module
+src/modules/AuditServiceInterface/    — AuditServiceInterface module
 src/shared/db connection.ts
 src/shared/base repository.ts
 src/shared/error types.ts
@@ -924,8 +925,3 @@ CREATE TABLE employees (
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
     manager_id UUID REFERENCES employees(id),
-    department VARCHAR(100)
-);
-
-CREATE TABLE leave_policies (
-    id UUID
