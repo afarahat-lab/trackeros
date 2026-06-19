@@ -97,7 +97,15 @@ agents:
       # reliably. If V4-Pro also fails Aider's diff parser
       # (same failure mode as V3.2), revert to Kimi and find a
       # different mitigation for the streaming flake.
-      model: deepseek-ai/DeepSeek-V4-Pro
+      #
+      # TR_077-qwen — swapped off deepseek-ai/DeepSeek-V4-Pro onto
+      # Qwen/Qwen3.6-27B to test whether a different code-agent model
+      # gets past the layering wall + Mode A on dependency-bearing
+      # service phases. Exact DeepInfra model string confirmed against
+      # https://api.deepinfra.com/v1/openai/models (Qwen/Qwen3.6-27B).
+      # Unregistered model string → resolves via the env DeepInfra
+      # default (LLM_BASE_URL/LLM_API_KEY) per llm/index.ts fallback.
+      model: Qwen/Qwen3.6-27B
       temperature: 0.1
       max_tokens: 8000
       # No reasoning_effort — Aider drives its own reasoning loop;
