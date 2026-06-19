@@ -130,9 +130,10 @@ Represents employee data managed by the `employee` module, including employee re
 | lastName | string | true |
 | email | string | true |
 | managerId | string \| null | false |
-| department | string | true |
+| department | string \| null | false |
 | hireDate | Date | true |
-| isActive | boolean | true |
+| terminationDate | Date \| null | false |
+| employmentStatus | 'ACTIVE' \| 'INACTIVE' \| 'TERMINATED' | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 | deletedAt | Date \| null | false |
@@ -172,34 +173,20 @@ Represents leave policy data managed by the `policy` module, including policy de
 
 Represents notification data managed by the `notification` module, including notification records, delivery status, and related messaging information.
 
-### NotificationType
-
-| Value | Description |
-|-------|-------------|
-| LEAVE_REQUESTED | A new leave request has been submitted |
-| LEAVE_APPROVED | A leave request has been approved |
-| LEAVE_REJECTED | A leave request has been rejected |
-| LEAVE_CANCELLED | A leave request has been cancelled |
-| BALANCE_UPDATED | Leave balance has been updated |
-| POLICY_UPDATED | Leave policy has been updated |
-
 ### Notification
 
 | Field | Type | Required |
 |-------|------|----------|
 | id | string | true |
 | recipientId | string | true |
-| senderId | string \| null | false |
-| type | NotificationType | true |
+| type | string | true |
 | title | string | true |
-| body | string | true |
-| metadata | Record<string, any> \| null | false |
-| isRead | boolean | true |
-| readAt | Date \| null | false |
+| message | string | true |
+| relatedEntityType | string \| null | false |
+| relatedEntityId | string \| null | false |
+| status | 'PENDING' \| 'SENT' \| 'READ' \| 'ARCHIVED' | true |
 | createdAt | Date | true |
-
-**Relationships**
-- `Employee` — many-to-one
+| readAt | Date \| null | false |
 
 ## audit
 
