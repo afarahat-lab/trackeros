@@ -57,9 +57,31 @@ Represents a leave record managed by the `leave` module, including leave request
 |-------|------|----------|
 | employeeId | string | true |
 | policyId | string | true |
-| startDate | Date | true |
-| endDate | Date | true |
+| startDate | string | true |
+| endDate | string | true |
 | reason | string | false |
+
+### SubmitLeaveRequestDto
+
+| Field | Type | Required |
+|-------|------|----------|
+| requestId | string | true |
+| employeeId | string | true |
+
+### ReviewLeaveRequestDto
+
+| Field | Type | Required |
+|-------|------|----------|
+| requestId | string | true |
+| managerId | string | true |
+| reviewNotes | string | false |
+
+### CancelLeaveRequestDto
+
+| Field | Type | Required |
+|-------|------|----------|
+| requestId | string | true |
+| employeeId | string | true |
 
 ### UpdateLeaveRequestDto
 
@@ -78,6 +100,15 @@ Represents a leave record managed by the `leave` module, including leave request
 | startDateTo | Date | false |
 | limit | number | false |
 | offset | number | false |
+
+### LeaveRequestQueryDto
+
+| Field | Type | Required |
+|-------|------|----------|
+| employeeId | string | false |
+| managerId | string | false |
+| status | string | false |
+| fiscalYear | number | false |
 
 ## balance
 
@@ -101,6 +132,32 @@ Represents leave balance data managed by the `balance` module, including tracked
 **Relationships**
 - `Employee` — many-to-one
 - `LeavePolicy` — many-to-one
+
+### BalanceAdjustmentDto
+
+| Field | Type | Required |
+|-------|------|----------|
+| employeeId | string | true |
+| policyId | string | true |
+| fiscalYear | number | true |
+| adjustmentType | 'accrual' \| 'usage' \| 'correction' | true |
+| days | number | true |
+| notes | string | false |
+
+### LeaveBalanceDto
+
+| Field | Type | Required |
+|-------|------|----------|
+| id | string | true |
+| employeeId | string | true |
+| policyId | string | true |
+| fiscalYear | number | true |
+| accruedDays | number | true |
+| usedDays | number | true |
+| carriedOver | number | true |
+| balanceDays | number | true |
+| createdAt | Date | true |
+| updatedAt | Date | true |
 
 ## employee
 
@@ -184,6 +241,32 @@ Represents notification data managed by the `notification` module, including not
 
 **Relationships**
 - `Employee` — many-to-one
+
+### CreateNotificationDto
+
+| Field | Type | Required |
+|-------|------|----------|
+| recipientId | string | true |
+| senderId | string | false |
+| type | 'leave_submitted' \| 'leave_approved' \| 'leave_rejected' \| 'balance_low' \| 'system_alert' | true |
+| title | string | true |
+| message | string | true |
+| metadata | Record<string, any> | false |
+
+### MarkAsReadDto
+
+| Field | Type | Required |
+|-------|------|----------|
+| notificationId | string | true |
+| recipientId | string | true |
+
+### NotificationQueryDto
+
+| Field | Type | Required |
+|-------|------|----------|
+| recipientId | string | true |
+| isRead | boolean | false |
+| type | string | false |
 
 ## audit
 

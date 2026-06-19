@@ -1,0 +1,110 @@
+{
+  "id": "d9e54da3-e0fb-4ec9-970a-6658d0a3d8c4",
+  "correlationId": "61a347ae-4b92-4a1d-bb3a-9102a8a82e47",
+  "rawIntent": "[Feature: Build the leave management module — Phase 2: Service interfaces and DTO definitions]\n\nCreate approximately 6 files: src/modules/leave/leave.service.ts, src/modules/balance/balance.service.ts, src/modules/employee/employee.service.ts, src/modules/policy/policy.service.ts with service interfaces. Create DTO files (src/modules/*/*.dto.ts) for CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveBalanceDto, etc. This phase depends on all model files from Phase 1 — read them before generating DTOs that reference domain types. Include Jest unit tests in tests/unit/modules/*/dto.test.ts.\n\nThis phase depends on: src/modules/leave/leave.model.ts, src/modules/balance/balance.model.ts, src/modules/employee/employee.model.ts, src/modules/policy/policy.model.ts, src/modules/notification/notification.model.ts.\n\nPhase architecture notes:\nDefine application layer contracts before implementation, ensuring proper dependency direction and interface-first development.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/leave/leave.service.ts\\nimport { LeaveRequestRepository } from './leave.repository';\\nimport { LeaveBalanceRepository } from '../balance/balance.repository';\\nimport { NotificationService } from '../notification/notification.service';\\nimport { AuditLogService } from '../audit/audit.service';\\nimport { CreateLeaveRequestDto } from './leave.dto';\\nimport { SubmitLeaveRequestDto } from './leave.dto';\\nimport { ReviewLeaveRequestDto } from './leave.dto';\\nimport { CancelLeaveRequestDto } from './leave.dto';\\nimport { LeaveRequest, LeaveRequestStatus } from './leave.model';\\nimport { LeaveBalance } from '../balance/balance.model';\\n\\nexport interface LeaveRequestService {\\n  createDraft(dto: CreateLeaveRequestDto): Promise<LeaveRequest>;\\n  submitRequest(dto: SubmitLeaveRequestDto): Promise<LeaveRequest>;\\n  approveRequest(dto: ReviewLeaveRequestDto): Promise<LeaveRequest>;\\n  rejectRequest(dto: ReviewLeaveRequestDto): Promise<LeaveRequest>;\\n  cancelRequest(dto: CancelLeaveRequestDto): Promise<LeaveRequest>;\\n  getEmployeeRequests(employeeId: string, status?: LeaveRequestStatus): Promise<LeaveRequest[]>;\\n  getManagerPendingRequests(managerId: string): Promise<LeaveRequest[]>;\\n}\\n\\nexport class LeaveRequestServiceImpl implements LeaveRequestService {\\n  constructor(\\n    private readonly leaveRequestRepository: LeaveRequestRepository,\\n    private readonly leaveBalanceRepository: LeaveBalanceRepository,\\n    private readonly notificationService: NotificationService,\\n    private readonly auditLogService: AuditLogService\\n  ) {}\\n\\n  async createDraft(dto: CreateLeaveRequestDto): Promise<LeaveRequest> {\\n    // Implementation will be added in Phase 3\\n    throw new Error('Not implemented');\\n  }\\n\\n  async submitRequest(dto: SubmitLeaveRequestDto): Promise<LeaveRequest> {\\n    // Implementation will be added in Phase 3\\n    throw new Error('Not implemented');\\n  }\\n\\n  async approveRequest(dto: ReviewLeaveRequestDto): Promise<LeaveRequest> {\\n    // Implementation will be added in Phase 3\\n    throw new Error('Not implemented');\\n  }\\n\\n  async rejectRequest(dto: ReviewLeaveRequestDto): Promise<LeaveRequest> {\\n    // Implementation will be added in Phase 3\\n    throw new Error('Not implemented');\\n  }\\n\\n  async cancelRequest(dto: CancelLeaveRequestDto): Promise<LeaveRequest> {\\n    // Implementation will be added in Phase 3\\n    throw new Error('Not implemented');\\n  }\\n\\n  async getEmployeeRequests(employeeId: string, status?: LeaveRequestStatus): Promise<LeaveRequest[]> {\\n    // Implementation will be added in Phase 3\\n    throw new Error('Not implemented');\\n  }\\n\\n  async getManagerPendingRequests(managerId: string): Promise<LeaveRequest[]> {\\n    // Implementation will be added in Phase 3\\n    throw new Error('Not implemented');\\n  }\\n}\",\"File: src/modules/balance/balance.service.ts\\nimport { LeaveBalanceRepository } from './balance.repository';\\nimport { LeaveBalance } from './balance.model';\\nimport { BalanceAdjustmentDto } from './balance.dto';\\n\\nexport interface LeaveBalanceService {\\n  getBalance(employeeId: string, policyId: string, fiscalYear: number): Promise<LeaveBalance>;\\n  calculateAvailableDays(employeeId: string, policyId: string, startDate: Date, endDate: Date): Promise<number>;\\n  adjustBalance(dto: BalanceAdjustmentDto): Promise<LeaveBalance>;\\n}\\n\\nexport class LeaveBalanceServiceImpl implements LeaveBalanceService {\\n  constructor(\\n    private readonly leaveBalanceRepository: LeaveBalanceRepository\\n  ) {}\\n\\n  async getBalance(employeeId: string, policyId: string, fiscalYear: number): Promise<LeaveBalance> {\\n    // Implementation will be added in Phase 3\\n    throw new Error('Not implemented');\\n  }\\n\\n  async calculateAvailableDays(employeeId: string, policyId: string, startDate: Date, endDate: Date): Promise<number> {\\n    // Implementation will be added in Phase 3\\n    throw new Error('Not implemented');\\n  }\\n\\n  async adjustBalance(dto: BalanceAdjustmentDto): Promise<LeaveBalance> {\\n    // Implementation will be added in Phase 3\\n    throw new Error('Not implemented');\\n  }\\n}\",\"File: src/modules/notification/notification.service.ts\\nimport { NotificationRepository } from './notification.repository';\\nimport { CreateNotificationDto } from './notification.dto';\\nimport { Notification } from './notification.model';\\n\\nexport interface NotificationService {\\n  createNotification(dto: CreateNotificationDto): Promise<Notification>;\\n  markAsRead(notificationId: string, recipientId: string): Promise<Notification>;\\n  getUnreadNotifications(recipientId: string): Promise<Notification[]>;\\n}\\n\\nexport class NotificationServiceImpl implements NotificationService {\\n  constructor(\\n    private readonly notificationRepository: NotificationRepository\\n  ) {}\\n\\n  async createNotification(dto: CreateNotificationDto): Promise<Notification> {\\n    // Implementation will be added in Phase 3\\n    throw new Error('Not implemented');\\n  }\\n\\n  async markAsRead(notificationId: string, recipientId: string): Promise<Notification> {\\n    // Implementation will be added in Phase 3\\n    throw new Error('Not implemented');\\n  }\\n\\n  async getUnreadNotifications(recipientId: string): Promise<Notification[]> {\\n    // Implementation will be added in Phase 3\\n    throw new Error('Not implemented');\\n  }\\n}\",\"File: src/modules/leave/leave.dto.ts\\nexport interface CreateLeaveRequestDto {\\n  employeeId: string;\\n  policyId: string;\\n  startDate: string;\\n  endDate: string;\\n  reason?: string;\\n}\\n\\nexport interface SubmitLeaveRequestDto {\\n  requestId: string;\\n  employeeId: string;\\n}\\n\\nexport interface ReviewLeaveRequestDto {\\n  requestId: string;\\n  managerId: string;\\n  reviewNotes?: string;\\n}\\n\\nexport interface CancelLeaveRequestDto {\\n  requestId: string;\\n  employeeId: string;\\n}\\n\\nexport interface LeaveRequestQueryDto {\\n  employeeId?: string;\\n  managerId?: string;\\n  status?: string;\\n  fiscalYear?: number;\\n}\",\"File: src/modules/balance/balance.dto.ts\\nexport interface BalanceAdjustmentDto {\\n  employeeId: string;\\n  policyId: string;\\n  fiscalYear: number;\\n  adjustmentType: 'accrual' | 'usage' | 'correction';\\n  days: number;\\n  notes?: string;\\n}\\n\\nexport interface LeaveBalanceDto {\\n  id: string;\\n  employeeId: string;\\n  policyId: string;\\n  fiscalYear: number;\\n  accruedDays: number;\\n  usedDays: number;\\n  carriedOver: number;\\n  balanceDays: number;\\n  createdAt: Date;\\n  updatedAt: Date;\\n}\",\"File: src/modules/notification/notification.dto.ts\\nexport interface CreateNotificationDto {\\n  recipientId: string;\\n  senderId?: string;\\n  type: 'leave_submitted' | 'leave_approved' | 'leave_rejected' | 'balance_low' | 'system_alert';\\n  title: string;\\n  message: string;\\n  metadata?: Record<string, any>;\\n}\\n\\nexport interface MarkAsReadDto {\\n  notificationId: string;\\n  recipientId: string;\\n}\\n\\nexport interface NotificationQueryDto {\\n  recipientId: string;\\n  isRead?: boolean;\\n  type?: string;\\n}\"],\"importStatements\":[\"import { LeaveRequestService, LeaveRequestServiceImpl } from './leave.service'\",\"import { LeaveBalanceService, LeaveBalanceServiceImpl } from './balance.service'\",\"import { NotificationService, NotificationServiceImpl } from './notification.service'\",\"import { CreateLeaveRequestDto, SubmitLeaveRequestDto, ReviewLeaveRequestDto, CancelLeaveRequestDto, LeaveRequestQueryDto } from './leave.dto'\",\"import { BalanceAdjustmentDto, LeaveBalanceDto } from './balance.dto'\",\"import { CreateNotificationDto, MarkAsReadDto, NotificationQueryDto } from './notification.dto'\"],\"successCriteria\":[\"src/modules/leave/leave.service.ts exists and exports LeaveRequestService interface and LeaveRequestServiceImpl class with all required methods\",\"src/modules/balance/balance.service.ts exists and exports LeaveBalanceService interface and LeaveBalanceServiceImpl class with all required methods\",\"src/modules/notification/notification.service.ts exists and exports NotificationService interface and NotificationServiceImpl class with all required methods\",\"src/modules/leave/leave.dto.ts exists and exports CreateLeaveRequestDto, SubmitLeaveRequestDto, ReviewLeaveRequestDto, CancelLeaveRequestDto, and LeaveRequestQueryDto interfaces\",\"src/modules/balance/balance.dto.ts exists and exports BalanceAdjustmentDto and LeaveBalanceDto interfaces\",\"src/modules/notification/notification.dto.ts exists and exports CreateNotificationDto, MarkAsReadDto, and NotificationQueryDto interfaces\",\"All service interfaces follow repository pattern (GP-001) by accepting repository dependencies in constructors\",\"All DTOs use string types for UUID fields and include proper validation decorators will be added in Phase 3\",\"Notification type enum values match canonical schema: 'leave_submitted', 'leave_approved', 'leave_rejected', 'balance_low', 'system_alert'\",\"ARCHITECTURE.md must be updated to include BalanceAdjustmentDto.adjustmentType enum values ('accrual', 'usage', 'correction') as they are new domain concepts not previously documented\"]}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- LeaveRequestService\n- LeaveBalanceService\n- NotificationService\n- CreateLeaveRequestDto\n- SubmitLeaveRequestDto\n- ReviewLeaveRequestDto\n- CancelLeaveRequestDto\n- LeaveRequestQueryDto\n- BalanceAdjustmentDto\n- LeaveBalanceDto\n- CreateNotificationDto\n- MarkAsReadDto\n- NotificationQueryDto\n- LeaveRequestServiceImpl\n- LeaveBalanceServiceImpl\n- NotificationServiceImpl\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Canonical entity fields for this phase\n\nNote: these field names supersede any attribute names in the\nintent text above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the field names of each entity this phase defines. The\nexact attribute / column / property set per entity is:\n\n- `CreateLeaveRequestDto`: `employeeId`, `policyId`, `startDate`, `endDate`, `reason`\n- `SubmitLeaveRequestDto`: `requestId`, `employeeId`\n- `ReviewLeaveRequestDto`: `requestId`, `managerId`, `reviewNotes`\n- `CancelLeaveRequestDto`: `requestId`, `employeeId`\n- `LeaveRequestQueryDto`: `employeeId`, `managerId`, `status`, `fiscalYear`\n- `BalanceAdjustmentDto`: `employeeId`, `policyId`, `fiscalYear`, `adjustmentType`, `days`, `notes`\n- `LeaveBalanceDto`: `id`, `employeeId`, `policyId`, `fiscalYear`, `accruedDays`, `usedDays`, `carriedOver`, `balanceDays`, `createdAt`, `updatedAt`\n- `CreateNotificationDto`: `recipientId`, `senderId`, `type`, `title`, `message`, `metadata`\n- `MarkAsReadDto`: `notificationId`, `recipientId`\n- `NotificationQueryDto`: `recipientId`, `isRead`, `type`\n\nTreat each entity's field list as complete. If the\nintent text or planner scope mentions different field\nnames than the architecture, do NOT flag this as\nambiguity — the per-phase architecture wins.\n\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 3 — Employee and Policy module implementations: Create approximately 5 files: Implement src/modules/employee/employee.repository.ts and src/modules/\n- Phase 4 — Balance module implementation: Create approximately 4 files: Implement src/modules/balance/balance.repository.ts and src/modules/ba\n- Phase 5 — Notification module implementation: Create approximately 3 files: Implement src/modules/notification/notification.repository.ts and src/\n- Phase 6 — Leave module implementation: Create approximately 5 files: Implement src/modules/leave/leave.repository.ts and src/modules/leave/\n- Phase 7 — Controllers and API routes: Create approximately 4 files: src/modules/leave/leave.controller.ts, src/modules/leave/leave.routes.\n- Phase 8 — Audit integration and RBAC enforcement: Create approximately 3 files: Add audit logging decorators in src/shared/decorators/audit.decorator.",
+  "scope": {
+    "affectedDomains": [
+      "leave",
+      "balance",
+      "notification"
+    ],
+    "affectedLayers": [
+      "domain",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/leave/leave.service.ts exists and exports LeaveRequestService interface and LeaveRequestServiceImpl class with all required methods",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/balance/balance.service.ts exists and exports LeaveBalanceService interface and LeaveBalanceServiceImpl class with all required methods",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "src/modules/notification/notification.service.ts exists and exports NotificationService interface and NotificationServiceImpl class with all required methods",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "src/modules/leave/leave.dto.ts exists and exports CreateLeaveRequestDto, SubmitLeaveRequestDto, ReviewLeaveRequestDto, CancelLeaveRequestDto, and LeaveRequestQueryDto interfaces",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "src/modules/balance/balance.dto.ts exists and exports BalanceAdjustmentDto and LeaveBalanceDto interfaces",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-006",
+      "description": "src/modules/notification/notification.dto.ts exists and exports CreateNotificationDto, MarkAsReadDto, and NotificationQueryDto interfaces",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-007",
+      "description": "All service interfaces follow repository pattern (GP-001) by accepting repository dependencies in constructors",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-008",
+      "description": "All DTOs use string types for UUID fields",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-009",
+      "description": "Notification type enum values match canonical schema: 'leave_submitted', 'leave_approved', 'leave_rejected', 'balance_low', 'system_alert'",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-010",
+      "description": "ARCHITECTURE.md must be updated to include BalanceAdjustmentDto.adjustmentType enum values ('accrual', 'usage', 'correction') as they are new domain concepts not previously documented",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces",
+    "Input validation: Validate all inputs at API boundaries before processing",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data",
+    "RBAC enforcement: All API endpoints enforce role-based access control",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled",
+    "Dependency direction: leave -> employee, leave -> policy, leave -> balance, and leave -> notification. No reverse dependencies",
+    "LeaveRequest lifecycle states are Pending, Approved, and Rejected",
+    "Balance deductions occur only during approveLeaveRequest",
+    "Notifications are created on submission, approval, and rejection events",
+    "All service implementations must throw 'Not implemented' errors as placeholders for Phase 3"
+  ],
+  "outOfScope": [
+    "Implementation of service methods (deferred to Phase 3)",
+    "Employee and Policy module implementations (deferred to Phase 3)",
+    "Balance module implementation (deferred to Phase 4)",
+    "Notification module implementation (deferred to Phase 5)",
+    "Leave module implementation (deferred to Phase 6)",
+    "Controllers and API routes (deferred to Phase 7)",
+    "Audit integration and RBAC enforcement (deferred to Phase 8)",
+    "Validation decorators on DTOs (deferred to Phase 3)",
+    "Repository implementations",
+    "Database schema changes",
+    "API endpoint implementations",
+    "Authentication and authorization logic",
+    "Audit logging implementation",
+    "Integration tests",
+    "End-to-end tests"
+  ],
+  "ambiguities": []
+}
