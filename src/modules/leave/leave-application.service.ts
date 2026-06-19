@@ -82,18 +82,21 @@ export class LeaveApplicationService implements ILeaveApplicationService {
     }
 
     // 4. Update status to 'submitted' via leaveRepository
+    const previousStatus = leaveRequest.requestStatus;
     const updatedAt = new Date();
-    const updatedLeaveRequest = await this.leaveRepository.updateLeaveRequestStatus(
+    const updatedLeaveRequest = await this.leaveRepository.updateLeaveRequest(
       leaveRequestId,
-      LeaveStatus.Pending,
-      updatedAt
+      {
+        status: LeaveStatus.Pending,
+        requestStatus: LeaveRequestStatus.PendingApproval,
+        updatedAt,
+      }
     );
-    updatedLeaveRequest.requestStatus = LeaveRequestStatus.PendingApproval;
 
     // 5. Write audit log via auditLogger (GP-002)
     await this.auditLogger.log('LeaveRequest', leaveRequestId, 'submitted', {
       employeeId,
-      previousStatus: LeaveRequestStatus.Draft,
+      previousStatus,
       newStatus: LeaveRequestStatus.PendingApproval,
     });
 
@@ -135,14 +138,16 @@ export class LeaveApplicationService implements ILeaveApplicationService {
     }
 
     // 4. Update status to 'cancelled' via leaveRepository
-    const updatedAt = new Date();
     const previousStatus = leaveRequest.requestStatus;
-    const updatedLeaveRequest = await this.leaveRepository.updateLeaveRequestStatus(
+    const updatedAt = new Date();
+    const updatedLeaveRequest = await this.leaveRepository.updateLeaveRequest(
       leaveRequestId,
-      LeaveStatus.Rejected,
-      updatedAt
+      {
+        status: LeaveStatus.Rejected,
+        requestStatus: LeaveRequestStatus.Cancelled,
+        updatedAt,
+      }
     );
-    updatedLeaveRequest.requestStatus = LeaveRequestStatus.Cancelled;
 
     // 5. Write audit log via auditLogger (GP-002)
     await this.auditLogger.log('LeaveRequest', leaveRequestId, 'cancelled', {
@@ -168,13 +173,10 @@ export class LeaveApplicationService implements ILeaveApplicationService {
   }
 
   async getLeaveRequestsByEmployee(employeeId: string, status?: LeaveRequestStatus): Promise<LeaveRequest[]> {
-    return this.leaveRepository.findLeaveRequestsByEmployeeId(employeeId, status as unknown as LeaveStatus);
+    return this.leaveRepository.findLeaveRequestsByEmployeeId(employeeId, status);
   }
 
   private validateCreateLeaveRequestDto(dto: CreateLeaveRequestDto): void {
-    if (!dto.employeeId) {
-      throw new Error('Employee ID is required');
-    }
     if (!dto.leaveType) {
       throw new Error('Leave type is required');
     }
