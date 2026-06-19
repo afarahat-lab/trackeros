@@ -179,6 +179,17 @@ Represents notification data managed by the `notification` module, including not
 **Relationships**
 - `Employee` — many-to-one
 
+### NotificationService
+
+| Field | Type | Required |
+|-------|------|----------|
+| notificationRepository | INotificationRepository | true |
+| auditLogger | AuditLogger | true |
+
+**Relationships**
+- `Notification` — one-to-many
+- `INotificationRepository` — one-to-one
+
 ## audit
 
 Represents audit data managed by the `audit` module, including audit records, change history, and activity tracking information.
