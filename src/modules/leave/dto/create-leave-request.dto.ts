@@ -1,4 +1,4 @@
-import { LeaveRequest } from '../leave.model';
+import { LeaveRequestStatus } from '../leave.model';
 
 export interface CreateLeaveRequestDto {
   employeeId: string;
@@ -10,24 +10,28 @@ export interface CreateLeaveRequestDto {
   managerId?: string | null;
 }
 
-export interface UpdateLeaveRequestDto {
-  startDate?: Date;
-  endDate?: Date;
-  totalDays?: number;
-  reason?: string | null;
-  managerId?: string | null;
-  status?: LeaveRequest['status'];
+export interface SubmitLeaveRequestDto {
+  leaveRequestId: string;
+}
+
+export interface ReviewLeaveRequestDto {
+  leaveRequestId: string;
+  status: LeaveRequestStatus;
   reviewNotes?: string | null;
 }
 
-export interface LeaveRequestResponseDto {
+export interface CancelLeaveRequestDto {
+  leaveRequestId: string;
+}
+
+export interface LeaveRequestDto {
   id: string;
   employeeId: string;
   policyId: string;
   startDate: Date;
   endDate: Date;
   totalDays: number;
-  status: LeaveRequest['status'];
+  status: LeaveRequestStatus;
   reason: string | null;
   managerId: string | null;
   reviewedAt: Date | null;
