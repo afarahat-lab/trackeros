@@ -179,6 +179,24 @@ Represents notification data managed by the `notification` module, including not
 **Relationships**
 - `Employee` — many-to-one
 
+### CreateNotificationDto
+
+| Field | Type | Required |
+|-------|------|----------|
+| recipientId | string | true |
+| senderId | string | false |
+| type | 'leave_request' \| 'leave_approval' \| 'leave_rejection' \| 'balance_update' \| 'policy_change' | true |
+| title | string | true |
+| message | string | true |
+| metadata | Record<string, any> | false |
+
+### UpdateNotificationDto
+
+| Field | Type | Required |
+|-------|------|----------|
+| isRead | boolean | false |
+| readAt | Date | false |
+
 ## audit
 
 Represents audit data managed by the `audit` module, including audit records, change history, and activity tracking information.
