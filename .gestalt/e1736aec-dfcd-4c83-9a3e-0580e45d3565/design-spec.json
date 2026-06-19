@@ -1,0 +1,33 @@
+{
+  "correlationId": "e1736aec-dfcd-4c83-9a3e-0580e45d3565",
+  "domainChanges": [
+    {
+      "entityName": "NotificationService",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "notificationRepository",
+          "type": "INotificationRepository",
+          "required": true
+        },
+        {
+          "name": "auditLogger",
+          "type": "AuditLogger",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "Notification",
+          "type": "one-to-many"
+        },
+        {
+          "entity": "INotificationRepository",
+          "type": "one-to-one"
+        }
+      ]
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}
