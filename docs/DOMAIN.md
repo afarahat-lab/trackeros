@@ -177,7 +177,30 @@ Represents notification data managed by the `notification` module, including not
 | createdAt | Date | true |
 
 **Relationships**
-- `Employee` — many-to-one
+- `Employee` — many-to-one (via `recipientId`)
+- `Employee` — many-to-one (via `senderId`)
+
+### CreateNotificationDto
+
+| Field | Type | Required |
+|-------|------|----------|
+| recipientId | string | true |
+| senderId | string | false |
+| type | 'leave_request' \| 'leave_approval' \| 'leave_rejection' \| 'balance_update' \| 'policy_change' | true |
+| title | string | true |
+| message | string | true |
+| metadata | Record<string, any> | false |
+
+### UpdateNotificationDto
+
+| Field | Type | Required |
+|-------|------|----------|
+| isRead | boolean | false |
+| readAt | Date | false |
+
+### INotificationRepository
+
+Repository interface for notification persistence operations.
 
 ## audit
 
