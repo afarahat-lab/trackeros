@@ -18,7 +18,7 @@ Base entity providing common fields for domain models.
 
 Represents a leave record managed by the `leave` module, including leave requests and related leave-tracking data.
 
-### LeaveRequestStatus
+### LeaveStatus
 
 | Value | Description |
 |-------|-------------|
@@ -33,50 +33,62 @@ Represents a leave record managed by the `leave` module, including leave request
 |-------|------|----------|
 | id | string | true |
 | employeeId | string | true |
-| policyId | string | true |
+| managerId | string \| null | true |
+| leaveType | LeaveType | true |
 | startDate | Date | true |
 | endDate | Date | true |
 | totalDays | number | true |
-| status | LeaveRequestStatus | true |
-| reason | string | true |
-| managerId | string \| null | false |
-| managerNotes | string \| null | false |
-| reviewedAt | Date \| null | false |
+| reason | string \| null | true |
+| attachmentUrl | string \| null | true |
+| submittedAt | Date \| null | true |
+| status | LeaveStatus | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
-| deletedAt | Date \| null | false |
 
 **Relationships**
 - `Employee` — many-to-one
-- `LeavePolicy` — many-to-one
 
 ### CreateLeaveRequestDto
 
 | Field | Type | Required |
 |-------|------|----------|
 | employeeId | string | true |
-| policyId | string | true |
+| managerId | string \| null | true |
+| leaveType | LeaveType | true |
 | startDate | Date | true |
 | endDate | Date | true |
+| totalDays | number | true |
 | reason | string | false |
+| attachmentUrl | string | false |
 
 ### UpdateLeaveRequestDto
 
 | Field | Type | Required |
 |-------|------|----------|
-| status | LeaveRequestStatus | true |
-| managerNotes | string | false |
+| managerId | string \| null | false |
+| leaveType | LeaveType | false |
+| startDate | Date | false |
+| endDate | Date | false |
+| totalDays | number | false |
+| reason | string \| null | false |
+| attachmentUrl | string \| null | false |
 
-### LeaveRequestQuery
+### LeaveQueryParams
 
 | Field | Type | Required |
 |-------|------|----------|
 | employeeId | string | false |
+| managerId | string | false |
+| leaveType | string | false |
 | status | string | false |
 | startDateFrom | Date | false |
 | startDateTo | Date | false |
+| endDateFrom | Date | false |
+| endDateTo | Date | false |
+| page | number | false |
 | limit | number | false |
-| offset | number | false |
+| sortBy | 'startDate' \| 'endDate' \| 'submittedAt' \| 'createdAt' | false |
+| sortOrder | 'asc' \| 'desc' | false |
 
 ## balance
 
