@@ -1,0 +1,70 @@
+{
+  "id": "e68cb95e-5991-41d8-b159-ae3eaaac22d0",
+  "correlationId": "5c363b11-8c69-45f9-849d-13b2a9f4ac80",
+  "rawIntent": "[Feature: Build the leave management module — Phase 3: Leave Service Implementation]\n\nCreate src/modules/leave/leave.service.ts implementing LeaveService class with methods for create, update, find, and delete operations. Import ILeaveRepository, ILeaveBalanceRepository, ILeavePolicyRepository interfaces. Create src/modules/leave/leave.service.test.ts with Jest unit tests mocking repository dependencies. This phase depends on repository interface files from Phases 1-2 but not implementations.\n\nThis phase depends on: src/modules/leave/leave.repository.ts, src/modules/balance/balance.repository.ts, src/modules/policy/policy.repository.ts, src/modules/leave/leave.model.ts, src/modules/balance/balance.model.ts, src/modules/policy/policy.model.ts.\n\nPhase architecture notes:\nImplement core business logic for leave management with dependency inversion\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/leave/leave.service.ts\\nimport { ILeaveRepository } from \\\"./leave.repository\\\";\\nimport { ILeaveBalanceRepository } from \\\"../balance/leave-balance.repository\\\";\\nimport { ILeavePolicyRepository } from \\\"../policy/leave-policy.repository\\\";\\nimport { IEmployeeService } from \\\"../employee/employee.service\\\";\\nimport { INotificationService } from \\\"../notification/notification.service\\\";\\nimport { LeaveRequest, CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveRequestQueryParams } from \\\"./leave.model\\\";\\nimport { LeaveBalance } from \\\"../balance/leave-balance.model\\\";\\nimport { LeavePolicy } from \\\"../policy/leave-policy.model\\\";\\nimport { Employee } from \\\"../employee/employee.model\\\";\\nimport { Notification } from \\\"../notification/notification.model\\\";\\n\\nexport interface ILeaveService {\\n  createLeaveRequest(dto: CreateLeaveRequestDto): Promise<LeaveRequest>;\\n  submitLeaveRequest(id: string, employeeId: string): Promise<LeaveRequest>;\\n  getLeaveRequestById(id: string): Promise<LeaveRequest | null>;\\n  getLeaveRequestsByEmployee(employeeId: string, query?: LeaveRequestQueryParams): Promise<LeaveRequest[]>;\\n  updateLeaveRequest(id: string, dto: UpdateLeaveRequestDto): Promise<LeaveRequest>;\\n  cancelLeaveRequest(id: string, employeeId: string): Promise<LeaveRequest>;\\n}\\n\\nexport class LeaveService implements ILeaveService {\\n  constructor(\\n    private readonly leaveRepository: ILeaveRepository,\\n    private readonly leaveBalanceRepository: ILeaveBalanceRepository,\\n    private readonly leavePolicyRepository: ILeavePolicyRepository,\\n    private readonly employeeService: IEmployeeService,\\n    private readonly notificationService: INotificationService\\n  ) {}\\n\\n  async createLeaveRequest(dto: CreateLeaveRequestDto): Promise<LeaveRequest> {\\n    // Implementation will validate employee exists, policy exists, check balance, create in DRAFT status\\n    throw new Error(\\\"Not implemented\\\");\\n  }\\n\\n  async submitLeaveRequest(id: string, employeeId: string): Promise<LeaveRequest> {\\n    // Implementation will transition from DRAFT to SUBMITTED, create audit log, send notification to manager\\n    throw new Error(\\\"Not implemented\\\");\\n  }\\n\\n  async getLeaveRequestById(id: string): Promise<LeaveRequest | null> {\\n    return this.leaveRepository.findById(id);\\n  }\\n\\n  async getLeaveRequestsByEmployee(employeeId: string, query?: LeaveRequestQueryParams): Promise<LeaveRequest[]> {\\n    return this.leaveRepository.findByEmployeeId(employeeId, query);\\n  }\\n\\n  async updateLeaveRequest(id: string, dto: UpdateLeaveRequestDto): Promise<LeaveRequest> {\\n    // Implementation will validate only DRAFT requests can be updated, update fields, create audit log\\n    throw new Error(\\\"Not implemented\\\");\\n  }\\n\\n  async cancelLeaveRequest(id: string, employeeId: string): Promise<LeaveRequest> {\\n    // Implementation will transition to CANCELLED, create audit log, send notification\\n    throw new Error(\\\"Not implemented\\\");\\n  }\\n}\",\"File: src/modules/employee/employee.service.ts\\nexport interface IEmployeeService {\\n  getEmployeeById(id: string): Promise<Employee | null>;\\n  getManagerByEmployeeId(employeeId: string): Promise<Employee | null>;\\n}\",\"File: src/modules/balance/balance.service.ts\\nexport interface IBalanceService {\\n  getBalanceByEmployeeAndPolicy(employeeId: string, policyId: string, fiscalYear: number): Promise<LeaveBalance | null>;\\n  updateBalance(balanceId: string, usedDaysDelta: number): Promise<LeaveBalance>;\\n}\",\"File: src/modules/notification/notification.service.ts\\nexport interface INotificationService {\\n  createNotification(dto: CreateNotificationDto): Promise<Notification>;\\n}\",\"File: src/modules/policy/policy.service.ts\\nexport interface IPolicyService {\\n  getPolicyById(id: string): Promise<LeavePolicy | null>;\\n  validateLeaveRequestAgainstPolicy(policy: LeavePolicy, startDate: Date, endDate: Date): void;\\n}\"],\"importStatements\":[\"import { ILeaveRepository } from \\\"./leave.repository\\\";\",\"import { ILeaveBalanceRepository } from \\\"../balance/leave-balance.repository\\\";\",\"import { ILeavePolicyRepository } from \\\"../policy/leave-policy.repository\\\";\",\"import { IEmployeeService } from \\\"../employee/employee.service\\\";\",\"import { INotificationService } from \\\"../notification/notification.service\\\";\",\"import { LeaveRequest, CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveRequestQueryParams } from \\\"./leave.model\\\";\",\"import { LeaveBalance } from \\\"../balance/leave-balance.model\\\";\",\"import { LeavePolicy } from \\\"../policy/leave-policy.model\\\";\",\"import { Employee } from \\\"../employee/employee.model\\\";\",\"import { Notification } from \\\"../notification/notification.model\\\";\"],\"successCriteria\":[\"src/modules/leave/leave.service.ts exists and exports ILeaveService interface and LeaveService class implementing it\",\"LeaveService constructor accepts ILeaveRepository, ILeaveBalanceRepository, ILeavePolicyRepository, IEmployeeService, and INotificationService dependencies\",\"All methods in ILeaveService have concrete implementations in LeaveService class (can throw 'Not implemented' for now)\",\"src/modules/leave/leave.service.test.ts exists with Vitest unit tests mocking all repository and service dependencies\",\"All cross-module dependencies target service interfaces (IEmployeeService, INotificationService) not repository interfaces\",\"Transaction semantics are explicitly defined: createLeaveRequest and submitLeaveRequest perform multiple coordinated writes (leave request, audit log, notification) within a single database transaction\",\"ARCHITECTURE.md is updated to include the new service interfaces: ILeaveService, IEmployeeService, IBalanceService, INotificationService, IPolicyService\"]}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- ILeaveService\n- IEmployeeService\n- IBalanceService\n- INotificationService\n- IPolicyService\n- ILeaveRepository\n- ILeaveBalanceRepository\n- ILeavePolicyRepository\n- LeaveRequest\n- CreateLeaveRequestDto\n- UpdateLeaveRequestDto\n- LeaveRequestQueryParams\n- LeaveBalance\n- LeavePolicy\n- Employee\n- Notification\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 4 — Balance & Policy Service Implementation: Create src/modules/balance/balance.service.ts implementing LeaveBalanceService with methods for getB\n- Phase 5 — PostgreSQL Repository Implementations: Create src/modules/leave/leave.postgres.repository.ts implementing ILeaveRepository with PostgreSQL \n- Phase 6 — Employee & Notification Repository Implementations: Create src/modules/employee/employee.postgres.repository.ts implementing IEmployeeRepository with Po\n- Phase 7 — Notification Service & Integration: Create src/modules/notification/notification.service.ts implementing NotificationService with method\n- Phase 8 — API Controllers & Input Validation: Create src/modules/leave/leave.controller.ts with Fastify routes for POST /leave/requests, GET /leav\n- Phase 9 — Balance & Policy API Controllers: Create src/modules/balance/balance.controller.ts with routes for GET /balance and PUT /balance. Crea\n- Phase 10 — Final Integration & Cross-Cutting Concerns: Create src/modules/notification/notification.controller.ts with routes for GET /notifications and PU",
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "domain",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/leave/leave.service.ts exists and exports ILeaveService interface and LeaveService class implementing it",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "LeaveService constructor accepts ILeaveRepository, ILeaveBalanceRepository, ILeavePolicyRepository, IEmployeeService, and INotificationService dependencies",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "All methods in ILeaveService have concrete implementations in LeaveService class (can throw 'Not implemented' for now)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "src/modules/leave/leave.service.test.ts exists with Vitest unit tests mocking all repository and service dependencies",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "All cross-module dependencies target service interfaces (IEmployeeService, INotificationService) not repository interfaces",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces",
+    "Input validation: Validate all inputs at API boundaries before processing",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled",
+    "Dependency direction is leave -> employee, leave -> policy, leave -> balance, and leave -> notification",
+    "No reverse dependencies are permitted",
+    "Transaction semantics are explicitly defined: createLeaveRequest and submitLeaveRequest perform multiple coordinated writes within a single database transaction"
+  ],
+  "outOfScope": [
+    "Implementation of repository interfaces (deferred to Phase 5)",
+    "Implementation of balance service (deferred to Phase 4)",
+    "Implementation of policy service (deferred to Phase 4)",
+    "Implementation of notification service (deferred to Phase 7)",
+    "Implementation of employee service (deferred to Phase 6)",
+    "API controllers and routes (deferred to Phase 8)",
+    "RBAC enforcement (deferred to Phase 8)",
+    "Audit record implementation (deferred to later phases)",
+    "Balance deductions during approveLeaveRequest (deferred to Phase 4)",
+    "Notification creation on workflow events (deferred to Phase 7)"
+  ],
+  "ambiguities": []
+}

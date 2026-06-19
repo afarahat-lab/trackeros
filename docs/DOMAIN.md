@@ -24,7 +24,6 @@ Represents a leave record managed by the `leave` module, including leave request
 |-------|-------------|
 | DRAFT | Leave request is in draft state |
 | SUBMITTED | Leave request has been submitted |
-| PENDING_APPROVAL | Leave request is pending manager approval |
 | APPROVED | Leave request has been approved |
 | REJECTED | Leave request has been rejected |
 | CANCELLED | Leave request has been cancelled |
@@ -38,19 +37,15 @@ Represents a leave record managed by the `leave` module, including leave request
 | policyId | string | true |
 | startDate | Date | true |
 | endDate | Date | true |
-| durationDays | number | true |
+| status | 'DRAFT' \| 'SUBMITTED' \| 'APPROVED' \| 'REJECTED' \| 'CANCELLED' | true |
 | reason | string | false |
-| status | 'DRAFT' \| 'SUBMITTED' \| 'PENDING_APPROVAL' \| 'APPROVED' \| 'REJECTED' \| 'CANCELLED' | true |
-| managerId | string | false |
-| submittedAt | Date | false |
-| decidedAt | Date | false |
-| decisionComment | string | false |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
 **Relationships**
 - `Employee` — many-to-one
 - `LeavePolicy` — many-to-one
+- `LeaveBalance` — many-to-one
 
 ### CreateLeaveRequestDto
 
@@ -60,9 +55,7 @@ Represents a leave record managed by the `leave` module, including leave request
 | policyId | string | true |
 | startDate | Date | true |
 | endDate | Date | true |
-| durationDays | number | true |
 | reason | string | false |
-| managerId | string | false |
 
 ### UpdateLeaveRequestDto
 
@@ -70,28 +63,19 @@ Represents a leave record managed by the `leave` module, including leave request
 |-------|------|----------|
 | startDate | Date | false |
 | endDate | Date | false |
-| durationDays | number | false |
 | reason | string | false |
-| managerId | string | false |
-| status | 'DRAFT' \| 'SUBMITTED' \| 'PENDING_APPROVAL' \| 'APPROVED' \| 'REJECTED' \| 'CANCELLED' | false |
-| decisionComment | string | false |
 
-### LeaveQueryParams
+### LeaveRequestQueryParams
 
 | Field | Type | Required |
 |-------|------|----------|
-| employeeId | string | false |
-| managerId | string | false |
-| policyId | string | false |
-| status | string | false |
+| status | 'DRAFT' \| 'SUBMITTED' \| 'APPROVED' \| 'REJECTED' \| 'CANCELLED' | false |
 | startDateFrom | Date | false |
 | startDateTo | Date | false |
 | endDateFrom | Date | false |
 | endDateTo | Date | false |
-| page | number | false |
 | limit | number | false |
-| sortBy | 'startDate' \| 'endDate' \| 'submittedAt' \| 'decidedAt' \| 'createdAt' | false |
-| sortOrder | 'asc' \| 'desc' | false |
+| offset | number | false |
 
 ## balance
 
