@@ -22,10 +22,12 @@ Represents a leave record managed by the `leave` module, including leave request
 
 | Value | Description |
 |-------|-------------|
-| Pending | Leave request is pending review |
-| Approved | Leave request has been approved |
-| Rejected | Leave request has been rejected |
-| Cancelled | Leave request has been cancelled |
+| DRAFT | Leave request is in draft state |
+| SUBMITTED | Leave request has been submitted |
+| PENDING_APPROVAL | Leave request is pending manager approval |
+| APPROVED | Leave request has been approved |
+| REJECTED | Leave request has been rejected |
+| CANCELLED | Leave request has been cancelled |
 
 ### LeaveRequest
 
@@ -33,45 +35,46 @@ Represents a leave record managed by the `leave` module, including leave request
 |-------|------|----------|
 | id | string | true |
 | employeeId | string | true |
-| managerId | string \| null | true |
-| leaveType | LeaveType | true |
+| policyId | string | true |
 | startDate | Date | true |
 | endDate | Date | true |
-| totalDays | number | true |
-| reason | string \| null | true |
-| attachmentUrl | string \| null | true |
-| submittedAt | Date \| null | true |
-| status | LeaveStatus | true |
+| durationDays | number | true |
+| reason | string | false |
+| status | 'DRAFT' \| 'SUBMITTED' \| 'PENDING_APPROVAL' \| 'APPROVED' \| 'REJECTED' \| 'CANCELLED' | true |
+| managerId | string | false |
+| submittedAt | Date | false |
+| decidedAt | Date | false |
+| decisionComment | string | false |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
 **Relationships**
 - `Employee` — many-to-one
+- `LeavePolicy` — many-to-one
 
 ### CreateLeaveRequestDto
 
 | Field | Type | Required |
 |-------|------|----------|
 | employeeId | string | true |
-| managerId | string \| null | true |
-| leaveType | LeaveType | true |
+| policyId | string | true |
 | startDate | Date | true |
 | endDate | Date | true |
-| totalDays | number | true |
+| durationDays | number | true |
 | reason | string | false |
-| attachmentUrl | string | false |
+| managerId | string | false |
 
 ### UpdateLeaveRequestDto
 
 | Field | Type | Required |
 |-------|------|----------|
-| managerId | string \| null | false |
-| leaveType | LeaveType | false |
 | startDate | Date | false |
 | endDate | Date | false |
-| totalDays | number | false |
-| reason | string \| null | false |
-| attachmentUrl | string \| null | false |
+| durationDays | number | false |
+| reason | string | false |
+| managerId | string | false |
+| status | 'DRAFT' \| 'SUBMITTED' \| 'PENDING_APPROVAL' \| 'APPROVED' \| 'REJECTED' \| 'CANCELLED' | false |
+| decisionComment | string | false |
 
 ### LeaveQueryParams
 
@@ -79,7 +82,7 @@ Represents a leave record managed by the `leave` module, including leave request
 |-------|------|----------|
 | employeeId | string | false |
 | managerId | string | false |
-| leaveType | string | false |
+| policyId | string | false |
 | status | string | false |
 | startDateFrom | Date | false |
 | startDateTo | Date | false |
@@ -87,7 +90,7 @@ Represents a leave record managed by the `leave` module, including leave request
 | endDateTo | Date | false |
 | page | number | false |
 | limit | number | false |
-| sortBy | 'startDate' \| 'endDate' \| 'submittedAt' \| 'createdAt' | false |
+| sortBy | 'startDate' \| 'endDate' \| 'submittedAt' \| 'decidedAt' \| 'createdAt' | false |
 | sortOrder | 'asc' \| 'desc' | false |
 
 ## balance
@@ -101,11 +104,11 @@ Represents leave balance data managed by the `balance` module, including tracked
 | id | string | true |
 | employeeId | string | true |
 | policyId | string | true |
-| balanceYear | number | true |
-| availableDays | number | true |
+| totalEntitlement | number | true |
 | usedDays | number | true |
-| pendingDays | number | true |
-| carriedOverDays | number | true |
+| remainingDays | number | true |
+| fiscalYear | number | true |
+| status | string | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
@@ -155,18 +158,15 @@ Represents leave policy data managed by the `policy` module, including policy de
 |-------|------|----------|
 | id | string | true |
 | policyName | string | true |
-| leaveType | LeaveType | true |
+| leaveType | string | true |
 | entitlementDays | number | true |
-| maxConsecutiveDays | number | true |
-| minNoticeDays | number | true |
-| requiresApproval | boolean | true |
-| carryOverLimit | number | true |
-| validityStart | Date | true |
-| validityEnd | Date | true |
+| accrualRate | number | false |
+| maxAccumulation | number | false |
+| minimumNoticeDays | number | false |
+| requiresManagerApproval | boolean | true |
 | isActive | boolean | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
-| deletedAt | Date \| null | false |
 
 ## notification
 

@@ -1,53 +1,49 @@
-import { LeaveType, LeaveStatus } from '../../shared/types/index';
-
 export interface LeaveRequest {
   id: string;
   employeeId: string;
-  managerId: string | null;
-  leaveType: string;
+  policyId: string;
   startDate: Date;
   endDate: Date;
-  totalDays: number;
-  reason: string | null;
-  attachmentUrl: string | null;
-  submittedAt: Date | null;
-  status: 'DRAFT' | 'SUBMITTED' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'IN_PROGRESS' | 'COMPLETED';
+  durationDays: number;
+  reason?: string;
+  status: 'DRAFT' | 'SUBMITTED' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+  managerId?: string;
+  submittedAt?: Date;
+  decidedAt?: Date;
+  decisionComment?: string;
   createdAt: Date;
   updatedAt: Date;
 }
 
 export interface CreateLeaveRequestDto {
   employeeId: string;
-  managerId: string | null;
-  leaveType: string;
+  policyId: string;
   startDate: Date;
   endDate: Date;
-  totalDays: number;
+  durationDays: number;
   reason?: string;
-  attachmentUrl?: string;
+  status?: 'DRAFT' | 'SUBMITTED' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+  managerId?: string;
 }
 
 export interface UpdateLeaveRequestDto {
-  managerId?: string | null;
-  leaveType?: string;
   startDate?: Date;
   endDate?: Date;
-  totalDays?: number;
-  reason?: string | null;
-  attachmentUrl?: string | null;
+  durationDays?: number;
+  reason?: string;
+  status?: 'DRAFT' | 'SUBMITTED' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+  managerId?: string;
+  decisionComment?: string;
 }
 
-export interface LeaveQueryParams {
+export interface LeaveRequestQueryParams {
   employeeId?: string;
-  managerId?: string;
-  leaveType?: string;
-  status?: string;
+  policyId?: string;
+  status?: 'DRAFT' | 'SUBMITTED' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
   startDateFrom?: Date;
   startDateTo?: Date;
   endDateFrom?: Date;
   endDateTo?: Date;
-  page?: number;
   limit?: number;
-  sortBy?: 'startDate' | 'endDate' | 'submittedAt' | 'createdAt';
-  sortOrder?: 'asc' | 'desc';
+  offset?: number;
 }
