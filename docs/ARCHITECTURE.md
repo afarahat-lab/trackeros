@@ -22,6 +22,7 @@ src/modules/employee/employee.{model,repository,service,controller,routes}.ts
 src/modules/policy/policy.{model,repository,service,controller,routes}.ts
 src/modules/notification/notification.{model,repository,service,controller,routes}.ts
 src/modules/BaseEntity/    — BaseEntity module
+src/modules/CreateLeaveRequestDto/    — CreateLeaveRequestDto module
 src/shared/db connection.ts
 src/shared/base repository.ts
 src/shared/error types.ts
