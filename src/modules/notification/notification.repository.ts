@@ -86,8 +86,6 @@ export class NotificationRepository implements INotificationRepository {
       throw new Error('No fields to update');
     }
 
-    updates.push(`updated_at = CURRENT_TIMESTAMP`);
-
     values.push(id);
     const query = `
       UPDATE notifications
