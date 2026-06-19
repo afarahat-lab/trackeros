@@ -29,6 +29,7 @@ src/modules/LeaveBalance/    — LeaveBalance module
 src/modules/LeaveType/    — LeaveType module
 src/modules/LeavePolicy/    — LeavePolicy module
 src/modules/NotificationType/    — NotificationType module
+src/modules/UpdateNotificationDto/    — UpdateNotificationDto module
 src/shared/db connection.ts
 src/shared/base repository.ts
 src/shared/error types.ts
