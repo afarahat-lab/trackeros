@@ -1,7 +1,3 @@
-Looking at this finding, it asks me to add `src/modules/LeaveRequestStatus/ — LeaveRequestStatus module` to the module listing in `docs/ARCHITECTURE.md`. However, `LeaveRequestStatus` is not a module — it's an enum/status value within the leave management domain. The module structure section lists actual modules like `leave`, `balance`, `employee`, `policy`, `notification`, and `BaseEntity`. Adding a fake module path for an enum would be incorrect and misleading.
-
-The finding cannot be resolved with a real structural edit that makes architectural sense. The file should remain unchanged.
-
 # Architecture — trackeros
 
 ## Overview
