@@ -109,18 +109,17 @@ Represents employee data managed by the `employee` module, including employee re
 | Field | Type | Required |
 |-------|------|----------|
 | id | string | true |
-| employeeNumber | string | true |
-| firstName | string | true |
-| lastName | string | true |
 | email | string | true |
+| name | string | true |
 | managerId | string \| null | false |
 | department | string \| null | false |
-| hireDate | Date | true |
-| terminationDate | Date \| null | false |
-| employmentStatus | 'ACTIVE' \| 'INACTIVE' \| 'TERMINATED' | true |
+| status | 'active' \| 'inactive' | false |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 | deletedAt | Date \| null | false |
+
+**Relationships**
+- `Employee` — many-to-one (self-referencing manager relationship)
 
 ## policy
 
@@ -133,23 +132,20 @@ Represents leave policy data managed by the `policy` module, including policy de
 | annual | Annual leave |
 | sick | Sick leave |
 | emergency | Emergency leave |
-| unpaid | Unpaid leave |
-| maternity | Maternity leave |
-| paternity | Paternity leave |
 
 ### LeavePolicy
 
 | Field | Type | Required |
 |-------|------|----------|
 | id | string | true |
-| policyName | string | true |
-| leaveType | string | true |
-| entitlementDays | number | true |
-| accrualRate | number | false |
-| maxAccumulation | number | false |
-| minimumNoticeDays | number | false |
-| requiresManagerApproval | boolean | true |
-| isActive | boolean | true |
+| leaveType | 'annual' \| 'sick' \| 'emergency' | true |
+| annualEntitlement | number | true |
+| maxConsecutiveDays | number | true |
+| requiresApproval | boolean | true |
+| requiresDocumentation | boolean | true |
+| documentationThresholdDays | number | true |
+| carryOverAllowed | boolean | true |
+| status | 'active' \| 'archived' | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
