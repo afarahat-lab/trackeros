@@ -1,45 +1,41 @@
 # PLAN.md — Build the leave management module
 
-_Phase plan updated by autonomous phase-split at 2026-06-19T14:30:07.599Z._
+_Phase plan updated by autonomous phase-split at 2026-06-20T21:10:54.197Z._
 
 ## Phases
 
-### Phase 1: Core domain models and repository interfaces [deployed]
+### Phase 1: Define core service interfaces (leave, balance, employee) [deployed]
 
-Create approximately 8 files: src/modules/leave/leave.model.ts, src/modules/balance/balance.model.ts, src/modules/employee/employee.model.ts, src/modules/policy/policy.model.ts, src/modules/notification/notification.model.ts with TypeScript interfaces for all domain entities (Employee, LeavePolicy, LeaveBalance, LeaveRequest, Notification). Create repository interfaces in src/modules/*/*.repository.ts files referencing these domain models. Use exact canonical names from architecture specification. Include Jest unit tests in tests/unit/modules/*/model.repository.test.ts.
+Create src/modules/leave/leave.service.interface.ts, src/modules/balance/balance.service.interface.ts, src/modules/employee/employee.service.interface.ts. Define ILeaveService, IBalanceService, IEmployeeService interfaces. Use domain types LeaveRequest, LeaveBalance, Employee from src/shared/types/index.ts (already exists). Each interface declares method signatures for the respective domain operations.
 
-### Phase 2: Create DTO files for Leave and Balance modules [pending]
+### Phase 2: Define supporting service interfaces (policy, notification, audit) [deployed]
 
-Create the DTO files for the Leave and Balance modules. These files depend only on the model files from Phase 1 and define the data transfer object interfaces needed by the service interfaces.
+Create src/modules/policy/policy.service.interface.ts, src/modules/notification/notification.service.interface.ts, src/modules/audit/audit.service.interface.ts. Define IPolicyService, INotificationService, IAuditService interfaces. Use domain types LeavePolicy, Notification, AuditRecord from src/shared/types/index.ts (already exists).
 
-### Phase 3: Create DTO files for Employee and Policy modules [pending]
+### Phase 3: Implement balance and employee services [deployed]
 
-Create the DTO files for the Employee and Policy modules. These files depend only on the model files from Phase 1 and define the data transfer object interfaces needed by the service interfaces.
+Create src/modules/balance/balance.service.ts and tests/unit/modules/balance/balance.service.test.ts. Implement IBalanceService from src/modules/balance/balance.service.interface.ts (Phase 1). Create src/modules/employee/employee.service.ts and tests/unit/modules/employee/employee.service.test.ts. Implement IEmployeeService from src/modules/employee/employee.service.interface.ts (Phase 1). Use domain entities LeaveBalance, Employee from src/shared/types/index.ts. This phase depends on Phase 1 interfaces.
 
-### Phase 4: Create Service Interface files [pending]
+### Phase 4: Implement policy service [deployed]
 
-Create the four service interface and implementation class files. These files depend on the DTO files created in the previous sub-phases and on the repository/model imports defined in the architecture.
+Create src/modules/policy/policy.service.ts and tests/unit/modules/policy/policy.service.test.ts. Implement IPolicyService from src/modules/policy/policy.service.interface.ts (Phase 2). Use domain entity LeavePolicy from src/shared/types/index.ts. This phase depends on Phase 2 interface.
 
-### Phase 5: Employee and Policy module implementations [pending]
+### Phase 5: Implement notification and audit services [deployed]
 
-Create approximately 5 files: Implement src/modules/employee/employee.repository.ts and src/modules/policy/policy.repository.ts with concrete repository implementations. Implement src/modules/employee/employee.service.impl.ts and src/modules/policy/policy.service.impl.ts with service implementations. This phase depends on model files from Phase 1 and service interfaces from Phase 2 — read them before generating implementations. Include Jest unit tests in tests/unit/modules/employee/ and tests/unit/modules/policy/.
+Create src/modules/notification/notification.service.ts and tests/unit/modules/notification/notification.service.test.ts. Implement INotificationService from src/modules/notification/notification.service.interface.ts (Phase 2). Create src/modules/audit/audit.service.ts and tests/unit/modules/audit/audit.service.test.ts. Implement IAuditService from src/modules/audit/audit.service.interface.ts (Phase 2). Use domain entities Notification, AuditRecord from src/shared/types/index.ts. This phase depends on Phase 2 interfaces.
 
-### Phase 6: Balance module implementation [pending]
+### Phase 6: Implement leave application service [deployed]
 
-Create approximately 4 files: Implement src/modules/balance/balance.repository.ts and src/modules/balance/balance.service.impl.ts. This phase depends on employee and policy model files from Phase 1, balance model from Phase 1, and service interfaces from Phase 2 — read them before generating implementations. Include Jest unit tests in tests/unit/modules/balance/.
+Create src/modules/leave/leave.service.ts and tests/unit/modules/leave/leave.service.test.ts. Implement ILeaveService from src/modules/leave/leave.service.interface.ts (Phase 1). Orchestrate leave request lifecycle using IBalanceService, IEmployeeService, IPolicyService, INotificationService, IAuditService (injected via constructor). Use domain entity LeaveRequest from src/shared/types/index.ts. This phase depends on all prior service interfaces and implementations (Phases 1-5).
 
-### Phase 7: Notification module implementation [pending]
+### Phase 7: Create leave validation schemas [pending]
 
-Create approximately 3 files: Implement src/modules/notification/notification.repository.ts and src/modules/notification/notification.service.impl.ts. This phase depends on notification model from Phase 1, notification service interface from Phase 2, and employee model from Phase 1 — read them before generating implementations. Include Jest unit tests in tests/unit/modules/notification/.
+Create src/modules/leave/leave.validation.ts with Zod schemas for leave request creation, approval, rejection, cancellation, retrieval, and balance lookup.
 
-### Phase 8: Leave module implementation [pending]
+### Phase 8: Create leave controller [pending]
 
-Create approximately 5 files: Implement src/modules/leave/leave.repository.ts and src/modules/leave/leave.service.impl.ts. This phase depends on leave model from Phase 1, leave service interface from Phase 2, and all dependency models (employee, policy, balance, notification) from prior phases — read them before generating implementations. Include Jest unit tests in tests/unit/modules/leave/.
+Create src/modules/leave/leave.controller.ts with the LeaveController class implementing ILeaveController, using ILeaveService from Phase 6.
 
-### Phase 9: Controllers and API routes [pending]
+### Phase 9: Create leave routes [pending]
 
-Create approximately 4 files: src/modules/leave/leave.controller.ts, src/modules/leave/leave.routes.ts, src/modules/balance/balance.controller.ts, src/modules/balance/balance.routes.ts with Fastify controllers and routes. This phase depends on all service implementations from prior phases — read them before generating controllers. Include Jest integration tests in tests/integration/modules/leave/ and tests/integration/modules/balance/.
-
-### Phase 10: Audit integration and RBAC enforcement [pending]
-
-Create approximately 3 files: Add audit logging decorators in src/shared/decorators/audit.decorator.ts. Implement RBAC middleware in src/shared/middleware/rbac.middleware.ts. Apply audit and RBAC to all controllers from Phase 7. This phase depends on all controller files from Phase 7 — read them before adding decorators and middleware. Include Jest security tests in tests/security/audit-rbac.test.ts.
+Create src/modules/leave/leave.routes.ts that registers all leave endpoints on a Fastify instance, applying Zod validation schemas and RBAC middleware.
