@@ -1,3 +1,5 @@
+The ARCHITECTURE.md shows `src/modules/balance/balance.{model,repository,service,controller,routes}.ts`, meaning the module's primary model is `Balance` (from `balance.model.ts`). The DOMAIN.md `## balance` section has `LeaveBalance` but no `Balance` entity matching the module's primary model name. I'll add a `Balance` entity definition to the balance section.
+
 # Domain Model — trackeros
 
 To be populated as the design-agent and context-agent learn the domain.
@@ -90,6 +92,25 @@ Represents a leave record managed by the `leave` module, including leave request
 ## balance
 
 Represents leave balance data managed by the `balance` module, including tracked entitlement, accrual, and remaining leave amounts.
+
+### Balance
+
+| Field | Type | Required |
+|-------|------|----------|
+| id | string | true |
+| employeeId | string | true |
+| policyId | string | true |
+| totalEntitlement | number | true |
+| usedDays | number | true |
+| remainingDays | number | true |
+| fiscalYear | number | true |
+| status | string | true |
+| createdAt | Date | true |
+| updatedAt | Date | true |
+
+**Relationships**
+- `Employee` — many-to-one
+- `LeavePolicy` — many-to-one
 
 ### LeaveBalance
 
