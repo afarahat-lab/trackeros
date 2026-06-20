@@ -1,4 +1,4 @@
-The ARCHITECTURE.md shows `src/modules/balance/balance.{model,repository,service,controller,routes}.ts`, meaning the module's primary model is `Balance` (from `balance.model.ts`). The DOMAIN.md `## balance` section has `LeaveBalance` but no `Balance` entity matching the module's primary model name. I'll add a `Balance` entity definition to the balance section.
+The ARCHITECTURE.md shows `src/modules/policy/policy.{model,repository,service,controller,routes}.ts`, meaning the module's primary model is `Policy` (from `policy.model.ts`). The DOMAIN.md `## policy` section has `LeaveType` and `LeavePolicy` but no `Policy` entity matching the module's primary model name. I'll add a `Policy` entity definition to the policy section.
 
 # Domain Model — trackeros
 
@@ -156,6 +156,22 @@ Represents employee data managed by the `employee` module, including employee re
 ## policy
 
 Represents leave policy data managed by the `policy` module, including policy definitions, rules, and leave entitlement configurations.
+
+### Policy
+
+| Field | Type | Required |
+|-------|------|----------|
+| id | string | true |
+| policyName | string | true |
+| leaveType | string | true |
+| entitlementDays | number | true |
+| accrualRate | number | false |
+| maxAccumulation | number | false |
+| minimumNoticeDays | number | false |
+| requiresManagerApproval | boolean | true |
+| isActive | boolean | true |
+| createdAt | Date | true |
+| updatedAt | Date | true |
 
 ### LeaveType
 
