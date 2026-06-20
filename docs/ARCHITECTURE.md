@@ -1,4 +1,4 @@
-The finding asks to add `LeaveRequestQueryParams` as a standalone module, but `LeaveRequestQueryParams` is a query-parameters type / Data Transfer Object — not a module. It belongs inside the `leave` module (e.g., `src/modules/leave/dto/leave-request-query-params.ts`). Adding a fake module entry for a query-params DTO would be architecturally incorrect and would not constitute a real structural edit that resolves the finding. The file is returned unchanged.
+The finding asks to add `src/modules/LeaveBalance/` as a standalone module, but `LeaveBalance` is already owned by the existing `src/modules/balance/` module (listed as `src/modules/balance/balance.{model,repository,service,controller,routes}.ts`). Adding a duplicate `LeaveBalance` module entry would be architecturally incorrect and would not constitute a real structural edit that resolves the finding. The file is returned unchanged.
 
 # Architecture — trackeros
 
@@ -853,9 +853,4 @@ CREATE INDEX idx_notifications_status ON notifications(status);
 
 **LeaveRequest**
 - Represents a leave application submitted by an employee
-- Status values: `PENDING`, `APPROVED`, `REJECTED`, `CANCELLED`
-- Links to employee, manager, and leave type
-
-**LeaveBalance**
-- Tracks remaining leave entitlement per employee per fiscal year
-- Updated
+- Status values: `PENDING`, `APPROVED`, `
