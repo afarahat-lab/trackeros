@@ -1,0 +1,55 @@
+{
+  "id": "38203c40-66bd-4942-96ad-0e8b94479b2e",
+  "correlationId": "1b8e92cf-34f6-4849-9d79-1741ca9134e5",
+  "rawIntent": "[Feature: Build the leave management module — Phase 2: Define supporting service interfaces (policy, notification, audit)]\n\nCreate src/modules/policy/policy.service.interface.ts, src/modules/notification/notification.service.interface.ts, src/modules/audit/audit.service.interface.ts. Define IPolicyService, INotificationService, IAuditService interfaces. Use domain types LeavePolicy, Notification, AuditRecord from src/shared/types/index.ts (already exists).\n\nPhase architecture notes:\nComplete service contracts for supporting domain services.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/policy/policy.service.interface.ts\\nimport { LeavePolicy, ValidationResult } from '../../shared/types';\\n\\nexport interface IPolicyService {\\n  getPolicy(leaveTypeId: string): Promise<LeavePolicy | null>;\\n  getPolicies(): Promise<LeavePolicy[]>;\\n  createPolicy(policy: Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeavePolicy>;\\n  updatePolicy(id: string, updates: Partial<LeavePolicy>): Promise<LeavePolicy>;\\n  deletePolicy(id: string): Promise<void>;\\n  validateRequest(employeeId: string, leaveTypeId: string, startDate: Date, endDate: Date): Promise<ValidationResult>;\\n}\",\"File: src/modules/notification/notification.service.interface.ts\\nimport { Notification } from '../../shared/types';\\n\\nexport interface INotificationService {\\n  sendNotification(notification: Omit<Notification, 'id' | 'createdAt' | 'sentAt'>): Promise<Notification>;\\n  markAsRead(notificationId: string): Promise<void>;\\n  getNotifications(employeeId: string): Promise<Notification[]>;\\n}\",\"File: src/modules/audit/audit.service.interface.ts\\nimport { AuditRecord } from '../../shared/types';\\n\\nexport interface IAuditService {\\n  logAudit(record: Omit<AuditRecord, 'id' | 'changedAt'>): Promise<AuditRecord>;\\n  getAuditLogs(entityType: string, entityId: string): Promise<AuditRecord[]>;\\n}\"],\"importStatements\":[\"import { LeavePolicy, ValidationResult } from '../../shared/types';\",\"import { Notification } from '../../shared/types';\",\"import { AuditRecord } from '../../shared/types';\"],\"successCriteria\":[\"src/modules/policy/policy.service.interface.ts exists and exports IPolicyService\",\"src/modules/notification/notification.service.interface.ts exists and exports INotificationService\",\"src/modules/audit/audit.service.interface.ts exists and exports IAuditService\"]}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- IPolicyService\n- INotificationService\n- IAuditService\n- LeavePolicy\n- ValidationResult\n- Notification\n- AuditRecord\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 3 — Implement balance and employee services: Create src/modules/balance/balance.service.ts and tests/unit/modules/balance/balance.service.test.ts\n- Phase 4 — Implement policy service: Create src/modules/policy/policy.service.ts and tests/unit/modules/policy/policy.service.test.ts. Im\n- Phase 5 — Implement notification and audit services: Create src/modules/notification/notification.service.ts and tests/unit/modules/notification/notifica\n- Phase 6 — Implement leave application service: Create src/modules/leave/leave.service.ts and tests/unit/modules/leave/leave.service.test.ts. Implem\n- Phase 7 — Expose leave API with controllers and routes: Create src/modules/leave/leave.controller.ts, src/modules/leave/leave.routes.ts, and src/modules/lea",
+  "scope": {
+    "affectedDomains": [
+      "policy",
+      "notification",
+      "audit"
+    ],
+    "affectedLayers": [
+      "domain"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/policy/policy.service.interface.ts exists and exports IPolicyService",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/notification/notification.service.interface.ts exists and exports INotificationService",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "src/modules/audit/audit.service.interface.ts exists and exports IAuditService",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Interfaces must be defined in the exact files specified: src/modules/policy/policy.service.interface.ts, src/modules/notification/notification.service.interface.ts, src/modules/audit/audit.service.interface.ts",
+    "Use domain types LeavePolicy, ValidationResult, Notification, AuditRecord from src/shared/types/index.ts",
+    "No implementation logic; only interface definitions",
+    "No reverse dependencies: leave module may depend on these services, but these interfaces must not import from leave, balance, or employee modules",
+    "Audit service interface must support logging audit records for state-changing operations (logAudit method)",
+    "All methods return Promises to support async operations",
+    "Follow modular-monolith architecture: each interface resides in its own module directory"
+  ],
+  "outOfScope": [
+    "Implementing the services (IPolicyService, INotificationService, IAuditService) — deferred to Phases 4 and 5",
+    "Writing unit or integration tests for these interfaces",
+    "Creating controllers, routes, or API endpoints",
+    "Any other modules (balance, employee, leave) or their services",
+    "Database schemas, migrations, or repository implementations",
+    "Actual notification sending logic or audit storage"
+  ],
+  "ambiguities": []
+}

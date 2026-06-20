@@ -53,3 +53,36 @@ export interface LeaveBalance {
   daysAllocated: number;
   daysUsed: number;
 }
+
+export interface LeavePolicy {
+  id: string;
+  leaveTypeId: string;
+  maxDays: number;
+  requiresApproval: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ValidationResult {
+  isValid: boolean;
+  errors: string[];
+}
+
+export interface Notification {
+  id: string;
+  employeeId: string;
+  message: string;
+  createdAt: Date;
+  sentAt?: Date;
+  readAt?: Date;
+}
+
+export interface AuditRecord {
+  id: string;
+  entityType: string;
+  entityId: string;
+  action: string;
+  changedBy: string;
+  changedAt: Date;
+  details?: string;
+}
