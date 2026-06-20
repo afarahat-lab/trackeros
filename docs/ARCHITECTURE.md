@@ -23,6 +23,7 @@ src/modules/policy/policy.{model,repository,service,controller,routes}.ts
 src/modules/notification/notification.{model,repository,service,controller,routes}.ts
 src/modules/LeaveStatus/    — LeaveStatus module
 src/modules/BaseEntity/    — BaseEntity module
+src/modules/LeaveRequest/    — LeaveRequest module
 src/shared/db connection.ts
 src/shared/base repository.ts
 src/shared/error types.ts
