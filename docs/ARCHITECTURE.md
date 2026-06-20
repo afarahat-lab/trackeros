@@ -21,6 +21,7 @@ src/modules/balance/balance.{model,repository,service,controller,routes}.ts
 src/modules/employee/employee.{model,repository,service,controller,routes}.ts
 src/modules/policy/policy.{model,repository,service,controller,routes}.ts
 src/modules/notification/notification.{model,repository,service,controller,routes}.ts
+src/modules/LeaveStatus/    — LeaveStatus module
 src/modules/BaseEntity/    — BaseEntity module
 src/shared/db connection.ts
 src/shared/base repository.ts
@@ -889,17 +890,4 @@ CREATE INDEX idx_notifications_status ON notifications(status);
 sql
 CREATE TABLE leave_requests (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    employee_id UUID NOT NULL REFERENCES employees(id),
-    leave_type VARCHAR(50) NOT NULL,
-    start_date DATE NOT NULL,
-    end_date DATE NOT NULL,
-    status VARCHAR(20) NOT NULL CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED', 'CANCELLED')),
-    reason TEXT,
-    manager_id UUID NOT NULL REFERENCES employees(id),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
-CREATE TABLE leave_balances (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    employee_id UUID NOT NULL
+    employee_id UUID NOT NULL REFERENCES employees
