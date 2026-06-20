@@ -27,6 +27,7 @@ src/modules/LeaveRequest/    — LeaveRequest module
 src/modules/LeaveType/    — LeaveType module
 src/modules/LeavePolicy/    — LeavePolicy module
 src/modules/AuditLog/    — AuditLog module
+src/modules/AuditRecord/    — AuditRecord module
 src/shared/db connection.ts
 src/shared/base repository.ts
 src/shared/error types.ts
