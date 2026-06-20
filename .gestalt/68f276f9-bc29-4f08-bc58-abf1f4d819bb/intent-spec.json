@@ -1,0 +1,47 @@
+{
+  "id": "bcbc42a7-4802-4c7c-87c5-d5bba2275668",
+  "correlationId": "68f276f9-bc29-4f08-bc58-abf1f4d819bb",
+  "rawIntent": "[Feature: Build the leave management module — Phase 7: Create leave validation schemas]\n\nCreate src/modules/leave/leave.validation.ts with Zod schemas for leave request creation, approval, rejection, cancellation, retrieval, and balance lookup.\n\nPhase architecture notes:\n{\"interfaces\":[\"File: src/modules/leave/leave.validation.ts\\nimport { z } from 'zod';\\n\\nexport const createLeaveSchema = z.object({\\n  leaveTypeId: z.string().uuid(),\\n  startDate: z.string().regex(/^\\\\\\\\d{4}-\\\\\\\\d{2}-\\\\\\\\d{2}$/),\\n  endDate: z.string().regex(/^\\\\\\\\d{4}-\\\\\\\\d{2}-\\\\\\\\d{2}$/),\\n  reason: z.string().optional(),\\n});\\n\\nexport const approveLeaveParamsSchema = z.object({\\n  id: z.string().uuid(),\\n});\\n\\nexport const rejectLeaveParamsSchema = z.object({\\n  id: z.string().uuid(),\\n});\\n\\nexport const rejectLeaveBodySchema = z.object({\\n  reason: z.string().optional(),\\n});\\n\\nexport const cancelLeaveParamsSchema = z.object({\\n  id: z.string().uuid(),\\n});\\n\\nexport const getLeaveParamsSchema = z.object({\\n  id: z.string().uuid(),\\n});\\n\\nexport const getBalanceParamsSchema = z.object({\\n  leaveTypeId: z.string().uuid(),\\n});\"],\"importStatements\":[\"import { z } from 'zod';\",\"import { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';\",\"import { ILeaveService } from './leave.service';\",\"import { requireRole } from '../../auth/middleware/rbac';\",\"import { LeaveController } from './leave.controller';\",\"import { createLeaveSchema, approveLeaveParamsSchema, rejectLeaveParamsSchema, rejectLeaveBodySchema, cancelLeaveParamsSchema, getLeaveParamsSchema, getBalanceParamsSchema } from './leave.validation';\"],\"successCriteria\":[\"src/modules/leave/leave.validation.ts exists and exports Zod schemas: createLeaveSchema, approveLeaveParamsSchema, rejectLeaveParamsSchema, rejectLeaveBodySchema, cancelLeaveParamsSchema, getLeaveParamsSchema, getBalanceParamsSchema.\"]}\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/leave/leave.validation.ts\\nimport { z } from 'zod';\\n\\nexport const createLeaveSchema = z.object({\\n  leaveTypeId: z.string().uuid(),\\n  startDate: z.string().regex(/^\\\\\\\\d{4}-\\\\\\\\d{2}-\\\\\\\\d{2}$/),\\n  endDate: z.string().regex(/^\\\\\\\\d{4}-\\\\\\\\d{2}-\\\\\\\\d{2}$/),\\n  reason: z.string().optional(),\\n});\\n\\nexport const approveLeaveParamsSchema = z.object({\\n  id: z.string().uuid(),\\n});\\n\\nexport const rejectLeaveParamsSchema = z.object({\\n  id: z.string().uuid(),\\n});\\n\\nexport const rejectLeaveBodySchema = z.object({\\n  reason: z.string().optional(),\\n});\\n\\nexport const cancelLeaveParamsSchema = z.object({\\n  id: z.string().uuid(),\\n});\\n\\nexport const getLeaveParamsSchema = z.object({\\n  id: z.string().uuid(),\\n});\\n\\nexport const getBalanceParamsSchema = z.object({\\n  leaveTypeId: z.string().uuid(),\\n});\"],\"importStatements\":[\"import { z } from 'zod';\",\"import { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';\",\"import { ILeaveService } from './leave.service';\",\"import { requireRole } from '../../auth/middleware/rbac';\",\"import { LeaveController } from './leave.controller';\",\"import { createLeaveSchema, approveLeaveParamsSchema, rejectLeaveParamsSchema, rejectLeaveBodySchema, cancelLeaveParamsSchema, getLeaveParamsSchema, getBalanceParamsSchema } from './leave.validation';\"],\"successCriteria\":[\"src/modules/leave/leave.validation.ts exists and exports Zod schemas: createLeaveSchema, approveLeaveParamsSchema, rejectLeaveParamsSchema, rejectLeaveBodySchema, cancelLeaveParamsSchema, getLeaveParamsSchema, getBalanceParamsSchema.\"]}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- z\n- FastifyRequest\n- FastifyReply\n- FastifyInstance\n- ILeaveService\n- requireRole\n- LeaveController\n- createLeaveSchema\n- approveLeaveParamsSchema\n- rejectLeaveParamsSchema\n- rejectLeaveBodySchema\n- cancelLeaveParamsSchema\n- getLeaveParamsSchema\n- getBalanceParamsSchema\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 8 — Create leave controller: Create src/modules/leave/leave.controller.ts with the LeaveController class implementing ILeaveContr\n- Phase 9 — Create leave routes: Create src/modules/leave/leave.routes.ts that registers all leave endpoints on a Fastify instance, a",
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "api"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "File src/modules/leave/leave.validation.ts exists.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "The file exports Zod schemas: createLeaveSchema, approveLeaveParamsSchema, rejectLeaveParamsSchema, rejectLeaveBodySchema, cancelLeaveParamsSchema, getLeaveParamsSchema, getBalanceParamsSchema.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "The file imports only { z } from 'zod' and contains no other import statements.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Validate all inputs at API boundaries before processing (the schemas are the validation layer).",
+    "The file must only import { z } from 'zod' and no other imports, as per the auto-diagnosis correction."
+  ],
+  "outOfScope": [
+    "Phase 8 — Create leave controller (src/modules/leave/leave.controller.ts)",
+    "Phase 9 — Create leave routes (src/modules/leave/leave.routes.ts)",
+    "Any other files in src/modules/leave besides leave.validation.ts",
+    "Implementation of leave service, repository, or other modules",
+    "Integration with Fastify, RBAC middleware, or other dependencies beyond the validation schemas themselves"
+  ],
+  "ambiguities": []
+}
