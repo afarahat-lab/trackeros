@@ -1,0 +1,217 @@
+{
+  "correlationId": "b3e8566c-2434-4b18-a8dd-9ec4f8107fbe",
+  "domainChanges": [],
+  "apiContracts": [
+    {
+      "method": "POST",
+      "path": "/leaves",
+      "description": "Create a new leave request",
+      "requestBody": {
+        "leaveTypeId": "string",
+        "startDate": "string",
+        "endDate": "string",
+        "reason?": "string"
+      },
+      "responseBody": {
+        "id": "string",
+        "employeeId": "string",
+        "leaveTypeId": "string",
+        "startDate": "string",
+        "endDate": "string",
+        "reason?": "string",
+        "status": "string",
+        "managerId": "string",
+        "approvedBy?": "string",
+        "approvedAt?": "string",
+        "createdAt": "string",
+        "updatedAt": "string"
+      },
+      "authRequired": true,
+      "roles": [
+        "employee"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/leaves/:id",
+      "description": "Get a specific leave request by ID",
+      "requestBody": {
+        "id": "string"
+      },
+      "responseBody": {
+        "id": "string",
+        "employeeId": "string",
+        "leaveTypeId": "string",
+        "startDate": "string",
+        "endDate": "string",
+        "reason?": "string",
+        "status": "string",
+        "managerId": "string",
+        "approvedBy?": "string",
+        "approvedAt?": "string",
+        "createdAt": "string",
+        "updatedAt": "string"
+      },
+      "authRequired": true,
+      "roles": [
+        "employee",
+        "manager",
+        "admin"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/leaves",
+      "description": "Get all leave requests for the authenticated employee",
+      "requestBody": {},
+      "responseBody": [
+        {
+          "id": "string",
+          "employeeId": "string",
+          "leaveTypeId": "string",
+          "startDate": "string",
+          "endDate": "string",
+          "reason?": "string",
+          "status": "string",
+          "managerId": "string",
+          "approvedBy?": "string",
+          "approvedAt?": "string",
+          "createdAt": "string",
+          "updatedAt": "string"
+        }
+      ],
+      "authRequired": true,
+      "roles": [
+        "employee"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/leaves/:id/approve",
+      "description": "Approve a leave request",
+      "requestBody": {
+        "id": "string"
+      },
+      "responseBody": {
+        "id": "string",
+        "employeeId": "string",
+        "leaveTypeId": "string",
+        "startDate": "string",
+        "endDate": "string",
+        "reason?": "string",
+        "status": "string",
+        "managerId": "string",
+        "approvedBy?": "string",
+        "approvedAt?": "string",
+        "createdAt": "string",
+        "updatedAt": "string"
+      },
+      "authRequired": true,
+      "roles": [
+        "manager",
+        "admin"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/leaves/:id/reject",
+      "description": "Reject a leave request",
+      "requestBody": {
+        "id": "string",
+        "reason?": "string"
+      },
+      "responseBody": {
+        "id": "string",
+        "employeeId": "string",
+        "leaveTypeId": "string",
+        "startDate": "string",
+        "endDate": "string",
+        "reason?": "string",
+        "status": "string",
+        "managerId": "string",
+        "approvedBy?": "string",
+        "approvedAt?": "string",
+        "createdAt": "string",
+        "updatedAt": "string"
+      },
+      "authRequired": true,
+      "roles": [
+        "manager",
+        "admin"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/leaves/:id/cancel",
+      "description": "Cancel a leave request",
+      "requestBody": {
+        "id": "string"
+      },
+      "responseBody": {
+        "id": "string",
+        "employeeId": "string",
+        "leaveTypeId": "string",
+        "startDate": "string",
+        "endDate": "string",
+        "reason?": "string",
+        "status": "string",
+        "managerId": "string",
+        "approvedBy?": "string",
+        "approvedAt?": "string",
+        "createdAt": "string",
+        "updatedAt": "string"
+      },
+      "authRequired": true,
+      "roles": [
+        "employee"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/balances/:leaveTypeId",
+      "description": "Get leave balance for a specific leave type",
+      "requestBody": {
+        "leaveTypeId": "string"
+      },
+      "responseBody": {
+        "id": "string",
+        "employeeId": "string",
+        "leaveTypeId": "string",
+        "year": "number",
+        "totalEntitlement": "number",
+        "usedDays": "number",
+        "remainingDays": "number",
+        "carryOverDays": "number",
+        "lastUpdated": "string"
+      },
+      "authRequired": true,
+      "roles": [
+        "employee"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/balances",
+      "description": "Get all leave balances for the authenticated employee",
+      "requestBody": {},
+      "responseBody": [
+        {
+          "id": "string",
+          "employeeId": "string",
+          "leaveTypeId": "string",
+          "year": "number",
+          "totalEntitlement": "number",
+          "usedDays": "number",
+          "remainingDays": "number",
+          "carryOverDays": "number",
+          "lastUpdated": "string"
+        }
+      ],
+      "authRequired": true,
+      "roles": [
+        "employee"
+      ]
+    }
+  ],
+  "componentSpecs": []
+}
