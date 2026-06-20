@@ -1,9 +1,3 @@
-The ARCHITECTURE.md shows `src/modules/policy/policy.{model,repository,service,controller,routes}.ts`, meaning the module's primary model is `Policy` (from `policy.model.ts`). The DOMAIN.md `## policy` section has `LeaveType` and `LeavePolicy` but no `Policy` entity matching the module's primary model name. I'll add a `Policy` entity definition to the policy section.
-
-# Domain Model — trackeros
-
-To be populated as the design-agent and context-agent learn the domain.
-
 ## base
 
 Base entity providing common fields for domain models.
@@ -222,6 +216,21 @@ Represents notification data managed by the `notification` module, including not
 ## audit
 
 Represents audit data managed by the `audit` module, including audit records, change history, and activity tracking information.
+
+### Audit
+
+| Field | Type | Required |
+|-------|------|----------|
+| id | string | true |
+| entityType | string | true |
+| entityId | string | true |
+| action | 'CREATE' \| 'UPDATE' \| 'DELETE' \| 'APPROVE' \| 'REJECT' | true |
+| oldValues | Record<string, any> \| null | false |
+| newValues | Record<string, any> \| null | false |
+| performedBy | string \| null | false |
+| performedAt | Date | true |
+| createdAt | Date | true |
+| updatedAt | Date | true |
 
 ### AuditLog
 
