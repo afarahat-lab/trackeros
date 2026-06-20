@@ -1,8 +1,8 @@
 import { Request, Response } from 'express';
-import { LeaveService } from './leave.service';
+import { ILeaveService } from './leave.service.interface';
 
 export class LeaveController {
-  constructor(private readonly leaveService: LeaveService) {}
+  constructor(private readonly leaveService: ILeaveService) {}
 
   createLeave = async (req: Request, res: Response) => {
     try {
