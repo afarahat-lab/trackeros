@@ -1,0 +1,65 @@
+{
+  "id": "f67ba9c7-cefb-4779-834a-c3c08995721f",
+  "correlationId": "001038cf-f4bb-448b-a62f-6b163294c1dc",
+  "rawIntent": "[Feature: Build the leave management module — Phase 4: Implement policy service]\n\nCreate src/modules/policy/policy.service.ts and tests/unit/modules/policy/policy.service.test.ts. Implement IPolicyService from src/modules/policy/policy.service.interface.ts (Phase 2). Use domain entity LeavePolicy from src/shared/types/index.ts. This phase depends on Phase 2 interface.\n\nPhase architecture notes:\nPolicy service for entitlement validation and business rules.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/policy/policy.repository.interface.ts\\nexport interface IPolicyRepository {\\n  findByLeaveTypeId(leaveTypeId: string): Promise<LeavePolicy | null>;\\n  findAll(): Promise<LeavePolicy[]>;\\n}\",\"File: src/modules/policy/policy.repository.ts\\nimport { Pool } from '../../shared/db/connection';\\nimport { IPolicyRepository } from './policy.repository.interface';\\nimport { LeavePolicy } from '../../shared/types';\\n\\nexport class PolicyRepository implements IPolicyRepository {\\n  constructor(private readonly pool: Pool) {}\\n\\n  async findByLeaveTypeId(leaveTypeId: string): Promise<LeavePolicy | null> {\\n    // implementation using pool.query\\n  }\\n\\n  async findAll(): Promise<LeavePolicy[]> {\\n    // implementation using pool.query\\n  }\\n}\",\"File: src/modules/policy/policy.service.ts\\nimport { IPolicyService } from './policy.service.interface';\\nimport { IPolicyRepository } from './policy.repository.interface';\\nimport { LeavePolicy, LeaveRequest } from '../../shared/types';\\n\\nexport interface ValidationResult {\\n  isValid: boolean;\\n  errors: string[];\\n}\\n\\nexport class PolicyService implements IPolicyService {\\n  constructor(private readonly policyRepository: IPolicyRepository) {}\\n\\n  async getPolicy(leaveTypeId: string): Promise<LeavePolicy | null> {\\n    return this.policyRepository.findByLeaveTypeId(leaveTypeId);\\n  }\\n\\n  async validateRequest(request: LeaveRequest): Promise<ValidationResult> {\\n    const policy = await this.policyRepository.findByLeaveTypeId(request.leaveTypeId);\\n    if (!policy) {\\n      return { isValid: false, errors: ['Leave type not found'] };\\n    }\\n    const errors: string[] = [];\\n    const days = (new Date(request.endDate).getTime() - new Date(request.startDate).getTime()) / (1000 * 60 * 60 * 24) + 1;\\n    if (days > policy.maxConsecutiveDays) {\\n      errors.push(`Exceeds maximum consecutive days of ${policy.maxConsecutiveDays}`);\\n    }\\n    if (policy.requiresDocumentation && days >= policy.documentationThresholdDays) {\\n      errors.push('Documentation required for this leave duration');\\n    }\\n    // Additional policy checks (max days per year, etc.) can be added here\\n    return { isValid: errors.length === 0, errors };\\n  }\\n}\"],\"importStatements\":[\"import { IPolicyService } from './policy.service.interface';\",\"import { IPolicyRepository } from './policy.repository.interface';\",\"import { LeavePolicy, LeaveRequest } from '../../shared/types';\",\"import { Pool } from '../../shared/db/connection';\",\"import { PolicyService } from './policy.service';\",\"import { PolicyRepository } from './policy.repository';\"],\"successCriteria\":[\"src/modules/policy/policy.repository.interface.ts exists and exports IPolicyRepository\",\"src/modules/policy/policy.repository.ts exists and exports PolicyRepository implementing IPolicyRepository\",\"src/modules/policy/policy.service.ts exists and exports PolicyService implementing IPolicyService\",\"tests/unit/modules/policy/policy.service.test.ts exists and passes with >80% coverage on PolicyService\",\"PolicyService.getPolicy returns the correct LeavePolicy for a given leaveTypeId\",\"PolicyService.validateRequest returns validation errors when policy limits (max consecutive days, documentation threshold) are exceeded\"]}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- IPolicyRepository\n- ValidationResult\n- IPolicyService\n- LeavePolicy\n- LeaveRequest\n- Pool\n- PolicyService\n- PolicyRepository\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Canonical entity fields for this phase\n\nNote: these field names supersede any attribute names in the\nintent text above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the field names of each entity this phase defines. The\nexact attribute / column / property set per entity is:\n\n- `ValidationResult`: `isValid`, `errors`\n\nTreat each entity's field list as complete. If the\nintent text or planner scope mentions different field\nnames than the architecture, do NOT flag this as\nambiguity — the per-phase architecture wins.\n\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 5 — Implement notification and audit services: Create src/modules/notification/notification.service.ts and tests/unit/modules/notification/notifica\n- Phase 6 — Implement leave application service: Create src/modules/leave/leave.service.ts and tests/unit/modules/leave/leave.service.test.ts. Implem\n- Phase 7 — Expose leave API with controllers and routes: Create src/modules/leave/leave.controller.ts, src/modules/leave/leave.routes.ts, and src/modules/lea",
+  "scope": {
+    "affectedDomains": [
+      "policy"
+    ],
+    "affectedLayers": [
+      "domain",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/policy/policy.repository.interface.ts exists and exports IPolicyRepository",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/policy/policy.repository.ts exists and exports PolicyRepository implementing IPolicyRepository",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "src/modules/policy/policy.service.ts exists and exports PolicyService implementing IPolicyService",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "tests/unit/modules/policy/policy.service.test.ts exists and passes with >80% coverage on PolicyService",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "PolicyService.getPolicy returns the correct LeavePolicy for a given leaveTypeId",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-006",
+      "description": "PolicyService.validateRequest returns validation errors when policy limits (max consecutive days, documentation threshold) are exceeded",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "Phase 5 — Implement notification and audit services",
+    "Phase 6 — Implement leave application service",
+    "Phase 7 — Expose leave API with controllers and routes"
+  ],
+  "ambiguities": []
+}
