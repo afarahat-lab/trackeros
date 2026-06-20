@@ -1,0 +1,39 @@
+{
+  "id": "e607fe87-e884-4dc8-8896-f6453c47b1dc",
+  "correlationId": "bbe74558-f40f-45ba-b5bd-8f73f8f56708",
+  "rawIntent": "[Feature: Build the leave management module — Phase 7: Create leave validation schemas]\n\nCreate src/modules/leave/leave.validation.ts with Zod schemas for leave request creation, approval, rejection, cancellation, retrieval, and balance lookup.\n\nPhase architecture notes:\n{\"interfaces\":[\"File: src/modules/leave/leave.validation.ts\\nimport { z } from 'zod';\\n\\nexport const createLeaveSchema = z.object({\\n  leaveTypeId: z.string().uuid(),\\n  startDate: z.string().regex(/^\\\\d{4}-\\\\d{2}-\\\\d{2}$/),\\n  endDate: z.string().regex(/^\\\\d{4}-\\\\d{2}-\\\\d{2}$/),\\n  reason: z.string().optional()\\n}).refine(data => data.startDate <= data.endDate, {\\n  message: \\\"startDate must be before or equal to endDate\\\"\\n});\\n\\nexport const approveLeaveParamsSchema = z.object({ id: z.string().uuid() });\\nexport const rejectLeaveParamsSchema = z.object({ id: z.string().uuid() });\\nexport const rejectLeaveBodySchema = z.object({ reason: z.string().optional() });\\nexport const cancelLeaveParamsSchema = z.object({ id: z.string().uuid() });\\nexport const getLeaveParamsSchema = z.object({ id: z.string().uuid() });\\nexport const getBalanceParamsSchema = z.object({ leaveTypeId: z.string().uuid() });\"],\"importStatements\":[\"import { z } from 'zod';\"],\"successCriteria\":[\"src/modules/leave/leave.validation.ts exists and exports Zod schemas: createLeaveSchema, approveLeaveParamsSchema, rejectLeaveParamsSchema, rejectLeaveBodySchema, cancelLeaveParamsSchema, getLeaveParamsSchema, getBalanceParamsSchema.\"]}\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/leave/leave.validation.ts\\nimport { z } from 'zod';\\n\\nexport const createLeaveSchema = z.object({\\n  employee_id: z.string().uuid(),\\n  leave_type_id: z.string().uuid(),\\n  start_date: z.string().regex(/^\\\\\\\\d{4}-\\\\\\\\d{2}-\\\\\\\\d{2}$/, 'Invalid date format (YYYY-MM-DD)'),\\n  end_date: z.string().regex(/^\\\\\\\\d{4}-\\\\\\\\d{2}-\\\\\\\\d{2}$/, 'Invalid date format (YYYY-MM-DD)'),\\n  reason: z.string().optional(),\\n}).refine(data => new Date(data.start_date) <= new Date(data.end_date), {\\n  message: 'end_date must be on or after start_date',\\n  path: ['end_date'],\\n});\\n\\nexport const approveLeaveParamsSchema = z.object({\\n  id: z.string().uuid(),\\n});\\n\\nexport const rejectLeaveParamsSchema = z.object({\\n  id: z.string().uuid(),\\n});\\n\\nexport const rejectLeaveBodySchema = z.object({\\n  reason: z.string().optional(),\\n});\\n\\nexport const cancelLeaveParamsSchema = z.object({\\n  id: z.string().uuid(),\\n});\\n\\nexport const getLeaveParamsSchema = z.object({\\n  id: z.string().uuid(),\\n});\\n\\nexport const getBalanceParamsSchema = z.object({\\n  employee_id: z.string().uuid(),\\n  year: z.coerce.number().int().optional(),\\n});\"],\"importStatements\":[\"import { z } from 'zod';\"],\"successCriteria\":[\"src/modules/leave/leave.validation.ts exists and exports Zod schemas: createLeaveSchema, approveLeaveParamsSchema, rejectLeaveParamsSchema, rejectLeaveBodySchema, cancelLeaveParamsSchema, getLeaveParamsSchema, getBalanceParamsSchema.\"]}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- z\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 8 — Create leave controller: Create src/modules/leave/leave.controller.ts with the LeaveController class implementing ILeaveContr\n- Phase 9 — Create leave routes: Create src/modules/leave/leave.routes.ts that registers all leave endpoints on a Fastify instance, a",
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "api"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/leave/leave.validation.ts exists and exports Zod schemas exactly as specified in the detailed phase architecture: createLeaveSchema (with employee_id, leave_type_id, start_date, end_date, reason, and refinement), approveLeaveParamsSchema (id), rejectLeaveParamsSchema (id), rejectLeaveBodySchema (reason), cancelLeaveParamsSchema (id), getLeaveParamsSchema (id), getBalanceParamsSchema (employee_id, year).",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Validate all inputs at API boundaries before processing (Zod schemas)",
+    "Implement schemas exactly as specified in the detailed phase architecture (authoritative source)",
+    "Export all schemas from the file",
+    "No sensitive data in logs (general principle, though not directly exercised by this file)",
+    "Adhere to modular-monolith dependency direction: leave module only imports from allowed modules (here only zod)"
+  ],
+  "outOfScope": [
+    "Creating leave controller (Phase 8)",
+    "Creating leave routes (Phase 9)",
+    "Implementing business logic or database access",
+    "Testing the schemas (only file creation required)",
+    "Generating any other files",
+    "Installing dependencies"
+  ],
+  "ambiguities": []
+}
