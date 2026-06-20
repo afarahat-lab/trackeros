@@ -1,0 +1,38 @@
+{
+  "id": "0e156ff8-0989-4d6f-927b-5bc1c60d040f",
+  "correlationId": "7623d538-7743-4962-b8ae-68208947a0d7",
+  "rawIntent": "[Feature: Build the leave management module — Phase 7: Create leave validation schemas]\n\nCreate src/modules/leave/leave.validation.ts with Zod schemas for leave request creation, approval, rejection, cancellation, retrieval, and balance lookup.\n\nPhase architecture notes:\n{\"interfaces\":[\"File: src/modules/leave/leave.validation.ts\\nimport { z } from 'zod';\\n\\nexport const createLeaveSchema = z.object({ leaveTypeId: z.string().uuid(), startDate: z.string().regex(/^\\\\\\\\d{4}-\\\\\\\\d{2}-\\\\\\\\d{2}$/), endDate: z.string().regex(/^\\\\\\\\d{4}-\\\\\\\\d{2}-\\\\\\\\d{2}$/), reason: z.string().optional() });\\nexport const approveLeaveParamsSchema = z.object({ id: z.string().uuid() });\\nexport const rejectLeaveParamsSchema = z.object({ id: z.string().uuid() });\\nexport const rejectLeaveBodySchema = z.object({ reason: z.string().optional() });\\nexport const cancelLeaveParamsSchema = z.object({ id: z.string().uuid() });\\nexport const getLeaveParamsSchema = z.object({ id: z.string().uuid() });\\nexport const getBalanceParamsSchema = z.object({ leaveTypeId: z.string().uuid() });\"],\"importStatements\":[\"import { z } from 'zod';\"],\"successCriteria\":[\"src/modules/leave/leave.validation.ts exists and exports Zod schemas: createLeaveSchema, approveLeaveParamsSchema, rejectLeaveParamsSchema, rejectLeaveBodySchema, cancelLeaveParamsSchema, getLeaveParamsSchema, getBalanceParamsSchema.\"]}\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/leave/leave.validation.ts\\nimport { z } from 'zod';\\n\\nexport const createLeaveSchema = z.object({\\n  leaveTypeId: z.string().uuid(),\\n  startDate: z.string().regex(/^\\\\d{4}-\\\\d{2}-\\\\d{2}$/),\\n  endDate: z.string().regex(/^\\\\d{4}-\\\\d{2}-\\\\d{2}$/),\\n  reason: z.string().optional()\\n}).refine(data => data.startDate <= data.endDate, {\\n  message: \\\"startDate must be before or equal to endDate\\\"\\n});\\n\\nexport const approveLeaveParamsSchema = z.object({ id: z.string().uuid() });\\n\\nexport const rejectLeaveParamsSchema = z.object({ id: z.string().uuid() });\\n\\nexport const rejectLeaveBodySchema = z.object({ reason: z.string().optional() });\\n\\nexport const cancelLeaveParamsSchema = z.object({ id: z.string().uuid() });\\n\\nexport const getLeaveParamsSchema = z.object({ id: z.string().uuid() });\\n\\nexport const getBalanceParamsSchema = z.object({ leaveTypeId: z.string().uuid() });\"],\"importStatements\":[\"import { z } from 'zod';\"],\"successCriteria\":[\"src/modules/leave/leave.validation.ts exists and exports Zod schemas: createLeaveSchema, approveLeaveParamsSchema, rejectLeaveParamsSchema, rejectLeaveBodySchema, cancelLeaveParamsSchema, getLeaveParamsSchema, getBalanceParamsSchema.\"]}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- z\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 8 — Create leave controller: Create src/modules/leave/leave.controller.ts with the LeaveController class implementing ILeaveContr\n- Phase 9 — Create leave routes: Create src/modules/leave/leave.routes.ts that registers all leave endpoints on a Fastify instance, a",
+  "scope": {
+    "affectedDomains": [
+      "src/modules/leave"
+    ],
+    "affectedLayers": [
+      "domain"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/leave/leave.validation.ts exists and exports Zod schemas: createLeaveSchema, approveLeaveParamsSchema, rejectLeaveParamsSchema, rejectLeaveBodySchema, cancelLeaveParamsSchema, getLeaveParamsSchema, getBalanceParamsSchema.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Input validation: All inputs at API boundaries must be validated before processing (these schemas will be used for that purpose).",
+    "No sensitive data in logs: The schemas themselves do not log anything, but any future usage must adhere to this principle.",
+    "RBAC enforcement: Not directly applicable to schema definitions, but the schemas will be used in endpoints that enforce RBAC.",
+    "Error handling: The schemas must be designed to throw validation errors that can be caught and handled by the API layer."
+  ],
+  "outOfScope": [
+    "Phase 8 — Create leave controller",
+    "Phase 9 — Create leave routes",
+    "Any other files or modules outside src/modules/leave/leave.validation.ts",
+    "Implementation of business logic, repositories, or services",
+    "Database schema or migrations",
+    "Testing infrastructure or test files"
+  ],
+  "ambiguities": []
+}
