@@ -113,7 +113,7 @@ agents:
       # intent via `gestalt agent test code-agent` (build + 17/17 jest
       # green, no loop, 3.2 min). The other agents stay on
       # deepseek-v4-pro. (TR_079 driver finding.)
-      model: fireworks/qwen3p6-plus
+      model: fireworks/qwen3p7-plus
       temperature: 0.1
       max_tokens: 8000
       # No reasoning_effort — Aider drives its own reasoning loop;
