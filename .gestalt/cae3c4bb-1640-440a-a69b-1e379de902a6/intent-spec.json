@@ -1,0 +1,34 @@
+{
+  "id": "e7ef0293-92dd-444e-abc0-2758f108e321",
+  "correlationId": "cae3c4bb-1640-440a-a69b-1e379de902a6",
+  "rawIntent": "The file src/modules/leave/leave.controller.ts (or the intent specification that generates it) imports ILeaveService from './leave.service.interface'. However, the ILeaveService interface is exported from './leave.service' as per the phase architecture. The import path is wrong, causing a module not found error. Fix the import to use './leave.service'. Preserve all existing exports, types, interfaces, and imports. Only add or modify what is needed to resolve the CI failure shown above.",
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "api"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "The import statement for ILeaveService in src/modules/leave/leave.controller.ts uses the correct path './leave.service'.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All imports must resolve correctly",
+    "No reverse dependencies (leave module must not import from modules that depend on it)"
+  ],
+  "outOfScope": [
+    "Any other files in the project",
+    "Any changes to business logic, tests, or configuration",
+    "Any changes to the ILeaveService interface or its implementation",
+    "Any changes to other imports in leave.controller.ts"
+  ],
+  "ambiguities": []
+}
