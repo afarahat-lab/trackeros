@@ -1,5 +1,3 @@
-The finding asks to add `src/modules/LeaveBalance/` as a standalone module, but `LeaveBalance` is already owned by the existing `src/modules/balance/` module (listed as `src/modules/balance/balance.{model,repository,service,controller,routes}.ts`). Adding a duplicate `LeaveBalance` module entry would be architecturally incorrect and would not constitute a real structural edit that resolves the finding. The file is returned unchanged.
-
 # Architecture — trackeros
 
 ## Overview
@@ -26,6 +24,7 @@ src/modules/notification/notification.{model,repository,service,controller,route
 src/modules/LeaveStatus/    — LeaveStatus module
 src/modules/BaseEntity/    — BaseEntity module
 src/modules/LeaveRequest/    — LeaveRequest module
+src/modules/LeaveType/    — LeaveType module
 src/shared/db connection.ts
 src/shared/base repository.ts
 src/shared/error types.ts
@@ -853,4 +852,3 @@ CREATE INDEX idx_notifications_status ON notifications(status);
 
 **LeaveRequest**
 - Represents a leave application submitted by an employee
-- Status values: `PENDING`, `APPROVED`, `
