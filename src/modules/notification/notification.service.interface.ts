@@ -1,7 +1,9 @@
-import { Notification } from '../../shared/types';
+import { Notification } from "../../shared/types/index";
 
 export interface INotificationService {
-  sendNotification(notification: Omit<Notification, 'id' | 'createdAt' | 'sentAt'>): Promise<Notification>;
-  markAsRead(notificationId: string): Promise<void>;
-  getNotifications(employeeId: string): Promise<Notification[]>;
+  createNotification(employeeId: string, message: string, leaveRequestId?: string): Promise<Notification>;
+  getNotification(id: string): Promise<Notification | null>;
+  getEmployeeNotifications(employeeId: string): Promise<Notification[]>;
+  markAsRead(id: string): Promise<void>;
+  markAsSent(id: string, sentAt?: Date): Promise<void>;
 }

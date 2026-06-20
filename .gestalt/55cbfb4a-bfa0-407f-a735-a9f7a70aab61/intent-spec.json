@@ -1,0 +1,107 @@
+{
+  "id": "92e1d2f3-812c-4484-8ecd-b6bd6fe9c9d6",
+  "correlationId": "55cbfb4a-bfa0-407f-a735-a9f7a70aab61",
+  "rawIntent": "[Feature: Build the leave management module — Phase 5: Implement notification and audit services]\n\nCreate src/modules/notification/notification.service.ts and tests/unit/modules/notification/notification.service.test.ts. Implement INotificationService from src/modules/notification/notification.service.interface.ts (Phase 2). Create src/modules/audit/audit.service.ts and tests/unit/modules/audit/audit.service.test.ts. Implement IAuditService from src/modules/audit/audit.service.interface.ts (Phase 2). Use domain entities Notification, AuditRecord from src/shared/types/index.ts. This phase depends on Phase 2 interfaces.\n\nPhase architecture notes:\nSupporting services for notifications and audit logging.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/notification/notification.repository.interface.ts\\nimport { Notification, NotificationType, ReadStatus, SentStatus } from \\\"../../shared/types/index\\\";\\n\\nexport interface CreateNotificationDTO {\\n  employeeId: string;\\n  leaveRequestId?: string;\\n  type: NotificationType;\\n  message: string;\\n}\\n\\nexport interface INotificationRepository {\\n  create(notification: CreateNotificationDTO): Promise<Notification>;\\n  findById(id: string): Promise<Notification | null>;\\n  findByEmployeeId(employeeId: string): Promise<Notification[]>;\\n  updateReadStatus(id: string, readStatus: ReadStatus): Promise<void>;\\n  updateSentStatus(id: string, sentStatus: SentStatus, sentAt?: Date): Promise<void>;\\n}\",\"File: src/modules/audit/audit.repository.interface.ts\\nimport { AuditRecord } from \\\"../../shared/types/index\\\";\\n\\nexport interface CreateAuditEntryDTO {\\n  entityType: string;\\n  entityId: string;\\n  action: string;\\n  changedBy: string;\\n  oldValues?: Record<string, unknown>;\\n  newValues?: Record<string, unknown>;\\n}\\n\\nexport interface IAuditRepository {\\n  create(entry: CreateAuditEntryDTO): Promise<AuditRecord>;\\n  findByEntity(entityType: string, entityId: string): Promise<AuditRecord[]>;\\n}\",\"File: src/modules/notification/notification.repository.ts\\nimport { Pool } from \\\"../../shared/db/connection\\\";\\nimport { INotificationRepository, CreateNotificationDTO } from \\\"./notification.repository.interface\\\";\\nimport { Notification } from \\\"../../shared/types/index\\\";\\n\\nexport class NotificationRepository implements INotificationRepository {\\n  constructor(private readonly pool: Pool) {}\\n\\n  async create(notification: CreateNotificationDTO): Promise<Notification> {\\n    const query = `\\n      INSERT INTO notifications (employee_id, leave_request_id, type, message)\\n      VALUES ($1, $2, $3, $4)\\n      RETURNING *;\\n    `;\\n    const values = [notification.employeeId, notification.leaveRequestId || null, notification.type, notification.message];\\n    const result = await this.pool.query(query, values);\\n    return this.mapRowToNotification(result.rows[0]);\\n  }\\n\\n  async findById(id: string): Promise<Notification | null> {\\n    const query = `SELECT * FROM notifications WHERE id = $1`;\\n    const result = await this.pool.query(query, [id]);\\n    return result.rows[0] ? this.mapRowToNotification(result.rows[0]) : null;\\n  }\\n\\n  async findByEmployeeId(employeeId: string): Promise<Notification[]> {\\n    const query = `SELECT * FROM notifications WHERE employee_id = $1 ORDER BY created_at DESC`;\\n    const result = await this.pool.query(query, [employeeId]);\\n    return result.rows.map(this.mapRowToNotification);\\n  }\\n\\n  async updateReadStatus(id: string, readStatus: ReadStatus): Promise<void> {\\n    const query = `UPDATE notifications SET read_status = $1 WHERE id = $2`;\\n    await this.pool.query(query, [readStatus, id]);\\n  }\\n\\n  async updateSentStatus(id: string, sentStatus: SentStatus, sentAt?: Date): Promise<void> {\\n    const query = `UPDATE notifications SET sent_status = $1, sent_at = $2 WHERE id = $3`;\\n    await this.pool.query(query, [sentStatus, sentAt || null, id]);\\n  }\\n\\n  private mapRowToNotification(row: any): Notification {\\n    return {\\n      id: row.id,\\n      employeeId: row.employee_id,\\n      leaveRequestId: row.leave_request_id,\\n      type: row.type,\\n      message: row.message,\\n      readStatus: row.read_status,\\n      sentStatus: row.sent_status,\\n      createdAt: row.created_at,\\n      sentAt: row.sent_at,\\n    };\\n  }\\n}\",\"File: src/modules/audit/audit.repository.ts\\nimport { Pool } from \\\"../../shared/db/connection\\\";\\nimport { IAuditRepository, CreateAuditEntryDTO } from \\\"./audit.repository.interface\\\";\\nimport { AuditRecord } from \\\"../../shared/types/index\\\";\\n\\nexport class AuditRepository implements IAuditRepository {\\n  constructor(private readonly pool: Pool) {}\\n\\n  async create(entry: CreateAuditEntryDTO): Promise<AuditRecord> {\\n    const query = `\\n      INSERT INTO audit_log (entity_type, entity_id, action, changed_by, old_values, new_values)\\n      VALUES ($1, $2, $3, $4, $5, $6)\\n      RETURNING *;\\n    `;\\n    const values = [entry.entityType, entry.entityId, entry.action, entry.changedBy, entry.oldValues || null, entry.newValues || null];\\n    const result = await this.pool.query(query, values);\\n    return this.mapRowToAuditRecord(result.rows[0]);\\n  }\\n\\n  async findByEntity(entityType: string, entityId: string): Promise<AuditRecord[]> {\\n    const query = `SELECT * FROM audit_log WHERE entity_type = $1 AND entity_id = $2 ORDER BY changed_at DESC`;\\n    const result = await this.pool.query(query, [entityType, entityId]);\\n    return result.rows.map(this.mapRowToAuditRecord);\\n  }\\n\\n  private mapRowToAuditRecord(row: any): AuditRecord {\\n    return {\\n      id: row.id,\\n      entityType: row.entity_type,\\n      entityId: row.entity_id,\\n      action: row.action,\\n      changedBy: row.changed_by,\\n      changedAt: row.changed_at,\\n      oldValues: row.old_values,\\n      newValues: row.new_values,\\n    };\\n  }\\n}\",\"File: src/modules/notification/notification.service.ts\\nimport { INotificationService } from \\\"./notification.service.interface\\\";\\nimport { INotificationRepository } from \\\"./notification.repository.interface\\\";\\nimport { Notification, NotificationType } from \\\"../../shared/types/index\\\";\\n\\nexport class NotificationService implements INotificationService {\\n  constructor(private readonly notificationRepository: INotificationRepository) {}\\n\\n  async createNotification(employeeId: string, leaveRequestId: string | undefined, type: NotificationType, message: string): Promise<Notification> {\\n    return this.notificationRepository.create({ employeeId, leaveRequestId, type, message });\\n  }\\n\\n  async getNotification(id: string): Promise<Notification | null> {\\n    return this.notificationRepository.findById(id);\\n  }\\n\\n  async getEmployeeNotifications(employeeId: string): Promise<Notification[]> {\\n    return this.notificationRepository.findByEmployeeId(employeeId);\\n  }\\n\\n  async markAsRead(id: string): Promise<void> {\\n    await this.notificationRepository.updateReadStatus(id, 'read');\\n  }\\n\\n  async markAsSent(id: string, sentAt?: Date): Promise<void> {\\n    await this.notificationRepository.updateSentStatus(id, 'sent', sentAt);\\n  }\\n}\",\"File: src/modules/audit/audit.service.ts\\nimport { IAuditService } from \\\"./audit.service.interface\\\";\\nimport { IAuditRepository } from \\\"./audit.repository.interface\\\";\\nimport { AuditRecord } from \\\"../../shared/types/index\\\";\\n\\nexport class AuditService implements IAuditService {\\n  constructor(private readonly auditRepository: IAuditRepository) {}\\n\\n  async logEntry(entityType: string, entityId: string, action: string, changedBy: string, oldValues?: Record<string, unknown>, newValues?: Record<string, unknown>): Promise<AuditRecord> {\\n    return this.auditRepository.create({ entityType, entityId, action, changedBy, oldValues, newValues });\\n  }\\n\\n  async getAuditTrail(entityType: string, entityId: string): Promise<AuditRecord[]> {\\n    return this.auditRepository.findByEntity(entityType, entityId);\\n  }\\n}\",\"File: tests/unit/modules/notification/notification.service.test.ts\\nimport { NotificationService } from \\\"../../../src/modules/notification/notification.service\\\";\\nimport { INotificationRepository } from \\\"../../../src/modules/notification/notification.repository.interface\\\";\\nimport { Notification, NotificationType } from \\\"../../../src/shared/types/index\\\";\\n\\ndescribe(\\\"NotificationService\\\", () => {\\n  let service: NotificationService;\\n  let mockRepo: jest.Mocked<INotificationRepository>;\\n\\n  beforeEach(() => {\\n    mockRepo = {\\n      create: jest.fn(),\\n      findById: jest.fn(),\\n      findByEmployeeId: jest.fn(),\\n      updateReadStatus: jest.fn(),\\n      updateSentStatus: jest.fn(),\\n    };\\n    service = new NotificationService(mockRepo);\\n  });\\n\\n  it(\\\"should create a notification\\\", async () => {\\n    const notification: Notification = { id: \\\"1\\\", employeeId: \\\"emp1\\\", leaveRequestId: \\\"lr1\\\", type: NotificationType.LEAVE_REQUEST_SUBMITTED, message: \\\"test\\\", readStatus: \\\"unread\\\", sentStatus: \\\"pending\\\", createdAt: new Date(), sentAt: null };\\n    mockRepo.create.mockResolvedValue(notification);\\n    const result = await service.createNotification(\\\"emp1\\\", \\\"lr1\\\", NotificationType.LEAVE_REQUEST_SUBMITTED, \\\"test\\\");\\n    expect(result).toEqual(notification);\\n    expect(mockRepo.create).toHaveBeenCalledWith({ employeeId: \\\"emp1\\\", leaveRequestId: \\\"lr1\\\", type: NotificationType.LEAVE_REQUEST_SUBMITTED, message: \\\"test\\\" });\\n  });\\n\\n  // Additional tests for other methods would follow the same pattern\\n});\",\"File: tests/unit/modules/audit/audit.service.test.ts\\nimport { AuditService } from \\\"../../../src/modules/audit/audit.service\\\";\\nimport { IAuditRepository } from \\\"../../../src/modules/audit/audit.repository.interface\\\";\\nimport { AuditRecord } from \\\"../../../src/shared/types/index\\\";\\n\\ndescribe(\\\"AuditService\\\", () => {\\n  let service: AuditService;\\n  let mockRepo: jest.Mocked<IAuditRepository>;\\n\\n  beforeEach(() => {\\n    mockRepo = {\\n      create: jest.fn(),\\n      findByEntity: jest.fn(),\\n    };\\n    service = new AuditService(mockRepo);\\n  });\\n\\n  it(\\\"should log an audit entry\\\", async () => {\\n    const record: AuditRecord = { id: \\\"1\\\", entityType: \\\"leave_request\\\", entityId: \\\"lr1\\\", action: \\\"created\\\", changedBy: \\\"emp1\\\", changedAt: new Date(), oldValues: null, newValues: { status: \\\"draft\\\" } };\\n    mockRepo.create.mockResolvedValue(record);\\n    const result = await service.logEntry(\\\"leave_request\\\", \\\"lr1\\\", \\\"created\\\", \\\"emp1\\\", undefined, { status: \\\"draft\\\" });\\n    expect(result).toEqual(record);\\n    expect(mockRepo.create).toHaveBeenCalledWith({ entityType: \\\"leave_request\\\", entityId: \\\"lr1\\\", action: \\\"created\\\", changedBy: \\\"emp1\\\", oldValues: undefined, newValues: { status: \\\"draft\\\" } });\\n  });\\n\\n  // Additional tests for other methods would follow the same pattern\\n});\"],\"importStatements\":[\"import { Pool } from \\\"../../shared/db/connection\\\";\",\"import { INotificationService } from \\\"./notification.service.interface\\\";\",\"import { IAuditService } from \\\"./audit.service.interface\\\";\",\"import { INotificationRepository, CreateNotificationDTO } from \\\"./notification.repository.interface\\\";\",\"import { IAuditRepository, CreateAuditEntryDTO } from \\\"./audit.repository.interface\\\";\",\"import { Notification, AuditRecord, NotificationType, ReadStatus, SentStatus } from \\\"../../shared/types/index\\\";\",\"import { NotificationService } from \\\"../../../src/modules/notification/notification.service\\\";\",\"import { AuditService } from \\\"../../../src/modules/audit/audit.service\\\";\"],\"successCriteria\":[\"src/modules/notification/notification.repository.interface.ts exists and exports INotificationRepository and CreateNotificationDTO\",\"src/modules/audit/audit.repository.interface.ts exists and exports IAuditRepository and CreateAuditEntryDTO\",\"src/modules/notification/notification.repository.ts exists and exports NotificationRepository implementing INotificationRepository\",\"src/modules/audit/audit.repository.ts exists and exports AuditRepository implementing IAuditRepository\",\"src/modules/notification/notification.service.ts exists and exports NotificationService implementing INotificationService\",\"src/modules/audit/audit.service.ts exists and exports AuditService implementing IAuditService\",\"tests/unit/modules/notification/notification.service.test.ts exists and contains Jest tests for NotificationService\",\"tests/unit/modules/audit/audit.service.test.ts exists and contains Jest tests for AuditService\",\"All repository implementations use the exact column names from the canonical SQL schemas (notifications, audit_log)\",\"NotificationService and AuditService delegate to their respective repository interfaces and do not access the database directly\",\"All Jest tests pass successfully\",\"NotificationService implements all methods of INotificationService; AuditService implements all methods of IAuditService\"]}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- CreateNotificationDTO\n- INotificationRepository\n- CreateAuditEntryDTO\n- IAuditRepository\n- Pool\n- INotificationService\n- IAuditService\n- Notification\n- AuditRecord\n- NotificationType\n- ReadStatus\n- SentStatus\n- NotificationService\n- AuditService\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Canonical entity fields for this phase\n\nNote: these field names supersede any attribute names in the\nintent text above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the field names of each entity this phase defines. The\nexact attribute / column / property set per entity is:\n\n- `CreateNotificationDTO`: `employeeId`, `leaveRequestId`, `type`, `message`\n- `CreateAuditEntryDTO`: `entityType`, `entityId`, `action`, `changedBy`, `oldValues`, `newValues`\n\nTreat each entity's field list as complete. If the\nintent text or planner scope mentions different field\nnames than the architecture, do NOT flag this as\nambiguity — the per-phase architecture wins.\n\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 6 — Implement leave application service: Create src/modules/leave/leave.service.ts and tests/unit/modules/leave/leave.service.test.ts. Implem\n- Phase 7 — Expose leave API with controllers and routes: Create src/modules/leave/leave.controller.ts, src/modules/leave/leave.routes.ts, and src/modules/lea",
+  "scope": {
+    "affectedDomains": [
+      "notification",
+      "audit"
+    ],
+    "affectedLayers": [
+      "domain",
+      "infra",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/notification/notification.repository.interface.ts exists and exports INotificationRepository and CreateNotificationDTO",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/audit/audit.repository.interface.ts exists and exports IAuditRepository and CreateAuditEntryDTO",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "src/modules/notification/notification.repository.ts exists and exports NotificationRepository implementing INotificationRepository",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "src/modules/audit/audit.repository.ts exists and exports AuditRepository implementing IAuditRepository",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "src/modules/notification/notification.service.ts exists and exports NotificationService implementing INotificationService",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-006",
+      "description": "src/modules/audit/audit.service.ts exists and exports AuditService implementing IAuditService",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-007",
+      "description": "tests/unit/modules/notification/notification.service.test.ts exists and contains Jest tests for NotificationService",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-008",
+      "description": "tests/unit/modules/audit/audit.service.test.ts exists and contains Jest tests for AuditService",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-009",
+      "description": "All repository implementations use the exact column names from the canonical SQL schemas (notifications, audit_log)",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "sc-010",
+      "description": "NotificationService and AuditService delegate to their respective repository interfaces and do not access the database directly",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-011",
+      "description": "All Jest tests pass successfully",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-012",
+      "description": "NotificationService implements all methods of INotificationService; AuditService implements all methods of IAuditService",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Audit records: All state-changing operations write an audit record (via AuditService).",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "Phase 6: leave application service implementation",
+    "Phase 7: leave API controllers and routes",
+    "Any other modules not mentioned (employee, policy, balance, leave)",
+    "Database schema creation or migrations",
+    "Integration tests beyond unit tests for services",
+    "API endpoints or RBAC enforcement (handled in later phases)"
+  ],
+  "ambiguities": []
+}
