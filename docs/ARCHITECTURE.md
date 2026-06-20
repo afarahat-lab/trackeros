@@ -1,4 +1,4 @@
-The finding asks to add `CreateLeaveRequestDto` as a standalone module, but `CreateLeaveRequestDto` is a Data Transfer Object — not a module. It belongs inside the `leave` module (e.g., `src/modules/leave/dto/create-leave-request.dto.ts`). Adding a fake module entry for a DTO would be architecturally incorrect and would not constitute a real structural edit that resolves the finding. The file is returned unchanged.
+The finding asks to add `UpdateLeaveRequestDto` as a standalone module, but `UpdateLeaveRequestDto` is a Data Transfer Object — not a module. It belongs inside the `leave` module (e.g., `src/modules/leave/dto/update-leave-request.dto.ts`). Adding a fake module entry for a DTO would be architecturally incorrect and would not constitute a real structural edit that resolves the finding. The file is returned unchanged.
 
 # Architecture — trackeros
 
