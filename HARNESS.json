@@ -91,8 +91,7 @@
         "Read the project's dependency manifest (package.json, requirements.txt, go.mod, pom.xml etc) before importing external packages. Only import packages that are listed as dependencies.",
         "Your verification command is configured to fail when no source implementation files exist. You MUST write implementation files before verification can pass. Do not consider the task complete based on a passing verification that ran before any source files were written.",
         "When code in one module needs data or behavior owned by another module, depend on that module's public SERVICE interface — never import another module's repository or other private files. A module's repository is private to that module; cross-module access goes through the owning module's service. A service may import its own module's repository interface (the standard repository pattern).",
-        "Every method that calls an injected repository or external service must wrap the call in explicit error handling. Do not let errors from dependency calls propagate unhandled.",
-        "When writing a unit test that mocks a module exporting a single default value, the mock factory function must return the mock value directly — not wrapped in an additional object property. The default import in the test resolves to whatever the factory returns."
+        "Every method that calls an injected repository or external service must wrap the call in explicit error handling. Do not let errors from dependency calls propagate unhandled."
       ]
     },
     "review-agent": {
