@@ -35,6 +35,7 @@ Represents a leave record managed by the `leave` module, including leave request
 | endDate | Date | true |
 | reason | string \| undefined | false |
 | status | LeaveRequestStatus | true |
+| managerId | string | true |
 | approvedBy | string \| null | false |
 | approvedAt | Date \| null | false |
 | createdAt | Date | true |
@@ -47,7 +48,6 @@ Represents a leave record managed by the `leave` module, including leave request
 
 | Field | Type | Required |
 |-------|------|----------|
-| employeeId | string | true |
 | leaveTypeId | string | true |
 | startDate | Date | true |
 | endDate | Date | true |
@@ -84,18 +84,17 @@ Represents leave balance data managed by the `balance` module, including tracked
 |-------|------|----------|
 | id | string | true |
 | employeeId | string | true |
-| policyId | string | true |
+| leaveTypeId | string | true |
+| year | number | true |
 | totalEntitlement | number | true |
 | usedDays | number | true |
 | remainingDays | number | true |
-| fiscalYear | number | true |
-| status | string | true |
-| createdAt | Date | true |
-| updatedAt | Date | true |
+| carryOverDays | number | true |
+| lastUpdated | Date | true |
 
 **Relationships**
 - `Employee` — many-to-one
-- `LeavePolicy` — many-to-one
+- `LeaveType` — many-to-one
 
 ### LeaveBalance
 
@@ -103,18 +102,17 @@ Represents leave balance data managed by the `balance` module, including tracked
 |-------|------|----------|
 | id | string | true |
 | employeeId | string | true |
-| policyId | string | true |
+| leaveTypeId | string | true |
+| year | number | true |
 | totalEntitlement | number | true |
 | usedDays | number | true |
 | remainingDays | number | true |
-| fiscalYear | number | true |
-| status | string | true |
-| createdAt | Date | true |
-| updatedAt | Date | true |
+| carryOverDays | number | true |
+| lastUpdated | Date | true |
 
 **Relationships**
 - `Employee` — many-to-one
-- `LeavePolicy` — many-to-one
+- `LeaveType` — many-to-one
 
 ## employee
 
