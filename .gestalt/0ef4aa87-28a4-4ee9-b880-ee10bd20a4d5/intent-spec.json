@@ -1,0 +1,100 @@
+{
+  "id": "6df5676c-8bd2-448d-b640-ed920310eddc",
+  "correlationId": "0ef4aa87-28a4-4ee9-b880-ee10bd20a4d5",
+  "rawIntent": "[Feature: Build the leave management module — Phase 3: Implement balance and employee services]\n\nCreate src/modules/balance/balance.service.ts and tests/unit/modules/balance/balance.service.test.ts. Implement IBalanceService from src/modules/balance/balance.service.interface.ts (Phase 1). Create src/modules/employee/employee.service.ts and tests/unit/modules/employee/employee.service.test.ts. Implement IEmployeeService from src/modules/employee/employee.service.interface.ts (Phase 1). Use domain entities LeaveBalance, Employee from src/shared/types/index.ts. This phase depends on Phase 1 interfaces.\n\nPhase architecture notes:\nCore domain services providing leave balance data and employee hierarchy.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/balance/balance.repository.interface.ts\\nexport interface IBalanceRepository {\\n  findByEmployeeAndTypeAndYear(employeeId: string, leaveTypeId: string, year: number): Promise<LeaveBalance | null>;\\n  findByEmployee(employeeId: string, year?: number): Promise<LeaveBalance[]>;\\n}\",\"File: src/modules/balance/balance.repository.ts\\nimport { Pool } from \\\"../../shared/db/connection\\\";\\nimport { LeaveBalance } from \\\"../../shared/types\\\";\\nimport { IBalanceRepository } from \\\"./balance.repository.interface\\\";\\n\\nexport class BalanceRepository implements IBalanceRepository {\\n  private pool: Pool;\\n  constructor(pool: Pool) {\\n    this.pool = pool;\\n  }\\n  async findByEmployeeAndTypeAndYear(employeeId: string, leaveTypeId: string, year: number): Promise<LeaveBalance | null> {\\n    // implementation using pool.query\\n  }\\n  async findByEmployee(employeeId: string, year?: number): Promise<LeaveBalance[]> {\\n    // implementation\\n  }\\n}\",\"File: src/modules/balance/balance.service.ts\\nimport { IBalanceService } from \\\"./balance.service.interface\\\";\\nimport { IBalanceRepository } from \\\"./balance.repository.interface\\\";\\nimport { LeaveBalance } from \\\"../../shared/types\\\";\\n\\nexport class BalanceService implements IBalanceService {\\n  private balanceRepo: IBalanceRepository;\\n  constructor(balanceRepo: IBalanceRepository) {\\n    this.balanceRepo = balanceRepo;\\n  }\\n  async getBalance(employeeId: string, leaveTypeId: string, year: number): Promise<LeaveBalance> {\\n    // implementation\\n  }\\n  async getBalancesForEmployee(employeeId: string, year?: number): Promise<LeaveBalance[]> {\\n    // implementation\\n  }\\n}\",\"File: tests/unit/modules/balance/balance.service.test.ts\\nimport { BalanceService } from \\\"../../../src/modules/balance/balance.service\\\";\\nimport { IBalanceRepository } from \\\"../../../src/modules/balance/balance.repository.interface\\\";\\nimport { LeaveBalance } from \\\"../../../src/shared/types\\\";\\n\\ndescribe(\\\"BalanceService\\\", () => {\\n  let service: BalanceService;\\n  let mockRepo: jest.Mocked<IBalanceRepository>;\\n\\n  beforeEach(() => {\\n    mockRepo = {\\n      findByEmployeeAndTypeAndYear: jest.fn(),\\n      findByEmployee: jest.fn(),\\n    };\\n    service = new BalanceService(mockRepo);\\n  });\\n\\n  describe(\\\"getBalance\\\", () => {\\n    it(\\\"should return balance when found\\\", async () => {\\n      // test\\n    });\\n    it(\\\"should throw error when not found\\\", async () => {\\n      // test\\n    });\\n  });\\n\\n  describe(\\\"getBalancesForEmployee\\\", () => {\\n    it(\\\"should return balances for employee\\\", async () => {\\n      // test\\n    });\\n    it(\\\"should handle empty result\\\", async () => {\\n      // test\\n    });\\n  });\\n});\",\"File: src/modules/employee/employee.repository.interface.ts\\nexport interface IEmployeeRepository {\\n  findById(id: string): Promise<Employee | null>;\\n  findByManagerId(managerId: string): Promise<Employee[]>;\\n}\",\"File: src/modules/employee/employee.repository.ts\\nimport { Pool } from \\\"../../shared/db/connection\\\";\\nimport { Employee } from \\\"../../shared/types\\\";\\nimport { IEmployeeRepository } from \\\"./employee.repository.interface\\\";\\n\\nexport class EmployeeRepository implements IEmployeeRepository {\\n  private pool: Pool;\\n  constructor(pool: Pool) {\\n    this.pool = pool;\\n  }\\n  async findById(id: string): Promise<Employee | null> {\\n    // implementation\\n  }\\n  async findByManagerId(managerId: string): Promise<Employee[]> {\\n    // implementation\\n  }\\n}\",\"File: src/modules/employee/employee.service.ts\\nimport { IEmployeeService } from \\\"./employee.service.interface\\\";\\nimport { IEmployeeRepository } from \\\"./employee.repository.interface\\\";\\nimport { Employee } from \\\"../../shared/types\\\";\\n\\nexport class EmployeeService implements IEmployeeService {\\n  private employeeRepo: IEmployeeRepository;\\n  constructor(employeeRepo: IEmployeeRepository) {\\n    this.employeeRepo = employeeRepo;\\n  }\\n  async getEmployeeById(id: string): Promise<Employee> {\\n    // implementation\\n  }\\n  async getManagerChain(employeeId: string): Promise<Employee[]> {\\n    // implementation\\n  }\\n  async getDirectReports(managerId: string): Promise<Employee[]> {\\n    // implementation\\n  }\\n}\",\"File: tests/unit/modules/employee/employee.service.test.ts\\nimport { EmployeeService } from \\\"../../../src/modules/employee/employee.service\\\";\\nimport { IEmployeeRepository } from \\\"../../../src/modules/employee/employee.repository.interface\\\";\\nimport { Employee } from \\\"../../../src/shared/types\\\";\\n\\ndescribe(\\\"EmployeeService\\\", () => {\\n  let service: EmployeeService;\\n  let mockRepo: jest.Mocked<IEmployeeRepository>;\\n\\n  beforeEach(() => {\\n    mockRepo = {\\n      findById: jest.fn(),\\n      findByManagerId: jest.fn(),\\n    };\\n    service = new EmployeeService(mockRepo);\\n  });\\n\\n  describe(\\\"getEmployeeById\\\", () => {\\n    it(\\\"should return employee when found\\\", async () => {\\n      // test\\n    });\\n    it(\\\"should throw error when not found\\\", async () => {\\n      // test\\n    });\\n  });\\n\\n  describe(\\\"getManagerChain\\\", () => {\\n    it(\\\"should return manager chain\\\", async () => {\\n      // test\\n    });\\n  });\\n\\n  describe(\\\"getDirectReports\\\", () => {\\n    it(\\\"should return direct reports\\\", async () => {\\n      // test\\n    });\\n  });\\n});\"],\"importStatements\":[\"import { Pool } from \\\"../../shared/db/connection\\\"\",\"import { LeaveBalance, Employee } from \\\"../../shared/types\\\"\",\"import { IBalanceService } from \\\"./balance.service.interface\\\"\",\"import { IEmployeeService } from \\\"./employee.service.interface\\\"\",\"import { IBalanceRepository } from \\\"./balance.repository.interface\\\"\",\"import { IEmployeeRepository } from \\\"./employee.repository.interface\\\"\",\"import { BalanceService } from \\\"../../../src/modules/balance/balance.service\\\"\",\"import { EmployeeService } from \\\"../../../src/modules/employee/employee.service\\\"\"],\"successCriteria\":[\"src/modules/balance/balance.repository.interface.ts exists and exports IBalanceRepository with findByEmployeeAndTypeAndYear and findByEmployee methods\",\"src/modules/balance/balance.repository.ts exists and exports BalanceRepository class implementing IBalanceRepository\",\"src/modules/balance/balance.service.ts exists and exports BalanceService class implementing IBalanceService\",\"tests/unit/modules/balance/balance.service.test.ts exists and contains Jest tests for BalanceService methods, covering success and error cases\",\"src/modules/employee/employee.repository.interface.ts exists and exports IEmployeeRepository with findById and findByManagerId methods\",\"src/modules/employee/employee.repository.ts exists and exports EmployeeRepository class implementing IEmployeeRepository\",\"src/modules/employee/employee.service.ts exists and exports EmployeeService class implementing IEmployeeService\",\"tests/unit/modules/employee/employee.service.test.ts exists and contains Jest tests for EmployeeService methods, covering success and error cases\",\"All service methods handle errors gracefully and do not throw unhandled promise rejections (GP-006)\",\"All database access is performed through repository interfaces (GP-001)\",\"No state-changing operations are performed in this phase, so audit records are not required (GP-002 not applicable)\"]}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- IBalanceRepository\n- IEmployeeRepository\n- Pool\n- LeaveBalance\n- Employee\n- IBalanceService\n- IEmployeeService\n- BalanceService\n- EmployeeService\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 4 — Implement policy service: Create src/modules/policy/policy.service.ts and tests/unit/modules/policy/policy.service.test.ts. Im\n- Phase 5 — Implement notification and audit services: Create src/modules/notification/notification.service.ts and tests/unit/modules/notification/notifica\n- Phase 6 — Implement leave application service: Create src/modules/leave/leave.service.ts and tests/unit/modules/leave/leave.service.test.ts. Implem\n- Phase 7 — Expose leave API with controllers and routes: Create src/modules/leave/leave.controller.ts, src/modules/leave/leave.routes.ts, and src/modules/lea",
+  "scope": {
+    "affectedDomains": [
+      "balance",
+      "employee"
+    ],
+    "affectedLayers": [
+      "domain",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/balance/balance.repository.interface.ts exists and exports IBalanceRepository with findByEmployeeAndTypeAndYear and findByEmployee methods",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/balance/balance.repository.ts exists and exports BalanceRepository class implementing IBalanceRepository",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "src/modules/balance/balance.service.ts exists and exports BalanceService class implementing IBalanceService",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "tests/unit/modules/balance/balance.service.test.ts exists and contains Jest tests for BalanceService methods, covering success and error cases",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "src/modules/employee/employee.repository.interface.ts exists and exports IEmployeeRepository with findById and findByManagerId methods",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-006",
+      "description": "src/modules/employee/employee.repository.ts exists and exports EmployeeRepository class implementing IEmployeeRepository",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-007",
+      "description": "src/modules/employee/employee.service.ts exists and exports EmployeeService class implementing IEmployeeService",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-008",
+      "description": "tests/unit/modules/employee/employee.service.test.ts exists and contains Jest tests for EmployeeService methods, covering success and error cases",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-009",
+      "description": "All service methods handle errors gracefully and do not throw unhandled promise rejections (GP-006)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-010",
+      "description": "All database access is performed through repository interfaces (GP-001)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-011",
+      "description": "No state-changing operations are performed in this phase, so audit records are not required (GP-002 not applicable)",
+      "testable": false,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "GP-001: Repository pattern – all database access goes through repository interfaces",
+    "GP-006: Error handling – no unhandled promise rejections; all async errors are caught and handled"
+  ],
+  "outOfScope": [
+    "Phase 4: policy service implementation",
+    "Phase 5: notification and audit services",
+    "Phase 6: leave application service",
+    "Phase 7: leave API controllers and routes",
+    "Implementation of Phase 1 interfaces (IBalanceService, IEmployeeService)",
+    "Definition of LeaveBalance and Employee types (already in src/shared/types)",
+    "Database connection pool implementation (Pool from shared/db/connection)",
+    "Any other modules not in balance or employee"
+  ],
+  "ambiguities": []
+}
