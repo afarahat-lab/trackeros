@@ -1,0 +1,24 @@
+{
+  "correlationId": "001038cf-f4bb-448b-a62f-6b163294c1dc",
+  "domainChanges": [
+    {
+      "entityName": "ValidationResult",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "isValid",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "errors",
+          "type": "string[]",
+          "required": true
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}
