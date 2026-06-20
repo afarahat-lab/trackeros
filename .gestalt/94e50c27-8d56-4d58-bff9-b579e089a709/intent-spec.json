@@ -1,0 +1,68 @@
+{
+  "id": "61ed1c37-91af-4e8d-ad5e-c9040c08e38f",
+  "correlationId": "94e50c27-8d56-4d58-bff9-b579e089a709",
+  "rawIntent": "[Feature: Build the leave management module — Phase 1: Define core service interfaces (leave, balance, employee)]\n\nCreate src/modules/leave/leave.service.interface.ts, src/modules/balance/balance.service.interface.ts, src/modules/employee/employee.service.interface.ts. Define ILeaveService, IBalanceService, IEmployeeService interfaces. Use domain types LeaveRequest, LeaveBalance, Employee from src/shared/types/index.ts (already exists). Each interface declares method signatures for the respective domain operations.\n\nPhase architecture notes:\nEstablish contracts for core domain services to enable parallel implementation.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/leave/leave.service.interface.ts\\nimport { LeaveRequest } from '../../shared/types/index';\\n\\nexport interface ILeaveService {\\n  createLeaveRequest(employeeId: string, leaveTypeId: string, startDate: Date, endDate: Date, reason?: string): Promise<LeaveRequest>;\\n  submitLeaveRequest(requestId: string, employeeId: string): Promise<LeaveRequest>;\\n  approveLeaveRequest(requestId: string, approverId: string): Promise<LeaveRequest>;\\n  rejectLeaveRequest(requestId: string, approverId: string, reason?: string): Promise<LeaveRequest>;\\n  cancelLeaveRequest(requestId: string, employeeId: string): Promise<LeaveRequest>;\\n  getLeaveRequest(requestId: string): Promise<LeaveRequest | null>;\\n  getLeaveRequestsByEmployee(employeeId: string, status?: string): Promise<LeaveRequest[]>;\\n  getPendingRequestsForManager(managerId: string): Promise<LeaveRequest[]>;\\n}\",\"File: src/modules/balance/balance.service.interface.ts\\nimport { LeaveBalance } from '../../shared/types/index';\\n\\nexport interface IBalanceService {\\n  getBalance(employeeId: string, leaveTypeId: string, year: number): Promise<LeaveBalance | null>;\\n  getBalancesForEmployee(employeeId: string, year?: number): Promise<LeaveBalance[]>;\\n  updateBalance(employeeId: string, leaveTypeId: string, year: number, daysUsed: number): Promise<LeaveBalance>;\\n}\",\"File: src/modules/employee/employee.service.interface.ts\\nimport { Employee } from '../../shared/types/index';\\n\\nexport interface IEmployeeService {\\n  getEmployee(id: string): Promise<Employee | null>;\\n  getEmployeesByManager(managerId: string): Promise<Employee[]>;\\n  getEmployeesByDepartment(department: string): Promise<Employee[]>;\\n  getEmployeeByEmail(email: string): Promise<Employee | null>;\\n}\"],\"importStatements\":[\"import { LeaveRequest } from '../../shared/types/index';\",\"import { LeaveBalance } from '../../shared/types/index';\",\"import { Employee } from '../../shared/types/index';\"],\"successCriteria\":[\"src/modules/leave/leave.service.interface.ts exists and exports ILeaveService with methods: createLeaveRequest, submitLeaveRequest, approveLeaveRequest, rejectLeaveRequest, cancelLeaveRequest, getLeaveRequest, getLeaveRequestsByEmployee, getPendingRequestsForManager.\",\"src/modules/balance/balance.service.interface.ts exists and exports IBalanceService with methods: getBalance, getBalancesForEmployee, updateBalance.\",\"src/modules/employee/employee.service.interface.ts exists and exports IEmployeeService with methods: getEmployee, getEmployeesByManager, getEmployeesByDepartment, getEmployeeByEmail.\",\"All service interfaces import domain types (LeaveRequest, LeaveBalance, Employee) from src/shared/types/index.ts and do not define new domain types.\",\"No extra files (e.g., types.ts) are created in the leave or balance modules; only the three service interface files are present.\"]}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- ILeaveService\n- IBalanceService\n- IEmployeeService\n- LeaveRequest\n- LeaveBalance\n- Employee\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 2 — Define supporting service interfaces (policy, notification, audit): Create src/modules/policy/policy.service.interface.ts, src/modules/notification/notification.service\n- Phase 3 — Implement balance and employee services: Create src/modules/balance/balance.service.ts and tests/unit/modules/balance/balance.service.test.ts\n- Phase 4 — Implement policy service: Create src/modules/policy/policy.service.ts and tests/unit/modules/policy/policy.service.test.ts. Im\n- Phase 5 — Implement notification and audit services: Create src/modules/notification/notification.service.ts and tests/unit/modules/notification/notifica\n- Phase 6 — Implement leave application service: Create src/modules/leave/leave.service.ts and tests/unit/modules/leave/leave.service.test.ts. Implem\n- Phase 7 — Expose leave API with controllers and routes: Create src/modules/leave/leave.controller.ts, src/modules/leave/leave.routes.ts, and src/modules/lea",
+  "scope": {
+    "affectedDomains": [
+      "leave",
+      "balance",
+      "employee"
+    ],
+    "affectedLayers": [
+      "domain"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/leave/leave.service.interface.ts exists and exports ILeaveService with methods: createLeaveRequest, submitLeaveRequest, approveLeaveRequest, rejectLeaveRequest, cancelLeaveRequest, getLeaveRequest, getLeaveRequestsByEmployee, getPendingRequestsForManager.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/balance/balance.service.interface.ts exists and exports IBalanceService with methods: getBalance, getBalancesForEmployee, updateBalance.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "src/modules/employee/employee.service.interface.ts exists and exports IEmployeeService with methods: getEmployee, getEmployeesByManager, getEmployeesByDepartment, getEmployeeByEmail.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "All service interfaces import domain types (LeaveRequest, LeaveBalance, Employee) from src/shared/types/index.ts and do not define new domain types.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "No extra files (e.g., types.ts) are created in the leave or balance modules; only the three service interface files are present.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Interfaces must be defined in the exact files specified: src/modules/leave/leave.service.interface.ts, src/modules/balance/balance.service.interface.ts, src/modules/employee/employee.service.interface.ts.",
+    "Each interface must export the named interface (ILeaveService, IBalanceService, IEmployeeService) with the exact method signatures provided in the architecture.",
+    "All domain types (LeaveRequest, LeaveBalance, Employee) must be imported from src/shared/types/index.ts; no new domain types or local type definitions are allowed.",
+    "No implementation logic, only interface declarations.",
+    "No additional files or modules should be created beyond the three interface files.",
+    "Repository pattern: All database access goes through repository interfaces (not directly applicable to this phase, but the service interfaces must not include data access logic).",
+    "Input validation: Validate all inputs at API boundaries before processing (not directly applicable to interface definitions, but method signatures should reflect expected input types)."
+  ],
+  "outOfScope": [
+    "Implementation of any service methods (leave, balance, employee).",
+    "Tests for these interfaces or any services.",
+    "Controllers, routes, or API endpoints.",
+    "Policy, notification, audit service interfaces or implementations.",
+    "Database access, repositories, or ORM configuration.",
+    "Any other files not explicitly listed in the success criteria.",
+    "Phases 2 through 7 of the leave management module."
+  ],
+  "ambiguities": []
+}
