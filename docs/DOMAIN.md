@@ -138,6 +138,20 @@ Represents employee data managed by the `employee` module, including employee re
 | updatedAt | Date | true |
 | deletedAt | Date \| null | false |
 
+## leavetype
+
+Represents leave type definitions managed by the `leavetype` module, including leave type records and related configuration.
+
+### LeaveType
+
+| Field | Type | Required |
+|-------|------|----------|
+| id | string | true |
+| name | string | true |
+| description | string \| null | false |
+| requiresDocumentation | boolean | true |
+| createdAt | Date | true |
+
 ## policy
 
 Represents leave policy data managed by the `policy` module, including policy definitions, rules, and leave entitlement configurations.
@@ -174,16 +188,16 @@ Represents leave policy data managed by the `policy` module, including policy de
 | Field | Type | Required |
 |-------|------|----------|
 | id | string | true |
-| policyName | string | true |
-| leaveType | string | true |
-| entitlementDays | number | true |
-| accrualRate | number | false |
-| maxAccumulation | number | false |
-| minimumNoticeDays | number | false |
-| requiresManagerApproval | boolean | true |
-| isActive | boolean | true |
+| leaveTypeId | string | true |
+| maxDaysPerYear | number | true |
+| maxConsecutiveDays | number \| null | false |
+| requiresApproval | boolean | true |
+| minNoticeDays | number | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
+
+**Relationships**
+- `LeaveType` — one-to-one
 
 ## notification
 
