@@ -153,6 +153,7 @@ agents:
     # `generateStackConfig` LLM call at `gestalt init` time.
     # Add more project-specific extensions below as needed.
     prompt_extensions:
+      - "Begin each phase with the architect edit format — it plans multi-file changes best. Only fall back to the diff edit format when you have EVIDENCE of assistant-mode drift in the feedback (the model acknowledged file additions conversationally without producing edits, and no files were written). Do not pre-emptively avoid architect."
       - "Use ES module syntax with resolveJsonModule for JSON imports — never require()"
       - "Use async/await throughout, never callbacks"
       - "Do not use require() for JSON imports — import them using ES module syntax with resolveJsonModule enabled in tsconfig."
