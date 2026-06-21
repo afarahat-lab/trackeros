@@ -210,14 +210,15 @@ Represents notification data managed by the `notification` module, including not
 |-------|------|----------|
 | id | string | true |
 | recipientId | string | true |
+| leaveRequestId | string | true |
 | type | string | true |
-| title | string | true |
 | message | string | true |
-| relatedEntityType | string \| null | false |
-| relatedEntityId | string \| null | false |
-| status | 'PENDING' \| 'SENT' \| 'READ' \| 'ARCHIVED' | true |
+| isRead | boolean | true |
 | createdAt | Date | true |
-| readAt | Date \| null | false |
+
+**Relationships**
+- `Employee` — many-to-one
+- `LeaveRequest` — many-to-one
 
 ## audit
 
@@ -245,11 +246,14 @@ Represents audit data managed by the `audit` module, including audit records, ch
 | id | string | true |
 | entityType | string | true |
 | entityId | string | true |
-| action | 'CREATE' \| 'UPDATE' \| 'DELETE' \| 'APPROVE' \| 'REJECT' | true |
-| oldValues | Record<string, any> \| null | false |
-| newValues | Record<string, any> \| null | false |
-| performedBy | string \| null | false |
-| performedAt | Date | true |
+| action | string | true |
+| changedBy | string | true |
+| oldValues | Record<string, unknown> \| null | true |
+| newValues | Record<string, unknown> \| null | true |
+| createdAt | Date | true |
+
+**Relationships**
+- `Employee` — many-to-one
 
 ### AuditRecord
 
