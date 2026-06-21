@@ -1,0 +1,31 @@
+{
+  "correlationId": "e5a2879c-7f37-4f5e-a8e9-7802b332aef4",
+  "domainChanges": [
+    {
+      "entityName": "LeaveRequest",
+      "operation": "update",
+      "fields": [
+        {
+          "name": "status",
+          "type": "LeaveRequestStatus (extended with 'cancelled')",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "Notification",
+      "operation": "update",
+      "fields": [
+        {
+          "name": "type",
+          "type": "NotificationType (extended with 'leave_cancelled')",
+          "required": true
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}

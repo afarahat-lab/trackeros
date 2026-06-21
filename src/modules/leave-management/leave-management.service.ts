@@ -52,6 +52,13 @@ export class ForbiddenError extends Error {
   }
 }
 
+export class ConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ConflictError';
+  }
+}
+
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export class LeaveManagementService implements ILeaveManagementService {
@@ -95,7 +102,7 @@ export class LeaveManagementService implements ILeaveManagementService {
         throw new NotFoundError('Leave balance not found');
       }
 
-      const requestedDays = this.calculateDays(dto.startDate.toString(), dto.endDate.toString());
+      const requestedDays = this.calculateDays(dto.startDate, dto.endDate);
       const availableDays = balance.totalEntitlement - balance.usedDays - balance.pendingDays;
 
       if (availableDays < requestedDays) {
@@ -172,7 +179,7 @@ export class LeaveManagementService implements ILeaveManagementService {
         throw new NotFoundError('Leave balance not found');
       }
 
-      const days = this.calculateDays(leaveRequest.startDate.toString(), leaveRequest.endDate.toString());
+      const days = this.calculateDays(leaveRequest.startDate, leaveRequest.endDate);
       await this.balanceRepo.update(balance.id, {
         usedDays: balance.usedDays + days,
         pendingDays: balance.pendingDays - days
@@ -245,7 +252,7 @@ export class LeaveManagementService implements ILeaveManagementService {
         throw new NotFoundError('Leave balance not found');
       }
 
-      const days = this.calculateDays(leaveRequest.startDate.toString(), leaveRequest.endDate.toString());
+      const days = this.calculateDays(leaveRequest.startDate, leaveRequest.endDate);
       await this.balanceRepo.update(balance.id, {
         pendingDays: balance.pendingDays - days
       });
@@ -276,11 +283,107 @@ export class LeaveManagementService implements ILeaveManagementService {
   }
 
   async cancelLeave(leaveId: string, employeeId: string): Promise<LeaveRequest> {
-    throw new NotImplementedError('cancelLeave not implemented');
+    this.validateUuid(leaveId, 'leaveId');
+    this.validateUuid(employeeId, 'employeeId');
+
+    const client = await this.dbPool.connect();
+    try {
+      await client.query('BEGIN');
+      const request = await this.leaveRepo.findById(leaveId);
+      if (!request) {
+        throw new NotFoundError('Leave request not found');
+      }
+      if (request.employeeId !== employeeId) {
+        throw new ForbiddenError('You can only cancel your own leave requests');
+      }
+      if (request.status !== 'submitted' && request.status !== 'approved') {
+        throw new ConflictError('Only submitted or approved requests can be cancelled');
+      }
+
+      const oldStatus = request.status;
+      const days = this.calculateDays(request.startDate, request.endDate);
+      const year = request.startDate.getFullYear();
+      const balance = await this.balanceRepo.findByEmployeeIdAndLeaveTypeIdAndYear(
+        request.employeeId,
+        request.leaveTypeId,
+        year
+      );
+      if (!balance) {
+        throw new NotFoundError('Leave balance not found');
+      }
+
+      const balanceUpdates: any = {};
+      if (oldStatus === 'submitted') {
+        balanceUpdates.pendingDays = balance.pendingDays - days;
+      } else if (oldStatus === 'approved') {
+        balanceUpdates.usedDays = balance.usedDays - days;
+      }
+      await this.balanceRepo.update(balance.id, balanceUpdates);
+
+      const updatedRequest = await this.leaveRepo.updateStatus(leaveId, 'cancelled');
+
+      await this.auditRepo.create({
+        entityType: 'leave_request',
+        entityId: request.id,
+        action: 'cancelled',
+        changedBy: employeeId,
+        oldValues: { status: oldStatus },
+        newValues: { status: 'cancelled' },
+      } as any);
+
+      await this.notificationRepo.create({
+        recipientId: request.approverId || request.employeeId,
+        leaveRequestId: request.id,
+        type: 'leave_cancelled',
+        message: `Leave request ${request.id} has been cancelled by employee.`,
+      } as any);
+
+      await client.query('COMMIT');
+      return updatedRequest;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   async discardDraft(leaveId: string, employeeId: string): Promise<void> {
-    throw new NotImplementedError('discardDraft not implemented');
+    this.validateUuid(leaveId, 'leaveId');
+    this.validateUuid(employeeId, 'employeeId');
+
+    const client = await this.dbPool.connect();
+    try {
+      await client.query('BEGIN');
+      const request = await this.leaveRepo.findById(leaveId);
+      if (!request) {
+        throw new NotFoundError('Leave request not found');
+      }
+      if (request.employeeId !== employeeId) {
+        throw new ForbiddenError('You can only discard your own drafts');
+      }
+      if (request.status !== 'draft') {
+        throw new ConflictError('Only draft requests can be discarded');
+      }
+
+      await this.leaveRepo.updateStatus(leaveId, 'cancelled');
+
+      await this.auditRepo.create({
+        entityType: 'leave_request',
+        entityId: request.id,
+        action: 'discarded',
+        changedBy: employeeId,
+        oldValues: { status: 'draft' },
+        newValues: { status: 'cancelled' },
+      } as any);
+
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   async getLeaveBalance(employeeId: string, leaveTypeId: string, year: number): Promise<LeaveBalance> {
@@ -297,10 +400,8 @@ export class LeaveManagementService implements ILeaveManagementService {
     }
   }
 
-  private calculateDays(start: string, end: string): number {
-    const startDate = new Date(start);
-    const endDate = new Date(end);
+  private calculateDays(startDate: Date, endDate: Date): number {
     const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // inclusive
   }
 }
