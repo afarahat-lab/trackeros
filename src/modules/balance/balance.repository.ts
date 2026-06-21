@@ -5,6 +5,7 @@ export interface ILeaveBalanceRepository {
   findById(id: string): Promise<LeaveBalance | null>;
   findByEmployeeIdAndYear(employeeId: string, year: number): Promise<LeaveBalance[]>;
   findByEmployeeIdAndLeaveTypeIdAndYear(employeeId: string, leaveTypeId: string, year: number): Promise<LeaveBalance | null>;
+  findByEmployeeId(employeeId: string): Promise<LeaveBalance[]>;
   create(dto: CreateLeaveBalanceDto): Promise<LeaveBalance>;
   update(id: string, updates: Partial<Pick<LeaveBalance, 'usedDays' | 'pendingDays' | 'totalEntitlement'>>): Promise<LeaveBalance>;
 }
@@ -43,6 +44,11 @@ export class LeaveBalanceRepository implements ILeaveBalanceRepository {
   async findByEmployeeIdAndLeaveTypeIdAndYear(employeeId: string, leaveTypeId: string, year: number): Promise<LeaveBalance | null> {
     const result = await this.pool.query('SELECT * FROM leave_balances WHERE employee_id = $1 AND leave_type_id = $2 AND year = $3', [employeeId, leaveTypeId, year]);
     return result.rows[0] ? this.mapRow(result.rows[0]) : null;
+  }
+
+  async findByEmployeeId(employeeId: string): Promise<LeaveBalance[]> {
+    const result = await this.pool.query('SELECT * FROM leave_balances WHERE employee_id = $1', [employeeId]);
+    return result.rows.map(this.mapRow);
   }
 
   async create(dto: CreateLeaveBalanceDto): Promise<LeaveBalance> {
