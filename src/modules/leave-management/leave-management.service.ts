@@ -1,10 +1,10 @@
 import { Pool, PoolClient } from 'pg';
 import { pool } from '../../shared/db/connection';
-import { ILeaveManagementService } from './leave-management.service.interface';
+import { ILeaveManagementService, UserContext, LeaveRequestFilters } from './leave-management.service.interface';
 import { ILeaveRequestRepository } from '../leave/leave.repository';
 import { ILeavePolicyRepository } from '../policy/policy.repository';
 import { ILeaveBalanceRepository } from '../balance/balance.repository';
-import { IAuditLogRepository } from '../audit/audit.repository';
+import { IAuditService, AuditLogParams } from '../../shared/audit/audit.service.interface';
 import { IEmployeeRepository } from '../employee/employee.repository';
 import { INotificationRepository } from '../notification/notification.repository';
 import { CreateLeaveRequestDto, LeaveRequest } from '../leave/leave.model';
@@ -66,13 +66,16 @@ export class LeaveManagementService implements ILeaveManagementService {
     private leaveRepo: ILeaveRequestRepository,
     private policyRepo: ILeavePolicyRepository,
     private balanceRepo: ILeaveBalanceRepository,
-    private auditRepo: IAuditLogRepository,
+    private auditService: IAuditService,
     private employeeRepo: IEmployeeRepository,
     private notificationRepo: INotificationRepository,
     private dbPool: Pool = pool
   ) {}
 
-  async applyForLeave(dto: CreateLeaveRequestDto): Promise<LeaveRequest> {
+  async submitLeaveRequest(dto: CreateLeaveRequestDto, user: UserContext): Promise<LeaveRequest> {
+    if (dto.employeeId !== user.id) {
+      throw new ForbiddenError('Cannot submit request for another employee');
+    }
     if (!dto.employeeId || !dto.leaveTypeId || !dto.startDate || !dto.endDate) {
       throw new ValidationError('Missing required fields: employeeId, leaveTypeId, startDate, endDate');
     }
@@ -118,13 +121,13 @@ export class LeaveManagementService implements ILeaveManagementService {
         'submitted'
       );
 
-      await this.auditRepo.create({
+      await this.auditService.log({
         entityType: 'leave_request',
         entityId: submittedRequest.id,
         action: 'SUBMITTED',
-        changedBy: dto.employeeId,
-        newValues: submittedRequest
-      } as any);
+        changedBy: user.id,
+        newValues: submittedRequest as any
+      });
 
       await client.query('COMMIT');
       return submittedRequest;
@@ -136,29 +139,22 @@ export class LeaveManagementService implements ILeaveManagementService {
     }
   }
 
-  async approveLeave(leaveId: string, approverId: string, comment?: string): Promise<LeaveRequest> {
+  async approveLeaveRequest(leaveId: string, comment: string | undefined, user: UserContext): Promise<LeaveRequest> {
     this.validateUuid(leaveId, 'leaveId');
-    this.validateUuid(approverId, 'approverId');
+    if (user.role !== 'manager') {
+      throw new ForbiddenError('Only managers can approve leave requests');
+    }
 
     const leaveRequest = await this.leaveRepo.findById(leaveId);
     if (!leaveRequest) {
       throw new NotFoundError('Leave request not found');
     }
 
-    const approver = await this.employeeRepo.findById(approverId);
-    if (!approver) {
-      throw new NotFoundError('Approver not found');
-    }
-
     const employee = await this.employeeRepo.findById(leaveRequest.employeeId);
-    if (!employee || employee.managerId !== approver.id) {
-      throw new ForbiddenError('Approver is not the manager of the requesting employee');
-    }
-    if (approver.role !== 'manager') {
-      throw new ForbiddenError('Approver does not have manager role');
+    if (!employee || employee.managerId !== user.id) {
+      throw new ForbiddenError('You are not the manager of this employee');
     }
 
-    // Note: The domain model uses 'submitted' for pending requests
     if (leaveRequest.status !== 'submitted') {
       throw new BadRequestError('Leave request is not in pending status');
     }
@@ -167,7 +163,7 @@ export class LeaveManagementService implements ILeaveManagementService {
     try {
       await client.query('BEGIN');
 
-      const updatedRequest = await this.leaveRepo.updateStatus(leaveId, 'approved', approverId, comment);
+      const updatedRequest = await this.leaveRepo.updateStatus(leaveId, 'approved', user.id, comment);
 
       const year = new Date(leaveRequest.startDate).getFullYear();
       const balance = await this.balanceRepo.findByEmployeeIdAndLeaveTypeIdAndYear(
@@ -185,13 +181,13 @@ export class LeaveManagementService implements ILeaveManagementService {
         pendingDays: balance.pendingDays - days
       });
 
-      await this.auditRepo.create({
+      await this.auditService.log({
         entityType: 'leave_request',
         entityId: leaveId,
         action: 'LEAVE_APPROVED',
-        changedBy: approverId,
-        newValues: updatedRequest
-      } as any);
+        changedBy: user.id,
+        newValues: updatedRequest as any
+      });
 
       await this.notificationRepo.create({
         recipientId: leaveRequest.employeeId,
@@ -210,26 +206,20 @@ export class LeaveManagementService implements ILeaveManagementService {
     }
   }
 
-  async rejectLeave(leaveId: string, approverId: string, comment?: string): Promise<LeaveRequest> {
+  async rejectLeaveRequest(leaveId: string, comment: string, user: UserContext): Promise<LeaveRequest> {
     this.validateUuid(leaveId, 'leaveId');
-    this.validateUuid(approverId, 'approverId');
+    if (user.role !== 'manager') {
+      throw new ForbiddenError('Only managers can reject leave requests');
+    }
 
     const leaveRequest = await this.leaveRepo.findById(leaveId);
     if (!leaveRequest) {
       throw new NotFoundError('Leave request not found');
     }
 
-    const approver = await this.employeeRepo.findById(approverId);
-    if (!approver) {
-      throw new NotFoundError('Approver not found');
-    }
-
     const employee = await this.employeeRepo.findById(leaveRequest.employeeId);
-    if (!employee || employee.managerId !== approver.id) {
-      throw new ForbiddenError('Approver is not the manager of the requesting employee');
-    }
-    if (approver.role !== 'manager') {
-      throw new ForbiddenError('Approver does not have manager role');
+    if (!employee || employee.managerId !== user.id) {
+      throw new ForbiddenError('You are not the manager of this employee');
     }
 
     if (leaveRequest.status !== 'submitted') {
@@ -240,7 +230,7 @@ export class LeaveManagementService implements ILeaveManagementService {
     try {
       await client.query('BEGIN');
 
-      const updatedRequest = await this.leaveRepo.updateStatus(leaveId, 'rejected', approverId, comment);
+      const updatedRequest = await this.leaveRepo.updateStatus(leaveId, 'rejected', user.id, comment);
 
       const year = new Date(leaveRequest.startDate).getFullYear();
       const balance = await this.balanceRepo.findByEmployeeIdAndLeaveTypeIdAndYear(
@@ -257,13 +247,13 @@ export class LeaveManagementService implements ILeaveManagementService {
         pendingDays: balance.pendingDays - days
       });
 
-      await this.auditRepo.create({
+      await this.auditService.log({
         entityType: 'leave_request',
         entityId: leaveId,
         action: 'LEAVE_REJECTED',
-        changedBy: approverId,
-        newValues: updatedRequest
-      } as any);
+        changedBy: user.id,
+        newValues: updatedRequest as any
+      });
 
       await this.notificationRepo.create({
         recipientId: leaveRequest.employeeId,
@@ -282,9 +272,8 @@ export class LeaveManagementService implements ILeaveManagementService {
     }
   }
 
-  async cancelLeave(leaveId: string, employeeId: string): Promise<LeaveRequest> {
+  async cancelLeaveRequest(leaveId: string, user: UserContext): Promise<LeaveRequest> {
     this.validateUuid(leaveId, 'leaveId');
-    this.validateUuid(employeeId, 'employeeId');
 
     const client = await this.dbPool.connect();
     try {
@@ -293,7 +282,7 @@ export class LeaveManagementService implements ILeaveManagementService {
       if (!request) {
         throw new NotFoundError('Leave request not found');
       }
-      if (request.employeeId !== employeeId) {
+      if (request.employeeId !== user.id) {
         throw new ForbiddenError('You can only cancel your own leave requests');
       }
       if (request.status !== 'submitted' && request.status !== 'approved') {
@@ -322,14 +311,14 @@ export class LeaveManagementService implements ILeaveManagementService {
 
       const updatedRequest = await this.leaveRepo.updateStatus(leaveId, 'cancelled');
 
-      await this.auditRepo.create({
+      await this.auditService.log({
         entityType: 'leave_request',
         entityId: request.id,
         action: 'cancelled',
-        changedBy: employeeId,
-        oldValues: { status: oldStatus },
-        newValues: { status: 'cancelled' },
-      } as any);
+        changedBy: user.id,
+        oldValues: { status: oldStatus } as any,
+        newValues: { status: 'cancelled' } as any,
+      });
 
       await this.notificationRepo.create({
         recipientId: request.approverId || request.employeeId,
@@ -348,9 +337,8 @@ export class LeaveManagementService implements ILeaveManagementService {
     }
   }
 
-  async discardDraft(leaveId: string, employeeId: string): Promise<void> {
+  async discardDraftLeaveRequest(leaveId: string, user: UserContext): Promise<void> {
     this.validateUuid(leaveId, 'leaveId');
-    this.validateUuid(employeeId, 'employeeId');
 
     const client = await this.dbPool.connect();
     try {
@@ -359,7 +347,7 @@ export class LeaveManagementService implements ILeaveManagementService {
       if (!request) {
         throw new NotFoundError('Leave request not found');
       }
-      if (request.employeeId !== employeeId) {
+      if (request.employeeId !== user.id) {
         throw new ForbiddenError('You can only discard your own drafts');
       }
       if (request.status !== 'draft') {
@@ -368,14 +356,14 @@ export class LeaveManagementService implements ILeaveManagementService {
 
       await this.leaveRepo.updateStatus(leaveId, 'cancelled');
 
-      await this.auditRepo.create({
+      await this.auditService.log({
         entityType: 'leave_request',
         entityId: request.id,
         action: 'discarded',
-        changedBy: employeeId,
-        oldValues: { status: 'draft' },
-        newValues: { status: 'cancelled' },
-      } as any);
+        changedBy: user.id,
+        oldValues: { status: 'draft' } as any,
+        newValues: { status: 'cancelled' } as any,
+      });
 
       await client.query('COMMIT');
     } catch (error) {
@@ -386,12 +374,38 @@ export class LeaveManagementService implements ILeaveManagementService {
     }
   }
 
-  async getLeaveBalance(employeeId: string, leaveTypeId: string, year: number): Promise<LeaveBalance> {
-    throw new NotImplementedError('getLeaveBalance not implemented');
+  async getLeaveBalance(employeeId: string, user: UserContext): Promise<LeaveBalance[]> {
+    if (user.role !== 'manager' && user.id !== employeeId) {
+      throw new ForbiddenError('Not authorized to view this balance');
+    }
+    if (user.role === 'manager' && user.id !== employeeId) {
+      const emp = await this.employeeRepo.findById(employeeId);
+      if (!emp || emp.managerId !== user.id) {
+        throw new ForbiddenError('Not authorized to view this balance');
+      }
+    }
+    return this.balanceRepo.findByEmployeeId(employeeId);
   }
 
-  async getLeaveHistory(employeeId: string): Promise<LeaveRequest[]> {
-    throw new NotImplementedError('getLeaveHistory not implemented');
+  async getLeaveHistory(filters: LeaveRequestFilters, user: UserContext): Promise<LeaveRequest[]> {
+    const targetEmployeeId = filters.employeeId || user.id;
+    
+    if (user.role !== 'manager' && targetEmployeeId !== user.id) {
+      throw new ForbiddenError('Not authorized to view this history');
+    }
+    if (user.role === 'manager' && targetEmployeeId !== user.id) {
+      const emp = await this.employeeRepo.findById(targetEmployeeId);
+      if (!emp || emp.managerId !== user.id) {
+        throw new ForbiddenError('Not authorized to view this history');
+      }
+    }
+
+    const requests = await this.leaveRepo.findByEmployeeId(targetEmployeeId);
+    return requests.filter(r => {
+      if (filters.status && r.status !== filters.status) return false;
+      if (filters.year && new Date(r.startDate).getFullYear() !== filters.year) return false;
+      return true;
+    });
   }
 
   private validateUuid(value: string, fieldName: string): void {
