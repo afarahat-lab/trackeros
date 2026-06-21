@@ -5,6 +5,8 @@ import { ILeaveRequestRepository } from '../leave/leave.repository';
 import { ILeavePolicyRepository } from '../policy/policy.repository';
 import { ILeaveBalanceRepository } from '../balance/balance.repository';
 import { IAuditLogRepository } from '../audit/audit.repository';
+import { IEmployeeRepository } from '../employee/employee.repository';
+import { INotificationRepository } from '../notification/notification.repository';
 import { CreateLeaveRequestDto, LeaveRequest } from '../leave/leave.model';
 import { LeaveBalance } from '../balance/balance.model';
 
@@ -36,12 +38,30 @@ export class NotImplementedError extends Error {
   }
 }
 
+export class BadRequestError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'BadRequestError';
+  }
+}
+
+export class ForbiddenError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ForbiddenError';
+  }
+}
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export class LeaveManagementService implements ILeaveManagementService {
   constructor(
     private leaveRepo: ILeaveRequestRepository,
     private policyRepo: ILeavePolicyRepository,
     private balanceRepo: ILeaveBalanceRepository,
     private auditRepo: IAuditLogRepository,
+    private employeeRepo: IEmployeeRepository,
+    private notificationRepo: INotificationRepository,
     private dbPool: Pool = pool
   ) {}
 
@@ -110,11 +130,149 @@ export class LeaveManagementService implements ILeaveManagementService {
   }
 
   async approveLeave(leaveId: string, approverId: string, comment?: string): Promise<LeaveRequest> {
-    throw new NotImplementedError('approveLeave not implemented');
+    this.validateUuid(leaveId, 'leaveId');
+    this.validateUuid(approverId, 'approverId');
+
+    const leaveRequest = await this.leaveRepo.findById(leaveId);
+    if (!leaveRequest) {
+      throw new NotFoundError('Leave request not found');
+    }
+
+    const approver = await this.employeeRepo.findById(approverId);
+    if (!approver) {
+      throw new NotFoundError('Approver not found');
+    }
+
+    const employee = await this.employeeRepo.findById(leaveRequest.employeeId);
+    if (!employee || employee.managerId !== approver.id) {
+      throw new ForbiddenError('Approver is not the manager of the requesting employee');
+    }
+    if (approver.role !== 'manager') {
+      throw new ForbiddenError('Approver does not have manager role');
+    }
+
+    // Note: The domain model uses 'submitted' for pending requests
+    if (leaveRequest.status !== 'submitted') {
+      throw new BadRequestError('Leave request is not in pending status');
+    }
+
+    const client: PoolClient = await this.dbPool.connect();
+    try {
+      await client.query('BEGIN');
+
+      const updatedRequest = await this.leaveRepo.updateStatus(leaveId, 'approved', approverId, comment);
+
+      const year = new Date(leaveRequest.startDate).getFullYear();
+      const balance = await this.balanceRepo.findByEmployeeIdAndLeaveTypeIdAndYear(
+        leaveRequest.employeeId,
+        leaveRequest.leaveTypeId,
+        year
+      );
+      if (!balance) {
+        throw new NotFoundError('Leave balance not found');
+      }
+
+      const days = this.calculateDays(leaveRequest.startDate.toString(), leaveRequest.endDate.toString());
+      await this.balanceRepo.update(balance.id, {
+        usedDays: balance.usedDays + days,
+        pendingDays: balance.pendingDays - days
+      });
+
+      await this.auditRepo.create({
+        entityType: 'leave_request',
+        entityId: leaveId,
+        action: 'LEAVE_APPROVED',
+        changedBy: approverId,
+        newValues: updatedRequest
+      } as any);
+
+      await this.notificationRepo.create({
+        recipientId: leaveRequest.employeeId,
+        leaveRequestId: leaveId,
+        type: 'LEAVE_APPROVED',
+        message: 'Your leave request has been approved.'
+      } as any);
+
+      await client.query('COMMIT');
+      return updatedRequest;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
-  async rejectLeave(leaveId: string, approverId: string, comment: string): Promise<LeaveRequest> {
-    throw new NotImplementedError('rejectLeave not implemented');
+  async rejectLeave(leaveId: string, approverId: string, comment?: string): Promise<LeaveRequest> {
+    this.validateUuid(leaveId, 'leaveId');
+    this.validateUuid(approverId, 'approverId');
+
+    const leaveRequest = await this.leaveRepo.findById(leaveId);
+    if (!leaveRequest) {
+      throw new NotFoundError('Leave request not found');
+    }
+
+    const approver = await this.employeeRepo.findById(approverId);
+    if (!approver) {
+      throw new NotFoundError('Approver not found');
+    }
+
+    const employee = await this.employeeRepo.findById(leaveRequest.employeeId);
+    if (!employee || employee.managerId !== approver.id) {
+      throw new ForbiddenError('Approver is not the manager of the requesting employee');
+    }
+    if (approver.role !== 'manager') {
+      throw new ForbiddenError('Approver does not have manager role');
+    }
+
+    if (leaveRequest.status !== 'submitted') {
+      throw new BadRequestError('Leave request is not in pending status');
+    }
+
+    const client: PoolClient = await this.dbPool.connect();
+    try {
+      await client.query('BEGIN');
+
+      const updatedRequest = await this.leaveRepo.updateStatus(leaveId, 'rejected', approverId, comment);
+
+      const year = new Date(leaveRequest.startDate).getFullYear();
+      const balance = await this.balanceRepo.findByEmployeeIdAndLeaveTypeIdAndYear(
+        leaveRequest.employeeId,
+        leaveRequest.leaveTypeId,
+        year
+      );
+      if (!balance) {
+        throw new NotFoundError('Leave balance not found');
+      }
+
+      const days = this.calculateDays(leaveRequest.startDate.toString(), leaveRequest.endDate.toString());
+      await this.balanceRepo.update(balance.id, {
+        pendingDays: balance.pendingDays - days
+      });
+
+      await this.auditRepo.create({
+        entityType: 'leave_request',
+        entityId: leaveId,
+        action: 'LEAVE_REJECTED',
+        changedBy: approverId,
+        newValues: updatedRequest
+      } as any);
+
+      await this.notificationRepo.create({
+        recipientId: leaveRequest.employeeId,
+        leaveRequestId: leaveId,
+        type: 'LEAVE_REJECTED',
+        message: comment ? `Your leave request has been rejected. Comment: ${comment}` : 'Your leave request has been rejected.'
+      } as any);
+
+      await client.query('COMMIT');
+      return updatedRequest;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   async cancelLeave(leaveId: string, employeeId: string): Promise<LeaveRequest> {
@@ -131,6 +289,12 @@ export class LeaveManagementService implements ILeaveManagementService {
 
   async getLeaveHistory(employeeId: string): Promise<LeaveRequest[]> {
     throw new NotImplementedError('getLeaveHistory not implemented');
+  }
+
+  private validateUuid(value: string, fieldName: string): void {
+    if (!UUID_REGEX.test(value)) {
+      throw new BadRequestError(`Invalid ${fieldName} UUID format`);
+    }
   }
 
   private calculateDays(start: string, end: string): number {
