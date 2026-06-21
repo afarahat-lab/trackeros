@@ -1,0 +1,64 @@
+{
+  "correlationId": "88bc978d-afe4-4122-b135-ebe229fa014a",
+  "domainChanges": [
+    {
+      "entityName": "Employee",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "firstName",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "lastName",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "email",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "managerId",
+          "type": "string | null",
+          "required": true
+        },
+        {
+          "name": "role",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "department",
+          "type": "string | null",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "Employee",
+          "type": "one-to-many"
+        }
+      ]
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}
