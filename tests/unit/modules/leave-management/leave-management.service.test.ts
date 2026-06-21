@@ -3,35 +3,46 @@ import { LeaveManagementService, ValidationError, NotFoundError, InsufficientBal
 describe('LeaveManagementService', () => {
   let service: LeaveManagementService;
   let mockLeaveRepo: any;
-  let mockPolicyRepo: any;
   let mockBalanceRepo: any;
-  let mockAuditRepo: any;
+  let mockLeaveTypeRepo: any;
+  let mockPolicyRepo: any;
   let mockEmployeeRepo: any;
-  let mockNotificationRepo: any;
+  let mockAuditService: any;
   let mockClient: any;
   let mockPool: any;
 
   beforeEach(() => {
     mockLeaveRepo = {
       create: jest.fn(),
-      updateStatus: jest.fn(),
       findById: jest.fn(),
+      findByEmployeeId: jest.fn(),
+      findByApproverId: jest.fn(),
+      update: jest.fn(),
+      updateStatus: jest.fn(),
+    };
+    mockBalanceRepo = {
+      findById: jest.fn(),
+      findByEmployeeIdAndYear: jest.fn(),
+      findByEmployeeIdAndLeaveTypeIdAndYear: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+    };
+    mockLeaveTypeRepo = {
+      findById: jest.fn(),
+      findAll: jest.fn(),
     };
     mockPolicyRepo = {
       findByLeaveTypeId: jest.fn(),
     };
-    mockBalanceRepo = {
-      findByEmployeeIdAndLeaveTypeIdAndYear: jest.fn(),
-      update: jest.fn(),
-    };
-    mockAuditRepo = {
-      create: jest.fn(),
-    };
     mockEmployeeRepo = {
       findById: jest.fn(),
-    };
-    mockNotificationRepo = {
+      findByEmail: jest.fn(),
+      findByManagerId: jest.fn(),
       create: jest.fn(),
+      update: jest.fn(),
+    };
+    mockAuditService = {
+      log: jest.fn(),
     };
     mockClient = {
       query: jest.fn(),
@@ -43,11 +54,11 @@ describe('LeaveManagementService', () => {
 
     service = new LeaveManagementService(
       mockLeaveRepo,
-      mockPolicyRepo,
       mockBalanceRepo,
-      mockAuditRepo,
+      mockLeaveTypeRepo,
+      mockPolicyRepo,
       mockEmployeeRepo,
-      mockNotificationRepo,
+      mockAuditService,
       mockPool
     );
   });
@@ -71,25 +82,15 @@ describe('LeaveManagementService', () => {
     const submittedReq = { ...draftReq, status: 'submitted' };
     
     mockLeaveRepo.create.mockResolvedValue(draftReq);
-    mockLeaveRepo.updateStatus.mockResolvedValue(submittedReq);
-    mockAuditRepo.create.mockResolvedValue({});
+    mockAuditService.log.mockResolvedValue({});
 
     const result = await service.createLeaveRequest(validDto, { id: 'emp1', role: 'employee' });
 
-    expect(mockClient.query).toHaveBeenCalledWith('BEGIN');
     expect(mockPolicyRepo.findByLeaveTypeId).toHaveBeenCalledWith('lt1');
     expect(mockBalanceRepo.findByEmployeeIdAndLeaveTypeIdAndYear).toHaveBeenCalledWith('emp1', 'lt1', 2023);
     expect(mockLeaveRepo.create).toHaveBeenCalledWith(expect.objectContaining({ status: 'draft' }));
-    expect(mockLeaveRepo.updateStatus).toHaveBeenCalledWith('req1', 'submitted');
-    expect(mockAuditRepo.create).toHaveBeenCalledWith(expect.objectContaining({
-      entityType: 'leave_request',
-      entityId: 'req1',
-      action: 'SUBMITTED',
-      changedBy: 'emp1',
-    }));
-    expect(mockClient.query).toHaveBeenCalledWith('COMMIT');
-    expect(mockClient.release).toHaveBeenCalled();
-    expect(result).toEqual(submittedReq);
+    expect(mockAuditService.log).toHaveBeenCalledWith('LeaveRequest', draftReq.id, 'CREATED', 'emp1', null, { status: 'draft' });
+    expect(result).toEqual(draftReq);
   });
 
   it('ValidationError: missing required fields', async () => {
@@ -105,7 +106,6 @@ describe('LeaveManagementService', () => {
   it('NotFoundError: leave policy not found', async () => {
     mockPolicyRepo.findByLeaveTypeId.mockResolvedValue(null);
     await expect(service.createLeaveRequest(validDto, { id: 'emp1', role: 'employee' })).rejects.toThrow(NotFoundError);
-    expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK');
   });
 
   it('InsufficientBalanceError: balance insufficient', async () => {
@@ -116,10 +116,9 @@ describe('LeaveManagementService', () => {
       pendingDays: 0,
     });
     await expect(service.createLeaveRequest(validDto, { id: 'emp1', role: 'employee' })).rejects.toThrow(InsufficientBalanceError);
-    expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK');
   });
 
-  it('Transaction rollback: DB error during creation triggers ROLLBACK', async () => {
+  it('DB error during creation', async () => {
     mockPolicyRepo.findByLeaveTypeId.mockResolvedValue({ id: 'p1' });
     mockBalanceRepo.findByEmployeeIdAndLeaveTypeIdAndYear.mockResolvedValue({
       totalEntitlement: 10,
@@ -129,8 +128,6 @@ describe('LeaveManagementService', () => {
     mockLeaveRepo.create.mockRejectedValue(new Error('DB Error'));
 
     await expect(service.createLeaveRequest(validDto, { id: 'emp1', role: 'employee' })).rejects.toThrow('DB Error');
-    expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK');
-    expect(mockClient.release).toHaveBeenCalled();
   });
 
   describe('approveLeave', () => {
@@ -161,17 +158,15 @@ describe('LeaveManagementService', () => {
       mockBalanceRepo.findByEmployeeIdAndLeaveTypeIdAndYear.mockResolvedValue(mockBalance);
       mockLeaveRepo.updateStatus.mockResolvedValue({ ...mockLeaveRequest, status: 'approved', approverId });
       mockBalanceRepo.update.mockResolvedValue({ ...mockBalance, usedDays: 2, pendingDays: 0 });
-      mockAuditRepo.create.mockResolvedValue({});
-      mockNotificationRepo.create.mockResolvedValue({});
+      mockAuditService.log.mockResolvedValue({});
     });
 
-    it('Success: approves leave, updates balance, creates audit and notification', async () => {
+    it('Success: approves leave, updates balance, creates audit', async () => {
       const result = await service.approveLeaveRequest(leaveId, { id: approverId, role: 'manager' });
       expect(result.status).toBe('approved');
       expect(mockLeaveRepo.updateStatus).toHaveBeenCalledWith(leaveId, 'approved', approverId, undefined);
       expect(mockBalanceRepo.update).toHaveBeenCalledWith('bal1', { usedDays: 2, pendingDays: 0 });
-      expect(mockAuditRepo.create).toHaveBeenCalledWith(expect.objectContaining({ action: 'LEAVE_APPROVED' }));
-      expect(mockNotificationRepo.create).toHaveBeenCalledWith(expect.objectContaining({ type: 'LEAVE_APPROVED' }));
+      expect(mockAuditService.log).toHaveBeenCalledWith('LeaveRequest', leaveId, 'APPROVED', approverId, { status: 'submitted' }, { status: 'approved' });
       expect(mockClient.query).toHaveBeenCalledWith('COMMIT');
     });
 
@@ -251,20 +246,15 @@ describe('LeaveManagementService', () => {
       mockBalanceRepo.findByEmployeeIdAndLeaveTypeIdAndYear.mockResolvedValue(mockBalance);
       mockLeaveRepo.updateStatus.mockResolvedValue({ ...mockLeaveRequest, status: 'rejected', approverId });
       mockBalanceRepo.update.mockResolvedValue({ ...mockBalance, pendingDays: 0 });
-      mockAuditRepo.create.mockResolvedValue({});
-      mockNotificationRepo.create.mockResolvedValue({});
+      mockAuditService.log.mockResolvedValue({});
     });
 
-    it('Success: rejects leave, releases pending days, creates audit and notification', async () => {
+    it('Success: rejects leave, releases pending days, creates audit', async () => {
       const result = await service.rejectLeaveRequest(leaveId, { id: approverId, role: 'manager' }, 'Not enough coverage');
       expect(result.status).toBe('rejected');
       expect(mockLeaveRepo.updateStatus).toHaveBeenCalledWith(leaveId, 'rejected', approverId, 'Not enough coverage');
       expect(mockBalanceRepo.update).toHaveBeenCalledWith('bal1', { pendingDays: 0 });
-      expect(mockAuditRepo.create).toHaveBeenCalledWith(expect.objectContaining({ action: 'LEAVE_REJECTED' }));
-      expect(mockNotificationRepo.create).toHaveBeenCalledWith(expect.objectContaining({ 
-        type: 'LEAVE_REJECTED',
-        message: expect.stringContaining('Not enough coverage')
-      }));
+      expect(mockAuditService.log).toHaveBeenCalledWith('LeaveRequest', leaveId, 'REJECTED', approverId, { status: 'submitted' }, { status: 'rejected' });
       expect(mockClient.query).toHaveBeenCalledWith('COMMIT');
     });
 
@@ -283,7 +273,7 @@ describe('LeaveManagementService', () => {
     });
     
     it('Transaction rollback: audit log creation fails', async () => {
-      mockAuditRepo.create.mockRejectedValue(new Error('Audit DB Error'));
+      mockAuditService.log.mockRejectedValue(new Error('Audit DB Error'));
       await expect(service.rejectLeaveRequest(leaveId, { id: approverId, role: 'manager' }, 'Rejection reason')).rejects.toThrow('Audit DB Error');
       expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK');
     });
@@ -310,8 +300,7 @@ describe('LeaveManagementService', () => {
       mockBalanceRepo.findByEmployeeIdAndLeaveTypeIdAndYear.mockResolvedValue(mockBalance);
       mockLeaveRepo.updateStatus.mockResolvedValue({ ...mockLeaveRequest, status: 'cancelled' });
       mockBalanceRepo.update.mockResolvedValue({ ...mockBalance });
-      mockAuditRepo.create.mockResolvedValue({});
-      mockNotificationRepo.create.mockResolvedValue({});
+      mockAuditService.log.mockResolvedValue({});
     });
 
     it('Success: cancels submitted leave, adjusts pendingDays (inclusive days calculation)', async () => {
@@ -320,8 +309,7 @@ describe('LeaveManagementService', () => {
       // 2023-10-01 to 2023-10-02 is 2 days inclusive
       expect(mockBalanceRepo.update).toHaveBeenCalledWith('bal1', { pendingDays: 0 });
       expect(mockLeaveRepo.updateStatus).toHaveBeenCalledWith(leaveId, 'cancelled');
-      expect(mockAuditRepo.create).toHaveBeenCalledWith(expect.objectContaining({ action: 'cancelled' }));
-      expect(mockNotificationRepo.create).toHaveBeenCalled();
+      expect(mockAuditService.log).toHaveBeenCalledWith('LeaveRequest', leaveId, 'CANCELLED', employeeId, { status: 'submitted' }, { status: 'cancelled' });
     });
 
     it('Success: cancels approved leave, adjusts usedDays', async () => {
@@ -372,13 +360,13 @@ describe('LeaveManagementService', () => {
     beforeEach(() => {
       mockLeaveRepo.findById.mockResolvedValue(mockLeaveRequest);
       mockLeaveRepo.updateStatus.mockResolvedValue({ ...mockLeaveRequest, status: 'cancelled' });
-      mockAuditRepo.create.mockResolvedValue({});
+      mockAuditService.log.mockResolvedValue({});
     });
 
     it('Success: discards draft and creates audit log', async () => {
       await service.discardDraftLeaveRequest(leaveId, { id: employeeId, role: 'employee' });
       expect(mockLeaveRepo.updateStatus).toHaveBeenCalledWith(leaveId, 'cancelled');
-      expect(mockAuditRepo.create).toHaveBeenCalledWith(expect.objectContaining({ action: 'discarded' }));
+      expect(mockAuditService.log).toHaveBeenCalledWith('LeaveRequest', leaveId, 'DISCARDED', employeeId, { status: 'draft' }, { status: 'cancelled' });
     });
 
     it('Throws NotFoundError: non-existent request', async () => {

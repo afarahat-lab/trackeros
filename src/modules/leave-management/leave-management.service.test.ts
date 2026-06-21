@@ -4,28 +4,53 @@ import { Pool } from 'pg';
 const mockLeaveRepo = {
   create: jest.fn(),
   findById: jest.fn(),
-  updateStatus: jest.fn(),
   findByEmployeeId: jest.fn(),
+  findByApproverId: jest.fn(),
+  update: jest.fn(),
+  updateStatus: jest.fn(),
 };
 
-const mockPolicyRepo = { findByLeaveTypeId: jest.fn() };
+const mockLeaveTypeRepo = { 
+  findById: jest.fn(), 
+  findAll: jest.fn() 
+};
+
+const mockPolicyRepo = { 
+  findByLeaveTypeId: jest.fn() 
+};
 
 const mockBalanceRepo = {
-  findByEmployeeIdAndLeaveTypeIdAndYear: jest.fn(),
-  update: jest.fn(),
+  findById: jest.fn(),
   findByEmployeeIdAndYear: jest.fn(),
+  findByEmployeeIdAndLeaveTypeIdAndYear: jest.fn(),
+  create: jest.fn(),
+  update: jest.fn(),
 };
 
-const mockAuditRepo = { create: jest.fn() };
+const mockAuditRepo = { 
+  create: jest.fn(),
+  findById: jest.fn(),
+  findByEntity: jest.fn(),
+};
 
 const mockEmployeeRepo = {
   findById: jest.fn(),
+  findByEmail: jest.fn(),
   findByManagerId: jest.fn(),
+  create: jest.fn(),
+  update: jest.fn(),
 };
 
-const mockNotificationRepo = { create: jest.fn() };
+const mockNotificationRepo = { 
+  create: jest.fn(),
+  findById: jest.fn(),
+  findByRecipient: jest.fn(),
+  markAsRead: jest.fn(),
+};
 
-const mockAuditService = { log: jest.fn() };
+const mockAuditService = { 
+  log: jest.fn() 
+};
 
 const mockPool = {
   connect: jest.fn().mockReturnValue({
@@ -41,11 +66,10 @@ describe('LeaveManagementService', () => {
     jest.clearAllMocks();
     service = new LeaveManagementService(
       mockLeaveRepo as any,
-      mockPolicyRepo as any,
       mockBalanceRepo as any,
-      mockAuditRepo as any,
+      mockLeaveTypeRepo as any,
+      mockPolicyRepo as any,
       mockEmployeeRepo as any,
-      mockNotificationRepo as any,
       mockAuditService as any,
       mockPool as any
     );

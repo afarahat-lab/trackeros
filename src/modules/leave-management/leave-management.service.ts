@@ -1,13 +1,12 @@
-import { Pool, PoolClient } from 'pg';
-import { pool } from '../../shared/db/connection';
+import { Pool } from 'pg';
 import { ILeaveManagementService, UserContext, LeaveRequestFilters } from './leave-management.service.interface';
-import { ILeaveRequestRepository } from '../leave/leave.repository';
-import { ILeavePolicyRepository } from '../policy/policy.repository';
-import { ILeaveBalanceRepository } from '../balance/balance.repository';
-import { IAuditLogRepository } from '../audit/audit.repository';
-import { IEmployeeRepository } from '../employee/employee.repository';
-import { INotificationRepository } from '../notification/notification.repository';
 import { IAuditService } from '../../shared/audit/audit.service.interface';
+import { ILeaveRequestRepository } from '../leave/leave.repository';
+import { ILeaveBalanceRepository } from '../balance/balance.repository';
+import { ILeaveTypeRepository } from '../leave-type/leave-type.repository';
+import { ILeavePolicyRepository } from '../policy/policy.repository';
+import { IEmployeeRepository } from '../employee/employee.repository';
+import { pool } from '../../shared/db/connection';
 import { CreateLeaveRequestDto, LeaveRequest } from '../leave/leave.model';
 import { LeaveBalance } from '../balance/balance.model';
 
@@ -65,11 +64,10 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 export class LeaveManagementService implements ILeaveManagementService {
   constructor(
     private leaveRepo: ILeaveRequestRepository,
-    private policyRepo: ILeavePolicyRepository,
     private balanceRepo: ILeaveBalanceRepository,
-    private auditRepo: IAuditLogRepository,
+    private leaveTypeRepo: ILeaveTypeRepository,
+    private policyRepo: ILeavePolicyRepository,
     private employeeRepo: IEmployeeRepository,
-    private notificationRepo: INotificationRepository,
     private auditService: IAuditService,
     private dbPool: Pool = pool
   ) {}
@@ -78,7 +76,25 @@ export class LeaveManagementService implements ILeaveManagementService {
     if (!dto.employeeId || !dto.leaveTypeId || !dto.startDate || !dto.endDate) {
       throw new ValidationError('Missing required fields: employeeId, leaveTypeId, startDate, endDate');
     }
+    if (new Date(dto.endDate) <= new Date(dto.startDate)) {
+      throw new ValidationError('endDate must be after startDate');
+    }
+
+    const policy = await this.policyRepo.findByLeaveTypeId(dto.leaveTypeId);
+    if (!policy) throw new NotFoundError('Leave policy not found');
+
+    const year = new Date(dto.startDate).getFullYear();
+    const balance = await this.balanceRepo.findByEmployeeIdAndLeaveTypeIdAndYear(dto.employeeId, dto.leaveTypeId, year);
+    if (!balance) throw new NotFoundError('Leave balance not found');
+
+    const days = this.calculateDays(dto.startDate, dto.endDate);
+    const available = balance.totalEntitlement - balance.usedDays - balance.pendingDays;
+    if (available < days) throw new InsufficientBalanceError('Insufficient leave balance');
+
     const draft = await this.leaveRepo.create({ ...dto, status: 'draft' } as any);
+    await this.balanceRepo.update(balance.id, { pendingDays: balance.pendingDays + days });
+    await this.auditService.log('LeaveRequest', draft.id, 'CREATED', user.id, null, { status: 'draft' });
+
     return draft;
   }
 
@@ -86,8 +102,9 @@ export class LeaveManagementService implements ILeaveManagementService {
     this.validateUuid(id, 'id');
     const request = await this.leaveRepo.findById(id);
     if (!request) throw new NotFoundError('Leave request not found');
-    if (request.employeeId !== user.id) throw new ForbiddenError('Can only submit own requests');
-    if (request.status !== 'draft') throw new BadRequestError('Request is not a draft');
+    if (request.employeeId !== user.id || request.status !== 'draft') {
+      throw new ForbiddenError('Forbidden: you can only submit your own draft requests');
+    }
 
     const client = await this.dbPool.connect();
     try {
@@ -243,8 +260,9 @@ export class LeaveManagementService implements ILeaveManagementService {
     this.validateUuid(id, 'id');
     const request = await this.leaveRepo.findById(id);
     if (!request) throw new NotFoundError('Leave request not found');
-    if (request.employeeId !== user.id) throw new ForbiddenError('Can only discard own drafts');
-    if (request.status !== 'draft') throw new BadRequestError('Only draft requests can be discarded');
+    if (request.employeeId !== user.id || request.status !== 'draft') {
+      throw new ForbiddenError('Can only discard own drafts');
+    }
 
     await this.leaveRepo.updateStatus(id, 'cancelled');
     await this.auditService.log('LeaveRequest', id, 'DISCARDED', user.id, { status: 'draft' }, { status: 'cancelled' });
@@ -256,7 +274,7 @@ export class LeaveManagementService implements ILeaveManagementService {
       if (employeeId !== user.id) throw new ForbiddenError('Cannot view other balances');
     } else if (user.role === 'manager') {
       const emp = await this.employeeRepo.findById(employeeId);
-      if (!emp || emp.managerId !== user.id) throw new ForbiddenError('Cannot view balance for this employee');
+      if (!emp || emp.managerId !== user.id) throw new ForbiddenError('Not the manager of this employee');
     } else {
       throw new ForbiddenError('Unauthorized');
     }
@@ -271,7 +289,7 @@ export class LeaveManagementService implements ILeaveManagementService {
     } else if (user.role === 'manager') {
       if (filters.employeeId) {
         const emp = await this.employeeRepo.findById(filters.employeeId);
-        if (!emp || emp.managerId !== user.id) throw new ForbiddenError('Cannot view history for this employee');
+        if (!emp || emp.managerId !== user.id) throw new ForbiddenError('Not the manager of this employee');
         return await this.leaveRepo.findByEmployeeId(filters.employeeId);
       } else {
         const team = await this.employeeRepo.findByManagerId(user.id);

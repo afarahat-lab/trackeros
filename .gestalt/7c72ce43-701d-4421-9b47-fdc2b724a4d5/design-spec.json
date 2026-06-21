@@ -3,157 +3,13 @@
   "domainChanges": [],
   "apiContracts": [
     {
-      "method": "POST",
-      "path": "/api/v1/leave-requests",
-      "description": "Create a new leave request (draft). Employee can create for themselves; manager can create for team members.",
-      "requestBody": {
-        "employeeId": "string",
-        "leaveTypeId": "string",
-        "startDate": "string",
-        "endDate": "string",
-        "reason": "string?"
-      },
-      "responseBody": {
-        "id": "string",
-        "employeeId": "string",
-        "leaveTypeId": "string",
-        "startDate": "string",
-        "endDate": "string",
-        "status": "string",
-        "reason": "string?",
-        "createdAt": "string",
-        "updatedAt": "string"
-      },
-      "authRequired": true,
-      "roles": [
-        "employee",
-        "manager"
-      ]
-    },
-    {
-      "method": "POST",
-      "path": "/api/v1/leave-requests/:id/submit",
-      "description": "Submit a draft leave request for approval. Employee can submit own request; manager can submit for team members.",
-      "requestBody": {},
-      "responseBody": {
-        "id": "string",
-        "employeeId": "string",
-        "leaveTypeId": "string",
-        "startDate": "string",
-        "endDate": "string",
-        "status": "string",
-        "reason": "string?",
-        "createdAt": "string",
-        "updatedAt": "string"
-      },
-      "authRequired": true,
-      "roles": [
-        "employee",
-        "manager"
-      ]
-    },
-    {
-      "method": "POST",
-      "path": "/api/v1/leave-requests/:id/approve",
-      "description": "Approve a pending leave request. Only the manager of the requesting employee can perform this action.",
-      "requestBody": {
-        "comment": "string?"
-      },
-      "responseBody": {
-        "id": "string",
-        "employeeId": "string",
-        "leaveTypeId": "string",
-        "startDate": "string",
-        "endDate": "string",
-        "status": "string",
-        "reason": "string?",
-        "approvedBy": "string?",
-        "approvedAt": "string?",
-        "createdAt": "string",
-        "updatedAt": "string"
-      },
-      "authRequired": true,
-      "roles": [
-        "manager"
-      ]
-    },
-    {
-      "method": "POST",
-      "path": "/api/v1/leave-requests/:id/reject",
-      "description": "Reject a pending leave request. Only the manager of the requesting employee can perform this action. A comment is required.",
-      "requestBody": {
-        "comment": "string"
-      },
-      "responseBody": {
-        "id": "string",
-        "employeeId": "string",
-        "leaveTypeId": "string",
-        "startDate": "string",
-        "endDate": "string",
-        "status": "string",
-        "reason": "string?",
-        "rejectedBy": "string?",
-        "rejectedAt": "string?",
-        "comment": "string?",
-        "createdAt": "string",
-        "updatedAt": "string"
-      },
-      "authRequired": true,
-      "roles": [
-        "manager"
-      ]
-    },
-    {
-      "method": "POST",
-      "path": "/api/v1/leave-requests/:id/cancel",
-      "description": "Cancel an approved or pending leave request. Allowed for the owning employee or their manager.",
-      "requestBody": {},
-      "responseBody": {
-        "id": "string",
-        "employeeId": "string",
-        "leaveTypeId": "string",
-        "startDate": "string",
-        "endDate": "string",
-        "status": "string",
-        "reason": "string?",
-        "cancelledBy": "string?",
-        "cancelledAt": "string?",
-        "createdAt": "string",
-        "updatedAt": "string"
-      },
-      "authRequired": true,
-      "roles": [
-        "employee",
-        "manager"
-      ]
-    },
-    {
-      "method": "DELETE",
-      "path": "/api/v1/leave-requests/:id/draft",
-      "description": "Discard a draft leave request. Only the owning employee can discard their own draft.",
-      "requestBody": {},
-      "responseBody": {},
-      "authRequired": true,
-      "roles": [
-        "employee"
-      ]
-    },
-    {
       "method": "GET",
       "path": "/api/v1/leave-balances",
-      "description": "Retrieve leave balances. Employees see only their own balances; managers see balances of their team members (filter by employeeId).",
-      "requestBody": {},
-      "responseBody": [
-        {
-          "id": "string",
-          "employeeId": "string",
-          "leaveTypeId": "string",
-          "balance": "number",
-          "used": "number",
-          "pending": "number",
-          "updatedAt": "string"
-        }
-      ],
+      "description": "Retrieve leave balances for the authenticated employee (or for a specific employee if manager and within team).",
+      "requestBody": null,
+      "responseBody": {
+        "balances": "LeaveBalance[]"
+      },
       "authRequired": true,
       "roles": [
         "employee",
@@ -163,21 +19,11 @@
     {
       "method": "GET",
       "path": "/api/v1/leave-requests",
-      "description": "Retrieve leave request history. Employees see their own requests; managers see requests of their team members. Supports filters: employeeId, status, startDate, endDate.",
-      "requestBody": {},
-      "responseBody": [
-        {
-          "id": "string",
-          "employeeId": "string",
-          "leaveTypeId": "string",
-          "startDate": "string",
-          "endDate": "string",
-          "status": "string",
-          "reason": "string?",
-          "createdAt": "string",
-          "updatedAt": "string"
-        }
-      ],
+      "description": "Retrieve leave request history with optional filters (employeeId, status, startDate, endDate). Scoped to the authenticated user's role.",
+      "requestBody": null,
+      "responseBody": {
+        "requests": "LeaveRequest[]"
+      },
       "authRequired": true,
       "roles": [
         "employee",
