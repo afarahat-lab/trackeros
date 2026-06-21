@@ -106,18 +106,17 @@ Represents leave balance data managed by the `balance` module, including tracked
 |-------|------|----------|
 | id | string | true |
 | employeeId | string | true |
-| policyId | string | true |
+| leaveTypeId | string | true |
 | totalEntitlement | number | true |
 | usedDays | number | true |
-| remainingDays | number | true |
-| fiscalYear | number | true |
-| status | string | true |
+| pendingDays | number | true |
+| year | number | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
 **Relationships**
 - `Employee` — many-to-one
-- `LeavePolicy` — many-to-one
+- `LeaveType` — many-to-one
 
 ## employee
 
