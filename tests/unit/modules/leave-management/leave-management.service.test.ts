@@ -1,4 +1,4 @@
-import { LeaveManagementService, ValidationError, NotFoundError, InsufficientBalanceError, BadRequestError, ForbiddenError } from '../../../../src/modules/leave-management/leave-management.service';
+import { LeaveManagementService, ValidationError, NotFoundError, InsufficientBalanceError, BadRequestError, ForbiddenError, ConflictError } from '../../../../src/modules/leave-management/leave-management.service';
 
 describe('LeaveManagementService', () => {
   let service: LeaveManagementService;
@@ -286,6 +286,114 @@ describe('LeaveManagementService', () => {
       mockAuditRepo.create.mockRejectedValue(new Error('Audit DB Error'));
       await expect(service.rejectLeave(leaveId, approverId)).rejects.toThrow('Audit DB Error');
       expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK');
+    });
+  });
+
+  describe('cancelLeave', () => {
+    const leaveId = '123e4567-e89b-12d3-a456-426614174000';
+    const employeeId = '123e4567-e89b-12d3-a456-426614174002';
+    
+    const mockLeaveRequest = {
+      id: leaveId,
+      employeeId,
+      leaveTypeId: 'lt1',
+      startDate: new Date('2023-10-01'),
+      endDate: new Date('2023-10-02'),
+      status: 'submitted',
+      approverId: '123e4567-e89b-12d3-a456-426614174001'
+    };
+
+    const mockBalance = { id: 'bal1', usedDays: 2, pendingDays: 2 };
+
+    beforeEach(() => {
+      mockLeaveRepo.findById.mockResolvedValue(mockLeaveRequest);
+      mockBalanceRepo.findByEmployeeIdAndLeaveTypeIdAndYear.mockResolvedValue(mockBalance);
+      mockLeaveRepo.updateStatus.mockResolvedValue({ ...mockLeaveRequest, status: 'cancelled' });
+      mockBalanceRepo.update.mockResolvedValue({ ...mockBalance });
+      mockAuditRepo.create.mockResolvedValue({});
+      mockNotificationRepo.create.mockResolvedValue({});
+    });
+
+    it('Success: cancels submitted leave, adjusts pendingDays (inclusive days calculation)', async () => {
+      const result = await service.cancelLeave(leaveId, employeeId);
+      expect(result.status).toBe('cancelled');
+      // 2023-10-01 to 2023-10-02 is 2 days inclusive
+      expect(mockBalanceRepo.update).toHaveBeenCalledWith('bal1', { pendingDays: 0 });
+      expect(mockLeaveRepo.updateStatus).toHaveBeenCalledWith(leaveId, 'cancelled');
+      expect(mockAuditRepo.create).toHaveBeenCalledWith(expect.objectContaining({ action: 'cancelled' }));
+      expect(mockNotificationRepo.create).toHaveBeenCalled();
+    });
+
+    it('Success: cancels approved leave, adjusts usedDays', async () => {
+      mockLeaveRepo.findById.mockResolvedValue({ ...mockLeaveRequest, status: 'approved' });
+      await service.cancelLeave(leaveId, employeeId);
+      expect(mockBalanceRepo.update).toHaveBeenCalledWith('bal1', { usedDays: 0 });
+    });
+
+    it('Throws NotFoundError: non-existent request', async () => {
+      mockLeaveRepo.findById.mockResolvedValue(null);
+      await expect(service.cancelLeave(leaveId, employeeId)).rejects.toThrow(NotFoundError);
+    });
+
+    it('Throws ForbiddenError: request not owned by employee', async () => {
+      mockLeaveRepo.findById.mockResolvedValue({ ...mockLeaveRequest, employeeId: 'other-emp' });
+      await expect(service.cancelLeave(leaveId, employeeId)).rejects.toThrow(ForbiddenError);
+    });
+
+    it('Throws ConflictError: invalid status (draft)', async () => {
+      mockLeaveRepo.findById.mockResolvedValue({ ...mockLeaveRequest, status: 'draft' });
+      await expect(service.cancelLeave(leaveId, employeeId)).rejects.toThrow(ConflictError);
+    });
+
+    it('Throws ConflictError: invalid status (rejected)', async () => {
+      mockLeaveRepo.findById.mockResolvedValue({ ...mockLeaveRequest, status: 'rejected' });
+      await expect(service.cancelLeave(leaveId, employeeId)).rejects.toThrow(ConflictError);
+    });
+
+    it('Throws ConflictError: invalid status (cancelled)', async () => {
+      mockLeaveRepo.findById.mockResolvedValue({ ...mockLeaveRequest, status: 'cancelled' });
+      await expect(service.cancelLeave(leaveId, employeeId)).rejects.toThrow(ConflictError);
+    });
+  });
+
+  describe('discardDraft', () => {
+    const leaveId = '123e4567-e89b-12d3-a456-426614174000';
+    const employeeId = '123e4567-e89b-12d3-a456-426614174002';
+    
+    const mockLeaveRequest = {
+      id: leaveId,
+      employeeId,
+      leaveTypeId: 'lt1',
+      startDate: new Date('2023-10-01'),
+      endDate: new Date('2023-10-02'),
+      status: 'draft',
+    };
+
+    beforeEach(() => {
+      mockLeaveRepo.findById.mockResolvedValue(mockLeaveRequest);
+      mockLeaveRepo.updateStatus.mockResolvedValue({ ...mockLeaveRequest, status: 'cancelled' });
+      mockAuditRepo.create.mockResolvedValue({});
+    });
+
+    it('Success: discards draft and creates audit log', async () => {
+      await service.discardDraft(leaveId, employeeId);
+      expect(mockLeaveRepo.updateStatus).toHaveBeenCalledWith(leaveId, 'cancelled');
+      expect(mockAuditRepo.create).toHaveBeenCalledWith(expect.objectContaining({ action: 'discarded' }));
+    });
+
+    it('Throws NotFoundError: non-existent request', async () => {
+      mockLeaveRepo.findById.mockResolvedValue(null);
+      await expect(service.discardDraft(leaveId, employeeId)).rejects.toThrow(NotFoundError);
+    });
+
+    it('Throws ForbiddenError: request not owned by employee', async () => {
+      mockLeaveRepo.findById.mockResolvedValue({ ...mockLeaveRequest, employeeId: 'other-emp' });
+      await expect(service.discardDraft(leaveId, employeeId)).rejects.toThrow(ForbiddenError);
+    });
+
+    it('Throws ConflictError: non-draft status', async () => {
+      mockLeaveRepo.findById.mockResolvedValue({ ...mockLeaveRequest, status: 'submitted' });
+      await expect(service.discardDraft(leaveId, employeeId)).rejects.toThrow(ConflictError);
     });
   });
 });

@@ -204,6 +204,14 @@ Represents leave policy data managed by the `policy` module, including policy de
 
 Represents notification data managed by the `notification` module, including notification records, delivery status, and related messaging information.
 
+### NotificationType
+
+| Value | Description |
+|-------|-------------|
+| LEAVE_APPROVED | Leave request has been approved |
+| LEAVE_REJECTED | Leave request has been rejected |
+| LEAVE_CANCELLED | Leave request has been cancelled |
+
 ### Notification
 
 | Field | Type | Required |
@@ -211,7 +219,7 @@ Represents notification data managed by the `notification` module, including not
 | id | string | true |
 | recipientId | string | true |
 | leaveRequestId | string | true |
-| type | string | true |
+| type | NotificationType | true |
 | message | string | true |
 | isRead | boolean | true |
 | createdAt | Date | true |
