@@ -1,4 +1,4 @@
-import { LeaveManagementService, ValidationError, NotFoundError, InsufficientBalanceError } from '../../../../src/modules/leave-management/leave-management.service';
+import { LeaveManagementService, ValidationError, NotFoundError, InsufficientBalanceError, BadRequestError, ForbiddenError } from '../../../../src/modules/leave-management/leave-management.service';
 
 describe('LeaveManagementService', () => {
   let service: LeaveManagementService;
@@ -6,6 +6,8 @@ describe('LeaveManagementService', () => {
   let mockPolicyRepo: any;
   let mockBalanceRepo: any;
   let mockAuditRepo: any;
+  let mockEmployeeRepo: any;
+  let mockNotificationRepo: any;
   let mockClient: any;
   let mockPool: any;
 
@@ -13,14 +15,22 @@ describe('LeaveManagementService', () => {
     mockLeaveRepo = {
       create: jest.fn(),
       updateStatus: jest.fn(),
+      findById: jest.fn(),
     };
     mockPolicyRepo = {
       findByLeaveTypeId: jest.fn(),
     };
     mockBalanceRepo = {
       findByEmployeeIdAndLeaveTypeIdAndYear: jest.fn(),
+      update: jest.fn(),
     };
     mockAuditRepo = {
+      create: jest.fn(),
+    };
+    mockEmployeeRepo = {
+      findById: jest.fn(),
+    };
+    mockNotificationRepo = {
       create: jest.fn(),
     };
     mockClient = {
@@ -36,6 +46,8 @@ describe('LeaveManagementService', () => {
       mockPolicyRepo,
       mockBalanceRepo,
       mockAuditRepo,
+      mockEmployeeRepo,
+      mockNotificationRepo,
       mockPool
     );
   });
@@ -119,5 +131,161 @@ describe('LeaveManagementService', () => {
     await expect(service.applyForLeave(validDto)).rejects.toThrow('DB Error');
     expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK');
     expect(mockClient.release).toHaveBeenCalled();
+  });
+
+  describe('approveLeave', () => {
+    const leaveId = '123e4567-e89b-12d3-a456-426614174000';
+    const approverId = '123e4567-e89b-12d3-a456-426614174001';
+    const employeeId = '123e4567-e89b-12d3-a456-426614174002';
+    
+    const mockLeaveRequest = {
+      id: leaveId,
+      employeeId,
+      leaveTypeId: 'lt1',
+      startDate: new Date('2023-10-01'),
+      endDate: new Date('2023-10-02'),
+      status: 'submitted',
+    };
+
+    const mockApprover = { id: approverId, role: 'manager' };
+    const mockEmployee = { id: employeeId, managerId: approverId };
+    const mockBalance = { id: 'bal1', usedDays: 0, pendingDays: 2 };
+
+    beforeEach(() => {
+      mockLeaveRepo.findById.mockResolvedValue(mockLeaveRequest);
+      mockEmployeeRepo.findById.mockImplementation((id: string) => {
+        if (id === approverId) return Promise.resolve(mockApprover);
+        if (id === employeeId) return Promise.resolve(mockEmployee);
+        return Promise.resolve(null);
+      });
+      mockBalanceRepo.findByEmployeeIdAndLeaveTypeIdAndYear.mockResolvedValue(mockBalance);
+      mockLeaveRepo.updateStatus.mockResolvedValue({ ...mockLeaveRequest, status: 'approved', approverId });
+      mockBalanceRepo.update.mockResolvedValue({ ...mockBalance, usedDays: 2, pendingDays: 0 });
+      mockAuditRepo.create.mockResolvedValue({});
+      mockNotificationRepo.create.mockResolvedValue({});
+    });
+
+    it('Success: approves leave, updates balance, creates audit and notification', async () => {
+      const result = await service.approveLeave(leaveId, approverId);
+      expect(result.status).toBe('approved');
+      expect(mockLeaveRepo.updateStatus).toHaveBeenCalledWith(leaveId, 'approved', approverId, undefined);
+      expect(mockBalanceRepo.update).toHaveBeenCalledWith('bal1', { usedDays: 2, pendingDays: 0 });
+      expect(mockAuditRepo.create).toHaveBeenCalledWith(expect.objectContaining({ action: 'LEAVE_APPROVED' }));
+      expect(mockNotificationRepo.create).toHaveBeenCalledWith(expect.objectContaining({ type: 'LEAVE_APPROVED' }));
+      expect(mockClient.query).toHaveBeenCalledWith('COMMIT');
+    });
+
+    it('Throws BadRequestError: invalid leaveId UUID', async () => {
+      await expect(service.approveLeave('invalid-uuid', approverId)).rejects.toThrow(BadRequestError);
+    });
+
+    it('Throws BadRequestError: invalid approverId UUID', async () => {
+      await expect(service.approveLeave(leaveId, 'invalid-uuid')).rejects.toThrow(BadRequestError);
+    });
+
+    it('Throws NotFoundError: leave request not found', async () => {
+      mockLeaveRepo.findById.mockResolvedValue(null);
+      await expect(service.approveLeave(leaveId, approverId)).rejects.toThrow(NotFoundError);
+    });
+
+    it('Throws NotFoundError: approver not found', async () => {
+      mockEmployeeRepo.findById.mockResolvedValue(null);
+      await expect(service.approveLeave(leaveId, approverId)).rejects.toThrow(NotFoundError);
+    });
+
+    it('Throws ForbiddenError: approver is not a manager', async () => {
+      mockEmployeeRepo.findById.mockImplementation((id: string) => {
+        if (id === approverId) return Promise.resolve({ ...mockApprover, role: 'employee' });
+        if (id === employeeId) return Promise.resolve(mockEmployee);
+        return Promise.resolve(null);
+      });
+      await expect(service.approveLeave(leaveId, approverId)).rejects.toThrow(ForbiddenError);
+    });
+
+    it('Throws ForbiddenError: approver is not the employee manager', async () => {
+      mockEmployeeRepo.findById.mockImplementation((id: string) => {
+        if (id === approverId) return Promise.resolve(mockApprover);
+        if (id === employeeId) return Promise.resolve({ ...mockEmployee, managerId: 'other-manager' });
+        return Promise.resolve(null);
+      });
+      await expect(service.approveLeave(leaveId, approverId)).rejects.toThrow(ForbiddenError);
+    });
+
+    it('Throws BadRequestError: leave request not in pending status', async () => {
+      mockLeaveRepo.findById.mockResolvedValue({ ...mockLeaveRequest, status: 'approved' });
+      await expect(service.approveLeave(leaveId, approverId)).rejects.toThrow(BadRequestError);
+    });
+
+    it('Transaction rollback: balance update fails', async () => {
+      mockBalanceRepo.update.mockRejectedValue(new Error('DB Error'));
+      await expect(service.approveLeave(leaveId, approverId)).rejects.toThrow('DB Error');
+      expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK');
+    });
+  });
+
+  describe('rejectLeave', () => {
+    const leaveId = '123e4567-e89b-12d3-a456-426614174000';
+    const approverId = '123e4567-e89b-12d3-a456-426614174001';
+    const employeeId = '123e4567-e89b-12d3-a456-426614174002';
+    
+    const mockLeaveRequest = {
+      id: leaveId,
+      employeeId,
+      leaveTypeId: 'lt1',
+      startDate: new Date('2023-10-01'),
+      endDate: new Date('2023-10-02'),
+      status: 'submitted',
+    };
+
+    const mockApprover = { id: approverId, role: 'manager' };
+    const mockEmployee = { id: employeeId, managerId: approverId };
+    const mockBalance = { id: 'bal1', usedDays: 0, pendingDays: 2 };
+
+    beforeEach(() => {
+      mockLeaveRepo.findById.mockResolvedValue(mockLeaveRequest);
+      mockEmployeeRepo.findById.mockImplementation((id: string) => {
+        if (id === approverId) return Promise.resolve(mockApprover);
+        if (id === employeeId) return Promise.resolve(mockEmployee);
+        return Promise.resolve(null);
+      });
+      mockBalanceRepo.findByEmployeeIdAndLeaveTypeIdAndYear.mockResolvedValue(mockBalance);
+      mockLeaveRepo.updateStatus.mockResolvedValue({ ...mockLeaveRequest, status: 'rejected', approverId });
+      mockBalanceRepo.update.mockResolvedValue({ ...mockBalance, pendingDays: 0 });
+      mockAuditRepo.create.mockResolvedValue({});
+      mockNotificationRepo.create.mockResolvedValue({});
+    });
+
+    it('Success: rejects leave, releases pending days, creates audit and notification', async () => {
+      const result = await service.rejectLeave(leaveId, approverId, 'Not enough coverage');
+      expect(result.status).toBe('rejected');
+      expect(mockLeaveRepo.updateStatus).toHaveBeenCalledWith(leaveId, 'rejected', approverId, 'Not enough coverage');
+      expect(mockBalanceRepo.update).toHaveBeenCalledWith('bal1', { pendingDays: 0 });
+      expect(mockAuditRepo.create).toHaveBeenCalledWith(expect.objectContaining({ action: 'LEAVE_REJECTED' }));
+      expect(mockNotificationRepo.create).toHaveBeenCalledWith(expect.objectContaining({ 
+        type: 'LEAVE_REJECTED',
+        message: expect.stringContaining('Not enough coverage')
+      }));
+      expect(mockClient.query).toHaveBeenCalledWith('COMMIT');
+    });
+
+    it('Throws BadRequestError: invalid UUID formats', async () => {
+      await expect(service.rejectLeave('invalid', approverId)).rejects.toThrow(BadRequestError);
+      await expect(service.rejectLeave(leaveId, 'invalid')).rejects.toThrow(BadRequestError);
+    });
+
+    it('Throws ForbiddenError: unauthorized approver', async () => {
+      mockEmployeeRepo.findById.mockImplementation((id: string) => {
+        if (id === approverId) return Promise.resolve({ ...mockApprover, role: 'employee' });
+        if (id === employeeId) return Promise.resolve(mockEmployee);
+        return Promise.resolve(null);
+      });
+      await expect(service.rejectLeave(leaveId, approverId)).rejects.toThrow(ForbiddenError);
+    });
+    
+    it('Transaction rollback: audit log creation fails', async () => {
+      mockAuditRepo.create.mockRejectedValue(new Error('Audit DB Error'));
+      await expect(service.rejectLeave(leaveId, approverId)).rejects.toThrow('Audit DB Error');
+      expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK');
+    });
   });
 });
