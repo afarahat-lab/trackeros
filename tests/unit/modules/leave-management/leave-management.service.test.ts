@@ -74,7 +74,7 @@ describe('LeaveManagementService', () => {
     mockLeaveRepo.updateStatus.mockResolvedValue(submittedReq);
     mockAuditRepo.create.mockResolvedValue({});
 
-    const result = await service.applyForLeave(validDto);
+    const result = await service.createLeaveRequest(validDto, { id: 'emp1', role: 'employee' });
 
     expect(mockClient.query).toHaveBeenCalledWith('BEGIN');
     expect(mockPolicyRepo.findByLeaveTypeId).toHaveBeenCalledWith('lt1');
@@ -94,17 +94,17 @@ describe('LeaveManagementService', () => {
 
   it('ValidationError: missing required fields', async () => {
     const invalidDto = { ...validDto, employeeId: '' };
-    await expect(service.applyForLeave(invalidDto)).rejects.toThrow(ValidationError);
+    await expect(service.createLeaveRequest(invalidDto, { id: 'emp1', role: 'employee' })).rejects.toThrow(ValidationError);
   });
 
   it('ValidationError: endDate before startDate', async () => {
     const invalidDto = { ...validDto, startDate: new Date('2023-10-05'), endDate: new Date('2023-10-01') };
-    await expect(service.applyForLeave(invalidDto)).rejects.toThrow(ValidationError);
+    await expect(service.createLeaveRequest(invalidDto, { id: 'emp1', role: 'employee' })).rejects.toThrow(ValidationError);
   });
 
   it('NotFoundError: leave policy not found', async () => {
     mockPolicyRepo.findByLeaveTypeId.mockResolvedValue(null);
-    await expect(service.applyForLeave(validDto)).rejects.toThrow(NotFoundError);
+    await expect(service.createLeaveRequest(validDto, { id: 'emp1', role: 'employee' })).rejects.toThrow(NotFoundError);
     expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK');
   });
 
@@ -115,7 +115,7 @@ describe('LeaveManagementService', () => {
       usedDays: 2,
       pendingDays: 0,
     });
-    await expect(service.applyForLeave(validDto)).rejects.toThrow(InsufficientBalanceError);
+    await expect(service.createLeaveRequest(validDto, { id: 'emp1', role: 'employee' })).rejects.toThrow(InsufficientBalanceError);
     expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK');
   });
 
@@ -128,7 +128,7 @@ describe('LeaveManagementService', () => {
     });
     mockLeaveRepo.create.mockRejectedValue(new Error('DB Error'));
 
-    await expect(service.applyForLeave(validDto)).rejects.toThrow('DB Error');
+    await expect(service.createLeaveRequest(validDto, { id: 'emp1', role: 'employee' })).rejects.toThrow('DB Error');
     expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK');
     expect(mockClient.release).toHaveBeenCalled();
   });
@@ -166,7 +166,7 @@ describe('LeaveManagementService', () => {
     });
 
     it('Success: approves leave, updates balance, creates audit and notification', async () => {
-      const result = await service.approveLeave(leaveId, approverId);
+      const result = await service.approveLeaveRequest(leaveId, { id: approverId, role: 'manager' });
       expect(result.status).toBe('approved');
       expect(mockLeaveRepo.updateStatus).toHaveBeenCalledWith(leaveId, 'approved', approverId, undefined);
       expect(mockBalanceRepo.update).toHaveBeenCalledWith('bal1', { usedDays: 2, pendingDays: 0 });
@@ -176,21 +176,21 @@ describe('LeaveManagementService', () => {
     });
 
     it('Throws BadRequestError: invalid leaveId UUID', async () => {
-      await expect(service.approveLeave('invalid-uuid', approverId)).rejects.toThrow(BadRequestError);
+      await expect(service.approveLeaveRequest('invalid-uuid', { id: approverId, role: 'manager' })).rejects.toThrow(BadRequestError);
     });
 
     it('Throws BadRequestError: invalid approverId UUID', async () => {
-      await expect(service.approveLeave(leaveId, 'invalid-uuid')).rejects.toThrow(BadRequestError);
+      await expect(service.approveLeaveRequest(leaveId, { id: 'invalid-uuid', role: 'manager' })).rejects.toThrow(BadRequestError);
     });
 
     it('Throws NotFoundError: leave request not found', async () => {
       mockLeaveRepo.findById.mockResolvedValue(null);
-      await expect(service.approveLeave(leaveId, approverId)).rejects.toThrow(NotFoundError);
+      await expect(service.approveLeaveRequest(leaveId, { id: approverId, role: 'manager' })).rejects.toThrow(NotFoundError);
     });
 
     it('Throws NotFoundError: approver not found', async () => {
       mockEmployeeRepo.findById.mockResolvedValue(null);
-      await expect(service.approveLeave(leaveId, approverId)).rejects.toThrow(NotFoundError);
+      await expect(service.approveLeaveRequest(leaveId, { id: approverId, role: 'manager' })).rejects.toThrow(NotFoundError);
     });
 
     it('Throws ForbiddenError: approver is not a manager', async () => {
@@ -199,7 +199,7 @@ describe('LeaveManagementService', () => {
         if (id === employeeId) return Promise.resolve(mockEmployee);
         return Promise.resolve(null);
       });
-      await expect(service.approveLeave(leaveId, approverId)).rejects.toThrow(ForbiddenError);
+      await expect(service.approveLeaveRequest(leaveId, { id: approverId, role: 'manager' })).rejects.toThrow(ForbiddenError);
     });
 
     it('Throws ForbiddenError: approver is not the employee manager', async () => {
@@ -208,17 +208,17 @@ describe('LeaveManagementService', () => {
         if (id === employeeId) return Promise.resolve({ ...mockEmployee, managerId: 'other-manager' });
         return Promise.resolve(null);
       });
-      await expect(service.approveLeave(leaveId, approverId)).rejects.toThrow(ForbiddenError);
+      await expect(service.approveLeaveRequest(leaveId, { id: approverId, role: 'manager' })).rejects.toThrow(ForbiddenError);
     });
 
     it('Throws BadRequestError: leave request not in pending status', async () => {
       mockLeaveRepo.findById.mockResolvedValue({ ...mockLeaveRequest, status: 'approved' });
-      await expect(service.approveLeave(leaveId, approverId)).rejects.toThrow(BadRequestError);
+      await expect(service.approveLeaveRequest(leaveId, { id: approverId, role: 'manager' })).rejects.toThrow(BadRequestError);
     });
 
     it('Transaction rollback: balance update fails', async () => {
       mockBalanceRepo.update.mockRejectedValue(new Error('DB Error'));
-      await expect(service.approveLeave(leaveId, approverId)).rejects.toThrow('DB Error');
+      await expect(service.approveLeaveRequest(leaveId, { id: approverId, role: 'manager' })).rejects.toThrow('DB Error');
       expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK');
     });
   });
@@ -256,7 +256,7 @@ describe('LeaveManagementService', () => {
     });
 
     it('Success: rejects leave, releases pending days, creates audit and notification', async () => {
-      const result = await service.rejectLeave(leaveId, approverId, 'Not enough coverage');
+      const result = await service.rejectLeaveRequest(leaveId, { id: approverId, role: 'manager' }, 'Not enough coverage');
       expect(result.status).toBe('rejected');
       expect(mockLeaveRepo.updateStatus).toHaveBeenCalledWith(leaveId, 'rejected', approverId, 'Not enough coverage');
       expect(mockBalanceRepo.update).toHaveBeenCalledWith('bal1', { pendingDays: 0 });
@@ -269,8 +269,8 @@ describe('LeaveManagementService', () => {
     });
 
     it('Throws BadRequestError: invalid UUID formats', async () => {
-      await expect(service.rejectLeave('invalid', approverId)).rejects.toThrow(BadRequestError);
-      await expect(service.rejectLeave(leaveId, 'invalid')).rejects.toThrow(BadRequestError);
+      await expect(service.rejectLeaveRequest('invalid', { id: approverId, role: 'manager' }, 'Rejection reason')).rejects.toThrow(BadRequestError);
+      await expect(service.rejectLeaveRequest(leaveId, { id: 'invalid', role: 'manager' }, 'Rejection reason')).rejects.toThrow(BadRequestError);
     });
 
     it('Throws ForbiddenError: unauthorized approver', async () => {
@@ -279,12 +279,12 @@ describe('LeaveManagementService', () => {
         if (id === employeeId) return Promise.resolve(mockEmployee);
         return Promise.resolve(null);
       });
-      await expect(service.rejectLeave(leaveId, approverId)).rejects.toThrow(ForbiddenError);
+      await expect(service.rejectLeaveRequest(leaveId, { id: approverId, role: 'manager' }, 'Rejection reason')).rejects.toThrow(ForbiddenError);
     });
     
     it('Transaction rollback: audit log creation fails', async () => {
       mockAuditRepo.create.mockRejectedValue(new Error('Audit DB Error'));
-      await expect(service.rejectLeave(leaveId, approverId)).rejects.toThrow('Audit DB Error');
+      await expect(service.rejectLeaveRequest(leaveId, { id: approverId, role: 'manager' }, 'Rejection reason')).rejects.toThrow('Audit DB Error');
       expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK');
     });
   });
@@ -315,7 +315,7 @@ describe('LeaveManagementService', () => {
     });
 
     it('Success: cancels submitted leave, adjusts pendingDays (inclusive days calculation)', async () => {
-      const result = await service.cancelLeave(leaveId, employeeId);
+      const result = await service.cancelLeaveRequest(leaveId, { id: employeeId, role: 'employee' });
       expect(result.status).toBe('cancelled');
       // 2023-10-01 to 2023-10-02 is 2 days inclusive
       expect(mockBalanceRepo.update).toHaveBeenCalledWith('bal1', { pendingDays: 0 });
@@ -326,33 +326,33 @@ describe('LeaveManagementService', () => {
 
     it('Success: cancels approved leave, adjusts usedDays', async () => {
       mockLeaveRepo.findById.mockResolvedValue({ ...mockLeaveRequest, status: 'approved' });
-      await service.cancelLeave(leaveId, employeeId);
+      await service.cancelLeaveRequest(leaveId, { id: employeeId, role: 'employee' });
       expect(mockBalanceRepo.update).toHaveBeenCalledWith('bal1', { usedDays: 0 });
     });
 
     it('Throws NotFoundError: non-existent request', async () => {
       mockLeaveRepo.findById.mockResolvedValue(null);
-      await expect(service.cancelLeave(leaveId, employeeId)).rejects.toThrow(NotFoundError);
+      await expect(service.cancelLeaveRequest(leaveId, { id: employeeId, role: 'employee' })).rejects.toThrow(NotFoundError);
     });
 
     it('Throws ForbiddenError: request not owned by employee', async () => {
       mockLeaveRepo.findById.mockResolvedValue({ ...mockLeaveRequest, employeeId: 'other-emp' });
-      await expect(service.cancelLeave(leaveId, employeeId)).rejects.toThrow(ForbiddenError);
+      await expect(service.cancelLeaveRequest(leaveId, { id: employeeId, role: 'employee' })).rejects.toThrow(ForbiddenError);
     });
 
     it('Throws ConflictError: invalid status (draft)', async () => {
       mockLeaveRepo.findById.mockResolvedValue({ ...mockLeaveRequest, status: 'draft' });
-      await expect(service.cancelLeave(leaveId, employeeId)).rejects.toThrow(ConflictError);
+      await expect(service.cancelLeaveRequest(leaveId, { id: employeeId, role: 'employee' })).rejects.toThrow(ConflictError);
     });
 
     it('Throws ConflictError: invalid status (rejected)', async () => {
       mockLeaveRepo.findById.mockResolvedValue({ ...mockLeaveRequest, status: 'rejected' });
-      await expect(service.cancelLeave(leaveId, employeeId)).rejects.toThrow(ConflictError);
+      await expect(service.cancelLeaveRequest(leaveId, { id: employeeId, role: 'employee' })).rejects.toThrow(ConflictError);
     });
 
     it('Throws ConflictError: invalid status (cancelled)', async () => {
       mockLeaveRepo.findById.mockResolvedValue({ ...mockLeaveRequest, status: 'cancelled' });
-      await expect(service.cancelLeave(leaveId, employeeId)).rejects.toThrow(ConflictError);
+      await expect(service.cancelLeaveRequest(leaveId, { id: employeeId, role: 'employee' })).rejects.toThrow(ConflictError);
     });
   });
 
@@ -376,24 +376,24 @@ describe('LeaveManagementService', () => {
     });
 
     it('Success: discards draft and creates audit log', async () => {
-      await service.discardDraft(leaveId, employeeId);
+      await service.discardDraftLeaveRequest(leaveId, { id: employeeId, role: 'employee' });
       expect(mockLeaveRepo.updateStatus).toHaveBeenCalledWith(leaveId, 'cancelled');
       expect(mockAuditRepo.create).toHaveBeenCalledWith(expect.objectContaining({ action: 'discarded' }));
     });
 
     it('Throws NotFoundError: non-existent request', async () => {
       mockLeaveRepo.findById.mockResolvedValue(null);
-      await expect(service.discardDraft(leaveId, employeeId)).rejects.toThrow(NotFoundError);
+      await expect(service.discardDraftLeaveRequest(leaveId, { id: employeeId, role: 'employee' })).rejects.toThrow(NotFoundError);
     });
 
     it('Throws ForbiddenError: request not owned by employee', async () => {
       mockLeaveRepo.findById.mockResolvedValue({ ...mockLeaveRequest, employeeId: 'other-emp' });
-      await expect(service.discardDraft(leaveId, employeeId)).rejects.toThrow(ForbiddenError);
+      await expect(service.discardDraftLeaveRequest(leaveId, { id: employeeId, role: 'employee' })).rejects.toThrow(ForbiddenError);
     });
 
     it('Throws ConflictError: non-draft status', async () => {
       mockLeaveRepo.findById.mockResolvedValue({ ...mockLeaveRequest, status: 'submitted' });
-      await expect(service.discardDraft(leaveId, employeeId)).rejects.toThrow(ConflictError);
+      await expect(service.discardDraftLeaveRequest(leaveId, { id: employeeId, role: 'employee' })).rejects.toThrow(ConflictError);
     });
   });
 });

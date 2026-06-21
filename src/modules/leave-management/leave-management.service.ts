@@ -1,12 +1,13 @@
 import { Pool, PoolClient } from 'pg';
 import { pool } from '../../shared/db/connection';
-import { ILeaveManagementService } from './leave-management.service.interface';
+import { ILeaveManagementService, UserContext, LeaveRequestFilters } from './leave-management.service.interface';
 import { ILeaveRequestRepository } from '../leave/leave.repository';
 import { ILeavePolicyRepository } from '../policy/policy.repository';
 import { ILeaveBalanceRepository } from '../balance/balance.repository';
 import { IAuditLogRepository } from '../audit/audit.repository';
 import { IEmployeeRepository } from '../employee/employee.repository';
 import { INotificationRepository } from '../notification/notification.repository';
+import { IAuditService } from '../../shared/audit/audit.service.interface';
 import { CreateLeaveRequestDto, LeaveRequest } from '../leave/leave.model';
 import { LeaveBalance } from '../balance/balance.model';
 
@@ -69,329 +70,226 @@ export class LeaveManagementService implements ILeaveManagementService {
     private auditRepo: IAuditLogRepository,
     private employeeRepo: IEmployeeRepository,
     private notificationRepo: INotificationRepository,
+    private auditService: IAuditService,
     private dbPool: Pool = pool
   ) {}
 
-  async applyForLeave(dto: CreateLeaveRequestDto): Promise<LeaveRequest> {
+  async createLeaveRequest(dto: CreateLeaveRequestDto, user: UserContext): Promise<LeaveRequest> {
     if (!dto.employeeId || !dto.leaveTypeId || !dto.startDate || !dto.endDate) {
       throw new ValidationError('Missing required fields: employeeId, leaveTypeId, startDate, endDate');
     }
+    const draft = await this.leaveRepo.create({ ...dto, status: 'draft' } as any);
+    return draft;
+  }
 
-    const start = new Date(dto.startDate);
-    const end = new Date(dto.endDate);
-    if (end < start) {
-      throw new ValidationError('endDate must be greater than or equal to startDate');
-    }
+  async submitLeaveRequest(id: string, user: UserContext): Promise<LeaveRequest> {
+    this.validateUuid(id, 'id');
+    const request = await this.leaveRepo.findById(id);
+    if (!request) throw new NotFoundError('Leave request not found');
+    if (request.employeeId !== user.id) throw new ForbiddenError('Can only submit own requests');
+    if (request.status !== 'draft') throw new BadRequestError('Request is not a draft');
 
-    const client: PoolClient = await this.dbPool.connect();
+    const client = await this.dbPool.connect();
     try {
       await client.query('BEGIN');
-
-      const policy = await this.policyRepo.findByLeaveTypeId(dto.leaveTypeId);
-      if (!policy) {
-        throw new NotFoundError('Leave policy not found');
-      }
-
-      const year = start.getFullYear();
-      const balance = await this.balanceRepo.findByEmployeeIdAndLeaveTypeIdAndYear(
-        dto.employeeId, 
-        dto.leaveTypeId, 
-        year
-      );
-      if (!balance) {
-        throw new NotFoundError('Leave balance not found');
-      }
-
-      const requestedDays = this.calculateDays(dto.startDate, dto.endDate);
-      const availableDays = balance.totalEntitlement - balance.usedDays - balance.pendingDays;
-
-      if (availableDays < requestedDays) {
-        throw new InsufficientBalanceError('Insufficient leave balance');
-      }
-
-      const draftRequest = await this.leaveRepo.create(
-        { ...dto, status: 'draft' } as any
-      );
       
-      const submittedRequest = await this.leaveRepo.updateStatus(
-        draftRequest.id, 
-        'submitted'
-      );
+      const year = new Date(request.startDate).getFullYear();
+      const balance = await this.balanceRepo.findByEmployeeIdAndLeaveTypeIdAndYear(request.employeeId, request.leaveTypeId, year);
+      if (!balance) throw new NotFoundError('Leave balance not found');
+      
+      const days = this.calculateDays(request.startDate, request.endDate);
+      const available = balance.totalEntitlement - balance.usedDays - balance.pendingDays;
+      if (available < days) throw new InsufficientBalanceError('Insufficient leave balance');
 
-      await this.auditRepo.create({
-        entityType: 'leave_request',
-        entityId: submittedRequest.id,
-        action: 'SUBMITTED',
-        changedBy: dto.employeeId,
-        newValues: submittedRequest
-      } as any);
-
+      const submitted = await this.leaveRepo.updateStatus(id, 'submitted');
+      await this.balanceRepo.update(balance.id, { pendingDays: balance.pendingDays + days });
+      
+      await this.auditService.log('LeaveRequest', id, 'SUBMITTED', user.id, { status: 'draft' }, { status: 'submitted' });
+      
       await client.query('COMMIT');
-      return submittedRequest;
-    } catch (error) {
+      return submitted;
+    } catch (err) {
       await client.query('ROLLBACK');
-      throw error;
+      throw err;
     } finally {
       client.release();
     }
   }
 
-  async approveLeave(leaveId: string, approverId: string, comment?: string): Promise<LeaveRequest> {
-    this.validateUuid(leaveId, 'leaveId');
-    this.validateUuid(approverId, 'approverId');
+  async approveLeaveRequest(id: string, user: UserContext, comment?: string): Promise<LeaveRequest> {
+    this.validateUuid(id, 'id');
+    if (user.role !== 'manager') throw new ForbiddenError('Only managers can approve requests');
+    
+    const request = await this.leaveRepo.findById(id);
+    if (!request) throw new NotFoundError('Leave request not found');
+    
+    const emp = await this.employeeRepo.findById(request.employeeId);
+    if (!emp || emp.managerId !== user.id) throw new ForbiddenError('Not authorized to approve this request');
+    if (request.status !== 'submitted') throw new BadRequestError('Request is not pending');
 
-    const leaveRequest = await this.leaveRepo.findById(leaveId);
-    if (!leaveRequest) {
-      throw new NotFoundError('Leave request not found');
-    }
-
-    const approver = await this.employeeRepo.findById(approverId);
-    if (!approver) {
-      throw new NotFoundError('Approver not found');
-    }
-
-    const employee = await this.employeeRepo.findById(leaveRequest.employeeId);
-    if (!employee || employee.managerId !== approver.id) {
-      throw new ForbiddenError('Approver is not the manager of the requesting employee');
-    }
-    if (approver.role !== 'manager') {
-      throw new ForbiddenError('Approver does not have manager role');
-    }
-
-    // Note: The domain model uses 'submitted' for pending requests
-    if (leaveRequest.status !== 'submitted') {
-      throw new BadRequestError('Leave request is not in pending status');
-    }
-
-    const client: PoolClient = await this.dbPool.connect();
+    const client = await this.dbPool.connect();
     try {
       await client.query('BEGIN');
-
-      const updatedRequest = await this.leaveRepo.updateStatus(leaveId, 'approved', approverId, comment);
-
-      const year = new Date(leaveRequest.startDate).getFullYear();
-      const balance = await this.balanceRepo.findByEmployeeIdAndLeaveTypeIdAndYear(
-        leaveRequest.employeeId,
-        leaveRequest.leaveTypeId,
-        year
-      );
-      if (!balance) {
-        throw new NotFoundError('Leave balance not found');
-      }
-
-      const days = this.calculateDays(leaveRequest.startDate, leaveRequest.endDate);
+      
+      const updated = await this.leaveRepo.updateStatus(id, 'approved', user.id, comment);
+      
+      const year = new Date(request.startDate).getFullYear();
+      const balance = await this.balanceRepo.findByEmployeeIdAndLeaveTypeIdAndYear(request.employeeId, request.leaveTypeId, year);
+      if (!balance) throw new NotFoundError('Leave balance not found');
+      
+      const days = this.calculateDays(request.startDate, request.endDate);
       await this.balanceRepo.update(balance.id, {
         usedDays: balance.usedDays + days,
         pendingDays: balance.pendingDays - days
       });
 
-      await this.auditRepo.create({
-        entityType: 'leave_request',
-        entityId: leaveId,
-        action: 'LEAVE_APPROVED',
-        changedBy: approverId,
-        newValues: updatedRequest
-      } as any);
-
-      await this.notificationRepo.create({
-        recipientId: leaveRequest.employeeId,
-        leaveRequestId: leaveId,
-        type: 'LEAVE_APPROVED',
-        message: 'Your leave request has been approved.'
-      } as any);
+      await this.auditService.log('LeaveRequest', id, 'APPROVED', user.id, { status: 'submitted' }, { status: 'approved' });
 
       await client.query('COMMIT');
-      return updatedRequest;
-    } catch (error) {
+      return updated;
+    } catch (err) {
       await client.query('ROLLBACK');
-      throw error;
+      throw err;
     } finally {
       client.release();
     }
   }
 
-  async rejectLeave(leaveId: string, approverId: string, comment?: string): Promise<LeaveRequest> {
-    this.validateUuid(leaveId, 'leaveId');
-    this.validateUuid(approverId, 'approverId');
-
-    const leaveRequest = await this.leaveRepo.findById(leaveId);
-    if (!leaveRequest) {
-      throw new NotFoundError('Leave request not found');
-    }
-
-    const approver = await this.employeeRepo.findById(approverId);
-    if (!approver) {
-      throw new NotFoundError('Approver not found');
-    }
-
-    const employee = await this.employeeRepo.findById(leaveRequest.employeeId);
-    if (!employee || employee.managerId !== approver.id) {
-      throw new ForbiddenError('Approver is not the manager of the requesting employee');
-    }
-    if (approver.role !== 'manager') {
-      throw new ForbiddenError('Approver does not have manager role');
-    }
-
-    if (leaveRequest.status !== 'submitted') {
-      throw new BadRequestError('Leave request is not in pending status');
-    }
-
-    const client: PoolClient = await this.dbPool.connect();
-    try {
-      await client.query('BEGIN');
-
-      const updatedRequest = await this.leaveRepo.updateStatus(leaveId, 'rejected', approverId, comment);
-
-      const year = new Date(leaveRequest.startDate).getFullYear();
-      const balance = await this.balanceRepo.findByEmployeeIdAndLeaveTypeIdAndYear(
-        leaveRequest.employeeId,
-        leaveRequest.leaveTypeId,
-        year
-      );
-      if (!balance) {
-        throw new NotFoundError('Leave balance not found');
-      }
-
-      const days = this.calculateDays(leaveRequest.startDate, leaveRequest.endDate);
-      await this.balanceRepo.update(balance.id, {
-        pendingDays: balance.pendingDays - days
-      });
-
-      await this.auditRepo.create({
-        entityType: 'leave_request',
-        entityId: leaveId,
-        action: 'LEAVE_REJECTED',
-        changedBy: approverId,
-        newValues: updatedRequest
-      } as any);
-
-      await this.notificationRepo.create({
-        recipientId: leaveRequest.employeeId,
-        leaveRequestId: leaveId,
-        type: 'LEAVE_REJECTED',
-        message: comment ? `Your leave request has been rejected. Comment: ${comment}` : 'Your leave request has been rejected.'
-      } as any);
-
-      await client.query('COMMIT');
-      return updatedRequest;
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
-    }
-  }
-
-  async cancelLeave(leaveId: string, employeeId: string): Promise<LeaveRequest> {
-    this.validateUuid(leaveId, 'leaveId');
-    this.validateUuid(employeeId, 'employeeId');
+  async rejectLeaveRequest(id: string, user: UserContext, comment: string): Promise<LeaveRequest> {
+    this.validateUuid(id, 'id');
+    if (user.role !== 'manager') throw new ForbiddenError('Only managers can reject requests');
+    
+    const request = await this.leaveRepo.findById(id);
+    if (!request) throw new NotFoundError('Leave request not found');
+    
+    const emp = await this.employeeRepo.findById(request.employeeId);
+    if (!emp || emp.managerId !== user.id) throw new ForbiddenError('Not authorized to reject this request');
+    if (request.status !== 'submitted') throw new BadRequestError('Request is not pending');
 
     const client = await this.dbPool.connect();
     try {
       await client.query('BEGIN');
-      const request = await this.leaveRepo.findById(leaveId);
-      if (!request) {
-        throw new NotFoundError('Leave request not found');
-      }
-      if (request.employeeId !== employeeId) {
-        throw new ForbiddenError('You can only cancel your own leave requests');
-      }
-      if (request.status !== 'submitted' && request.status !== 'approved') {
-        throw new ConflictError('Only submitted or approved requests can be cancelled');
-      }
-
-      const oldStatus = request.status;
+      
+      const updated = await this.leaveRepo.updateStatus(id, 'rejected', user.id, comment);
+      
+      const year = new Date(request.startDate).getFullYear();
+      const balance = await this.balanceRepo.findByEmployeeIdAndLeaveTypeIdAndYear(request.employeeId, request.leaveTypeId, year);
+      if (!balance) throw new NotFoundError('Leave balance not found');
+      
       const days = this.calculateDays(request.startDate, request.endDate);
-      const year = request.startDate.getFullYear();
-      const balance = await this.balanceRepo.findByEmployeeIdAndLeaveTypeIdAndYear(
-        request.employeeId,
-        request.leaveTypeId,
-        year
-      );
-      if (!balance) {
-        throw new NotFoundError('Leave balance not found');
-      }
+      await this.balanceRepo.update(balance.id, { pendingDays: balance.pendingDays - days });
 
+      await this.auditService.log('LeaveRequest', id, 'REJECTED', user.id, { status: 'submitted' }, { status: 'rejected' });
+
+      await client.query('COMMIT');
+      return updated;
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  async cancelLeaveRequest(id: string, user: UserContext): Promise<LeaveRequest> {
+    this.validateUuid(id, 'id');
+    const request = await this.leaveRepo.findById(id);
+    if (!request) throw new NotFoundError('Leave request not found');
+    
+    let isAuthorized = false;
+    if (request.employeeId === user.id) {
+      isAuthorized = true;
+    } else if (user.role === 'manager') {
+      const emp = await this.employeeRepo.findById(request.employeeId);
+      if (emp && emp.managerId === user.id) isAuthorized = true;
+    }
+    if (!isAuthorized) throw new ForbiddenError('Not authorized to cancel this request');
+    if (request.status !== 'submitted' && request.status !== 'approved') {
+      throw new BadRequestError('Only submitted or approved requests can be cancelled');
+    }
+
+    const client = await this.dbPool.connect();
+    try {
+      await client.query('BEGIN');
+      
+      const year = new Date(request.startDate).getFullYear();
+      const balance = await this.balanceRepo.findByEmployeeIdAndLeaveTypeIdAndYear(request.employeeId, request.leaveTypeId, year);
+      if (!balance) throw new NotFoundError('Leave balance not found');
+      
+      const days = this.calculateDays(request.startDate, request.endDate);
       const balanceUpdates: any = {};
-      if (oldStatus === 'submitted') {
+      if (request.status === 'submitted') {
         balanceUpdates.pendingDays = balance.pendingDays - days;
-      } else if (oldStatus === 'approved') {
+      } else if (request.status === 'approved') {
         balanceUpdates.usedDays = balance.usedDays - days;
       }
       await this.balanceRepo.update(balance.id, balanceUpdates);
 
-      const updatedRequest = await this.leaveRepo.updateStatus(leaveId, 'cancelled');
-
-      await this.auditRepo.create({
-        entityType: 'leave_request',
-        entityId: request.id,
-        action: 'cancelled',
-        changedBy: employeeId,
-        oldValues: { status: oldStatus },
-        newValues: { status: 'cancelled' },
-      } as any);
-
-      await this.notificationRepo.create({
-        recipientId: request.approverId || request.employeeId,
-        leaveRequestId: request.id,
-        type: 'leave_cancelled',
-        message: `Leave request ${request.id} has been cancelled by employee.`,
-      } as any);
+      const updated = await this.leaveRepo.updateStatus(id, 'cancelled');
+      
+      await this.auditService.log('LeaveRequest', id, 'CANCELLED', user.id, { status: request.status }, { status: 'cancelled' });
 
       await client.query('COMMIT');
-      return updatedRequest;
-    } catch (error) {
+      return updated;
+    } catch (err) {
       await client.query('ROLLBACK');
-      throw error;
+      throw err;
     } finally {
       client.release();
     }
   }
 
-  async discardDraft(leaveId: string, employeeId: string): Promise<void> {
-    this.validateUuid(leaveId, 'leaveId');
+  async discardDraftLeaveRequest(id: string, user: UserContext): Promise<void> {
+    this.validateUuid(id, 'id');
+    const request = await this.leaveRepo.findById(id);
+    if (!request) throw new NotFoundError('Leave request not found');
+    if (request.employeeId !== user.id) throw new ForbiddenError('Can only discard own drafts');
+    if (request.status !== 'draft') throw new BadRequestError('Only draft requests can be discarded');
+
+    await this.leaveRepo.updateStatus(id, 'cancelled');
+    await this.auditService.log('LeaveRequest', id, 'DISCARDED', user.id, { status: 'draft' }, { status: 'cancelled' });
+  }
+
+  async getLeaveBalance(employeeId: string, user: UserContext): Promise<LeaveBalance[]> {
     this.validateUuid(employeeId, 'employeeId');
-
-    const client = await this.dbPool.connect();
-    try {
-      await client.query('BEGIN');
-      const request = await this.leaveRepo.findById(leaveId);
-      if (!request) {
-        throw new NotFoundError('Leave request not found');
-      }
-      if (request.employeeId !== employeeId) {
-        throw new ForbiddenError('You can only discard your own drafts');
-      }
-      if (request.status !== 'draft') {
-        throw new ConflictError('Only draft requests can be discarded');
-      }
-
-      await this.leaveRepo.updateStatus(leaveId, 'cancelled');
-
-      await this.auditRepo.create({
-        entityType: 'leave_request',
-        entityId: request.id,
-        action: 'discarded',
-        changedBy: employeeId,
-        oldValues: { status: 'draft' },
-        newValues: { status: 'cancelled' },
-      } as any);
-
-      await client.query('COMMIT');
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
+    if (user.role === 'employee') {
+      if (employeeId !== user.id) throw new ForbiddenError('Cannot view other balances');
+    } else if (user.role === 'manager') {
+      const emp = await this.employeeRepo.findById(employeeId);
+      if (!emp || emp.managerId !== user.id) throw new ForbiddenError('Cannot view balance for this employee');
+    } else {
+      throw new ForbiddenError('Unauthorized');
     }
+    
+    const year = new Date().getFullYear();
+    return await this.balanceRepo.findByEmployeeIdAndYear(employeeId, year);
   }
 
-  async getLeaveBalance(employeeId: string, leaveTypeId: string, year: number): Promise<LeaveBalance> {
-    throw new NotImplementedError('getLeaveBalance not implemented');
-  }
+  async getLeaveHistory(filters: LeaveRequestFilters, user: UserContext): Promise<LeaveRequest[]> {
+    if (user.role === 'employee') {
+      filters.employeeId = user.id;
+    } else if (user.role === 'manager') {
+      if (filters.employeeId) {
+        const emp = await this.employeeRepo.findById(filters.employeeId);
+        if (!emp || emp.managerId !== user.id) throw new ForbiddenError('Cannot view history for this employee');
+        return await this.leaveRepo.findByEmployeeId(filters.employeeId);
+      } else {
+        const team = await this.employeeRepo.findByManagerId(user.id);
+        const history: LeaveRequest[] = [];
+        for (const emp of team) {
+          const empHistory = await this.leaveRepo.findByEmployeeId(emp.id);
+          history.push(...empHistory);
+        }
+        return history;
+      }
+    } else {
+      throw new ForbiddenError('Unauthorized');
+    }
 
-  async getLeaveHistory(employeeId: string): Promise<LeaveRequest[]> {
-    throw new NotImplementedError('getLeaveHistory not implemented');
+    if (filters.employeeId) {
+      return await this.leaveRepo.findByEmployeeId(filters.employeeId);
+    }
+    return [];
   }
 
   private validateUuid(value: string, fieldName: string): void {
