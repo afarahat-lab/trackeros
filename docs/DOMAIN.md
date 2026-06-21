@@ -33,15 +33,18 @@ Represents a leave record managed by the `leave` module, including leave request
 | leaveTypeId | string | true |
 | startDate | Date | true |
 | endDate | Date | true |
-| reason | string \| undefined | false |
+| reason | string | false |
 | status | LeaveRequestStatus | true |
-| approvedBy | string \| null | false |
-| approvedAt | Date \| null | false |
+| approverId | string | false |
+| approverComment | string | false |
+| approvedAt | Date | false |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
 **Relationships**
-- `Employee` — many-to-one
+- `Employee` — many-to-one (employeeId → Employee)
+- `LeaveType` — many-to-one (leaveTypeId → LeaveType)
+- `Employee` — many-to-one (approverId → Employee)
 
 ### CreateLeaveRequestDto
 
@@ -51,7 +54,7 @@ Represents a leave record managed by the `leave` module, including leave request
 | leaveTypeId | string | true |
 | startDate | Date | true |
 | endDate | Date | true |
-| reason | string \| undefined | false |
+| reason | string | false |
 
 ### UpdateLeaveRequestDto
 
@@ -59,7 +62,7 @@ Represents a leave record managed by the `leave` module, including leave request
 |-------|------|----------|
 | startDate | Date | false |
 | endDate | Date | false |
-| reason | string \| undefined | false |
+| reason | string | false |
 
 ### LeaveRequestQueryParams
 
