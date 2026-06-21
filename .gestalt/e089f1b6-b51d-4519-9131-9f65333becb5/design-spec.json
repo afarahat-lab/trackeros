@@ -1,0 +1,19 @@
+{
+  "correlationId": "e089f1b6-b51d-4519-9131-9f65333becb5",
+  "domainChanges": [],
+  "apiContracts": [],
+  "componentSpecs": [
+    {
+      "name": "LeaveManagementService",
+      "type": "service",
+      "description": "Implements the ILeaveManagementService interface. Provides the applyForLeave method that validates leave policy, checks balance, creates a leave request in DRAFT status, transitions it to SUBMITTED, and logs an audit record, all within a single database transaction. Other methods (approveLeave, rejectLeave, cancelLeave, getLeaveBalance) throw NotImplementedError as placeholders for future phases.",
+      "props": {
+        "leaveRepo": "ILeaveRepository",
+        "policyRepo": "ILeavePolicyRepository",
+        "balanceRepo": "IBalanceRepository",
+        "auditRepo": "IAuditLogRepository",
+        "dbPool": "Pool"
+      }
+    }
+  ]
+}
