@@ -1,0 +1,101 @@
+{
+  "id": "a6fbf11b-3643-4370-9706-2a012f17ef36",
+  "correlationId": "3ca0cac8-e936-4dcd-a6c5-ed7549340a12",
+  "rawIntent": "[Feature: Build the leave management module — Phase 9: Create Leave orchestration service]\n\nCreate src/modules/leave/leave.service.ts with LeaveService class that orchestrates leave workflow (apply, approve, reject, cancel) using ILeaveRepository, EmployeeService, PolicyService, BalanceService, INotificationRepository, IAuditRepository. Include Jest unit tests in tests/unit/modules/leave/leave.service.test.ts. This phase depends on src/modules/leave/leave.model.ts and src/modules/leave/leave.repository.ts from Phase 8, src/modules/employee/employee.service.ts from Phase 3, src/modules/policy/policy.service.ts from Phase 4, src/modules/balance/balance.service.ts from Phase 6, src/modules/notification/notification.repository.ts from Phase 7, and src/modules/audit/audit.repository.ts from Phase 7 — read them before generating any code.\n\nThis phase depends on: Phase 8, Phase 3, Phase 4, Phase 6, Phase 7.\n\nPhase architecture notes:\n{\"interfaces\":[\"File: src/modules/leave/leave.service.ts\\nimport { ILeaveRepository } from './leave.repository';\\nimport { EmployeeService } from '../employee/employee.service';\\nimport { PolicyService } from '../policy/policy.service';\\nimport { BalanceService } from '../balance/balance.service';\\nimport { INotificationRepository } from '../notification/notification.repository';\\nimport { IAuditRepository } from '../audit/audit.repository';\\nimport { CreateLeaveRequestDto, LeaveRequest, LeaveRequestStatus } from './leave.model';\\n\\nexport interface LeaveRequestFilters {\\n  status?: LeaveRequestStatus;\\n  startDate?: Date;\\n  endDate?: Date;\\n}\\n\\nexport interface ILeaveService {\\n  createDraftLeaveRequest(dto: CreateLeaveRequestDto): Promise<LeaveRequest>;\\n  submitLeaveRequest(id: string): Promise<LeaveRequest>;\\n  approveLeaveRequest(id: string, managerId: string): Promise<LeaveRequest>;\\n  rejectLeaveRequest(id: string, managerId: string, reason?: string): Promise<LeaveRequest>;\\n  cancelLeaveRequest(id: string, employeeId: string): Promise<LeaveRequest>;\\n  getLeaveRequest(id: string): Promise<LeaveRequest | null>;\\n  getEmployeeLeaveRequests(employeeId: string, filters?: LeaveRequestFilters): Promise<LeaveRequest[]>;\\n}\\n\\nexport class LeaveService implements ILeaveService {\\n  constructor(\\n    private readonly leaveRepo: ILeaveRepository,\\n    private readonly employeeService: EmployeeService,\\n    private readonly policyService: PolicyService,\\n    private readonly balanceService: BalanceService,\\n    private readonly notificationRepo: INotificationRepository,\\n    private readonly auditRepo: IAuditRepository\\n  ) {}\\n\\n  async createDraftLeaveRequest(dto: CreateLeaveRequestDto): Promise<LeaveRequest> {\\n    // implementation\\n  }\\n\\n  async submitLeaveRequest(id: string): Promise<LeaveRequest> {\\n    // implementation\\n  }\\n\\n  async approveLeaveRequest(id: string, managerId: string): Promise<LeaveRequest> {\\n    // implementation\\n  }\\n\\n  async rejectLeaveRequest(id: string, managerId: string, reason?: string): Promise<LeaveRequest> {\\n    // implementation\\n  }\\n\\n  async cancelLeaveRequest(id: string, employeeId: string): Promise<LeaveRequest> {\\n    // implementation\\n  }\\n\\n  async getLeaveRequest(id: string): Promise<LeaveRequest | null> {\\n    // implementation\\n  }\\n\\n  async getEmployeeLeaveRequests(employeeId: string, filters?: LeaveRequestFilters): Promise<LeaveRequest[]> {\\n    // implementation\\n  }\\n}\",\"File: tests/unit/modules/leave/leave.service.test.ts\\nimport { LeaveService } from '../../src/modules/leave/leave.service';\\nimport { ILeaveRepository } from '../../src/modules/leave/leave.repository';\\nimport { EmployeeService } from '../../src/modules/employee/employee.service';\\nimport { PolicyService } from '../../src/modules/policy/policy.service';\\nimport { BalanceService } from '../../src/modules/balance/balance.service';\\nimport { INotificationRepository } from '../../src/modules/notification/notification.repository';\\nimport { IAuditRepository } from '../../src/modules/audit/audit.repository';\\n\\ndescribe('LeaveService', () => {\\n  let leaveService: LeaveService;\\n  let mockLeaveRepo: jest.Mocked<ILeaveRepository>;\\n  let mockEmployeeService: jest.Mocked<EmployeeService>;\\n  let mockPolicyService: jest.Mocked<PolicyService>;\\n  let mockBalanceService: jest.Mocked<BalanceService>;\\n  let mockNotificationRepo: jest.Mocked<INotificationRepository>;\\n  let mockAuditRepo: jest.Mocked<IAuditRepository>;\\n\\n  beforeEach(() => {\\n    mockLeaveRepo = {} as any;\\n    mockEmployeeService = {} as any;\\n    mockPolicyService = {} as any;\\n    mockBalanceService = {} as any;\\n    mockNotificationRepo = {} as any;\\n    mockAuditRepo = {} as any;\\n    leaveService = new LeaveService(mockLeaveRepo, mockEmployeeService, mockPolicyService, mockBalanceService, mockNotificationRepo, mockAuditRepo);\\n  });\\n\\n  describe('createDraftLeaveRequest', () => {\\n    it('should create a draft leave request', async () => {\\n      // test\\n    });\\n  });\\n\\n  describe('submitLeaveRequest', () => {\\n    it('should submit a leave request', async () => {\\n      // test\\n    });\\n  });\\n\\n  describe('approveLeaveRequest', () => {\\n    it('should approve a leave request', async () => {\\n      // test\\n    });\\n  });\\n\\n  describe('rejectLeaveRequest', () => {\\n    it('should reject a leave request', async () => {\\n      // test\\n    });\\n  });\\n\\n  describe('cancelLeaveRequest', () => {\\n    it('should cancel a leave request', async () => {\\n      // test\\n    });\\n  });\\n\\n  describe('getLeaveRequest', () => {\\n    it('should return a leave request by id', async () => {\\n      // test\\n    });\\n  });\\n\\n  describe('getEmployeeLeaveRequests', () => {\\n    it('should return employee leave requests', async () => {\\n      // test\\n    });\\n  });\\n});\"],\"importStatements\":[\"import { ILeaveRepository } from './leave.repository';\",\"import { EmployeeService } from '../employee/employee.service';\",\"import { PolicyService } from '../policy/policy.service';\",\"import { BalanceService } from '../balance/balance.service';\",\"import { INotificationRepository } from '../notification/notification.repository';\",\"import { IAuditRepository } from '../audit/audit.repository';\",\"import { CreateLeaveRequestDto, LeaveRequest, LeaveRequestStatus } from './leave.model';\"],\"successCriteria\":[\"src/modules/leave/leave.service.ts exists and exports ILeaveService, LeaveService, and LeaveRequestFilters.\",\"tests/unit/modules/leave/leave.service.test.ts exists and contains Jest tests for all public methods of LeaveService.\",\"LeaveService constructor accepts ILeaveRepository, EmployeeService, PolicyService, BalanceService, INotificationRepository, IAuditRepository.\",\"All state-changing operations (submit, approve, reject, cancel) write an audit record via IAuditRepository.\",\"All inputs are validated before processing (e.g., leave request exists, valid status transitions, manager authorization).\",\"Transaction semantics: each state-changing operation executes within a single database transaction that includes the leave request update, balance adjustment (if applicable), notification creation, and audit log insertion, ensuring atomicity.\",\"All async methods catch errors and do not result in unhandled promise rejections; errors are thrown as typed exceptions.\",\"No sensitive data (passwords, tokens, PII) is logged.\"]}\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/leave/leave.service.ts\\nimport { ILeaveRepository } from './leave.repository';\\nimport { EmployeeService } from '../employee/employee.service';\\nimport { PolicyService } from '../policy/policy.service';\\nimport { BalanceService } from '../balance/balance.service';\\nimport { INotificationRepository } from '../notification/notification.repository';\\nimport { IAuditRepository } from '../audit/audit.repository';\\nimport { CreateLeaveRequestDto, LeaveRequest, LeaveRequestStatus } from './leave.model';\\n\\nexport interface LeaveRequestFilters {\\n  status?: LeaveRequestStatus;\\n  startDate?: Date;\\n  endDate?: Date;\\n}\\n\\nexport interface ILeaveService {\\n  createDraftLeaveRequest(dto: CreateLeaveRequestDto): Promise<LeaveRequest>;\\n  submitLeaveRequest(id: string): Promise<LeaveRequest>;\\n  approveLeaveRequest(id: string, managerId: string): Promise<LeaveRequest>;\\n  rejectLeaveRequest(id: string, managerId: string, reason?: string): Promise<LeaveRequest>;\\n  cancelLeaveRequest(id: string, employeeId: string): Promise<LeaveRequest>;\\n  getLeaveRequest(id: string): Promise<LeaveRequest | null>;\\n  getEmployeeLeaveRequests(employeeId: string, filters?: LeaveRequestFilters): Promise<LeaveRequest[]>;\\n}\\n\\nexport class LeaveService implements ILeaveService {\\n  constructor(\\n    private readonly leaveRepo: ILeaveRepository,\\n    private readonly employeeService: EmployeeService,\\n    private readonly policyService: PolicyService,\\n    private readonly balanceService: BalanceService,\\n    private readonly notificationRepo: INotificationRepository,\\n    private readonly auditRepo: IAuditRepository\\n  ) {}\\n\\n  async createDraftLeaveRequest(dto: CreateLeaveRequestDto): Promise<LeaveRequest> { /* implementation */ }\\n  async submitLeaveRequest(id: string): Promise<LeaveRequest> { /* implementation */ }\\n  async approveLeaveRequest(id: string, managerId: string): Promise<LeaveRequest> { /* implementation */ }\\n  async rejectLeaveRequest(id: string, managerId: string, reason?: string): Promise<LeaveRequest> { /* implementation */ }\\n  async cancelLeaveRequest(id: string, employeeId: string): Promise<LeaveRequest> { /* implementation */ }\\n  async getLeaveRequest(id: string): Promise<LeaveRequest | null> { /* implementation */ }\\n  async getEmployeeLeaveRequests(employeeId: string, filters?: LeaveRequestFilters): Promise<LeaveRequest[]> { /* implementation */ }\\n}\",\"File: tests/unit/modules/leave/leave.service.test.ts\\nimport { LeaveService } from '../../../../src/modules/leave/leave.service';\\n// Jest test suite with tests for createDraftLeaveRequest, submitLeaveRequest, approveLeaveRequest, rejectLeaveRequest, cancelLeaveRequest, getLeaveRequest, getEmployeeLeaveRequests.\"],\"importStatements\":[\"import { ILeaveRepository } from './leave.repository';\",\"import { EmployeeService } from '../employee/employee.service';\",\"import { PolicyService } from '../policy/policy.service';\",\"import { BalanceService } from '../balance/balance.service';\",\"import { INotificationRepository } from '../notification/notification.repository';\",\"import { IAuditRepository } from '../audit/audit.repository';\",\"import { CreateLeaveRequestDto, LeaveRequest, LeaveRequestStatus } from './leave.model';\"],\"successCriteria\":[\"src/modules/leave/leave.service.ts exists and exports ILeaveService, LeaveService, and LeaveRequestFilters.\",\"tests/unit/modules/leave/leave.service.test.ts exists and contains Jest tests for all public methods of LeaveService.\",\"LeaveService constructor accepts ILeaveRepository, EmployeeService, PolicyService, BalanceService, INotificationRepository, IAuditRepository.\",\"All state-changing operations (submit, approve, reject, cancel) write an audit record via IAuditRepository.\",\"All inputs are validated before processing (e.g., leave request exists, valid status transitions, manager authorization).\",\"The service validates the leave request against leave policies (max days, consecutive days, blackout dates) using PolicyService before allowing submission.\",\"On approval, the service deducts the requested days from the employee's leave balance via BalanceService.\",\"The service sends notifications via INotificationRepository on state changes (e.g., submit, approve, reject, cancel).\",\"Each state-changing operation (submit, approve, reject, cancel) is executed atomically: the leave request status update, any balance adjustments, and the audit log entry are performed within a single database transaction.\",\"The service does not log any sensitive data (passwords, tokens, PII, financial data) in accordance with GP-004.\",\"All async errors are caught and handled; no unhandled promise rejections (GP-006).\"]}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- LeaveRequestFilters\n- ILeaveService\n- ILeaveRepository\n- EmployeeService\n- PolicyService\n- BalanceService\n- INotificationRepository\n- IAuditRepository\n- CreateLeaveRequestDto\n- LeaveRequest\n- LeaveRequestStatus\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Canonical entity fields for this phase\n\nNote: these field names supersede any attribute names in the\nintent text above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the field names of each entity this phase defines. The\nexact attribute / column / property set per entity is:\n\n- `LeaveRequestFilters`: `status`, `startDate`, `endDate`\n\nTreat each entity's field list as complete. If the\nintent text or planner scope mentions different field\nnames than the architecture, do NOT flag this as\nambiguity — the per-phase architecture wins.\n\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 10 — Wire services, create routes and controllers: Create src/modules/leave/leave.controller.ts with REST endpoints for leave operations (POST /apply, ",
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "domain",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/leave/leave.service.ts exists and exports ILeaveService, LeaveService, and LeaveRequestFilters.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "tests/unit/modules/leave/leave.service.test.ts exists and contains Jest tests for all public methods of LeaveService.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "LeaveService constructor accepts ILeaveRepository, EmployeeService, PolicyService, BalanceService, INotificationRepository, IAuditRepository.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "All state-changing operations (submit, approve, reject, cancel) write an audit record via IAuditRepository.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "All inputs are validated before processing (e.g., leave request exists, valid status transitions, manager authorization).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-006",
+      "description": "The service validates the leave request against leave policies (max days, consecutive days, blackout dates) using PolicyService before allowing submission.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-007",
+      "description": "On approval, the service deducts the requested days from the employee's leave balance via BalanceService.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-008",
+      "description": "The service sends notifications via INotificationRepository on state changes (e.g., submit, approve, reject, cancel).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-009",
+      "description": "Each state-changing operation (submit, approve, reject, cancel) is executed atomically: the leave request status update, any balance adjustments, and the audit log entry are performed within a single database transaction.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "sc-010",
+      "description": "The service does not log any sensitive data (passwords, tokens, PII, financial data) in accordance with GP-004.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-011",
+      "description": "All async errors are caught and handled; no unhandled promise rejections (GP-006).",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Audit records: All state-changing operations write an audit record.",
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "RBAC enforcement: The service must enforce manager authorization for approve/reject operations.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled.",
+    "Dependency direction: leave -> employee, leave -> policy, leave -> balance, leave -> notification. No reverse dependencies are permitted."
+  ],
+  "outOfScope": [
+    "Phase 10 — Wire services, create routes and controllers (leave.controller.ts)",
+    "Implementation of dependent services (EmployeeService, PolicyService, BalanceService, INotificationRepository, IAuditRepository)",
+    "Database schema changes",
+    "API endpoint definitions",
+    "Integration tests beyond unit tests for LeaveService"
+  ],
+  "ambiguities": []
+}
