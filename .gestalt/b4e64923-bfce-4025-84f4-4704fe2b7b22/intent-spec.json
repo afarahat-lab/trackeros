@@ -1,0 +1,54 @@
+{
+  "id": "39213ea4-6d6f-4877-9b34-462e1ae97126",
+  "correlationId": "b4e64923-bfce-4025-84f4-4704fe2b7b22",
+  "rawIntent": "[Feature: Build the leave management module — Phase 5: Create Notification and AuditLog domain models and repositories]\n\nCreate src/modules/notification/notification.model.ts with Notification interface (id, recipientId, message, type, read, createdAt). Create src/modules/notification/notification.repository.ts with INotificationRepository interface (create, findByRecipient). Create src/modules/audit/audit.model.ts with AuditLog interface (id, actorId, action, entityType, entityId, timestamp, details). Create src/modules/audit/audit.repository.ts with IAuditRepository interface (create, findByEntity). Depends on src/modules/employee/employee.model.ts from Phase 2 for actorId/recipientId references.\n\nPhase architecture notes:\nSupporting cross-cutting concerns.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/notification/notification.model.ts\\nexport interface Notification {\\n  id: string;\\n  recipientId: string;\\n  leaveRequestId: string;\\n  type: string;\\n  message: string;\\n  isRead: boolean;\\n  createdAt: Date;\\n}\\n\\nexport interface CreateNotificationDto {\\n  recipientId: string;\\n  leaveRequestId: string;\\n  type: string;\\n  message: string;\\n}\",\"File: src/modules/notification/notification.repository.ts\\nimport { Notification, CreateNotificationDto } from './notification.model';\\n\\nexport interface INotificationRepository {\\n  create(dto: CreateNotificationDto): Promise<Notification>;\\n  findById(id: string): Promise<Notification | null>;\\n  findByRecipient(recipientId: string): Promise<Notification[]>;\\n  markAsRead(id: string): Promise<void>;\\n}\",\"File: src/modules/audit/audit.model.ts\\nexport interface AuditLog {\\n  id: string;\\n  entityType: string;\\n  entityId: string;\\n  action: string;\\n  changedBy: string;\\n  oldValues: Record<string, unknown> | null;\\n  newValues: Record<string, unknown> | null;\\n  createdAt: Date;\\n}\\n\\nexport interface CreateAuditLogDto {\\n  entityType: string;\\n  entityId: string;\\n  action: string;\\n  changedBy: string;\\n  oldValues?: Record<string, unknown> | null;\\n  newValues?: Record<string, unknown> | null;\\n}\",\"File: src/modules/audit/audit.repository.ts\\nimport { AuditLog, CreateAuditLogDto } from './audit.model';\\n\\nexport interface IAuditLogRepository {\\n  create(dto: CreateAuditLogDto): Promise<AuditLog>;\\n  findById(id: string): Promise<AuditLog | null>;\\n  findByEntity(entityType: string, entityId: string): Promise<AuditLog[]>;\\n}\"],\"importStatements\":[\"import { Notification, CreateNotificationDto } from './notification.model';\",\"import { AuditLog, CreateAuditLogDto } from './audit.model';\"],\"successCriteria\":[\"src/modules/notification/notification.model.ts exists and exports Notification, CreateNotificationDto\",\"src/modules/notification/notification.repository.ts exists and exports INotificationRepository\",\"src/modules/audit/audit.model.ts exists and exports AuditLog, CreateAuditLogDto\",\"src/modules/audit/audit.repository.ts exists and exports IAuditLogRepository\"]}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- Notification\n- CreateNotificationDto\n- INotificationRepository\n- AuditLog\n- CreateAuditLogDto\n- IAuditLogRepository\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Canonical entity fields for this phase\n\nNote: these field names supersede any attribute names in the\nintent text above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the field names of each entity this phase defines. The\nexact attribute / column / property set per entity is:\n\n- `Notification`: `id`, `recipientId`, `leaveRequestId`, `type`, `message`, `isRead`, `createdAt`\n- `CreateNotificationDto`: `recipientId`, `leaveRequestId`, `type`, `message`\n- `AuditLog`: `id`, `entityType`, `entityId`, `action`, `changedBy`, `oldValues`, `newValues`, `createdAt`\n- `CreateAuditLogDto`: `entityType`, `entityId`, `action`, `changedBy`, `oldValues`, `newValues`\n\nTreat each entity's field list as complete. If the\nintent text or planner scope mentions different field\nnames than the architecture, do NOT flag this as\nambiguity — the per-phase architecture wins.\n\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 6 — Scaffold leave-management module and define ILeaveManagementService interface: Create src/modules/leave-management/leave-management.service.interface.ts with ILeaveManagementServi\n- Phase 7 — Implement applyForLeave use case: Create src/modules/leave-management/leave-management.service.ts implementing ILeaveManagementService\n- Phase 8 — Implement approve and reject use cases: Add approveLeave and rejectLeave methods to src/modules/leave-management/leave-management.service.ts\n- Phase 9 — Implement cancel leave, discard draft, and balance recalculation: Add cancelLeave and discardDraft methods to src/modules/leave-management/leave-management.service.ts\n- Phase 10 — Integrate audit logging, RBAC enforcement, and read operations: Modify src/modules/leave-management/leave-management.service.ts to inject IAuditService and enforce ",
+  "scope": {
+    "affectedDomains": [
+      "notification",
+      "audit"
+    ],
+    "affectedLayers": [
+      "domain"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/notification/notification.model.ts exists and exports Notification and CreateNotificationDto interfaces with the exact fields specified in the canonical entity fields.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/notification/notification.repository.ts exists and exports INotificationRepository interface with methods create, findById, findByRecipient, markAsRead.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "src/modules/audit/audit.model.ts exists and exports AuditLog and CreateAuditLogDto interfaces with the exact fields specified in the canonical entity fields.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "src/modules/audit/audit.repository.ts exists and exports IAuditLogRepository interface with methods create, findById, findByEntity.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access must go through repository interfaces (INotificationRepository, IAuditLogRepository).",
+    "Audit records: The AuditLog model must be designed to capture audit records for state-changing operations (oldValues, newValues)."
+  ],
+  "outOfScope": [
+    "Implementing repository methods (database access logic)",
+    "Integrating notification and audit into leave workflow",
+    "Creating API endpoints or controllers",
+    "Writing tests for these modules",
+    "Any other modules or files not explicitly listed"
+  ],
+  "ambiguities": []
+}

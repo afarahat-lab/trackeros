@@ -1,0 +1,66 @@
+{
+  "id": "df78dc61-6325-4263-a36c-7e12f754661d",
+  "correlationId": "71fe39e2-23f3-482a-a048-0516112cfc16",
+  "rawIntent": "[Feature: Build the leave management module — Phase 4: Create LeaveBalance domain model and repository]\n\nCreate src/modules/balance/balance.model.ts with LeaveBalance interface (id, employeeId, leaveTypeId, year, totalEntitlement, usedDays, pendingDays). Create src/modules/balance/balance.repository.ts with IBalanceRepository interface (findByEmployeeAndType, updateBalance, create). Depends on src/modules/employee/employee.model.ts from Phase 2 and src/modules/leave-type/leave-type.model.ts from Phase 1.\n\nPhase architecture notes:\nTracks leave entitlements and pending days.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/balance/balance.model.ts\\nexport interface LeaveBalance {\\n  id: string;\\n  employeeId: string;\\n  leaveTypeId: string;\\n  totalEntitlement: number;\\n  usedDays: number;\\n  pendingDays: number;\\n  year: number;\\n  createdAt: Date;\\n  updatedAt: Date;\\n}\\n\\nexport interface CreateLeaveBalanceDto {\\n  employeeId: string;\\n  leaveTypeId: string;\\n  totalEntitlement: number;\\n  year: number;\\n}\",\"File: src/modules/balance/balance.repository.ts\\nimport { Pool } from 'pg';\\nimport { LeaveBalance, CreateLeaveBalanceDto, ILeaveBalanceRepository } from './balance.model';\\n\\nexport interface ILeaveBalanceRepository {\\n  findById(id: string): Promise<LeaveBalance | null>;\\n  findByEmployeeIdAndYear(employeeId: string, year: number): Promise<LeaveBalance[]>;\\n  findByEmployeeIdAndLeaveTypeIdAndYear(employeeId: string, leaveTypeId: string, year: number): Promise<LeaveBalance | null>;\\n  create(dto: CreateLeaveBalanceDto): Promise<LeaveBalance>;\\n  update(id: string, updates: Partial<Pick<LeaveBalance, 'usedDays' | 'pendingDays' | 'totalEntitlement'>>): Promise<LeaveBalance>;\\n}\\n\\nexport class LeaveBalanceRepository implements ILeaveBalanceRepository {\\n  private pool: Pool;\\n\\n  constructor(pool: Pool) {\\n    this.pool = pool;\\n  }\\n\\n  private mapRow(row: any): LeaveBalance {\\n    return {\\n      id: row.id,\\n      employeeId: row.employee_id,\\n      leaveTypeId: row.leave_type_id,\\n      totalEntitlement: Number(row.total_entitlement),\\n      usedDays: Number(row.used_days),\\n      pendingDays: Number(row.pending_days),\\n      year: row.year,\\n      createdAt: row.created_at,\\n      updatedAt: row.updated_at,\\n    };\\n  }\\n\\n  async findById(id: string): Promise<LeaveBalance | null> {\\n    const result = await this.pool.query('SELECT * FROM leave_balances WHERE id = $1', [id]);\\n    return result.rows[0] ? this.mapRow(result.rows[0]) : null;\\n  }\\n\\n  async findByEmployeeIdAndYear(employeeId: string, year: number): Promise<LeaveBalance[]> {\\n    const result = await this.pool.query('SELECT * FROM leave_balances WHERE employee_id = $1 AND year = $2', [employeeId, year]);\\n    return result.rows.map(this.mapRow);\\n  }\\n\\n  async findByEmployeeIdAndLeaveTypeIdAndYear(employeeId: string, leaveTypeId: string, year: number): Promise<LeaveBalance | null> {\\n    const result = await this.pool.query('SELECT * FROM leave_balances WHERE employee_id = $1 AND leave_type_id = $2 AND year = $3', [employeeId, leaveTypeId, year]);\\n    return result.rows[0] ? this.mapRow(result.rows[0]) : null;\\n  }\\n\\n  async create(dto: CreateLeaveBalanceDto): Promise<LeaveBalance> {\\n    const result = await this.pool.query(\\n      `INSERT INTO leave_balances (employee_id, leave_type_id, total_entitlement, year)\\n       VALUES ($1, $2, $3, $4)\\n       RETURNING *`,\\n      [dto.employeeId, dto.leaveTypeId, dto.totalEntitlement, dto.year]\\n    );\\n    return this.mapRow(result.rows[0]);\\n  }\\n\\n  async update(id: string, updates: Partial<Pick<LeaveBalance, 'usedDays' | 'pendingDays' | 'totalEntitlement'>>): Promise<LeaveBalance> {\\n    const setClauses: string[] = [];\\n    const values: any[] = [];\\n    let paramIndex = 1;\\n\\n    if (updates.usedDays !== undefined) {\\n      setClauses.push(`used_days = $${paramIndex++}`);\\n      values.push(updates.usedDays);\\n    }\\n    if (updates.pendingDays !== undefined) {\\n      setClauses.push(`pending_days = $${paramIndex++}`);\\n      values.push(updates.pendingDays);\\n    }\\n    if (updates.totalEntitlement !== undefined) {\\n      setClauses.push(`total_entitlement = $${paramIndex++}`);\\n      values.push(updates.totalEntitlement);\\n    }\\n\\n    if (setClauses.length === 0) {\\n      throw new Error('No updates provided');\\n    }\\n\\n    values.push(id);\\n    const query = `UPDATE leave_balances SET ${setClauses.join(', ')}, updated_at = now() WHERE id = $${paramIndex} RETURNING *`;\\n    const result = await this.pool.query(query, values);\\n    return this.mapRow(result.rows[0]);\\n  }\\n}\"],\"importStatements\":[\"import { Pool } from 'pg';\",\"import { LeaveBalance, CreateLeaveBalanceDto, ILeaveBalanceRepository } from './balance.model';\"],\"successCriteria\":[\"src/modules/balance/balance.model.ts exists and exports LeaveBalance interface with fields id, employeeId, leaveTypeId, totalEntitlement, usedDays, pendingDays, year, createdAt, updatedAt matching the canonical leave_balances columns.\",\"src/modules/balance/balance.model.ts exports CreateLeaveBalanceDto interface with fields employeeId, leaveTypeId, totalEntitlement, year.\",\"src/modules/balance/balance.repository.ts exists and exports ILeaveBalanceRepository interface with methods findById, findByEmployeeIdAndYear, findByEmployeeIdAndLeaveTypeIdAndYear, create, update.\",\"src/modules/balance/balance.repository.ts exports LeaveBalanceRepository class that implements ILeaveBalanceRepository, uses a pg Pool, and maps snake_case database columns to camelCase properties in all query results.\",\"The leave_balances SQL table definition in the architecture matches the canonical schema exactly (columns, types, constraints, indexes).\"],\"sqlSchema\":\"CREATE TABLE leave_balances (\\n  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\\n  employee_id UUID NOT NULL REFERENCES employees(id),\\n  leave_type_id UUID NOT NULL REFERENCES leave_types(id),\\n  total_entitlement NUMERIC(5,1) NOT NULL,\\n  used_days NUMERIC(5,1) NOT NULL DEFAULT 0,\\n  pending_days NUMERIC(5,1) NOT NULL DEFAULT 0,\\n  year INTEGER NOT NULL,\\n  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),\\n  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),\\n  UNIQUE (employee_id, leave_type_id, year)\\n);\\nCREATE INDEX idx_leave_balances_employee ON leave_balances(employee_id);\\nCREATE INDEX idx_leave_balances_type ON leave_balances(leave_type_id);\"}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- LeaveBalance\n- CreateLeaveBalanceDto\n- ILeaveBalanceRepository\n- Pool\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Canonical entity fields for this phase\n\nNote: these field names supersede any attribute names in the\nintent text above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the field names of each entity this phase defines. The\nexact attribute / column / property set per entity is:\n\n- `LeaveBalance`: `id`, `employeeId`, `leaveTypeId`, `totalEntitlement`, `usedDays`, `pendingDays`, `year`, `createdAt`, `updatedAt`\n- `CreateLeaveBalanceDto`: `employeeId`, `leaveTypeId`, `totalEntitlement`, `year`\n\nTreat each entity's field list as complete. If the\nintent text or planner scope mentions different field\nnames than the architecture, do NOT flag this as\nambiguity — the per-phase architecture wins.\n\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 5 — Create Notification and AuditLog domain models and repositories: Create src/modules/notification/notification.model.ts with Notification interface (id, recipientId, \n- Phase 6 — Scaffold leave-management module and define ILeaveManagementService interface: Create src/modules/leave-management/leave-management.service.interface.ts with ILeaveManagementServi\n- Phase 7 — Implement applyForLeave use case: Create src/modules/leave-management/leave-management.service.ts implementing ILeaveManagementService\n- Phase 8 — Implement approve and reject use cases: Add approveLeave and rejectLeave methods to src/modules/leave-management/leave-management.service.ts\n- Phase 9 — Implement cancel leave, discard draft, and balance recalculation: Add cancelLeave and discardDraft methods to src/modules/leave-management/leave-management.service.ts\n- Phase 10 — Integrate audit logging, RBAC enforcement, and read operations: Modify src/modules/leave-management/leave-management.service.ts to inject IAuditService and enforce ",
+  "scope": {
+    "affectedDomains": [
+      "balance"
+    ],
+    "affectedLayers": [
+      "domain"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/balance/balance.model.ts exists and exports LeaveBalance interface with fields id, employeeId, leaveTypeId, totalEntitlement, usedDays, pendingDays, year, createdAt, updatedAt matching the canonical leave_balances columns.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/balance/balance.model.ts exports CreateLeaveBalanceDto interface with fields employeeId, leaveTypeId, totalEntitlement, year.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "src/modules/balance/balance.repository.ts exists and exports ILeaveBalanceRepository interface with methods findById, findByEmployeeIdAndYear, findByEmployeeIdAndLeaveTypeIdAndYear, create, update.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "src/modules/balance/balance.repository.ts exports LeaveBalanceRepository class that implements ILeaveBalanceRepository, uses a pg Pool, and maps snake_case database columns to camelCase properties in all query results.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "The leave_balances SQL table definition in the architecture matches the canonical schema exactly (columns, types, constraints, indexes).",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "Phase 5-10 items (Notification, AuditLog, leave-management service, applyForLeave, approve/reject, cancel, audit logging, RBAC enforcement, read operations)",
+    "API endpoints",
+    "UI components",
+    "Tests (unit/integration/e2e)",
+    "Database migration execution",
+    "Input validation at API boundaries",
+    "RBAC enforcement",
+    "Audit record creation",
+    "Notification creation",
+    "Leave request lifecycle",
+    "Balance deduction logic",
+    "Everything outside src/modules/balance/balance.model.ts and src/modules/balance/balance.repository.ts"
+  ],
+  "ambiguities": []
+}

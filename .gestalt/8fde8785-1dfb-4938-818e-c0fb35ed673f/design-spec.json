@@ -1,0 +1,156 @@
+{
+  "correlationId": "8fde8785-1dfb-4938-818e-c0fb35ed673f",
+  "domainChanges": [],
+  "apiContracts": [
+    {
+      "method": "POST",
+      "path": "/api/leave/submit",
+      "description": "Submit a new leave request",
+      "requestBody": {
+        "leaveTypeId": "string (UUID)",
+        "startDate": "string (ISO 8601 date)",
+        "endDate": "string (ISO 8601 date)",
+        "reason": "string (optional)"
+      },
+      "responseBody": {
+        "id": "string",
+        "employeeId": "string",
+        "leaveTypeId": "string",
+        "startDate": "string",
+        "endDate": "string",
+        "reason": "string | null",
+        "status": "string",
+        "managerComment": "string | null",
+        "createdAt": "string",
+        "updatedAt": "string"
+      },
+      "authRequired": true,
+      "roles": [
+        "employee"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/leave/approve/:id",
+      "description": "Approve a leave request by ID",
+      "requestBody": {
+        "comment": "string (optional)"
+      },
+      "responseBody": {
+        "id": "string",
+        "employeeId": "string",
+        "leaveTypeId": "string",
+        "startDate": "string",
+        "endDate": "string",
+        "reason": "string | null",
+        "status": "string",
+        "managerComment": "string | null",
+        "createdAt": "string",
+        "updatedAt": "string"
+      },
+      "authRequired": true,
+      "roles": [
+        "manager"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/leave/reject/:id",
+      "description": "Reject a leave request by ID",
+      "requestBody": {
+        "comment": "string (optional)"
+      },
+      "responseBody": {
+        "id": "string",
+        "employeeId": "string",
+        "leaveTypeId": "string",
+        "startDate": "string",
+        "endDate": "string",
+        "reason": "string | null",
+        "status": "string",
+        "managerComment": "string | null",
+        "createdAt": "string",
+        "updatedAt": "string"
+      },
+      "authRequired": true,
+      "roles": [
+        "manager"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/leave/cancel/:id",
+      "description": "Cancel a leave request by ID",
+      "requestBody": {},
+      "responseBody": {
+        "id": "string",
+        "employeeId": "string",
+        "leaveTypeId": "string",
+        "startDate": "string",
+        "endDate": "string",
+        "reason": "string | null",
+        "status": "string",
+        "managerComment": "string | null",
+        "createdAt": "string",
+        "updatedAt": "string"
+      },
+      "authRequired": true,
+      "roles": [
+        "employee"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/leave/discard-draft/:id",
+      "description": "Discard a draft leave request by ID",
+      "requestBody": {},
+      "responseBody": null,
+      "authRequired": true,
+      "roles": [
+        "employee"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/leave/balances",
+      "description": "Get leave balances for the authenticated employee",
+      "requestBody": null,
+      "responseBody": [
+        {
+          "leaveTypeId": "string",
+          "balance": "number",
+          "year": "number"
+        }
+      ],
+      "authRequired": true,
+      "roles": [
+        "employee"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/leave/history",
+      "description": "Get leave request history for the authenticated employee with optional filters",
+      "requestBody": null,
+      "responseBody": [
+        {
+          "id": "string",
+          "employeeId": "string",
+          "leaveTypeId": "string",
+          "startDate": "string",
+          "endDate": "string",
+          "reason": "string | null",
+          "status": "string",
+          "managerComment": "string | null",
+          "createdAt": "string",
+          "updatedAt": "string"
+        }
+      ],
+      "authRequired": true,
+      "roles": [
+        "employee"
+      ]
+    }
+  ],
+  "componentSpecs": []
+}
