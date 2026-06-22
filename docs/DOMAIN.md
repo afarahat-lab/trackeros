@@ -200,6 +200,23 @@ Represents leave policy data managed by the `policy` module, including policy de
 **Relationships**
 - `LeaveType` — one-to-one
 
+## user
+
+Represents user authentication data managed by the `user` module, including user credentials and role assignments for platform access.
+
+### User
+
+| Field | Type | Required |
+|-------|------|----------|
+| id | string | true |
+| username | string | true |
+| passwordHash | string | true |
+| employeeId | string | true |
+| role | string | true |
+
+**Relationships**
+- `Employee` — one-to-one (employeeId → Employee)
+
 ## notification
 
 Represents notification data managed by the `notification` module, including notification records, delivery status, and related messaging information.
