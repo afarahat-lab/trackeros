@@ -18,7 +18,7 @@ importers:
         specifier: ^0.5.1
         version: 0.5.1
       class-validator:
-        specifier: ^0.14.0
+        specifier: ^0.14.1
         version: 0.14.4
       dotenv:
         specifier: ^10.0.0
@@ -27,7 +27,7 @@ importers:
         specifier: ^4.17.1
         version: 4.22.2
       fastify:
-        specifier: ^4.0.0
+        specifier: ^4.26.0
         version: 4.29.1
       jsonwebtoken:
         specifier: ^8.5.1
@@ -46,7 +46,7 @@ importers:
         specifier: ^5.0.0
         version: 5.0.2
       '@types/bcryptjs':
-        specifier: ^2.4.2
+        specifier: ^2.4.6
         version: 2.4.6
       '@types/express':
         specifier: ^4.17.13
