@@ -1,0 +1,66 @@
+{
+  "id": "6ec5179c-ceea-4fe4-ac52-0dbc6ce65005",
+  "correlationId": "4868a4a2-52e6-4022-a5a6-c2200f678d22",
+  "rawIntent": "[Feature: Build the leave management module — Phase 5: Create LeaveBalance model and repository]\n\nCreate src/modules/balance/balance.model.ts with TypeScript interfaces for LeaveBalance (attributes: id, employeeId, leaveTypeId, year, totalDays, usedDays, remainingDays computed) and CreateLeaveBalanceDto. Create src/modules/balance/balance.repository.ts with IBalanceRepository interface and BalanceRepository class. Include Jest unit tests in tests/unit/modules/balance/balance.repository.test.ts. This phase has no dependencies on other application modules.\n\nPhase architecture notes:\nLeaveBalance tracks remaining leave entitlement per employee per leave type and year.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/balance/balance.model.ts\\nexport interface LeaveBalance {\\n  id: string;\\n  employeeId: string;\\n  leaveTypeId: string;\\n  year: number;\\n  totalDays: number;\\n  usedDays: number;\\n  remainingDays: number;\\n}\\n\\nexport interface CreateLeaveBalanceDto {\\n  employeeId: string;\\n  leaveTypeId: string;\\n  year: number;\\n  totalDays: number;\\n  usedDays?: number;\\n}\",\"File: src/modules/balance/balance.repository.ts\\nimport { pool } from \\\"../../shared/db/connection\\\";\\nimport { LeaveBalance, CreateLeaveBalanceDto } from \\\"./balance.model\\\";\\n\\nexport interface ILeaveBalanceRepository {\\n  findById(id: string): Promise<LeaveBalance | null>;\\n  findByEmployeeAndYear(employeeId: string, year: number): Promise<LeaveBalance[]>;\\n  findByEmployeeLeaveTypeAndYear(employeeId: string, leaveTypeId: string, year: number): Promise<LeaveBalance | null>;\\n  create(dto: CreateLeaveBalanceDto): Promise<LeaveBalance>;\\n  updateUsedDays(id: string, usedDays: number): Promise<LeaveBalance>;\\n}\\n\\nexport class LeaveBalanceRepository implements ILeaveBalanceRepository {\\n  async findById(id: string): Promise<LeaveBalance | null> {\\n    const result = await pool.query('SELECT * FROM leave_balances WHERE id = $1', [id]);\\n    return result.rows[0] ? this._mapRow(result.rows[0]) : null;\\n  }\\n\\n  async findByEmployeeAndYear(employeeId: string, year: number): Promise<LeaveBalance[]> {\\n    const result = await pool.query('SELECT * FROM leave_balances WHERE employee_id = $1 AND year = $2', [employeeId, year]);\\n    return result.rows.map(this._mapRow);\\n  }\\n\\n  async findByEmployeeLeaveTypeAndYear(employeeId: string, leaveTypeId: string, year: number): Promise<LeaveBalance | null> {\\n    const result = await pool.query('SELECT * FROM leave_balances WHERE employee_id = $1 AND leave_type_id = $2 AND year = $3', [employeeId, leaveTypeId, year]);\\n    return result.rows[0] ? this._mapRow(result.rows[0]) : null;\\n  }\\n\\n  async create(dto: CreateLeaveBalanceDto): Promise<LeaveBalance> {\\n    const result = await pool.query(\\n      'INSERT INTO leave_balances (employee_id, leave_type_id, year, total_days, used_days) VALUES ($1, $2, $3, $4, $5) RETURNING *',\\n      [dto.employeeId, dto.leaveTypeId, dto.year, dto.totalDays, dto.usedDays ?? 0]\\n    );\\n    return this._mapRow(result.rows[0]);\\n  }\\n\\n  async updateUsedDays(id: string, usedDays: number): Promise<LeaveBalance> {\\n    const result = await pool.query(\\n      'UPDATE leave_balances SET used_days = $1 WHERE id = $2 RETURNING *',\\n      [usedDays, id]\\n    );\\n    return this._mapRow(result.rows[0]);\\n  }\\n\\n  private _mapRow(row: any): LeaveBalance {\\n    return {\\n      id: row.id,\\n      employeeId: row.employee_id,\\n      leaveTypeId: row.leave_type_id,\\n      year: row.year,\\n      totalDays: row.total_days,\\n      usedDays: row.used_days,\\n      remainingDays: row.remaining_days,\\n    };\\n  }\\n}\"],\"importStatements\":[\"import { pool } from \\\"../../shared/db/connection\\\";\",\"import { LeaveBalance, CreateLeaveBalanceDto } from \\\"./balance.model\\\";\"],\"successCriteria\":[\"src/modules/balance/balance.model.ts exists and exports LeaveBalance, CreateLeaveBalanceDto\",\"src/modules/balance/balance.repository.ts exists and exports ILeaveBalanceRepository and LeaveBalanceRepository\",\"tests/unit/modules/balance/balance.repository.test.ts exists with Jest tests covering all repository methods\",\"LeaveBalanceRepository.create inserts a row and returns the created LeaveBalance with computed remaining_days\",\"LeaveBalanceRepository.findByEmployeeLeaveTypeAndYear returns the correct balance or null\"],\"sqlSchema\":\"CREATE TABLE IF NOT EXISTS leave_balances (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), employee_id UUID NOT NULL REFERENCES employees(id) ON DELETE CASCADE, leave_type_id UUID NOT NULL REFERENCES leave_types(id) ON DELETE CASCADE, year INTEGER NOT NULL, total_days INTEGER NOT NULL DEFAULT 0, used_days INTEGER NOT NULL DEFAULT 0, remaining_days INTEGER GENERATED ALWAYS AS (total_days - used_days) STORED, UNIQUE(employee_id, leave_type_id, year));\\nCREATE INDEX IF NOT EXISTS idx_leave_balances_employee_year ON leave_balances(employee_id, year);\"}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- LeaveBalance\n- CreateLeaveBalanceDto\n- ILeaveBalanceRepository\n- pool\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Canonical entity fields for this phase\n\nNote: these field names supersede any attribute names in the\nintent text above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the field names of each entity this phase defines. The\nexact attribute / column / property set per entity is:\n\n- `LeaveBalance`: `id`, `employeeId`, `leaveTypeId`, `year`, `totalDays`, `usedDays`, `remainingDays`\n- `CreateLeaveBalanceDto`: `employeeId`, `leaveTypeId`, `year`, `totalDays`, `usedDays`\n\nTreat each entity's field list as complete. If the\nintent text or planner scope mentions different field\nnames than the architecture, do NOT flag this as\nambiguity — the per-phase architecture wins.\n\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 6 — Create Balance service: Create src/modules/balance/balance.service.ts with BalanceService class that uses IBalanceRepository\n- Phase 7 — Create Notification and Audit models and repositories: Create src/modules/notification/notification.model.ts with TypeScript interfaces for Notification (a\n- Phase 8 — Create LeaveRequest model and repository: Create src/modules/leave/leave.model.ts with TypeScript interfaces for LeaveRequest (attributes: id,\n- Phase 9 — Create Leave orchestration service: Create src/modules/leave/leave.service.ts with LeaveService class that orchestrates leave workflow (\n- Phase 10 — Wire services, create routes and controllers: Create src/modules/leave/leave.controller.ts with REST endpoints for leave operations (POST /apply, ",
+  "scope": {
+    "affectedDomains": [
+      "balance"
+    ],
+    "affectedLayers": [
+      "domain",
+      "infra",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/balance/balance.model.ts exists and exports LeaveBalance and CreateLeaveBalanceDto",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/balance/balance.repository.ts exists and exports ILeaveBalanceRepository and LeaveBalanceRepository",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "tests/unit/modules/balance/balance.repository.test.ts exists with Jest tests covering all repository methods",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "LeaveBalanceRepository.create inserts a row and returns the created LeaveBalance with computed remaining_days",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "LeaveBalanceRepository.findByEmployeeLeaveTypeAndYear returns the correct balance or null",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Error handling: No unhandled promise rejections; all async errors must be caught and handled.",
+    "No reverse dependencies: The balance module must not depend on other application modules (employee, policy, leave, notification)."
+  ],
+  "outOfScope": [
+    "Phase 6: Balance service",
+    "Phase 7: Notification and Audit models/repositories",
+    "Phase 8: LeaveRequest model/repository",
+    "Phase 9: Leave orchestration service",
+    "Phase 10: Routes and controllers",
+    "All other modules (employee, policy, leave, notification)",
+    "Audit logging for balance operations",
+    "API endpoints",
+    "Integration tests beyond unit tests for repository"
+  ],
+  "ambiguities": []
+}
