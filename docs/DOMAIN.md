@@ -186,14 +186,11 @@ Represents notification data managed by the `notification` module, including not
 |-------|------|----------|
 | id | string | true |
 | recipientId | string | true |
-| type | string | true |
-| title | string | true |
 | message | string | true |
-| relatedEntityType | string \| null | false |
-| relatedEntityId | string \| null | false |
-| status | 'PENDING' \| 'SENT' \| 'READ' \| 'ARCHIVED' | true |
+| type | NotificationType | true |
+| status | NotificationStatus | true |
+| read | boolean | true |
 | createdAt | Date | true |
-| readAt | Date \| null | false |
 
 ## audit
 
@@ -222,9 +219,9 @@ Represents audit data managed by the `audit` module, including audit records, ch
 | entityType | string | true |
 | entityId | string | true |
 | action | string | true |
-| oldValue | Record<string, unknown> | false |
-| newValue | Record<string, unknown> | false |
-| changedBy | string | false |
+| oldValue | Record<string, unknown> \| null | true |
+| newValue | Record<string, unknown> \| null | true |
+| changedBy | string \| null | true |
 | changedAt | Date | true |
 
 ### AuditRecord

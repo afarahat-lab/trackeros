@@ -3,6 +3,7 @@ import { LeaveBalance, CreateLeaveBalanceDto } from './balance.model';
 import { EmployeeService } from '../employee/employee.service';
 import { PolicyService } from '../policy/policy.service';
 import { IAuditRepository } from '../audit/audit.repository';
+import { AuditAction, EntityType } from '../audit/audit.model';
 import { AppError } from '../../shared/types';
 
 export interface IBalanceService {
@@ -26,10 +27,10 @@ export class BalanceService implements IBalanceService {
     
     const balance = await this.balanceRepo.create(dto);
     
-    await this.auditRepo.createAuditLog({
-      entityType: 'LeaveBalance',
+    await this.auditRepo.create({
+      entityType: EntityType.LEAVE_BALANCE,
       entityId: balance.id,
-      action: 'CREATE',
+      action: AuditAction.CREATE,
       newValue: balance as unknown as Record<string, unknown>,
     });
     
@@ -58,10 +59,10 @@ export class BalanceService implements IBalanceService {
 
     const updatedBalance = await this.balanceRepo.updateUsedDays(id, usedDays);
     
-    await this.auditRepo.createAuditLog({
-      entityType: 'LeaveBalance',
+    await this.auditRepo.create({
+      entityType: EntityType.LEAVE_BALANCE,
       entityId: id,
-      action: 'UPDATE',
+      action: AuditAction.UPDATE,
       oldValue: currentBalance as unknown as Record<string, unknown>,
       newValue: updatedBalance as unknown as Record<string, unknown>,
     });

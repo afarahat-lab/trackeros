@@ -35,7 +35,9 @@ describe('BalanceService', () => {
       archivePolicy: jest.fn(),
     } as any;
     auditRepo = {
-      createAuditLog: jest.fn(),
+      create: jest.fn(),
+      findById: jest.fn(),
+      findByEntity: jest.fn(),
     };
 
     balanceService = new BalanceService(balanceRepo, employeeService, policyService, auditRepo);
@@ -49,7 +51,7 @@ describe('BalanceService', () => {
       employeeService.getEmployeeById.mockResolvedValue({ id: 'emp1' } as any);
       policyService.getPolicyByLeaveTypeId.mockResolvedValue({ id: 'pol1', allowNegativeBalance: false } as any);
       balanceRepo.create.mockResolvedValue(mockBalance as any);
-      auditRepo.createAuditLog.mockResolvedValue({} as any);
+      auditRepo.create.mockResolvedValue({} as any);
 
       const result = await balanceService.initializeBalance(dto as any);
       
@@ -57,7 +59,7 @@ describe('BalanceService', () => {
       expect(employeeService.getEmployeeById).toHaveBeenCalledWith('emp1');
       expect(policyService.getPolicyByLeaveTypeId).toHaveBeenCalledWith('lt1');
       expect(balanceRepo.create).toHaveBeenCalledWith(dto);
-      expect(auditRepo.createAuditLog).toHaveBeenCalled();
+      expect(auditRepo.create).toHaveBeenCalled();
     });
 
     it('should throw an error if employee is not found', async () => {
@@ -109,7 +111,7 @@ describe('BalanceService', () => {
       balanceRepo.findById.mockResolvedValue(currentBalance as any);
       policyService.getPolicyByLeaveTypeId.mockResolvedValue(policy as any);
       balanceRepo.updateUsedDays.mockResolvedValue(updatedBalance as any);
-      auditRepo.createAuditLog.mockResolvedValue({} as any);
+      auditRepo.create.mockResolvedValue({} as any);
 
       const result = await balanceService.updateBalance('bal1', 10);
       expect(result).toEqual(updatedBalance);

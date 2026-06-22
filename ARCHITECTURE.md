@@ -29,3 +29,23 @@
 
 ### Repositories
 - `src/modules/employee/employee.repository.ts` — `IEmployeeRepository`, `EmployeeRepository`
+
+## Notification Module
+
+### Domain Models
+- `src/modules/notification/notification.model.ts` — `Notification`, `CreateNotificationDto`
+
+### Enums
+- `NotificationType`: `leave_request_submitted`, `leave_request_approved`, `leave_request_rejected`, `leave_request_cancelled`
+- `NotificationStatus`: `pending`, `sent`, `failed`, `read`
+
+### Notification Entity
+- `id` (string), `recipientId` (string), `message` (string), `type` (NotificationType), `status` (NotificationStatus), `read` (boolean), `createdAt` (Date)
+
+## Audit Module
+
+### Domain Models
+- `src/modules/audit/audit.model.ts` — `AuditLog`, `CreateAuditLogDto`
+
+### AuditLog Entity
+- `id` (string), `entityType` (string), `entityId` (string), `action` (string), `oldValue` (Record<string, unknown> | null), `newValue` (Record<string, unknown> | null), `changedBy` (string | null), `changedAt` (Date)
