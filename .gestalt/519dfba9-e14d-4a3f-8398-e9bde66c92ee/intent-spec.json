@@ -1,0 +1,55 @@
+{
+  "id": "35161d6b-8a23-486c-b791-c16783c2ffbb",
+  "correlationId": "519dfba9-e14d-4a3f-8398-e9bde66c92ee",
+  "rawIntent": "[Feature: Build the leave management module — Phase 4: Create Policy service]\n\nCreate src/modules/policy/policy.service.ts with PolicyService class that uses IPolicyRepository. Include Jest unit tests in tests/unit/modules/policy/policy.service.test.ts. This phase depends on src/modules/policy/policy.model.ts and src/modules/policy/policy.repository.ts from Phase 2 — read them before generating any code.\n\nThis phase depends on: Phase 2.\n\nPhase architecture notes:\nPolicy service provides rule validation for leave requests.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/policy/policy.service.ts\\nimport { IPolicyRepository } from './policy.repository';\\nimport { LeavePolicy } from './policy.model';\\n\\nexport interface ValidationResult {\\n  valid: boolean;\\n  errors: string[];\\n}\\n\\nexport interface IPolicyService {\\n  getPolicy(leaveTypeId: string): Promise<LeavePolicy>;\\n  validateRequest(policy: LeavePolicy, startDate: Date, endDate: Date, daysRequested: number): ValidationResult;\\n}\\n\\nexport class PolicyService implements IPolicyService {\\n  constructor(private readonly policyRepository: IPolicyRepository) {}\\n\\n  async getPolicy(leaveTypeId: string): Promise<LeavePolicy> {\\n    const policy = await this.policyRepository.findByLeaveTypeId(leaveTypeId);\\n    if (!policy) {\\n      throw new Error(`Policy not found for leave type ID: ${leaveTypeId}`);\\n    }\\n    if (policy.status !== 'active') {\\n      throw new Error(`Policy for leave type ID ${leaveTypeId} is not active`);\\n    }\\n    return policy;\\n  }\\n\\n  validateRequest(policy: LeavePolicy, startDate: Date, endDate: Date, daysRequested: number): ValidationResult {\\n    const errors: string[] = [];\\n    // Check max consecutive days\\n    const diffTime = endDate.getTime() - startDate.getTime();\\n    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // inclusive\\n    if (diffDays > policy.max_consecutive_days) {\\n      errors.push(`Requested ${diffDays} consecutive days exceeds maximum allowed ${policy.max_consecutive_days}`);\\n    }\\n    // Check blackout dates\\n    if (policy.blackout_dates && policy.blackout_dates.length > 0) {\\n      const requestDates = this.getDateRange(startDate, endDate);\\n      const blackoutSet = new Set(policy.blackout_dates.map(d => d.toISOString().split('T')[0]));\\n      const conflictingDates = requestDates.filter(d => blackoutSet.has(d));\\n      if (conflictingDates.length > 0) {\\n        errors.push(`Request includes blackout dates: ${conflictingDates.join(', ')}`);\\n      }\\n    }\\n    return { valid: errors.length === 0, errors };\\n  }\\n\\n  private getDateRange(start: Date, end: Date): string[] {\\n    const dates: string[] = [];\\n    const current = new Date(start);\\n    while (current <= end) {\\n      dates.push(current.toISOString().split('T')[0]);\\n      current.setDate(current.getDate() + 1);\\n    }\\n    return dates;\\n  }\\n}\\n\"],\"importStatements\":[\"import { IPolicyRepository } from './policy.repository';\",\"import { LeavePolicy } from './policy.model';\"],\"successCriteria\":[\"src/modules/policy/policy.service.ts exists and exports IPolicyService and PolicyService\",\"PolicyService.getPolicy returns the active policy for a given leave type ID or throws a descriptive error if not found or inactive\",\"PolicyService.validateRequest correctly enforces max_consecutive_days and blackout_dates from the policy, returning { valid: false, errors: [...] } for violations\",\"Unit tests in tests/unit/modules/policy/policy.service.test.ts cover all validation branches (valid request, consecutive days exceeded, blackout date conflict, missing policy) and pass with Jest\"]}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- ValidationResult\n- IPolicyService\n- IPolicyRepository\n- LeavePolicy\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Canonical entity fields for this phase\n\nNote: these field names supersede any attribute names in the\nintent text above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the field names of each entity this phase defines. The\nexact attribute / column / property set per entity is:\n\n- `ValidationResult`: `valid`, `errors`\n\nTreat each entity's field list as complete. If the\nintent text or planner scope mentions different field\nnames than the architecture, do NOT flag this as\nambiguity — the per-phase architecture wins.\n\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 5 — Create LeaveBalance model and repository: Create src/modules/balance/balance.model.ts with TypeScript interfaces for LeaveBalance (attributes:\n- Phase 6 — Create Balance service: Create src/modules/balance/balance.service.ts with BalanceService class that uses IBalanceRepository\n- Phase 7 — Create Notification and Audit models and repositories: Create src/modules/notification/notification.model.ts with TypeScript interfaces for Notification (a\n- Phase 8 — Create LeaveRequest model and repository: Create src/modules/leave/leave.model.ts with TypeScript interfaces for LeaveRequest (attributes: id,\n- Phase 9 — Create Leave orchestration service: Create src/modules/leave/leave.service.ts with LeaveService class that orchestrates leave workflow (\n- Phase 10 — Wire services, create routes and controllers: Create src/modules/leave/leave.controller.ts with REST endpoints for leave operations (POST /apply, ",
+  "scope": {
+    "affectedDomains": [
+      "policy"
+    ],
+    "affectedLayers": [
+      "domain",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/policy/policy.service.ts exists and exports IPolicyService and PolicyService",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "PolicyService.getPolicy returns the active policy for a given leave type ID or throws a descriptive error if not found or inactive",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "PolicyService.validateRequest correctly enforces max_consecutive_days and blackout_dates from the policy, returning { valid: false, errors: [...] } for violations",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "Unit tests in tests/unit/modules/policy/policy.service.test.ts cover all validation branches (valid request, consecutive days exceeded, blackout date conflict, missing policy) and pass with Jest",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces (PolicyService uses IPolicyRepository).",
+    "Error handling: No unhandled promise rejections; async errors must be thrown or caught appropriately."
+  ],
+  "outOfScope": [
+    "Creating policy.model.ts and policy.repository.ts (already exist from Phase 2).",
+    "Phases 5-10 (balance, notification, leave request, orchestration, wiring, controllers, routes).",
+    "Any API endpoints, controllers, or HTTP routes.",
+    "Integration with leave, balance, notification, or employee modules.",
+    "Database migrations or schema changes.",
+    "UI components or React Native code."
+  ],
+  "ambiguities": []
+}
