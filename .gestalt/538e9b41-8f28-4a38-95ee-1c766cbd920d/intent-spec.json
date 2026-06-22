@@ -1,0 +1,67 @@
+{
+  "id": "60c02123-0eae-4b12-8706-341a4dbe2400",
+  "correlationId": "538e9b41-8f28-4a38-95ee-1c766cbd920d",
+  "rawIntent": "The CI pipeline failed with the following TypeScript errors:\n- src/modules/leave-api/leave.dto.ts:13 — Unable to resolve signature of property decorator when called as an expression.\n- src/modules/leave-api/leave.dto.ts:10 — Unable to resolve signature of property decorator when called as an expression.\n- src/modules/leave-api/leave.dto.ts:7 — Unable to resolve signature of property decorator when called as an expression.\n- src/modules/leave-api/leave.dto.ts:4 — Unable to resolve signature of property decorator when called as an expression.\n- src/modules/leave-api/leave.controller.ts:77 — 'request.params' is of type 'unknown'.\n- src/modules/leave-api/leave.controller.ts:68 — 'request.params' is of type 'unknown'.\n- src/modules/leave-api/leave.controller.ts:59 — Argument of type 'string | undefined' is not assignable to parameter of type 'string'.\n- src/modules/leave-api/leave.controller.ts:59 — 'request.params' is of type 'unknown'.\n- src/modules/leave-api/leave.controller.ts:47 — 'request.params' is of type 'unknown'.\n- src/modules/leave-api/leave.controller.ts:35 — Argument of type 'import(\"/home/runner/work/trackeros/trackeros/src/modules/leave-api/leave.dto\").CreateLeaveRequestDto' is not assignable to parameter of type 'import(\"/home/runner/work/trackeros/trackeros/src/modules/leave/leave.model\").CreateLeaveRequestDto'.\n\nThe project's tsconfig.json does not have experimentalDecorators enabled, which causes the class-validator decorators in leave.dto.ts to fail compilation. Additionally, the leave controller uses FastifyRequest generic types that are not recognized by the installed Fastify version, leading to 'unknown' params and a type mismatch when passing the DTO to ILeaveManagementService.submitLeaveRequest (the service expects a CreateLeaveRequestDto from leave.model, not the class from leave.dto.ts).\n\nPreserve all existing exports, types, interfaces, and imports. Only add or modify what is needed to resolve the CI failure shown above.",
+  "scope": {
+    "affectedDomains": [
+      "leave-api"
+    ],
+    "affectedLayers": [
+      "api",
+      "config"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "experimentalDecorators is enabled in tsconfig.json and all decorator-related compilation errors in leave.dto.ts are resolved.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "Fastify request generic types in leave.controller.ts are corrected so that request.params is properly typed (no 'unknown' errors) and the argument type matches the expected service signature.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "DTO imports in leave.controller.ts are consistent: the CreateLeaveRequestDto used in the controller matches the type expected by ILeaveManagementService.submitLeaveRequest (from leave.model).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "The CI pipeline passes with zero TypeScript errors related to the listed files.",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "Preserve all existing exports, types, interfaces, and imports in the affected files.",
+    "Only modify files necessary to resolve the CI errors (leave.dto.ts, leave.controller.ts, tsconfig.json, and any route files if needed).",
+    "Enable experimentalDecorators in tsconfig.json.",
+    "Correct Fastify request types to match the installed Fastify version and the expected service signatures.",
+    "Ensure DTO imports are consistent: the controller must use the same CreateLeaveRequestDto type that the service expects (from leave.model).",
+    "No changes to business logic, service contracts, or leave request lifecycle.",
+    "Adhere to existing architecture: dependency direction leave -> employee, leave -> policy, leave -> balance, leave -> notification; no reverse dependencies.",
+    "All modifications must not introduce new linting or type errors.",
+    "Repository pattern: all database access goes through repository interfaces (not directly relevant to this fix, but must not be violated).",
+    "Input validation: validate all inputs at API boundaries (existing validation logic must remain intact).",
+    "No sensitive data in logs: ensure no logging of passwords, tokens, PII, or financial data (no new logging introduced).",
+    "RBAC enforcement: all API endpoints enforce role-based access control (existing guards must remain).",
+    "Error handling: no unhandled promise rejections; all async errors are caught and handled (existing error handling must remain)."
+  ],
+  "outOfScope": [
+    "Modifying leave module business logic or service implementations.",
+    "Changing the leave request lifecycle (Pending, Approved, Rejected).",
+    "Adding new endpoints, features, or functionality.",
+    "Modifying employee, policy, balance, or notification modules.",
+    "Changing database schema or migrations.",
+    "Updating package dependencies (unless strictly required to resolve type errors, but not indicated).",
+    "Any files outside src/modules/leave-api/ and tsconfig.json."
+  ],
+  "ambiguities": []
+}

@@ -1,0 +1,44 @@
+{
+  "id": "1e6be937-5e3e-43de-8790-71b16ca89561",
+  "correlationId": "88bc978d-afe4-4122-b135-ebe229fa014a",
+  "rawIntent": "[Feature: Build the leave management module — Phase 2: Create Employee domain model and repository]\n\nCreate src/modules/employee/employee.model.ts with Employee interface (id, firstName, lastName, email, managerId, role, department). Create src/modules/employee/employee.repository.ts with IEmployeeRepository interface (findById, findByManagerId). No dependencies.\n\nPhase architecture notes:\nEmployee entity needed for leave requests and approvals.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/employee/employee.model.ts\\nexport interface Employee {\\n  id: string;\\n  firstName: string;\\n  lastName: string;\\n  email: string;\\n  managerId: string | null;\\n  role: string;\\n  department: string | null;\\n  createdAt: Date;\\n  updatedAt: Date;\\n}\\n\\nexport interface CreateEmployeeDto {\\n  firstName: string;\\n  lastName: string;\\n  email: string;\\n  managerId?: string | null;\\n  role?: string;\\n  department?: string | null;\\n}\",\"File: src/modules/employee/employee.repository.ts\\nimport { Employee, CreateEmployeeDto } from \\\"./employee.model\\\";\\n\\nexport interface IEmployeeRepository {\\n  findById(id: string): Promise<Employee | null>;\\n  findByEmail(email: string): Promise<Employee | null>;\\n  findByManagerId(managerId: string): Promise<Employee[]>;\\n  create(dto: CreateEmployeeDto): Promise<Employee>;\\n  update(id: string, dto: Partial<CreateEmployeeDto>): Promise<Employee>;\\n}\"],\"importStatements\":[\"import { Employee, CreateEmployeeDto } from \\\"./employee.model\\\";\"],\"successCriteria\":[\"src/modules/employee/employee.model.ts exists and exports Employee and CreateEmployeeDto\",\"src/modules/employee/employee.repository.ts exists and exports IEmployeeRepository\"]}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- Employee\n- CreateEmployeeDto\n- IEmployeeRepository\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Canonical entity fields for this phase\n\nNote: these field names supersede any attribute names in the\nintent text above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the field names of each entity this phase defines. The\nexact attribute / column / property set per entity is:\n\n- `Employee`: `id`, `firstName`, `lastName`, `email`, `managerId`, `role`, `department`, `createdAt`, `updatedAt`\n- `CreateEmployeeDto`: `firstName`, `lastName`, `email`, `managerId`, `role`, `department`\n\nTreat each entity's field list as complete. If the\nintent text or planner scope mentions different field\nnames than the architecture, do NOT flag this as\nambiguity — the per-phase architecture wins.\n\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 3 — Create LeaveRequest domain model and repository: Create src/modules/leave/leave.model.ts with LeaveRequest interface (id, employeeId, leaveTypeId, st\n- Phase 4 — Create LeaveBalance domain model and repository: Create src/modules/balance/balance.model.ts with LeaveBalance interface (id, employeeId, leaveTypeId\n- Phase 5 — Create Notification and AuditLog domain models and repositories: Create src/modules/notification/notification.model.ts with Notification interface (id, recipientId, \n- Phase 6 — Scaffold leave-management module and define ILeaveManagementService interface: Create src/modules/leave-management/leave-management.service.interface.ts with ILeaveManagementServi\n- Phase 7 — Implement applyForLeave use case: Create src/modules/leave-management/leave-management.service.ts implementing ILeaveManagementService\n- Phase 8 — Implement approve and reject use cases: Add approveLeave and rejectLeave methods to src/modules/leave-management/leave-management.service.ts\n- Phase 9 — Implement cancel leave, discard draft, and balance recalculation: Add cancelLeave and discardDraft methods to src/modules/leave-management/leave-management.service.ts\n- Phase 10 — Integrate audit logging, RBAC enforcement, and read operations: Modify src/modules/leave-management/leave-management.service.ts to inject IAuditService and enforce ",
+  "scope": {
+    "affectedDomains": [
+      "employee"
+    ],
+    "affectedLayers": [
+      "domain"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/employee/employee.model.ts exists and exports Employee and CreateEmployeeDto interfaces with the exact fields specified in the canonical entity fields.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/employee/employee.repository.ts exists and exports IEmployeeRepository interface with methods findById, findByEmail, findByManagerId, create, and update.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces (IEmployeeRepository).",
+    "No reverse dependencies: The employee module must not depend on leave, policy, balance, or notification modules.",
+    "Employee entity fields must exactly match the canonical list: id, firstName, lastName, email, managerId, role, department, createdAt, updatedAt.",
+    "CreateEmployeeDto fields must exactly match the canonical list: firstName, lastName, email, managerId, role, department."
+  ],
+  "outOfScope": [
+    "Implementing the concrete repository class (e.g., PostgresEmployeeRepository).",
+    "Database schema, migrations, or any persistence logic.",
+    "API endpoints, controllers, or routes.",
+    "Input validation, RBAC enforcement, audit logging, or error handling (deferred to later phases).",
+    "Any other modules (leave, policy, balance, notification) or their models/repositories.",
+    "All phases beyond Phase 2 as listed in the deferred list."
+  ],
+  "ambiguities": []
+}

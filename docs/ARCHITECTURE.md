@@ -23,12 +23,18 @@ src/modules/policy/policy.{model,repository,service,controller,routes}.ts
 src/modules/notification/notification.{model,repository,service,controller,routes}.ts
 src/modules/LeaveStatus/    — LeaveStatus module
 src/modules/BaseEntity/    — BaseEntity module
+src/modules/LeaveBalance/    — LeaveBalance module
 src/modules/LeaveRequest/    — LeaveRequest module
+src/modules/LeaveRequestQueryParams/    — LeaveRequestQueryParams module
 src/modules/LeaveType/    — LeaveType module
+src/modules/NotificationType/    — NotificationType module
 src/modules/LeavePolicy/    — LeavePolicy module
 src/modules/AuditLog/    — AuditLog module
 src/modules/AuditRecord/    — AuditRecord module
 src/modules/AuditServiceInterface/    — AuditServiceInterface module
+src/modules/CreateLeaveRequestDto/    — CreateLeaveRequestDto module
+src/modules/UpdateLeaveRequestDto/    — UpdateLeaveRequestDto module
+src/modules/ValidationResult/    — ValidationResult module
 src/shared/db connection.ts
 src/shared/base repository.ts
 src/shared/error types.ts
@@ -832,27 +838,4 @@ CREATE TABLE leave_policies (
     leave_type VARCHAR(20) UNIQUE NOT NULL CHECK (leave_type IN ('ANNUAL', 'SICK', 'EMERGENCY')),
     entitlement_days INTEGER NOT NULL CHECK (entitlement_days >= 0),
     carry_over_limit DECIMAL(5,1) NOT NULL DEFAULT 0,
-    requires_approval BOOLEAN NOT NULL DEFAULT true
-);
-
--- Notifications
-CREATE TABLE notifications (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    recipient_id UUID NOT NULL REFERENCES employees(id),
-    type VARCHAR(50) NOT NULL,
-    title VARCHAR(255) NOT NULL,
-    body TEXT NOT NULL,
-    metadata JSONB,
-    status VARCHAR(20) NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'SENT', 'FAILED')),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
-CREATE INDEX idx_notifications_recipient_id ON notifications(recipient_id);
-CREATE INDEX idx_notifications_status ON notifications(status);
-
-## Leave Management Module
-
-### Domain Entities
-
-**LeaveRequest**
-- Represents a leave application submitted by an employee
+    requires_approval

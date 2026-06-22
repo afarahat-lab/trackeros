@@ -1,0 +1,92 @@
+{
+  "id": "76a8da72-3b57-4ceb-81f8-f0d79e13cd7b",
+  "correlationId": "1630c6ac-ffce-45e5-9788-36addc2dfe48",
+  "rawIntent": "[Feature: Build the leave management module — Phase 10: Integrate audit logging, RBAC enforcement, and read operations]\n\nModify src/modules/leave-management/leave-management.service.ts to inject IAuditService and enforce role-based access: only managers can approve/reject, employees can only act on their own requests. Add getLeaveBalance and getLeaveHistory query methods. Update tests to cover RBAC and read operations. Depends on Phase 9 service file.\n\nPhase architecture notes:\n{\"interfaces\":[\"File: src/modules/leave-management/leave-management.service.interface.ts\\nexport interface UserContext { id: string; role: string; }\\nexport interface LeaveRequestFilters { employeeId?: string; status?: string; startDate?: string; endDate?: string; }\\nexport interface ILeaveManagementService {\\n  createLeaveRequest(dto: CreateLeaveRequestDto, user: UserContext): Promise<LeaveRequest>;\\n  submitLeaveRequest(id: string, user: UserContext): Promise<LeaveRequest>;\\n  approveLeaveRequest(id: string, user: UserContext, comment?: string): Promise<LeaveRequest>;\\n  rejectLeaveRequest(id: string, user: UserContext, comment: string): Promise<LeaveRequest>;\\n  cancelLeaveRequest(id: string, user: UserContext): Promise<LeaveRequest>;\\n  discardDraftLeaveRequest(id: string, user: UserContext): Promise<void>;\\n  getLeaveBalance(employeeId: string, user: UserContext): Promise<LeaveBalance[]>;\\n  getLeaveHistory(filters: LeaveRequestFilters, user: UserContext): Promise<LeaveRequest[]>;\\n}\",\"File: src/modules/leave-management/leave-management.service.ts\\nimport { ILeaveManagementService, UserContext, LeaveRequestFilters } from './leave-management.service.interface';\\nimport { IAuditService } from '../../shared/audit/audit.service.interface';\\nimport { ILeaveRepository } from '../leave/leave.repository';\\nimport { IBalanceRepository } from '../balance/balance.repository';\\nimport { ILeaveTypeRepository } from '../leave-type/leave-type.repository';\\nimport { ILeavePolicyRepository } from '../policy/policy.repository';\\nimport { IEmployeeRepository } from '../employee/employee.repository';\\nimport { pool } from '../../shared/db/connection';\\n\\nexport class LeaveManagementService implements ILeaveManagementService {\\n  constructor(\\n    private readonly leaveRepo: ILeaveRepository,\\n    private readonly balanceRepo: IBalanceRepository,\\n    private readonly leaveTypeRepo: ILeaveTypeRepository,\\n    private readonly policyRepo: ILeavePolicyRepository,\\n    private readonly employeeRepo: IEmployeeRepository,\\n    private readonly auditService: IAuditService\\n  ) {}\\n\\n  // ... implementation of all methods with RBAC checks and audit logging\\n}\",\"File: src/modules/leave-management/leave-management.service.test.ts\\nimport { LeaveManagementService } from './leave-management.service';\\nimport { ILeaveRepository } from '../leave/leave.repository';\\nimport { IBalanceRepository } from '../balance/balance.repository';\\nimport { ILeaveTypeRepository } from '../leave-type/leave-type.repository';\\nimport { ILeavePolicyRepository } from '../policy/policy.repository';\\nimport { IEmployeeRepository } from '../employee/employee.repository';\\nimport { IAuditService } from '../../shared/audit/audit.service.interface';\\nimport { UserContext } from './leave-management.service.interface';\\n\\ndescribe('LeaveManagementService', () => {\\n  let service: LeaveManagementService;\\n  let mockLeaveRepo: jest.Mocked<ILeaveRepository>;\\n  let mockBalanceRepo: jest.Mocked<IBalanceRepository>;\\n  let mockLeaveTypeRepo: jest.Mocked<ILeaveTypeRepository>;\\n  let mockPolicyRepo: jest.Mocked<ILeavePolicyRepository>;\\n  let mockEmployeeRepo: jest.Mocked<IEmployeeRepository>;\\n  let mockAuditService: jest.Mocked<IAuditService>;\\n\\n  beforeEach(() => {\\n    mockLeaveRepo = { ... };\\n    mockBalanceRepo = { ... };\\n    mockLeaveTypeRepo = { ... };\\n    mockPolicyRepo = { ... };\\n    mockEmployeeRepo = { ... };\\n    mockAuditService = { log: jest.fn() };\\n    service = new LeaveManagementService(\\n      mockLeaveRepo,\\n      mockBalanceRepo,\\n      mockLeaveTypeRepo,\\n      mockPolicyRepo,\\n      mockEmployeeRepo,\\n      mockAuditService\\n    );\\n  });\\n\\n  // tests for RBAC enforcement, read operations, and audit logging\\n});\"],\"importStatements\":[\"import { ILeaveManagementService, UserContext, LeaveRequestFilters } from './leave-management.service.interface';\",\"import { IAuditService } from '../../shared/audit/audit.service.interface';\",\"import { ILeaveRepository } from '../leave/leave.repository';\",\"import { IBalanceRepository } from '../balance/balance.repository';\",\"import { ILeaveTypeRepository } from '../leave-type/leave-type.repository';\",\"import { ILeavePolicyRepository } from '../policy/policy.repository';\",\"import { IEmployeeRepository } from '../employee/employee.repository';\",\"import { pool } from '../../shared/db/connection';\",\"import { CreateLeaveRequestDto } from '../leave/leave.model';\",\"import { LeaveRequest } from '../leave/leave.model';\",\"import { LeaveBalance } from '../balance/balance.model';\"],\"successCriteria\":[\"src/modules/leave-management/leave-management.service.interface.ts exports ILeaveManagementService with getLeaveBalance and getLeaveHistory methods added.\",\"src/modules/leave-management/leave-management.service.ts injects IAuditService and enforces RBAC: approve/reject only allowed for users with role 'manager' who are the manager of the requesting employee; cancel allowed for owning employee or their manager; discard draft allowed only for owning employee when status is 'draft'.\",\"src/modules/leave-management/leave-management.service.ts getLeaveBalance returns only the authenticated employee's balances when role is 'employee', and any employee's balances when role is 'manager' and the employee is in their team.\",\"src/modules/leave-management/leave-management.service.ts getLeaveHistory returns only the authenticated employee's requests when role is 'employee', and all team requests when role is 'manager' and the employee is the manager of the requesters.\",\"src/modules/leave-management/leave-management.service.ts all state-changing methods (approve, reject, cancel, submit) write an audit record via IAuditService.log with correct entity type, entity id, changed by, old and new values.\",\"src/modules/leave-management/leave-management.service.ts approveLeaveRequest and rejectLeaveRequest execute the status update and audit log insertion within a single database transaction to ensure atomicity.\",\"src/modules/leave-management/leave-management.service.test.ts includes Jest tests that verify RBAC enforcement: a non-manager user calling approve/reject receives an error; a manager not managing the employee receives an error; an employee calling cancel on another's request receives an error.\",\"src/modules/leave-management/leave-management.service.test.ts includes Jest tests that verify getLeaveBalance and getLeaveHistory return correct data scoped to the user's role.\",\"src/modules/leave-management/leave-management.service.test.ts includes Jest tests that verify audit logging is called with correct parameters for each state-changing operation.\"]}\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/leave-management/leave-management.service.interface.ts\\nexport interface UserContext { id: string; role: string; }\\nexport interface LeaveRequestFilters { employeeId?: string; status?: string; startDate?: string; endDate?: string; }\\nexport interface ILeaveManagementService {\\n  createLeaveRequest(dto: CreateLeaveRequestDto, user: UserContext): Promise<LeaveRequest>;\\n  submitLeaveRequest(id: string, user: UserContext): Promise<LeaveRequest>;\\n  approveLeaveRequest(id: string, user: UserContext, comment?: string): Promise<LeaveRequest>;\\n  rejectLeaveRequest(id: string, user: UserContext, comment: string): Promise<LeaveRequest>;\\n  cancelLeaveRequest(id: string, user: UserContext): Promise<LeaveRequest>;\\n  discardDraftLeaveRequest(id: string, user: UserContext): Promise<void>;\\n  getLeaveBalance(employeeId: string, user: UserContext): Promise<LeaveBalance[]>;\\n  getLeaveHistory(filters: LeaveRequestFilters, user: UserContext): Promise<LeaveRequest[]>;\\n}\",\"File: src/shared/audit/audit.service.interface.ts\\nexport interface AuditLogParams { entityType: string; entityId: string; action: string; changedBy: string; oldValues?: Record<string, unknown>; newValues?: Record<string, unknown>; }\\nexport interface IAuditService { log(params: AuditLogParams): Promise<void>; }\"],\"importStatements\":[\"import { ILeaveManagementService, UserContext, LeaveRequestFilters } from './leave-management.service.interface';\",\"import { IAuditService } from '../../shared/audit/audit.service.interface';\",\"import { ILeaveRepository } from '../leave/leave.repository';\",\"import { IBalanceRepository } from '../balance/balance.repository';\",\"import { ILeaveTypeRepository } from '../leave-type/leave-type.repository';\",\"import { ILeavePolicyRepository } from '../policy/policy.repository';\",\"import { IEmployeeRepository } from '../employee/employee.repository';\",\"import { pool } from '../../shared/db/connection';\",\"import { CreateLeaveRequestDto, LeaveRequest, LeaveRequestStatus } from '../leave/leave.model';\",\"import { LeaveBalance } from '../balance/balance.model';\"],\"successCriteria\":[\"src/modules/leave-management/leave-management.service.ts is modified to inject IAuditService and call auditService.log for every state-changing operation (create, submit, approve, reject, cancel, discardDraft) within the same database transaction.\",\"RBAC enforcement: approveLeaveRequest and rejectLeaveRequest throw Forbidden if user.role !== 'manager'; submitLeaveRequest, cancelLeaveRequest, discardDraftLeaveRequest throw Forbidden if user.id !== request.employee_id; getLeaveBalance and getLeaveHistory restrict access to own data unless user.role === 'manager'.\",\"New query methods getLeaveBalance and getLeaveHistory are implemented and return data with proper authorization.\",\"Tests in src/modules/leave-management/__tests__/leave-management.service.test.ts cover RBAC scenarios and read operations using Jest, verifying that unauthorized access throws errors and authorized access returns correct data.\",\"All state-changing operations and their audit log entries are executed atomically in a single database transaction (using pool.query with BEGIN/COMMIT or a transaction helper).\"]}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- UserContext\n- LeaveRequestFilters\n- ILeaveManagementService\n- AuditLogParams\n- IAuditService\n- ILeaveRepository\n- IBalanceRepository\n- ILeaveTypeRepository\n- ILeavePolicyRepository\n- IEmployeeRepository\n- pool\n- CreateLeaveRequestDto\n- LeaveRequest\n- LeaveRequestStatus\n- LeaveBalance\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Canonical entity fields for this phase\n\nNote: these field names supersede any attribute names in the\nintent text above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the field names of each entity this phase defines. The\nexact attribute / column / property set per entity is:\n\n- `UserContext`: `id`, `role`\n- `LeaveRequestFilters`: `employeeId`, `status`, `startDate`, `endDate`\n- `AuditLogParams`: `entityType`, `entityId`, `action`, `changedBy`, `oldValues`, `newValues`\n\nTreat each entity's field list as complete. If the\nintent text or planner scope mentions different field\nnames than the architecture, do NOT flag this as\nambiguity — the per-phase architecture wins.\n",
+  "scope": {
+    "affectedDomains": [
+      "leave-management"
+    ],
+    "affectedLayers": [
+      "domain",
+      "test"
+    ],
+    "isBreakingChange": true,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/leave-management/leave-management.service.interface.ts exports ILeaveManagementService with getLeaveBalance and getLeaveHistory methods added.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/leave-management/leave-management.service.ts injects IAuditService and enforces RBAC: approve/reject only allowed for users with role 'manager' who are the manager of the requesting employee; cancel allowed for owning employee or their manager; discard draft allowed only for owning employee when status is 'draft'.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "src/modules/leave-management/leave-management.service.ts getLeaveBalance returns only the authenticated employee's balances when role is 'employee', and any employee's balances when role is 'manager' and the employee is in their team.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "src/modules/leave-management/leave-management.service.ts getLeaveHistory returns only the authenticated employee's requests when role is 'employee', and all team requests when role is 'manager' and the employee is the manager of the requesters.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "src/modules/leave-management/leave-management.service.ts all state-changing methods (approve, reject, cancel, submit) write an audit record via IAuditService.log with correct entity type, entity id, changed by, old and new values.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-006",
+      "description": "src/modules/leave-management/leave-management.service.ts approveLeaveRequest and rejectLeaveRequest execute the status update and audit log insertion within a single database transaction to ensure atomicity.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-007",
+      "description": "src/modules/leave-management/leave-management.service.test.ts includes Jest tests that verify RBAC enforcement: a non-manager user calling approve/reject receives an error; a manager not managing the employee receives an error; an employee calling cancel on another's request receives an error.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-008",
+      "description": "src/modules/leave-management/leave-management.service.test.ts includes Jest tests that verify getLeaveBalance and getLeaveHistory return correct data scoped to the user's role.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-009",
+      "description": "src/modules/leave-management/leave-management.service.test.ts includes Jest tests that verify audit logging is called with correct parameters for each state-changing operation.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Audit records: All state-changing operations write an audit record.",
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "RBAC enforcement: All API endpoints enforce role-based access control.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled.",
+    "Approve/reject operations must be atomic with audit logging within a single database transaction."
+  ],
+  "outOfScope": [
+    "Implementation of IAuditService",
+    "Implementation of repository interfaces (ILeaveRepository, IBalanceRepository, etc.)",
+    "API route handlers",
+    "UI components",
+    "Database migrations",
+    "Integration tests beyond unit tests for the service",
+    "End-to-end tests",
+    "Other modules (leave, balance, policy, employee, notification) except as dependencies"
+  ],
+  "ambiguities": []
+}

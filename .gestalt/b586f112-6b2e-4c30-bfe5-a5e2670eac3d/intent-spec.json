@@ -1,0 +1,53 @@
+{
+  "id": "c33cd3fa-2e07-4d67-8dc5-2fd41d5cddc3",
+  "correlationId": "b586f112-6b2e-4c30-bfe5-a5e2670eac3d",
+  "rawIntent": "[Feature: Build the leave management module — Phase 3: Create LeaveRequest domain model and repository]\n\nCreate src/modules/leave/leave.model.ts with LeaveRequest interface (id, employeeId, leaveTypeId, startDate, endDate, reason, status: LeaveRequestStatus enum (Draft, Submitted, Approved, Rejected, Cancelled), approverId, approverComment, createdAt, updatedAt) and CreateLeaveRequestDto. Create src/modules/leave/leave.repository.ts with ILeaveRepository interface (create, findById, findByEmployeeId, updateStatus). This phase depends on src/modules/leave-type/leave-type.model.ts from Phase 1 and src/modules/employee/employee.model.ts from Phase 2 — read them before generating code that references LeaveType and Employee.\n\nPhase architecture notes:\nCore leave request entity with lifecycle states.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/leave/leave.model.ts\\nexport type LeaveRequestStatus = 'draft' | 'submitted' | 'approved' | 'rejected' | 'cancelled';\\nexport interface LeaveRequest {\\n  id: string;\\n  employeeId: string;\\n  leaveTypeId: string;\\n  startDate: Date;\\n  endDate: Date;\\n  status: LeaveRequestStatus;\\n  reason?: string;\\n  approverId?: string;\\n  approverComment?: string;\\n  approvedAt?: Date;\\n  createdAt: Date;\\n  updatedAt: Date;\\n}\\nexport interface CreateLeaveRequestDto {\\n  employeeId: string;\\n  leaveTypeId: string;\\n  startDate: Date;\\n  endDate: Date;\\n  reason?: string;\\n}\\nexport interface UpdateLeaveRequestDto {\\n  startDate?: Date;\\n  endDate?: Date;\\n  reason?: string;\\n}\",\"File: src/modules/leave/leave.repository.ts\\nimport { LeaveRequest, CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveRequestStatus } from \\\"./leave.model\\\";\\nexport interface ILeaveRequestRepository {\\n  create(dto: CreateLeaveRequestDto): Promise<LeaveRequest>;\\n  findById(id: string): Promise<LeaveRequest | null>;\\n  findByEmployeeId(employeeId: string): Promise<LeaveRequest[]>;\\n  findByApproverId(approverId: string): Promise<LeaveRequest[]>;\\n  update(id: string, dto: UpdateLeaveRequestDto): Promise<LeaveRequest>;\\n  updateStatus(id: string, status: LeaveRequestStatus, approverId?: string, comment?: string): Promise<LeaveRequest>;\\n}\"],\"importStatements\":[\"import { LeaveRequest, CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveRequestStatus } from \\\"./leave.model\\\";\"],\"successCriteria\":[\"src/modules/leave/leave.model.ts exists and exports LeaveRequest, LeaveRequestStatus, CreateLeaveRequestDto, UpdateLeaveRequestDto\",\"src/modules/leave/leave.repository.ts exists and exports ILeaveRequestRepository\",\"src/modules/leave/leave.repository.ts imports from ./leave.model\"],\"sqlSchema\":\"CREATE TABLE leave_requests (\\n  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\\n  employee_id UUID NOT NULL REFERENCES employees(id),\\n  leave_type_id UUID NOT NULL REFERENCES leave_types(id),\\n  start_date DATE NOT NULL,\\n  end_date DATE NOT NULL,\\n  status VARCHAR(20) NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'submitted', 'approved', 'rejected', 'cancelled')),\\n  reason TEXT,\\n  approver_id UUID REFERENCES employees(id),\\n  approver_comment TEXT,\\n  approved_at TIMESTAMPTZ,\\n  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),\\n  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),\\n  CONSTRAINT chk_dates CHECK (end_date >= start_date)\\n);\\nCREATE INDEX idx_leave_requests_employee_id ON leave_requests(employee_id);\\nCREATE INDEX idx_leave_requests_status ON leave_requests(status);\\nCREATE INDEX idx_leave_requests_dates ON leave_requests(start_date, end_date);\\nCREATE INDEX idx_leave_requests_approver_id ON leave_requests(approver_id);\"}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- LeaveRequest\n- CreateLeaveRequestDto\n- UpdateLeaveRequestDto\n- ILeaveRequestRepository\n- LeaveRequestStatus\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Canonical entity fields for this phase\n\nNote: these field names supersede any attribute names in the\nintent text above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the field names of each entity this phase defines. The\nexact attribute / column / property set per entity is:\n\n- `LeaveRequest`: `id`, `employeeId`, `leaveTypeId`, `startDate`, `endDate`, `status`, `reason`, `approverId`, `approverComment`, `approvedAt`, `createdAt`, `updatedAt`\n- `CreateLeaveRequestDto`: `employeeId`, `leaveTypeId`, `startDate`, `endDate`, `reason`\n- `UpdateLeaveRequestDto`: `startDate`, `endDate`, `reason`\n\nTreat each entity's field list as complete. If the\nintent text or planner scope mentions different field\nnames than the architecture, do NOT flag this as\nambiguity — the per-phase architecture wins.\n\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 4 — Create LeaveBalance domain model and repository: Create src/modules/balance/balance.model.ts with LeaveBalance interface (id, employeeId, leaveTypeId\n- Phase 5 — Create Notification and AuditLog domain models and repositories: Create src/modules/notification/notification.model.ts with Notification interface (id, recipientId, \n- Phase 6 — Scaffold leave-management module and define ILeaveManagementService interface: Create src/modules/leave-management/leave-management.service.interface.ts with ILeaveManagementServi\n- Phase 7 — Implement applyForLeave use case: Create src/modules/leave-management/leave-management.service.ts implementing ILeaveManagementService\n- Phase 8 — Implement approve and reject use cases: Add approveLeave and rejectLeave methods to src/modules/leave-management/leave-management.service.ts\n- Phase 9 — Implement cancel leave, discard draft, and balance recalculation: Add cancelLeave and discardDraft methods to src/modules/leave-management/leave-management.service.ts\n- Phase 10 — Integrate audit logging, RBAC enforcement, and read operations: Modify src/modules/leave-management/leave-management.service.ts to inject IAuditService and enforce ",
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "domain"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/leave/leave.model.ts exists and exports LeaveRequest, LeaveRequestStatus, CreateLeaveRequestDto, UpdateLeaveRequestDto",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/leave/leave.repository.ts exists and exports ILeaveRequestRepository",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "src/modules/leave/leave.repository.ts imports from ./leave.model",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Dependency direction: leave module may depend on employee, policy, balance, notification modules; no reverse dependencies."
+  ],
+  "outOfScope": [
+    "Phase 4: LeaveBalance domain model and repository",
+    "Phase 5: Notification and AuditLog domain models and repositories",
+    "Phase 6: Scaffold leave-management module and define ILeaveManagementService interface",
+    "Phase 7: Implement applyForLeave use case",
+    "Phase 8: Implement approve and reject use cases",
+    "Phase 9: Implement cancel leave, discard draft, and balance recalculation",
+    "Phase 10: Integrate audit logging, RBAC enforcement, and read operations",
+    "Implementation of leave request service logic",
+    "API endpoints for leave requests",
+    "Database migration execution (only model and repository definitions)",
+    "Modification of employee or leave-type modules"
+  ],
+  "ambiguities": []
+}
