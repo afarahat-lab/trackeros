@@ -20,4 +20,5 @@ export interface ILeaveManagementService {
   discardDraftLeaveRequest(leaveId: string, user: UserContext): Promise<void>;
   getLeaveBalance(employeeId: string, user: UserContext): Promise<LeaveBalance[]>;
   getLeaveHistory(filters: LeaveRequestFilters, user: UserContext): Promise<LeaveRequest[]>;
+  getLeaveRequestById(id: string, user: UserContext): Promise<LeaveRequest>;
 }

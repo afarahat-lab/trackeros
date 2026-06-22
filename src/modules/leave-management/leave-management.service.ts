@@ -387,6 +387,23 @@ export class LeaveManagementService implements ILeaveManagementService {
     return this.balanceRepo.findByEmployeeId(employeeId);
   }
 
+  async getLeaveRequestById(id: string, user: UserContext): Promise<LeaveRequest> {
+    this.validateUuid(id, 'leaveId');
+    const request = await this.leaveRepo.findById(id);
+    if (!request) {
+      throw new NotFoundError('Leave request not found');
+    }
+
+    if (user.role !== 'manager' && request.employeeId !== user.id) {
+      const emp = await this.employeeRepo.findById(request.employeeId);
+      if (!emp || emp.managerId !== user.id) {
+        throw new ForbiddenError('Not authorized to view this leave request');
+      }
+    }
+
+    return request;
+  }
+
   async getLeaveHistory(filters: LeaveRequestFilters, user: UserContext): Promise<LeaveRequest[]> {
     const targetEmployeeId = filters.employeeId || user.id;
     

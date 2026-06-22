@@ -30,12 +30,13 @@ export class LeaveController {
     request: FastifyRequest<{ Params: { id: string } }>,
     reply: FastifyReply
   ) {
-    // Handle string | undefined case for params
+    const user = request.user as UserContext;
     const id = request.params?.id;
     if (!id) {
       return reply.status(400).send({ error: 'Missing id parameter' });
     }
     
-    // Add implementation for fetching leave request by ID
+    const result = await this.leaveService.getLeaveRequestById(id, user);
+    return reply.status(200).send(result);
   }
 }
