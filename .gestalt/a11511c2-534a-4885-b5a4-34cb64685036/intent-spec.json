@@ -1,0 +1,92 @@
+{
+  "id": "4d766737-1040-402b-912d-7d74971501a0",
+  "correlationId": "a11511c2-534a-4885-b5a4-34cb64685036",
+  "rawIntent": "[Feature: Build the leave management module — Phase 6: Create Balance service]\n\nCreate src/modules/balance/balance.service.ts with BalanceService class that uses IBalanceRepository, EmployeeService, and PolicyService. Include Jest unit tests in tests/unit/modules/balance/balance.service.test.ts. This phase depends on src/modules/balance/balance.model.ts and src/modules/balance/balance.repository.ts from Phase 5, src/modules/employee/employee.service.ts from Phase 3, and src/modules/policy/policy.service.ts from Phase 4 — read them before generating any code.\n\nThis phase depends on: Phase 5, Phase 3, Phase 4.\n\nPhase architecture notes:\nBalance service initializes and validates balances using employee and policy services.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/balance/balance.service.ts\\nimport { IBalanceRepository } from './balance.repository';\\nimport { LeaveBalance } from './balance.model';\\nimport { EmployeeService } from '../employee/employee.service';\\nimport { PolicyService } from '../policy/policy.service';\\nimport { IAuditRepository } from '../audit/audit.repository';\\nimport { AuditLog } from '../audit/audit.model';\\n\\nexport interface IBalanceService {\\n  initializeBalance(employeeId: string, leaveTypeId: string, year: number, totalDays: number): Promise<LeaveBalance>;\\n  getBalance(employeeId: string, leaveTypeId: string, year: number): Promise<LeaveBalance | null>;\\n  getBalancesForEmployee(employeeId: string, year?: number): Promise<LeaveBalance[]>;\\n  updateBalance(id: string, updates: Partial<Pick<LeaveBalance, 'totalDays' | 'usedDays'>>): Promise<LeaveBalance>;\\n}\\n\\nexport class BalanceService implements IBalanceService {\\n  constructor(\\n    private readonly balanceRepo: IBalanceRepository,\\n    private readonly employeeService: EmployeeService,\\n    private readonly policyService: PolicyService,\\n    private readonly auditRepo: IAuditRepository\\n  ) {}\\n\\n  async initializeBalance(employeeId: string, leaveTypeId: string, year: number, totalDays: number): Promise<LeaveBalance> {\\n    // Validate employee exists via employeeService.getEmployeeById\\n    // Validate leave type policy exists and is active via policyService.getPolicyByLeaveType\\n    // Create balance via balanceRepo.create within a transaction\\n    // Write audit log via auditRepo.createAuditLog within the same transaction\\n    throw new Error('Not implemented');\\n  }\\n\\n  async getBalance(employeeId: string, leaveTypeId: string, year: number): Promise<LeaveBalance | null> {\\n    return this.balanceRepo.findByEmployeeAndTypeAndYear(employeeId, leaveTypeId, year);\\n  }\\n\\n  async getBalancesForEmployee(employeeId: string, year?: number): Promise<LeaveBalance[]> {\\n    return this.balanceRepo.findByEmployee(employeeId, year);\\n  }\\n\\n  async updateBalance(id: string, updates: Partial<Pick<LeaveBalance, 'totalDays' | 'usedDays'>>): Promise<LeaveBalance> {\\n    // Validate policy constraints (max days, negative balance) via policyService\\n    // Update balance via balanceRepo.update within a transaction\\n    // Write audit log via auditRepo.createAuditLog within the same transaction\\n    throw new Error('Not implemented');\\n  }\\n}\",\"File: tests/unit/modules/balance/balance.service.test.ts\\nimport { BalanceService } from '../../../src/modules/balance/balance.service';\\nimport { IBalanceRepository } from '../../../src/modules/balance/balance.repository';\\nimport { EmployeeService } from '../../../src/modules/employee/employee.service';\\nimport { PolicyService } from '../../../src/modules/policy/policy.service';\\nimport { IAuditRepository } from '../../../src/modules/audit/audit.repository';\\n\\ndescribe('BalanceService', () => {\\n  let service: BalanceService;\\n  let mockBalanceRepo: jest.Mocked<IBalanceRepository>;\\n  let mockEmployeeService: jest.Mocked<EmployeeService>;\\n  let mockPolicyService: jest.Mocked<PolicyService>;\\n  let mockAuditRepo: jest.Mocked<IAuditRepository>;\\n\\n  beforeEach(() => {\\n    mockBalanceRepo = {\\n      findByEmployeeAndTypeAndYear: jest.fn(),\\n      findByEmployee: jest.fn(),\\n      create: jest.fn(),\\n      update: jest.fn(),\\n    } as any;\\n    mockEmployeeService = {\\n      getEmployeeById: jest.fn(),\\n    } as any;\\n    mockPolicyService = {\\n      getPolicyByLeaveType: jest.fn(),\\n    } as any;\\n    mockAuditRepo = {\\n      createAuditLog: jest.fn(),\\n    } as any;\\n    service = new BalanceService(mockBalanceRepo, mockEmployeeService, mockPolicyService, mockAuditRepo);\\n  });\\n\\n  // Tests for initializeBalance, getBalance, getBalancesForEmployee, updateBalance\\n});\",\"File: src/modules/audit/audit.model.ts\\nexport interface AuditLog {\\n  id: string;\\n  entityType: string;\\n  entityId: string;\\n  action: string;\\n  oldValue?: Record<string, unknown>;\\n  newValue?: Record<string, unknown>;\\n  changedBy?: string;\\n  changedAt: Date;\\n}\\n\\nexport interface CreateAuditLogDto {\\n  entityType: string;\\n  entityId: string;\\n  action: string;\\n  oldValue?: Record<string, unknown>;\\n  newValue?: Record<string, unknown>;\\n  changedBy?: string;\\n}\",\"File: src/modules/audit/audit.repository.ts\\nimport { Pool } from 'pg';\\nimport { AuditLog, CreateAuditLogDto } from './audit.model';\\n\\nexport interface IAuditRepository {\\n  createAuditLog(dto: CreateAuditLogDto): Promise<AuditLog>;\\n}\\n\\nexport class AuditRepository implements IAuditRepository {\\n  constructor(private readonly db: Pool) {}\\n\\n  async createAuditLog(dto: CreateAuditLogDto): Promise<AuditLog> {\\n    // Insert into audit_logs table using db.query\\n    // Return the created AuditLog\\n    throw new Error('Not implemented');\\n  }\\n}\"],\"importStatements\":[\"import { IBalanceRepository } from './balance.repository';\",\"import { LeaveBalance } from './balance.model';\",\"import { EmployeeService } from '../employee/employee.service';\",\"import { PolicyService } from '../policy/policy.service';\",\"import { IAuditRepository } from '../audit/audit.repository';\",\"import { AuditLog, CreateAuditLogDto } from '../audit/audit.model';\",\"import { Pool } from 'pg';\",\"import { BalanceService } from '../../../src/modules/balance/balance.service';\"],\"successCriteria\":[\"src/modules/balance/balance.service.ts exists and exports BalanceService class implementing IBalanceService.\",\"tests/unit/modules/balance/balance.service.test.ts exists and contains Jest tests for all public methods of BalanceService.\",\"BalanceService.initializeBalance validates employee existence via EmployeeService.getEmployeeById, validates leave type policy via PolicyService.getPolicyByLeaveType, creates balance via IBalanceRepository.create, and writes audit log via IAuditRepository.createAuditLog, all within a single database transaction.\",\"BalanceService.updateBalance validates policy constraints (max days, negative balance) before updating, and writes audit log, all within a single database transaction.\",\"src/modules/audit/audit.model.ts exists and exports AuditLog and CreateAuditLogDto interfaces.\",\"src/modules/audit/audit.repository.ts exists and exports IAuditRepository interface and AuditRepository class.\",\"ARCHITECTURE.md is updated to document the new Audit module (AuditLog entity, IAuditRepository) if not already present.\"]}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- IBalanceService\n- AuditLog\n- CreateAuditLogDto\n- IAuditRepository\n- IBalanceRepository\n- LeaveBalance\n- EmployeeService\n- PolicyService\n- Pool\n- BalanceService\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Canonical entity fields for this phase\n\nNote: these field names supersede any attribute names in the\nintent text above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the field names of each entity this phase defines. The\nexact attribute / column / property set per entity is:\n\n- `AuditLog`: `id`, `entityType`, `entityId`, `action`, `oldValue`, `newValue`, `changedBy`, `changedAt`\n- `CreateAuditLogDto`: `entityType`, `entityId`, `action`, `oldValue`, `newValue`, `changedBy`\n\nTreat each entity's field list as complete. If the\nintent text or planner scope mentions different field\nnames than the architecture, do NOT flag this as\nambiguity — the per-phase architecture wins.\n\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 7 — Create Notification and Audit models and repositories: Create src/modules/notification/notification.model.ts with TypeScript interfaces for Notification (a\n- Phase 8 — Create LeaveRequest model and repository: Create src/modules/leave/leave.model.ts with TypeScript interfaces for LeaveRequest (attributes: id,\n- Phase 9 — Create Leave orchestration service: Create src/modules/leave/leave.service.ts with LeaveService class that orchestrates leave workflow (\n- Phase 10 — Wire services, create routes and controllers: Create src/modules/leave/leave.controller.ts with REST endpoints for leave operations (POST /apply, ",
+  "scope": {
+    "affectedDomains": [
+      "balance",
+      "employee",
+      "policy",
+      "audit"
+    ],
+    "affectedLayers": [
+      "domain",
+      "infra",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/balance/balance.service.ts exists and exports BalanceService class implementing IBalanceService.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "tests/unit/modules/balance/balance.service.test.ts exists and contains Jest tests for all public methods of BalanceService.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "BalanceService.initializeBalance validates employee existence via EmployeeService.getEmployeeById, validates leave type policy via PolicyService.getPolicyByLeaveType, creates balance via IBalanceRepository.create, and writes audit log via IAuditRepository.createAuditLog, all within a single database transaction.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "BalanceService.updateBalance validates policy constraints (max days, negative balance) before updating, and writes audit log, all within a single database transaction.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "src/modules/audit/audit.model.ts exists and exports AuditLog and CreateAuditLogDto interfaces.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-006",
+      "description": "src/modules/audit/audit.repository.ts exists and exports IAuditRepository interface and AuditRepository class.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-007",
+      "description": "ARCHITECTURE.md is updated to document the new Audit module (AuditLog entity, IAuditRepository) if not already present.",
+      "testable": false,
+      "layer": "e2e"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces (IBalanceRepository, IAuditRepository).",
+    "Audit records: All state-changing operations (initializeBalance, updateBalance) write an audit record via IAuditRepository.",
+    "Input validation: Validate inputs before processing (employee existence, policy constraints).",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "Creating EmployeeService, PolicyService, IBalanceRepository, LeaveBalance model (already exist from prior phases).",
+    "Creating any API routes or controllers.",
+    "Implementing notification module.",
+    "Implementing leave request lifecycle (submit, approve, reject).",
+    "Phase 7 — Notification and Audit models and repositories beyond the audit model/repository created here.",
+    "Phase 8 — LeaveRequest model and repository.",
+    "Phase 9 — Leave orchestration service.",
+    "Phase 10 — Wire services, create routes and controllers."
+  ],
+  "ambiguities": [
+    {
+      "id": "amb-001",
+      "description": "ARCHITECTURE.md location and format not specified; unclear if it exists or needs to be created.",
+      "options": [
+        "Assume ARCHITECTURE.md exists at project root and update it",
+        "Create ARCHITECTURE.md if missing"
+      ],
+      "impactIfWrong": "low"
+    }
+  ]
+}

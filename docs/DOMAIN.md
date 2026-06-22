@@ -221,11 +221,11 @@ Represents audit data managed by the `audit` module, including audit records, ch
 | id | string | true |
 | entityType | string | true |
 | entityId | string | true |
-| action | 'CREATE' \| 'UPDATE' \| 'DELETE' \| 'APPROVE' \| 'REJECT' | true |
-| oldValues | Record<string, any> \| null | false |
-| newValues | Record<string, any> \| null | false |
-| performedBy | string \| null | false |
-| performedAt | Date | true |
+| action | string | true |
+| oldValue | Record<string, unknown> | false |
+| newValue | Record<string, unknown> | false |
+| changedBy | string | false |
+| changedAt | Date | true |
 
 ### AuditRecord
 
