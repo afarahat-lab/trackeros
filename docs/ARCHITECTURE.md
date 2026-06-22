@@ -27,6 +27,7 @@ src/modules/LeaveBalance/    — LeaveBalance module
 src/modules/LeaveRequest/    — LeaveRequest module
 src/modules/LeaveRequestQueryParams/    — LeaveRequestQueryParams module
 src/modules/LeaveType/    — LeaveType module
+src/modules/NotificationType/    — NotificationType module
 src/modules/LeavePolicy/    — LeavePolicy module
 src/modules/AuditLog/    — AuditLog module
 src/modules/AuditRecord/    — AuditRecord module
