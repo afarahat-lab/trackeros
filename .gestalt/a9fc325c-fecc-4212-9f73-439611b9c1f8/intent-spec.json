@@ -1,0 +1,93 @@
+{
+  "id": "5b589234-6be2-4bdd-89ec-7459b2fd82be",
+  "correlationId": "a9fc325c-fecc-4212-9f73-439611b9c1f8",
+  "rawIntent": "[Feature: Build the leave management module — Phase 1: Create foundational domain models and repositories for LeaveType and LeavePolicy]\n\nCreate src/modules/leave-type/leave-type.model.ts with TypeScript interface LeaveType (id, name, description, requiresDocumentation) and CreateLeaveTypeDto. Create src/modules/leave-type/leave-type.repository.ts with ILeaveTypeRepository interface (findById, findAll). Create src/modules/policy/policy.model.ts with LeavePolicy interface (id, leaveTypeId, ...). Create src/modules/policy/policy.repository.ts with ILeavePolicyRepository interface (findByLeaveTypeId). No dependencies on other phases.\n\nPhase architecture notes:\nFoundation for leave type and policy lookups.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/leave-type/leave-type.model.ts\\nexport interface LeaveType {\\n  id: string;\\n  name: string;\\n  description: string | null;\\n  requiresDocumentation: boolean;\\n  createdAt: Date;\\n}\\n\\nexport interface CreateLeaveTypeDto {\\n  name: string;\\n  description?: string | null;\\n  requiresDocumentation?: boolean;\\n}\",\"File: src/modules/leave-type/leave-type.repository.ts\\nimport { Pool } from 'pg';\\nimport { pool } from '../../shared/db/connection';\\nimport { LeaveType, CreateLeaveTypeDto } from './leave-type.model';\\n\\nexport interface ILeaveTypeRepository {\\n  findById(id: string): Promise<LeaveType | null>;\\n  findAll(): Promise<LeaveType[]>;\\n}\\n\\nexport class LeaveTypeRepository implements ILeaveTypeRepository {\\n  private db: Pool;\\n\\n  constructor(dbPool: Pool = pool) {\\n    this.db = dbPool;\\n  }\\n\\n  async findById(id: string): Promise<LeaveType | null> {\\n    const result = await this.db.query(\\n      'SELECT id, name, description, requires_documentation, created_at FROM leave_types WHERE id = $1',\\n      [id]\\n    );\\n    if (result.rows.length === 0) return null;\\n    const row = result.rows[0];\\n    return {\\n      id: row.id,\\n      name: row.name,\\n      description: row.description,\\n      requiresDocumentation: row.requires_documentation,\\n      createdAt: row.created_at,\\n    };\\n  }\\n\\n  async findAll(): Promise<LeaveType[]> {\\n    const result = await this.db.query(\\n      'SELECT id, name, description, requires_documentation, created_at FROM leave_types ORDER BY name'\\n    );\\n    return result.rows.map(row => ({\\n      id: row.id,\\n      name: row.name,\\n      description: row.description,\\n      requiresDocumentation: row.requires_documentation,\\n      createdAt: row.created_at,\\n    }));\\n  }\\n}\",\"File: src/modules/policy/policy.model.ts\\nexport interface LeavePolicy {\\n  id: string;\\n  leaveTypeId: string;\\n  maxDaysPerYear: number;\\n  maxConsecutiveDays: number | null;\\n  requiresApproval: boolean;\\n  minNoticeDays: number;\\n  createdAt: Date;\\n  updatedAt: Date;\\n}\",\"File: src/modules/policy/policy.repository.ts\\nimport { Pool } from 'pg';\\nimport { pool } from '../../shared/db/connection';\\nimport { LeavePolicy } from './policy.model';\\n\\nexport interface ILeavePolicyRepository {\\n  findByLeaveTypeId(leaveTypeId: string): Promise<LeavePolicy | null>;\\n}\\n\\nexport class LeavePolicyRepository implements ILeavePolicyRepository {\\n  private db: Pool;\\n\\n  constructor(dbPool: Pool = pool) {\\n    this.db = dbPool;\\n  }\\n\\n  async findByLeaveTypeId(leaveTypeId: string): Promise<LeavePolicy | null> {\\n    const result = await this.db.query(\\n      'SELECT id, leave_type_id, max_days_per_year, max_consecutive_days, requires_approval, min_notice_days, created_at, updated_at FROM leave_policies WHERE leave_type_id = $1',\\n      [leaveTypeId]\\n    );\\n    if (result.rows.length === 0) return null;\\n    const row = result.rows[0];\\n    return {\\n      id: row.id,\\n      leaveTypeId: row.leave_type_id,\\n      maxDaysPerYear: row.max_days_per_year,\\n      maxConsecutiveDays: row.max_consecutive_days,\\n      requiresApproval: row.requires_approval,\\n      minNoticeDays: row.min_notice_days,\\n      createdAt: row.created_at,\\n      updatedAt: row.updated_at,\\n    };\\n  }\\n}\"],\"importStatements\":[\"import { Pool } from 'pg';\",\"import { pool } from '../../shared/db/connection';\",\"import { LeaveType, CreateLeaveTypeDto } from './leave-type.model';\",\"import { LeavePolicy } from './policy.model';\"],\"successCriteria\":[\"src/modules/leave-type/leave-type.model.ts exists and exports LeaveType and CreateLeaveTypeDto\",\"src/modules/policy/policy.model.ts exists and exports LeavePolicy\",\"src/modules/leave-type/leave-type.repository.ts exists and exports ILeaveTypeRepository and LeaveTypeRepository\",\"src/modules/policy/policy.repository.ts exists and exports ILeavePolicyRepository and LeavePolicyRepository\",\"LeaveTypeRepository implements ILeaveTypeRepository using the pg Pool from src/shared/db/connection\",\"LeavePolicyRepository implements ILeavePolicyRepository using the pg Pool from src/shared/db/connection\",\"LeaveTypeRepository.findById queries the leave_types table by id and returns a LeaveType or null\",\"LeaveTypeRepository.findAll queries all leave_types and returns an array of LeaveType\",\"LeavePolicyRepository.findByLeaveTypeId queries the leave_policies table by leave_type_id and returns a LeavePolicy or null\"]}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- LeaveType\n- CreateLeaveTypeDto\n- ILeaveTypeRepository\n- LeavePolicy\n- ILeavePolicyRepository\n- Pool\n- pool\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Canonical entity fields for this phase\n\nNote: these field names supersede any attribute names in the\nintent text above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the field names of each entity this phase defines. The\nexact attribute / column / property set per entity is:\n\n- `LeaveType`: `id`, `name`, `description`, `requiresDocumentation`, `createdAt`\n- `CreateLeaveTypeDto`: `name`, `description`, `requiresDocumentation`\n- `LeavePolicy`: `id`, `leaveTypeId`, `maxDaysPerYear`, `maxConsecutiveDays`, `requiresApproval`, `minNoticeDays`, `createdAt`, `updatedAt`\n\nTreat each entity's field list as complete. If the\nintent text or planner scope mentions different field\nnames than the architecture, do NOT flag this as\nambiguity — the per-phase architecture wins.\n\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 2 — Create Employee domain model and repository: Create src/modules/employee/employee.model.ts with Employee interface (id, firstName, lastName, emai\n- Phase 3 — Create LeaveRequest domain model and repository: Create src/modules/leave/leave.model.ts with LeaveRequest interface (id, employeeId, leaveTypeId, st\n- Phase 4 — Create LeaveBalance domain model and repository: Create src/modules/balance/balance.model.ts with LeaveBalance interface (id, employeeId, leaveTypeId\n- Phase 5 — Create Notification and AuditLog domain models and repositories: Create src/modules/notification/notification.model.ts with Notification interface (id, recipientId, \n- Phase 6 — Scaffold leave-management module and define ILeaveManagementService interface: Create src/modules/leave-management/leave-management.service.interface.ts with ILeaveManagementServi\n- Phase 7 — Implement applyForLeave use case: Create src/modules/leave-management/leave-management.service.ts implementing ILeaveManagementService\n- Phase 8 — Implement approve and reject use cases: Add approveLeave and rejectLeave methods to src/modules/leave-management/leave-management.service.ts\n- Phase 9 — Implement cancel leave, discard draft, and balance recalculation: Add cancelLeave and discardDraft methods to src/modules/leave-management/leave-management.service.ts\n- Phase 10 — Integrate audit logging, RBAC enforcement, and read operations: Modify src/modules/leave-management/leave-management.service.ts to inject IAuditService and enforce ",
+  "scope": {
+    "affectedDomains": [
+      "leave-type",
+      "policy"
+    ],
+    "affectedLayers": [
+      "domain",
+      "infra"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/leave-type/leave-type.model.ts exists and exports LeaveType and CreateLeaveTypeDto",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/policy/policy.model.ts exists and exports LeavePolicy",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "src/modules/leave-type/leave-type.repository.ts exists and exports ILeaveTypeRepository and LeaveTypeRepository",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "src/modules/policy/policy.repository.ts exists and exports ILeavePolicyRepository and LeavePolicyRepository",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "LeaveTypeRepository implements ILeaveTypeRepository using the pg Pool from src/shared/db/connection",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-006",
+      "description": "LeavePolicyRepository implements ILeavePolicyRepository using the pg Pool from src/shared/db/connection",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-007",
+      "description": "LeaveTypeRepository.findById queries the leave_types table by id and returns a LeaveType or null",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-008",
+      "description": "LeaveTypeRepository.findAll queries all leave_types and returns an array of LeaveType",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-009",
+      "description": "LeavePolicyRepository.findByLeaveTypeId queries the leave_policies table by leave_type_id and returns a LeavePolicy or null",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "No dependencies on other modules (leave, employee, balance, notification).",
+    "Use the pg Pool from src/shared/db/connection."
+  ],
+  "outOfScope": [
+    "Phase 2 — Employee domain model and repository",
+    "Phase 3 — LeaveRequest domain model and repository",
+    "Phase 4 — LeaveBalance domain model and repository",
+    "Phase 5 — Notification and AuditLog domain models and repositories",
+    "Phase 6 — Scaffold leave-management module and service interface",
+    "Phase 7 — applyForLeave use case",
+    "Phase 8 — approve and reject use cases",
+    "Phase 9 — cancel leave, discard draft, balance recalculation",
+    "Phase 10 — audit logging, RBAC enforcement, read operations",
+    "Any API endpoints or controllers",
+    "Database migrations (table creation)",
+    "Tests (unless explicitly required)"
+  ],
+  "ambiguities": []
+}

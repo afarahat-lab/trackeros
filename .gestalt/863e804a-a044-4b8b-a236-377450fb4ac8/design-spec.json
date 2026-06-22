@@ -1,0 +1,70 @@
+{
+  "correlationId": "863e804a-a044-4b8b-a236-377450fb4ac8",
+  "domainChanges": [
+    {
+      "entityName": "User",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "username",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "passwordHash",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "employeeId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "role",
+          "type": "'employee' | 'manager'",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "Employee",
+          "type": "one-to-one"
+        }
+      ]
+    }
+  ],
+  "apiContracts": [
+    {
+      "method": "POST",
+      "path": "/auth/login",
+      "description": "Authenticate user with username and password, return a JWT token",
+      "requestBody": {
+        "username": "string",
+        "password": "string"
+      },
+      "responseBody": {
+        "token": "string"
+      },
+      "authRequired": false,
+      "roles": []
+    },
+    {
+      "method": "POST",
+      "path": "/auth/logout",
+      "description": "Logout the current user (client discards token)",
+      "requestBody": {},
+      "responseBody": {
+        "message": "string"
+      },
+      "authRequired": true,
+      "roles": []
+    }
+  ],
+  "componentSpecs": []
+}

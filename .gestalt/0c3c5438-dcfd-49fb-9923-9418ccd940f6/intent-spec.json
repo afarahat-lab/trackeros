@@ -1,0 +1,60 @@
+{
+  "id": "a46ea338-abe1-4106-8db5-708e4dcfadd4",
+  "correlationId": "0c3c5438-dcfd-49fb-9923-9418ccd940f6",
+  "rawIntent": "[Feature: Build the leave management module — Phase 6: Scaffold leave-management module and define ILeaveManagementService interface]\n\nCreate src/modules/leave-management/leave-management.service.interface.ts with ILeaveManagementService interface declaring methods: applyForLeave(dto: CreateLeaveRequestDto): Promise<LeaveRequest>; approveLeave(leaveId: string, approverId: string, comment?: string): Promise<LeaveRequest>; rejectLeave(leaveId: string, approverId: string, comment: string): Promise<LeaveRequest>; cancelLeave(leaveId: string, employeeId: string): Promise<LeaveRequest>; discardDraft(leaveId: string, employeeId: string): Promise<void>; getLeaveBalance(employeeId: string, leaveTypeId: string, year: number): Promise<LeaveBalance>; getLeaveHistory(employeeId: string): Promise<LeaveRequest[]>. Create src/modules/leave-management/index.ts as barrel export. Depends on src/modules/leave/leave.model.ts from Phase 3, src/modules/balance/balance.model.ts from Phase 4, and src/modules/leave-type/leave-type.model.ts from Phase 1 for type imports.\n\nPhase architecture notes:\nPublic API contract for the leave management orchestration.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/leave-management/leave-management.service.interface.ts\\nimport { LeaveRequest, CreateLeaveRequestDto } from '../leave/leave.model';\\nimport { LeaveBalance } from '../balance/balance.model';\\n\\nexport interface ILeaveManagementService {\\n  applyForLeave(dto: CreateLeaveRequestDto): Promise<LeaveRequest>;\\n  approveLeave(leaveId: string, approverId: string, comment?: string): Promise<LeaveRequest>;\\n  rejectLeave(leaveId: string, approverId: string, comment: string): Promise<LeaveRequest>;\\n  cancelLeave(leaveId: string, employeeId: string): Promise<LeaveRequest>;\\n  discardDraft(leaveId: string, employeeId: string): Promise<void>;\\n  getLeaveBalance(employeeId: string, leaveTypeId: string, year: number): Promise<LeaveBalance>;\\n  getLeaveHistory(employeeId: string): Promise<LeaveRequest[]>;\\n}\",\"File: src/modules/leave-management/index.ts\\nexport { ILeaveManagementService } from './leave-management.service.interface';\"],\"importStatements\":[\"import { LeaveRequest, CreateLeaveRequestDto } from '../leave/leave.model';\",\"import { LeaveBalance } from '../balance/balance.model';\"],\"successCriteria\":[\"src/modules/leave-management/leave-management.service.interface.ts exists and exports ILeaveManagementService\",\"ILeaveManagementService defines applyForLeave, approveLeave, rejectLeave, cancelLeave, discardDraft, getLeaveBalance, getLeaveHistory\",\"All method signatures reference existing types from src/modules/leave/leave.model.ts and src/modules/balance/balance.model.ts\",\"No circular dependencies introduced (leave-management depends on leave and balance, which do not depend on leave-management)\",\"src/modules/leave-management/index.ts exists and re-exports ILeaveManagementService\"]}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- ILeaveManagementService\n- LeaveRequest\n- CreateLeaveRequestDto\n- LeaveBalance\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 7 — Implement applyForLeave use case: Create src/modules/leave-management/leave-management.service.ts implementing ILeaveManagementService\n- Phase 8 — Implement approve and reject use cases: Add approveLeave and rejectLeave methods to src/modules/leave-management/leave-management.service.ts\n- Phase 9 — Implement cancel leave, discard draft, and balance recalculation: Add cancelLeave and discardDraft methods to src/modules/leave-management/leave-management.service.ts\n- Phase 10 — Integrate audit logging, RBAC enforcement, and read operations: Modify src/modules/leave-management/leave-management.service.ts to inject IAuditService and enforce ",
+  "scope": {
+    "affectedDomains": [
+      "leave-management"
+    ],
+    "affectedLayers": [
+      "domain"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/leave-management/leave-management.service.interface.ts exists and exports ILeaveManagementService",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "ILeaveManagementService defines applyForLeave, approveLeave, rejectLeave, cancelLeave, discardDraft, getLeaveBalance, getLeaveHistory with correct signatures",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "All method signatures reference existing types from src/modules/leave/leave.model.ts and src/modules/balance/balance.model.ts",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "No circular dependencies introduced (leave-management depends on leave and balance, which do not depend on leave-management)",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "sc-005",
+      "description": "src/modules/leave-management/index.ts exists and re-exports ILeaveManagementService",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No circular dependencies: leave-management may import from leave and balance, but not vice versa",
+    "Interface must use exact type names: LeaveRequest, CreateLeaveRequestDto, LeaveBalance as defined in the canonical dependencies",
+    "Barrel export file must re-export only ILeaveManagementService"
+  ],
+  "outOfScope": [
+    "Implementation of ILeaveManagementService (deferred to Phase 7-10)",
+    "Audit logging, RBAC enforcement, input validation, error handling (deferred to Phase 10)",
+    "Any database access or repository patterns",
+    "Any API endpoints or controllers",
+    "Any modifications to existing modules (leave, balance, employee, policy, notification)"
+  ],
+  "ambiguities": []
+}
