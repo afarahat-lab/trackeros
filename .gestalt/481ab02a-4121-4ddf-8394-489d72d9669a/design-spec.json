@@ -1,0 +1,59 @@
+{
+  "correlationId": "481ab02a-4121-4ddf-8394-489d72d9669a",
+  "domainChanges": [
+    {
+      "entityName": "LeavePolicy",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "leaveTypeId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "maxDaysPerYear",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "maxConsecutiveDays",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "requiresApproval",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "allowNegativeBalance",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "blackoutDates",
+          "type": "Date[]",
+          "required": true
+        },
+        {
+          "name": "status",
+          "type": "'active' | 'archived'",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "LeaveType",
+          "type": "one-to-one"
+        }
+      ]
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}
