@@ -267,5 +267,5 @@ Represents validation data managed by the `validation` module, including validat
 
 | Field | Type | Required |
 |-------|------|----------|
-| isValid | boolean | true |
+| valid | boolean | true |
 | errors | string[] | true |
