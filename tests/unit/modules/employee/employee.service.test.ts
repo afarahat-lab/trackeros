@@ -1,14 +1,20 @@
 import { EmployeeService } from '../../../../src/modules/employee/employee.service';
 import { IEmployeeRepository } from '../../../../src/modules/employee/employee.repository.interface';
 import { AppError } from '../../../../src/shared/types';
-import { Employee, CreateEmployeeInput, UpdateEmployeeInput } from '../../../../src/modules/employee/employee.model';
+import { Employee } from '../../../../src/modules/employee/employee.model';
 
 describe('EmployeeService', () => {
   let service: EmployeeService;
-  let repository: jest.Mocked<IEmployeeRepository>;
+  let mockRepository: IEmployeeRepository;
+
+  const mockEmployee: Employee = {
+    id: '1', name: 'John Doe', email: 'john@example.com', managerId: '2',
+    department: 'Engineering', status: 'active', createdAt: new Date(), updatedAt: new Date(),
+  };
+  const mockManager: Employee = { ...mockEmployee, id: '2', name: 'Jane Doe', managerId: null };
 
   beforeEach(() => {
-    repository = {
+    mockRepository = {
       findById: jest.fn(),
       findByEmail: jest.fn(),
       findAll: jest.fn(),
@@ -16,104 +22,107 @@ describe('EmployeeService', () => {
       update: jest.fn(),
       delete: jest.fn(),
     };
-    service = new EmployeeService(repository);
+    service = new EmployeeService(mockRepository);
   });
 
-  const mockEmployee: Employee = {
-    id: '1',
-    name: 'John Doe',
-    email: 'john@example.com',
-    managerId: null,
-    department: 'Engineering',
-    status: 'active',
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  };
-
   describe('getEmployeeById', () => {
-    it('should return an employee if found', async () => {
-      repository.findById.mockResolvedValue(mockEmployee);
-      const result = await service.getEmployeeById('1');
-      expect(result).toEqual(mockEmployee);
-      expect(repository.findById).toHaveBeenCalledWith('1');
+    it('should return an employee on success', async () => {
+      (mockRepository.findById as any).mockResolvedValue(mockEmployee);
+      await expect(service.getEmployeeById('1')).resolves.toEqual(mockEmployee);
     });
-
     it('should throw AppError if not found', async () => {
-      repository.findById.mockResolvedValue(null);
+      (mockRepository.findById as any).mockResolvedValue(null);
       await expect(service.getEmployeeById('1')).rejects.toThrow(AppError);
+    });
+    it('should throw AppError for invalid input', async () => {
+      await expect(service.getEmployeeById('')).rejects.toThrow(AppError);
+    });
+    it('should propagate repository errors', async () => {
+      (mockRepository.findById as any).mockRejectedValue(new Error('DB error'));
+      await expect(service.getEmployeeById('1')).rejects.toThrow('DB error');
     });
   });
 
   describe('getEmployeeByEmail', () => {
-    it('should return an employee if found', async () => {
-      repository.findByEmail.mockResolvedValue(mockEmployee);
-      const result = await service.getEmployeeByEmail('john@example.com');
-      expect(result).toEqual(mockEmployee);
+    it('should return an employee on success', async () => {
+      (mockRepository.findByEmail as any).mockResolvedValue(mockEmployee);
+      await expect(service.getEmployeeByEmail('john@example.com')).resolves.toEqual(mockEmployee);
     });
-
     it('should throw AppError if not found', async () => {
-      repository.findByEmail.mockResolvedValue(null);
+      (mockRepository.findByEmail as any).mockResolvedValue(null);
       await expect(service.getEmployeeByEmail('john@example.com')).rejects.toThrow(AppError);
     });
-  });
-
-  describe('getAllEmployees', () => {
-    it('should return an array of employees', async () => {
-      repository.findAll.mockResolvedValue([mockEmployee]);
-      const result = await service.getAllEmployees();
-      expect(result).toEqual([mockEmployee]);
+    it('should throw AppError for invalid input', async () => {
+      await expect(service.getEmployeeByEmail('')).rejects.toThrow(AppError);
+    });
+    it('should propagate repository errors', async () => {
+      (mockRepository.findByEmail as any).mockRejectedValue(new Error('DB error'));
+      await expect(service.getEmployeeByEmail('john@example.com')).rejects.toThrow('DB error');
     });
   });
 
-  describe('createEmployee', () => {
-    const input: CreateEmployeeInput = {
-      name: 'John Doe',
-      email: 'john@example.com',
-      managerId: null,
-      department: 'Engineering',
-      status: 'active',
-    };
-
-    it('should create and return an employee', async () => {
-      repository.findByEmail.mockResolvedValue(null);
-      repository.create.mockResolvedValue(mockEmployee);
-      const result = await service.createEmployee(input);
-      expect(result).toEqual(mockEmployee);
+  describe('employeeExists', () => {
+    it('should return true if employee exists', async () => {
+      (mockRepository.findById as any).mockResolvedValue(mockEmployee);
+      await expect(service.employeeExists('1')).resolves.toBe(true);
     });
-
-    it('should throw AppError if email already exists', async () => {
-      repository.findByEmail.mockResolvedValue(mockEmployee);
-      await expect(service.createEmployee(input)).rejects.toThrow(AppError);
+    it('should return false if not found', async () => {
+      (mockRepository.findById as any).mockResolvedValue(null);
+      await expect(service.employeeExists('1')).resolves.toBe(false);
+    });
+    it('should throw AppError for invalid input', async () => {
+      await expect(service.employeeExists('')).rejects.toThrow(AppError);
+    });
+    it('should propagate repository errors', async () => {
+      (mockRepository.findById as any).mockRejectedValue(new Error('DB error'));
+      await expect(service.employeeExists('1')).rejects.toThrow('DB error');
     });
   });
 
-  describe('updateEmployee', () => {
-    const input: UpdateEmployeeInput = { name: 'Jane Doe' };
-
-    it('should update and return an employee', async () => {
-      repository.update.mockResolvedValue({ ...mockEmployee, name: 'Jane Doe' });
-      const result = await service.updateEmployee('1', input);
-      expect(result.name).toBe('Jane Doe');
+  describe('getManagerHierarchy', () => {
+    it('should return hierarchy on success', async () => {
+      (mockRepository.findById as any).mockImplementation(async (id: string) => {
+        if (id === '1') return mockEmployee;
+        if (id === '2') return mockManager;
+        return null;
+      });
+      await expect(service.getManagerHierarchy('1')).resolves.toEqual([mockManager]);
     });
-
-    it('should throw AppError if new email already exists for another employee', async () => {
-      const otherEmployee = { ...mockEmployee, id: '2' };
-      repository.findByEmail.mockResolvedValue(otherEmployee);
-      await expect(service.updateEmployee('1', { email: 'john@example.com' })).rejects.toThrow(AppError);
+    it('should return empty array if employee not found', async () => {
+      (mockRepository.findById as any).mockResolvedValue(null);
+      await expect(service.getManagerHierarchy('1')).resolves.toEqual([]);
+    });
+    it('should throw AppError for invalid input', async () => {
+      await expect(service.getManagerHierarchy('')).rejects.toThrow(AppError);
+    });
+    it('should propagate repository errors', async () => {
+      (mockRepository.findById as any).mockRejectedValue(new Error('DB error'));
+      await expect(service.getManagerHierarchy('1')).rejects.toThrow('DB error');
     });
   });
 
-  describe('deleteEmployee', () => {
-    it('should delete an employee if found', async () => {
-      repository.findById.mockResolvedValue(mockEmployee);
-      repository.delete.mockResolvedValue(undefined);
-      await service.deleteEmployee('1');
-      expect(repository.delete).toHaveBeenCalledWith('1');
+  describe('isManagerOf', () => {
+    it('should return true if user is manager', async () => {
+      (mockRepository.findById as any).mockImplementation(async (id: string) => {
+        if (id === '1') return mockEmployee;
+        if (id === '2') return mockManager;
+        return null;
+      });
+      await expect(service.isManagerOf('2', '1')).resolves.toBe(true);
     });
-
-    it('should throw AppError if not found', async () => {
-      repository.findById.mockResolvedValue(null);
-      await expect(service.deleteEmployee('1')).rejects.toThrow(AppError);
+    it('should return false if user is not manager', async () => {
+      (mockRepository.findById as any).mockImplementation(async (id: string) => {
+        if (id === '1') return mockEmployee;
+        return null;
+      });
+      await expect(service.isManagerOf('99', '1')).resolves.toBe(false);
+    });
+    it('should throw AppError for invalid input', async () => {
+      await expect(service.isManagerOf('', '1')).rejects.toThrow(AppError);
+    });
+    it('should propagate repository errors', async () => {
+      (mockRepository.findById as any).mockRejectedValue(new Error('DB error'));
+      await expect(service.isManagerOf('2', '1')).rejects.toThrow('DB error');
     });
   });
 });

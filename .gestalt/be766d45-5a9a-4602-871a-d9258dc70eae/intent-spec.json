@@ -1,7 +1,7 @@
 {
-  "id": "e98caf03-d5ae-48d5-b3dc-fca1a682608f",
+  "id": "64d9854f-d8a5-4869-89f6-09612285ac38",
   "correlationId": "be766d45-5a9a-4602-871a-d9258dc70eae",
-  "rawIntent": "[Feature: Build the leave management module — Phase 3: Create Employee service]\n\nCreate src/modules/employee/employee.service.ts with EmployeeService class that uses IEmployeeRepository. Include Jest unit tests in tests/unit/modules/employee/employee.service.test.ts. This phase depends on src/modules/employee/employee.model.ts and src/modules/employee/employee.repository.ts from Phase 1 — read them before generating any code.\n\nThis phase depends on: Phase 1.\n\nPhase architecture notes:\nEmployee service provides lookup and validation for employee existence and manager hierarchy.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/employee/employee.service.ts\\nimport { IEmployeeRepository } from './employee.repository';\\nimport { Employee } from './employee.model';\\n\\nexport interface IEmployeeService {\\n  getEmployeeById(id: string): Promise<Employee | null>;\\n  getEmployeeByEmail(email: string): Promise<Employee | null>;\\n  employeeExists(id: string): Promise<boolean>;\\n  getManagerHierarchy(employeeId: string): Promise<Employee[]>;\\n  isManagerOf(managerId: string, employeeId: string): Promise<boolean>;\\n}\\n\\nexport class EmployeeService implements IEmployeeService {\\n  constructor(private readonly employeeRepository: IEmployeeRepository) {}\\n\\n  async getEmployeeById(id: string): Promise<Employee | null> {\\n    if (!id || typeof id !== 'string') {\\n      throw new Error('Invalid employee ID');\\n    }\\n    try {\\n      return await this.employeeRepository.findById(id);\\n    } catch (error) {\\n      console.error('Error fetching employee by ID');\\n      throw error;\\n    }\\n  }\\n\\n  async getEmployeeByEmail(email: string): Promise<Employee | null> {\\n    if (!email || typeof email !== 'string' || !email.includes('@')) {\\n      throw new Error('Invalid email');\\n    }\\n    try {\\n      return await this.employeeRepository.findByEmail(email);\\n    } catch (error) {\\n      console.error('Error fetching employee by email');\\n      throw error;\\n    }\\n  }\\n\\n  async employeeExists(id: string): Promise<boolean> {\\n    if (!id || typeof id !== 'string') {\\n      throw new Error('Invalid employee ID');\\n    }\\n    try {\\n      return await this.employeeRepository.exists(id);\\n    } catch (error) {\\n      console.error('Error checking employee existence');\\n      throw error;\\n    }\\n  }\\n\\n  async getManagerHierarchy(employeeId: string): Promise<Employee[]> {\\n    if (!employeeId || typeof employeeId !== 'string') {\\n      throw new Error('Invalid employee ID');\\n    }\\n    try {\\n      return await this.employeeRepository.getManagerHierarchy(employeeId);\\n    } catch (error) {\\n      console.error('Error fetching manager hierarchy');\\n      throw error;\\n    }\\n  }\\n\\n  async isManagerOf(managerId: string, employeeId: string): Promise<boolean> {\\n    if (!managerId || typeof managerId !== 'string' || !employeeId || typeof employeeId !== 'string') {\\n      throw new Error('Invalid manager or employee ID');\\n    }\\n    try {\\n      return await this.employeeRepository.isManagerOf(managerId, employeeId);\\n    } catch (error) {\\n      console.error('Error checking manager relationship');\\n      throw error;\\n    }\\n  }\\n}\",\"File: tests/unit/modules/employee/employee.service.test.ts\\nimport { EmployeeService, IEmployeeService } from '../../../src/modules/employee/employee.service';\\nimport { IEmployeeRepository } from '../../../src/modules/employee/employee.repository';\\nimport { Employee } from '../../../src/modules/employee/employee.model';\\n\\ndescribe('EmployeeService', () => {\\n  let service: IEmployeeService;\\n  let mockRepository: jest.Mocked<IEmployeeRepository>;\\n\\n  beforeEach(() => {\\n    mockRepository = {\\n      findById: jest.fn(),\\n      findByEmail: jest.fn(),\\n      exists: jest.fn(),\\n      getManagerHierarchy: jest.fn(),\\n      isManagerOf: jest.fn(),\\n    };\\n    service = new EmployeeService(mockRepository);\\n  });\\n\\n  describe('getEmployeeById', () => {\\n    it('should return employee when found', async () => {\\n      const employee: Employee = { id: '1', name: 'John', email: 'john@example.com', managerId: null, department: 'Engineering', status: 'active', createdAt: new Date(), updatedAt: new Date() };\\n      mockRepository.findById.mockResolvedValue(employee);\\n      const result = await service.getEmployeeById('1');\\n      expect(result).toEqual(employee);\\n      expect(mockRepository.findById).toHaveBeenCalledWith('1');\\n    });\\n\\n    it('should return null when not found', async () => {\\n      mockRepository.findById.mockResolvedValue(null);\\n      const result = await service.getEmployeeById('nonexistent');\\n      expect(result).toBeNull();\\n    });\\n\\n    it('should throw error for invalid id', async () => {\\n      await expect(service.getEmployeeById('')).rejects.toThrow('Invalid employee ID');\\n      await expect(service.getEmployeeById(null as any)).rejects.toThrow('Invalid employee ID');\\n    });\\n\\n    it('should propagate repository errors', async () => {\\n      mockRepository.findById.mockRejectedValue(new Error('DB error'));\\n      await expect(service.getEmployeeById('1')).rejects.toThrow('DB error');\\n    });\\n  });\\n\\n  describe('getEmployeeByEmail', () => {\\n    it('should return employee when found', async () => {\\n      const employee: Employee = { id: '1', name: 'John', email: 'john@example.com', managerId: null, department: 'Engineering', status: 'active', createdAt: new Date(), updatedAt: new Date() };\\n      mockRepository.findByEmail.mockResolvedValue(employee);\\n      const result = await service.getEmployeeByEmail('john@example.com');\\n      expect(result).toEqual(employee);\\n      expect(mockRepository.findByEmail).toHaveBeenCalledWith('john@example.com');\\n    });\\n\\n    it('should return null when not found', async () => {\\n      mockRepository.findByEmail.mockResolvedValue(null);\\n      const result = await service.getEmployeeByEmail('unknown@example.com');\\n      expect(result).toBeNull();\\n    });\\n\\n    it('should throw error for invalid email', async () => {\\n      await expect(service.getEmployeeByEmail('')).rejects.toThrow('Invalid email');\\n      await expect(service.getEmployeeByEmail('invalid')).rejects.toThrow('Invalid email');\\n    });\\n\\n    it('should propagate repository errors', async () => {\\n      mockRepository.findByEmail.mockRejectedValue(new Error('DB error'));\\n      await expect(service.getEmployeeByEmail('john@example.com')).rejects.toThrow('DB error');\\n    });\\n  });\\n\\n  describe('employeeExists', () => {\\n    it('should return true when employee exists', async () => {\\n      mockRepository.exists.mockResolvedValue(true);\\n      const result = await service.employeeExists('1');\\n      expect(result).toBe(true);\\n      expect(mockRepository.exists).toHaveBeenCalledWith('1');\\n    });\\n\\n    it('should return false when employee does not exist', async () => {\\n      mockRepository.exists.mockResolvedValue(false);\\n      const result = await service.employeeExists('nonexistent');\\n      expect(result).toBe(false);\\n    });\\n\\n    it('should throw error for invalid id', async () => {\\n      await expect(service.employeeExists('')).rejects.toThrow('Invalid employee ID');\\n    });\\n\\n    it('should propagate repository errors', async () => {\\n      mockRepository.exists.mockRejectedValue(new Error('DB error'));\\n      await expect(service.employeeExists('1')).rejects.toThrow('DB error');\\n    });\\n  });\\n\\n  describe('getManagerHierarchy', () => {\\n    it('should return hierarchy array', async () => {\\n      const hierarchy: Employee[] = [\\n        { id: '2', name: 'Manager', email: 'manager@example.com', managerId: null, department: 'Engineering', status: 'active', createdAt: new Date(), updatedAt: new Date() },\\n        { id: '1', name: 'John', email: 'john@example.com', managerId: '2', department: 'Engineering', status: 'active', createdAt: new Date(), updatedAt: new Date() }\\n      ];\\n      mockRepository.getManagerHierarchy.mockResolvedValue(hierarchy);\\n      const result = await service.getManagerHierarchy('1');\\n      expect(result).toEqual(hierarchy);\\n      expect(mockRepository.getManagerHierarchy).toHaveBeenCalledWith('1');\\n    });\\n\\n    it('should throw error for invalid id', async () => {\\n      await expect(service.getManagerHierarchy('')).rejects.toThrow('Invalid employee ID');\\n    });\\n\\n    it('should propagate repository errors', async () => {\\n      mockRepository.getManagerHierarchy.mockRejectedValue(new Error('DB error'));\\n      await expect(service.getManagerHierarchy('1')).rejects.toThrow('DB error');\\n    });\\n  });\\n\\n  describe('isManagerOf', () => {\\n    it('should return true when manager relationship exists', async () => {\\n      mockRepository.isManagerOf.mockResolvedValue(true);\\n      const result = await service.isManagerOf('2', '1');\\n      expect(result).toBe(true);\\n      expect(mockRepository.isManagerOf).toHaveBeenCalledWith('2', '1');\\n    });\\n\\n    it('should return false when not manager', async () => {\\n      mockRepository.isManagerOf.mockResolvedValue(false);\\n      const result = await service.isManagerOf('3', '1');\\n      expect(result).toBe(false);\\n    });\\n\\n    it('should throw error for invalid ids', async () => {\\n      await expect(service.isManagerOf('', '1')).rejects.toThrow('Invalid manager or employee ID');\\n      await expect(service.isManagerOf('2', '')).rejects.toThrow('Invalid manager or employee ID');\\n    });\\n\\n    it('should propagate repository errors', async () => {\\n      mockRepository.isManagerOf.mockRejectedValue(new Error('DB error'));\\n      await expect(service.isManagerOf('2', '1')).rejects.toThrow('DB error');\\n    });\\n  });\\n});\"],\"importStatements\":[\"import { IEmployeeRepository } from './employee.repository';\",\"import { Employee } from './employee.model';\"],\"successCriteria\":[\"src/modules/employee/employee.service.ts exists and exports IEmployeeService and EmployeeService\",\"tests/unit/modules/employee/employee.service.test.ts exists and all tests pass\",\"EmployeeService uses IEmployeeRepository for all data access (GP-001)\",\"All public methods validate input parameters (GP-003)\",\"No sensitive data logged (GP-004)\",\"All async errors are caught and handled (GP-006)\"]}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- IEmployeeService\n- IEmployeeRepository\n- Employee\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 4 — Create Policy service: Create src/modules/policy/policy.service.ts with PolicyService class that uses IPolicyRepository. In\n- Phase 5 — Create LeaveBalance model and repository: Create src/modules/balance/balance.model.ts with TypeScript interfaces for LeaveBalance (attributes:\n- Phase 6 — Create Balance service: Create src/modules/balance/balance.service.ts with BalanceService class that uses IBalanceRepository\n- Phase 7 — Create Notification and Audit models and repositories: Create src/modules/notification/notification.model.ts with TypeScript interfaces for Notification (a\n- Phase 8 — Create LeaveRequest model and repository: Create src/modules/leave/leave.model.ts with TypeScript interfaces for LeaveRequest (attributes: id,\n- Phase 9 — Create Leave orchestration service: Create src/modules/leave/leave.service.ts with LeaveService class that orchestrates leave workflow (\n- Phase 10 — Wire services, create routes and controllers: Create src/modules/leave/leave.controller.ts with REST endpoints for leave operations (POST /apply, ",
+  "rawIntent": "Create src/modules/employee/employee.service.ts with EmployeeService class that uses IEmployeeRepository. Include unit tests in tests/unit/modules/employee/employee.service.test.ts using Vitest (import from 'vitest'). All service methods must wrap repository calls in try/catch and rethrow or handle errors. This phase depends on src/modules/employee/employee.model.ts and src/modules/employee/employee.repository.ts from Phase 1 — read them before generating any code.",
   "scope": {
     "affectedDomains": [
       "employee"
@@ -16,52 +16,87 @@
   "successCriteria": [
     {
       "id": "sc-001",
-      "description": "src/modules/employee/employee.service.ts exists and exports IEmployeeService and EmployeeService",
+      "description": "EmployeeService class exists in src/modules/employee/employee.service.ts and imports IEmployeeRepository from the repository module.",
       "testable": true,
       "layer": "unit"
     },
     {
       "id": "sc-002",
-      "description": "tests/unit/modules/employee/employee.service.test.ts exists and all tests pass",
+      "description": "Every public method of EmployeeService that calls a repository method is wrapped in a try/catch block.",
       "testable": true,
       "layer": "unit"
     },
     {
       "id": "sc-003",
-      "description": "EmployeeService uses IEmployeeRepository for all data access (GP-001)",
+      "description": "Caught errors are either rethrown or handled explicitly (no silent catch blocks).",
       "testable": true,
       "layer": "unit"
     },
     {
       "id": "sc-004",
-      "description": "All public methods validate input parameters (GP-003)",
+      "description": "Unit tests exist in tests/unit/modules/employee/employee.service.test.ts and import from 'vitest'.",
       "testable": true,
       "layer": "unit"
     },
     {
       "id": "sc-005",
-      "description": "No sensitive data logged (GP-004)",
+      "description": "Unit tests cover at least one error scenario per service method where the repository mock rejects, verifying the service catches and rethrows/handles the error.",
       "testable": true,
       "layer": "unit"
     },
     {
       "id": "sc-006",
-      "description": "All async errors are caught and handled (GP-006)",
+      "description": "The service does not directly access any database or ORM; all data operations go through the injected IEmployeeRepository.",
       "testable": true,
       "layer": "unit"
     }
   ],
   "constraints": [
-    "Repository pattern: All database access goes through repository interfaces (GP-001)",
-    "Input validation: Validate all inputs at API boundaries before processing (GP-003)",
-    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data (GP-004)",
-    "Error handling: No unhandled promise rejections. All async errors are caught and handled (GP-006)"
+    "Repository pattern: All data access must go through IEmployeeRepository interface; no direct database calls.",
+    "Error handling: All repository calls must be wrapped in try/catch blocks; no unhandled promise rejections.",
+    "Audit records: If the service performs state-changing operations, it must ensure audit records are written (via repository or dedicated audit mechanism).",
+    "No sensitive data in logs: The service must not log passwords, tokens, PII, or financial data.",
+    "Unit tests must use Vitest (import from 'vitest') and mock the repository.",
+    "The service must not import or depend on modules outside the allowed dependency direction (leave -> employee is allowed, but employee must not depend on leave, policy, balance, or notification)."
   ],
   "outOfScope": [
-    "Phase 4-10 (Policy service, Balance model/repository/service, Notification/Audit, LeaveRequest model/repository, Leave orchestration service, routes/controllers)",
-    "Any state-changing operations (create, update, delete) on Employee",
-    "API endpoints or controllers",
-    "Database migrations or schema changes"
+    "Modifying or regenerating employee.model.ts or employee.repository.ts (these are Phase 1 artifacts, read-only).",
+    "Creating any other files beyond employee.service.ts and its unit test.",
+    "Implementing API endpoints, routes, or controllers.",
+    "Database migrations or schema changes.",
+    "Integration or end-to-end tests.",
+    "Configuration files (package.json, tsconfig, etc.).",
+    "Any other modules (leave, policy, balance, notification)."
   ],
-  "ambiguities": []
+  "ambiguities": [
+    {
+      "id": "amb-001",
+      "description": "What specific methods should EmployeeService expose? The intent only says 'uses IEmployeeRepository' but does not list method signatures.",
+      "options": [
+        "Mirror all methods from IEmployeeRepository (e.g., findById, findAll, create, update, delete).",
+        "Expose only a subset of repository methods relevant to the employee domain (e.g., getEmployee, updateEmployee, listEmployees).",
+        "Methods are defined by the architecture spec for the employee module (to be inferred from employee.model.ts and employee.repository.ts)."
+      ],
+      "impactIfWrong": "high"
+    },
+    {
+      "id": "amb-002",
+      "description": "How should the service handle caught errors: rethrow after logging, or return a result object with success/error status?",
+      "options": [
+        "Rethrow the error after logging (or wrapping in a domain-specific error).",
+        "Return a result object (e.g., { success: boolean, data?: T, error?: string }) without throwing."
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "id": "amb-003",
+      "description": "What test scenarios are required beyond error handling? Should tests cover all repository methods, edge cases, or only the happy path?",
+      "options": [
+        "Test all public methods with both success and error cases.",
+        "Test only the error handling paths as explicitly required by the diagnosis.",
+        "Test a representative sample of methods to demonstrate the pattern."
+      ],
+      "impactIfWrong": "medium"
+    }
+  ]
 }
