@@ -33,15 +33,17 @@ Represents a leave record managed by the `leave` module, including leave request
 | leaveTypeId | string | true |
 | startDate | Date | true |
 | endDate | Date | true |
-| reason | string \| undefined | false |
+| daysRequested | number | true |
+| reason | string \| null | false |
 | status | LeaveRequestStatus | true |
-| approvedBy | string \| null | false |
-| approvedAt | Date \| null | false |
+| managerId | string \| null | false |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
 **Relationships**
-- `Employee` — many-to-one
+- `Employee` — many-to-one (employee)
+- `LeaveType` — many-to-one
+- `Employee` — many-to-one (manager)
 
 ### CreateLeaveRequestDto
 

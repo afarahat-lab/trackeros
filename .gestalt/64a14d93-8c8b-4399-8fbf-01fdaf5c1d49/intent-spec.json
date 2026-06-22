@@ -1,0 +1,90 @@
+{
+  "id": "3d6b1693-499f-4ec4-a98f-ea64f876cdad",
+  "correlationId": "64a14d93-8c8b-4399-8fbf-01fdaf5c1d49",
+  "rawIntent": "[Feature: Build the leave management module — Phase 8: Create LeaveRequest model and repository]\n\nCreate src/modules/leave/leave.model.ts with TypeScript interfaces for LeaveRequest (attributes: id, employeeId, leaveTypeId, startDate, endDate, daysRequested, status, reason, managerId, createdAt, updatedAt) and CreateLeaveRequestDto, UpdateLeaveRequestDto. Import LeaveType from src/shared/types/index.ts which already exists. Create src/modules/leave/leave.repository.ts with ILeaveRepository interface and LeaveRepository class. Include Jest unit tests in tests/unit/modules/leave/leave.repository.test.ts. This phase has no dependencies on other application modules.\n\nPhase architecture notes:\nLeaveRequest represents an employee's leave application with lifecycle states.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/leave/leave.model.ts\\nimport { LeaveType } from '../../shared/types/index';\\n\\nexport enum LeaveRequestStatus {\\n  DRAFT = 'draft',\\n  SUBMITTED = 'submitted',\\n  UNDER_REVIEW = 'under_review',\\n  APPROVED = 'approved',\\n  REJECTED = 'rejected',\\n  CANCELLED = 'cancelled'\\n}\\n\\nexport interface LeaveRequest {\\n  id: string;\\n  employeeId: string;\\n  leaveTypeId: string;\\n  startDate: Date;\\n  endDate: Date;\\n  daysRequested: number;\\n  status: LeaveRequestStatus;\\n  reason: string | null;\\n  managerId: string | null;\\n  createdAt: Date;\\n  updatedAt: Date;\\n}\\n\\nexport interface CreateLeaveRequestDto {\\n  employeeId: string;\\n  leaveTypeId: string;\\n  startDate: Date;\\n  endDate: Date;\\n  daysRequested: number;\\n  reason?: string;\\n  managerId?: string;\\n}\\n\\nexport interface UpdateLeaveRequestDto {\\n  status?: LeaveRequestStatus;\\n  reason?: string;\\n  managerId?: string;\\n  startDate?: Date;\\n  endDate?: Date;\\n  daysRequested?: number;\\n}\",\"File: src/modules/leave/leave.repository.ts\\nimport { Pool } from 'pg';\\nimport { pool } from '../../shared/db/connection';\\nimport { LeaveRequest, CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveRequestStatus } from './leave.model';\\n\\nexport interface ILeaveRequestRepository {\\n  create(dto: CreateLeaveRequestDto): Promise<LeaveRequest>;\\n  findById(id: string): Promise<LeaveRequest | null>;\\n  findByEmployeeId(employeeId: string): Promise<LeaveRequest[]>;\\n  findByManagerId(managerId: string): Promise<LeaveRequest[]>;\\n  updateStatus(id: string, status: LeaveRequestStatus, managerId?: string): Promise<LeaveRequest>;\\n}\\n\\nexport class LeaveRequestRepository implements ILeaveRequestRepository {\\n  constructor(private readonly pool: Pool) {}\\n\\n  async create(dto: CreateLeaveRequestDto): Promise<LeaveRequest> {\\n    // implementation\\n  }\\n\\n  async findById(id: string): Promise<LeaveRequest | null> {\\n    // implementation\\n  }\\n\\n  async findByEmployeeId(employeeId: string): Promise<LeaveRequest[]> {\\n    // implementation\\n  }\\n\\n  async findByManagerId(managerId: string): Promise<LeaveRequest[]> {\\n    // implementation\\n  }\\n\\n  async updateStatus(id: string, status: LeaveRequestStatus, managerId?: string): Promise<LeaveRequest> {\\n    // implementation\\n  }\\n}\",\"File: tests/unit/modules/leave/leave.repository.test.ts\\nimport { LeaveRequestRepository } from '../../../../src/modules/leave/leave.repository';\\nimport { Pool } from 'pg';\\nimport { LeaveRequestStatus } from '../../../../src/modules/leave/leave.model';\\n\\ndescribe('LeaveRequestRepository', () => {\\n  // Jest tests for create, findById, findByEmployeeId, findByManagerId, updateStatus\\n});\"],\"importStatements\":[\"import { LeaveType } from '../../shared/types/index';\",\"import { Pool } from 'pg';\",\"import { pool } from '../../shared/db/connection';\",\"import { LeaveRequest, CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveRequestStatus } from './leave.model';\",\"import { LeaveRequestRepository } from '../../../../src/modules/leave/leave.repository';\",\"import { LeaveRequestStatus } from '../../../../src/modules/leave/leave.model';\"],\"successCriteria\":[\"src/modules/leave/leave.model.ts exists and exports LeaveRequest, LeaveRequestStatus, CreateLeaveRequestDto, UpdateLeaveRequestDto\",\"src/modules/leave/leave.repository.ts exists and exports ILeaveRequestRepository and LeaveRequestRepository\",\"tests/unit/modules/leave/leave.repository.test.ts exists and contains Jest tests for LeaveRequestRepository methods\",\"All Jest tests pass\",\"LeaveRequestRepository.create and updateStatus write audit records to audit_logs table (GP-002)\",\"All repository methods catch and handle errors, no unhandled promise rejections (GP-006)\",\"LeaveRequestRepository uses the pool from src/shared/db/connection.ts for database access (GP-001)\",\"LeaveRequestStatus enum values match the CHECK constraint in leave_requests table\",\"Created leave request has status 'draft' by default\"]}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- LeaveRequest\n- CreateLeaveRequestDto\n- UpdateLeaveRequestDto\n- ILeaveRequestRepository\n- LeaveType\n- Pool\n- pool\n- LeaveRequestStatus\n- LeaveRequestRepository\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Canonical entity fields for this phase\n\nNote: these field names supersede any attribute names in the\nintent text above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the field names of each entity this phase defines. The\nexact attribute / column / property set per entity is:\n\n- `LeaveRequest`: `id`, `employeeId`, `leaveTypeId`, `startDate`, `endDate`, `daysRequested`, `status`, `reason`, `managerId`, `createdAt`, `updatedAt`\n- `CreateLeaveRequestDto`: `employeeId`, `leaveTypeId`, `startDate`, `endDate`, `daysRequested`, `reason`, `managerId`\n- `UpdateLeaveRequestDto`: `status`, `reason`, `managerId`, `startDate`, `endDate`, `daysRequested`\n\nTreat each entity's field list as complete. If the\nintent text or planner scope mentions different field\nnames than the architecture, do NOT flag this as\nambiguity — the per-phase architecture wins.\n\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 9 — Create Leave orchestration service: Create src/modules/leave/leave.service.ts with LeaveService class that orchestrates leave workflow (\n- Phase 10 — Wire services, create routes and controllers: Create src/modules/leave/leave.controller.ts with REST endpoints for leave operations (POST /apply, ",
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "domain",
+      "infra",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/leave/leave.model.ts exists and exports LeaveRequest, LeaveRequestStatus, CreateLeaveRequestDto, UpdateLeaveRequestDto",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/leave/leave.repository.ts exists and exports ILeaveRequestRepository and LeaveRequestRepository",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "tests/unit/modules/leave/leave.repository.test.ts exists and contains Jest tests for LeaveRequestRepository methods",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "All Jest tests pass",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "LeaveRequestRepository.create and updateStatus write audit records to audit_logs table (GP-002)",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "sc-006",
+      "description": "All repository methods catch and handle errors, no unhandled promise rejections (GP-006)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-007",
+      "description": "LeaveRequestRepository uses the pool from src/shared/db/connection.ts for database access (GP-001)",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "sc-008",
+      "description": "LeaveRequestStatus enum values match the CHECK constraint in leave_requests table",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "sc-009",
+      "description": "Created leave request has status 'draft' by default",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access goes through repository interfaces (GP-001)",
+    "All state-changing operations write an audit record (GP-002)",
+    "All async errors are caught and handled (GP-006)",
+    "LeaveRequestRepository must use the pool from src/shared/db/connection.ts",
+    "LeaveRequestStatus enum values must match the CHECK constraint in leave_requests table",
+    "Created leave request must have status 'draft' by default"
+  ],
+  "outOfScope": [
+    "Leave orchestration service (Phase 9)",
+    "REST endpoints and controllers (Phase 10)",
+    "Integration with employee, policy, balance, notification modules",
+    "Database schema creation/migration for leave_requests table",
+    "Input validation at API boundaries (no API in this phase)",
+    "Any business logic beyond repository data access"
+  ],
+  "ambiguities": []
+}
