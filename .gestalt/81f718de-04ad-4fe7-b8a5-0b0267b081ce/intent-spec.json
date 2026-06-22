@@ -1,0 +1,70 @@
+{
+  "id": "e9bcaaf1-1ea5-4535-a927-76c9a58a58b8",
+  "correlationId": "81f718de-04ad-4fe7-b8a5-0b0267b081ce",
+  "rawIntent": "[Feature: Build the leave management module — Phase 7: Create leave validation schemas]\n\nCreate src/modules/leave/leave.validation.ts with Zod schemas for leave request creation, approval, rejection, cancellation, retrieval, and balance lookup.\n\nPhase architecture notes:\n{\"interfaces\":[\"File: src/modules/leave/leave.validation.ts\\nimport { z } from 'zod';\\n\\nexport const createLeaveSchema = z.object({\\n  leaveTypeId: z.string().uuid(),\\n  startDate: z.string().regex(/^\\\\\\\\d{4}-\\\\\\\\d{2}-\\\\\\\\d{2}$/),\\n  endDate: z.string().regex(/^\\\\\\\\d{4}-\\\\\\\\d{2}-\\\\\\\\d{2}$/),\\n  reason: z.string().optional(),\\n}).refine(data => data.startDate <= data.endDate, {\\n  message: \\\"startDate must be before or equal to endDate\\\",\\n  path: [\\\"endDate\\\"],\\n}).refine(data => {\\n  const start = new Date(data.startDate);\\n  const end = new Date(data.endDate);\\n  return !isNaN(start.getTime()) && !isNaN(end.getTime());\\n}, {\\n  message: \\\"startDate and endDate must be valid dates\\\",\\n  path: [\\\"startDate\\\"],\\n});\\n\\nexport const approveLeaveParamsSchema = z.object({\\n  id: z.string().uuid(),\\n});\\n\\nexport const rejectLeaveParamsSchema = z.object({\\n  id: z.string().uuid(),\\n});\\n\\nexport const rejectLeaveBodySchema = z.object({\\n  reason: z.string().optional(),\\n});\\n\\nexport const cancelLeaveParamsSchema = z.object({\\n  id: z.string().uuid(),\\n});\\n\\nexport const getLeaveParamsSchema = z.object({\\n  id: z.string().uuid(),\\n});\\n\\nexport const getBalanceParamsSchema = z.object({\\n  leaveTypeId: z.string().uuid(),\\n});\"],\"importStatements\":[\"import { z } from 'zod';\"],\"successCriteria\":[\"src/modules/leave/leave.validation.ts exists and exports createLeaveSchema that validates leaveTypeId as UUID, startDate and endDate as valid dates (YYYY-MM-DD) with startDate <= endDate, and optional reason.\",\"approveLeaveParamsSchema validates id as UUID.\",\"rejectLeaveParamsSchema validates id as UUID.\",\"rejectLeaveBodySchema validates optional reason.\",\"cancelLeaveParamsSchema validates id as UUID.\",\"getLeaveParamsSchema validates id as UUID.\",\"getBalanceParamsSchema validates leaveTypeId as UUID.\"]}\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/leave/leave.validation.ts\\nimport { z } from 'zod';\\n\\nexport const createLeaveSchema = z.object({\\n  leaveTypeId: z.string().uuid(),\\n  startDate: z.string().regex(/^\\\\\\\\d{4}-\\\\\\\\d{2}-\\\\\\\\d{2}$/),\\n  endDate: z.string().regex(/^\\\\\\\\d{4}-\\\\\\\\d{2}-\\\\\\\\d{2}$/),\\n  reason: z.string().optional(),\\n}).refine(data => data.startDate <= data.endDate, {\\n  message: \\\"startDate must be before or equal to endDate\\\",\\n  path: [\\\"endDate\\\"],\\n}).refine(data => {\\n  const start = new Date(data.startDate);\\n  const end = new Date(data.endDate);\\n  return !isNaN(start.getTime()) && !isNaN(end.getTime());\\n}, {\\n  message: \\\"startDate and endDate must be valid dates\\\",\\n  path: [\\\"startDate\\\"],\\n});\\n\\nexport const approveLeaveParamsSchema = z.object({\\n  id: z.string().uuid(),\\n});\\n\\nexport const rejectLeaveParamsSchema = z.object({\\n  id: z.string().uuid(),\\n});\\n\\nexport const rejectLeaveBodySchema = z.object({\\n  reason: z.string().optional(),\\n});\\n\\nexport const cancelLeaveParamsSchema = z.object({\\n  id: z.string().uuid(),\\n});\\n\\nexport const getLeaveParamsSchema = z.object({\\n  id: z.string().uuid(),\\n});\\n\\nexport const getBalanceParamsSchema = z.object({\\n  leaveTypeId: z.string().uuid(),\\n});\"],\"importStatements\":[\"import { z } from 'zod';\"],\"successCriteria\":[\"src/modules/leave/leave.validation.ts exists and exports createLeaveSchema that validates leaveTypeId as UUID, startDate and endDate as valid dates (YYYY-MM-DD) with startDate <= endDate, and optional reason.\",\"approveLeaveParamsSchema validates id as UUID.\",\"rejectLeaveParamsSchema validates id as UUID.\",\"rejectLeaveBodySchema validates optional reason.\",\"cancelLeaveParamsSchema validates id as UUID.\",\"getLeaveParamsSchema validates id as UUID.\",\"getBalanceParamsSchema validates leaveTypeId as UUID.\"]}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- z\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 8 — Create leave controller: Create src/modules/leave/leave.controller.ts with the LeaveController class implementing ILeaveContr\n- Phase 9 — Create leave routes: Create src/modules/leave/leave.routes.ts that registers all leave endpoints on a Fastify instance, a",
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "domain"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/leave/leave.validation.ts exists and exports createLeaveSchema that validates leaveTypeId as UUID, startDate and endDate as valid dates (YYYY-MM-DD) with startDate <= endDate, and optional reason.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "approveLeaveParamsSchema validates id as UUID.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "rejectLeaveParamsSchema validates id as UUID.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "rejectLeaveBodySchema validates optional reason.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "cancelLeaveParamsSchema validates id as UUID.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-006",
+      "description": "getLeaveParamsSchema validates id as UUID.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-007",
+      "description": "getBalanceParamsSchema validates leaveTypeId as UUID.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Validate all inputs at API boundaries before processing (these schemas will be used for that)."
+  ],
+  "outOfScope": [
+    "Phase 8 - Create leave controller",
+    "Phase 9 - Create leave routes",
+    "Any other leave module files (repositories, services, etc.)",
+    "Implementation of leave request lifecycle logic",
+    "Database schema or migrations"
+  ],
+  "ambiguities": []
+}
