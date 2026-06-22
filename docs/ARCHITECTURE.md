@@ -24,6 +24,7 @@ src/modules/notification/notification.{model,repository,service,controller,route
 src/modules/LeaveStatus/    — LeaveStatus module
 src/modules/BaseEntity/    — BaseEntity module
 src/modules/LeaveRequest/    — LeaveRequest module
+src/modules/LeaveRequestQueryParams/    — LeaveRequestQueryParams module
 src/modules/LeaveType/    — LeaveType module
 src/modules/LeavePolicy/    — LeavePolicy module
 src/modules/AuditLog/    — AuditLog module
