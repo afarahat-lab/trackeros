@@ -1,0 +1,54 @@
+{
+  "correlationId": "a11511c2-534a-4885-b5a4-34cb64685036",
+  "domainChanges": [
+    {
+      "entityName": "AuditLog",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "entityType",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "entityId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "action",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "oldValue",
+          "type": "Record<string, unknown>",
+          "required": false
+        },
+        {
+          "name": "newValue",
+          "type": "Record<string, unknown>",
+          "required": false
+        },
+        {
+          "name": "changedBy",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "changedAt",
+          "type": "Date",
+          "required": true
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}
