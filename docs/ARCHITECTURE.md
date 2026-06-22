@@ -29,6 +29,7 @@ src/modules/LeavePolicy/    — LeavePolicy module
 src/modules/AuditLog/    — AuditLog module
 src/modules/AuditRecord/    — AuditRecord module
 src/modules/AuditServiceInterface/    — AuditServiceInterface module
+src/modules/CreateLeaveRequestDto/    — CreateLeaveRequestDto module
 src/shared/db connection.ts
 src/shared/base repository.ts
 src/shared/error types.ts
@@ -843,16 +844,3 @@ CREATE TABLE notifications (
     title VARCHAR(255) NOT NULL,
     body TEXT NOT NULL,
     metadata JSONB,
-    status VARCHAR(20) NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'SENT', 'FAILED')),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
-CREATE INDEX idx_notifications_recipient_id ON notifications(recipient_id);
-CREATE INDEX idx_notifications_status ON notifications(status);
-
-## Leave Management Module
-
-### Domain Entities
-
-**LeaveRequest**
-- Represents a leave application submitted by an employee
