@@ -1,0 +1,102 @@
+{
+  "id": "64d9854f-d8a5-4869-89f6-09612285ac38",
+  "correlationId": "be766d45-5a9a-4602-871a-d9258dc70eae",
+  "rawIntent": "Create src/modules/employee/employee.service.ts with EmployeeService class that uses IEmployeeRepository. Include unit tests in tests/unit/modules/employee/employee.service.test.ts using Vitest (import from 'vitest'). All service methods must wrap repository calls in try/catch and rethrow or handle errors. This phase depends on src/modules/employee/employee.model.ts and src/modules/employee/employee.repository.ts from Phase 1 — read them before generating any code.",
+  "scope": {
+    "affectedDomains": [
+      "employee"
+    ],
+    "affectedLayers": [
+      "domain",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "EmployeeService class exists in src/modules/employee/employee.service.ts and imports IEmployeeRepository from the repository module.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "Every public method of EmployeeService that calls a repository method is wrapped in a try/catch block.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "Caught errors are either rethrown or handled explicitly (no silent catch blocks).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "Unit tests exist in tests/unit/modules/employee/employee.service.test.ts and import from 'vitest'.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "Unit tests cover at least one error scenario per service method where the repository mock rejects, verifying the service catches and rethrows/handles the error.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-006",
+      "description": "The service does not directly access any database or ORM; all data operations go through the injected IEmployeeRepository.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All data access must go through IEmployeeRepository interface; no direct database calls.",
+    "Error handling: All repository calls must be wrapped in try/catch blocks; no unhandled promise rejections.",
+    "Audit records: If the service performs state-changing operations, it must ensure audit records are written (via repository or dedicated audit mechanism).",
+    "No sensitive data in logs: The service must not log passwords, tokens, PII, or financial data.",
+    "Unit tests must use Vitest (import from 'vitest') and mock the repository.",
+    "The service must not import or depend on modules outside the allowed dependency direction (leave -> employee is allowed, but employee must not depend on leave, policy, balance, or notification)."
+  ],
+  "outOfScope": [
+    "Modifying or regenerating employee.model.ts or employee.repository.ts (these are Phase 1 artifacts, read-only).",
+    "Creating any other files beyond employee.service.ts and its unit test.",
+    "Implementing API endpoints, routes, or controllers.",
+    "Database migrations or schema changes.",
+    "Integration or end-to-end tests.",
+    "Configuration files (package.json, tsconfig, etc.).",
+    "Any other modules (leave, policy, balance, notification)."
+  ],
+  "ambiguities": [
+    {
+      "id": "amb-001",
+      "description": "What specific methods should EmployeeService expose? The intent only says 'uses IEmployeeRepository' but does not list method signatures.",
+      "options": [
+        "Mirror all methods from IEmployeeRepository (e.g., findById, findAll, create, update, delete).",
+        "Expose only a subset of repository methods relevant to the employee domain (e.g., getEmployee, updateEmployee, listEmployees).",
+        "Methods are defined by the architecture spec for the employee module (to be inferred from employee.model.ts and employee.repository.ts)."
+      ],
+      "impactIfWrong": "high"
+    },
+    {
+      "id": "amb-002",
+      "description": "How should the service handle caught errors: rethrow after logging, or return a result object with success/error status?",
+      "options": [
+        "Rethrow the error after logging (or wrapping in a domain-specific error).",
+        "Return a result object (e.g., { success: boolean, data?: T, error?: string }) without throwing."
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "id": "amb-003",
+      "description": "What test scenarios are required beyond error handling? Should tests cover all repository methods, edge cases, or only the happy path?",
+      "options": [
+        "Test all public methods with both success and error cases.",
+        "Test only the error handling paths as explicitly required by the diagnosis.",
+        "Test a representative sample of methods to demonstrate the pattern."
+      ],
+      "impactIfWrong": "medium"
+    }
+  ]
+}
