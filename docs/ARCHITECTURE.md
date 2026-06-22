@@ -30,6 +30,7 @@ src/modules/AuditLog/    — AuditLog module
 src/modules/AuditRecord/    — AuditRecord module
 src/modules/AuditServiceInterface/    — AuditServiceInterface module
 src/modules/CreateLeaveRequestDto/    — CreateLeaveRequestDto module
+src/modules/UpdateLeaveRequestDto/    — UpdateLeaveRequestDto module
 src/shared/db connection.ts
 src/shared/base repository.ts
 src/shared/error types.ts
