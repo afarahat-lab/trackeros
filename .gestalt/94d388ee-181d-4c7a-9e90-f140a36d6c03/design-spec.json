@@ -1,0 +1,96 @@
+{
+  "correlationId": "94d388ee-181d-4c7a-9e90-f140a36d6c03",
+  "domainChanges": [
+    {
+      "entityName": "Notification",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "recipientId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "message",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "type",
+          "type": "NotificationType",
+          "required": true
+        },
+        {
+          "name": "status",
+          "type": "NotificationStatus",
+          "required": true
+        },
+        {
+          "name": "read",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "AuditLog",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "entityType",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "entityId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "action",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "oldValue",
+          "type": "Record<string, unknown> | null",
+          "required": true
+        },
+        {
+          "name": "newValue",
+          "type": "Record<string, unknown> | null",
+          "required": true
+        },
+        {
+          "name": "changedBy",
+          "type": "string | null",
+          "required": true
+        },
+        {
+          "name": "changedAt",
+          "type": "Date",
+          "required": true
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}
