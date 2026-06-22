@@ -1,0 +1,39 @@
+{
+  "id": "74b26876-29e4-42da-9791-cd9ece8a3839",
+  "correlationId": "538e9b41-8f28-4a38-95ee-1c766cbd920d",
+  "rawIntent": "The CI pipeline failed with the following TypeScript errors:\n- src/modules/leave-api/leave.dto.ts:13 — Unable to resolve signature of property decorator when called as an expression.\n- src/modules/leave-api/leave.dto.ts:10 — Unable to resolve signature of property decorator when called as an expression.\n- src/modules/leave-api/leave.dto.ts:7 — Unable to resolve signature of property decorator when called as an expression.\n- src/modules/leave-api/leave.dto.ts:4 — Unable to resolve signature of property decorator when called as an expression.\n- src/modules/leave-api/leave.controller.ts:77 — 'request.params' is of type 'unknown'.\n- src/modules/leave-api/leave.controller.ts:68 — 'request.params' is of type 'unknown'.\n- src/modules/leave-api/leave.controller.ts:59 — Argument of type 'string | undefined' is not assignable to parameter of type 'string'.\n- src/modules/leave-api/leave.controller.ts:59 — 'request.params' is of type 'unknown'.\n- src/modules/leave-api/leave.controller.ts:47 — 'request.params' is of type 'unknown'.\n- src/modules/leave-api/leave.controller.ts:35 — Argument of type 'import(\"/home/runner/work/trackeros/trackeros/src/modules/leave-api/leave.dto\").CreateLeaveRequestDto' is not assignable to parameter of type 'import(\"/home/runner/work/trackeros/trackeros/src/modules/leave/leave.model\").CreateLeaveRequestDto'.\n\nThe project's tsconfig.json does not have experimentalDecorators enabled, which causes the class-validator decorators in leave.dto.ts to fail compilation. Additionally, the leave controller uses FastifyRequest generic types that are not recognized by the installed Fastify version, leading to 'unknown' params and a type mismatch when passing the DTO to ILeaveManagementService.submitLeaveRequest (the service expects a CreateLeaveRequestDto from leave.model, not the class from leave.dto.ts).\n\nPreserve all existing exports, types, interfaces, and imports. Only add or modify what is needed to resolve the CI failure shown above.",
+  "scope": {
+    "affectedDomains": [
+      "leave-api"
+    ],
+    "affectedLayers": [
+      "config",
+      "api"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "TypeScript compilation succeeds with zero errors related to the reported issues (decorator resolution, unknown params, DTO type mismatch).",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Preserve all existing exports, types, interfaces, and imports.",
+    "Only add or modify what is needed to resolve the CI failure.",
+    "Do not modify the ILeaveManagementService interface or the CreateLeaveRequestDto in leave.model.",
+    "Enable experimentalDecorators in tsconfig.json to allow class-validator decorators.",
+    "Fix type errors in leave.controller.ts by using correct Fastify types and aligning the DTO import to match the service's expected parameter type."
+  ],
+  "outOfScope": [
+    "Any changes to leave.dto.ts (decorator errors will be resolved by tsconfig.json change).",
+    "Modifications to leave.model, ILeaveManagementService, or any other module outside leave-api.",
+    "Adding new functionality, endpoints, or business logic.",
+    "Changes to package.json, dependencies, or other configuration files except tsconfig.json.",
+    "Any other files not explicitly mentioned in the error list."
+  ],
+  "ambiguities": []
+}
