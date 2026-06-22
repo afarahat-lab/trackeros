@@ -298,3 +298,65 @@ Represents validation data managed by the `validation` module, including validat
 |-------|------|----------|
 | isValid | boolean | true |
 | errors | string[] | true |
+
+## user
+
+Represents user authentication data managed by the `user` module, including login credentials and role assignments for platform access.
+
+### User
+
+| Field | Type | Required |
+|-------|------|----------|
+| id | string | true |
+| username | string | true |
+| passwordHash | string | true |
+| employeeId | string | true |
+| role | 'employee' \| 'manager' | true |
+
+**Relationships**
+- `Employee` — one-to-one (employeeId → Employee)
+
+## auth
+
+Represents authentication API contracts managed by the `auth` module, including login and logout endpoints.
+
+### POST /api/auth/login
+
+Authenticates user with username and password, returns a JWT token.
+
+| Field | Type | Required |
+|-------|------|----------|
+| authRequired | boolean | false |
+| roles | string[] | false |
+
+**Request Body**
+
+| Field | Type | Required |
+|-------|------|----------|
+| username | string | true |
+| password | string | true |
+
+**Response Body**
+
+| Field | Type | Required |
+|-------|------|----------|
+| token | string | true |
+
+### POST /api/auth/logout
+
+Logs out the authenticated user (stateless, client discards token).
+
+| Field | Type | Required |
+|-------|------|----------|
+| authRequired | boolean | true |
+| roles | string[] | false |
+
+**Request Body**
+
+No request body required.
+
+**Response Body**
+
+| Field | Type | Required |
+|-------|------|----------|
+| message | string | true |
