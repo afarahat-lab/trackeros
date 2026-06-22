@@ -1,0 +1,53 @@
+{
+  "id": "f4f29e73-1c0a-45fd-94fd-7a90955b9e21",
+  "correlationId": "481ab02a-4121-4ddf-8394-489d72d9669a",
+  "rawIntent": "[Feature: Build the leave management module — Phase 2: Create LeavePolicy model and repository]\n\nCreate src/modules/policy/policy.model.ts with TypeScript interfaces for LeavePolicy (attributes: id, leaveTypeId, maxDaysPerYear, maxConsecutiveDays, requiresApproval, allowNegativeBalance, blackoutDates, status) and CreateLeavePolicyDto. Import LeaveType from src/shared/types/index.ts which already exists. Create src/modules/policy/policy.repository.ts with IPolicyRepository interface and PolicyRepository class. Include Jest unit tests in tests/unit/modules/policy/policy.repository.test.ts. This phase has no dependencies on other application modules.\n\nPhase architecture notes:\nLeavePolicy defines rules and constraints for a specific leave type.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/policy/policy.model.ts\\nimport { LeaveType } from \\\"../../shared/types/index\\\";\\n\\nexport interface LeavePolicy {\\n  id: string;\\n  leaveTypeId: string;\\n  maxDaysPerYear: number;\\n  maxConsecutiveDays: number;\\n  requiresApproval: boolean;\\n  allowNegativeBalance: boolean;\\n  blackoutDates: Date[];\\n  status: 'active' | 'archived';\\n}\\n\\nexport interface CreateLeavePolicyDto {\\n  leaveTypeId: string;\\n  maxDaysPerYear: number;\\n  maxConsecutiveDays: number;\\n  requiresApproval?: boolean;\\n  allowNegativeBalance?: boolean;\\n  blackoutDates?: Date[];\\n  status?: 'active' | 'archived';\\n}\",\"File: src/modules/policy/policy.repository.ts\\nimport { Pool } from \\\"../../shared/db/connection\\\";\\nimport { LeavePolicy, CreateLeavePolicyDto } from \\\"./policy.model\\\";\\n\\nexport interface ILeavePolicyRepository {\\n  findById(id: string): Promise<LeavePolicy | null>;\\n  findByLeaveTypeId(leaveTypeId: string): Promise<LeavePolicy | null>;\\n  create(dto: CreateLeavePolicyDto): Promise<LeavePolicy>;\\n  update(id: string, dto: Partial<CreateLeavePolicyDto>): Promise<LeavePolicy>;\\n  archive(id: string): Promise<LeavePolicy>;\\n}\\n\\nexport class LeavePolicyRepository implements ILeavePolicyRepository {\\n  constructor(private pool: Pool) {}\\n\\n  async findById(id: string): Promise<LeavePolicy | null> { /* implementation */ }\\n  async findByLeaveTypeId(leaveTypeId: string): Promise<LeavePolicy | null> { /* implementation */ }\\n  async create(dto: CreateLeavePolicyDto): Promise<LeavePolicy> { /* implementation */ }\\n  async update(id: string, dto: Partial<CreateLeavePolicyDto>): Promise<LeavePolicy> { /* implementation */ }\\n  async archive(id: string): Promise<LeavePolicy> { /* implementation */ }\\n}\"],\"importStatements\":[\"import { LeaveType } from \\\"../../shared/types/index\\\";\",\"import { Pool } from \\\"../../shared/db/connection\\\";\",\"import { LeavePolicy, CreateLeavePolicyDto } from \\\"./policy.model\\\";\"],\"successCriteria\":[\"src/modules/policy/policy.model.ts exists and exports LeavePolicy and CreateLeavePolicyDto\",\"src/modules/policy/policy.repository.ts exists and exports ILeavePolicyRepository and LeavePolicyRepository\",\"tests/unit/modules/policy/policy.repository.test.ts exists and tests all repository methods with Jest\"],\"sqlSchema\":\"CREATE TABLE IF NOT EXISTS leave_type_policies (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), leave_type_id UUID NOT NULL REFERENCES leave_types(id) ON DELETE CASCADE, max_days_per_year INTEGER NOT NULL CHECK (max_days_per_year > 0), max_consecutive_days INTEGER NOT NULL CHECK (max_consecutive_days > 0), requires_approval BOOLEAN NOT NULL DEFAULT true, allow_negative_balance BOOLEAN NOT NULL DEFAULT false, blackout_dates DATE[] DEFAULT '{}', status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','archived')), UNIQUE(leave_type_id));\"}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- LeavePolicy\n- CreateLeavePolicyDto\n- ILeavePolicyRepository\n- LeaveType\n- Pool\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Canonical entity fields for this phase\n\nNote: these field names supersede any attribute names in the\nintent text above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the field names of each entity this phase defines. The\nexact attribute / column / property set per entity is:\n\n- `LeavePolicy`: `id`, `leaveTypeId`, `maxDaysPerYear`, `maxConsecutiveDays`, `requiresApproval`, `allowNegativeBalance`, `blackoutDates`, `status`\n- `CreateLeavePolicyDto`: `leaveTypeId`, `maxDaysPerYear`, `maxConsecutiveDays`, `requiresApproval`, `allowNegativeBalance`, `blackoutDates`, `status`\n\nTreat each entity's field list as complete. If the\nintent text or planner scope mentions different field\nnames than the architecture, do NOT flag this as\nambiguity — the per-phase architecture wins.\n\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 3 — Create Employee service: Create src/modules/employee/employee.service.ts with EmployeeService class that uses IEmployeeReposi\n- Phase 4 — Create Policy service: Create src/modules/policy/policy.service.ts with PolicyService class that uses IPolicyRepository. In\n- Phase 5 — Create LeaveBalance model and repository: Create src/modules/balance/balance.model.ts with TypeScript interfaces for LeaveBalance (attributes:\n- Phase 6 — Create Balance service: Create src/modules/balance/balance.service.ts with BalanceService class that uses IBalanceRepository\n- Phase 7 — Create Notification and Audit models and repositories: Create src/modules/notification/notification.model.ts with TypeScript interfaces for Notification (a\n- Phase 8 — Create LeaveRequest model and repository: Create src/modules/leave/leave.model.ts with TypeScript interfaces for LeaveRequest (attributes: id,\n- Phase 9 — Create Leave orchestration service: Create src/modules/leave/leave.service.ts with LeaveService class that orchestrates leave workflow (\n- Phase 10 — Wire services, create routes and controllers: Create src/modules/leave/leave.controller.ts with REST endpoints for leave operations (POST /apply, ",
+  "scope": {
+    "affectedDomains": [
+      "policy"
+    ],
+    "affectedLayers": [
+      "domain",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/policy/policy.model.ts exists and exports LeavePolicy and CreateLeavePolicyDto",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/policy/policy.repository.ts exists and exports ILeavePolicyRepository and LeavePolicyRepository",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "tests/unit/modules/policy/policy.repository.test.ts exists and tests all repository methods with Jest",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Audit records: All state-changing operations (create, update, archive) must write an audit record when implemented."
+  ],
+  "outOfScope": [
+    "Implementation of repository methods (only stubs provided)",
+    "Policy service (Phase 4)",
+    "LeaveBalance model and repository (Phase 5)",
+    "Balance service (Phase 6)",
+    "Notification and Audit models and repositories (Phase 7)",
+    "LeaveRequest model and repository (Phase 8)",
+    "Leave orchestration service (Phase 9)",
+    "Routes and controllers (Phase 10)",
+    "Any other application modules (employee, balance, leave, notification)",
+    "Integration or end-to-end tests"
+  ],
+  "ambiguities": []
+}

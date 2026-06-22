@@ -172,16 +172,16 @@ Represents leave policy data managed by the `policy` module, including policy de
 | Field | Type | Required |
 |-------|------|----------|
 | id | string | true |
-| policyName | string | true |
-| leaveType | string | true |
-| entitlementDays | number | true |
-| accrualRate | number | false |
-| maxAccumulation | number | false |
-| minimumNoticeDays | number | false |
-| requiresManagerApproval | boolean | true |
-| isActive | boolean | true |
-| createdAt | Date | true |
-| updatedAt | Date | true |
+| leaveTypeId | string | true |
+| maxDaysPerYear | number | true |
+| maxConsecutiveDays | number | true |
+| requiresApproval | boolean | true |
+| allowNegativeBalance | boolean | true |
+| blackoutDates | Date[] | true |
+| status | 'active' \| 'archived' | true |
+
+**Relationships**
+- `LeaveType` — one-to-one
 
 ## notification
 
