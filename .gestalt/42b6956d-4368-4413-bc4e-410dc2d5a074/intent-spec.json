@@ -1,0 +1,131 @@
+{
+  "id": "c9aa4f22-3505-4b7a-a7bb-e66b87b48b76",
+  "correlationId": "42b6956d-4368-4413-bc4e-410dc2d5a074",
+  "rawIntent": "[Feature: Build a browser-usable web application for the leave-management module, in two p — Phase 1: Authentication & User Context]\n\nCreate src/modules/auth/auth.controller.ts, src/modules/auth/auth.service.ts, src/modules/auth/auth.middleware.ts, src/modules/auth/auth.dto.ts, and tests/unit/modules/auth/auth.service.test.ts. Implement JWT-based login endpoint (POST /api/auth/login), token verification middleware that populates UserContext (employee id + role), and a logout endpoint. Depend on existing src/modules/employee/employee.model.ts and src/modules/employee/employee.repository.ts for employee lookup and credential validation. Use jsonwebtoken and bcryptjs libraries.\n\nPhase architecture notes:\nEstablishes the authentication foundation required by all protected endpoints. The middleware extracts and verifies JWT from Authorization header and attaches user context to request.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/auth/user.entity.ts\\nexport interface User {\\n  id: string;\\n  username: string;\\n  passwordHash: string;\\n  employeeId: string;\\n  role: 'employee' | 'manager';\\n}\",\"File: src/modules/auth/user.repository.ts\\nimport { Pool } from '../../shared/db/connection';\\nimport { User } from './user.entity';\\n\\nexport class UserRepository {\\n  constructor(private pool: Pool) {}\\n\\n  async findByUsername(username: string): Promise<User | null> {\\n    const result = await this.pool.query(\\n      'SELECT id, username, password_hash AS \\\"passwordHash\\\", employee_id AS \\\"employeeId\\\", role FROM users WHERE username = $1',\\n      [username]\\n    );\\n    return result.rows[0] || null;\\n  }\\n}\",\"File: src/modules/auth/auth.dto.ts\\nexport interface LoginRequest {\\n  username: string;\\n  password: string;\\n}\\n\\nexport interface LoginResponse {\\n  token: string;\\n}\\n\\nexport const loginSchema = {\\n  type: 'object',\\n  required: ['username', 'password'],\\n  properties: {\\n    username: { type: 'string' },\\n    password: { type: 'string' }\\n  }\\n};\",\"File: src/modules/auth/auth.service.ts\\nimport jwt from 'jsonwebtoken';\\nimport bcrypt from 'bcryptjs';\\nimport { UserRepository } from './user.repository';\\n\\nexport interface IAuthService {\\n  login(username: string, password: string): Promise<string>;\\n}\\n\\nexport class AuthService implements IAuthService {\\n  constructor(\\n    private userRepository: UserRepository,\\n    private jwtSecret: string\\n  ) {}\\n\\n  async login(username: string, password: string): Promise<string> {\\n    const user = await this.userRepository.findByUsername(username);\\n    if (!user) {\\n      throw new Error('Invalid credentials');\\n    }\\n    const valid = await bcrypt.compare(password, user.passwordHash);\\n    if (!valid) {\\n      throw new Error('Invalid credentials');\\n    }\\n    const payload = { sub: user.employeeId, role: user.role };\\n    return jwt.sign(payload, this.jwtSecret, { expiresIn: '8h' });\\n  }\\n}\",\"File: src/modules/auth/auth.middleware.ts\\nimport { FastifyRequest, FastifyReply } from 'fastify';\\nimport jwt from 'jsonwebtoken';\\n\\nexport async function authenticateJWT(\\n  request: FastifyRequest,\\n  reply: FastifyReply\\n): Promise<void> {\\n  const authHeader = request.headers.authorization;\\n  if (!authHeader || !authHeader.startsWith('Bearer ')) {\\n    reply.status(401).send({ error: 'Missing or invalid token' });\\n    return;\\n  }\\n  const token = authHeader.substring(7);\\n  try {\\n    const decoded = jwt.verify(token, request.server.config.JWT_SECRET) as { sub: string; role: string };\\n    request.user = { employeeId: decoded.sub, role: decoded.role };\\n  } catch (err) {\\n    reply.status(401).send({ error: 'Invalid token' });\\n  }\\n}\\n\\nexport function requireRole(role: string) {\\n  return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {\\n    if (!request.user || request.user.role !== role) {\\n      reply.status(403).send({ error: 'Forbidden' });\\n    }\\n  };\\n}\",\"File: src/modules/auth/auth.controller.ts\\nimport { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';\\nimport { AuthService } from './auth.service';\\nimport { UserRepository } from './user.repository';\\nimport { loginSchema, LoginRequest } from './auth.dto';\\nimport { authenticateJWT } from './auth.middleware';\\nimport { Pool } from '../../shared/db/connection';\\n\\nexport default async function authRoutes(\\n  fastify: FastifyInstance,\\n  opts: { pool: Pool; jwtSecret: string }\\n): Promise<void> {\\n  const userRepo = new UserRepository(opts.pool);\\n  const authService = new AuthService(userRepo, opts.jwtSecret);\\n\\n  fastify.post<{ Body: LoginRequest }>(\\n    '/auth/login',\\n    { schema: { body: loginSchema } },\\n    async (request, reply) => {\\n      try {\\n        const token = await authService.login(request.body.username, request.body.password);\\n        return { token };\\n      } catch (err) {\\n        if (err.message === 'Invalid credentials') {\\n          reply.status(401).send({ error: 'Invalid credentials' });\\n        } else {\\n          request.log.error(err);\\n          reply.status(500).send({ error: 'Internal server error' });\\n        }\\n      }\\n    }\\n  );\\n\\n  fastify.post(\\n    '/auth/logout',\\n    { preHandler: authenticateJWT },\\n    async (request, reply) => {\\n      return { message: 'Logged out successfully' };\\n    }\\n  );\\n\\n  fastify.decorateRequest('user', null);\\n  fastify.addHook('onRequest', async (request) => {\\n    // user population is handled by authenticateJWT middleware on protected routes\\n  });\\n}\",\"File: src/modules/auth/index.ts\\nexport { default as authPlugin } from './auth.controller';\",\"File: tests/unit/modules/auth/auth.service.test.ts\\nimport { AuthService } from '../../../src/modules/auth/auth.service';\\nimport { UserRepository } from '../../../src/modules/auth/user.repository';\\n\\njest.mock('../../../src/modules/auth/user.repository');\\n\\ndescribe('AuthService', () => {\\n  let authService: AuthService;\\n  let mockUserRepo: jest.Mocked<UserRepository>;\\n  const jwtSecret = 'test-secret';\\n\\n  beforeEach(() => {\\n    mockUserRepo = new UserRepository(null as any) as jest.Mocked<UserRepository>;\\n    authService = new AuthService(mockUserRepo, jwtSecret);\\n  });\\n\\n  it('should return a token for valid credentials', async () => {\\n    mockUserRepo.findByUsername.mockResolvedValue({\\n      id: '1',\\n      username: 'test',\\n      passwordHash: await bcrypt.hash('password', 10),\\n      employeeId: 'emp1',\\n      role: 'employee'\\n    });\\n    const token = await authService.login('test', 'password');\\n    expect(token).toBeDefined();\\n  });\\n\\n  it('should throw for invalid username', async () => {\\n    mockUserRepo.findByUsername.mockResolvedValue(null);\\n    await expect(authService.login('bad', 'pass')).rejects.toThrow('Invalid credentials');\\n  });\\n\\n  it('should throw for invalid password', async () => {\\n    mockUserRepo.findByUsername.mockResolvedValue({\\n      id: '1',\\n      username: 'test',\\n      passwordHash: await bcrypt.hash('correct', 10),\\n      employeeId: 'emp1',\\n      role: 'employee'\\n    });\\n    await expect(authService.login('test', 'wrong')).rejects.toThrow('Invalid credentials');\\n  });\\n});\"],\"importStatements\":[\"import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';\",\"import { Pool } from '../../shared/db/connection';\",\"import jwt from 'jsonwebtoken';\",\"import bcrypt from 'bcryptjs';\",\"import { IAuthService } from './auth.service';\",\"import { UserRepository } from './user.repository';\",\"import { User } from './user.entity';\",\"import { loginSchema, LoginRequest, LoginResponse } from './auth.dto';\",\"import { authenticateJWT, requireRole } from './auth.middleware';\",\"import { authPlugin } from './index';\"],\"successCriteria\":[\"src/modules/auth/user.entity.ts exists and exports User interface matching the users table schema\",\"src/modules/auth/user.repository.ts exists and exports UserRepository class with findByUsername method\",\"src/modules/auth/auth.dto.ts exists and exports LoginRequest, LoginResponse interfaces and a Fastify-compatible loginSchema for input validation\",\"src/modules/auth/auth.service.ts exists and exports IAuthService interface and AuthService class implementing login\",\"src/modules/auth/auth.middleware.ts exists and exports authenticateJWT and requireRole preHandler hooks\",\"src/modules/auth/auth.controller.ts exists and exports a Fastify plugin that registers POST /auth/login and POST /auth/logout, and decorates request with user\",\"src/modules/auth/index.ts exists and re-exports the auth plugin\",\"tests/unit/modules/auth/auth.service.test.ts exists and contains Jest tests for AuthService.login with valid and invalid credentials\",\"POST /auth/login with valid credentials returns 200 and a JWT token\",\"POST /auth/login with invalid credentials returns 401\",\"POST /auth/login with missing username or password returns 400 due to Fastify schema validation\",\"A protected route using authenticateJWT returns 401 when no Authorization header is present\",\"A protected route using requireRole('manager') returns 403 when user role is 'employee'\",\"All async errors in AuthService.login and middleware are caught and return appropriate HTTP error responses (401 for invalid credentials, 500 for unexpected errors)\",\"AuthService.login does not log password or passwordHash (GP-004 compliance)\",\"The auth plugin can be registered on a Fastify instance with pool and jwtSecret options\"]}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- User\n- LoginRequest\n- LoginResponse\n- IAuthService\n- FastifyInstance\n- FastifyRequest\n- FastifyReply\n- Pool\n- UserRepository\n- loginSchema\n- authenticateJWT\n- requireRole\n- authPlugin\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Canonical entity fields for this phase\n\nNote: these field names supersede any attribute names in the\nintent text above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the field names of each entity this phase defines. The\nexact attribute / column / property set per entity is:\n\n- `User`: `id`, `username`, `passwordHash`, `employeeId`, `role`\n- `LoginRequest`: `username`, `password`\n- `LoginResponse`: `token`\n\nTreat each entity's field list as complete. If the\nintent text or planner scope mentions different field\nnames than the architecture, do NOT flag this as\nambiguity — the per-phase architecture wins.\n\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 2 — Leave Management REST API: Create src/modules/leave-api/leave.controller.ts, src/modules/leave-api/leave.dto.ts, src/modules/le\n- Phase 3 — Web Client Scaffold & Login: Create web/package.json, web/vite.config.ts, web/index.html, web/src/main.tsx, web/src/App.tsx. Init\n- Phase 4 — Employee View – Leave Application Form: Create web/src/pages/EmployeeDashboard.tsx, web/src/components/LeaveForm.tsx, web/src/services/leave\n- Phase 5 — Employee View – Balances & History: Create web/src/components/BalancesPanel.tsx, web/src/components/RequestHistory.tsx, and web/src/__te\n- Phase 6 — Web Client – Manager View: Create web/src/pages/ManagerDashboard.tsx, web/src/components/PendingRequests.tsx, web/src/component",
+  "scope": {
+    "affectedDomains": [
+      "auth",
+      "employee"
+    ],
+    "affectedLayers": [
+      "api",
+      "domain",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/auth/user.entity.ts exists and exports User interface matching the users table schema",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/auth/user.repository.ts exists and exports UserRepository class with findByUsername method",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "src/modules/auth/auth.dto.ts exists and exports LoginRequest, LoginResponse interfaces and a Fastify-compatible loginSchema for input validation",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "src/modules/auth/auth.service.ts exists and exports IAuthService interface and AuthService class implementing login",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "src/modules/auth/auth.middleware.ts exists and exports authenticateJWT and requireRole preHandler hooks",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-006",
+      "description": "src/modules/auth/auth.controller.ts exists and exports a Fastify plugin that registers POST /auth/login and POST /auth/logout, and decorates request with user",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-007",
+      "description": "src/modules/auth/index.ts exists and re-exports the auth plugin",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-008",
+      "description": "tests/unit/modules/auth/auth.service.test.ts exists and contains Jest tests for AuthService.login with valid and invalid credentials",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-009",
+      "description": "POST /auth/login with valid credentials returns 200 and a JWT token",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "sc-010",
+      "description": "POST /auth/login with invalid credentials returns 401",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "sc-011",
+      "description": "POST /auth/login with missing username or password returns 400 due to Fastify schema validation",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "sc-012",
+      "description": "A protected route using authenticateJWT returns 401 when no Authorization header is present",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "sc-013",
+      "description": "A protected route using requireRole('manager') returns 403 when user role is 'employee'",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "sc-014",
+      "description": "All async errors in AuthService.login and middleware are caught and return appropriate HTTP error responses (401 for invalid credentials, 500 for unexpected errors)",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "sc-015",
+      "description": "AuthService.login does not log password or passwordHash (GP-004 compliance)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-016",
+      "description": "The auth plugin can be registered on a Fastify instance with pool and jwtSecret options",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "RBAC enforcement: All API endpoints enforce role-based access control.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "Phase 2 — Leave Management REST API",
+    "Phase 3 — Web Client Scaffold & Login",
+    "Phase 4 — Employee View – Leave Application Form",
+    "Phase 5 — Employee View – Balances & History",
+    "Phase 6 — Web Client – Manager View"
+  ],
+  "ambiguities": []
+}

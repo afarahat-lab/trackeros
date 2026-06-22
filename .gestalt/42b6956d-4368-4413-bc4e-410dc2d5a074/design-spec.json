@@ -1,0 +1,65 @@
+{
+  "correlationId": "42b6956d-4368-4413-bc4e-410dc2d5a074",
+  "domainChanges": [
+    {
+      "entityName": "User",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "username",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "passwordHash",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "employeeId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "role",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [
+    {
+      "method": "POST",
+      "path": "/auth/login",
+      "description": "Authenticate user with username and password, returns a JWT token",
+      "requestBody": {
+        "username": "string",
+        "password": "string"
+      },
+      "responseBody": {
+        "token": "string"
+      },
+      "authRequired": false,
+      "roles": []
+    },
+    {
+      "method": "POST",
+      "path": "/auth/logout",
+      "description": "Logout current user (client-side token invalidation)",
+      "requestBody": {},
+      "responseBody": {
+        "message": "string"
+      },
+      "authRequired": true,
+      "roles": []
+    }
+  ],
+  "componentSpecs": []
+}

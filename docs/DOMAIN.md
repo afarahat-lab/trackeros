@@ -33,15 +33,18 @@ Represents a leave record managed by the `leave` module, including leave request
 | leaveTypeId | string | true |
 | startDate | Date | true |
 | endDate | Date | true |
-| reason | string \| undefined | false |
+| reason | string | false |
 | status | LeaveRequestStatus | true |
-| approvedBy | string \| null | false |
-| approvedAt | Date \| null | false |
+| approverId | string | false |
+| approverComment | string | false |
+| approvedAt | Date | false |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
 **Relationships**
-- `Employee` — many-to-one
+- `Employee` — many-to-one (employeeId → Employee)
+- `LeaveType` — many-to-one (leaveTypeId → LeaveType)
+- `Employee` — many-to-one (approverId → Employee)
 
 ### CreateLeaveRequestDto
 
@@ -51,7 +54,7 @@ Represents a leave record managed by the `leave` module, including leave request
 | leaveTypeId | string | true |
 | startDate | Date | true |
 | endDate | Date | true |
-| reason | string \| undefined | false |
+| reason | string | false |
 
 ### UpdateLeaveRequestDto
 
@@ -59,7 +62,7 @@ Represents a leave record managed by the `leave` module, including leave request
 |-------|------|----------|
 | startDate | Date | false |
 | endDate | Date | false |
-| reason | string \| undefined | false |
+| reason | string | false |
 
 ### LeaveRequestQueryParams
 
@@ -103,18 +106,17 @@ Represents leave balance data managed by the `balance` module, including tracked
 |-------|------|----------|
 | id | string | true |
 | employeeId | string | true |
-| policyId | string | true |
+| leaveTypeId | string | true |
 | totalEntitlement | number | true |
 | usedDays | number | true |
-| remainingDays | number | true |
-| fiscalYear | number | true |
-| status | string | true |
+| pendingDays | number | true |
+| year | number | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
 **Relationships**
 - `Employee` — many-to-one
-- `LeavePolicy` — many-to-one
+- `LeaveType` — many-to-one
 
 ## employee
 
@@ -125,18 +127,31 @@ Represents employee data managed by the `employee` module, including employee re
 | Field | Type | Required |
 |-------|------|----------|
 | id | string | true |
-| employeeNumber | string | true |
 | firstName | string | true |
 | lastName | string | true |
 | email | string | true |
-| managerId | string \| null | false |
-| department | string \| null | false |
-| hireDate | Date | true |
-| terminationDate | Date \| null | false |
-| employmentStatus | 'ACTIVE' \| 'INACTIVE' \| 'TERMINATED' | true |
+| managerId | string \| null | true |
+| role | string | true |
+| department | string \| null | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
-| deletedAt | Date \| null | false |
+
+**Relationships**
+- `Employee` — one-to-many (self-referencing, manager → subordinates)
+
+## leavetype
+
+Represents leave type definitions managed by the `leavetype` module, including leave type records and related configuration.
+
+### LeaveType
+
+| Field | Type | Required |
+|-------|------|----------|
+| id | string | true |
+| name | string | true |
+| description | string \| null | false |
+| requiresDocumentation | boolean | true |
+| createdAt | Date | true |
 
 ## policy
 
@@ -174,20 +189,45 @@ Represents leave policy data managed by the `policy` module, including policy de
 | Field | Type | Required |
 |-------|------|----------|
 | id | string | true |
-| policyName | string | true |
-| leaveType | string | true |
-| entitlementDays | number | true |
-| accrualRate | number | false |
-| maxAccumulation | number | false |
-| minimumNoticeDays | number | false |
-| requiresManagerApproval | boolean | true |
-| isActive | boolean | true |
+| leaveTypeId | string | true |
+| maxDaysPerYear | number | true |
+| maxConsecutiveDays | number \| null | false |
+| requiresApproval | boolean | true |
+| minNoticeDays | number | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
+
+**Relationships**
+- `LeaveType` — one-to-one
+
+## user
+
+Represents user authentication data managed by the `user` module, including user credentials and role assignments for platform access.
+
+### User
+
+| Field | Type | Required |
+|-------|------|----------|
+| id | string | true |
+| username | string | true |
+| passwordHash | string | true |
+| employeeId | string | true |
+| role | string | true |
+
+**Relationships**
+- `Employee` — one-to-one (employeeId → Employee)
 
 ## notification
 
 Represents notification data managed by the `notification` module, including notification records, delivery status, and related messaging information.
+
+### NotificationType
+
+| Value | Description |
+|-------|-------------|
+| LEAVE_APPROVED | Leave request has been approved |
+| LEAVE_REJECTED | Leave request has been rejected |
+| LEAVE_CANCELLED | Leave request has been cancelled |
 
 ### Notification
 
@@ -195,14 +235,15 @@ Represents notification data managed by the `notification` module, including not
 |-------|------|----------|
 | id | string | true |
 | recipientId | string | true |
-| type | string | true |
-| title | string | true |
+| leaveRequestId | string | true |
+| type | NotificationType | true |
 | message | string | true |
-| relatedEntityType | string \| null | false |
-| relatedEntityId | string \| null | false |
-| status | 'PENDING' \| 'SENT' \| 'READ' \| 'ARCHIVED' | true |
+| isRead | boolean | true |
 | createdAt | Date | true |
-| readAt | Date \| null | false |
+
+**Relationships**
+- `Employee` — many-to-one
+- `LeaveRequest` — many-to-one
 
 ## audit
 
@@ -230,11 +271,14 @@ Represents audit data managed by the `audit` module, including audit records, ch
 | id | string | true |
 | entityType | string | true |
 | entityId | string | true |
-| action | 'CREATE' \| 'UPDATE' \| 'DELETE' \| 'APPROVE' \| 'REJECT' | true |
-| oldValues | Record<string, any> \| null | false |
-| newValues | Record<string, any> \| null | false |
-| performedBy | string \| null | false |
-| performedAt | Date | true |
+| action | string | true |
+| changedBy | string | true |
+| oldValues | Record<string, unknown> \| null | true |
+| newValues | Record<string, unknown> \| null | true |
+| createdAt | Date | true |
+
+**Relationships**
+- `Employee` — many-to-one
 
 ### AuditRecord
 
