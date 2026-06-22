@@ -25,6 +25,7 @@ export class AuthService implements IAuthService {
       throw new Error('Employee not found');
     }
 
+
     const isValid = await bcrypt.compare(password, user.passwordHash);
     if (!isValid) {
       throw new Error('Invalid credentials');
