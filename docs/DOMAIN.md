@@ -77,6 +77,193 @@ Represents a leave record managed by the `leave` module, including leave request
 | limit | number | false |
 | offset | number | false |
 
+### POST /api/leave/submit
+
+Submit a new leave request.
+
+| Field | Type | Required |
+|-------|------|----------|
+| authRequired | boolean | true |
+| roles | string[] | false |
+
+**Request Body**
+
+| Field | Type | Required |
+|-------|------|----------|
+| leaveTypeId | string (UUID) | true |
+| startDate | string (ISO 8601 date) | true |
+| endDate | string (ISO 8601 date) | true |
+| reason | string | false |
+
+**Response Body**
+
+| Field | Type | Required |
+|-------|------|----------|
+| id | string | true |
+| employeeId | string | true |
+| leaveTypeId | string | true |
+| startDate | string | true |
+| endDate | string | true |
+| reason | string \| null | true |
+| status | string | true |
+| managerComment | string \| null | true |
+| createdAt | string | true |
+| updatedAt | string | true |
+
+### PUT /api/leave/approve/:id
+
+Approve a leave request by ID.
+
+| Field | Type | Required |
+|-------|------|----------|
+| authRequired | boolean | true |
+| roles | string[] | false |
+
+**Request Body**
+
+| Field | Type | Required |
+|-------|------|----------|
+| comment | string | false |
+
+**Response Body**
+
+| Field | Type | Required |
+|-------|------|----------|
+| id | string | true |
+| employeeId | string | true |
+| leaveTypeId | string | true |
+| startDate | string | true |
+| endDate | string | true |
+| reason | string \| null | true |
+| status | string | true |
+| managerComment | string \| null | true |
+| createdAt | string | true |
+| updatedAt | string | true |
+
+### PUT /api/leave/reject/:id
+
+Reject a leave request by ID.
+
+| Field | Type | Required |
+|-------|------|----------|
+| authRequired | boolean | true |
+| roles | string[] | false |
+
+**Request Body**
+
+| Field | Type | Required |
+|-------|------|----------|
+| comment | string | false |
+
+**Response Body**
+
+| Field | Type | Required |
+|-------|------|----------|
+| id | string | true |
+| employeeId | string | true |
+| leaveTypeId | string | true |
+| startDate | string | true |
+| endDate | string | true |
+| reason | string \| null | true |
+| status | string | true |
+| managerComment | string \| null | true |
+| createdAt | string | true |
+| updatedAt | string | true |
+
+### PUT /api/leave/cancel/:id
+
+Cancel a leave request by ID.
+
+| Field | Type | Required |
+|-------|------|----------|
+| authRequired | boolean | true |
+| roles | string[] | false |
+
+**Request Body**
+
+No request body required.
+
+**Response Body**
+
+| Field | Type | Required |
+|-------|------|----------|
+| id | string | true |
+| employeeId | string | true |
+| leaveTypeId | string | true |
+| startDate | string | true |
+| endDate | string | true |
+| reason | string \| null | true |
+| status | string | true |
+| managerComment | string \| null | true |
+| createdAt | string | true |
+| updatedAt | string | true |
+
+### DELETE /api/leave/discard-draft/:id
+
+Discard a draft leave request by ID.
+
+| Field | Type | Required |
+|-------|------|----------|
+| authRequired | boolean | true |
+| roles | string[] | false |
+
+**Request Body**
+
+No request body required.
+
+**Response Body**
+
+No response body returned.
+
+### GET /api/leave/balances
+
+Get leave balances for the authenticated employee.
+
+| Field | Type | Required |
+|-------|------|----------|
+| authRequired | boolean | true |
+| roles | string[] | false |
+
+**Request Body**
+
+No request body required.
+
+**Response Body**
+
+| Field | Type | Required |
+|-------|------|----------|
+| leaveTypeId | string | true |
+| balance | number | true |
+| year | number | true |
+
+### GET /api/leave/history
+
+Get leave request history for the authenticated employee with optional filters.
+
+| Field | Type | Required |
+|-------|------|----------|
+| authRequired | boolean | true |
+| roles | string[] | false |
+
+**Request Body**
+
+No request body required.
+
+**Response Body**
+
+| Field | Type | Required |
+|-------|------|----------|
+| id | string | true |
+| employeeId | string | true |
+| leaveTypeId | string | true |
+| startDate | string | true |
+| endDate | string | true |
+| reason | string \| null | true |
+| status | string | true |
+| managerComment | string \| null | true |
+| createdAt | string | true |
+| updatedAt | string | true |
+
 ## balance
 
 Represents leave balance data managed by the `balance` module, including tracked entitlement, accrual, and remaining leave amounts.
