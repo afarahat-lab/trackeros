@@ -139,6 +139,23 @@ Represents employee data managed by the `employee` module, including employee re
 **Relationships**
 - `Employee` — one-to-many (self-referencing, manager → subordinates)
 
+## user
+
+Represents user authentication data managed by the `user` module, including login credentials and role assignments.
+
+### User
+
+| Field | Type | Required |
+|-------|------|----------|
+| id | string | true |
+| username | string | true |
+| passwordHash | string | true |
+| employeeId | string | true |
+| role | 'employee' \| 'manager' | true |
+
+**Relationships**
+- `Employee` — one-to-one (employeeId → Employee)
+
 ## leavetype
 
 Represents leave type definitions managed by the `leavetype` module, including leave type records and related configuration.
