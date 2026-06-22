@@ -1,0 +1,35 @@
+{
+  "correlationId": "7c72ce43-701d-4421-9b47-fdc2b724a4d5",
+  "domainChanges": [],
+  "apiContracts": [
+    {
+      "method": "GET",
+      "path": "/api/v1/leave-balances",
+      "description": "Retrieve leave balances for the authenticated employee (or for a specific employee if manager and within team).",
+      "requestBody": null,
+      "responseBody": {
+        "balances": "LeaveBalance[]"
+      },
+      "authRequired": true,
+      "roles": [
+        "employee",
+        "manager"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/leave-requests",
+      "description": "Retrieve leave request history with optional filters (employeeId, status, startDate, endDate). Scoped to the authenticated user's role.",
+      "requestBody": null,
+      "responseBody": {
+        "requests": "LeaveRequest[]"
+      },
+      "authRequired": true,
+      "roles": [
+        "employee",
+        "manager"
+      ]
+    }
+  ],
+  "componentSpecs": []
+}

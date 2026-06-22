@@ -1,0 +1,78 @@
+{
+  "id": "d25cc204-650c-407a-b974-00f12815cf2b",
+  "correlationId": "1cb5a5f2-9eeb-49b0-af4b-de8c80885dd0",
+  "rawIntent": "[Feature: Build the leave management module — Phase 8: Implement approve and reject use cases]\n\nAdd approveLeave and rejectLeave methods to src/modules/leave-management/leave-management.service.ts. approveLeave: validate manager role, update LeaveRequest status to Approved, adjust LeaveBalance (move pendingDays to usedDays), send notification via INotificationRepository, audit log. rejectLeave: similar with Rejected status, release pendingDays. Update tests/unit/modules/leave-management/leave-management.service.test.ts with tests for these methods. Depends on Phase 7 service file and all repositories.\n\nPhase architecture notes:\nManager actions that mutate state and balances.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[],\"importStatements\":[\"import { ILeaveRepository } from '../leave/leave.repository';\",\"import { IBalanceRepository } from '../balance/balance.repository';\",\"import { IEmployeeRepository } from '../employee/employee.repository';\",\"import { IAuditRepository } from '../audit/audit.repository';\",\"import { INotificationRepository } from '../notification/notification.repository';\",\"import { LeaveRequest, LeaveRequestStatus } from '../leave/leave.model';\",\"import { LeaveBalance } from '../balance/balance.model';\",\"import { Employee } from '../employee/employee.model';\",\"import { AuditLog } from '../audit/audit.model';\",\"import { Notification } from '../notification/notification.model';\",\"import { pool } from '../../shared/db/connection';\",\"import { ForbiddenError } from '../../shared/errors';\"],\"successCriteria\":[\"src/modules/leave-management/leave-management.service.ts exports approveLeave(leaveId: string, approverId: string): Promise<LeaveRequest> and rejectLeave(leaveId: string, approverId: string, comment?: string): Promise<LeaveRequest> methods\",\"approveLeave method updates leave request status to Approved, moves pendingDays to usedDays in the corresponding LeaveBalance, creates an audit log entry, and sends a notification to the employee — all within a single database transaction\",\"rejectLeave method updates leave request status to Rejected, reduces pendingDays in the LeaveBalance, creates an audit log entry, and sends a notification to the employee — all within a single database transaction\",\"Both methods validate that the approver has the manager role and is the manager of the requesting employee (using IEmployeeRepository to check role and manager relationship) and throw a ForbiddenError if not\",\"Input validation is performed on leaveId (UUID format) and approverId (UUID format) before processing\",\"All async errors are caught and handled, with no unhandled promise rejections\",\"Unit tests in tests/unit/modules/leave-management/leave-management.service.test.ts cover approve and reject scenarios including successful approval, successful rejection, unauthorized approver, invalid leaveId, and transaction rollback on failure\"]}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- ILeaveRepository\n- IBalanceRepository\n- IEmployeeRepository\n- IAuditRepository\n- INotificationRepository\n- LeaveRequest\n- LeaveRequestStatus\n- LeaveBalance\n- Employee\n- AuditLog\n- Notification\n- pool\n- ForbiddenError\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 9 — Implement cancel leave, discard draft, and balance recalculation: Add cancelLeave and discardDraft methods to src/modules/leave-management/leave-management.service.ts\n- Phase 10 — Integrate audit logging, RBAC enforcement, and read operations: Modify src/modules/leave-management/leave-management.service.ts to inject IAuditService and enforce ",
+  "scope": {
+    "affectedDomains": [
+      "leave-management"
+    ],
+    "affectedLayers": [
+      "domain",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/leave-management/leave-management.service.ts exports approveLeave(leaveId: string, approverId: string): Promise<LeaveRequest> and rejectLeave(leaveId: string, approverId: string, comment?: string): Promise<LeaveRequest> methods",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "approveLeave method updates leave request status to Approved, moves pendingDays to usedDays in the corresponding LeaveBalance, creates an audit log entry, and sends a notification to the employee — all within a single database transaction",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "rejectLeave method updates leave request status to Rejected, reduces pendingDays in the LeaveBalance, creates an audit log entry, and sends a notification to the employee — all within a single database transaction",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "Both methods validate that the approver has the manager role and is the manager of the requesting employee (using IEmployeeRepository to check role and manager relationship) and throw a ForbiddenError if not",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "Input validation is performed on leaveId (UUID format) and approverId (UUID format) before processing",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-006",
+      "description": "All async errors are caught and handled, with no unhandled promise rejections",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-007",
+      "description": "Unit tests in tests/unit/modules/leave-management/leave-management.service.test.ts cover approve and reject scenarios including successful approval, successful rejection, unauthorized approver, invalid leaveId, and transaction rollback on failure",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Audit records: All state-changing operations write an audit record.",
+    "Input validation: Validate all inputs (leaveId, approverId) before processing.",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "RBAC enforcement: Validate approver has manager role and is manager of the requesting employee.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled.",
+    "All operations within a single database transaction.",
+    "Dependency direction: leave-management depends on leave, balance, employee, notification, audit; no reverse dependencies."
+  ],
+  "outOfScope": [
+    "Phase 9: cancelLeave and discardDraft methods",
+    "Phase 10: integrate IAuditService and RBAC enforcement for read operations",
+    "Any other leave management features beyond approveLeave and rejectLeave",
+    "API endpoints or UI for these actions",
+    "Modifications to existing modules (leave, balance, employee, notification, audit) beyond using their repositories"
+  ],
+  "ambiguities": []
+}
