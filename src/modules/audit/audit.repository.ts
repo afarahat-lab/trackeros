@@ -16,7 +16,7 @@ export class AuditRepository implements IAuditRepository {
     const query = `
       INSERT INTO audit_logs (entity_type, entity_id, action, old_value, new_value, changed_by, changed_at)
       VALUES ($1, $2, $3, $4, $5, $6, NOW())
-      RETURNING id, entity_type, entity_id, action, old_value, new_value, changed_by, changed_at
+      RETURNING *
     `;
 
     const values = [
@@ -29,8 +29,23 @@ export class AuditRepository implements IAuditRepository {
     ];
 
     const result = await this.pool.query(query, values);
-    const row = result.rows[0];
+    return this.mapRow(result.rows[0]);
+  }
 
+  async findById(id: string): Promise<AuditLog | null> {
+    const result = await this.pool.query('SELECT * FROM audit_logs WHERE id = $1', [id]);
+    return result.rows[0] ? this.mapRow(result.rows[0]) : null;
+  }
+
+  async findByEntity(entityType: string, entityId: string): Promise<AuditLog[]> {
+    const result = await this.pool.query(
+      'SELECT * FROM audit_logs WHERE entity_type = $1 AND entity_id = $2 ORDER BY changed_at DESC',
+      [entityType, entityId]
+    );
+    return result.rows.map(this.mapRow);
+  }
+
+  private mapRow(row: any): AuditLog {
     return {
       id: row.id,
       entityType: row.entity_type,
@@ -41,13 +56,5 @@ export class AuditRepository implements IAuditRepository {
       changedBy: row.changed_by,
       changedAt: row.changed_at
     };
-  }
-
-  async findById(id: string): Promise<AuditLog | null> {
-    throw new Error('Not implemented');
-  }
-
-  async findByEntity(entityType: string, entityId: string): Promise<AuditLog[]> {
-    throw new Error('Not implemented');
   }
 }

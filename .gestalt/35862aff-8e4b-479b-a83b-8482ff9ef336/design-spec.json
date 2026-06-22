@@ -1,0 +1,153 @@
+{
+  "correlationId": "35862aff-8e4b-479b-a83b-8482ff9ef336",
+  "domainChanges": [],
+  "apiContracts": [
+    {
+      "method": "POST",
+      "path": "/apply",
+      "description": "Submit a new leave request",
+      "requestBody": {
+        "leaveTypeId": "string (UUID)",
+        "startDate": "string (date)",
+        "endDate": "string (date)",
+        "reason": "string (optional)"
+      },
+      "responseBody": {
+        "id": "string",
+        "employeeId": "string",
+        "leaveTypeId": "string",
+        "startDate": "string",
+        "endDate": "string",
+        "reason": "string",
+        "status": "string",
+        "createdAt": "string",
+        "updatedAt": "string"
+      },
+      "authRequired": true,
+      "roles": [
+        "employee"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/approve/:id",
+      "description": "Approve a pending leave request",
+      "requestBody": {},
+      "responseBody": {
+        "id": "string",
+        "employeeId": "string",
+        "leaveTypeId": "string",
+        "startDate": "string",
+        "endDate": "string",
+        "reason": "string",
+        "status": "string",
+        "createdAt": "string",
+        "updatedAt": "string"
+      },
+      "authRequired": true,
+      "roles": [
+        "manager"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/reject/:id",
+      "description": "Reject a pending leave request",
+      "requestBody": {
+        "reason": "string (optional)"
+      },
+      "responseBody": {
+        "id": "string",
+        "employeeId": "string",
+        "leaveTypeId": "string",
+        "startDate": "string",
+        "endDate": "string",
+        "reason": "string",
+        "status": "string",
+        "createdAt": "string",
+        "updatedAt": "string"
+      },
+      "authRequired": true,
+      "roles": [
+        "manager"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/cancel/:id",
+      "description": "Cancel a leave request (by the employee)",
+      "requestBody": {},
+      "responseBody": {
+        "id": "string",
+        "employeeId": "string",
+        "leaveTypeId": "string",
+        "startDate": "string",
+        "endDate": "string",
+        "reason": "string",
+        "status": "string",
+        "createdAt": "string",
+        "updatedAt": "string"
+      },
+      "authRequired": true,
+      "roles": [
+        "employee"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/:id",
+      "description": "Get a single leave request by ID",
+      "requestBody": {},
+      "responseBody": {
+        "id": "string",
+        "employeeId": "string",
+        "leaveTypeId": "string",
+        "startDate": "string",
+        "endDate": "string",
+        "reason": "string",
+        "status": "string",
+        "createdAt": "string",
+        "updatedAt": "string"
+      },
+      "authRequired": true,
+      "roles": []
+    },
+    {
+      "method": "GET",
+      "path": "/",
+      "description": "List leave requests with optional filters (status, employeeId)",
+      "requestBody": {},
+      "responseBody": [
+        {
+          "id": "string",
+          "employeeId": "string",
+          "leaveTypeId": "string",
+          "startDate": "string",
+          "endDate": "string",
+          "reason": "string",
+          "status": "string",
+          "createdAt": "string",
+          "updatedAt": "string"
+        }
+      ],
+      "authRequired": true,
+      "roles": []
+    },
+    {
+      "method": "GET",
+      "path": "/balance",
+      "description": "Get leave balance for the authenticated employee, optionally filtered by leaveTypeId and year",
+      "requestBody": {},
+      "responseBody": {
+        "id": "string",
+        "employeeId": "string",
+        "leaveTypeId": "string",
+        "balance": "number",
+        "year": "number"
+      },
+      "authRequired": true,
+      "roles": []
+    }
+  ],
+  "componentSpecs": []
+}

@@ -1,0 +1,102 @@
+{
+  "id": "666022a2-22e4-4f6c-89f9-cbdc85ae2b4e",
+  "correlationId": "35862aff-8e4b-479b-a83b-8482ff9ef336",
+  "rawIntent": "[Feature: Build the leave management module — Phase 10: Wire services, create routes and controllers]\n\nCreate src/modules/leave/leave.controller.ts with REST endpoints for leave operations (POST /apply, PUT /approve/:id, etc.) using LeaveService. Create src/modules/leave/leave.routes.ts to define routes. Set up dependency injection container (e.g., in src/shared/di/container.ts) to wire all services and repositories. Include integration tests in tests/integration/leave/leave.api.test.ts that validate end-to-end flows. This phase depends on all prior phases — read all service and repository files before generating.\n\nThis phase depends on: Phase 9, Phase 7, Phase 6, Phase 4, Phase 3, Phase 2, Phase 1.\n\nPhase architecture notes:\nWiring phase connects all modules, exposes API, and ensures audit records are written for state-changing operations.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/shared/types/auth.ts\\nexport interface AuthenticatedUser {\\n  id: string;\\n  role: string;\\n}\\n\\nexport interface AuthenticatedRequest extends FastifyRequest {\\n  user: AuthenticatedUser;\\n}\",\"File: src/modules/leave/leave.schemas.ts\\nexport const applyLeaveSchema = {\\n  body: {\\n    type: 'object',\\n    required: ['leaveTypeId', 'startDate', 'endDate'],\\n    properties: {\\n      leaveTypeId: { type: 'string', format: 'uuid' },\\n      startDate: { type: 'string', format: 'date' },\\n      endDate: { type: 'string', format: 'date' },\\n      reason: { type: 'string' }\\n    }\\n  }\\n};\\n\\nexport const approveLeaveSchema = {\\n  params: {\\n    type: 'object',\\n    required: ['id'],\\n    properties: {\\n      id: { type: 'string', format: 'uuid' }\\n    }\\n  }\\n};\\n\\nexport const rejectLeaveSchema = {\\n  params: {\\n    type: 'object',\\n    required: ['id'],\\n    properties: {\\n      id: { type: 'string', format: 'uuid' }\\n    }\\n  },\\n  body: {\\n    type: 'object',\\n    properties: {\\n      reason: { type: 'string' }\\n    }\\n  }\\n};\\n\\nexport const cancelLeaveSchema = {\\n  params: {\\n    type: 'object',\\n    required: ['id'],\\n    properties: {\\n      id: { type: 'string', format: 'uuid' }\\n    }\\n  }\\n};\\n\\nexport const getLeaveRequestSchema = {\\n  params: {\\n    type: 'object',\\n    required: ['id'],\\n    properties: {\\n      id: { type: 'string', format: 'uuid' }\\n    }\\n  }\\n};\\n\\nexport const getLeaveRequestsSchema = {\\n  querystring: {\\n    type: 'object',\\n    properties: {\\n      status: { type: 'string' },\\n      employeeId: { type: 'string', format: 'uuid' }\\n    }\\n  }\\n};\\n\\nexport const getLeaveBalanceSchema = {\\n  querystring: {\\n    type: 'object',\\n    properties: {\\n      leaveTypeId: { type: 'string', format: 'uuid' },\\n      year: { type: 'integer' }\\n    }\\n  }\\n};\",\"File: src/modules/leave/leave.controller.ts\\nimport { FastifyRequest, FastifyReply } from 'fastify';\\nimport { LeaveService } from './leave.service';\\nimport { BalanceService } from '../balance/balance.service';\\nimport { CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveRequest } from './leave.model';\\nimport { LeaveBalance } from '../balance/balance.model';\\nimport { AuthenticatedRequest } from '../../shared/types/auth';\\n\\nexport class LeaveController {\\n  constructor(\\n    private readonly leaveService: LeaveService,\\n    private readonly balanceService: BalanceService\\n  ) {}\\n\\n  async applyLeave(request: AuthenticatedRequest, reply: FastifyReply): Promise<void> {\\n    const dto: CreateLeaveRequestDto = request.body;\\n    const employeeId = request.user.id;\\n    const leaveRequest = await this.leaveService.applyLeave(employeeId, dto);\\n    reply.code(201).send(leaveRequest);\\n  }\\n\\n  async approveLeave(request: AuthenticatedRequest, reply: FastifyReply): Promise<void> {\\n    const { id } = request.params as { id: string };\\n    const approverId = request.user.id;\\n    const leaveRequest = await this.leaveService.approveLeave(id, approverId);\\n    reply.send(leaveRequest);\\n  }\\n\\n  async rejectLeave(request: AuthenticatedRequest, reply: FastifyReply): Promise<void> {\\n    const { id } = request.params as { id: string };\\n    const approverId = request.user.id;\\n    const reason = (request.body as any)?.reason;\\n    const leaveRequest = await this.leaveService.rejectLeave(id, approverId, reason);\\n    reply.send(leaveRequest);\\n  }\\n\\n  async cancelLeave(request: AuthenticatedRequest, reply: FastifyReply): Promise<void> {\\n    const { id } = request.params as { id: string };\\n    const employeeId = request.user.id;\\n    const leaveRequest = await this.leaveService.cancelLeave(id, employeeId);\\n    reply.send(leaveRequest);\\n  }\\n\\n  async getLeaveRequest(request: AuthenticatedRequest, reply: FastifyReply): Promise<void> {\\n    const { id } = request.params as { id: string };\\n    const leaveRequest = await this.leaveService.getLeaveRequest(id);\\n    reply.send(leaveRequest);\\n  }\\n\\n  async getLeaveRequests(request: AuthenticatedRequest, reply: FastifyReply): Promise<void> {\\n    const filters = request.query as any;\\n    const leaveRequests = await this.leaveService.getLeaveRequests(filters);\\n    reply.send(leaveRequests);\\n  }\\n\\n  async getLeaveBalance(request: AuthenticatedRequest, reply: FastifyReply): Promise<void> {\\n    const employeeId = request.user.id;\\n    const { leaveTypeId, year } = request.query as any;\\n    const balance = await this.balanceService.getBalance(employeeId, leaveTypeId, year);\\n    reply.send(balance);\\n  }\\n}\",\"File: src/modules/leave/leave.routes.ts\\nimport { FastifyInstance } from 'fastify';\\nimport { LeaveController } from './leave.controller';\\nimport { applyLeaveSchema, approveLeaveSchema, rejectLeaveSchema, cancelLeaveSchema, getLeaveRequestSchema, getLeaveRequestsSchema, getLeaveBalanceSchema } from './leave.schemas';\\nimport { AuthenticatedRequest } from '../../shared/types/auth';\\n\\nexport function registerLeaveRoutes(fastify: FastifyInstance, leaveController: LeaveController): void {\\n  fastify.post('/apply', { schema: applyLeaveSchema, preHandler: [fastify.authenticate, fastify.authorize('employee')] }, leaveController.applyLeave.bind(leaveController));\\n  fastify.put('/approve/:id', { schema: approveLeaveSchema, preHandler: [fastify.authenticate, fastify.authorize('manager')] }, leaveController.approveLeave.bind(leaveController));\\n  fastify.put('/reject/:id', { schema: rejectLeaveSchema, preHandler: [fastify.authenticate, fastify.authorize('manager')] }, leaveController.rejectLeave.bind(leaveController));\\n  fastify.put('/cancel/:id', { schema: cancelLeaveSchema, preHandler: [fastify.authenticate, fastify.authorize('employee')] }, leaveController.cancelLeave.bind(leaveController));\\n  fastify.get('/:id', { schema: getLeaveRequestSchema, preHandler: [fastify.authenticate] }, leaveController.getLeaveRequest.bind(leaveController));\\n  fastify.get('/', { schema: getLeaveRequestsSchema, preHandler: [fastify.authenticate] }, leaveController.getLeaveRequests.bind(leaveController));\\n  fastify.get('/balance', { schema: getLeaveBalanceSchema, preHandler: [fastify.authenticate] }, leaveController.getLeaveBalance.bind(leaveController));\\n}\",\"File: src/shared/di/container.ts\\nimport { FastifyInstance } from 'fastify';\\nimport { LeaveService } from '../modules/leave/leave.service';\\nimport { BalanceService } from '../modules/balance/balance.service';\\nimport { EmployeeService } from '../modules/employee/employee.service';\\nimport { LeaveRepository } from '../modules/leave/leave.repository';\\nimport { BalanceRepository } from '../modules/balance/balance.repository';\\nimport { EmployeeRepository } from '../modules/employee/employee.repository';\\nimport { LeaveController } from '../modules/leave/leave.controller';\\nimport { registerLeaveRoutes } from '../modules/leave/leave.routes';\\n\\nexport function setupContainer(fastify: FastifyInstance): void {\\n  const leaveRepository = new LeaveRepository(fastify.db);\\n  const balanceRepository = new BalanceRepository(fastify.db);\\n  const employeeRepository = new EmployeeRepository(fastify.db);\\n\\n  const leaveService = new LeaveService(leaveRepository, balanceRepository, employeeRepository);\\n  const balanceService = new BalanceService(balanceRepository);\\n  const employeeService = new EmployeeService(employeeRepository);\\n\\n  const leaveController = new LeaveController(leaveService, balanceService);\\n\\n  registerLeaveRoutes(fastify, leaveController);\\n}\"],\"importStatements\":[\"import { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';\",\"import { LeaveService } from './leave.service';\",\"import { BalanceService } from '../balance/balance.service';\",\"import { EmployeeService } from '../employee/employee.service';\",\"import { CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveRequest } from './leave.model';\",\"import { LeaveBalance } from '../balance/balance.model';\",\"import { AuthenticatedUser, AuthenticatedRequest } from '../../shared/types/auth';\",\"import { applyLeaveSchema, approveLeaveSchema, rejectLeaveSchema, cancelLeaveSchema, getLeaveRequestSchema, getLeaveRequestsSchema, getLeaveBalanceSchema } from './leave.schemas';\",\"import { LeaveRepository } from '../modules/leave/leave.repository';\",\"import { BalanceRepository } from '../modules/balance/balance.repository';\",\"import { EmployeeRepository } from '../modules/employee/employee.repository';\",\"import { LeaveController } from '../modules/leave/leave.controller';\",\"import { registerLeaveRoutes } from '../modules/leave/leave.routes';\"],\"successCriteria\":[\"src/modules/leave/leave.controller.ts exists and exports LeaveController class with methods: applyLeave, approveLeave, rejectLeave, cancelLeave, getLeaveRequest, getLeaveRequests, getLeaveBalance.\",\"src/modules/leave/leave.routes.ts exists and exports registerLeaveRoutes(fastify: FastifyInstance, leaveController: LeaveController) that registers all leave endpoints with RBAC preHandlers and schema validation.\",\"src/modules/leave/leave.schemas.ts exists and exports JSON Schema objects for each endpoint's request validation (applyLeaveSchema, approveLeaveSchema, rejectLeaveSchema, cancelLeaveSchema, getLeaveRequestSchema, getLeaveRequestsSchema, getLeaveBalanceSchema).\",\"src/shared/types/auth.ts exists and exports AuthenticatedUser and AuthenticatedRequest interfaces.\",\"src/shared/di/container.ts exists and exports setupContainer(fastify: FastifyInstance) that instantiates all repositories, services, and the LeaveController, then registers leave routes on the Fastify instance.\",\"All leave endpoints enforce RBAC: employees can only apply/cancel their own requests; managers can approve/reject requests for their subordinates; admins have full access. RBAC is enforced via Fastify preHandler hooks using authenticate and authorize decorators.\",\"Input validation rejects invalid payloads with 400 status using Fastify schema validation defined in leave.schemas.ts.\",\"State-changing operations (apply, approve, reject, cancel) result in audit log entries written by LeaveService (no additional audit logic in controller).\",\"Jest unit tests for LeaveController and routes exist in tests/unit/modules/leave/leave.controller.test.ts and tests/unit/modules/leave/leave.routes.test.ts.\",\"Integration tests in tests/integration/leave/leave.api.test.ts validate end-to-end flows using Fastify's inject method, covering apply, approve, reject, cancel, and balance retrieval with proper authentication and authorization.\"]}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- AuthenticatedUser\n- AuthenticatedRequest\n- FastifyRequest\n- FastifyReply\n- FastifyInstance\n- LeaveService\n- BalanceService\n- EmployeeService\n- CreateLeaveRequestDto\n- UpdateLeaveRequestDto\n- LeaveRequest\n- LeaveBalance\n- applyLeaveSchema\n- approveLeaveSchema\n- rejectLeaveSchema\n- cancelLeaveSchema\n- getLeaveRequestSchema\n- getLeaveRequestsSchema\n- getLeaveBalanceSchema\n- LeaveRepository\n- BalanceRepository\n- EmployeeRepository\n- LeaveController\n- registerLeaveRoutes\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Canonical entity fields for this phase\n\nNote: these field names supersede any attribute names in the\nintent text above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the field names of each entity this phase defines. The\nexact attribute / column / property set per entity is:\n\n- `AuthenticatedUser`: `id`, `role`\n- `AuthenticatedRequest`: `user`\n\nTreat each entity's field list as complete. If the\nintent text or planner scope mentions different field\nnames than the architecture, do NOT flag this as\nambiguity — the per-phase architecture wins.\n",
+  "scope": {
+    "affectedDomains": [
+      "leave",
+      "balance",
+      "employee",
+      "shared"
+    ],
+    "affectedLayers": [
+      "api",
+      "infra",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/leave/leave.controller.ts exists and exports LeaveController class with methods: applyLeave, approveLeave, rejectLeave, cancelLeave, getLeaveRequest, getLeaveRequests, getLeaveBalance.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/leave/leave.routes.ts exists and exports registerLeaveRoutes(fastify, leaveController) that registers all leave endpoints with RBAC preHandlers and schema validation.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "src/modules/leave/leave.schemas.ts exists and exports JSON Schema objects for each endpoint's request validation (applyLeaveSchema, approveLeaveSchema, rejectLeaveSchema, cancelLeaveSchema, getLeaveRequestSchema, getLeaveRequestsSchema, getLeaveBalanceSchema).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "src/shared/types/auth.ts exists and exports AuthenticatedUser and AuthenticatedRequest interfaces.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "src/shared/di/container.ts exists and exports setupContainer(fastify) that instantiates all repositories, services, and LeaveController, then registers leave routes.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-006",
+      "description": "All leave endpoints enforce RBAC: employees can only apply/cancel their own requests; managers can approve/reject requests for their subordinates; admins have full access. RBAC is enforced via Fastify preHandler hooks using authenticate and authorize decorators.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "sc-007",
+      "description": "Input validation rejects invalid payloads with 400 status using Fastify schema validation defined in leave.schemas.ts.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "sc-008",
+      "description": "State-changing operations (apply, approve, reject, cancel) result in audit log entries written by LeaveService (no additional audit logic in controller).",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "sc-009",
+      "description": "Jest unit tests for LeaveController and routes exist in tests/unit/modules/leave/leave.controller.test.ts and tests/unit/modules/leave/leave.routes.test.ts.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-010",
+      "description": "Integration tests in tests/integration/leave/leave.api.test.ts validate end-to-end flows using Fastify's inject method, covering apply, approve, reject, cancel, and balance retrieval with proper authentication and authorization.",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "All database access goes through repository interfaces (LeaveRepository, BalanceRepository, EmployeeRepository).",
+    "All state-changing operations (apply, approve, reject, cancel) must write an audit record via LeaveService.",
+    "Validate all inputs at API boundaries before processing using Fastify schema validation.",
+    "No sensitive data (passwords, tokens, PII, financial data) in logs.",
+    "RBAC enforcement: All API endpoints enforce role-based access control via preHandler hooks (authenticate, authorize).",
+    "Error handling: No unhandled promise rejections; all async errors are caught and handled.",
+    "Dependency direction: leave module depends on employee, policy, balance, notification; no reverse dependencies."
+  ],
+  "outOfScope": [
+    "Implementing LeaveService, BalanceService, EmployeeService, or any repository logic (already completed in prior phases).",
+    "Modifying existing service or repository files.",
+    "UI components or mobile app.",
+    "Database migrations or schema changes.",
+    "Notification module implementation or wiring.",
+    "Policy module implementation or wiring.",
+    "Setting up the Fastify server instance or database connection (assumed to be provided).",
+    "Implementing the authenticate and authorize decorators on the Fastify instance (assumed to exist)."
+  ],
+  "ambiguities": []
+}
