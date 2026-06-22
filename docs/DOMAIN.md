@@ -125,18 +125,16 @@ Represents employee data managed by the `employee` module, including employee re
 | Field | Type | Required |
 |-------|------|----------|
 | id | string | true |
-| employeeNumber | string | true |
-| firstName | string | true |
-| lastName | string | true |
+| name | string | true |
 | email | string | true |
-| managerId | string \| null | false |
-| department | string \| null | false |
-| hireDate | Date | true |
-| terminationDate | Date \| null | false |
-| employmentStatus | 'ACTIVE' \| 'INACTIVE' \| 'TERMINATED' | true |
+| managerId | string \| null | true |
+| department | string | true |
+| status | 'active' \| 'inactive' | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
-| deletedAt | Date \| null | false |
+
+**Relationships**
+- `Employee` — one-to-many (self-referencing, manager → subordinates)
 
 ## policy
 

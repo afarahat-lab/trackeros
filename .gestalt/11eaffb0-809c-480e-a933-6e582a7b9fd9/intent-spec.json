@@ -1,0 +1,82 @@
+{
+  "id": "8989e2ec-e59d-42df-af0d-731db2e28afb",
+  "correlationId": "11eaffb0-809c-480e-a933-6e582a7b9fd9",
+  "rawIntent": "[Feature: Build the leave management module — Phase 1: Create Employee model and repository]\n\nCreate src/modules/employee/employee.model.ts with TypeScript interfaces for Employee (attributes: id, name, email, managerId, department, status) and CreateEmployeeDto. Create src/modules/employee/employee.repository.ts with IEmployeeRepository interface and EmployeeRepository class implementing it. Include Jest unit tests in tests/unit/modules/employee/employee.repository.test.ts. This phase has no dependencies on other application modules.\n\nPhase architecture notes:\nEmployee entity provides identity and reporting hierarchy for leave approvals.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/employee/employee.model.ts\\nexport interface Employee {\\n  id: string;\\n  name: string;\\n  email: string;\\n  managerId: string | null;\\n  department: string;\\n  status: 'active' | 'inactive';\\n  createdAt: Date;\\n  updatedAt: Date;\\n}\\n\\nexport type CreateEmployeeInput = Omit<Employee, 'id' | 'createdAt' | 'updatedAt'>;\\n\\nexport type UpdateEmployeeInput = Partial<CreateEmployeeInput>;\",\"File: src/modules/employee/employee.repository.interface.ts\\nimport { Employee, CreateEmployeeInput, UpdateEmployeeInput } from './employee.model';\\n\\nexport interface IEmployeeRepository {\\n  findById(id: string): Promise<Employee | null>;\\n  findByEmail(email: string): Promise<Employee | null>;\\n  findAll(): Promise<Employee[]>;\\n  create(input: CreateEmployeeInput): Promise<Employee>;\\n  update(id: string, input: UpdateEmployeeInput): Promise<Employee>;\\n  delete(id: string): Promise<void>;\\n}\",\"File: src/modules/employee/employee.repository.ts\\nimport { Pool } from 'pg';\\nimport { pool } from '../../shared/db/connection';\\nimport { Employee, CreateEmployeeInput, UpdateEmployeeInput } from './employee.model';\\nimport { IEmployeeRepository } from './employee.repository.interface';\\n\\nexport class EmployeeRepository implements IEmployeeRepository {\\n  private db: Pool;\\n\\n  constructor() {\\n    this.db = pool;\\n  }\\n\\n  async findById(id: string): Promise<Employee | null> {\\n    // implementation\\n  }\\n\\n  async findByEmail(email: string): Promise<Employee | null> {\\n    // implementation\\n  }\\n\\n  async findAll(): Promise<Employee[]> {\\n    // implementation\\n  }\\n\\n  async create(input: CreateEmployeeInput): Promise<Employee> {\\n    // implementation with audit log in transaction\\n  }\\n\\n  async update(id: string, input: UpdateEmployeeInput): Promise<Employee> {\\n    // implementation with audit log in transaction\\n  }\\n\\n  async delete(id: string): Promise<void> {\\n    // implementation with audit log in transaction\\n  }\\n}\"],\"importStatements\":[\"import { Employee, CreateEmployeeInput, UpdateEmployeeInput } from './employee.model';\",\"import { IEmployeeRepository } from './employee.repository.interface';\",\"import { Pool } from 'pg';\",\"import { pool } from '../../shared/db/connection';\"],\"successCriteria\":[\"src/modules/employee/employee.model.ts exists and exports Employee, CreateEmployeeInput, UpdateEmployeeInput\",\"src/modules/employee/employee.repository.interface.ts exists and exports IEmployeeRepository\",\"src/modules/employee/employee.repository.ts exists and exports EmployeeRepository class implementing IEmployeeRepository\",\"EmployeeRepository uses the database pool from src/shared/db/connection.ts for all queries\",\"All state-changing operations (create, update, delete) write an audit record to the audit_logs table with entity_type 'employee' and exclude PII fields (name, email) from old_value/new_value\",\"All state-changing operations execute the primary mutation and the audit log insert within a single database transaction to ensure atomicity\",\"tests/unit/modules/employee/employee.repository.test.ts exists and contains Jest tests for EmployeeRepository covering all CRUD methods and audit logging, with tests passing\"]}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- Employee\n- IEmployeeRepository\n- CreateEmployeeInput\n- UpdateEmployeeInput\n- Pool\n- pool\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Canonical entity fields for this phase\n\nNote: these field names supersede any attribute names in the\nintent text above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the field names of each entity this phase defines. The\nexact attribute / column / property set per entity is:\n\n- `Employee`: `id`, `name`, `email`, `managerId`, `department`, `status`, `createdAt`, `updatedAt`\n\nTreat each entity's field list as complete. If the\nintent text or planner scope mentions different field\nnames than the architecture, do NOT flag this as\nambiguity — the per-phase architecture wins.\n\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 2 — Create LeavePolicy model and repository: Create src/modules/policy/policy.model.ts with TypeScript interfaces for LeavePolicy (attributes: id\n- Phase 3 — Create Employee service: Create src/modules/employee/employee.service.ts with EmployeeService class that uses IEmployeeReposi\n- Phase 4 — Create Policy service: Create src/modules/policy/policy.service.ts with PolicyService class that uses IPolicyRepository. In\n- Phase 5 — Create LeaveBalance model and repository: Create src/modules/balance/balance.model.ts with TypeScript interfaces for LeaveBalance (attributes:\n- Phase 6 — Create Balance service: Create src/modules/balance/balance.service.ts with BalanceService class that uses IBalanceRepository\n- Phase 7 — Create Notification and Audit models and repositories: Create src/modules/notification/notification.model.ts with TypeScript interfaces for Notification (a\n- Phase 8 — Create LeaveRequest model and repository: Create src/modules/leave/leave.model.ts with TypeScript interfaces for LeaveRequest (attributes: id,\n- Phase 9 — Create Leave orchestration service: Create src/modules/leave/leave.service.ts with LeaveService class that orchestrates leave workflow (\n- Phase 10 — Wire services, create routes and controllers: Create src/modules/leave/leave.controller.ts with REST endpoints for leave operations (POST /apply, ",
+  "scope": {
+    "affectedDomains": [
+      "employee"
+    ],
+    "affectedLayers": [
+      "domain",
+      "infra",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/employee/employee.model.ts exists and exports Employee, CreateEmployeeInput, UpdateEmployeeInput",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/employee/employee.repository.interface.ts exists and exports IEmployeeRepository",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "src/modules/employee/employee.repository.ts exists and exports EmployeeRepository class implementing IEmployeeRepository",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "EmployeeRepository uses the database pool from src/shared/db/connection.ts for all queries",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "sc-005",
+      "description": "All state-changing operations (create, update, delete) write an audit record to the audit_logs table with entity_type 'employee' and exclude PII fields (name, email) from old_value/new_value",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "sc-006",
+      "description": "All state-changing operations execute the primary mutation and the audit log insert within a single database transaction to ensure atomicity",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "sc-007",
+      "description": "tests/unit/modules/employee/employee.repository.test.ts exists and contains Jest tests for EmployeeRepository covering all CRUD methods and audit logging, with tests passing",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Audit records: All state-changing operations write an audit record.",
+    "No sensitive data in logs: Exclude PII fields (name, email) from audit log old_value/new_value.",
+    "Error handling: All async errors are caught and handled.",
+    "All state-changing operations execute the primary mutation and the audit log insert within a single database transaction to ensure atomicity."
+  ],
+  "outOfScope": [
+    "Creating LeavePolicy, LeaveBalance, LeaveRequest, or Notification models or repositories",
+    "Employee service (Phase 3)",
+    "Policy service (Phase 4)",
+    "Balance service (Phase 6)",
+    "Leave orchestration service (Phase 9)",
+    "API endpoints, controllers, routes (Phase 10)",
+    "Integration with other modules (policy, balance, leave, notification)",
+    "Leave request lifecycle logic",
+    "Balance deductions",
+    "Notifications",
+    "Any modifications to existing modules outside employee"
+  ],
+  "ambiguities": []
+}
