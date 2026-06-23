@@ -79,6 +79,14 @@ Represents a leave record managed by the `leave` module, including leave request
 
 Represents leave balance data managed by the `balance` module, including tracked entitlement, accrual, and remaining leave amounts.
 
+### BalanceStatus
+
+| Value | Description |
+|-------|-------------|
+| ACTIVE | Balance is currently active |
+| EXPIRED | Balance has expired |
+| EXHAUSTED | Balance has been fully used |
+
 ### Balance
 
 | Field | Type | Required |
@@ -105,13 +113,14 @@ Represents leave balance data managed by the `balance` module, including tracked
 | id | string | true |
 | employeeId | string | true |
 | policyId | string | true |
-| totalEntitlement | number | true |
+| totalDays | number | true |
 | usedDays | number | true |
 | remainingDays | number | true |
 | fiscalYear | number | true |
-| status | string | true |
+| status | BalanceStatus | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
+| deletedAt | Date \| null | false |
 
 **Relationships**
 - `Employee` — many-to-one

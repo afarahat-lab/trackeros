@@ -1,0 +1,98 @@
+{
+  "id": "686a1216-7bc9-4ebb-94d1-b7ead1264bdd",
+  "correlationId": "94f5b07f-7d9b-4414-88f9-cdb623d63a2f",
+  "rawIntent": "[Feature: Build the leave management module — Phase 6: Balance — model and repository]\n\nCreate src/modules/balance/balance.model.ts: import LeaveBalance, CreateLeaveBalanceDto from src/shared/types/index.ts (Phase 1); add BalanceStatus enum (INITIALIZED, ACTIVE, EXHAUSTED). Create src/modules/balance/balance.repository.ts: implement PgLeaveBalanceRepository extending BaseRepository from src/shared/base-repository.ts (Phase 1). Define ILeaveBalanceRepository with findByEmployeeAndPolicy(employeeId, policyId, fiscalYear), findByEmployee(employeeId), deductDays(id, days), restoreDays(id, days). Depends on src/shared/types/index.ts (Phase 1) and src/shared/base-repository.ts (Phase 1). Include Jest unit tests in tests/unit/modules/balance/.\n\nThis phase depends on: Phase 1.\n\nPhase architecture notes:\nBalance persistence layer. The repository exposes atomic deductDays and restoreDays methods that the service layer will wrap with audit recording in the next phase.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/balance/balance.model.ts\\nimport { LeaveBalance, CreateLeaveBalanceDto } from '../../shared/types/index';\\nexport { LeaveBalance, CreateLeaveBalanceDto };\\nexport enum BalanceStatus {\\n  INITIALIZED = 'INITIALIZED',\\n  ACTIVE = 'ACTIVE',\\n  EXHAUSTED = 'EXHAUSTED',\\n}\",\"File: src/modules/balance/balance.repository.ts\\nimport { LeaveBalance } from './balance.model';\\nimport { BaseRepository } from '../../shared/base-repository';\\nimport { pool } from '../../shared/db/connection';\\n\\nexport interface ILeaveBalanceRepository {\\n  findByEmployeeAndPolicy(employeeId: string, policyId: string, fiscalYear: number): Promise<LeaveBalance | null>;\\n  findByEmployee(employeeId: string): Promise<LeaveBalance[]>;\\n  deductDays(id: string, days: number): Promise<LeaveBalance>;\\n  restoreDays(id: string, days: number): Promise<LeaveBalance>;\\n}\\n\\nexport class PgLeaveBalanceRepository extends BaseRepository<LeaveBalance> implements ILeaveBalanceRepository {\\n  async findByEmployeeAndPolicy(employeeId: string, policyId: string, fiscalYear: number): Promise<LeaveBalance | null> {\\n    const result = await pool.query(\\n      'SELECT * FROM leave_balances WHERE employee_id = $1 AND policy_id = $2 AND fiscal_year = $3 AND deleted_at IS NULL',\\n      [employeeId, policyId, fiscalYear]\\n    );\\n    return result.rows[0] || null;\\n  }\\n\\n  async findByEmployee(employeeId: string): Promise<LeaveBalance[]> {\\n    const result = await pool.query(\\n      'SELECT * FROM leave_balances WHERE employee_id = $1 AND deleted_at IS NULL',\\n      [employeeId]\\n    );\\n    return result.rows;\\n  }\\n\\n  async deductDays(id: string, days: number): Promise<LeaveBalance> {\\n    const client = await pool.connect();\\n    try {\\n      await client.query('BEGIN');\\n      const balanceResult = await client.query(\\n        'SELECT * FROM leave_balances WHERE id = $1 FOR UPDATE',\\n        [id]\\n      );\\n      const balance = balanceResult.rows[0];\\n      if (!balance) throw new Error('Balance not found');\\n      if (balance.remaining_days < days) throw new Error('Insufficient balance');\\n      const updated = await client.query(\\n        'UPDATE leave_balances SET remaining_days = remaining_days - $1, used_days = used_days + $1, updated_at = NOW() WHERE id = $2 RETURNING *',\\n        [days, id]\\n      );\\n      await client.query(\\n        'INSERT INTO audit_records (entity_type, entity_id, action, old_values, new_values, performed_by) VALUES ($1, $2, $3, $4, $5, $6)',\\n        ['leave_balances', id, 'UPDATE', JSON.stringify(balance), JSON.stringify(updated.rows[0]), null]\\n      );\\n      await client.query('COMMIT');\\n      return updated.rows[0];\\n    } catch (e) {\\n      await client.query('ROLLBACK');\\n      throw e;\\n    } finally {\\n      client.release();\\n    }\\n  }\\n\\n  async restoreDays(id: string, days: number): Promise<LeaveBalance> {\\n    const client = await pool.connect();\\n    try {\\n      await client.query('BEGIN');\\n      const balanceResult = await client.query(\\n        'SELECT * FROM leave_balances WHERE id = $1 FOR UPDATE',\\n        [id]\\n      );\\n      const balance = balanceResult.rows[0];\\n      if (!balance) throw new Error('Balance not found');\\n      const updated = await client.query(\\n        'UPDATE leave_balances SET remaining_days = remaining_days + $1, used_days = used_days - $1, updated_at = NOW() WHERE id = $2 RETURNING *',\\n        [days, id]\\n      );\\n      await client.query(\\n        'INSERT INTO audit_records (entity_type, entity_id, action, old_values, new_values, performed_by) VALUES ($1, $2, $3, $4, $5, $6)',\\n        ['leave_balances', id, 'UPDATE', JSON.stringify(balance), JSON.stringify(updated.rows[0]), null]\\n      );\\n      await client.query('COMMIT');\\n      return updated.rows[0];\\n    } catch (e) {\\n      await client.query('ROLLBACK');\\n      throw e;\\n    } finally {\\n      client.release();\\n    }\\n  }\\n}\"],\"importStatements\":[\"import { LeaveBalance, CreateLeaveBalanceDto } from '../../shared/types/index';\",\"import { LeaveBalance } from './balance.model';\",\"import { BaseRepository } from '../../shared/base-repository';\",\"import { pool } from '../../shared/db/connection';\"],\"successCriteria\":[\"src/modules/balance/balance.model.ts exists and exports LeaveBalance (re-exported from shared types), CreateLeaveBalanceDto (re-exported), and BalanceStatus enum with values INITIALIZED, ACTIVE, EXHAUSTED.\",\"src/modules/balance/balance.repository.ts exists and exports ILeaveBalanceRepository and PgLeaveBalanceRepository.\",\"ILeaveBalanceRepository defines findByEmployeeAndPolicy(employeeId, policyId, fiscalYear), findByEmployee(employeeId), deductDays(id, days), restoreDays(id, days).\",\"PgLeaveBalanceRepository extends BaseRepository<LeaveBalance> and implements ILeaveBalanceRepository, using pool from src/shared/db/connection for all database operations.\",\"findByEmployeeAndPolicy returns the LeaveBalance for given employee, policy, fiscal year, or null.\",\"findByEmployee returns all LeaveBalance records for the given employee.\",\"deductDays atomically decrements remaining_days and increments used_days within a single database transaction, throws error if insufficient balance, and writes an audit record (action 'UPDATE') in the same transaction.\",\"restoreDays atomically increments remaining_days and decrements used_days within a single database transaction, and writes an audit record (action 'UPDATE') in the same transaction.\",\"All repository methods handle errors and throw meaningful exceptions (no unhandled rejections).\",\"ARCHITECTURE.md updated to include BalanceStatus enum with values INITIALIZED, ACTIVE, EXHAUSTED.\",\"tests/unit/modules/balance/balance.repository.test.ts exists and contains Jest tests for all ILeaveBalanceRepository methods using a mocked pool.\"]}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- ILeaveBalanceRepository\n- LeaveBalance\n- CreateLeaveBalanceDto\n- BaseRepository\n- pool\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 7 — Balance — service, controller, and routes: Create src/modules/balance/balance.service.ts: implement IBalanceService with initializeBalance(empl\n- Phase 8 — Notification module: Create src/modules/notification/notification.model.ts: import Notification, CreateNotificationDto fr\n- Phase 9 — Leave — model and repository: Create src/modules/leave/leave.model.ts: import LeaveRequest, LeaveRequestStatus, CreateLeaveRequest\n- Phase 10 — Leave — service, controller, and routes: Create src/modules/leave/leave.service.ts: implement ILeaveService as the orchestration hub. Constru",
+  "scope": {
+    "affectedDomains": [
+      "balance"
+    ],
+    "affectedLayers": [
+      "domain",
+      "infra",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/balance/balance.model.ts exists and exports LeaveBalance (re-exported from shared types), CreateLeaveBalanceDto (re-exported), and BalanceStatus enum with values INITIALIZED, ACTIVE, EXHAUSTED.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/balance/balance.repository.ts exists and exports ILeaveBalanceRepository and PgLeaveBalanceRepository.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "ILeaveBalanceRepository defines findByEmployeeAndPolicy(employeeId, policyId, fiscalYear), findByEmployee(employeeId), deductDays(id, days), restoreDays(id, days).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "PgLeaveBalanceRepository extends BaseRepository<LeaveBalance> and implements ILeaveBalanceRepository, using pool from src/shared/db/connection for all database operations.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "findByEmployeeAndPolicy returns the LeaveBalance for given employee, policy, fiscal year, or null.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-006",
+      "description": "findByEmployee returns all LeaveBalance records for the given employee.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-007",
+      "description": "deductDays atomically decrements remaining_days and increments used_days within a single database transaction, throws error if insufficient balance, and writes an audit record (action 'UPDATE') in the same transaction.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-008",
+      "description": "restoreDays atomically increments remaining_days and decrements used_days within a single database transaction, and writes an audit record (action 'UPDATE') in the same transaction.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-009",
+      "description": "All repository methods handle errors and throw meaningful exceptions (no unhandled rejections).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-010",
+      "description": "ARCHITECTURE.md updated to include BalanceStatus enum with values INITIALIZED, ACTIVE, EXHAUSTED.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-011",
+      "description": "tests/unit/modules/balance/balance.repository.test.ts exists and contains Jest tests for all ILeaveBalanceRepository methods using a mocked pool.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Audit records: All state-changing operations write an audit record.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "Phase 7: Balance service, controller, and routes",
+    "Phase 8: Notification module",
+    "Phase 9: Leave model and repository",
+    "Phase 10: Leave service, controller, and routes",
+    "Any other modules not part of this phase"
+  ],
+  "ambiguities": []
+}
