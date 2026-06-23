@@ -1,0 +1,95 @@
+{
+  "id": "b581ca9a-64a2-4a28-9c3e-321f28fcd7af",
+  "correlationId": "5295092b-a24c-415a-a9e3-cd9c74bd196d",
+  "rawIntent": "[Feature: Build the leave management module — Phase 8: Notification module]\n\nCreate src/modules/notification/notification.model.ts: import Notification, CreateNotificationDto from src/shared/types/index.ts (Phase 1). Create src/modules/notification/notification.repository.ts: implement PgNotificationRepository extending BaseRepository from src/shared/base-repository.ts (Phase 1); define INotificationRepository with findByEmployee(employeeId), markSent(id), markRead(id). Create src/modules/notification/notification.service.ts: implement INotificationService with sendNotification(employeeId, message), markAsRead(id). Depends on INotificationRepository and IAuditService from src/modules/audit/audit.service.ts (Phase 5). Create src/modules/notification/notification.controller.ts: Fastify handlers with Zod validation and RBAC. Create src/modules/notification/notification.routes.ts: register GET /notifications, PATCH /notifications/:id/read. All async errors mapped to HTTP responses (GP-006). Include Jest unit tests in tests/unit/modules/notification/.\n\nThis phase depends on: Phase 1, Phase 5.\n\nPhase architecture notes:\nCompletes the Notification module. Called programmatically by the Leave orchestration service on submit, approve, reject, and cancel. Also exposes a read API for employees. Audit integration on state changes (sent, read).\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/notification/notification.model.ts\\nexport { Notification, CreateNotificationDto } from '../../shared/types/index';\",\"File: src/modules/notification/notification.repository.ts\\nimport { IBaseRepository, BaseRepository } from '../../shared/base-repository';\\nimport { pool } from '../../shared/db/connection';\\nimport { Notification } from './notification.model';\\n\\nexport interface INotificationRepository extends IBaseRepository<Notification> {\\n  findByRecipient(recipientId: string, options?: { status?: string; limit?: number; offset?: number }): Promise<Notification[]>;\\n  markAsSent(id: string): Promise<void>;\\n  markAsRead(id: string): Promise<void>;\\n  countUnread(recipientId: string): Promise<number>;\\n}\\n\\nexport class PgNotificationRepository extends BaseRepository<Notification> implements INotificationRepository {\\n  constructor() {\\n    super(pool, 'notifications');\\n  }\\n\\n  async findByRecipient(recipientId: string, options?: { status?: string; limit?: number; offset?: number }): Promise<Notification[]> {\\n    // implementation\\n  }\\n\\n  async markAsSent(id: string): Promise<void> {\\n    // implementation\\n  }\\n\\n  async markAsRead(id: string): Promise<void> {\\n    // implementation\\n  }\\n\\n  async countUnread(recipientId: string): Promise<number> {\\n    // implementation\\n  }\\n}\",\"File: src/modules/notification/notification.service.ts\\nimport { INotificationRepository } from './notification.repository';\\nimport { IAuditService } from '../audit/audit.service';\\nimport { Notification, CreateNotificationDto } from './notification.model';\\n\\nexport interface INotificationService {\\n  createNotification(dto: CreateNotificationDto): Promise<Notification>;\\n  sendNotification(id: string): Promise<Notification>;\\n  getNotificationsForEmployee(employeeId: string, options?: { status?: string; limit?: number; offset?: number }): Promise<Notification[]>;\\n  markAsRead(notificationId: string, employeeId: string): Promise<Notification>;\\n  getNotification(id: string): Promise<Notification>;\\n}\\n\\nexport class NotificationService implements INotificationService {\\n  constructor(\\n    private readonly notificationRepository: INotificationRepository,\\n    private readonly auditService: IAuditService\\n  ) {}\\n\\n  async createNotification(dto: CreateNotificationDto): Promise<Notification> {\\n    // implementation with transaction and audit\\n  }\\n\\n  async sendNotification(id: string): Promise<Notification> {\\n    // implementation with transaction and audit\\n  }\\n\\n  async getNotificationsForEmployee(employeeId: string, options?: { status?: string; limit?: number; offset?: number }): Promise<Notification[]> {\\n    // implementation\\n  }\\n\\n  async markAsRead(notificationId: string, employeeId: string): Promise<Notification> {\\n    // implementation with audit\\n  }\\n\\n  async getNotification(id: string): Promise<Notification> {\\n    // implementation\\n  }\\n}\",\"File: src/modules/notification/notification.controller.ts\\nimport { FastifyRequest, FastifyReply } from 'fastify';\\nimport { z } from 'zod';\\nimport { INotificationService } from './notification.service';\\n\\nexport class NotificationController {\\n  constructor(private readonly notificationService: INotificationService) {}\\n\\n  async listNotifications(request: FastifyRequest, reply: FastifyReply): Promise<void> {\\n    // Zod validation for query params, RBAC check, error handling\\n  }\\n\\n  async getNotification(request: FastifyRequest, reply: FastifyReply): Promise<void> {\\n    // Zod validation for params, RBAC check, error handling\\n  }\\n\\n  async markAsRead(request: FastifyRequest, reply: FastifyReply): Promise<void> {\\n    // Zod validation for params, RBAC check, error handling\\n  }\\n}\",\"File: src/modules/notification/notification.routes.ts\\nimport { FastifyInstance } from 'fastify';\\nimport { NotificationController } from './notification.controller';\\n\\nexport function notificationRoutes(app: FastifyInstance, notificationController: NotificationController): void {\\n  app.get('/notifications', notificationController.listNotifications.bind(notificationController));\\n  app.get('/notifications/:id', notificationController.getNotification.bind(notificationController));\\n  app.patch('/notifications/:id/read', notificationController.markAsRead.bind(notificationController));\\n}\"],\"importStatements\":[\"import { Notification, CreateNotificationDto } from '../../shared/types/index';\",\"import { IBaseRepository, BaseRepository } from '../../shared/base-repository';\",\"import { pool } from '../../shared/db/connection';\",\"import { IAuditService } from '../audit/audit.service';\",\"import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';\",\"import { z } from 'zod';\",\"import { INotificationRepository } from './notification.repository';\",\"import { INotificationService } from './notification.service';\",\"import { NotificationController } from './notification.controller';\"],\"successCriteria\":[\"src/modules/notification/notification.model.ts exists and re-exports Notification from shared types, plus any module-specific DTOs.\",\"src/modules/notification/notification.repository.ts exists, implements INotificationRepository, and extends BaseRepository<Notification>.\",\"src/modules/notification/notification.service.ts exists, implements INotificationService, and depends on INotificationRepository and IAuditService.\",\"src/modules/notification/notification.controller.ts exists, uses Fastify with Zod validation and RBAC, and handles all async errors (GP-006).\",\"src/modules/notification/notification.routes.ts exists and registers GET /notifications, GET /notifications/:id, PATCH /notifications/:id/read.\",\"Jest unit tests exist in tests/unit/modules/notification/ covering repository, service, and controller.\",\"All state-changing operations (createNotification, sendNotification, markAsRead) write an audit record via IAuditService (GP-002).\",\"When creating or sending a notification, the notification record and its audit record are written in a single database transaction to ensure consistency.\",\"All API endpoints enforce RBAC (GP-005) and validate inputs with Zod (GP-003).\",\"No sensitive data is logged (GP-004).\"]}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- INotificationRepository\n- INotificationService\n- Notification\n- CreateNotificationDto\n- IBaseRepository\n- BaseRepository\n- pool\n- IAuditService\n- FastifyInstance\n- FastifyRequest\n- FastifyReply\n- z\n- NotificationController\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Canonical entity fields for this phase\n\nNote: these field names supersede any attribute names in the\nintent text above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the field names of each entity this phase defines. The\nexact attribute / column / property set per entity is:\n\n- `INotificationRepository`: `limit`, `offset`\n- `INotificationService`: `limit`, `offset`\n\nTreat each entity's field list as complete. If the\nintent text or planner scope mentions different field\nnames than the architecture, do NOT flag this as\nambiguity — the per-phase architecture wins.\n\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 9 — Leave — model and repository: Create src/modules/leave/leave.model.ts: import LeaveRequest, LeaveRequestStatus, CreateLeaveRequest\n- Phase 10 — Leave — service, controller, and routes: Create src/modules/leave/leave.service.ts: implement ILeaveService as the orchestration hub. Constru",
+  "scope": {
+    "affectedDomains": [
+      "notification"
+    ],
+    "affectedLayers": [
+      "domain",
+      "infra",
+      "api",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/notification/notification.model.ts exists and re-exports Notification from shared types, plus any module-specific DTOs.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/notification/notification.repository.ts exists, implements INotificationRepository, and extends BaseRepository<Notification>.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "src/modules/notification/notification.service.ts exists, implements INotificationService, and depends on INotificationRepository and IAuditService.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "src/modules/notification/notification.controller.ts exists, uses Fastify with Zod validation and RBAC, and handles all async errors (GP-006).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "src/modules/notification/notification.routes.ts exists and registers GET /notifications, GET /notifications/:id, PATCH /notifications/:id/read.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-006",
+      "description": "Jest unit tests exist in tests/unit/modules/notification/ covering repository, service, and controller.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-007",
+      "description": "All state-changing operations (createNotification, sendNotification, markAsRead) write an audit record via IAuditService (GP-002).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-008",
+      "description": "When creating or sending a notification, the notification record and its audit record are written in a single database transaction to ensure consistency.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "sc-009",
+      "description": "All API endpoints enforce RBAC (GP-005) and validate inputs with Zod (GP-003).",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "sc-010",
+      "description": "No sensitive data is logged (GP-004).",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Audit records: All state-changing operations write an audit record.",
+    "Input validation: Validate all inputs at API boundaries before processing.",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "RBAC enforcement: All API endpoints enforce role-based access control.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled.",
+    "When creating or sending a notification, the notification record and its audit record are written in a single database transaction."
+  ],
+  "outOfScope": [
+    "Leave module (Phase 9, 10)",
+    "Actual notification delivery (email, push, etc.)",
+    "Any other modules not explicitly mentioned in this phase"
+  ],
+  "ambiguities": []
+}

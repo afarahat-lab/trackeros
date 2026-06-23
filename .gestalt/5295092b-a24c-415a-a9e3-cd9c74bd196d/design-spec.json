@@ -1,0 +1,90 @@
+{
+  "correlationId": "5295092b-a24c-415a-a9e3-cd9c74bd196d",
+  "domainChanges": [
+    {
+      "entityName": "Notification",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "recipientId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "message",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "status",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": true
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [
+    {
+      "method": "GET",
+      "path": "/api/v1/notifications",
+      "description": "List notifications for the authenticated employee, with optional filtering by status and pagination.",
+      "requestBody": {},
+      "responseBody": {
+        "notifications": "Notification[]"
+      },
+      "authRequired": true,
+      "roles": [
+        "employee",
+        "manager",
+        "admin"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/notifications/:id",
+      "description": "Get a single notification by ID.",
+      "requestBody": {},
+      "responseBody": {
+        "notification": "Notification"
+      },
+      "authRequired": true,
+      "roles": [
+        "employee",
+        "manager",
+        "admin"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/notifications/:id/read",
+      "description": "Mark a notification as read.",
+      "requestBody": {},
+      "responseBody": {
+        "notification": "Notification"
+      },
+      "authRequired": true,
+      "roles": [
+        "employee",
+        "manager",
+        "admin"
+      ]
+    }
+  ],
+  "componentSpecs": []
+}
