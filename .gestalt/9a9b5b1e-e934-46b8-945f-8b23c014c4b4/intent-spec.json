@@ -1,0 +1,90 @@
+{
+  "id": "a05473ca-64c9-4686-9812-2e7a5df6c06d",
+  "correlationId": "9a9b5b1e-e934-46b8-945f-8b23c014c4b4",
+  "rawIntent": "[Feature: Build the leave management module — Phase 5: Audit module — model, repository, and service]\n\nCreate src/modules/audit/audit.model.ts: import AuditRecord, CreateAuditRecordDto from src/shared/types/index.ts (Phase 1). Create src/modules/audit/audit.repository.ts: implement PgAuditRepository extending BaseRepository from src/shared/base-repository.ts (Phase 1), define IAuditRepository with findByEntity(entityType, entityId). Create src/modules/audit/audit.service.ts: implement IAuditService with recordAction(entityType, entityId, action, changedBy, details). Depends on IAuditRepository. No controller or routes — audit is called programmatically by other services, not directly via API. Satisfies GP-002 before any state-changing operations are built. Include Jest unit tests in tests/unit/modules/audit/.\n\nThis phase depends on: Phase 1.\n\nPhase architecture notes:\nCross-cutting concern (GP-002). Must exist before Balance and Leave modules, which both record audit events on state changes. No API surface — purely programmatic.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/audit/audit.model.ts\\nimport { AuditRecord, CreateAuditRecordDto } from '../../shared/types/index';\\nexport { AuditRecord, CreateAuditRecordDto };\\nexport enum AuditAction { CREATE = 'CREATE', UPDATE = 'UPDATE', DELETE = 'DELETE', APPROVE = 'APPROVE', REJECT = 'REJECT', SUBMIT = 'SUBMIT', CANCEL = 'CANCEL' }\",\"File: src/modules/audit/audit.repository.ts\\nimport { pool } from '../../shared/db/connection';\\nimport { BaseRepository } from '../../shared/base-repository';\\nimport { AuditRecord, CreateAuditRecordDto } from './audit.model';\\n\\nexport interface IAuditRepository {\\n  findByEntity(entityType: string, entityId: string): Promise<AuditRecord[]>;\\n  create(input: CreateAuditRecordDto): Promise<AuditRecord>;\\n}\\n\\nexport class PgAuditRepository extends BaseRepository<AuditRecord> implements IAuditRepository {\\n  constructor() {\\n    super(pool, 'audit_records');\\n  }\\n\\n  async findByEntity(entityType: string, entityId: string): Promise<AuditRecord[]> {\\n    const result = await this.pool.query(\\n      'SELECT * FROM audit_records WHERE entity_type = $1 AND entity_id = $2 ORDER BY performed_at DESC',\\n      [entityType, entityId]\\n    );\\n    return result.rows;\\n  }\\n\\n  async create(input: CreateAuditRecordDto): Promise<AuditRecord> {\\n    const result = await this.pool.query(\\n      `INSERT INTO audit_records (entity_type, entity_id, action, old_values, new_values, performed_by, ip_address, user_agent)\\n       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)\\n       RETURNING *`,\\n      [\\n        input.entityType,\\n        input.entityId,\\n        input.action,\\n        input.oldValues ?? null,\\n        input.newValues ?? null,\\n        input.performedBy ?? null,\\n        input.ipAddress ?? null,\\n        input.userAgent ?? null,\\n      ]\\n    );\\n    return result.rows[0];\\n  }\\n}\",\"File: src/modules/audit/audit.service.ts\\nimport { IAuditRepository } from './audit.repository';\\nimport { AuditRecord, AuditAction, CreateAuditRecordDto } from './audit.model';\\n\\nexport interface IAuditService {\\n  recordAction(\\n    entityType: string,\\n    entityId: string,\\n    action: AuditAction,\\n    changedBy: string | null,\\n    details: {\\n      oldValues?: Record<string, unknown> | null;\\n      newValues?: Record<string, unknown> | null;\\n      ipAddress?: string | null;\\n      userAgent?: string | null;\\n    }\\n  ): Promise<AuditRecord>;\\n}\\n\\nexport class AuditService implements IAuditService {\\n  constructor(private readonly auditRepository: IAuditRepository) {}\\n\\n  async recordAction(\\n    entityType: string,\\n    entityId: string,\\n    action: AuditAction,\\n    changedBy: string | null,\\n    details: {\\n      oldValues?: Record<string, unknown> | null;\\n      newValues?: Record<string, unknown> | null;\\n      ipAddress?: string | null;\\n      userAgent?: string | null;\\n    }\\n  ): Promise<AuditRecord> {\\n    const input: CreateAuditRecordDto = {\\n      entityType,\\n      entityId,\\n      action,\\n      performedBy: changedBy,\\n      oldValues: details.oldValues,\\n      newValues: details.newValues,\\n      ipAddress: details.ipAddress,\\n      userAgent: details.userAgent,\\n    };\\n    return this.auditRepository.create(input);\\n  }\\n}\"],\"importStatements\":[\"import { pool } from '../../shared/db/connection';\",\"import { BaseRepository } from '../../shared/base-repository';\",\"import { AuditRecord, CreateAuditRecordDto, AuditAction } from './audit.model';\",\"import { IAuditRepository } from './audit.repository';\"],\"successCriteria\":[\"src/modules/audit/audit.model.ts exists and imports AuditRecord, CreateAuditRecordDto from ../../shared/types/index, re-exports them, and exports AuditAction enum\",\"src/modules/audit/audit.repository.ts exists and exports IAuditRepository (with findByEntity and create methods) and PgAuditRepository (extends BaseRepository<AuditRecord>)\",\"src/modules/audit/audit.service.ts exists and exports IAuditService (with recordAction method) and AuditService (depends on IAuditRepository)\",\"IAuditRepository.findByEntity(entityType, entityId) returns all audit records for that entity ordered by performed_at DESC\",\"AuditService.recordAction constructs a CreateAuditRecordDto from its parameters and calls auditRepository.create, returning the created AuditRecord\",\"PgAuditRepository.create inserts a row into audit_records using the pool and returns the created AuditRecord with generated id, performed_at, and created_at\",\"All audit record creations are atomic and use the database connection from src/shared/db/connection.ts\",\"Jest unit tests exist in tests/unit/modules/audit/audit.repository.test.ts covering PgAuditRepository.create and findByEntity\",\"Jest unit tests exist in tests/unit/modules/audit/audit.service.test.ts covering AuditService.recordAction with a mocked IAuditRepository\"]}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- IAuditRepository\n- IAuditService\n- pool\n- BaseRepository\n- AuditRecord\n- CreateAuditRecordDto\n- AuditAction\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Canonical entity fields for this phase\n\nNote: these field names supersede any attribute names in the\nintent text above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the field names of each entity this phase defines. The\nexact attribute / column / property set per entity is:\n\n- `IAuditService`: `entityType`, `entityId`, `action`, `changedBy`, `details`, `oldValues`, `newValues`, `ipAddress`, `userAgent`\n\nTreat each entity's field list as complete. If the\nintent text or planner scope mentions different field\nnames than the architecture, do NOT flag this as\nambiguity — the per-phase architecture wins.\n\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 6 — Balance — model and repository: Create src/modules/balance/balance.model.ts: import LeaveBalance, CreateLeaveBalanceDto from src/sha\n- Phase 7 — Balance — service, controller, and routes: Create src/modules/balance/balance.service.ts: implement IBalanceService with initializeBalance(empl\n- Phase 8 — Notification module: Create src/modules/notification/notification.model.ts: import Notification, CreateNotificationDto fr\n- Phase 9 — Leave — model and repository: Create src/modules/leave/leave.model.ts: import LeaveRequest, LeaveRequestStatus, CreateLeaveRequest\n- Phase 10 — Leave — service, controller, and routes: Create src/modules/leave/leave.service.ts: implement ILeaveService as the orchestration hub. Constru",
+  "scope": {
+    "affectedDomains": [
+      "audit"
+    ],
+    "affectedLayers": [
+      "domain",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/audit/audit.model.ts exists and imports AuditRecord, CreateAuditRecordDto from ../../shared/types/index, re-exports them, and exports AuditAction enum",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/audit/audit.repository.ts exists and exports IAuditRepository (with findByEntity and create methods) and PgAuditRepository (extends BaseRepository<AuditRecord>)",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "sc-003",
+      "description": "src/modules/audit/audit.service.ts exists and exports IAuditService (with recordAction method) and AuditService (depends on IAuditRepository)",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "sc-004",
+      "description": "IAuditRepository.findByEntity(entityType, entityId) returns all audit records for that entity ordered by performed_at DESC",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "AuditService.recordAction constructs a CreateAuditRecordDto from its parameters and calls auditRepository.create, returning the created AuditRecord",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-006",
+      "description": "PgAuditRepository.create inserts a row into audit_records using the pool and returns the created AuditRecord with generated id, performed_at, and created_at",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-007",
+      "description": "All audit record creations are atomic and use the database connection from src/shared/db/connection.ts",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-008",
+      "description": "Jest unit tests exist in tests/unit/modules/audit/audit.repository.test.ts covering PgAuditRepository.create and findByEntity",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-009",
+      "description": "Jest unit tests exist in tests/unit/modules/audit/audit.service.test.ts covering AuditService.recordAction with a mocked IAuditRepository",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Audit records: All state-changing operations write an audit record (this module implements the audit record mechanism).",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled.",
+    "No API surface — purely programmatic, called by other services.",
+    "Audit module must not depend on any other domain modules (employee, policy, balance, leave, notification)."
+  ],
+  "outOfScope": [
+    "API endpoints, controllers, routes",
+    "Balance module (Phase 6-7)",
+    "Notification module (Phase 8)",
+    "Leave module (Phase 9-10)",
+    "Any other modules not explicitly mentioned",
+    "Database table creation/migration for audit_records",
+    "Integration tests, e2e tests, configuration files beyond the module files"
+  ],
+  "ambiguities": []
+}
