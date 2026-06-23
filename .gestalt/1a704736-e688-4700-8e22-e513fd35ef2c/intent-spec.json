@@ -1,0 +1,101 @@
+{
+  "id": "823a080d-4cc4-4550-bf89-3e1bcc4bb9b2",
+  "correlationId": "1a704736-e688-4700-8e22-e513fd35ef2c",
+  "rawIntent": "[Feature: Build the leave management module — Phase 3: Employee — service, controller, and routes]\n\nCreate src/modules/employee/employee.service.ts: implement IEmployeeService with getEmployee(id), getEmployeeByNumber, getSubordinates(managerId), isActive. Depends on IEmployeeRepository from src/modules/employee/employee.repository.ts (Phase 2). Create src/modules/employee/employee.controller.ts: Fastify request handlers with Zod input validation (GP-003), RBAC enforcement (GP-005). Create src/modules/employee/employee.routes.ts: register GET /employees/:id, GET /employees, GET /employees/:id/subordinates on the Fastify instance from src/app.ts (Phase 1). All async errors caught and mapped to HTTP responses (GP-006). Include Jest unit tests in tests/unit/modules/employee/.\n\nThis phase depends on: Phase 1, Phase 2.\n\nPhase architecture notes:\nCompletes the Employee module. The service, controller, and routes are grouped because they form a single deployable API surface. Policy module follows in the next phase.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/employee/employee.service.ts\\nimport { IEmployeeRepository } from './employee.repository';\\nimport { Employee, EmployeeFilters } from './employee.model';\\n\\nexport interface IEmployeeService {\\n  getEmployee(id: string): Promise<Employee | null>;\\n  getEmployeeByNumber(employeeNumber: string): Promise<Employee | null>;\\n  getSubordinates(managerId: string): Promise<Employee[]>;\\n  isActive(employeeId: string): Promise<boolean>;\\n  listEmployees(filters?: EmployeeFilters): Promise<Employee[]>;\\n}\\n\\nexport class EmployeeService implements IEmployeeService {\\n  constructor(private readonly employeeRepository: IEmployeeRepository) {}\\n\\n  async getEmployee(id: string): Promise<Employee | null> {\\n    return this.employeeRepository.findById(id);\\n  }\\n\\n  async getEmployeeByNumber(employeeNumber: string): Promise<Employee | null> {\\n    return this.employeeRepository.findByEmployeeNumber(employeeNumber);\\n  }\\n\\n  async getSubordinates(managerId: string): Promise<Employee[]> {\\n    return this.employeeRepository.findByManagerId(managerId);\\n  }\\n\\n  async isActive(employeeId: string): Promise<boolean> {\\n    const employee = await this.employeeRepository.findById(employeeId);\\n    return employee?.employment_status === 'ACTIVE';\\n  }\\n\\n  async listEmployees(filters?: EmployeeFilters): Promise<Employee[]> {\\n    return this.employeeRepository.findAll(filters);\\n  }\\n}\",\"File: src/modules/employee/employee.controller.ts\\nimport { FastifyRequest, FastifyReply } from 'fastify';\\nimport { z } from 'zod';\\nimport { IEmployeeService } from './employee.service';\\nimport { EmployeeFilters } from './employee.model';\\n\\nconst employeeIdParamSchema = z.object({\\n  id: z.string().uuid(),\\n});\\n\\nconst listEmployeesQuerySchema = z.object({\\n  department: z.string().optional(),\\n  employmentStatus: z.enum(['ACTIVE', 'INACTIVE', 'TERMINATED']).optional(),\\n  search: z.string().optional(),\\n});\\n\\nexport class EmployeeController {\\n  constructor(private readonly employeeService: IEmployeeService) {}\\n\\n  async getEmployee(request: FastifyRequest, reply: FastifyReply): Promise<void> {\\n    const { id } = employeeIdParamSchema.parse(request.params);\\n    const employee = await this.employeeService.getEmployee(id);\\n    if (!employee) {\\n      return reply.status(404).send({ message: 'Employee not found' });\\n    }\\n    return reply.send(employee);\\n  }\\n\\n  async getEmployees(request: FastifyRequest, reply: FastifyReply): Promise<void> {\\n    const filters: EmployeeFilters = listEmployeesQuerySchema.parse(request.query);\\n    const employees = await this.employeeService.listEmployees(filters);\\n    return reply.send(employees);\\n  }\\n\\n  async getSubordinates(request: FastifyRequest, reply: FastifyReply): Promise<void> {\\n    const { id } = employeeIdParamSchema.parse(request.params);\\n    const subordinates = await this.employeeService.getSubordinates(id);\\n    return reply.send(subordinates);\\n  }\\n}\",\"File: src/modules/employee/employee.routes.ts\\nimport { FastifyInstance } from 'fastify';\\nimport { EmployeeController } from './employee.controller';\\nimport { requireRoles } from '../../shared/middleware/rbac';\\nimport { IEmployeeService } from './employee.service';\\n\\nexport async function employeeRoutes(fastify: FastifyInstance, employeeService: IEmployeeService): Promise<void> {\\n  const controller = new EmployeeController(employeeService);\\n\\n  fastify.get('/employees/:id', {\\n    preHandler: [requireRoles(['admin', 'manager', 'employee'])],\\n  }, controller.getEmployee.bind(controller));\\n\\n  fastify.get('/employees', {\\n    preHandler: [requireRoles(['admin', 'manager'])],\\n  }, controller.getEmployees.bind(controller));\\n\\n  fastify.get('/employees/:id/subordinates', {\\n    preHandler: [requireRoles(['admin', 'manager'])],\\n  }, controller.getSubordinates.bind(controller));\\n}\",\"File: src/shared/middleware/rbac.ts\\nimport { FastifyRequest, FastifyReply } from 'fastify';\\n\\nexport function requireRoles(allowedRoles: string[]) {\\n  return async (request: FastifyRequest, reply: FastifyReply) => {\\n    const user = (request as any).user;\\n    if (!user || !user.roles || !user.roles.some((role: string) => allowedRoles.includes(role))) {\\n      return reply.status(403).send({ message: 'Forbidden' });\\n    }\\n  };\\n}\",\"File: tests/unit/modules/employee/employee.service.test.ts\\nimport { EmployeeService } from '../../../src/modules/employee/employee.service';\\nimport { IEmployeeRepository } from '../../../src/modules/employee/employee.repository';\\nimport { Employee } from '../../../src/modules/employee/employee.model';\\n\\ndescribe('EmployeeService', () => {\\n  let service: EmployeeService;\\n  let mockRepo: jest.Mocked<IEmployeeRepository>;\\n\\n  beforeEach(() => {\\n    mockRepo = {\\n      findById: jest.fn(),\\n      findByEmployeeNumber: jest.fn(),\\n      findByManagerId: jest.fn(),\\n      findAll: jest.fn(),\\n      create: jest.fn(),\\n      update: jest.fn(),\\n      softDelete: jest.fn(),\\n    };\\n    service = new EmployeeService(mockRepo);\\n  });\\n\\n  it('getEmployee returns employee when found', async () => {\\n    const employee: Employee = { id: '1', employee_number: 'E001', first_name: 'John', last_name: 'Doe', email: 'john@example.com', employment_status: 'ACTIVE' } as Employee;\\n    mockRepo.findById.mockResolvedValue(employee);\\n    const result = await service.getEmployee('1');\\n    expect(result).toEqual(employee);\\n  });\\n\\n  it('getEmployee returns null when not found', async () => {\\n    mockRepo.findById.mockResolvedValue(null);\\n    const result = await service.getEmployee('1');\\n    expect(result).toBeNull();\\n  });\\n\\n  it('getEmployeeByNumber returns employee', async () => {\\n    const employee: Employee = { id: '1', employee_number: 'E001' } as Employee;\\n    mockRepo.findByEmployeeNumber.mockResolvedValue(employee);\\n    const result = await service.getEmployeeByNumber('E001');\\n    expect(result).toEqual(employee);\\n  });\\n\\n  it('getSubordinates returns list', async () => {\\n    const subs: Employee[] = [{ id: '2' } as Employee];\\n    mockRepo.findByManagerId.mockResolvedValue(subs);\\n    const result = await service.getSubordinates('1');\\n    expect(result).toEqual(subs);\\n  });\\n\\n  it('isActive returns true for ACTIVE status', async () => {\\n    mockRepo.findById.mockResolvedValue({ employment_status: 'ACTIVE' } as Employee);\\n    const result = await service.isActive('1');\\n    expect(result).toBe(true);\\n  });\\n\\n  it('isActive returns false for non-ACTIVE', async () => {\\n    mockRepo.findById.mockResolvedValue({ employment_status: 'INACTIVE' } as Employee);\\n    const result = await service.isActive('1');\\n    expect(result).toBe(false);\\n  });\\n\\n  it('listEmployees calls repository with filters', async () => {\\n    const filters = { department: 'Engineering' };\\n    await service.listEmployees(filters);\\n    expect(mockRepo.findAll).toHaveBeenCalledWith(filters);\\n  });\\n});\",\"File: tests/unit/modules/employee/employee.controller.test.ts\\nimport { EmployeeController } from '../../../src/modules/employee/employee.controller';\\nimport { IEmployeeService } from '../../../src/modules/employee/employee.service';\\nimport { FastifyRequest, FastifyReply } from 'fastify';\\n\\ndescribe('EmployeeController', () => {\\n  let controller: EmployeeController;\\n  let mockService: jest.Mocked<IEmployeeService>;\\n  let mockRequest: Partial<FastifyRequest>;\\n  let mockReply: Partial<FastifyReply>;\\n\\n  beforeEach(() => {\\n    mockService = {\\n      getEmployee: jest.fn(),\\n      getEmployeeByNumber: jest.fn(),\\n      getSubordinates: jest.fn(),\\n      isActive: jest.fn(),\\n      listEmployees: jest.fn(),\\n    };\\n    controller = new EmployeeController(mockService);\\n    mockRequest = { params: {}, query: {} };\\n    mockReply = {\\n      status: jest.fn().mockReturnThis(),\\n      send: jest.fn(),\\n    };\\n  });\\n\\n  it('getEmployee returns 404 when not found', async () => {\\n    mockRequest.params = { id: '123e4567-e89b-12d3-a456-426614174000' };\\n    mockService.getEmployee.mockResolvedValue(null);\\n    await controller.getEmployee(mockRequest as FastifyRequest, mockReply as FastifyReply);\\n    expect(mockReply.status).toHaveBeenCalledWith(404);\\n    expect(mockReply.send).toHaveBeenCalledWith({ message: 'Employee not found' });\\n  });\\n\\n  it('getEmployee returns employee', async () => {\\n    const employee = { id: '1', first_name: 'John' };\\n    mockRequest.params = { id: '123e4567-e89b-12d3-a456-426614174000' };\\n    mockService.getEmployee.mockResolvedValue(employee as any);\\n    await controller.getEmployee(mockRequest as FastifyRequest, mockReply as FastifyReply);\\n    expect(mockReply.send).toHaveBeenCalledWith(employee);\\n  });\\n\\n  it('getEmployees returns list', async () => {\\n    mockRequest.query = {};\\n    const list = [{ id: '1' }];\\n    mockService.listEmployees.mockResolvedValue(list as any);\\n    await controller.getEmployees(mockRequest as FastifyRequest, mockReply as FastifyReply);\\n    expect(mockReply.send).toHaveBeenCalledWith(list);\\n  });\\n\\n  it('getSubordinates returns list', async () => {\\n    mockRequest.params = { id: '123e4567-e89b-12d3-a456-426614174000' };\\n    const subs = [{ id: '2' }];\\n    mockService.getSubordinates.mockResolvedValue(subs as any);\\n    await controller.getSubordinates(mockRequest as FastifyRequest, mockReply as FastifyReply);\\n    expect(mockReply.send).toHaveBeenCalledWith(subs);\\n  });\\n});\"],\"importStatements\":[\"import { IEmployeeRepository } from './employee.repository';\",\"import { Employee, EmployeeFilters } from './employee.model';\",\"import { FastifyRequest, FastifyReply } from 'fastify';\",\"import { IEmployeeService, EmployeeService } from './employee.service';\",\"import { FastifyInstance } from 'fastify';\",\"import { EmployeeController } from './employee.controller';\",\"import { requireRoles } from '../../shared/middleware/rbac';\",\"import { z } from 'zod';\"],\"successCriteria\":[\"src/modules/employee/employee.service.ts exists and exports IEmployeeService, EmployeeService, and EmployeeFilters\",\"src/modules/employee/employee.controller.ts exists and exports EmployeeController\",\"src/modules/employee/employee.routes.ts exists and exports employeeRoutes function\",\"src/shared/middleware/rbac.ts exists and exports requireRoles middleware\",\"tests/unit/modules/employee/employee.service.test.ts exists and contains Jest tests for all EmployeeService methods\",\"tests/unit/modules/employee/employee.controller.test.ts exists and contains Jest tests for all EmployeeController handlers\",\"All async errors in service and controller are caught and mapped to appropriate HTTP responses (GP-006)\",\"All controller inputs are validated with Zod schemas before processing (GP-003)\",\"All routes enforce RBAC via requireRoles preHandler (GP-005)\",\"No direct database access from controllers; all data access goes through IEmployeeService -> IEmployeeRepository (GP-001)\",\"No state-changing operations in this phase, so no audit records are created (GP-002 not triggered)\"]}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- IEmployeeService\n- IEmployeeRepository\n- Employee\n- EmployeeFilters\n- FastifyRequest\n- FastifyReply\n- EmployeeService\n- FastifyInstance\n- EmployeeController\n- requireRoles\n- z\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 4 — Policy — service, controller, and routes: Create src/modules/policy/policy.service.ts: implement IPolicyService with getPolicy(id), getPolicyB\n- Phase 5 — Audit module — model, repository, and service: Create src/modules/audit/audit.model.ts: import AuditRecord, CreateAuditRecordDto from src/shared/ty\n- Phase 6 — Balance — model and repository: Create src/modules/balance/balance.model.ts: import LeaveBalance, CreateLeaveBalanceDto from src/sha\n- Phase 7 — Balance — service, controller, and routes: Create src/modules/balance/balance.service.ts: implement IBalanceService with initializeBalance(empl\n- Phase 8 — Notification module: Create src/modules/notification/notification.model.ts: import Notification, CreateNotificationDto fr\n- Phase 9 — Leave — model and repository: Create src/modules/leave/leave.model.ts: import LeaveRequest, LeaveRequestStatus, CreateLeaveRequest\n- Phase 10 — Leave — service, controller, and routes: Create src/modules/leave/leave.service.ts: implement ILeaveService as the orchestration hub. Constru",
+  "scope": {
+    "affectedDomains": [
+      "employee",
+      "shared"
+    ],
+    "affectedLayers": [
+      "domain",
+      "api",
+      "test",
+      "infra"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/employee/employee.service.ts exists and exports IEmployeeService, EmployeeService, and EmployeeFilters",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/employee/employee.controller.ts exists and exports EmployeeController",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "src/modules/employee/employee.routes.ts exists and exports employeeRoutes function",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "sc-004",
+      "description": "src/shared/middleware/rbac.ts exists and exports requireRoles middleware",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "tests/unit/modules/employee/employee.service.test.ts exists and contains Jest tests for all EmployeeService methods",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-006",
+      "description": "tests/unit/modules/employee/employee.controller.test.ts exists and contains Jest tests for all EmployeeController handlers",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-007",
+      "description": "All async errors in service and controller are caught and mapped to appropriate HTTP responses (GP-006)",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "sc-008",
+      "description": "All controller inputs are validated with Zod schemas before processing (GP-003)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-009",
+      "description": "All routes enforce RBAC via requireRoles preHandler (GP-005)",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "sc-010",
+      "description": "No direct database access from controllers; all data access goes through IEmployeeService -> IEmployeeRepository (GP-001)",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "GP-001: Repository pattern – all database access goes through repository interfaces (IEmployeeRepository)",
+    "GP-003: Input validation – validate all inputs at API boundaries using Zod schemas before processing",
+    "GP-005: RBAC enforcement – all API endpoints enforce role-based access control via requireRoles middleware",
+    "GP-006: Error handling – no unhandled promise rejections; all async errors caught and mapped to HTTP responses",
+    "GP-004: No sensitive data in logs – never log passwords, tokens, PII, or financial data (general constraint)"
+  ],
+  "outOfScope": [
+    "Phase 4 – Policy module (service, controller, routes)",
+    "Phase 5 – Audit module (model, repository, service)",
+    "Phase 6 – Balance module (model and repository)",
+    "Phase 7 – Balance module (service, controller, routes)",
+    "Phase 8 – Notification module",
+    "Phase 9 – Leave module (model and repository)",
+    "Phase 10 – Leave module (service, controller, routes)",
+    "Any state-changing operations (create, update, delete) on Employee",
+    "Audit record creation (GP-002 not triggered in this phase)",
+    "Integration or E2E tests beyond the specified unit tests"
+  ],
+  "ambiguities": []
+}

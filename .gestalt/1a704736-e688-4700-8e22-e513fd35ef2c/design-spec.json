@@ -1,0 +1,75 @@
+{
+  "correlationId": "1a704736-e688-4700-8e22-e513fd35ef2c",
+  "domainChanges": [],
+  "apiContracts": [
+    {
+      "method": "GET",
+      "path": "/employees/:id",
+      "description": "Retrieve a single employee by ID",
+      "requestBody": null,
+      "responseBody": {
+        "id": "string (UUID)",
+        "employee_number": "string",
+        "first_name": "string",
+        "last_name": "string",
+        "email": "string",
+        "employment_status": "string (ACTIVE | INACTIVE | TERMINATED)",
+        "manager_id": "string (UUID | null)",
+        "department": "string | null"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "manager",
+        "employee"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/employees",
+      "description": "List employees with optional filters (department, employmentStatus, search)",
+      "requestBody": null,
+      "responseBody": [
+        {
+          "id": "string (UUID)",
+          "employee_number": "string",
+          "first_name": "string",
+          "last_name": "string",
+          "email": "string",
+          "employment_status": "string",
+          "manager_id": "string (UUID | null)",
+          "department": "string | null"
+        }
+      ],
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "manager"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/employees/:id/subordinates",
+      "description": "Retrieve all direct subordinates of a manager",
+      "requestBody": null,
+      "responseBody": [
+        {
+          "id": "string (UUID)",
+          "employee_number": "string",
+          "first_name": "string",
+          "last_name": "string",
+          "email": "string",
+          "employment_status": "string",
+          "manager_id": "string (UUID | null)",
+          "department": "string | null"
+        }
+      ],
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "manager"
+      ]
+    }
+  ],
+  "componentSpecs": []
+}
