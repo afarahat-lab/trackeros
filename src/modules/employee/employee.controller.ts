@@ -25,7 +25,7 @@ export class EmployeeController {
         return;
       }
       reply.send(employee);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         reply.status(400).send({ message: 'Invalid input', errors: error.issues });
         return;
@@ -39,7 +39,7 @@ export class EmployeeController {
       const filters: EmployeeFilters = listEmployeesQuerySchema.parse(request.query);
       const employees = await this.employeeService.listEmployees(filters);
       reply.send(employees);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         reply.status(400).send({ message: 'Invalid input', errors: error.issues });
         return;
@@ -53,7 +53,7 @@ export class EmployeeController {
       const { id } = employeeIdParamSchema.parse(request.params);
       const subordinates = await this.employeeService.getSubordinates(id);
       reply.send(subordinates);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         reply.status(400).send({ message: 'Invalid input', errors: error.issues });
         return;

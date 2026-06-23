@@ -1,0 +1,107 @@
+{
+  "correlationId": "3336030f-4945-4346-a855-0bdf056cb4c9",
+  "domainChanges": [],
+  "apiContracts": [
+    {
+      "method": "GET",
+      "path": "/api/v1/policies/:id",
+      "description": "Retrieve a single leave policy by its UUID",
+      "requestBody": null,
+      "responseBody": {
+        "id": "string (UUID)",
+        "policy_name": "string",
+        "leave_type": "string (enum: annual, sick, emergency, unpaid, maternity, paternity)",
+        "entitlement_days": "number",
+        "accrual_rate": "number | null",
+        "max_accumulation": "number | null",
+        "minimum_notice_days": "number | null",
+        "requires_manager_approval": "boolean",
+        "is_active": "boolean",
+        "created_at": "string (ISO 8601)",
+        "updated_at": "string (ISO 8601)"
+      },
+      "authRequired": true,
+      "roles": [
+        "read:policy"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/policies",
+      "description": "List all active leave policies",
+      "requestBody": null,
+      "responseBody": {
+        "policies": "Array of LeavePolicy objects"
+      },
+      "authRequired": true,
+      "roles": [
+        "read:policy"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/policies",
+      "description": "Create a new leave policy",
+      "requestBody": {
+        "policy_name": "string (required)",
+        "leave_type": "string (required, enum: annual, sick, emergency, unpaid, maternity, paternity)",
+        "entitlement_days": "number (required, >=0)",
+        "accrual_rate": "number (optional)",
+        "max_accumulation": "number (optional, >=0)",
+        "minimum_notice_days": "number (optional, integer >=0)",
+        "requires_manager_approval": "boolean (optional, default true)",
+        "is_active": "boolean (optional, default true)"
+      },
+      "responseBody": {
+        "id": "string (UUID)",
+        "policy_name": "string",
+        "leave_type": "string",
+        "entitlement_days": "number",
+        "accrual_rate": "number | null",
+        "max_accumulation": "number | null",
+        "minimum_notice_days": "number | null",
+        "requires_manager_approval": "boolean",
+        "is_active": "boolean",
+        "created_at": "string (ISO 8601)",
+        "updated_at": "string (ISO 8601)"
+      },
+      "authRequired": true,
+      "roles": [
+        "create:policy"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/policies/:id",
+      "description": "Update an existing leave policy",
+      "requestBody": {
+        "policy_name": "string (optional)",
+        "leave_type": "string (optional, enum: annual, sick, emergency, unpaid, maternity, paternity)",
+        "entitlement_days": "number (optional, >=0)",
+        "accrual_rate": "number (optional)",
+        "max_accumulation": "number (optional, >=0)",
+        "minimum_notice_days": "number (optional, integer >=0)",
+        "requires_manager_approval": "boolean (optional)",
+        "is_active": "boolean (optional)"
+      },
+      "responseBody": {
+        "id": "string (UUID)",
+        "policy_name": "string",
+        "leave_type": "string",
+        "entitlement_days": "number",
+        "accrual_rate": "number | null",
+        "max_accumulation": "number | null",
+        "minimum_notice_days": "number | null",
+        "requires_manager_approval": "boolean",
+        "is_active": "boolean",
+        "created_at": "string (ISO 8601)",
+        "updated_at": "string (ISO 8601)"
+      },
+      "authRequired": true,
+      "roles": [
+        "update:policy"
+      ]
+    }
+  ],
+  "componentSpecs": []
+}
