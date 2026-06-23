@@ -4,18 +4,17 @@
   "apiContracts": [
     {
       "method": "GET",
-      "path": "/employees/:id",
-      "description": "Retrieve a single employee by ID",
-      "requestBody": null,
+      "path": "/api/v1/employees/:id",
+      "description": "Retrieve a single employee by ID. Requires authentication and appropriate role.",
+      "requestBody": {},
       "responseBody": {
-        "id": "string (UUID)",
-        "employee_number": "string",
-        "first_name": "string",
-        "last_name": "string",
+        "id": "string",
+        "employeeNumber": "string",
+        "firstName": "string",
+        "lastName": "string",
         "email": "string",
-        "employment_status": "string (ACTIVE | INACTIVE | TERMINATED)",
-        "manager_id": "string (UUID | null)",
-        "department": "string | null"
+        "employmentStatus": "string",
+        "managerId": "string | null"
       },
       "authRequired": true,
       "roles": [
@@ -26,21 +25,22 @@
     },
     {
       "method": "GET",
-      "path": "/employees",
-      "description": "List employees with optional filters (department, employmentStatus, search)",
-      "requestBody": null,
-      "responseBody": [
-        {
-          "id": "string (UUID)",
-          "employee_number": "string",
-          "first_name": "string",
-          "last_name": "string",
-          "email": "string",
-          "employment_status": "string",
-          "manager_id": "string (UUID | null)",
-          "department": "string | null"
-        }
-      ],
+      "path": "/api/v1/employees",
+      "description": "List employees with optional filters: department (string), employmentStatus (ACTIVE|INACTIVE|TERMINATED), search (string). Requires admin or manager role.",
+      "requestBody": {},
+      "responseBody": {
+        "employees": [
+          {
+            "id": "string",
+            "employeeNumber": "string",
+            "firstName": "string",
+            "lastName": "string",
+            "email": "string",
+            "employmentStatus": "string",
+            "managerId": "string | null"
+          }
+        ]
+      },
       "authRequired": true,
       "roles": [
         "admin",
@@ -49,21 +49,22 @@
     },
     {
       "method": "GET",
-      "path": "/employees/:id/subordinates",
-      "description": "Retrieve all direct subordinates of a manager",
-      "requestBody": null,
-      "responseBody": [
-        {
-          "id": "string (UUID)",
-          "employee_number": "string",
-          "first_name": "string",
-          "last_name": "string",
-          "email": "string",
-          "employment_status": "string",
-          "manager_id": "string (UUID | null)",
-          "department": "string | null"
-        }
-      ],
+      "path": "/api/v1/employees/:id/subordinates",
+      "description": "Retrieve all direct subordinates of a given manager (employee ID). Requires admin or manager role.",
+      "requestBody": {},
+      "responseBody": {
+        "subordinates": [
+          {
+            "id": "string",
+            "employeeNumber": "string",
+            "firstName": "string",
+            "lastName": "string",
+            "email": "string",
+            "employmentStatus": "string",
+            "managerId": "string | null"
+          }
+        ]
+      },
       "authRequired": true,
       "roles": [
         "admin",

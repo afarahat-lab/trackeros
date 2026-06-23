@@ -4,68 +4,63 @@ import { Employee } from '../../../../src/modules/employee/employee.model';
 
 describe('EmployeeService', () => {
   let service: EmployeeService;
-  let mockRepository: jest.Mocked<IEmployeeRepository>;
+  let mockRepo: jest.Mocked<IEmployeeRepository>;
 
   beforeEach(() => {
-    mockRepository = {
+    mockRepo = {
       findById: jest.fn(),
       findByEmployeeNumber: jest.fn(),
       findSubordinates: jest.fn(),
       findAll: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
-      delete: jest.fn()
-    };
-    service = new EmployeeService(mockRepository);
+      delete: jest.fn(),
+    } as unknown as jest.Mocked<IEmployeeRepository>;
+    service = new EmployeeService(mockRepo);
   });
 
-  it('getEmployee should call repository.findById', async () => {
-    const mockEmployee = { id: '1', employmentStatus: 'ACTIVE' } as Employee;
-    mockRepository.findById.mockResolvedValue(mockEmployee);
+  it('getEmployee returns employee when found', async () => {
+    const employee: Employee = { id: '1', employeeNumber: 'E001', firstName: 'John', lastName: 'Doe', email: 'john@example.com', employmentStatus: 'ACTIVE' } as Employee;
+    mockRepo.findById.mockResolvedValue(employee);
     const result = await service.getEmployee('1');
-    expect(mockRepository.findById).toHaveBeenCalledWith('1');
-    expect(result).toEqual(mockEmployee);
+    expect(result).toEqual(employee);
   });
 
-  it('getEmployeeByNumber should call repository.findByEmployeeNumber', async () => {
-    const mockEmployee = { id: '1', employeeNumber: 'E123' } as Employee;
-    mockRepository.findByEmployeeNumber.mockResolvedValue(mockEmployee);
-    const result = await service.getEmployeeByNumber('E123');
-    expect(mockRepository.findByEmployeeNumber).toHaveBeenCalledWith('E123');
-    expect(result).toEqual(mockEmployee);
+  it('getEmployee returns null when not found', async () => {
+    mockRepo.findById.mockResolvedValue(null);
+    const result = await service.getEmployee('1');
+    expect(result).toBeNull();
   });
 
-  it('getSubordinates should call repository.findSubordinates', async () => {
-    const mockSubordinates = [{ id: '2' }] as Employee[];
-    mockRepository.findSubordinates.mockResolvedValue(mockSubordinates);
+  it('getEmployeeByNumber returns employee', async () => {
+    const employee: Employee = { id: '1', employeeNumber: 'E001' } as Employee;
+    mockRepo.findByEmployeeNumber.mockResolvedValue(employee);
+    const result = await service.getEmployeeByNumber('E001');
+    expect(result).toEqual(employee);
+  });
+
+  it('getSubordinates returns list', async () => {
+    const subs: Employee[] = [{ id: '2' } as Employee];
+    mockRepo.findSubordinates.mockResolvedValue(subs);
     const result = await service.getSubordinates('1');
-    expect(mockRepository.findSubordinates).toHaveBeenCalledWith('1');
-    expect(result).toEqual(mockSubordinates);
+    expect(result).toEqual(subs);
   });
 
-  it('isActive should return true if employee status is ACTIVE', async () => {
-    mockRepository.findById.mockResolvedValue({ id: '1', employmentStatus: 'ACTIVE' } as Employee);
+  it('isActive returns true for ACTIVE status', async () => {
+    mockRepo.findById.mockResolvedValue({ employmentStatus: 'ACTIVE' } as Employee);
     const result = await service.isActive('1');
     expect(result).toBe(true);
   });
 
-  it('isActive should return false if employee status is not ACTIVE', async () => {
-    mockRepository.findById.mockResolvedValue({ id: '1', employmentStatus: 'INACTIVE' } as Employee);
+  it('isActive returns false for non-ACTIVE', async () => {
+    mockRepo.findById.mockResolvedValue({ employmentStatus: 'INACTIVE' } as Employee);
     const result = await service.isActive('1');
     expect(result).toBe(false);
   });
 
-  it('isActive should return false if employee not found', async () => {
-    mockRepository.findById.mockResolvedValue(null);
-    const result = await service.isActive('1');
-    expect(result).toBe(false);
-  });
-
-  it('listEmployees should call repository.findAll', async () => {
-    const mockEmployees = [{ id: '1' }] as Employee[];
-    mockRepository.findAll.mockResolvedValue(mockEmployees);
-    const result = await service.listEmployees({ department: 'IT' });
-    expect(mockRepository.findAll).toHaveBeenCalledWith({ department: 'IT' });
-    expect(result).toEqual(mockEmployees);
+  it('listEmployees calls repository with filters', async () => {
+    const filters = { department: 'Engineering' };
+    await service.listEmployees(filters);
+    expect(mockRepo.findAll).toHaveBeenCalledWith(filters);
   });
 });

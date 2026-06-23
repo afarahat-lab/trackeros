@@ -1,13 +1,12 @@
-import { Employee } from './employee.model';
 import { IEmployeeRepository } from './employee.repository';
-import { EmploymentStatus } from '../../shared/types';
+import { Employee, EmployeeFilters } from './employee.model';
 
 export interface IEmployeeService {
   getEmployee(id: string): Promise<Employee | null>;
   getEmployeeByNumber(employeeNumber: string): Promise<Employee | null>;
   getSubordinates(managerId: string): Promise<Employee[]>;
   isActive(employeeId: string): Promise<boolean>;
-  listEmployees(filters?: Record<string, any>): Promise<Employee[]>;
+  listEmployees(filters?: EmployeeFilters): Promise<Employee[]>;
 }
 
 export class EmployeeService implements IEmployeeService {
@@ -27,10 +26,10 @@ export class EmployeeService implements IEmployeeService {
 
   async isActive(employeeId: string): Promise<boolean> {
     const employee = await this.employeeRepository.findById(employeeId);
-    return employee ? employee.employmentStatus === EmploymentStatus.ACTIVE : false;
+    return employee?.employmentStatus === 'ACTIVE';
   }
 
-  async listEmployees(filters?: Record<string, any>): Promise<Employee[]> {
+  async listEmployees(filters?: EmployeeFilters): Promise<Employee[]> {
     return this.employeeRepository.findAll(filters);
   }
 }

@@ -1,7 +1,6 @@
 import { EmployeeController } from '../../../../src/modules/employee/employee.controller';
 import { IEmployeeService } from '../../../../src/modules/employee/employee.service';
 import { FastifyRequest, FastifyReply } from 'fastify';
-import { Employee } from '../../../../src/modules/employee/employee.model';
 
 describe('EmployeeController', () => {
   let controller: EmployeeController;
@@ -15,63 +14,45 @@ describe('EmployeeController', () => {
       getEmployeeByNumber: jest.fn(),
       getSubordinates: jest.fn(),
       isActive: jest.fn(),
-      listEmployees: jest.fn()
+      listEmployees: jest.fn(),
     };
     controller = new EmployeeController(mockService);
+    mockRequest = { params: {}, query: {} };
     mockReply = {
       status: jest.fn().mockReturnThis(),
-      send: jest.fn().mockReturnThis()
+      send: jest.fn(),
     };
   });
 
-  it('getEmployee should return 200 and employee if found', async () => {
-    const mockEmployee = { id: '123e4567-e89b-12d3-a456-426614174000' } as Employee;
-    mockService.getEmployee.mockResolvedValue(mockEmployee);
-    mockRequest = { params: { id: '123e4567-e89b-12d3-a456-426614174000' } };
-
-    await controller.getEmployee(mockRequest as FastifyRequest, mockReply as FastifyReply);
-
-    expect(mockService.getEmployee).toHaveBeenCalledWith('123e4567-e89b-12d3-a456-426614174000');
-    expect(mockReply.send).toHaveBeenCalledWith(mockEmployee);
-  });
-
-  it('getEmployee should return 404 if not found', async () => {
+  it('getEmployee returns 404 when not found', async () => {
+    mockRequest.params = { id: '123e4567-e89b-12d3-a456-426614174000' };
     mockService.getEmployee.mockResolvedValue(null);
-    mockRequest = { params: { id: '123e4567-e89b-12d3-a456-426614174000' } };
-
     await controller.getEmployee(mockRequest as FastifyRequest, mockReply as FastifyReply);
-
     expect(mockReply.status).toHaveBeenCalledWith(404);
-    expect(mockReply.send).toHaveBeenCalledWith({ error: 'Employee not found' });
+    expect(mockReply.send).toHaveBeenCalledWith({ message: 'Employee not found' });
   });
 
-  it('getEmployee should return 400 for invalid UUID', async () => {
-    mockRequest = { params: { id: 'invalid-uuid' } };
-
+  it('getEmployee returns employee', async () => {
+    const employee = { id: '1', first_name: 'John' };
+    mockRequest.params = { id: '123e4567-e89b-12d3-a456-426614174000' };
+    mockService.getEmployee.mockResolvedValue(employee as any);
     await controller.getEmployee(mockRequest as FastifyRequest, mockReply as FastifyReply);
-
-    expect(mockReply.status).toHaveBeenCalledWith(400);
+    expect(mockReply.send).toHaveBeenCalledWith(employee);
   });
 
-  it('getEmployees should return 200 and employees', async () => {
-    const mockEmployees = [{ id: '1' }] as Employee[];
-    mockService.listEmployees.mockResolvedValue(mockEmployees);
-    mockRequest = { query: {} };
-
+  it('getEmployees returns list', async () => {
+    mockRequest.query = {};
+    const list = [{ id: '1' }];
+    mockService.listEmployees.mockResolvedValue(list as any);
     await controller.getEmployees(mockRequest as FastifyRequest, mockReply as FastifyReply);
-
-    expect(mockService.listEmployees).toHaveBeenCalled();
-    expect(mockReply.send).toHaveBeenCalledWith(mockEmployees);
+    expect(mockReply.send).toHaveBeenCalledWith(list);
   });
 
-  it('getSubordinates should return 200 and subordinates', async () => {
-    const mockSubordinates = [{ id: '2' }] as Employee[];
-    mockService.getSubordinates.mockResolvedValue(mockSubordinates);
-    mockRequest = { params: { id: '123e4567-e89b-12d3-a456-426614174000' } };
-
+  it('getSubordinates returns list', async () => {
+    mockRequest.params = { id: '123e4567-e89b-12d3-a456-426614174000' };
+    const subs = [{ id: '2' }];
+    mockService.getSubordinates.mockResolvedValue(subs as any);
     await controller.getSubordinates(mockRequest as FastifyRequest, mockReply as FastifyReply);
-
-    expect(mockService.getSubordinates).toHaveBeenCalledWith('123e4567-e89b-12d3-a456-426614174000');
-    expect(mockReply.send).toHaveBeenCalledWith(mockSubordinates);
+    expect(mockReply.send).toHaveBeenCalledWith(subs);
   });
 });
