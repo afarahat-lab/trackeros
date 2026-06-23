@@ -1,5 +1,5 @@
-import { policyRoutes } from '../../../src/modules/policy/policy.routes';
-import { IPolicyService } from '../../../src/modules/policy/policy.service';
+import { policyRoutes } from '../../../../src/modules/policy/policy.routes';
+import { IPolicyService } from '../../../../src/modules/policy/policy.service';
 
 describe('policyRoutes', () => {
   let mockFastify: any;

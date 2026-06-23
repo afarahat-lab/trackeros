@@ -1,5 +1,5 @@
-import { PolicyController } from '../../../src/modules/policy/policy.controller';
-import { IPolicyService } from '../../../src/modules/policy/policy.service';
+import { PolicyController } from '../../../../src/modules/policy/policy.controller';
+import { IPolicyService } from '../../../../src/modules/policy/policy.service';
 
 describe('PolicyController', () => {
   let controller: PolicyController;

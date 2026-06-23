@@ -1,6 +1,6 @@
-import { PolicyService, ILeavePolicyRepository } from '../../../src/modules/policy/policy.service';
-import { IAuditService } from '../../../src/shared/audit/audit.service';
-import { AuditAction, LeaveType } from '../../../src/shared/types';
+import { PolicyService, ILeavePolicyRepository } from '../../../../src/modules/policy/policy.service';
+import { IAuditService } from '../../../../src/shared/audit/audit.service';
+import { AuditAction, LeaveType } from '../../../../src/shared/types';
 
 describe('PolicyService', () => {
   let service: PolicyService;
