@@ -20,6 +20,7 @@ describe('PolicyService', () => {
     mockRepo = {
       findById: jest.fn(),
       findAll: jest.fn(),
+      findByLeaveType: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
       delete: jest.fn()
@@ -46,41 +47,53 @@ describe('PolicyService', () => {
     expect(result[0].id).toBe('1');
   });
 
-  it('should create policy with transaction and audit', async () => {
+  it('should create policy and audit', async () => {
     const dto = { policyName: 'Test', leaveType: LeaveType.ANNUAL, entitlementDays: 10 };
-    const newPolicy = { id: '1', ...dto } as any;
+    const newPolicy = { id: '1', policyName: 'Test', leaveType: LeaveType.ANNUAL, entitlementDays: 10, accrualRate: null, maxAccumulation: null, minimumNoticeDays: null, requiresManagerApproval: true, isActive: true } as any;
     mockRepo.create.mockResolvedValue(newPolicy);
     
     const result = await service.createPolicy(dto as any, 'user1');
     
-    expect(mockPool.connect).toHaveBeenCalled();
-    expect(mockClient.query).toHaveBeenCalledWith('BEGIN');
-    expect(mockRepo.create).toHaveBeenCalledWith(dto, mockClient);
+    expect(mockRepo.create).toHaveBeenCalledWith(expect.objectContaining({
+      policyName: 'Test',
+      leaveType: LeaveType.ANNUAL,
+      entitlementDays: 10
+    }));
     expect(mockAudit.logAction).toHaveBeenCalledWith(expect.objectContaining({
       action: AuditAction.CREATE,
       performedBy: 'user1'
-    }), mockClient);
-    expect(mockClient.query).toHaveBeenCalledWith('COMMIT');
-    expect(mockClient.release).toHaveBeenCalled();
+    }));
     expect(result).toEqual(newPolicy);
   });
 
-  it('should rollback transaction on create error', async () => {
+  it('should throw error on create error', async () => {
     mockRepo.create.mockRejectedValue(new Error('DB Error'));
     await expect(service.createPolicy({} as any)).rejects.toThrow('DB Error');
-    expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK');
-    expect(mockClient.release).toHaveBeenCalled();
+  });
+
+  it('should get policy by leave type', async () => {
+    const policies = [
+      { id: '1', leaveType: LeaveType.ANNUAL, isActive: true },
+      { id: '2', leaveType: LeaveType.SICK, isActive: true }
+    ] as any;
+    mockRepo.findAll.mockResolvedValue(policies);
+    
+    const result = await service.getPolicyByLeaveType(LeaveType.ANNUAL);
+    expect(result).toEqual(policies[0]);
+    
+    const resultNull = await service.getPolicyByLeaveType('non-existent');
+    expect(resultNull).toBeNull();
   });
 
   it('should validate entitlement correctly', async () => {
-    mockRepo.findById.mockResolvedValue({ id: '1', isActive: true } as any);
+    mockRepo.findAll.mockResolvedValue([{ id: '1', isActive: true, leaveType: '1' }] as any);
     expect(await service.validateEntitlement('1', 5, 10)).toBe(true);
     expect(await service.validateEntitlement('1', 15, 10)).toBe(false);
     
-    mockRepo.findById.mockResolvedValue({ id: '1', isActive: false } as any);
+    mockRepo.findAll.mockResolvedValue([{ id: '1', isActive: false, leaveType: '1' }] as any);
     expect(await service.validateEntitlement('1', 5, 10)).toBe(false);
     
-    mockRepo.findById.mockResolvedValue(null);
+    mockRepo.findAll.mockResolvedValue([]);
     expect(await service.validateEntitlement('1', 5, 10)).toBe(false);
   });
 });

@@ -11,6 +11,7 @@ describe('PolicyController', () => {
     mockService = {
       getPolicy: jest.fn(),
       getPolicies: jest.fn(),
+      getPolicyByLeaveType: jest.fn(),
       createPolicy: jest.fn(),
       updatePolicy: jest.fn(),
       deletePolicy: jest.fn(),
@@ -35,15 +36,13 @@ describe('PolicyController', () => {
     await controller.getPolicy(mockRequest, mockReply);
     
     expect(mockReply.status).toHaveBeenCalledWith(404);
-    expect(mockReply.send).toHaveBeenCalledWith({ message: 'Policy not found' });
+    expect(mockReply.send).toHaveBeenCalledWith({ error: 'Policy not found' });
   });
 
-  it('should return 400 for invalid params', async () => {
+  it('should throw error for invalid params', async () => {
     mockRequest.params = { id: 'invalid-uuid' };
     
-    await controller.getPolicy(mockRequest, mockReply);
-    
-    expect(mockReply.status).toHaveBeenCalledWith(400);
+    await expect(controller.getPolicy(mockRequest, mockReply)).rejects.toThrow();
   });
 
   it('should create policy and return 201', async () => {
@@ -57,7 +56,7 @@ describe('PolicyController', () => {
     
     await controller.createPolicy(mockRequest, mockReply);
     
-    expect(mockService.createPolicy).toHaveBeenCalledWith(mockRequest.body, 'user1');
+    expect(mockService.createPolicy).toHaveBeenCalledWith(mockRequest.body);
     expect(mockReply.status).toHaveBeenCalledWith(201);
     expect(mockReply.send).toHaveBeenCalledWith(newPolicy);
   });

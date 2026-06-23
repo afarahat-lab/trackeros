@@ -1,30 +1,35 @@
-import { Pool, PoolClient } from 'pg';
-import { pool } from '../../shared/db/connection';
-import { LeavePolicy, CreateLeavePolicyDto, UpdateLeavePolicyDto, AuditAction } from '../../shared/types';
+import { LeavePolicy, CreateLeavePolicyDto, UpdateLeavePolicyDto, AuditAction } from '../../shared/types/index';
+import { LeavePolicyRepository } from './policy.repository';
 import { IAuditService } from '../../shared/audit/audit.service';
 
 export interface ILeavePolicyRepository {
-  findById(id: string, client?: PoolClient): Promise<LeavePolicy | null>;
-  findAll(filters?: Record<string, any>, client?: PoolClient): Promise<LeavePolicy[]>;
-  create(entity: Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>, client?: PoolClient): Promise<LeavePolicy>;
-  update(id: string, updates: Partial<LeavePolicy>, client?: PoolClient): Promise<LeavePolicy>;
-  delete(id: string, client?: PoolClient): Promise<void>;
+  findById(id: string): Promise<LeavePolicy | null>;
+  findAll(): Promise<LeavePolicy[]>;
+  findByLeaveType(leaveTypeId: string): Promise<LeavePolicy | null>;
+  create(entity: any): Promise<LeavePolicy>;
+  update(id: string, updates: any): Promise<LeavePolicy>;
+  delete(id: string): Promise<void>;
 }
 
 export interface IPolicyService {
   getPolicy(id: string): Promise<LeavePolicy | null>;
   getPolicies(): Promise<LeavePolicy[]>;
+  getPolicyByLeaveType(leaveTypeId: string): Promise<LeavePolicy | null>;
   createPolicy(dto: CreateLeavePolicyDto, performedBy?: string): Promise<LeavePolicy>;
   updatePolicy(id: string, dto: UpdateLeavePolicyDto, performedBy?: string): Promise<LeavePolicy>;
   deletePolicy(id: string, performedBy?: string): Promise<void>;
-  validateEntitlement(policyId: string, requestedDays: number, remainingBalance: number): Promise<boolean>;
+  validateEntitlement(
+    leaveTypeId: string,
+    requestedDays: number,
+    remainingBalance: number
+  ): Promise<boolean>;
 }
 
 export class PolicyService implements IPolicyService {
   constructor(
     private readonly policyRepository: ILeavePolicyRepository,
     private readonly auditService: IAuditService,
-    private readonly dbPool: Pool = pool
+    private readonly pool?: any
   ) {}
 
   async getPolicy(id: string): Promise<LeavePolicy | null> {
@@ -36,85 +41,70 @@ export class PolicyService implements IPolicyService {
     return policies.filter(p => p.isActive);
   }
 
-  async createPolicy(dto: CreateLeavePolicyDto, performedBy?: string): Promise<LeavePolicy> {
-    const client = await this.dbPool.connect();
-    try {
-      await client.query('BEGIN');
-      const newPolicy = await this.policyRepository.create(dto as any, client);
-      
-      await this.auditService.logAction({
-        entityType: 'LeavePolicy',
-        entityId: newPolicy.id,
-        action: AuditAction.CREATE,
-        newValues: dto as any,
-        performedBy
-      }, client);
-      
-      await client.query('COMMIT');
-      return newPolicy;
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
-    }
+  async getPolicyByLeaveType(leaveTypeId: string): Promise<LeavePolicy | null> {
+    const policies = await this.policyRepository.findAll();
+    return policies.find(p => p.leaveType === leaveTypeId || p.id === leaveTypeId) || null;
   }
 
-  async updatePolicy(id: string, dto: UpdateLeavePolicyDto, performedBy?: string): Promise<LeavePolicy> {
-    const client = await this.dbPool.connect();
-    try {
-      await client.query('BEGIN');
-      const oldPolicy = await this.policyRepository.findById(id, client);
-      const updatedPolicy = await this.policyRepository.update(id, dto, client);
-      
-      await this.auditService.logAction({
-        entityType: 'LeavePolicy',
-        entityId: id,
-        action: AuditAction.UPDATE,
-        oldValues: oldPolicy as any,
-        newValues: dto as any,
-        performedBy
-      }, client);
-      
-      await client.query('COMMIT');
-      return updatedPolicy;
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
-    }
+  async createPolicy(dto: CreateLeavePolicyDto, performedBy: string = 'system'): Promise<LeavePolicy> {
+    const entity = {
+      policyName: dto.policyName,
+      leaveType: dto.leaveType,
+      entitlementDays: dto.entitlementDays,
+      accrualRate: dto.accrualRate ?? null,
+      maxAccumulation: dto.maxAccumulation ?? null,
+      minimumNoticeDays: dto.minimumNoticeDays ?? null,
+      requiresManagerApproval: dto.requiresManagerApproval ?? true,
+      isActive: dto.isActive ?? true,
+    };
+    const policy = await this.policyRepository.create(entity as any);
+    
+    await this.auditService.logAction({
+      entityType: 'LeavePolicy',
+      entityId: policy.id,
+      action: AuditAction.CREATE,
+      newValues: policy as any,
+      performedBy,
+    });
+    return policy;
   }
 
-  async deletePolicy(id: string, performedBy?: string): Promise<void> {
-    const client = await this.dbPool.connect();
-    try {
-      await client.query('BEGIN');
-      const oldPolicy = await this.policyRepository.findById(id, client);
-      await this.policyRepository.delete(id, client);
-      
-      await this.auditService.logAction({
-        entityType: 'LeavePolicy',
-        entityId: id,
-        action: AuditAction.DELETE,
-        oldValues: oldPolicy as any,
-        performedBy
-      }, client);
-      
-      await client.query('COMMIT');
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
-    }
+  async updatePolicy(id: string, dto: UpdateLeavePolicyDto, performedBy: string = 'system'): Promise<LeavePolicy> {
+    const policy = await this.policyRepository.update(id, dto as any);
+    
+    await this.auditService.logAction({
+      entityType: 'LeavePolicy',
+      entityId: id,
+      action: AuditAction.UPDATE,
+      newValues: policy as any,
+      performedBy,
+    });
+    return policy;
   }
 
-  async validateEntitlement(policyId: string, requestedDays: number, remainingBalance: number): Promise<boolean> {
-    const policy = await this.policyRepository.findById(policyId);
-    if (!policy) return false;
-    if (!policy.isActive) return false;
-    if (requestedDays > remainingBalance) return false;
+  async deletePolicy(id: string, performedBy: string = 'system'): Promise<void> {
+    await this.policyRepository.delete(id);
+    
+    await this.auditService.logAction({
+      entityType: 'LeavePolicy',
+      entityId: id,
+      action: AuditAction.DELETE,
+      performedBy,
+    });
+  }
+
+  async validateEntitlement(
+    leaveTypeId: string,
+    requestedDays: number,
+    remainingBalance: number
+  ): Promise<boolean> {
+    const policy = await this.getPolicyByLeaveType(leaveTypeId);
+    if (!policy || !policy.isActive) {
+      return false;
+    }
+    if (requestedDays > remainingBalance) {
+      return false;
+    }
     return true;
   }
 }
