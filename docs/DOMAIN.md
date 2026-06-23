@@ -246,17 +246,10 @@ Represents notification data managed by the `notification` module, including not
 |-------|------|----------|
 | id | string | true |
 | recipientId | string | true |
-| type | string | true |
-| title | string | true |
 | message | string | true |
-| relatedEntityType | string \| null | false |
-| relatedEntityId | string \| null | false |
-| status | NotificationStatus | true |
+| status | string | true |
 | createdAt | Date | true |
-| readAt | Date \| null | false |
-
-**Relationships**
-- `Employee` — many-to-one
+| updatedAt | Date | true |
 
 ## audit
 
