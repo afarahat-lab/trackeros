@@ -1,0 +1,54 @@
+{
+  "correlationId": "04a38c64-dee3-4e13-b600-fedeefb7ba19",
+  "domainChanges": [],
+  "apiContracts": [
+    {
+      "method": "GET",
+      "path": "/api/v1/balances",
+      "description": "Retrieve all leave balances (admin/manager view).",
+      "requestBody": null,
+      "responseBody": {
+        "balances": "LeaveBalance[]"
+      },
+      "authRequired": true,
+      "roles": [
+        "employee",
+        "manager",
+        "admin"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/balances/:employeeId",
+      "description": "Retrieve leave balances for a specific employee.",
+      "requestBody": null,
+      "responseBody": {
+        "balances": "LeaveBalance[]"
+      },
+      "authRequired": true,
+      "roles": [
+        "employee",
+        "manager",
+        "admin"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/balances/initialize",
+      "description": "Initialize a new leave balance for an employee under a policy for a fiscal year.",
+      "requestBody": {
+        "employeeId": "string (UUID)",
+        "policyId": "string (UUID)",
+        "fiscalYear": "number (integer, min 2000)"
+      },
+      "responseBody": {
+        "balance": "LeaveBalance"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin"
+      ]
+    }
+  ],
+  "componentSpecs": []
+}
