@@ -1,0 +1,88 @@
+{
+  "id": "f77b2cc9-7972-4795-b6f5-f5095587b102",
+  "correlationId": "ef7728e4-e9bb-4819-ab72-36ba45feb61f",
+  "rawIntent": "[Feature: Build the leave management module — Phase 9: Leave — model and repository]\n\nCreate src/modules/leave/leave.model.ts: import LeaveRequest, LeaveRequestStatus, CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveRequestQueryParams from src/shared/types/index.ts (Phase 1). Define the LeaveRequest state machine transitions (DRAFT→SUBMITTED→APPROVED|REJECTED, plus CANCELLED from DRAFT|SUBMITTED|APPROVED). Create src/modules/leave/leave.repository.ts: implement PgLeaveRepository extending BaseRepository from src/shared/base-repository.ts (Phase 1). Define ILeaveRequestRepository with findByEmployee(employeeId, queryParams), findByApprover(approverId), findPending, updateStatus(id, status, approvedBy, approvedAt). Depends on src/shared/types/index.ts (Phase 1) and src/shared/base-repository.ts (Phase 1). Include Jest unit tests in tests/unit/modules/leave/.\n\nThis phase depends on: Phase 1.\n\nPhase architecture notes:\nEstablishes the LeaveRequest persistence layer. The repository's updateStatus method enforces valid state transitions. The orchestration service in Phase 10 will consume this repository alongside all other module services.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/leave/leave.model.ts\\nimport { LeaveRequest, LeaveRequestStatus, CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveRequestQueryParams } from \\\"../../shared/types/index\\\";\\n\\nexport { LeaveRequest, LeaveRequestStatus, CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveRequestQueryParams };\\n\\nexport const LEAVE_REQUEST_TRANSITIONS: Record<LeaveRequestStatus, LeaveRequestStatus[]> = {\\n  DRAFT: ['SUBMITTED', 'CANCELLED'],\\n  SUBMITTED: ['APPROVED', 'REJECTED', 'CANCELLED'],\\n  APPROVED: ['CANCELLED'],\\n  REJECTED: [],\\n  CANCELLED: []\\n};\\n\\nexport function isValidTransition(from: LeaveRequestStatus, to: LeaveRequestStatus): boolean {\\n  return LEAVE_REQUEST_TRANSITIONS[from]?.includes(to) ?? false;\\n}\",\"File: src/modules/leave/leave.repository.ts\\nimport { IBaseRepository, BaseRepository } from \\\"../../shared/base-repository\\\";\\nimport { LeaveRequest, CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveRequestStatus, LeaveRequestQueryParams } from \\\"../../shared/types/index\\\";\\nimport { isValidTransition } from \\\"./leave.model\\\";\\n\\nexport interface ILeaveRequestRepository extends IBaseRepository<LeaveRequest> {\\n  findByEmployee(employeeId: string, queryParams: LeaveRequestQueryParams): Promise<LeaveRequest[]>;\\n  findByApprover(approverId: string): Promise<LeaveRequest[]>;\\n  findPending(): Promise<LeaveRequest[]>;\\n  updateStatus(id: string, status: LeaveRequestStatus, approvedBy?: string, approvedAt?: Date): Promise<LeaveRequest>;\\n}\\n\\nexport class PgLeaveRequestRepository extends BaseRepository<LeaveRequest> implements ILeaveRequestRepository {\\n  // implementation using this.pool\\n}\"],\"importStatements\":[\"import { LeaveRequest, CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveRequestStatus, LeaveRequestQueryParams } from \\\"../../shared/types/index\\\"\",\"import { IBaseRepository, BaseRepository } from \\\"../../shared/base-repository\\\"\",\"import { LEAVE_REQUEST_TRANSITIONS, isValidTransition } from \\\"./leave.model\\\"\"],\"successCriteria\":[\"src/modules/leave/leave.model.ts exists and exports LEAVE_REQUEST_TRANSITIONS, isValidTransition, and re-exports LeaveRequest, CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveRequestStatus, LeaveRequestQueryParams from shared types\",\"src/modules/leave/leave.repository.ts exists and exports ILeaveRequestRepository and PgLeaveRequestRepository\",\"PgLeaveRequestRepository extends BaseRepository<LeaveRequest> and implements ILeaveRequestRepository\",\"ILeaveRequestRepository includes methods: findByEmployee(employeeId, queryParams), findByApprover(approverId), findPending(), updateStatus(id, status, approvedBy?, approvedAt?)\",\"updateStatus enforces valid state transitions using isValidTransition from leave.model; throws on invalid transition\",\"updateStatus writes an audit record (action: 'SUBMIT', 'APPROVE', 'REJECT', or 'CANCEL' as appropriate) in the same database transaction as the status update, satisfying GP-002\",\"PgLeaveRequestRepository.create (inherited from BaseRepository) writes an audit record (action: 'CREATE') in the same transaction\",\"All repository methods use parameterized queries via this.pool (from BaseRepository) to prevent SQL injection\",\"tests/unit/modules/leave/leave.repository.test.ts exists and all tests pass using Jest, covering valid transitions, invalid transitions, and audit record creation\"]}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- ILeaveRequestRepository\n- LeaveRequest\n- CreateLeaveRequestDto\n- UpdateLeaveRequestDto\n- LeaveRequestStatus\n- LeaveRequestQueryParams\n- IBaseRepository\n- BaseRepository\n- LEAVE_REQUEST_TRANSITIONS\n- isValidTransition\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 10 — Leave — service, controller, and routes: Create src/modules/leave/leave.service.ts: implement ILeaveService as the orchestration hub. Constru",
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "domain",
+      "infra",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "id": "sc-001",
+      "description": "src/modules/leave/leave.model.ts exists and exports LEAVE_REQUEST_TRANSITIONS, isValidTransition, and re-exports LeaveRequest, CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveRequestStatus, LeaveRequestQueryParams from shared types.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-002",
+      "description": "src/modules/leave/leave.repository.ts exists and exports ILeaveRequestRepository and PgLeaveRequestRepository.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-003",
+      "description": "PgLeaveRequestRepository extends BaseRepository<LeaveRequest> and implements ILeaveRequestRepository.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-004",
+      "description": "ILeaveRequestRepository includes methods: findByEmployee(employeeId, queryParams), findByApprover(approverId), findPending(), updateStatus(id, status, approvedBy?, approvedAt?).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-005",
+      "description": "updateStatus enforces valid state transitions using isValidTransition; throws on invalid transition.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-006",
+      "description": "updateStatus writes an audit record (action: 'SUBMIT', 'APPROVE', 'REJECT', or 'CANCEL' as appropriate) in the same database transaction as the status update.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-007",
+      "description": "PgLeaveRequestRepository.create (inherited from BaseRepository) writes an audit record (action: 'CREATE') in the same transaction.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-008",
+      "description": "All repository methods use parameterized queries via this.pool to prevent SQL injection.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "sc-009",
+      "description": "tests/unit/modules/leave/leave.repository.test.ts exists and all tests pass using Jest, covering valid transitions, invalid transitions, and audit record creation.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces.",
+    "Audit records: All state-changing operations write an audit record.",
+    "No sensitive data in logs: Never log passwords, tokens, PII, or financial data.",
+    "Error handling: No unhandled promise rejections. All async errors are caught and handled."
+  ],
+  "outOfScope": [
+    "Phase 10 — Leave — service, controller, and routes",
+    "Integration with other modules (employee, policy, balance, notification)",
+    "API endpoints",
+    "Frontend UI",
+    "Database migrations",
+    "Configuration files"
+  ],
+  "ambiguities": []
+}

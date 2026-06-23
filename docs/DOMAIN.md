@@ -30,10 +30,10 @@ Represents a leave record managed by the `leave` module, including leave request
 |-------|------|----------|
 | id | string | true |
 | employeeId | string | true |
-| leaveTypeId | string | true |
+| leaveType | string | true |
 | startDate | Date | true |
 | endDate | Date | true |
-| reason | string \| null | false |
+| reason | string | true |
 | status | LeaveRequestStatus | true |
 | approvedBy | string \| null | false |
 | approvedAt | Date \| null | false |
@@ -42,14 +42,13 @@ Represents a leave record managed by the `leave` module, including leave request
 
 **Relationships**
 - `Employee` — many-to-one
-- `LeavePolicy` — many-to-one
 
 ### CreateLeaveRequestDto
 
 | Field | Type | Required |
 |-------|------|----------|
 | employeeId | string | true |
-| leaveTypeId | string | true |
+| leaveType | string | true |
 | startDate | Date | true |
 | endDate | Date | true |
 | reason | string \| undefined | false |
@@ -67,7 +66,7 @@ Represents a leave record managed by the `leave` module, including leave request
 | Field | Type | Required |
 |-------|------|----------|
 | status | LeaveRequestStatus | false |
-| leaveTypeId | string | false |
+| leaveType | string | false |
 | startDateFrom | Date | false |
 | startDateTo | Date | false |
 | endDateFrom | Date | false |
