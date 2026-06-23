@@ -1,0 +1,76 @@
+{
+  "correlationId": "311f6d15-bc5d-4533-85af-c50bd03e19d1",
+  "domainChanges": [
+    {
+      "entityName": "EmployeeFilters",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "department",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "employmentStatus",
+          "type": "'ACTIVE' | 'INACTIVE' | 'TERMINATED'",
+          "required": false
+        },
+        {
+          "name": "managerId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "search",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "limit",
+          "type": "number",
+          "required": false
+        },
+        {
+          "name": "offset",
+          "type": "number",
+          "required": false
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "PolicyFilters",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "leaveType",
+          "type": "'annual' | 'sick' | 'emergency' | 'unpaid' | 'maternity' | 'paternity'",
+          "required": false
+        },
+        {
+          "name": "isActive",
+          "type": "boolean",
+          "required": false
+        },
+        {
+          "name": "search",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "limit",
+          "type": "number",
+          "required": false
+        },
+        {
+          "name": "offset",
+          "type": "number",
+          "required": false
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}
