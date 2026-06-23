@@ -150,6 +150,17 @@ Represents employee data managed by the `employee` module, including employee re
 **Relationships**
 - `Employee` — many-to-one (self-referencing manager relationship)
 
+### EmployeeFilters
+
+| Field | Type | Required |
+|-------|------|----------|
+| department | string | false |
+| employmentStatus | 'ACTIVE' \| 'INACTIVE' \| 'TERMINATED' | false |
+| managerId | string | false |
+| search | string | false |
+| limit | number | false |
+| offset | number | false |
+
 ## policy
 
 Represents leave policy data managed by the `policy` module, including policy definitions, rules, and leave entitlement configurations.
@@ -196,6 +207,16 @@ Represents leave policy data managed by the `policy` module, including policy de
 | isActive | boolean | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
+
+### PolicyFilters
+
+| Field | Type | Required |
+|-------|------|----------|
+| leaveType | 'annual' \| 'sick' \| 'emergency' \| 'unpaid' \| 'maternity' \| 'paternity' | false |
+| isActive | boolean | false |
+| search | string | false |
+| limit | number | false |
+| offset | number | false |
 
 ## notification
 
