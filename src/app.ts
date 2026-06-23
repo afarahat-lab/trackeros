@@ -1,7 +1,14 @@
-import express from 'express';
+import Fastify from 'fastify';
+import cors from '@fastify/cors';
+import sensible from '@fastify/sensible';
 
-const app = express();
+export async function buildApp() {
+  const app = Fastify({ logger: true });
 
-app.use(express.json());
+  await app.register(cors);
+  await app.register(sensible);
 
-export default app;
+  app.get('/health', async () => ({ status: 'ok' }));
+
+  return app;
+}
