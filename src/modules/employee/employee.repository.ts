@@ -3,7 +3,17 @@ import { BaseRepository } from '../../shared/base-repository';
 import { pool } from '../../shared/db/connection';
 import { Employee } from './employee.model';
 
-export class EmployeeRepository extends BaseRepository<Employee> {
+export interface IEmployeeRepository {
+  findById(id: string, client?: PoolClient): Promise<Employee | null>;
+  findByEmployeeNumber(employeeNumber: string, client?: PoolClient): Promise<Employee | null>;
+  findSubordinates(managerId: string, client?: PoolClient): Promise<Employee[]>;
+  findAll(filters?: Record<string, any>, client?: PoolClient): Promise<Employee[]>;
+  create(entity: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'>, client?: PoolClient): Promise<Employee>;
+  update(id: string, updates: Partial<Employee>, client?: PoolClient): Promise<Employee>;
+  delete(id: string, client?: PoolClient): Promise<void>;
+}
+
+export class EmployeeRepository extends BaseRepository<Employee> implements IEmployeeRepository {
   constructor() {
     super(pool);
   }
@@ -15,6 +25,24 @@ export class EmployeeRepository extends BaseRepository<Employee> {
       [id]
     );
     return result.rows[0] || null;
+  }
+
+  async findByEmployeeNumber(employeeNumber: string, client?: PoolClient): Promise<Employee | null> {
+    const executor = client || this.pool;
+    const result = await executor.query(
+      'SELECT * FROM employees WHERE employee_number = $1 AND deleted_at IS NULL', 
+      [employeeNumber]
+    );
+    return result.rows[0] || null;
+  }
+
+  async findSubordinates(managerId: string, client?: PoolClient): Promise<Employee[]> {
+    const executor = client || this.pool;
+    const result = await executor.query(
+      'SELECT * FROM employees WHERE manager_id = $1 AND deleted_at IS NULL', 
+      [managerId]
+    );
+    return result.rows;
   }
 
   async findAll(filters?: Record<string, any>, client?: PoolClient): Promise<Employee[]> {

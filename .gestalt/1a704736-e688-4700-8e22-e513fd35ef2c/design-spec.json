@@ -1,0 +1,76 @@
+{
+  "correlationId": "1a704736-e688-4700-8e22-e513fd35ef2c",
+  "domainChanges": [],
+  "apiContracts": [
+    {
+      "method": "GET",
+      "path": "/api/v1/employees/:id",
+      "description": "Retrieve a single employee by ID. Requires authentication and appropriate role.",
+      "requestBody": {},
+      "responseBody": {
+        "id": "string",
+        "employeeNumber": "string",
+        "firstName": "string",
+        "lastName": "string",
+        "email": "string",
+        "employmentStatus": "string",
+        "managerId": "string | null"
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "manager",
+        "employee"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/employees",
+      "description": "List employees with optional filters: department (string), employmentStatus (ACTIVE|INACTIVE|TERMINATED), search (string). Requires admin or manager role.",
+      "requestBody": {},
+      "responseBody": {
+        "employees": [
+          {
+            "id": "string",
+            "employeeNumber": "string",
+            "firstName": "string",
+            "lastName": "string",
+            "email": "string",
+            "employmentStatus": "string",
+            "managerId": "string | null"
+          }
+        ]
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "manager"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/employees/:id/subordinates",
+      "description": "Retrieve all direct subordinates of a given manager (employee ID). Requires admin or manager role.",
+      "requestBody": {},
+      "responseBody": {
+        "subordinates": [
+          {
+            "id": "string",
+            "employeeNumber": "string",
+            "firstName": "string",
+            "lastName": "string",
+            "email": "string",
+            "employmentStatus": "string",
+            "managerId": "string | null"
+          }
+        ]
+      },
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "manager"
+      ]
+    }
+  ],
+  "componentSpecs": []
+}
