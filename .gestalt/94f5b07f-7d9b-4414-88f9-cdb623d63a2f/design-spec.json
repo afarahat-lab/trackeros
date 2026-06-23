@@ -1,0 +1,69 @@
+{
+  "correlationId": "94f5b07f-7d9b-4414-88f9-cdb623d63a2f",
+  "domainChanges": [
+    {
+      "entityName": "LeaveBalance",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "employeeId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "policyId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "fiscalYear",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "totalDays",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "usedDays",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "remainingDays",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "status",
+          "type": "BalanceStatus",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "deletedAt",
+          "type": "Date | null",
+          "required": false
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}
