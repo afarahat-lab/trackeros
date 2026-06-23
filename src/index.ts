@@ -1,7 +1,13 @@
-import app from './app';
+import { buildApp } from './app';
 
-const PORT = 3000;
+const start = async () => {
+  const app = await buildApp();
+  const port = parseInt(process.env.PORT || '3000', 10);
+  await app.listen({ port, host: '0.0.0.0' });
+  console.log(`Server running on port ${port}`);
+};
 
-app.listen(PORT, () => {
-    console.log(`Server is running on http://localhost:${PORT}`);
+start().catch((err) => {
+  console.error(err);
+  process.exit(1);
 });

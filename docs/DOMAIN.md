@@ -33,7 +33,7 @@ Represents a leave record managed by the `leave` module, including leave request
 | leaveTypeId | string | true |
 | startDate | Date | true |
 | endDate | Date | true |
-| reason | string \| undefined | false |
+| reason | string \| null | false |
 | status | LeaveRequestStatus | true |
 | approvedBy | string \| null | false |
 | approvedAt | Date \| null | false |
@@ -42,6 +42,7 @@ Represents a leave record managed by the `leave` module, including leave request
 
 **Relationships**
 - `Employee` — many-to-one
+- `LeavePolicy` — many-to-one
 
 ### CreateLeaveRequestDto
 
@@ -120,6 +121,14 @@ Represents leave balance data managed by the `balance` module, including tracked
 
 Represents employee data managed by the `employee` module, including employee records and related personnel information.
 
+### EmploymentStatus
+
+| Value | Description |
+|-------|-------------|
+| ACTIVE | Employee is currently active |
+| INACTIVE | Employee is inactive |
+| TERMINATED | Employee has been terminated |
+
 ### Employee
 
 | Field | Type | Required |
@@ -133,10 +142,13 @@ Represents employee data managed by the `employee` module, including employee re
 | department | string \| null | false |
 | hireDate | Date | true |
 | terminationDate | Date \| null | false |
-| employmentStatus | 'ACTIVE' \| 'INACTIVE' \| 'TERMINATED' | true |
+| employmentStatus | EmploymentStatus | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 | deletedAt | Date \| null | false |
+
+**Relationships**
+- `Employee` — many-to-one (self-referencing manager relationship)
 
 ## policy
 
@@ -175,11 +187,11 @@ Represents leave policy data managed by the `policy` module, including policy de
 |-------|------|----------|
 | id | string | true |
 | policyName | string | true |
-| leaveType | string | true |
+| leaveType | LeaveType | true |
 | entitlementDays | number | true |
-| accrualRate | number | false |
-| maxAccumulation | number | false |
-| minimumNoticeDays | number | false |
+| accrualRate | number \| null | false |
+| maxAccumulation | number \| null | false |
+| minimumNoticeDays | number \| null | false |
 | requiresManagerApproval | boolean | true |
 | isActive | boolean | true |
 | createdAt | Date | true |
@@ -188,6 +200,15 @@ Represents leave policy data managed by the `policy` module, including policy de
 ## notification
 
 Represents notification data managed by the `notification` module, including notification records, delivery status, and related messaging information.
+
+### NotificationStatus
+
+| Value | Description |
+|-------|-------------|
+| PENDING | Notification is pending delivery |
+| SENT | Notification has been sent |
+| READ | Notification has been read by recipient |
+| ARCHIVED | Notification has been archived |
 
 ### Notification
 
@@ -200,13 +221,26 @@ Represents notification data managed by the `notification` module, including not
 | message | string | true |
 | relatedEntityType | string \| null | false |
 | relatedEntityId | string \| null | false |
-| status | 'PENDING' \| 'SENT' \| 'READ' \| 'ARCHIVED' | true |
+| status | NotificationStatus | true |
 | createdAt | Date | true |
 | readAt | Date \| null | false |
+
+**Relationships**
+- `Employee` — many-to-one
 
 ## audit
 
 Represents audit data managed by the `audit` module, including audit records, change history, and activity tracking information.
+
+### AuditAction
+
+| Value | Description |
+|-------|-------------|
+| CREATE | Entity was created |
+| UPDATE | Entity was updated |
+| DELETE | Entity was deleted |
+| APPROVE | Entity was approved |
+| REJECT | Entity was rejected |
 
 ### Audit
 
@@ -240,14 +274,20 @@ Represents audit data managed by the `audit` module, including audit records, ch
 
 | Field | Type | Required |
 |-------|------|----------|
-| entity_type | string | true |
-| entity_id | string | true |
-| action | string | true |
-| changed_by | string \| null | false |
-| old_values | Record<string, any> \| null | false |
-| new_values | Record<string, any> \| null | false |
-| ip_address | string \| null | false |
-| user_agent | string \| null | false |
+| id | string | true |
+| entityType | string | true |
+| entityId | string | true |
+| action | AuditAction | true |
+| oldValues | Record<string, any> \| null | false |
+| newValues | Record<string, any> \| null | false |
+| performedBy | string \| null | false |
+| performedAt | Date | true |
+| ipAddress | string \| null | false |
+| userAgent | string \| null | false |
+| createdAt | Date | true |
+
+**Relationships**
+- `Employee` — many-to-one
 
 ### AuditServiceInterface
 
