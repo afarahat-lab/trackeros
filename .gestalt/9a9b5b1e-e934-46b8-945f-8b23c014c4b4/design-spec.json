@@ -1,0 +1,69 @@
+{
+  "correlationId": "9a9b5b1e-e934-46b8-945f-8b23c014c4b4",
+  "domainChanges": [
+    {
+      "entityName": "AuditRecord",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "entityType",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "entityId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "action",
+          "type": "AuditAction",
+          "required": true
+        },
+        {
+          "name": "oldValues",
+          "type": "Record<string, unknown> | null",
+          "required": false
+        },
+        {
+          "name": "newValues",
+          "type": "Record<string, unknown> | null",
+          "required": false
+        },
+        {
+          "name": "performedBy",
+          "type": "string | null",
+          "required": false
+        },
+        {
+          "name": "ipAddress",
+          "type": "string | null",
+          "required": false
+        },
+        {
+          "name": "userAgent",
+          "type": "string | null",
+          "required": false
+        },
+        {
+          "name": "performedAt",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": true
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}

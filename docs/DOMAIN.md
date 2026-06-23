@@ -299,8 +299,8 @@ Represents audit data managed by the `audit` module, including audit records, ch
 | entityType | string | true |
 | entityId | string | true |
 | action | AuditAction | true |
-| oldValues | Record<string, any> \| null | false |
-| newValues | Record<string, any> \| null | false |
+| oldValues | Record<string, unknown> \| null | false |
+| newValues | Record<string, unknown> \| null | false |
 | performedBy | string \| null | false |
 | performedAt | Date | true |
 | ipAddress | string \| null | false |
