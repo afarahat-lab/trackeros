@@ -1,0 +1,18 @@
+{
+  "correlationId": "1bbc14a0-306b-417d-8cf5-f49b4ec91452",
+  "domainChanges": [],
+  "apiContracts": [
+    {
+      "method": "GET",
+      "path": "/status",
+      "description": "Returns system health status with uptime indicator and version string",
+      "authRequired": false,
+      "roles": [],
+      "responseBody": {
+        "up": "boolean",
+        "version": "string"
+      }
+    }
+  ],
+  "componentSpecs": []
+}

@@ -1,0 +1,84 @@
+{
+  "id": "b2919d83-6ee4-4af0-9a0a-d43051adcadf",
+  "correlationId": "1bbc14a0-306b-417d-8cf5-f49b4ec91452",
+  "rawIntent": "[Feature: Add a status module: a GET /status route returning JSON {up:true,version:'1'} — Phase 2: Phase 2: Create Fastify route plugin, barrel export, and unit test]\n\nCreate src/modules/status/status.routes.ts — a Fastify plugin that instantiates StatusService, calls getStatus(), and registers GET /status returning the SystemStatus JSON. Create src/modules/status/index.ts as the barrel export re-exporting SystemStatus, IStatusService, StatusService, and the route plugin. Create tests/unit/modules/status/status.test.ts with Vitest unit tests covering the route returns { up: true, version: '1' } with a 200 status. This phase depends on src/modules/status/status.model.ts, src/modules/status/status.service.interface.ts, and src/modules/status/status.service.ts from Phase 1 — read them before generating any code that references SystemStatus, IStatusService, or StatusService.\n\nThis phase depends on: Phase 1.\n\nPhase architecture notes:\n{\"interfaces\":[\"File: src/modules/status/status.routes.ts\\nimport { FastifyInstance } from 'fastify';\\nimport { StatusService } from './status.service';\\nimport { IStatusService } from './status.service.interface';\\nimport { SystemStatus } from './status.model';\\n\\nexport async function statusRoutes(fastify: FastifyInstance): Promise<void> {\\n  const statusService: IStatusService = new StatusService();\\n\\n  fastify.get('/status', async (request, reply) => {\\n    try {\\n      const status: SystemStatus = statusService.getStatus();\\n      return reply.status(200).send(status);\\n    } catch (error) {\\n      return reply.status(500).send({ up: false, version: '1' });\\n    }\\n  });\\n}\",\"File: src/modules/status/index.ts\\nexport { SystemStatus } from './status.model';\\nexport { IStatusService } from './status.service.interface';\\nexport { StatusService } from './status.service';\\nexport { statusRoutes } from './status.routes';\",\"File: src/modules/status/__tests__/status.routes.test.ts\\nimport Fastify, { FastifyInstance } from 'fastify';\\nimport { statusRoutes } from '../status.routes';\\nimport { IStatusService } from '../status.service.interface';\\nimport { SystemStatus } from '../status.model';\\n\\njest.mock('../status.service', () => ({\\n  StatusService: jest.fn().mockImplementation(() => ({\\n    getStatus: jest.fn(),\\n  })),\\n}));\\n\\nconst { StatusService } = require('../status.service');\\n\\ndescribe('statusRoutes', () => {\\n  let app: FastifyInstance;\\n  let mockGetStatus: jest.Mock;\\n\\n  beforeEach(async () => {\\n    mockGetStatus = jest.fn();\\n    (StatusService as jest.Mock).mockImplementation(() => ({\\n      getStatus: mockGetStatus,\\n    }));\\n\\n    app = Fastify();\\n    await app.register(statusRoutes);\\n    await app.ready();\\n  });\\n\\n  afterEach(async () => {\\n    await app.close();\\n  });\\n\\n  it('should return 200 with { up: true, version: \\\"1\\\" } when service succeeds', async () => {\\n    mockGetStatus.mockReturnValue({ up: true, version: '1' });\\n    const response = await app.inject({ method: 'GET', url: '/status' });\\n    expect(response.statusCode).toBe(200);\\n    expect(response.json()).toEqual({ up: true, version: '1' });\\n  });\\n\\n  it('should return 500 with { up: false, version: \\\"1\\\" } when service throws', async () => {\\n    mockGetStatus.mockImplementation(() => {\\n      throw new Error('Service failure');\\n    });\\n    const response = await app.inject({ method: 'GET', url: '/status' });\\n    expect(response.statusCode).toBe(500);\\n    expect(response.json()).toEqual({ up: false, version: '1' });\\n  });\\n});\"],\"importStatements\":[\"import { FastifyInstance } from 'fastify';\",\"import { StatusService } from './status.service';\",\"import { IStatusService } from './status.service.interface';\",\"import { SystemStatus } from './status.model';\",\"import { statusRoutes } from './status.routes';\",\"import { IStatusService, StatusService, statusRoutes } from './index';\"],\"successCriteria\":[\"src/modules/status/status.routes.ts exists and exports a named async function statusRoutes(fastify: FastifyInstance): Promise<void> that registers GET /status\",\"src/modules/status/index.ts exists and re-exports SystemStatus, IStatusService, StatusService, and statusRoutes\",\"src/modules/status/__tests__/status.routes.test.ts exists and contains Jest tests that verify GET /status returns 200 with { up: true, version: '1' } and returns 500 with { up: false, version: '1' } on service failure\",\"Running Jest passes the status routes test suite\",\"GET /status returns HTTP 200 with JSON body { up: true, version: '1' } when the service succeeds\",\"The route handler catches errors and returns HTTP 500 with { up: false, version: '1' }\"]}\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/status/status.routes.ts\\nimport { FastifyInstance } from 'fastify';\\nimport { StatusService } from './status.service';\\nimport { IStatusService } from './status.service.interface';\\nimport { SystemStatus } from './status.model';\\n\\nexport async function statusRoutes(fastify: FastifyInstance): Promise<void> {\\n  const statusService: IStatusService = new StatusService();\\n\\n  fastify.get('/status', async (request, reply) => {\\n    try {\\n      const status: SystemStatus = statusService.getStatus();\\n      return reply.status(200).send(status);\\n    } catch (error) {\\n      return reply.status(500).send({ up: false, version: '1' });\\n    }\\n  });\\n}\",\"File: src/modules/status/index.ts\\nexport { SystemStatus } from './status.model';\\nexport { IStatusService } from './status.service.interface';\\nexport { StatusService } from './status.service';\\nexport { statusRoutes } from './status.routes';\",\"File: tests/unit/modules/status/status.test.ts\\nimport Fastify, { FastifyInstance } from 'fastify';\\nimport { statusRoutes } from '../../../../src/modules/status/status.routes';\\nimport { IStatusService } from '../../../../src/modules/status/status.service.interface';\\nimport { SystemStatus } from '../../../../src/modules/status/status.model';\\n\\njest.mock('../../../../src/modules/status/status.service', () => ({\\n  StatusService: jest.fn().mockImplementation(() => ({\\n    getStatus: jest.fn(),\\n  })),\\n}));\\n\\nconst { StatusService } = require('../../../../src/modules/status/status.service');\\n\\ndescribe('statusRoutes', () => {\\n  let app: FastifyInstance;\\n  let mockGetStatus: jest.Mock;\\n\\n  beforeEach(async () => {\\n    mockGetStatus = jest.fn();\\n    (StatusService as jest.Mock).mockImplementation(() => ({\\n      getStatus: mockGetStatus,\\n    }));\\n\\n    app = Fastify();\\n    await app.register(statusRoutes);\\n    await app.ready();\\n  });\\n\\n  afterEach(async () => {\\n    await app.close();\\n  });\\n\\n  it('should return 200 with { up: true, version: \\\"1\\\" } when service succeeds', async () => {\\n    mockGetStatus.mockReturnValue({ up: true, version: '1' });\\n\\n    const response = await app.inject({\\n      method: 'GET',\\n      url: '/status',\\n    });\\n\\n    expect(response.statusCode).toBe(200);\\n    expect(response.json()).toEqual({ up: true, version: '1' });\\n  });\\n\\n  it('should return 500 with { up: false, version: \\\"1\\\" } when service throws', async () => {\\n    mockGetStatus.mockImplementation(() => {\\n      throw new Error('Service failure');\\n    });\\n\\n    const response = await app.inject({\\n      method: 'GET',\\n      url: '/status',\\n    });\\n\\n    expect(response.statusCode).toBe(500);\\n    expect(response.json()).toEqual({ up: false, version: '1' });\\n  });\\n});\"],\"importStatements\":[\"import { FastifyInstance } from 'fastify';\",\"import { StatusService } from './status.service';\",\"import { IStatusService } from './status.service.interface';\",\"import { SystemStatus } from './status.model';\",\"import Fastify, { FastifyInstance } from 'fastify';\",\"import { statusRoutes } from '../../../../src/modules/status/status.routes';\",\"import { IStatusService } from '../../../../src/modules/status/status.service.interface';\",\"import { SystemStatus } from '../../../../src/modules/status/status.model';\"],\"successCriteria\":[\"src/modules/status/status.routes.ts exists and exports a Fastify plugin function statusRoutes that registers GET /status.\",\"src/modules/status/index.ts exists and re-exports SystemStatus, IStatusService, StatusService, and statusRoutes.\",\"tests/unit/modules/status/status.test.ts exists and contains a Jest test that verifies GET /status returns 200 with { up: true, version: '1' }.\",\"All imports reference only Phase 1 files (status.model.ts, status.service.interface.ts, status.service.ts) or files created in this phase.\",\"The test uses Jest mocking to isolate StatusService.\",\"No circular dependencies introduced.\",\"All framework references use Fastify and Jest as per declared stack.\"]}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- FastifyInstance\n- StatusService\n- IStatusService\n- SystemStatus\n- statusRoutes\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n",
+  "scope": {
+    "affectedDomains": [
+      "status"
+    ],
+    "affectedLayers": [
+      "api",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "f79adb82-72d8-4a90-84cb-41a901d6152c",
+      "description": "src/modules/status/status.routes.ts exists and exports a named async function statusRoutes(fastify: FastifyInstance): Promise<void> that registers GET /status",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "6e753037-32ab-4e1f-8d76-e3a54f25083a",
+      "description": "src/modules/status/index.ts re-exports SystemStatus, IStatusService, StatusService, and statusRoutes",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "7215979c-c30a-4b37-90b3-20c127f514e4",
+      "description": "tests/unit/modules/status/status.test.ts exists with a test verifying GET /status returns HTTP 200 with JSON body { up: true, version: '1' }",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "d330c716-9ce4-4013-a6cb-9c1011864c0f",
+      "description": "The route handler catches service errors and returns HTTP 500 with { up: false, version: '1' }",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "691a4dca-4469-4c08-a361-b74d9372c1e1",
+      "description": "All imports reference only Phase 1 files (status.model.ts, status.service.interface.ts, status.service.ts) or files created in this phase — no circular dependencies",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No sensitive data in logs: the /status route must not log passwords, tokens, PII, or financial data",
+    "Error handling: the route handler must catch all async errors and return a controlled 500 response — no unhandled promise rejections",
+    "All imports must resolve to files that exist in the project (Phase 1 files already on disk)",
+    "No @gestalt/* packages in any generated code",
+    "The route plugin must follow Fastify plugin conventions (async function receiving FastifyInstance)"
+  ],
+  "outOfScope": [
+    "Any database access, repository pattern, or persistence — this is a pure in-memory status check",
+    "RBAC enforcement on GET /status — the intent does not mention authentication or authorization for this health-check endpoint",
+    "Input validation — GET /status has no request body or query parameters to validate",
+    "Audit records — no state-changing operations occur",
+    "Any routes beyond GET /status",
+    "Phase 1 files (status.model.ts, status.service.interface.ts, status.service.ts) — these already exist and are not modified",
+    "Any other modules (leave, balance, employee, policy, notification, audit)"
+  ],
+  "ambiguities": [
+    {
+      "id": "421f01c5-42fc-4954-98a8-8de6645b9b07",
+      "description": "Test framework name mismatch: the intent text says 'Vitest' but HARNESS.json declares 'Jest' as the test framework, and the per-phase architecture code uses Jest APIs (jest.mock, jest.fn, jest.Mock). The per-phase architecture code is authoritative for implementation.",
+      "options": [
+        "Use Jest as declared in HARNESS.json and shown in per-phase architecture code",
+        "Use Vitest as stated in the intent prose"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "id": "b4e50786-07b9-47c5-8b35-f32436e77d20",
+      "description": "Test file location mismatch: the intent prose says 'tests/unit/modules/status/status.test.ts' but the per-phase architecture code places the test at 'src/modules/status/__tests__/status.routes.test.ts'. The canonical dependencies block does not specify the test file path.",
+      "options": [
+        "Use tests/unit/modules/status/status.test.ts as stated in the intent prose",
+        "Use src/modules/status/__tests__/status.routes.test.ts as shown in the per-phase architecture code"
+      ],
+      "impactIfWrong": "low"
+    }
+  ]
+}
