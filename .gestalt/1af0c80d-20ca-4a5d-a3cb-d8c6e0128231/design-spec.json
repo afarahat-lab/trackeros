@@ -1,0 +1,145 @@
+{
+  "correlationId": "1af0c80d-20ca-4a5d-a3cb-d8c6e0128231",
+  "domainChanges": [],
+  "apiContracts": [
+    {
+      "method": "POST",
+      "path": "/api/v1/leave/requests",
+      "description": "Submit a new leave request. Validates employee active status and leave entitlement, creates the request with status SUBMITTED, records audit, and sends notification. All operations are atomic within a single database transaction.",
+      "requestBody": {
+        "leave_type_id": "string (UUID)",
+        "start_date": "string (YYYY-MM-DD)",
+        "end_date": "string (YYYY-MM-DD)",
+        "reason": "string (optional)"
+      },
+      "responseBody": {
+        "id": "string (UUID)",
+        "employee_id": "string (UUID)",
+        "leave_type_id": "string (UUID)",
+        "start_date": "string (YYYY-MM-DD)",
+        "end_date": "string (YYYY-MM-DD)",
+        "status": "SUBMITTED",
+        "reason": "string | null",
+        "approved_by": "string | null",
+        "approved_at": "string (ISO 8601) | null",
+        "created_at": "string (ISO 8601)",
+        "updated_at": "string (ISO 8601)"
+      },
+      "authRequired": true,
+      "roles": [
+        "employee"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/leave/requests/:id/approve",
+      "description": "Approve a submitted leave request. Transitions status to APPROVED, deducts leave balance, records audit, and sends notification. All operations are atomic within a single database transaction.",
+      "requestBody": {},
+      "responseBody": {
+        "id": "string (UUID)",
+        "employee_id": "string (UUID)",
+        "leave_type_id": "string (UUID)",
+        "start_date": "string (YYYY-MM-DD)",
+        "end_date": "string (YYYY-MM-DD)",
+        "status": "APPROVED",
+        "reason": "string | null",
+        "approved_by": "string (UUID)",
+        "approved_at": "string (ISO 8601)",
+        "created_at": "string (ISO 8601)",
+        "updated_at": "string (ISO 8601)"
+      },
+      "authRequired": true,
+      "roles": [
+        "manager"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/leave/requests/:id/reject",
+      "description": "Reject a submitted leave request. Transitions status to REJECTED, records audit, and sends notification. All operations are atomic within a single database transaction.",
+      "requestBody": {
+        "reason": "string (optional)"
+      },
+      "responseBody": {
+        "id": "string (UUID)",
+        "employee_id": "string (UUID)",
+        "leave_type_id": "string (UUID)",
+        "start_date": "string (YYYY-MM-DD)",
+        "end_date": "string (YYYY-MM-DD)",
+        "status": "REJECTED",
+        "reason": "string | null",
+        "approved_by": "string | null",
+        "approved_at": "string | null",
+        "created_at": "string (ISO 8601)",
+        "updated_at": "string (ISO 8601)"
+      },
+      "authRequired": true,
+      "roles": [
+        "manager"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/leave/requests/:id/cancel",
+      "description": "Cancel a leave request. Only the owner can cancel. Transitions status to CANCELLED, restores balance if previously APPROVED, records audit, and sends notification. All operations are atomic within a single database transaction.",
+      "requestBody": {},
+      "responseBody": {
+        "id": "string (UUID)",
+        "employee_id": "string (UUID)",
+        "leave_type_id": "string (UUID)",
+        "start_date": "string (YYYY-MM-DD)",
+        "end_date": "string (YYYY-MM-DD)",
+        "status": "CANCELLED",
+        "reason": "string | null",
+        "approved_by": "string | null",
+        "approved_at": "string | null",
+        "created_at": "string (ISO 8601)",
+        "updated_at": "string (ISO 8601)"
+      },
+      "authRequired": true,
+      "roles": [
+        "employee"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/leave/requests/:id",
+      "description": "Retrieve a single leave request by its ID.",
+      "requestBody": {},
+      "responseBody": {
+        "id": "string (UUID)",
+        "employee_id": "string (UUID)",
+        "leave_type_id": "string (UUID)",
+        "start_date": "string (YYYY-MM-DD)",
+        "end_date": "string (YYYY-MM-DD)",
+        "status": "string (SUBMITTED | APPROVED | REJECTED | CANCELLED)",
+        "reason": "string | null",
+        "approved_by": "string | null",
+        "approved_at": "string (ISO 8601) | null",
+        "created_at": "string (ISO 8601)",
+        "updated_at": "string (ISO 8601)"
+      },
+      "authRequired": true,
+      "roles": [
+        "employee",
+        "manager"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/leave/requests",
+      "description": "List leave requests with optional filtering and pagination. Supports query parameters: employee_id, status, start_date, end_date, page, limit.",
+      "requestBody": {},
+      "responseBody": {
+        "data": "Array of LeaveRequest objects",
+        "total": "number"
+      },
+      "authRequired": true,
+      "roles": [
+        "employee",
+        "manager"
+      ]
+    }
+  ],
+  "componentSpecs": []
+}

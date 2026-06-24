@@ -18,7 +18,6 @@ Represents a leave record managed by the `leave` module, including leave request
 
 | Value | Description |
 |-------|-------------|
-| DRAFT | Leave request is in draft state |
 | SUBMITTED | Leave request has been submitted |
 | APPROVED | Leave request has been approved |
 | REJECTED | Leave request has been rejected |
@@ -30,11 +29,11 @@ Represents a leave record managed by the `leave` module, including leave request
 |-------|------|----------|
 | id | string | true |
 | employeeId | string | true |
-| leaveType | string | true |
+| leaveTypeId | string | true |
 | startDate | Date | true |
 | endDate | Date | true |
-| reason | string | true |
-| status | LeaveRequestStatus | true |
+| reason | string \| null | false |
+| status | LeaveStatus | true |
 | approvedBy | string \| null | false |
 | approvedAt | Date \| null | false |
 | createdAt | Date | true |
@@ -42,13 +41,13 @@ Represents a leave record managed by the `leave` module, including leave request
 
 **Relationships**
 - `Employee` — many-to-one
+- `LeavePolicy` — many-to-one
 
 ### CreateLeaveRequestDto
 
 | Field | Type | Required |
 |-------|------|----------|
-| employeeId | string | true |
-| leaveType | string | true |
+| leaveTypeId | string | true |
 | startDate | Date | true |
 | endDate | Date | true |
 | reason | string \| undefined | false |
@@ -65,14 +64,12 @@ Represents a leave record managed by the `leave` module, including leave request
 
 | Field | Type | Required |
 |-------|------|----------|
-| status | LeaveRequestStatus | false |
-| leaveType | string | false |
-| startDateFrom | Date | false |
-| startDateTo | Date | false |
-| endDateFrom | Date | false |
-| endDateTo | Date | false |
+| employeeId | string | false |
+| status | LeaveStatus | false |
+| startDate | Date | false |
+| endDate | Date | false |
+| page | number | false |
 | limit | number | false |
-| offset | number | false |
 
 ## balance
 
