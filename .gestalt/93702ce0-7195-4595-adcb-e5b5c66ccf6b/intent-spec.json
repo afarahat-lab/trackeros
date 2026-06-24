@@ -1,62 +1,45 @@
 {
-  "id": "b57b4928-7234-4311-a88d-563310e14e6b",
+  "id": "3d10042b-b0d7-4f69-bbf7-417ca5771755",
   "correlationId": "93702ce0-7195-4595-adcb-e5b5c66ccf6b",
   "rawIntent": "The CI workflow does not trigger on push to gestalt/** branches. The workflow file at .github/workflows/ci.yml is missing or does not contain the correct on.push.branches filter. The deploy orchestrator reported: 'GitHub Actions: no push-triggered run appeared on branch gestalt/2a22ec77-feature-add-a-status-module within 21s. Verify the workflow file has `on: push: branches: ['gestalt/**']` and that pr-agent's push actually landed.' This prevents automated CI from running on feature branches. Preserve all existing exports, types, interfaces, and imports. Only add or modify what is needed to resolve the CI failure shown above.",
   "scope": {
-    "affectedDomains": [],
+    "affectedDomains": [
+      ".github/workflows/ci.yml"
+    ],
     "affectedLayers": [
-      "infra",
-      "config"
+      "config",
+      "infra"
     ],
     "isBreakingChange": false,
     "estimatedComplexity": "small"
   },
   "successCriteria": [
     {
-      "id": "fb7379ff-85ad-4466-b8e2-8938b23748b9",
-      "description": "A CI workflow file exists at .github/workflows/ci.yml that triggers on push to branches matching the pattern 'gestalt/**'",
+      "id": "a41bef55-9953-457c-8ff1-48d6bf8844cd",
+      "description": ".github/workflows/ci.yml contains `on: push: branches:` with a filter that matches `gestalt/**` branches, using either YAML list syntax (`- 'gestalt/**'`) or inline array syntax (`['gestalt/**']`)",
       "testable": true,
       "layer": "integration"
     },
     {
-      "id": "08a224dd-ac83-4b13-aa99-c8aaa2d0cb90",
-      "description": "The workflow runs the project's build and test commands as defined in HARNESS.json (npm run build && npx jest --passWithNoTests) so that CI gates pass on gestalt feature branches",
+      "id": "72756c39-f59e-4cb9-9a0e-1c879bb38548",
+      "description": "A push to any branch matching `gestalt/**` triggers the CI workflow (build-and-test job) in GitHub Actions",
       "testable": true,
-      "layer": "integration"
+      "layer": "e2e"
     }
   ],
   "constraints": [
-    "Only add or modify .github/workflows/ci.yml — do not touch any application source files, domain modules, types, interfaces, or imports",
-    "The workflow must use the test command from HARNESS.json codeGeneration.verification.testCmd: 'find src -name '*.ts' -not -name '*.spec.ts' -not -name '*.test.ts' -not -name '*.d.ts' -type f | grep -q . && npm run build && npx jest --passWithNoTests'",
-    "No @gestalt/* packages in any generated files"
+    "Preserve all existing jobs, steps, and configuration in ci.yml — only add or correct the on.push.branches trigger",
+    "The workflow file must be valid YAML that GitHub Actions can parse",
+    "No @gestalt/* packages in any generated package.json files"
   ],
   "outOfScope": [
-    "All application source code under src/",
-    "All domain modules (leave, balance, employee, policy, notification, audit, status)",
-    "All shared types, DTOs, interfaces, repositories, services, controllers, routes",
-    "Any package.json, tsconfig.json, or other project configuration files",
-    "Any test files",
-    "Any documentation files",
-    "Everything outside .github/workflows/ci.yml"
+    "All TypeScript source files under src/",
+    "All test files",
+    "All domain modules (employee, policy, balance, leave, notification)",
+    "All other workflow files (e.g., .github/workflows/gestalt.yml)",
+    "package.json, tsconfig.json, or any other project configuration",
+    "Any changes to application code, routes, controllers, services, or repositories",
+    "The gestalt.yml pipeline workflow — it already has the correct trigger and is not part of this fix"
   ],
-  "ambiguities": [
-    {
-      "id": "a5c518ac-c718-47f9-921e-94bcf3154bfd",
-      "description": "The intent says the file is 'missing or does not contain the correct on.push.branches filter.' The file does not exist in the repository. It is unclear whether the CI workflow previously existed and was deleted, or was never created. If it existed, we may need to restore its full content (jobs, steps, runners, etc.) rather than just the trigger. If it never existed, we need to create a minimal but complete CI workflow from scratch.",
-      "options": [
-        "Create a minimal new ci.yml with only the correct trigger and the build+test commands from HARNESS.json",
-        "Restore a presumed-lost ci.yml with full CI steps (lint, typecheck, unit tests, Semgrep security pass) as described in HARNESS.json description"
-      ],
-      "impactIfWrong": "medium"
-    },
-    {
-      "id": "3dd7f219-484f-4fbd-9f35-447a410d800a",
-      "description": "The intent mentions 'Preserve all existing exports, types, interfaces, and imports' — language typically used for source code changes, not CI config. This may indicate the intent was templated from a code-change intent and the preservation clause is vestigial, or it may hint that the ci.yml previously referenced specific source files.",
-      "options": [
-        "The preservation clause is vestigial and can be ignored for a CI config change",
-        "The preservation clause implies the ci.yml existed and contained references to source artifacts that must be preserved"
-      ],
-      "impactIfWrong": "low"
-    }
-  ]
+  "ambiguities": []
 }
