@@ -1,0 +1,50 @@
+{
+  "id": "415aa38f-3948-4c87-8f1d-ee3793d026f1",
+  "correlationId": "9a89d7ce-8786-464c-8907-ea7753749135",
+  "rawIntent": "[Feature: Add a single GET /uptime route that returns JSON {uptimeSeconds: floor of proces — Phase 1: Phase 1: UptimeStatus model and IUptimeService interface]\n\nCreate src/modules/uptime/uptime.model.ts with the UptimeStatus interface containing uptimeSeconds: number. Create src/modules/uptime/uptime.service.interface.ts with the IUptimeService interface declaring getUptime(): UptimeStatus. Follow the exact same pattern as src/modules/status/status.model.ts and src/modules/status/status.service.interface.ts.\n\nPhase architecture notes:\nUptimeStatus is a transient read-only value object. IUptimeService defines the contract. No persistence, no identity.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/uptime/uptime.model.ts\\nexport interface UptimeStatus { uptimeSeconds: number; }\",\"File: src/modules/uptime/uptime.service.interface.ts\\nimport { UptimeStatus } from './uptime.model';\\nexport interface IUptimeService { getUptime(): UptimeStatus; }\"],\"importStatements\":[\"import { UptimeStatus } from './uptime.model';\"],\"successCriteria\":[\"src/modules/uptime/uptime.model.ts exists and exports UptimeStatus\",\"src/modules/uptime/uptime.service.interface.ts exists and exports IUptimeService\",\"src/modules/uptime/uptime.service.interface.ts imports UptimeStatus from ./uptime.model\"]}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- UptimeStatus\n- IUptimeService\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Canonical entity fields for this phase\n\nNote: these field names supersede any attribute names in the\nintent text above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the field names of each entity this phase defines. The\nexact attribute / column / property set per entity is:\n\n- `UptimeStatus`: `uptimeSeconds`\n\nTreat each entity's field list as complete. If the\nintent text or planner scope mentions different field\nnames than the architecture, do NOT flag this as\nambiguity — the per-phase architecture wins.\n\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 2 — Phase 2: UptimeService implementation: Create src/modules/uptime/uptime.service.ts. Implement UptimeService class that implements IUptimeSe\n- Phase 3 — Phase 3: GET /uptime route handler and barrel export: Create src/modules/uptime/uptime.route.ts with an Express Router that handles GET / and returns JSON\n- Phase 4 — Phase 4: Register uptime route in app.ts: Modify src/app.ts to import the uptime router from src/modules/uptime and mount it at /uptime via ap",
+  "scope": {
+    "affectedDomains": [
+      "uptime"
+    ],
+    "affectedLayers": [
+      "domain"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "0c5365c2-9d20-4efb-94b3-9b7badfc814c",
+      "description": "src/modules/uptime/uptime.model.ts exists and exports UptimeStatus interface with uptimeSeconds: number",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "3c865722-620e-4544-8e22-f75da705b558",
+      "description": "src/modules/uptime/uptime.service.interface.ts exists and exports IUptimeService interface with getUptime(): UptimeStatus",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "60beb3b1-62c9-4231-98dc-976be52be535",
+      "description": "src/modules/uptime/uptime.service.interface.ts imports UptimeStatus from ./uptime.model",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Use unknown with type guards instead of any — no `any` type usage (HARNESS.json constraint no-any)",
+    "Do not add @gestalt/* packages as project dependencies (HARNESS.json constraint no-gestalt-internal-deps)",
+    "Follow the exact same file structure and naming pattern as src/modules/status/ — model file exports the value-object interface, service-interface file imports the model and exports a service interface with a single method"
+  ],
+  "outOfScope": [
+    "UptimeService implementation class (Phase 2)",
+    "GET /uptime route handler and barrel export (Phase 3)",
+    "Registering the uptime route in app.ts (Phase 4)",
+    "Any persistence, database access, or repository layer for uptime",
+    "Any API endpoint, controller, or route registration",
+    "Any test files",
+    "Any barrel export (index.ts) for the uptime module"
+  ],
+  "ambiguities": []
+}
