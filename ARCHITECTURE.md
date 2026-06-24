@@ -39,3 +39,11 @@ The Status module provides a simple health-check endpoint. It defines:
 - **StatusService** — Implementation that returns `{ up: true, version: '1' }`.
 
 No database or repository is needed — this is purely read-only.
+
+## Metrics Module
+
+### Domain Models
+- `src/modules/metrics/metrics.model.ts` — `MetricsResponse`
+
+### Repositories
+- `src/modules/metrics/metrics.repository.ts` — `IMetricsRepository`, `MetricsRepository`
