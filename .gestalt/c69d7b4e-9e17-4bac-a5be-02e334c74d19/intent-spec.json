@@ -1,0 +1,98 @@
+{
+  "id": "179acd1c-4c3f-447a-a169-0ddd080608c3",
+  "correlationId": "c69d7b4e-9e17-4bac-a5be-02e334c74d19",
+  "rawIntent": "[Feature: Add a notes module with persistence: POST /notes creates a note from JSON {title — Phase 1: Phase 1: Note domain model and repository layer]\n\nCreate src/modules/notes/notes.model.ts: define Note interface (id, title, body, status, createdAt, updatedAt), NoteStatus enum ('ACTIVE' | 'ARCHIVED'), CreateNoteDto interface, and zod createNoteSchema validating {title: string, body: string}. Create src/modules/notes/notes.repository.ts: define INotesRepository interface with findAll(), findById(id), create(dto), and PostgresNotesRepository class implementing it using the pg Pool from src/shared/db/connection.ts. findAll and findById filter by status='ACTIVE'. Throw AppError from src/shared/types/index.ts on query failures. Include Jest unit tests in tests/unit/modules/notes/notes.repository.test.ts.\n\nThis phase depends on: src/shared/db/connection.ts, src/shared/types/index.ts.\n\nPhase architecture notes:\nModel and repository coexist so Aider sees field definitions and their SQL usage in one context. Repository filters ACTIVE notes per domain rules.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/notes/notes.model.ts\\nexport enum NoteStatus {\\n  ACTIVE = 'ACTIVE',\\n  ARCHIVED = 'ARCHIVED'\\n}\\n\\nexport interface Note {\\n  id: string;\\n  title: string;\\n  body: string;\\n  status: NoteStatus;\\n  createdAt: Date;\\n  updatedAt: Date;\\n}\\n\\nexport interface CreateNoteDto {\\n  title: string;\\n  body: string;\\n}\\n\\nimport { z } from 'zod';\\n\\nexport const createNoteSchema = z.object({\\n  title: z.string().min(1).max(255),\\n  body: z.string().min(1)\\n});\",\"File: src/modules/notes/notes.repository.ts\\nimport { Pool } from 'pg';\\nimport { pool } from '../../shared/db/connection';\\nimport { Note, CreateNoteDto } from './notes.model';\\nimport { AppError } from '../../shared/types';\\n\\nexport interface INotesRepository {\\n  findAll(): Promise<Note[]>;\\n  findById(id: string): Promise<Note | null>;\\n  create(dto: CreateNoteDto): Promise<Note>;\\n}\\n\\nexport class PostgresNotesRepository implements INotesRepository {\\n  private pool: Pool;\\n\\n  constructor(pool: Pool) {\\n    this.pool = pool;\\n  }\\n\\n  async findAll(): Promise<Note[]> {\\n    try {\\n      const result = await this.pool.query(\\n        'SELECT id, title, body, status, created_at, updated_at FROM notes WHERE status = $1 ORDER BY created_at DESC',\\n        ['ACTIVE']\\n      );\\n      return result.rows.map(this.mapRowToNote);\\n    } catch (error) {\\n      throw new AppError('Failed to fetch notes', 500);\\n    }\\n  }\\n\\n  async findById(id: string): Promise<Note | null> {\\n    try {\\n      const result = await this.pool.query(\\n        'SELECT id, title, body, status, created_at, updated_at FROM notes WHERE id = $1 AND status = $2',\\n        [id, 'ACTIVE']\\n      );\\n      return result.rows.length ? this.mapRowToNote(result.rows[0]) : null;\\n    } catch (error) {\\n      throw new AppError('Failed to fetch note', 500);\\n    }\\n  }\\n\\n  async create(dto: CreateNoteDto): Promise<Note> {\\n    try {\\n      const result = await this.pool.query(\\n        'INSERT INTO notes (title, body) VALUES ($1, $2) RETURNING id, title, body, status, created_at, updated_at',\\n        [dto.title, dto.body]\\n      );\\n      return this.mapRowToNote(result.rows[0]);\\n    } catch (error) {\\n      throw new AppError('Failed to create note', 500);\\n    }\\n  }\\n\\n  private mapRowToNote(row: any): Note {\\n    return {\\n      id: row.id,\\n      title: row.title,\\n      body: row.body,\\n      status: row.status as Note['status'],\\n      createdAt: row.created_at,\\n      updatedAt: row.updated_at\\n    };\\n  }\\n}\",\"File: tests/unit/modules/notes/notes.repository.test.ts\\nimport { PostgresNotesRepository } from '../../../src/modules/notes/notes.repository';\\nimport { Note, NoteStatus } from '../../../src/modules/notes/notes.model';\\nimport { Pool } from 'pg';\\n\\n// Jest mock for pg Pool\\njest.mock('pg', () => {\\n  const mPool = {\\n    query: jest.fn()\\n  };\\n  return { Pool: jest.fn(() => mPool) };\\n});\\n\\ndescribe('PostgresNotesRepository', () => {\\n  let repository: PostgresNotesRepository;\\n  let mockPool: any;\\n\\n  beforeEach(() => {\\n    mockPool = new Pool();\\n    repository = new PostgresNotesRepository(mockPool);\\n  });\\n\\n  afterEach(() => {\\n    jest.clearAllMocks();\\n  });\\n\\n  describe('findAll', () => {\\n    it('should return only active notes ordered by created_at DESC', async () => {\\n      const mockRows = [\\n        { id: '1', title: 'Note 1', body: 'Body 1', status: 'ACTIVE', created_at: new Date(), updated_at: new Date() }\\n      ];\\n      mockPool.query.mockResolvedValueOnce({ rows: mockRows });\\n\\n      const notes = await repository.findAll();\\n\\n      expect(mockPool.query).toHaveBeenCalledWith(\\n        'SELECT id, title, body, status, created_at, updated_at FROM notes WHERE status = $1 ORDER BY created_at DESC',\\n        ['ACTIVE']\\n      );\\n      expect(notes).toHaveLength(1);\\n      expect(notes[0].status).toBe(NoteStatus.ACTIVE);\\n    });\\n\\n    it('should throw AppError on query failure', async () => {\\n      mockPool.query.mockRejectedValueOnce(new Error('DB error'));\\n      await expect(repository.findAll()).rejects.toThrow('Failed to fetch notes');\\n    });\\n  });\\n\\n  describe('findById', () => {\\n    it('should return note if active', async () => {\\n      const mockRow = { id: '1', title: 'Note', body: 'Body', status: 'ACTIVE', created_at: new Date(), updated_at: new Date() };\\n      mockPool.query.mockResolvedValueOnce({ rows: [mockRow] });\\n\\n      const note = await repository.findById('1');\\n\\n      expect(mockPool.query).toHaveBeenCalledWith(\\n        'SELECT id, title, body, status, created_at, updated_at FROM notes WHERE id = $1 AND status = $2',\\n        ['1', 'ACTIVE']\\n      );\\n      expect(note).not.toBeNull();\\n      expect(note!.status).toBe(NoteStatus.ACTIVE);\\n    });\\n\\n    it('should return null if note not found or not active', async () => {\\n      mockPool.query.mockResolvedValueOnce({ rows: [] });\\n      const note = await repository.findById('nonexistent');\\n      expect(note).toBeNull();\\n    });\\n\\n    it('should throw AppError on query failure', async () => {\\n      mockPool.query.mockRejectedValueOnce(new Error('DB error'));\\n      await expect(repository.findById('1')).rejects.toThrow('Failed to fetch note');\\n    });\\n  });\\n\\n  describe('create', () => {\\n    it('should insert a note and return it with ACTIVE status', async () => {\\n      const dto = { title: 'New Note', body: 'New Body' };\\n      const mockRow = { id: '2', title: 'New Note', body: 'New Body', status: 'ACTIVE', created_at: new Date(), updated_at: new Date() };\\n      mockPool.query.mockResolvedValueOnce({ rows: [mockRow] });\\n\\n      const note = await repository.create(dto);\\n\\n      expect(mockPool.query).toHaveBeenCalledWith(\\n        'INSERT INTO notes (title, body) VALUES ($1, $2) RETURNING id, title, body, status, created_at, updated_at',\\n        ['New Note', 'New Body']\\n      );\\n      expect(note.status).toBe(NoteStatus.ACTIVE);\\n      expect(note.title).toBe('New Note');\\n    });\\n\\n    it('should throw AppError on query failure', async () => {\\n      mockPool.query.mockRejectedValueOnce(new Error('DB error'));\\n      await expect(repository.create({ title: 'x', body: 'y' })).rejects.toThrow('Failed to create note');\\n    });\\n  });\\n});\"],\"importStatements\":[\"import { z } from \\\"zod\\\";\",\"import { Pool } from \\\"pg\\\";\",\"import { pool } from \\\"../../shared/db/connection\\\";\",\"import { Note, CreateNoteDto } from \\\"./notes.model\\\";\",\"import { AppError } from \\\"../../shared/types\\\";\",\"import { PostgresNotesRepository } from \\\"../../../src/modules/notes/notes.repository\\\";\",\"import { Note, NoteStatus } from \\\"../../../src/modules/notes/notes.model\\\";\"],\"successCriteria\":[\"src/modules/notes/notes.model.ts exists and exports Note, NoteStatus, CreateNoteDto, createNoteSchema\",\"src/modules/notes/notes.repository.ts exists and exports INotesRepository, PostgresNotesRepository\",\"PostgresNotesRepository implements INotesRepository and uses pool from src/shared/db/connection.ts\",\"Repository findAll() returns only notes with status 'ACTIVE' ordered by created_at DESC\",\"Repository findById() returns a note only if status is 'ACTIVE'\",\"Repository create() inserts a new note with status 'ACTIVE' and returns the created note\",\"All database queries use parameterized queries to prevent SQL injection\",\"No new npm dependencies are added\",\"tests/unit/modules/notes/notes.repository.test.ts exists and contains Jest tests for PostgresNotesRepository covering findAll, findById, create, and error scenarios\",\"ARCHITECTURE.md is updated to document the notes module, Note entity, and NoteStatus enum\"],\"sqlSchema\":\"CREATE TABLE notes (\\n  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\\n  title VARCHAR(255) NOT NULL,\\n  body TEXT NOT NULL,\\n  status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'ARCHIVED')),\\n  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),\\n  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()\\n);\\n\\nCREATE INDEX idx_notes_created_at ON notes(created_at DESC);\\n\\nCREATE INDEX idx_notes_status ON notes(status);\"}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- Note\n- CreateNoteDto\n- INotesRepository\n- z\n- Pool\n- pool\n- AppError\n- PostgresNotesRepository\n- NoteStatus\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Canonical entity fields for this phase\n\nNote: these field names supersede any attribute names in the\nintent text above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the field names of each entity this phase defines. The\nexact attribute / column / property set per entity is:\n\n- `Note`: `id`, `title`, `body`, `status`, `createdAt`, `updatedAt`\n- `CreateNoteDto`: `title`, `body`\n\nTreat each entity's field list as complete. If the\nintent text or planner scope mentions different field\nnames than the architecture, do NOT flag this as\nambiguity — the per-phase architecture wins.\n\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 2 — Phase 2: Notes service interface and implementation: Create src/modules/notes/notes.service.interface.ts: define INotesService with createNote(dto: Creat\n- Phase 3 — Phase 3: Express controller, routes, and module barrel export: Create src/modules/notes/notes.controller.ts: Express request handlers for POST /notes (validate bod",
+  "scope": {
+    "affectedDomains": [
+      "notes"
+    ],
+    "affectedLayers": [
+      "domain",
+      "infra",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "be8b425f-bfc3-4145-947b-6186c8da73e1",
+      "description": "src/modules/notes/notes.model.ts exists and exports Note, NoteStatus, CreateNoteDto, and createNoteSchema",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "7049ec9b-eedc-443d-9e5c-1d88a8165b72",
+      "description": "src/modules/notes/notes.repository.ts exists and exports INotesRepository and PostgresNotesRepository",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "3b383a09-5d79-4aeb-bd2d-b760ec23c2fe",
+      "description": "PostgresNotesRepository implements INotesRepository and uses pool from src/shared/db/connection.ts",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "c256a8fd-9e54-4368-a1b4-9690299ed93a",
+      "description": "Repository findAll() returns only notes with status 'ACTIVE' ordered by created_at DESC",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "627399f3-3b35-42dd-bab7-7f8de194b1d5",
+      "description": "Repository findById() returns a note only if status is 'ACTIVE'",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "533f89c8-f8d7-40b5-9765-c6de3deccc3e",
+      "description": "Repository create() inserts a new note with status 'ACTIVE' and returns the created note",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "f3fdaf32-0f11-47e9-a05c-44472a8859c2",
+      "description": "All database queries use parameterized queries to prevent SQL injection",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "24b2f46d-42c5-46fc-a21c-dcb4b5cf901f",
+      "description": "No new npm dependencies are added",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "788044ea-c270-4a0c-9974-d1e856b82a8d",
+      "description": "tests/unit/modules/notes/notes.repository.test.ts exists with Jest tests covering findAll, findById, create, and error scenarios",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "04d5dd2b-43f2-4018-acaa-2dc972ff37d7",
+      "description": "ARCHITECTURE.md is updated to document the notes module, Note entity, and NoteStatus enum",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through repository interfaces — PostgresNotesRepository is the sole data-access surface for notes",
+    "Input validation: createNoteSchema (zod) validates title and body at the boundary before persistence",
+    "No sensitive data in logs: Note title and body must not be logged at any level that could expose PII",
+    "Error handling: All async repository methods wrap pg Pool calls in try/catch and throw typed AppError instances — no unhandled promise rejections",
+    "No new npm dependencies: zod and pg are already project dependencies; no additional packages may be added",
+    "No @gestalt/* packages: Do not add @gestalt/* as project dependencies — these are Gestalt platform internals not available on npm"
+  ],
+  "outOfScope": [
+    "Phase 2: Notes service interface (INotesService) and implementation",
+    "Phase 3: Fastify controller, routes, and module barrel export for POST /notes",
+    "Any HTTP API endpoints or route registration",
+    "RBAC enforcement on note operations (deferred to controller/routes phase)",
+    "Audit record creation for note state changes (deferred to service layer)",
+    "Note status transitions beyond the initial ACTIVE default (ARCHIVED handling deferred)",
+    "Any cross-module dependencies on employee, leave, balance, policy, or notification modules",
+    "Database migration SQL — the CREATE TABLE statement in the architecture is informational; migration file creation is deferred"
+  ],
+  "ambiguities": []
+}
