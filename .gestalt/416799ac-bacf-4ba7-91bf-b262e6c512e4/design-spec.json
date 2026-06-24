@@ -1,0 +1,24 @@
+{
+  "correlationId": "416799ac-bacf-4ba7-91bf-b262e6c512e4",
+  "domainChanges": [
+    {
+      "entityName": "SystemStatus",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "up",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "version",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}

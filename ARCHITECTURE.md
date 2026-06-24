@@ -29,3 +29,13 @@
 
 ### Repositories
 - `src/modules/employee/employee.repository.ts` — `IEmployeeRepository`, `EmployeeRepository`
+
+## Status Module
+
+The Status module provides a simple health-check endpoint. It defines:
+
+- **SystemStatus** — A transient value object with `up: boolean` and `version: string` fields, computed inline and discarded after the response.
+- **IStatusService** — Service interface with a single `getStatus(): SystemStatus` method.
+- **StatusService** — Implementation that returns `{ up: true, version: '1' }`.
+
+No database or repository is needed — this is purely read-only.

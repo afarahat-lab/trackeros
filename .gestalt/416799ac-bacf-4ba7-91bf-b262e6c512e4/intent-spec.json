@@ -1,0 +1,69 @@
+{
+  "id": "0e6b867c-5196-45be-832e-5677d22aca52",
+  "correlationId": "416799ac-bacf-4ba7-91bf-b262e6c512e4",
+  "rawIntent": "[Feature: Add a status module: a GET /status route returning JSON {up:true,version:'1'} — Phase 1: Phase 1: Create status domain model, service interface, and service implementation]\n\nCreate src/modules/status/status.model.ts defining the SystemStatus transient value object with attributes `up: boolean` and `version: string`. Create src/modules/status/status.service.interface.ts defining the IStatusService interface with a single method `getStatus(): SystemStatus`. Create src/modules/status/status.service.ts implementing StatusService — the `getStatus()` method returns `{ up: true, version: '1' }`. No database, no repository, no external dependencies. This phase has no prior-phase dependencies.\n\nPhase architecture notes:\nSystemStatus is a transient value object computed inline and discarded after the response. IStatusService and StatusService are the canonical names from the architecture spec. No repository needed — purely read-only.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/status/status.model.ts\\nexport interface SystemStatus {\\n  up: boolean;\\n  version: string;\\n}\",\"File: src/modules/status/status.service.interface.ts\\nimport { SystemStatus } from './status.model';\\n\\nexport interface IStatusService {\\n  getStatus(): SystemStatus;\\n}\",\"File: src/modules/status/status.service.ts\\nimport { SystemStatus } from './status.model';\\nimport { IStatusService } from './status.service.interface';\\n\\nexport class StatusService implements IStatusService {\\n  getStatus(): SystemStatus {\\n    return { up: true, version: '1' };\\n  }\\n}\",\"File: src/modules/status/index.ts\\nexport { SystemStatus } from './status.model';\\nexport { IStatusService } from './status.service.interface';\\nexport { StatusService } from './status.service';\"],\"importStatements\":[\"import { SystemStatus } from './status.model';\",\"import { IStatusService } from './status.service.interface';\",\"export { SystemStatus } from './status.model';\",\"export { IStatusService } from './status.service.interface';\",\"export { StatusService } from './status.service';\"],\"successCriteria\":[\"src/modules/status/status.model.ts exists and exports SystemStatus interface with up: boolean and version: string\",\"src/modules/status/status.service.interface.ts exists and exports IStatusService interface with getStatus(): SystemStatus\",\"src/modules/status/status.service.ts exists and exports StatusService class implementing IStatusService, getStatus() returns { up: true, version: '1' }\",\"src/modules/status/index.ts exists and re-exports SystemStatus, IStatusService, and StatusService\",\"ARCHITECTURE.md updated to document the Status module and SystemStatus value object\"]}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- SystemStatus\n- IStatusService\n- StatusService\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Canonical entity fields for this phase\n\nNote: these field names supersede any attribute names in the\nintent text above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the field names of each entity this phase defines. The\nexact attribute / column / property set per entity is:\n\n- `SystemStatus`: `up`, `version`\n\nTreat each entity's field list as complete. If the\nintent text or planner scope mentions different field\nnames than the architecture, do NOT flag this as\nambiguity — the per-phase architecture wins.\n\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 2 — Phase 2: Create Fastify route plugin, barrel export, and unit test: Create src/modules/status/status.routes.ts — a Fastify plugin that instantiates StatusService, calls",
+  "scope": {
+    "affectedDomains": [
+      "status"
+    ],
+    "affectedLayers": [
+      "domain"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "80ee3a85-5d5f-4fec-a49e-805e99c4ab02",
+      "description": "src/modules/status/status.model.ts exists and exports SystemStatus interface with up: boolean and version: string",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "148b90ae-e756-41ea-94ed-9bb6af2837dd",
+      "description": "src/modules/status/status.service.interface.ts exists and exports IStatusService interface with getStatus(): SystemStatus",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "f517a030-16db-49bd-8fd4-ceaee42eb7a2",
+      "description": "src/modules/status/status.service.ts exists and exports StatusService class implementing IStatusService; getStatus() returns { up: true, version: '1' }",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "efdb8894-c621-4167-bade-3af54a77f60b",
+      "description": "src/modules/status/index.ts exists and re-exports SystemStatus, IStatusService, and StatusService",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "7bb7729e-3874-4edb-b30d-eb65a172f180",
+      "description": "ARCHITECTURE.md updated to document the Status module and SystemStatus value object",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No database access — SystemStatus is a transient value object with no persistence",
+    "No repository pattern needed — purely read-only inline computation",
+    "No audit records required — no state-changing operations in this phase",
+    "No input validation needed — no API boundaries in this phase",
+    "No RBAC enforcement needed — no API endpoints in this phase",
+    "No sensitive data in logs — the returned values (up: true, version: '1') contain no PII, tokens, or secrets",
+    "All async errors must be caught and handled — though getStatus() is synchronous, the pattern must be followed if async wrappers are added later",
+    "Do not add @gestalt/* packages as project dependencies",
+    "Use unknown with type guards instead of any — though no any usage is expected in this simple phase"
+  ],
+  "outOfScope": [
+    "Phase 2 — Fastify route plugin (src/modules/status/status.routes.ts)",
+    "Phase 2 — unit tests for StatusService",
+    "Phase 2 — registering GET /status endpoint on Fastify instance",
+    "Any database tables, migrations, or repository implementations",
+    "Any cross-module dependencies on leave, balance, employee, policy, notification, or audit modules",
+    "Any external npm dependencies beyond what already exists in package.json",
+    "RBAC middleware or authentication guards",
+    "Input validation schemas (Zod or otherwise)"
+  ],
+  "ambiguities": []
+}
