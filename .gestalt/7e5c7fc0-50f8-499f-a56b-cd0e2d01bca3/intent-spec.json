@@ -1,0 +1,70 @@
+{
+  "id": "0f1b8348-b20c-4352-b7e0-a2f3a4e6c0ef",
+  "correlationId": "7e5c7fc0-50f8-499f-a56b-cd0e2d01bca3",
+  "rawIntent": "The repository is missing a GitHub Actions workflow file that triggers CI on push to gestalt/** branches. The deploy pipeline failed because no CI run appeared after pushing to branch gestalt/1bbc14a0-feature-add-a-status-module. The error: 'GitHub Actions: no push-triggered run appeared on branch gestalt/1bbc14a0-feature-add-a-status-module within 21s. Verify the workflow file has `on: push: branches: ['gestalt/**']` and that pr-agent's push actually landed.' The workflow file should be created at .github/workflows/ci.yml with appropriate triggers and steps to run tests. Preserve all existing exports, types, interfaces, and imports. Only add or modify what is needed to resolve the CI failure shown above.",
+  "scope": {
+    "affectedDomains": [
+      "ci-pipeline"
+    ],
+    "affectedLayers": [
+      "infra",
+      "config"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "17f5f551-d7aa-41bb-99c4-aea3eeb226ab",
+      "description": "File .github/workflows/ci.yml exists with `on: push: branches: ['gestalt/**']` trigger so that pushes to gestalt/** branches start a CI run",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "0911f3a3-ceb2-4cc7-92d8-7e6db919b3e5",
+      "description": "The workflow includes a job that runs the project's test suite (npm run build + npx jest) matching the verification command declared in HARNESS.json",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "4057b168-2fae-4820-bc20-29f85fa6bd1d",
+      "description": "The workflow includes lint (ESLint) and typecheck (tsc --noEmit) steps as described in HARNESS.json's CI pipeline definition",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "Use the test framework declared in HARNESS.json (Jest via npx jest) — HARNESS.json is the authoritative stack declaration",
+    "No hardcoded secrets, tokens, or credentials in the workflow file (GP: no-hardcoded-secrets)",
+    "The workflow file must be valid GitHub Actions YAML syntax",
+    "Do not add @gestalt/* packages as dependencies — these are Gestalt platform internals not available on npm"
+  ],
+  "outOfScope": [
+    "Any changes to source code under src/modules/*",
+    "Any changes to package.json, tsconfig.json, .eslintrc, or other project configuration files",
+    "Any changes to existing domain modules (employee, policy, balance, leave, notification)",
+    "Any changes to the application itself — this is purely a CI pipeline fix",
+    "Any changes to HARNESS.json, ARCHITECTURE.md, PLAN.md, or AGENTS.md",
+    "Adding Semgrep to the workflow (HARNESS.json mentions it but the intent only asks for tests; include only if it requires zero additional configuration)"
+  ],
+  "ambiguities": [
+    {
+      "id": "9297fc68-de3c-42a4-a6ba-8d1e73bd6821",
+      "description": "The intent says 'run tests' but HARNESS.json describes a fuller CI pipeline: lint (ESLint) + typecheck (tsc --noEmit) + unit tests + Semgrep. Should the workflow include only tests, or the full pipeline?",
+      "options": [
+        "Tests only — minimal fix matching the literal intent text",
+        "Full pipeline (lint + typecheck + tests) — matching HARNESS.json's CI description"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "id": "55a017be-c96d-4550-9ff6-4a71326cd7af",
+      "description": "The intent includes 'Preserve all existing exports, types, interfaces, and imports' — this is standard boilerplate for source-code changes and does not apply to a YAML workflow file. Should it be ignored?",
+      "options": [
+        "Ignore — it's inapplicable boilerplate for a YAML file",
+        "Treat as a reminder not to modify any existing files"
+      ],
+      "impactIfWrong": "low"
+    }
+  ]
+}
