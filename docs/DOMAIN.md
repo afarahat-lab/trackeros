@@ -271,3 +271,14 @@ Represents validation data managed by the `validation` module, including validat
 |-------|------|----------|
 | isValid | boolean | true |
 | errors | string[] | true |
+
+## system
+
+Represents system-level status information, including health-check and version data.
+
+### SystemStatus
+
+| Field | Type | Required |
+|-------|------|----------|
+| up | boolean | true |
+| version | string | true |
