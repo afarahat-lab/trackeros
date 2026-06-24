@@ -1,0 +1,17 @@
+{
+  "correlationId": "cb37907a-2014-4833-ac91-779f28af439d",
+  "domainChanges": [],
+  "apiContracts": [
+    {
+      "method": "GET",
+      "path": "/uptime",
+      "description": "Returns the current process uptime in seconds, floored to the nearest integer.",
+      "authRequired": false,
+      "roles": [],
+      "responseBody": {
+        "uptimeSeconds": "number"
+      }
+    }
+  ],
+  "componentSpecs": []
+}

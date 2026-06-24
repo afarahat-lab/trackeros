@@ -1,7 +1,8 @@
-import express from 'express';
+import Fastify from 'fastify';
+import { uptimeRoutes } from './modules/uptime/uptime.routes';
 
-const app = express();
+const app = Fastify({ logger: true });
 
-app.use(express.json());
+app.register(uptimeRoutes);
 
 export default app;

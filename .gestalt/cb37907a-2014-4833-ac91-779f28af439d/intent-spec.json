@@ -1,0 +1,55 @@
+{
+  "id": "86d36710-077b-4dad-adb6-663e5b4e7e96",
+  "correlationId": "cb37907a-2014-4833-ac91-779f28af439d",
+  "rawIntent": "[Feature: Add a single GET /uptime route that returns JSON {uptimeSeconds: floor of proces — Phase 3: Phase 3: GET /uptime route handler and barrel export]\n\nCreate src/modules/uptime/uptime.route.ts with an Express Router that handles GET / and returns JSON from UptimeService.getUptime(). Create src/modules/uptime/index.ts as a barrel export re-exporting UptimeStatus, IUptimeService, UptimeService, and the router. This phase depends on src/modules/uptime/uptime.model.ts, src/modules/uptime/uptime.service.interface.ts, and src/modules/uptime/uptime.service.ts from Phases 1-2 — read all three before generating.\n\nThis phase depends on: Phase 1, Phase 2.\n\nPhase architecture notes:\nRoute handler follows Express Router pattern. Barrel export mirrors src/modules/status/index.ts.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/uptime/uptime.routes.ts\\nimport { FastifyInstance } from 'fastify';\\nimport { UptimeService } from './uptime.service';\\n\\nexport async function uptimeRoutes(fastify: FastifyInstance): Promise<void> {\\n  fastify.get('/uptime', async (request, reply) => {\\n    try {\\n      const status = UptimeService.getUptime();\\n      return reply.status(200).send(status);\\n    } catch (error) {\\n      request.log.error(error);\\n      return reply.status(500).send({ error: 'Internal Server Error' });\\n    }\\n  });\\n}\",\"File: src/modules/uptime/index.ts\\nexport { UptimeStatus } from './uptime.model';\\nexport { IUptimeService } from './uptime.service.interface';\\nexport { UptimeService } from './uptime.service';\\nexport { uptimeRoutes } from './uptime.routes';\"],\"importStatements\":[\"import { FastifyInstance } from 'fastify';\",\"import { UptimeService } from './uptime.service';\",\"export { UptimeStatus } from './uptime.model';\",\"export { IUptimeService } from './uptime.service.interface';\",\"export { UptimeService } from './uptime.service';\",\"export { uptimeRoutes } from './uptime.routes';\"],\"successCriteria\":[\"src/modules/uptime/uptime.routes.ts exists and exports an async function uptimeRoutes(fastify: FastifyInstance): Promise<void> that registers GET /uptime\",\"src/modules/uptime/index.ts exists and re-exports UptimeStatus, IUptimeService, UptimeService, and uptimeRoutes\",\"GET /uptime returns HTTP 200 with JSON body { uptimeSeconds: number } where number equals Math.floor(process.uptime())\",\"The route handler does not produce unhandled promise rejections (GP-006)\",\"No database access, no audit records, no RBAC, no input validation required (GP-001, GP-002, GP-003, GP-005 not applicable)\"]}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- FastifyInstance\n- UptimeService\n- UptimeStatus\n- IUptimeService\n- uptimeRoutes\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 4 — Phase 4: Register uptime route in app.ts: Modify src/app.ts to import the uptime router from src/modules/uptime and mount it at /uptime via ap",
+  "scope": {
+    "affectedDomains": [
+      "uptime"
+    ],
+    "affectedLayers": [
+      "api"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "fdcc576b-b5e1-4c08-8302-312e85450c49",
+      "description": "src/modules/uptime/uptime.routes.ts exists and exports an async function uptimeRoutes(fastify: FastifyInstance): Promise<void> that registers GET /uptime",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "75ac53d9-5dbd-4eaa-805e-4ad09def69d1",
+      "description": "src/modules/uptime/index.ts exists and re-exports UptimeStatus, IUptimeService, UptimeService, and uptimeRoutes",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "c0bc6f57-959f-4e6e-af3f-11a44f4b5385",
+      "description": "GET /uptime returns HTTP 200 with JSON body { uptimeSeconds: number } where number equals Math.floor(process.uptime())",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "fbced02c-ef96-4e8d-956c-22a4a3790ab1",
+      "description": "The route handler catches errors and does not produce unhandled promise rejections (GP-006)",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "GP-006: No unhandled promise rejections — the route handler must wrap its logic in try/catch and return a proper error response",
+    "Use FastifyInstance (from Fastify, the declared framework in HARNESS.json) — not Express",
+    "No database access, no audit records, no RBAC, no input validation required for this route (GP-001, GP-002, GP-003, GP-005 not applicable)"
+  ],
+  "outOfScope": [
+    "Phase 4: Registering the uptime route in src/app.ts",
+    "Any database access or repository pattern usage",
+    "Audit record creation",
+    "RBAC enforcement on the /uptime endpoint",
+    "Input validation (no request body or query params to validate)",
+    "Any files outside src/modules/uptime/"
+  ],
+  "ambiguities": []
+}
