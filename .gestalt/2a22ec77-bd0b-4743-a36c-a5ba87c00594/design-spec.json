@@ -1,0 +1,18 @@
+{
+  "correlationId": "2a22ec77-bd0b-4743-a36c-a5ba87c00594",
+  "domainChanges": [],
+  "apiContracts": [
+    {
+      "method": "GET",
+      "path": "/status",
+      "description": "Health-check endpoint returning system status. Public — no authentication required.",
+      "authRequired": false,
+      "roles": [],
+      "responseBody": {
+        "up": "boolean",
+        "version": "string"
+      }
+    }
+  ],
+  "componentSpecs": []
+}
