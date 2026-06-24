@@ -1,0 +1,75 @@
+{
+  "id": "2d9700ec-358d-4deb-9496-eda4a0d8312a",
+  "correlationId": "b2ef2d5e-a96c-4386-9c56-763e07536fa1",
+  "rawIntent": "[Feature: Add a metrics module: a GET /metrics route returning JSON {requests:0,uptime:0} — Phase 1: Phase 1: Metrics model, repository interface, repository implementation, SQL migration, and service interface]\n\nCreate the metrics module foundation. Create src/modules/metrics/metrics.model.ts defining the MetricsResponse DTO with fields { requests: number; uptime: number } matching the Metrics domain entity (requestCount maps to requests, uptimeSeconds maps to uptime). Create src/modules/metrics/metrics.repository.interface.ts defining IMetricsRepository with methods: getRequestCount(): Promise<number>, incrementRequestCount(): Promise<void>, getUptimeSeconds(): Promise<number>, resetCounters(): Promise<{ requestCount: number; uptimeSeconds: number }>. Create src/modules/metrics/metrics.repository.ts implementing IMetricsRepository using the existing pg Pool from src/shared/db/connection.ts — read that file before generating. The repository reads/writes a key-value style metrics table (key TEXT PRIMARY KEY, value TEXT NOT NULL) with rows for 'request_count' and 'uptime_start'. Create the SQL migration file (e.g., migrations/001_create_metrics_table.sql) with CREATE TABLE metrics and seed INSERT for request_count=0. Create src/modules/metrics/metrics.service.interface.ts defining IMetricsService with methods: getMetrics(): Promise<MetricsResponse> and resetMetrics(): Promise<MetricsResponse>. No imports from other modules.\n\nPhase architecture notes:\nEstablishes the MetricsResponse DTO, IMetricsRepository contract, Postgres-backed MetricsRepository, SQL migration, and IMetricsService interface. Model and repository co-located so Aider sees exact field names. Depends only on existing src/shared/db/connection.ts.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/metrics/metrics.model.ts\\nexport interface MetricsResponse {\\n  requests: number;\\n  uptime: number;\\n}\",\"File: src/modules/metrics/metrics.repository.interface.ts\\nexport interface IMetricsRepository {\\n  getRequestCount(): Promise<number>;\\n  incrementRequestCount(): Promise<void>;\\n  getUptimeSeconds(): Promise<number>;\\n  resetCounters(): Promise<{ requestCount: number; uptimeSeconds: number }>;\\n}\",\"File: src/modules/metrics/metrics.repository.ts\\nimport { Pool } from \\\"../../shared/db/connection\\\";\\nimport { IMetricsRepository } from \\\"./metrics.repository.interface\\\";\\n\\nexport class MetricsRepository implements IMetricsRepository {\\n  constructor(private readonly pool: Pool) {}\\n\\n  async getRequestCount(): Promise<number> {\\n    const result = await this.pool.query(\\n      \\\"SELECT value FROM metrics WHERE key = 'request_count'\\\"\\n    );\\n    return result.rows[0]?.value ?? 0;\\n  }\\n\\n  async incrementRequestCount(): Promise<void> {\\n    await this.pool.query(\\n      \\\"UPDATE metrics SET value = value + 1, updated_at = NOW() WHERE key = 'request_count'\\\"\\n    );\\n  }\\n\\n  async getUptimeSeconds(): Promise<number> {\\n    const result = await this.pool.query(\\n      \\\"SELECT value FROM metrics WHERE key = 'uptime_start'\\\"\\n    );\\n    const start = result.rows[0]?.value;\\n    if (!start) return 0;\\n    return Math.floor((Date.now() - Number(start)) / 1000);\\n  }\\n\\n  async resetCounters(): Promise<{ requestCount: number; uptimeSeconds: number }> {\\n    const now = Date.now();\\n    await this.pool.query(\\n      \\\"UPDATE metrics SET value = 0, updated_at = NOW() WHERE key = 'request_count'\\\"\\n    );\\n    await this.pool.query(\\n      \\\"UPDATE metrics SET value = $1, updated_at = NOW() WHERE key = 'uptime_start'\\\",\\n      [now]\\n    );\\n    return { requestCount: 0, uptimeSeconds: 0 };\\n  }\\n}\",\"File: src/modules/metrics/metrics.service.interface.ts\\nimport { MetricsResponse } from \\\"./metrics.model\\\";\\n\\nexport interface IMetricsService {\\n  getMetrics(): Promise<MetricsResponse>;\\n  resetMetrics(): Promise<MetricsResponse>;\\n}\",\"File: src/modules/metrics/migrations/001_create_metrics_table.sql\\nCREATE TABLE IF NOT EXISTS metrics (\\n  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\\n  key VARCHAR(255) NOT NULL,\\n  value INTEGER NOT NULL DEFAULT 0,\\n  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),\\n  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),\\n  CONSTRAINT uq_metrics_key UNIQUE (key)\\n);\\n\\nCREATE INDEX IF NOT EXISTS idx_metrics_key ON metrics (key);\\n\\nINSERT INTO metrics (key, value) VALUES ('request_count', 0) ON CONFLICT (key) DO NOTHING;\"],\"importStatements\":[\"import { Pool } from \\\"../../shared/db/connection\\\";\",\"import { IMetricsRepository } from \\\"./metrics.repository.interface\\\";\",\"import { MetricsResponse } from \\\"./metrics.model\\\";\"],\"successCriteria\":[\"src/modules/metrics/metrics.model.ts exists and exports MetricsResponse\",\"src/modules/metrics/metrics.repository.interface.ts exists and exports IMetricsRepository with methods getRequestCount, incrementRequestCount, getUptimeSeconds, resetCounters\",\"src/modules/metrics/metrics.repository.ts exists and exports MetricsRepository implementing IMetricsRepository using Pool from src/shared/db/connection.ts\",\"src/modules/metrics/metrics.service.interface.ts exists and exports IMetricsService\",\"src/modules/metrics/migrations/001_create_metrics_table.sql exists with the canonical metrics schema\",\"MetricsRepository uses pool from src/shared/db/connection.ts\",\"All TypeScript files compile without errors\",\"ARCHITECTURE.md updated to include the metrics module and MetricsResponse entity\"],\"sqlSchema\":\"CREATE TABLE IF NOT EXISTS metrics (\\n  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\\n  key VARCHAR(255) NOT NULL,\\n  value INTEGER NOT NULL DEFAULT 0,\\n  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),\\n  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),\\n  CONSTRAINT uq_metrics_key UNIQUE (key)\\n);\\n\\nCREATE INDEX IF NOT EXISTS idx_metrics_key ON metrics (key);\\n\\nINSERT INTO metrics (key, value) VALUES ('request_count', 0) ON CONFLICT (key) DO NOTHING;\"}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- MetricsResponse\n- IMetricsRepository\n- IMetricsService\n- Pool\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Canonical entity fields for this phase\n\nNote: these field names supersede any attribute names in the\nintent text above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the field names of each entity this phase defines. The\nexact attribute / column / property set per entity is:\n\n- `MetricsResponse`: `requests`, `uptime`\n- `IMetricsRepository`: `uptimeSeconds`\n\nTreat each entity's field list as complete. If the\nintent text or planner scope mentions different field\nnames than the architecture, do NOT flag this as\nambiguity — the per-phase architecture wins.\n\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 2 — Phase 2: Metrics service implementation and controller: Implement the service and controller layers. Create src/modules/metrics/metrics.service.ts implement\n- Phase 3 — Phase 3: Fastify routes, RBAC hooks, plugin registration, and barrel export: Wire the module into the Fastify application. Create src/modules/metrics/metrics.routes.ts as a Fast",
+  "scope": {
+    "affectedDomains": [
+      "metrics"
+    ],
+    "affectedLayers": [
+      "domain",
+      "infra"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "f7f1ce59-ea0e-4ec9-8691-757406bb0620",
+      "description": "src/modules/metrics/metrics.model.ts exists and exports MetricsResponse with fields { requests: number; uptime: number }",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "1bd6d542-c324-492d-ba5d-d689b3ba4951",
+      "description": "src/modules/metrics/metrics.repository.interface.ts exists and exports IMetricsRepository with methods getRequestCount, incrementRequestCount, getUptimeSeconds, resetCounters",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "963780c9-2f73-4547-9790-dd28c6b608cf",
+      "description": "src/modules/metrics/metrics.repository.ts exists and exports MetricsRepository implementing IMetricsRepository, using the pool instance from src/shared/db/connection.ts",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "0ad08936-d1a3-4303-8f27-c122a6c7d332",
+      "description": "src/modules/metrics/metrics.service.interface.ts exists and exports IMetricsService with methods getMetrics and resetMetrics returning Promise<MetricsResponse>",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "53310576-0555-4932-9182-d66ef80f704f",
+      "description": "src/modules/metrics/migrations/001_create_metrics_table.sql exists with the canonical metrics table schema and seed INSERT for request_count=0",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "aab1cc08-7193-427f-833b-5d3ff234dc35",
+      "description": "All TypeScript files compile without errors (npm run build passes)",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "Repository pattern: All database access goes through IMetricsRepository interface — MetricsRepository is the only file that touches the database",
+    "No direct DB access outside repository: MetricsRepository is the sole data-access layer for the metrics module",
+    "No sensitive data in logs: Metrics counters (request_count, uptime) are non-sensitive but must still avoid logging any PII or tokens",
+    "Error handling: All async repository methods must catch and handle errors — no unhandled promise rejections",
+    "No imports from other modules: The metrics module must not depend on leave, balance, employee, policy, or notification modules",
+    "Dependency direction: Metrics module depends only on src/shared/db/connection.ts (shared infrastructure); no reverse dependencies permitted",
+    "No @gestalt/* packages: Do not add any @gestalt/* internal platform packages as dependencies"
+  ],
+  "outOfScope": [
+    "Phase 2: MetricsService implementation (src/modules/metrics/metrics.service.ts) — deferred",
+    "Phase 2: MetricsController (src/modules/metrics/metrics.controller.ts) — deferred",
+    "Phase 3: Fastify route registration (src/modules/metrics/metrics.routes.ts) — deferred",
+    "Phase 3: RBAC hooks and middleware for the metrics endpoint — deferred",
+    "Phase 3: Barrel export (src/modules/metrics/index.ts) — deferred",
+    "Phase 3: Plugin registration wiring into the Fastify app — deferred",
+    "The GET /metrics HTTP endpoint itself — not delivered in this phase",
+    "Unit tests for the repository or service — not in scope for this foundation phase",
+    "Any integration or e2e tests"
+  ],
+  "ambiguities": []
+}

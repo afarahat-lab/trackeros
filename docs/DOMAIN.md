@@ -282,3 +282,14 @@ Represents system-level status information, including health-check and version d
 |-------|------|----------|
 | up | boolean | true |
 | version | string | true |
+
+## metrics
+
+Represents system metrics data managed by the `metrics` module, including request counts and server uptime tracking.
+
+### MetricsResponse
+
+| Field | Type | Required |
+|-------|------|----------|
+| requests | number | true |
+| uptime | number | true |

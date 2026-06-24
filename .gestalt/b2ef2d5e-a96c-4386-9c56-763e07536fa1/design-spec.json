@@ -1,0 +1,55 @@
+{
+  "correlationId": "b2ef2d5e-a96c-4386-9c56-763e07536fa1",
+  "domainChanges": [
+    {
+      "entityName": "MetricsResponse",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "requests",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "uptime",
+          "type": "number",
+          "required": true
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [
+    {
+      "method": "GET",
+      "path": "/api/v1/metrics",
+      "description": "Returns current metrics including total request count and server uptime in seconds",
+      "authRequired": true,
+      "roles": [
+        "admin",
+        "operator"
+      ],
+      "responseBody": {
+        "requests": "number",
+        "uptime": "number"
+      }
+    }
+  ],
+  "componentSpecs": [
+    {
+      "name": "IMetricsRepository",
+      "type": "service",
+      "description": "Repository interface for reading and writing metrics counters in the database. Exposes getRequestCount, incrementRequestCount, getUptimeSeconds, and resetCounters."
+    },
+    {
+      "name": "MetricsRepository",
+      "type": "service",
+      "description": "Postgres-backed implementation of IMetricsRepository using the shared pool from src/shared/db/connection.ts. Reads/writes a key-value metrics table with rows for 'request_count' and 'uptime_start'."
+    },
+    {
+      "name": "IMetricsService",
+      "type": "service",
+      "description": "Service interface for the metrics module. Exposes getMetrics (returns MetricsResponse) and resetMetrics (resets counters and returns fresh MetricsResponse)."
+    }
+  ]
+}
