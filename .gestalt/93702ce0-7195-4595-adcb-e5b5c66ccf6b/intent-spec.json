@@ -1,0 +1,51 @@
+{
+  "id": "c12b60b5-97f5-429a-8f9f-fa91d8c91380",
+  "correlationId": "93702ce0-7195-4595-adcb-e5b5c66ccf6b",
+  "rawIntent": "The CI workflow does not trigger on push to gestalt/** branches. The workflow file at .github/workflows/ci.yml is missing or does not contain the correct on.push.branches filter. The deploy orchestrator reported: 'GitHub Actions: no push-triggered run appeared on branch gestalt/2a22ec77-feature-add-a-status-module within 21s. Verify the workflow file has `on: push: branches: ['gestalt/**']` and that pr-agent's push actually landed.' This prevents automated CI from running on feature branches. Preserve all existing exports, types, interfaces, and imports. Only add or modify what is needed to resolve the CI failure shown above.",
+  "scope": {
+    "affectedDomains": [
+      ".github/workflows/ci.yml"
+    ],
+    "affectedLayers": [
+      "config",
+      "infra"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "81ea43d2-f58b-40b3-b1ba-f0317b4d5085",
+      "description": ".github/workflows/ci.yml contains `on: push: branches: ['gestalt/**']` so that GitHub Actions triggers a workflow run on every push to a gestalt/** branch",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "id": "2634a4e1-16fc-4757-b768-ab84aa5c6f26",
+      "description": "The ci.yml file preserves all existing jobs, steps, and configuration — only the `on.push.branches` filter is added or corrected if missing",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Preserve all existing exports, types, interfaces, and imports — only add or modify what is needed to resolve the CI failure",
+    "No changes to application source code, domain modules, services, or routes"
+  ],
+  "outOfScope": [
+    "Everything outside .github/workflows/ci.yml — no changes to src/, tests/, package.json, tsconfig, or any other workflow files",
+    "The gestalt.yml workflow file — it already has the correct trigger and is managed separately by the Gestalt platform",
+    "Any application code, domain logic, or module changes",
+    "Debugging why the push didn't land on the branch — that is a platform/infrastructure concern outside this file fix"
+  ],
+  "ambiguities": [
+    {
+      "id": "c9b2af14-631c-495a-9aa4-66e8b05f9240",
+      "description": "The file .github/workflows/ci.yml already contains the correct `on: push: branches: ['gestalt/**']` trigger. The CI failure may have been caused by a transient issue (push not landing, race condition) rather than a missing trigger. The auto-diagnosis instructs regeneration regardless.",
+      "options": [
+        "Regenerate the file with the same correct trigger (idempotent no-op)",
+        "Add additional debugging or verification steps to the workflow"
+      ],
+      "impactIfWrong": "low"
+    }
+  ]
+}
