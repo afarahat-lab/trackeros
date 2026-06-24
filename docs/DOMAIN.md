@@ -204,6 +204,27 @@ Represents notification data managed by the `notification` module, including not
 | createdAt | Date | true |
 | readAt | Date \| null | false |
 
+## note
+
+Represents a note managed by the `note` module, including note records with title, body, and status tracking.
+
+### NoteStatus
+
+| Value | Description |
+|-------|-------------|
+| *TBD* | Status values to be defined |
+
+### Note
+
+| Field | Type | Required |
+|-------|------|----------|
+| id | string | true |
+| title | string | true |
+| body | string | true |
+| status | NoteStatus | true |
+| createdAt | Date | true |
+| updatedAt | Date | true |
+
 ## audit
 
 Represents audit data managed by the `audit` module, including audit records, change history, and activity tracking information.

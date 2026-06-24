@@ -39,3 +39,14 @@ The Status module provides a simple health-check endpoint. It defines:
 - **StatusService** — Implementation that returns `{ up: true, version: '1' }`.
 
 No database or repository is needed — this is purely read-only.
+
+## Notes Module
+
+### Domain Models
+- `src/modules/notes/notes.model.ts` — `Note`, `CreateNoteDto`, `NoteStatus`
+
+### Repositories
+- `src/modules/notes/notes.repository.ts` — `INotesRepository`, `PostgresNotesRepository`
+
+### Enums
+- `NoteStatus`: `ACTIVE`, `ARCHIVED`
