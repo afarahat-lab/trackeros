@@ -1,0 +1,56 @@
+{
+  "id": "0a540ffa-9075-4b53-b48b-d02f0cd55e58",
+  "correlationId": "4238bbf7-6017-4698-af62-bc5992f7b9dc",
+  "rawIntent": "[Feature: Add a single GET /uptime route that returns JSON {uptimeSeconds: floor of proces — Phase 2: Phase 2: UptimeService implementation]\n\nCreate src/modules/uptime/uptime.service.ts. Implement UptimeService class that implements IUptimeService. The getUptime() method returns { uptimeSeconds: Math.floor(process.uptime()) }. This phase depends on src/modules/uptime/uptime.model.ts and src/modules/uptime/uptime.service.interface.ts from Phase 1 — read both before generating.\n\nThis phase depends on: Phase 1.\n\nPhase architecture notes:\nPure computation with no side effects. process.uptime() is a built-in Node.js function.\n\nDetailed phase architecture (architecture-agent):\n{\"interfaces\":[\"File: src/modules/uptime/uptime.service.ts\\nimport { IUptimeService } from './uptime.service.interface';\\nimport { UptimeStatus } from './uptime.model';\\n\\nexport class UptimeService implements IUptimeService {\\n  getUptime(): UptimeStatus {\\n    return { uptimeSeconds: Math.floor(process.uptime()) };\\n  }\\n}\"],\"importStatements\":[\"import { IUptimeService } from './uptime.service.interface';\",\"import { UptimeStatus } from './uptime.model';\"],\"successCriteria\":[\"src/modules/uptime/uptime.service.ts exists and exports UptimeService\",\"UptimeService implements IUptimeService\",\"getUptime() returns { uptimeSeconds: number } where uptimeSeconds equals Math.floor(process.uptime())\",\"No external dependencies, no database access, no side effects\"]}\n\n## Canonical dependencies for this phase\n\nNote: this list supersedes any dependency names in the intent\ntext above. Do not emit ambiguity for mismatches.\n\nThe per-phase architecture above is the AUTHORITATIVE source\nfor the dependency list this phase must implement. The exact\nset of types, abstractions, and references defined or used by\nthis phase is:\n\n- IUptimeService\n- UptimeStatus\n\nTreat this list as complete. If additional dependencies appear\nin the architecture but the planner's scope text mentions a\npartial subset, do NOT flag this as ambiguity — the per-phase\narchitecture wins.\n\n\n## Deferred to later phases\nThe following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:\n- Phase 3 — Phase 3: GET /uptime route handler and barrel export: Create src/modules/uptime/uptime.route.ts with an Express Router that handles GET / and returns JSON\n- Phase 4 — Phase 4: Register uptime route in app.ts: Modify src/app.ts to import the uptime router from src/modules/uptime and mount it at /uptime via ap",
+  "scope": {
+    "affectedDomains": [
+      "uptime"
+    ],
+    "affectedLayers": [
+      "domain"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "id": "854f479e-a9e0-4f49-814a-c7a30ff48469",
+      "description": "src/modules/uptime/uptime.service.ts exists and exports UptimeService class",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "36e19b27-8596-4788-8714-3735af569d08",
+      "description": "UptimeService implements IUptimeService interface",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "c9d8ac59-8c57-4658-a6f5-9aa31cbb41fc",
+      "description": "getUptime() returns { uptimeSeconds: number } where uptimeSeconds equals Math.floor(process.uptime())",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "id": "1071ed4c-19dc-429f-b776-0e5b89424a81",
+      "description": "No external dependencies, no database access, no side effects — pure synchronous computation",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No database access — this is a pure computation service with no repository dependency",
+    "No side effects — getUptime() is a read-only synchronous method",
+    "No sensitive data in logs — process.uptime() returns a number of seconds, which is not PII or sensitive",
+    "Error handling — though the method is synchronous and cannot throw under normal operation, any unexpected errors must not propagate unhandled",
+    "Import only from canonical dependencies: IUptimeService from ./uptime.service.interface and UptimeStatus from ./uptime.model"
+  ],
+  "outOfScope": [
+    "Phase 3: GET /uptime route handler (src/modules/uptime/uptime.route.ts) and barrel export",
+    "Phase 4: Registering the uptime router in src/app.ts and mounting at /uptime",
+    "Any Fastify route registration, request handling, or HTTP concerns",
+    "Any test files — this phase only produces the service implementation",
+    "Any other modules outside src/modules/uptime/"
+  ],
+  "ambiguities": []
+}

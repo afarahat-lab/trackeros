@@ -1,0 +1,12 @@
+{
+  "correlationId": "4238bbf7-6017-4698-af62-bc5992f7b9dc",
+  "domainChanges": [],
+  "apiContracts": [],
+  "componentSpecs": [
+    {
+      "name": "UptimeService",
+      "type": "service",
+      "description": "Concrete implementation of IUptimeService. Provides getUptime() which returns the floor of process.uptime() in seconds. Pure synchronous computation — no database access, no side effects, no external dependencies."
+    }
+  ]
+}
