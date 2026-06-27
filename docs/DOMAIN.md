@@ -282,3 +282,29 @@ Represents system-level status information, including health-check and version d
 |-------|------|----------|
 | up | boolean | true |
 | version | string | true |
+
+### HealthStatus
+
+Represents the current operational health of the application, computed on-demand per request. Not persisted; exists only for the duration of the response.
+
+| Field | Type | Required |
+|-------|------|----------|
+| isHealthy | boolean | true |
+| timestamp | Date | true |
+| version | string | true |
+| uptimeSeconds | number | true |
+
+**Lifecycle**: COMPUTED — materialized fresh on each health probe request by aggregating runtime metrics (process uptime, version string, database connectivity).
+
+### VersionInfo
+
+Represents immutable application version metadata sourced from build configuration. Not persisted; immutable after initial load.
+
+| Field | Type | Required |
+|-------|------|----------|
+| version | string | true |
+| buildNumber | string | true |
+| commitHash | string | true |
+| buildDate | Date | true |
+
+**Lifecycle**: LOADED — loaded once from build configuration (package.json or environment-injected build metadata) at application startup and remains constant for the process lifetime.
