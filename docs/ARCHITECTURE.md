@@ -29,6 +29,9 @@ src/modules/LeavePolicy/    — LeavePolicy module
 src/modules/AuditLog/    — AuditLog module
 src/modules/AuditRecord/    — AuditRecord module
 src/modules/AuditServiceInterface/    — AuditServiceInterface module
+src/modules/ping/ping.{model,service.interface,service}.ts    — Ping module (stateless health-check)
+src/modules/uptime/uptime.{model,service.interface,service,routes}.ts    — Uptime module
+src/modules/status/status.{model,service.interface,service}.ts    — Status module
 src/shared/db connection.ts
 src/shared/base repository.ts
 src/shared/error types.ts
@@ -55,7 +58,60 @@ This module handles leave requests, approvals, and leave balance tracking for em
 ## Leave Management Module
 This module handles leave requests, approvals, and leave balance tracking for employees.
 
-## Leave Management Feature\n\n### Domain entities\n- LeaveRequest: leave applications submitted by employees and processed by managers.\n- LeaveBalance: remaining entitlement by employee and leave type.\n- Employee: employee identity and reporting hierarchy.\n- LeavePolicy: entitlement and leave-type rules.\n- Notification: leave workflow notifications.\n\n### Module ownership\n- src/modules/leave owns leave request workflows and approval state transitions.\n- src/modules/balance owns leave balance storage and adjustments.\n- src/modules/employee owns employee and manager relationship data.\n- src/modules/policy owns leave entitlement rules.\n- src/modules/notification owns leave-related notifications.\n\n### Dependency direction\n- leave -> employee\n- leave -> policy\n- leave -> balance\n- leave -> notification\n\nNo reverse dependencies are introduced, preserving an acyclic module graph.
+## Leave Management Feature\n\n### Domain entities\n- LeaveRequest: leave applications submitted by employees and processed by managers.\n- LeaveBalance: remaining entitlement by employee and leave type.\n- Employee: employee identity and reporting hierarchy.\n- LeavePolicy: entitlement and leave-type rules.\n- Notification: leave workflow notifications.\n\n### Module ownership\n- src/modules/leave owns leave request workflows and approval state transitions.\n- src/modules/balance owns leave balance storage and adjustments.\n- src/modules/employee owns employee and manager relationship data.\n- src/modules/policy owns leave entitlement rules.\n- src/modules/notification owns leave-related notifications.\n\n### Dependency direction\n- leave -> employee\n- leave -> policy\n- leave -> balance\n- leave -> notification\n\nNo reverse dependencies are introduced, preservi
+## Intent
+{"scope":{"affectedDomains":["ping"],"affectedLayers":["domain","service"],"isBreakingChange":false,"estimatedComplexity":"small"},"successCriteria":[{"description":"src/modules/ping/ping.model.ts exists and exports a `PingResponse` interface with `message: string` and `timestamp: Date` fields","testable":true,"layer":"unit"},{"description":"src/modules/ping/ping.service.interface.ts exists and exports an `IPingService` interface with a single method `ping(): PingResponse`, importing `PingResponse` from `./ping.model`","testable":true,"layer":"unit"},{"description":"src/modules/ping/ping.service.ts exists and exports a `PingService` class that implements `IPingService`, importing `IPingService` from `./ping.service.interface` and `PingResponse` from `./ping.model`","testable":true,"layer":"unit"},{"description":"`PingService.ping()` returns an object with `message` equal to the literal string 'pong' and `timestamp` equal to a `Date` instance (i.e., `new Date()`)","testable":true,"layer":"unit"},{"description":"`tsc --noEmit` passes with zero errors across the entire project, confirming the new files compile correctly under strict TypeScript settings","testable":true,"layer":"unit"}],"constraints":["No existing files may be modified — this phase adds new files only (src/modules/ping/ping.model.ts, src/modules/ping/ping.service.interface.ts, src/modules/ping/ping.service.ts)","Follow the existing uptime module pattern: src/modules/uptime/uptime.model.ts, src/modules/uptime/uptime.service.interface.ts, src/modules/uptime/uptime.service.ts","Strict TypeScript compliance: no implicit any, strict null checks (per tsconfig.json strict: true)","No use of `any` type — use `unknown` with type guards instead (per HARNESS.json constraint rule no-any)"],"outOfScope":["Phase 2 — Wiring ping routes, barrel export (index.ts), Fastify app registration, and tests. These are explicitly deferred to later phases.","No controller, routes, or index.ts barrel file for the ping module — these are not part of this phase","No database access, repository, or persistence layer — PingResponse is a pure value object with no persistence"],"ambiguities":[]}
+## Intent spec
+{"scope":{"affectedDomains":["ping"],"affectedLayers":["domain","service"],"isBreakingChange":false,"estimatedComplexity":"small"},"successCriteria":[{"description":"src/modules/ping/ping.model.ts exists and exports a `PingResponse` interface with `message: string` and `timestamp: Date` fields","testable":true,"layer":"unit"},{"description":"src/modules/ping/ping.service.interface.ts exists and exports an `IPingService` interface with a single method `ping(): PingResponse`, importing `PingResponse` from `./ping.model`","testable":true,"layer":"unit"},{"description":"src/modules/ping/ping.service.ts exists and exports a `PingService` class that implements `IPingService`, importing `IPingService` from `./ping.service.interface` and `PingResponse` from `./ping.model`","testable":true,"layer":"unit"},{"description":"`PingService.ping()` returns an object with `message` equal to the literal string 'pong' and `timestamp` equal to a `Date` instance (i.e., `new Date()`)","testable":true,"layer":"unit"},{"description":"`tsc --noEmit` passes with zero errors across the entire project, confirming the new files compile correctly under strict TypeScript settings","testable":true,"layer":"unit"}],"constraints":["No existing files may be modified — this phase adds new files only (src/modules/ping/ping.model.ts, src/modules/ping/ping.service.interface.ts, src/modules/ping/ping.service.ts)","Follow the existing uptime module pattern: src/modules/uptime/uptime.model.ts, src/modules/uptime/uptime.service.interface.ts, src/modules/uptime/uptime.service.ts","Strict TypeScript compliance: no implicit any, strict null checks (per tsconfig.json strict: true)","No use of `any` type — use `unknown` with type guards instead (per HARNESS.json constraint rule no-any)"],"outOfScope":["Phase 2 — Wiring ping routes, barrel export (index.ts), Fastify app registration, and tests. These are explicitly deferred to later phases.","No controller, routes, or index.ts barrel file for the ping module — these are not part of this phase","No database access, repository, or persistence layer — PingResponse is a pure value object with no persistence"],"ambiguities":[]}
+
+## Ping Module
+
+### Overview
+Stateless health-check module providing a liveness probe endpoint. No persistence, no state transitions, no external dependencies.
+
+### Domain Model
+- **PingResponse** (value object): `message: string` (always 'pong'), `timestamp: Date` (server-side time at processing).
+
+### Module Structure
+- `src/modules/ping/ping.model.ts` — PingResponse interface
+- `src/modules/ping/ping.service.interface.ts` — IPingService interface
+- `src/modules/ping/ping.service.ts` — PingService implementation
+
+### Dependencies
+- None (self-contained module)
+- No reverse dependencies
+
+### Golden Principles Compliance
+- GP-001 (Repository pattern): N/A — no database access
+- GP-002 (Audit records): N/A — read-only, non-state-changing
+- GP-003 (Input validation): N/A — no input parameters
+- GP-004 (No sensitive data in logs): Compliant
+- GP-005 (RBAC): Public health-check; no authentication required
+- GP-006 (Error handling): Service call wrapped in try/catch at route level
+
+## Leave Management Feature
+
+### Domain entities
+- LeaveRequest: leave applications submitted by employees and processed by managers.
+- LeaveBalance: remaining entitlement by employee and leave type.
+- Employee: employee identity and reporting hierarchy.
+- LeavePolicy: entitlement and leave-type rules.
+- Notification: leave workflow notifications.
+
+### Module ownership
+- src/modules/leave owns leave request workflows and approval state transitions.
+- src/modules/balance owns leave balance storage and adjustments.
+- src/modules/employee owns employee and manager relationship data.
+- src/modules/policy owns leave entitlement rules.
+- src/modules/notification owns leave-related notifications.
+
+### Dependency direction
+- leave -> employee
+- leave -> policy
+- leave -> balance
+- leave -> notification
+
+No reverse dependencies are introduced, preserving an acyclic module graph.
 
 ## Leave Management Feature
 
@@ -204,7 +260,7 @@ Architecture Style: modular-monolith using TypeScript, Node.js 20, Fastify, Post
 
 ### Domain Entities
 - LeaveRequest(id, employeeId, leaveType, startDate, endDate, status)
-- LeaveBalance(employeeId, leaveType, availableDays)
+- LeaveBalance(employeeId, leaveType, remainingDays)
 - Employee(id, managerId, role)
 - LeavePolicy(id, leaveType, annualEntitlement)
 - Notification(id, recipientEmployeeId, type, status)
@@ -318,6 +374,14 @@ Architecture Style: modular-monolith using TypeScript, Node.js 20, Fastify, Post
 - leave -> balance
 - leave -> notification
 - leave -> audit
+
+### Cross-Cutting Rules
+- All database access uses repository interfaces with PostgreSQL-backed implementations.
+- Every state-changing operation creates an AuditRecord.
+- API boundaries validate inputs.
+- RBAC is enforced on all leave APIs.
+- Sensitive data is excluded from logs.
+- Async errors are handled explicitly.
 
 ## Leave Management Module
 

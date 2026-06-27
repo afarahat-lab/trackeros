@@ -10,6 +10,24 @@ Base entity providing common fields for domain models.
 | created_at | Date | true |
 | updated_at | Date | true |
 
+## ping
+
+Represents the ping health-check domain, providing a stateless liveness probe with no persistence or external dependencies.
+
+### PingResponse
+
+| Field | Type | Required |
+|-------|------|----------|
+| message | string | true |
+| timestamp | Date | true |
+
+**Business Rules:**
+- `message` must always be the literal string 'pong'
+- `timestamp` reflects the server-side time at the moment the ping is processed
+
+**Lifecycle:**
+- Instantiated in-memory and immediately returned; never persisted
+
 ## leave
 
 Represents a leave record managed by the `leave` module, including leave requests and related leave-tracking data.
