@@ -856,3 +856,70 @@ CREATE INDEX idx_notifications_status ON notifications(status);
 
 **LeaveRequest**
 - Represents a leave application submitted by an employee
+
+
+# /ping Endpoint — Phase 1 Architecture
+
+## Overview
+Stateless health-check endpoint implementing a liveness probe. No persistence, no state transitions, no external dependencies.
+
+## Domain Model
+
+### PingResponse (Value Object)
+**Purpose:** Represents the response payload returned when the system receives a ping request, confirming the application process is alive and responsive.
+
+**Attributes:**
+- `message: string` — the literal response payload, always 'pong'
+- `timestamp: Date` — the server-side timestamp at which the ping was processed
+
+**Lifecycle States:**
+- `CREATED` — instantiated in-memory when a ping request is received and immediately returned to the caller; never persisted or transitioned to another state
+
+**Business Rules:**
+- BR-PING-001: The message attribute must always be the literal string 'pong'. No other value is permitted.
+- BR-PING-002: The timestamp must reflect the server-side time at the exact moment the ping request is processed, ensuring callers can measure round-trip latency.
+
+## Module Structure
+
+### ping Module (`src/modules/ping/`)
+**Files:**
+- `ping.model.ts` — PingResponse interface definition
+- `ping.service.interface.ts` — IPingService interface
+- `ping.service.ts` — PingService implementation
+- `ping.routes.ts` — Fastify route handler for GET /ping
+- `index.ts` — Barrel exports
+
+**Dependencies:** None (self-contained module)
+
+## Dependency Map
+```
+app → ping
+```
+The app bootstrap registers the ping module routes. No reverse dependencies.
+
+## Data Layer
+**No persistence required.** The /ping endpoint is a stateless health-check with no database operations, no repositories, and no SQL schemas.
+
+## Golden Principles Compliance
+
+- **GP-001 (Repository pattern):** N/A — no database access
+- **GP-002 (Audit records):** N/A — read-only, non-state-changing operation
+- **GP-003 (Input validation):** N/A — no input parameters on GET /ping
+- **GP-004 (No sensitive data in logs):** Compliant — no sensitive data involved
+- **GP-005 (RBAC):** Public health-check endpoint; no authentication required (consistent with existing /uptime endpoint)
+- **GP-006 (Error handling):** Route handler wraps service call in try/catch; no unhandled rejections
+
+## Implementation Phases
+
+### Phase 1: Implement /ping endpoint
+**Estimated files:** 7 (including tests)
+
+**Rationale:** Single self-contained phase. Create the ping module with model (PingResponse with message and timestamp), service interface (IPingService), service implementation (PingService), Fastify route handler (ping.routes.ts), barrel index, and register the route in app.ts. No database access, no external dependencies. Follows the same modular pattern as the existing uptime module. Includes a Jest test for PingService.ping() and a route-level integration test verifying GET /ping returns 200 with { message: 'pong', timestamp: <ISO date> }.
+
+## Reconciliation Notes
+
+**Conflict resolved:** Domain design specified `PingResponse` with `message: string` and `timestamp: Date`, while app design simplified to `{ pong: boolean }`. Domain definition is authoritative — the response includes both message and timestamp to support latency measurement (BR-PING-002).
+
+**Duplicate module removed:** App design listed both `ping` and `ping-routes` as separate modules. Consolidated to single `ping` module with routes as an internal file.
+
+**Stack compliance verified:** TypeScript, Fastify, Jest — all aligned with declared stack. No framework violations.
