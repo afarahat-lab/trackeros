@@ -1,41 +1,117 @@
-# PLAN.md — Build the leave management module
+# PLAN.md
 
-_Phase plan updated by autonomous phase-split at 2026-06-20T21:10:54.197Z._
+## Phase 1: Phase 1: Domain models and service/repository interfaces for status module
 
-## Phases
+Create the foundation of the new `src/modules/status/` module. This phase creates only type definitions and interfaces — no runtime behavior changes, so the app remains fully functional.
 
-### Phase 1: Define core service interfaces (leave, balance, employee) [deployed]
+Create the following files:
 
-Create src/modules/leave/leave.service.interface.ts, src/modules/balance/balance.service.interface.ts, src/modules/employee/employee.service.interface.ts. Define ILeaveService, IBalanceService, IEmployeeService interfaces. Use domain types LeaveRequest, LeaveBalance, Employee from src/shared/types/index.ts (already exists). Each interface declares method signatures for the respective domain operations.
+1. **src/modules/status/health.model.ts** — Define the `HealthStatus` interface with attributes: `isHealthy: boolean`, `timestamp: Date`, `version: string`, `uptimeSeconds: number`.
 
-### Phase 2: Define supporting service interfaces (policy, notification, audit) [deployed]
+2. **src/modules/status/version.model.ts** — Define the `VersionInfo` interface with attributes: `version: string`, `buildNumber: string`, `commitHash: string`, `buildDate: Date`.
 
-Create src/modules/policy/policy.service.interface.ts, src/modules/notification/notification.service.interface.ts, src/modules/audit/audit.service.interface.ts. Define IPolicyService, INotificationService, IAuditService interfaces. Use domain types LeavePolicy, Notification, AuditRecord from src/shared/types/index.ts (already exists).
+3. **src/modules/status/health.service.interface.ts** — Define `IHealthService` interface with method `getHealth(): Promise<HealthStatus>`. Import `HealthStatus` from `./health.model`.
 
-### Phase 3: Implement balance and employee services [deployed]
+4. **src/modules/status/version.service.interface.ts** — Define `IVersionService` interface with method `getVersion(): VersionInfo`. Import `VersionInfo` from `./version.model`.
 
-Create src/modules/balance/balance.service.ts and tests/unit/modules/balance/balance.service.test.ts. Implement IBalanceService from src/modules/balance/balance.service.interface.ts (Phase 1). Create src/modules/employee/employee.service.ts and tests/unit/modules/employee/employee.service.test.ts. Implement IEmployeeService from src/modules/employee/employee.service.interface.ts (Phase 1). Use domain entities LeaveBalance, Employee from src/shared/types/index.ts. This phase depends on Phase 1 interfaces.
+5. **src/modules/status/health.repository.interface.ts** — Define `IHealthRepository` interface with method `checkDatabaseConnection(): Promise<boolean>`.
 
-### Phase 4: Implement policy service [deployed]
+Read `src/modules/uptime/uptime.model.ts` and `src/modules/uptime/uptime.service.interface.ts` as reference for the existing module pattern. Follow the same style and conventions. Strict TypeScript — no implicit any, strict null checks (per tsconfig.json).
 
-Create src/modules/policy/policy.service.ts and tests/unit/modules/policy/policy.service.test.ts. Implement IPolicyService from src/modules/policy/policy.service.interface.ts (Phase 2). Use domain entity LeavePolicy from src/shared/types/index.ts. This phase depends on Phase 2 interface.
+Include Jest unit tests in `tests/unit/modules/status/` that verify the interfaces are importable and the model shapes are correct.
 
-### Phase 5: Implement notification and audit services [deployed]
+## Phase 2: Phase 2: Health repository implementation
 
-Create src/modules/notification/notification.service.ts and tests/unit/modules/notification/notification.service.test.ts. Implement INotificationService from src/modules/notification/notification.service.interface.ts (Phase 2). Create src/modules/audit/audit.service.ts and tests/unit/modules/audit/audit.service.test.ts. Implement IAuditService from src/modules/audit/audit.service.interface.ts (Phase 2). Use domain entities Notification, AuditRecord from src/shared/types/index.ts. This phase depends on Phase 2 interfaces.
+Implement the health repository that checks database connectivity. This phase depends on the interfaces and models created in Phase 1.
 
-### Phase 6: Implement leave application service [deployed]
+Create the following file:
 
-Create src/modules/leave/leave.service.ts and tests/unit/modules/leave/leave.service.test.ts. Implement ILeaveService from src/modules/leave/leave.service.interface.ts (Phase 1). Orchestrate leave request lifecycle using IBalanceService, IEmployeeService, IPolicyService, INotificationService, IAuditService (injected via constructor). Use domain entity LeaveRequest from src/shared/types/index.ts. This phase depends on all prior service interfaces and implementations (Phases 1-5).
+1. **src/modules/status/health.repository.ts** — Implement the `HealthRepository` class that implements `IHealthRepository` from `./health.repository.interface`. The `checkDatabaseConnection()` method should:
+   - Import `pool` from `../../shared/db/connection` (this file already exists)
+   - Execute a simple query like `SELECT 1` to verify database connectivity
+   - Return `true` if the query succeeds, `false` if it fails
+   - Wrap the database call in explicit try-catch error handling (per project rules)
 
-### Phase 7: Create leave validation schemas [pending]
+Read these files from Phase 1 before generating code:
+- `src/modules/status/health.repository.interface.ts` — to see the exact interface signature
+- `src/modules/status/health.model.ts` — to understand the domain types
+- `src/shared/db/connection.ts` — to see how the database pool is exported
 
-Create src/modules/leave/leave.validation.ts with Zod schemas for leave request creation, approval, rejection, cancellation, retrieval, and balance lookup.
+Follow the repository pattern: all database access must go through the repository layer. Use the existing `pool` from `src/shared/db/connection.ts`. Strict TypeScript — no implicit any.
 
-### Phase 8: Create leave controller [pending]
+Include Jest unit tests in `tests/unit/modules/status/` that mock the database pool and verify the repository returns correct boolean values for success and failure cases.
 
-Create src/modules/leave/leave.controller.ts with the LeaveController class implementing ILeaveController, using ILeaveService from Phase 6.
+## Phase 3: Phase 3: Health service and Version service implementations
 
-### Phase 9: Create leave routes [pending]
+Implement both service classes for the status module. This phase depends on the interfaces, models, and repository created in Phases 1 and 2.
 
-Create src/modules/leave/leave.routes.ts that registers all leave endpoints on a Fastify instance, applying Zod validation schemas and RBAC middleware.
+Create the following files:
+
+1. **src/modules/status/health.service.ts** — Implement the `HealthService` class that implements `IHealthService` from `./health.service.interface`. The `getHealth()` method should:
+   - Accept an `IHealthRepository` via constructor injection (dependency injection pattern)
+   - Call `this.healthRepository.checkDatabaseConnection()` wrapped in explicit try-catch error handling
+   - Return a `HealthStatus` object with: `isHealthy` set to the result of the database check, `timestamp` set to `new Date()`, `version` read from `package.json` (use ES module import with resolveJsonModule — per tsconfig.json this is enabled), `uptimeSeconds` from `Math.floor(process.uptime())`
+   - If the database check throws, set `isHealthy` to `false` rather than propagating the error
+
+2. **src/modules/status/version.service.ts** — Implement the `VersionService` class that implements `IVersionService` from `./version.service.interface`. The `getVersion()` method should:
+   - Read version metadata from `package.json` (import using ES module syntax — `resolveJsonModule` is enabled in tsconfig.json)
+   - Return a `VersionInfo` object with: `version` from package.json version field, `buildNumber` from environment variable `BUILD_NUMBER` or `'dev'`, `commitHash` from environment variable `COMMIT_HASH` or `'unknown'`, `buildDate` from environment variable `BUILD_DATE` or current date
+
+Read these files from prior phases before generating code:
+- `src/modules/status/health.model.ts` — for `HealthStatus` interface fields
+- `src/modules/status/health.service.interface.ts` — for `IHealthService` method signature
+- `src/modules/status/health.repository.interface.ts` — for `IHealthRepository` to inject
+- `src/modules/status/version.model.ts` — for `VersionInfo` interface fields
+- `src/modules/status/version.service.interface.ts` — for `IVersionService` method signature
+- `src/modules/status/health.repository.ts` — to understand the concrete repository class
+- `package.json` — to see the version field and confirm resolveJsonModule is available
+
+Strict TypeScript — no implicit any, strict null checks. No hardcoded secrets (per project constraints).
+
+Include Jest unit tests in `tests/unit/modules/status/` that mock the repository and verify both services return correctly shaped objects.
+
+## Phase 4: Phase 4: Status routes and module index
+
+Create the Fastify route handlers for `/health` and `/version` endpoints, plus the module barrel export. This phase depends on the services created in Phase 3.
+
+Create the following files:
+
+1. **src/modules/status/status.routes.ts** — Define an async Fastify plugin function `statusRoutes(fastify: FastifyInstance): Promise<void>` that registers two GET routes:
+   - `GET /health` — Instantiate `HealthRepository` (from `./health.repository`), instantiate `HealthService` (from `./health.service`) injecting the repository, call `healthService.getHealth()`, return the result with status 200. Wrap in try-catch and return 500 with `{ error: 'Internal Server Error' }` on failure.
+   - `GET /version` — Instantiate `VersionService` (from `./version.service`), call `versionService.getVersion()`, return the result with status 200. Wrap in try-catch and return 500 with `{ error: 'Internal Server Error' }` on failure.
+   - Import `FastifyInstance` from `fastify`
+
+2. **src/modules/status/index.ts** — Barrel export file that re-exports:
+   - `HealthStatus` from `./health.model`
+   - `VersionInfo` from `./version.model`
+   - `IHealthService` from `./health.service.interface`
+   - `IVersionService` from `./version.service.interface`
+   - `HealthService` from `./health.service`
+   - `VersionService` from `./version.service`
+   - `statusRoutes` from `./status.routes`
+
+Read these files from prior phases before generating code:
+- `src/modules/status/health.service.ts` — to see the HealthService constructor signature and how to instantiate it
+- `src/modules/status/health.repository.ts` — to see the HealthRepository class
+- `src/modules/status/version.service.ts` — to see the VersionService class
+- `src/modules/uptime/uptime.routes.ts` — as reference for the existing route pattern in this project
+
+Follow the same route pattern as `src/modules/uptime/uptime.routes.ts`. Strict TypeScript — no implicit any.
+
+Include Jest unit tests in `tests/unit/modules/status/` that mock the services and verify the routes return correct status codes and response shapes.
+
+## Phase 5: Phase 5: Wire status routes into app.ts
+
+Register the new status routes in the main Fastify application so the `/health` and `/version` endpoints become accessible. This is a minimal wiring change.
+
+Modify the following file:
+
+1. **src/app.ts** — Add an import for `statusRoutes` from `./modules/status/status.routes` and register it with `app.register(statusRoutes)` alongside the existing `app.register(uptimeRoutes)` call.
+
+Read this file before modifying:
+- `src/app.ts` — to see the current structure (it already imports and registers `uptimeRoutes` from `./modules/uptime/uptime.routes`)
+- `src/modules/status/status.routes.ts` from Phase 4 — to confirm the exported function name
+
+This phase is independently deployable: after this change, `GET /health` returns a `HealthStatus` JSON object and `GET /version` returns a `VersionInfo` JSON object. The existing `/uptime` endpoint continues to work unchanged.
+
+Include a Jest integration test in `tests/unit/modules/status/` that verifies the app registers the status routes without errors.

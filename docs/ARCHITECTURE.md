@@ -856,3 +856,128 @@ CREATE INDEX idx_notifications_status ON notifications(status);
 
 **LeaveRequest**
 - Represents a leave application submitted by an employee
+
+
+## Health & Version Endpoints Feature (§9 re-run)
+
+### Overview
+This feature adds two operational monitoring endpoints: `GET /health` and `GET /version`. These endpoints provide system health status (including database connectivity) and application version metadata. Both endpoints are publicly accessible without authentication as they are consumed by load balancers, orchestrators, and monitoring systems.
+
+### Domain Entities
+
+**HealthStatus**
+- Represents the current operational health of the application, computed on-demand per request
+- Attributes: `isHealthy: boolean`, `timestamp: Date`, `version: string`, `uptimeSeconds: number`
+- Lifecycle state: **COMPUTED** — materialized fresh on each health probe request by aggregating runtime metrics (process uptime, version string, database connectivity)
+- Not persisted; exists only for the duration of the response
+
+**VersionInfo**
+- Represents immutable application version metadata sourced from build configuration
+- Attributes: `version: string`, `buildNumber: string`, `commitHash: string`, `buildDate: Date`
+- Lifecycle state: **LOADED** — loaded once from build configuration (package.json or environment-injected build metadata) at application startup and remains constant for the process lifetime
+- Not persisted; immutable after initial load
+
+### Module Ownership
+
+**src/modules/status** owns:
+- `health.model.ts` — HealthStatus interface
+- `version.model.ts` — VersionInfo interface
+- `health.service.interface.ts` — IHealthService interface
+- `health.service.ts` — HealthService implementation
+- `version.service.interface.ts` — IVersionService interface
+- `version.service.ts` — VersionService implementation
+- `health.repository.interface.ts` — IHealthRepository interface
+- `health.repository.ts` — HealthRepository implementation (PostgreSQL-backed)
+- `status.routes.ts` — Fastify routes for GET /health and GET /version
+- `index.ts` — barrel exports
+
+### Service Interfaces
+
+**IHealthService**
+- Method: `checkHealth(): Promise<HealthStatus>`
+- Concrete implementation: `HealthService`
+- Computes health status by checking database connectivity via IHealthRepository and aggregating runtime metrics
+
+**IVersionService**
+- Method: `getVersion(): VersionInfo`
+- Concrete implementation: `VersionService`
+- Returns immutable version metadata loaded from package.json at startup
+
+### Repository Interface
+
+**IHealthRepository**
+- Method: `checkConnection(): Promise<boolean>`
+- Concrete implementation: `HealthRepository`
+- Backing: PostgreSQL via pg Pool (shared pool instance from src/shared/db/connection.ts)
+- Executes `SELECT 1` to verify database reachability; returns true on success, false on connection failure
+
+### Dependency Direction
+
+```
+app.ts → status.routes → HealthService/VersionService → health.model/version.model
+                                                        ↓
+                                                   IHealthRepository (interface)
+                                                        ↓
+                                                   HealthRepository (implementation)
+                                                        ↓
+                                                   shared/db (infrastructure)
+```
+
+All dependencies flow inward. No circular dependencies.
+
+### Database Schema
+
+No SQL schemas are required for this feature. HealthStatus and VersionInfo are non-persisted value objects computed or loaded at runtime. The HealthRepository uses the existing shared PostgreSQL pool to verify connectivity but does not introduce new tables.
+
+### Golden Principles Compliance
+
+- **GP-001 (Repository pattern):** HealthService depends on IHealthRepository interface for database connectivity checks. HealthRepository provides the concrete PostgreSQL implementation using the shared pool.
+- **GP-002 (Audit records):** Not applicable. These are read-only, stateless queries that produce no state mutations.
+- **GP-003 (Input validation):** Not applicable. Both endpoints are parameterless GET operations with no user input.
+- **GP-004 (No sensitive data in logs):** The domain model contains no PII, tokens, passwords, or financial data. Safe to log freely.
+- **GP-005 (RBAC enforcement):** Health and version endpoints are publicly accessible without authentication. This is a deliberate exception for infrastructure monitoring endpoints consumed by load balancers and orchestrators that do not carry user credentials.
+- **GP-006 (Error handling):** Routes wrap service calls in try-catch blocks, log errors, and return 500 status codes on failure.
+
+### Stack Compliance
+
+- **Language:** TypeScript (strict mode, no implicit any)
+- **Framework:** Fastify (routes use FastifyInstance)
+- **Database:** PostgreSQL via shared pool (for health check connectivity verification)
+- **Test Framework:** Jest (unit tests for services)
+- **Architecture Style:** Modular monolith
+
+### Lifecycle States Coverage
+
+| Entity | State | Description |
+|--------|-------|-------------|
+| HealthStatus | COMPUTED | Health status is computed on-demand per request; no persistence, no transitions |
+| VersionInfo | LOADED | Version metadata is loaded once at startup from build config; immutable thereafter |
+
+Both lifecycle states are fully supported by the service implementations:
+- HealthService.checkHealth() produces a COMPUTED HealthStatus on each invocation
+- VersionService.getVersion() returns the LOADED VersionInfo that was initialized at startup
+
+### Implementation Phases
+
+**Phase 1: Domain Models and Service Interfaces (5 files)**
+- health.model.ts, version.model.ts
+- health.service.interface.ts, version.service.interface.ts
+- health.repository.interface.ts
+
+**Phase 2: Service and Repository Implementations (3 files)**
+- health.service.ts, version.service.ts
+- health.repository.ts
+
+**Phase 3: Routes and App Registration (2 files)**
+- status.routes.ts
+- app.ts (route registration)
+
+Each phase is independently deployable and ordered by dependency. No circular dependencies.
+
+### Relationship to Existing Code
+
+The existing `SystemStatus` model in `src/modules/status/status.model.ts` (with `up: boolean` and `version: string`) is a precursor that hardcodes values. The new domain entities replace it with properly structured, semantically distinct concepts:
+- HealthStatus (runtime health with database connectivity check)
+- VersionInfo (build metadata from package.json)
+
+The existing `IStatusService` and `StatusService` are superseded by the new `IHealthService`/`HealthService` and `IVersionService`/`VersionService` interfaces and implementations.
