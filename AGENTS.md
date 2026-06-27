@@ -19,7 +19,7 @@ Trackeros — a corporate operations web and mobile platform for
   repository,service,controller,routes}.ts. Domain modules
   include leave, balance, employee, policy, notification.
   Shared utilities under src/shared/ (db connection, base
-  repository, error types).
+  repository, error types, shared type definitions).
   
   Frontend: React + Vite SPA for the web client, React Native
   for the mobile client (shared @trackeros/contracts package
@@ -27,7 +27,7 @@ Trackeros — a corporate operations web and mobile platform for
   backend's /auth endpoints; identity comes from corporate
   OIDC in production and from local users in development.
   
-  Tests: Vitest for unit + integration. CI on GitHub Actions
+  Tests: Jest for unit + integration. CI on GitHub Actions
   runs lint (ESLint) + typecheck (tsc --noEmit) + unit tests +
   a Semgrep security pass on every PR. Conventional Commits +
   squash-merge. Strict TypeScript (no implicit any, strict
@@ -37,7 +37,7 @@ Trackeros — a corporate operations web and mobile platform for
 
 - Runtime: Node 20 LTS
 - Package manager: npm
-- Test framework: Vitest
+- Test framework: Jest
 - Backend: Fastify
 - Frontend: React Native
 - Database: PostgreSQL
@@ -53,11 +53,21 @@ user projects use whatever stack matches their description.
 
 1. Modules never import from each other's internals — only from index.ts
 2. All database access through the repository pattern
-3. Every state-changing operation produces an audit record (GP-001)
-4. RBAC enforced at middleware, never inline (GP-002)
+3. Every state-changing operation produces an audit record (GP-002)
+4. RBAC enforced at middleware, never inline (GP-005)
+
+## Shared types
+
+Shared enums and type definitions live under `src/shared/types/`.
+These files are leaf dependencies with zero internal imports.
+
+- `src/shared/types/leave.types.ts` — `LeaveType`, `LeaveStatus`,
+  `NotificationType`, `AuditAction`, `EntityType`
 
 ## What agents must never do
 
+- Violate principle GP-001 as defined in `GOLDEN_PRINCIPLES.md`.
+- Violate principle GP-002 as defined in `GOLDEN_PRINCIPLES.md`.
 - Violate principle GP-003 as defined in `GOLDEN_PRINCIPLES.md`.
 - Violate principle GP-004 as defined in `GOLDEN_PRINCIPLES.md`.
 - Violate principle GP-005 as defined in `GOLDEN_PRINCIPLES.md`.
