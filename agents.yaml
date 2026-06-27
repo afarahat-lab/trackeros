@@ -40,7 +40,6 @@ agents:
       # supported by DeepInfra OpenAI-compatible endpoint).
       model: fireworks/FireworkAI-Deepseek-v4-pro
       temperature: 0.1
-      max_tokens: 4000
     prompt_extensions: []
 
   design-agent:
@@ -50,7 +49,6 @@ agents:
       # TR_050 — DeepInfra DeepSeek-V3.2
       model: fireworks/FireworkAI-Deepseek-v4-pro
       temperature: 0.1
-      max_tokens: 4000
     prompt_extensions: []
 
   context-agent:
@@ -64,7 +62,6 @@ agents:
       # explicitly to bypass the env-fallthrough.
       model: fireworks/FireworkAI-Deepseek-v4-pro
       temperature: 0.1
-      max_tokens: 8000
     tools:
       builtin:
         - readFile          # read existing context files before updating
@@ -115,7 +112,6 @@ agents:
       # deepseek-v4-pro. (TR_079 driver finding.)
       model: fireworks/qwen3p7-plus
       temperature: 0.1
-      max_tokens: 8000
       # No reasoning_effort — Aider drives its own reasoning loop;
       # DeepInfra also does not support reasoning_effort.
     tools:
@@ -167,7 +163,6 @@ agents:
       # is harmless and consistent.
       model: fireworks/FireworkAI-Deepseek-v4-pro
       temperature: 0.1
-      max_tokens: 6000
     prompt_extensions: []
 
   # ── Gate layer (Amendment 2026-06: tools enabled by default) ──
@@ -184,7 +179,6 @@ agents:
       model: fireworks/FireworkAI-Deepseek-v4-pro
       reasoning_effort: low
       temperature: 0.0
-      max_tokens: 2000
     tools:
       builtin: [executeScript, readFile, searchFiles]
     prompt_extensions: []
@@ -197,7 +191,6 @@ agents:
       # not supported by DeepInfra).
       model: fireworks/FireworkAI-Deepseek-v4-pro
       temperature: 0.0
-      max_tokens: 4000
     tools:
       # TEST_REPORT_007 — gains executeScript so it can `tsc --noEmit`
       # to verify import resolution before flagging "Import cannot be
@@ -215,7 +208,6 @@ agents:
       # TR_061-followup — pin off env-default Kimi-K2.6 fallthrough.
       model: fireworks/FireworkAI-Deepseek-v4-pro
       temperature: 0.1
-      max_tokens: 2000
     tools:
       builtin: [readFile, listDirectory, searchFiles, getFileTree]
     prompt_extensions: []
@@ -227,7 +219,6 @@ agents:
       # TR_061-followup — pin off env-default Kimi-K2.6 fallthrough.
       model: fireworks/FireworkAI-Deepseek-v4-pro
       temperature: 0.1
-      max_tokens: 2000
     tools:
       builtin: [readFile, listDirectory, searchFiles, getFileTree]
     prompt_extensions: []
@@ -239,7 +230,6 @@ agents:
       # TR_061-followup — pin off env-default Kimi-K2.6 fallthrough.
       model: fireworks/FireworkAI-Deepseek-v4-pro
       temperature: 0.2
-      max_tokens: 8192
     tools:
       # Pared-down set — context-fixer verifies the current file
       # state before editing, but doesn't need to enumerate the tree.
@@ -267,7 +257,6 @@ agents:
       # agent where the prompt size is much smaller.
       model: fireworks/FireworkAI-Deepseek-v4-pro
       temperature: 0.1
-      max_tokens: 12000
     prompt_extensions:
       - "Always ground your design in the existing ARCHITECTURE.md — extend it, never contradict it"
       - "High-level designs focus on domain entities, module boundaries, and dependency direction only — not implementation details"
@@ -304,7 +293,6 @@ agents:
     llm:
       model: fireworks/FireworkAI-Deepseek-v4-pro
       temperature: 0.1
-      max_tokens: 6000
     prompt_extensions:
       - "Focus exclusively on domain concepts — entities, attributes, lifecycle states, business rules"
       - "Do not specify persistence (data architect handles that) or modules / APIs (application architect handles that)"
@@ -316,7 +304,6 @@ agents:
     llm:
       model: fireworks/FireworkAI-Deepseek-v4-pro
       temperature: 0.1
-      max_tokens: 6000
     prompt_extensions:
       - "Every persistent entity must have a complete SQL CREATE TABLE statement"
       - "Every repository interface must name its concrete backing implementation using the declared stack — PostgreSQL via pg Pool"
@@ -328,7 +315,6 @@ agents:
     llm:
       model: fireworks/FireworkAI-Deepseek-v4-pro
       temperature: 0.1
-      max_tokens: 6000
     prompt_extensions:
       - "Dependencies flow inward only — outer layers toward inner layers; never the reverse"
       - "No circular dependencies between modules — verify dependencyMap before returning"
@@ -344,7 +330,6 @@ agents:
       # the chief model choice once DeepInfra Kimi stability improves.
       model: fireworks/FireworkAI-Deepseek-v4-pro
       temperature: 0.1
-      max_tokens: 12000
     prompt_extensions:
       - "You receive three specialist designs. Your job is to reconcile them, not regenerate them."
       - "Resolve naming conflicts by choosing the most semantically correct name and applying it consistently"
@@ -358,7 +343,6 @@ agents:
       # TR_050 — DeepInfra DeepSeek-V3.2 (no reasoning_effort).
       model: fireworks/FireworkAI-Deepseek-v4-pro
       temperature: 0.1
-      max_tokens: 12000
     prompt_extensions:
       - "Each phase must touch at most 5 files — prefer 2-3 files per phase"
       - "Each phase must have a single clear concern (model, repository, service, routes — not combined)"
@@ -373,7 +357,6 @@ agents:
       # TR_050 — DeepInfra DeepSeek-V3.2 (no reasoning_effort).
       model: fireworks/FireworkAI-Deepseek-v4-pro
       temperature: 0.1
-      max_tokens: 8000
     tools:
       # TR_026 — executeScript is mandatory: the agent runs `git diff`
       # against the phase branch itself to discover what was built.
@@ -403,7 +386,6 @@ agents:
       # reasoning_effort intentionally omitted.
       model: fireworks/FireworkAI-Deepseek-v4-pro
       temperature: 0.0
-      max_tokens: 6000
     prompt_extensions:
       - "Always ground your diagnosis in the actual error output — do not infer failures not evidenced in the provided context"
       - "A fix-intent is only appropriate when retrying the same intent would produce the same failure"
