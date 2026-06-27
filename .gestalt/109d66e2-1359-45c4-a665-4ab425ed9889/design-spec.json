@@ -1,0 +1,164 @@
+{
+  "domainChanges": [
+    {
+      "entityName": "HealthStatus",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "isHealthy",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "timestamp",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "version",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "uptimeSeconds",
+          "type": "number",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "VersionInfo",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "version",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "buildNumber",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "commitHash",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "buildDate",
+          "type": "Date",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "IHealthService",
+      "operation": "create",
+      "fields": [],
+      "relationships": [
+        {
+          "entity": "HealthStatus",
+          "type": "returns"
+        }
+      ]
+    },
+    {
+      "entityName": "IVersionService",
+      "operation": "create",
+      "fields": [],
+      "relationships": [
+        {
+          "entity": "VersionInfo",
+          "type": "returns"
+        }
+      ]
+    },
+    {
+      "entityName": "IHealthRepository",
+      "operation": "create",
+      "fields": [],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [
+    {
+      "method": "GET",
+      "path": "/health",
+      "description": "Returns the current health status of the application including database connectivity, uptime, and version information. This endpoint will be implemented in Phase 4 using the IHealthService interface.",
+      "requestBody": null,
+      "responseBody": {
+        "isHealthy": "boolean",
+        "timestamp": "string (ISO 8601)",
+        "version": "string",
+        "uptimeSeconds": "number"
+      },
+      "authRequired": false,
+      "roles": []
+    },
+    {
+      "method": "GET",
+      "path": "/version",
+      "description": "Returns the current version information including version number, build number, commit hash, and build date. This endpoint will be implemented in Phase 4 using the IVersionService interface.",
+      "requestBody": null,
+      "responseBody": {
+        "version": "string",
+        "buildNumber": "string",
+        "commitHash": "string",
+        "buildDate": "string (ISO 8601)"
+      },
+      "authRequired": false,
+      "roles": []
+    }
+  ],
+  "componentSpecs": [
+    {
+      "name": "health.model",
+      "type": "service",
+      "description": "Domain model file for the status module. Exports the HealthStatus interface with attributes: isHealthy (boolean), timestamp (Date), version (string), uptimeSeconds (number). Located at src/modules/status/health.model.ts. Follows the pattern established by src/modules/uptime/uptime.model.ts.",
+      "props": {
+        "isHealthy": "boolean — whether the application and its dependencies are healthy",
+        "timestamp": "Date — the timestamp when the health check was performed",
+        "version": "string — the current application version string",
+        "uptimeSeconds": "number — how long the application has been running in seconds"
+      }
+    },
+    {
+      "name": "version.model",
+      "type": "service",
+      "description": "Domain model file for the status module. Exports the VersionInfo interface with attributes: version (string), buildNumber (string), commitHash (string), buildDate (Date). Located at src/modules/status/version.model.ts. Follows the pattern established by src/modules/uptime/uptime.model.ts.",
+      "props": {
+        "version": "string — semantic version of the application (e.g. '1.2.3')",
+        "buildNumber": "string — CI/CD build identifier",
+        "commitHash": "string — git commit hash of the deployed build",
+        "buildDate": "Date — date when the build was produced"
+      }
+    },
+    {
+      "name": "health.service.interface",
+      "type": "service",
+      "description": "Service interface for health checks. Exports IHealthService with method getHealth(): Promise<HealthStatus>. Imports HealthStatus from ./health.model. Located at src/modules/status/health.service.interface.ts. Follows the pattern established by src/modules/uptime/uptime.service.interface.ts.",
+      "props": {
+        "getHealth": "(): Promise<HealthStatus> — returns the current health status of the application asynchronously, checking database connectivity and computing uptime"
+      }
+    },
+    {
+      "name": "version.service.interface",
+      "type": "service",
+      "description": "Service interface for version information retrieval. Exports IVersionService with method getVersion(): VersionInfo. Imports VersionInfo from ./version.model. Located at src/modules/status/version.service.interface.ts. Follows the pattern established by src/modules/uptime/uptime.service.interface.ts.",
+      "props": {
+        "getVersion": "(): VersionInfo — returns the current version information synchronously from build-time configuration"
+      }
+    },
+    {
+      "name": "health.repository.interface",
+      "type": "service",
+      "description": "Repository interface for health-related data access. Exports IHealthRepository with method checkDatabaseConnection(): Promise<boolean>. Located at src/modules/status/health.repository.interface.ts. This interface will be implemented in Phase 2 to check PostgreSQL connectivity. Follows the repository pattern (GP-001).",
+      "props": {
+        "checkDatabaseConnection": "(): Promise<boolean> — checks whether the database connection is alive and returns true if healthy, false otherwise"
+      }
+    }
+  ]
+}
