@@ -33,7 +33,7 @@ name: gestalt
 #                        (different `inputs.environment` value).
 on:
   push:
-    branches: ['gestalt/**']
+    branches: ['gestalt/**', 'feature/**', 'phase/**', 'retry/**', 'fix/**']
   workflow_dispatch:
     inputs:
       environment:
