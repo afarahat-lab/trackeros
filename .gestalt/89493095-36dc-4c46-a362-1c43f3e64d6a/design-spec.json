@@ -1,0 +1,23 @@
+{
+  "domainChanges": [
+    {
+      "entityName": "PingResponse",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "message",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "timestamp",
+          "type": "Date",
+          "required": true
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}
