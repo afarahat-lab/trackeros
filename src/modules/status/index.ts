@@ -1,3 +1,5 @@
-export { SystemStatus } from './status.model';
-export { IStatusService } from './status.service.interface';
-export { StatusService } from './status.service';
+export { HealthStatus } from './health.model';
+export { VersionInfo } from './version.model';
+export { IHealthService } from './health.service.interface';
+export { IVersionService } from './version.service.interface';
+export { IHealthRepository } from './health.repository.interface';
