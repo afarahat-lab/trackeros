@@ -27,7 +27,7 @@ Trackeros — a corporate operations web and mobile platform for
   backend's /auth endpoints; identity comes from corporate
   OIDC in production and from local users in development.
   
-  Tests: Vitest for unit + integration. CI on GitHub Actions
+  Tests: Jest for unit + integration. CI on GitHub Actions
   runs lint (ESLint) + typecheck (tsc --noEmit) + unit tests +
   a Semgrep security pass on every PR. Conventional Commits +
   squash-merge. Strict TypeScript (no implicit any, strict
@@ -37,7 +37,7 @@ Trackeros — a corporate operations web and mobile platform for
 
 - Runtime: Node 20 LTS
 - Package manager: npm
-- Test framework: Vitest
+- Test framework: Jest
 - Backend: Fastify
 - Frontend: React Native
 - Database: PostgreSQL

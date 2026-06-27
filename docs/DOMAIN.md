@@ -18,8 +18,7 @@ Represents a leave record managed by the `leave` module, including leave request
 
 | Value | Description |
 |-------|-------------|
-| DRAFT | Leave request is in draft state |
-| SUBMITTED | Leave request has been submitted |
+| PENDING | Leave request is pending review |
 | APPROVED | Leave request has been approved |
 | REJECTED | Leave request has been rejected |
 | CANCELLED | Leave request has been cancelled |
@@ -162,12 +161,12 @@ Represents leave policy data managed by the `policy` module, including policy de
 
 | Value | Description |
 |-------|-------------|
-| annual | Annual leave |
-| sick | Sick leave |
-| emergency | Emergency leave |
-| unpaid | Unpaid leave |
-| maternity | Maternity leave |
-| paternity | Paternity leave |
+| ANNUAL | Annual leave |
+| SICK | Sick leave |
+| MATERNITY | Maternity leave |
+| PATERNITY | Paternity leave |
+| UNPAID | Unpaid leave |
+| OTHER | Other leave |
 
 ### LeavePolicy
 
