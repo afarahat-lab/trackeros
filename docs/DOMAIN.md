@@ -1,3 +1,40 @@
+## shared/types
+
+Shared type definitions and enums used across the leave management module.
+
+### LeaveType
+
+| Value | Description |
+|-------|-------------|
+| ANNUAL | Annual/vacation leave |
+| SICK | Sick leave |
+| EMERGENCY | Emergency leave |
+
+### LeaveRequestStatus
+
+| Value | Description |
+|-------|-------------|
+| PENDING | Leave request is awaiting manager review |
+| APPROVED | Leave request has been approved by manager |
+| REJECTED | Leave request has been rejected by manager |
+| CANCELLED | Leave request has been cancelled by employee |
+
+### LeaveBalanceStatus
+
+| Value | Description |
+|-------|-------------|
+| ACTIVE | Balance is active and available for use |
+| EXHAUSTED | Balance has been fully consumed |
+| FROZEN | Balance is frozen and cannot be used |
+
+### EmploymentStatus
+
+| Value | Description |
+|-------|-------------|
+| ACTIVE | Employee is actively working |
+| ON_LEAVE | Employee is currently on leave |
+| TERMINATED | Employee has been terminated |
+
 ## base
 
 Base entity providing common fields for domain models.
@@ -13,16 +50,6 @@ Base entity providing common fields for domain models.
 ## leave
 
 Represents a leave record managed by the `leave` module, including leave requests and related leave-tracking data.
-
-### LeaveStatus
-
-| Value | Description |
-|-------|-------------|
-| DRAFT | Leave request is in draft state |
-| SUBMITTED | Leave request has been submitted |
-| APPROVED | Leave request has been approved |
-| REJECTED | Leave request has been rejected |
-| CANCELLED | Leave request has been cancelled |
 
 ### LeaveRequest
 
@@ -89,7 +116,7 @@ Represents leave balance data managed by the `balance` module, including tracked
 | usedDays | number | true |
 | remainingDays | number | true |
 | fiscalYear | number | true |
-| status | string | true |
+| status | LeaveBalanceStatus | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
@@ -108,7 +135,7 @@ Represents leave balance data managed by the `balance` module, including tracked
 | usedDays | number | true |
 | remainingDays | number | true |
 | fiscalYear | number | true |
-| status | string | true |
+| status | LeaveBalanceStatus | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
@@ -133,7 +160,7 @@ Represents employee data managed by the `employee` module, including employee re
 | department | string \| null | false |
 | hireDate | Date | true |
 | terminationDate | Date \| null | false |
-| employmentStatus | 'ACTIVE' \| 'INACTIVE' \| 'TERMINATED' | true |
+| employmentStatus | EmploymentStatus | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 | deletedAt | Date \| null | false |
@@ -148,7 +175,7 @@ Represents leave policy data managed by the `policy` module, including policy de
 |-------|------|----------|
 | id | string | true |
 | policyName | string | true |
-| leaveType | string | true |
+| leaveType | LeaveType | true |
 | entitlementDays | number | true |
 | accrualRate | number | false |
 | maxAccumulation | number | false |
@@ -158,24 +185,13 @@ Represents leave policy data managed by the `policy` module, including policy de
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
-### LeaveType
-
-| Value | Description |
-|-------|-------------|
-| annual | Annual leave |
-| sick | Sick leave |
-| emergency | Emergency leave |
-| unpaid | Unpaid leave |
-| maternity | Maternity leave |
-| paternity | Paternity leave |
-
 ### LeavePolicy
 
 | Field | Type | Required |
 |-------|------|----------|
 | id | string | true |
 | policyName | string | true |
-| leaveType | string | true |
+| leaveType | LeaveType | true |
 | entitlementDays | number | true |
 | accrualRate | number | false |
 | maxAccumulation | number | false |
@@ -216,8 +232,8 @@ Represents audit data managed by the `audit` module, including audit records, ch
 | entityType | string | true |
 | entityId | string | true |
 | action | 'CREATE' \| 'UPDATE' \| 'DELETE' \| 'APPROVE' \| 'REJECT' | true |
-| oldValues | Record<string, any> \| null | false |
-| newValues | Record<string, any> \| null | false |
+| oldValues | Record<string, unknown> \| null | false |
+| newValues | Record<string, unknown> \| null | false |
 | performedBy | string \| null | false |
 | performedAt | Date | true |
 | createdAt | Date | true |
@@ -231,8 +247,8 @@ Represents audit data managed by the `audit` module, including audit records, ch
 | entityType | string | true |
 | entityId | string | true |
 | action | 'CREATE' \| 'UPDATE' \| 'DELETE' \| 'APPROVE' \| 'REJECT' | true |
-| oldValues | Record<string, any> \| null | false |
-| newValues | Record<string, any> \| null | false |
+| oldValues | Record<string, unknown> \| null | false |
+| newValues | Record<string, unknown> \| null | false |
 | performedBy | string \| null | false |
 | performedAt | Date | true |
 
@@ -244,8 +260,8 @@ Represents audit data managed by the `audit` module, including audit records, ch
 | entity_id | string | true |
 | action | string | true |
 | changed_by | string \| null | false |
-| old_values | Record<string, any> \| null | false |
-| new_values | Record<string, any> \| null | false |
+| old_values | Record<string, unknown> \| null | false |
+| new_values | Record<string, unknown> \| null | false |
 | ip_address | string \| null | false |
 | user_agent | string \| null | false |
 
