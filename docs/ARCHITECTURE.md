@@ -21,6 +21,9 @@ src/modules/balance/balance.{model,repository,service,controller,routes}.ts
 src/modules/employee/employee.{model,repository,service,controller,routes}.ts
 src/modules/policy/policy.{model,repository,service,controller,routes}.ts
 src/modules/notification/notification.{model,repository,service,controller,routes}.ts
+src/modules/status/    — SystemStatus module (legacy, superseded by health + version)
+src/modules/uptime/    — Uptime module
+src/modules/health/    — Health module (HealthState, HealthStatus, IHealthService)
 src/modules/LeaveStatus/    — LeaveStatus module
 src/modules/BaseEntity/    — BaseEntity module
 src/modules/LeaveRequest/    — LeaveRequest module

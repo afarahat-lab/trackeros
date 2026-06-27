@@ -282,3 +282,32 @@ Represents system-level status information, including health-check and version d
 |-------|------|----------|
 | up | boolean | true |
 | version | string | true |
+
+**Note:** `SystemStatus` is legacy. Superseded by the `health` and `version` modules.
+
+## health
+
+Represents operational health state managed by the `health` module. Provides system health-check data for monitoring infrastructure and load balancer integration. Health state is computed on demand (no persistence).
+
+### HealthState
+
+| Value | Description |
+|-------|-------------|
+| HEALTHY | All critical subsystems are operational and responding normally |
+| DEGRADED | Application is running but one or more non-critical dependencies are impaired |
+| UNHEALTHY | A critical subsystem has failed; application cannot serve requests reliably |
+
+### HealthStatus
+
+| Field | Type | Required |
+|-------|------|----------|
+| status | HealthState | true |
+| checkedAt | Date | true |
+| message | string \| undefined | false |
+
+**Relationships**
+- None — computed on demand from runtime state (no persistence)
+
+### IHealthService
+
+Service interface for health checks. Single method `getHealth(): Promise<HealthStatus>`.
