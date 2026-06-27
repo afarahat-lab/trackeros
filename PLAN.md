@@ -1,41 +1,116 @@
-# PLAN.md — Build the leave management module
+# PLAN.md
 
-_Phase plan updated by autonomous phase-split at 2026-06-20T21:10:54.197Z._
+## Phase 1: Create Health domain model and service interface
 
-## Phases
+Create the health module domain types in src/modules/health/. 
 
-### Phase 1: Define core service interfaces (leave, balance, employee) [deployed]
+Create src/modules/health/health.model.ts with:
+- HealthState type alias: 'HEALTHY' | 'DEGRADED' | 'UNHEALTHY'
+- HealthStatus interface with attributes: status (HealthState), checkedAt (Date), message (string | undefined)
 
-Create src/modules/leave/leave.service.interface.ts, src/modules/balance/balance.service.interface.ts, src/modules/employee/employee.service.interface.ts. Define ILeaveService, IBalanceService, IEmployeeService interfaces. Use domain types LeaveRequest, LeaveBalance, Employee from src/shared/types/index.ts (already exists). Each interface declares method signatures for the respective domain operations.
+Create src/modules/health/health.service.interface.ts with:
+- IHealthService interface defining method: getHealth(): HealthStatus
 
-### Phase 2: Define supporting service interfaces (policy, notification, audit) [deployed]
+Follow the exact pattern from src/modules/uptime/uptime.model.ts and src/modules/uptime/uptime.service.interface.ts which already exist in the project.
 
-Create src/modules/policy/policy.service.interface.ts, src/modules/notification/notification.service.interface.ts, src/modules/audit/audit.service.interface.ts. Define IPolicyService, INotificationService, IAuditService interfaces. Use domain types LeavePolicy, Notification, AuditRecord from src/shared/types/index.ts (already exists).
+This phase depends on no prior phases — only existing files src/modules/uptime/uptime.model.ts and src/modules/uptime/uptime.service.interface.ts for reference pattern.
 
-### Phase 3: Implement balance and employee services [deployed]
+## Phase 2: Implement Health service
 
-Create src/modules/balance/balance.service.ts and tests/unit/modules/balance/balance.service.test.ts. Implement IBalanceService from src/modules/balance/balance.service.interface.ts (Phase 1). Create src/modules/employee/employee.service.ts and tests/unit/modules/employee/employee.service.test.ts. Implement IEmployeeService from src/modules/employee/employee.service.interface.ts (Phase 1). Use domain entities LeaveBalance, Employee from src/shared/types/index.ts. This phase depends on Phase 1 interfaces.
+Create the health service implementation in src/modules/health/health.service.ts.
 
-### Phase 4: Implement policy service [deployed]
+Implement HealthService class that implements IHealthService interface. The getHealth() method should:
+- Return a HealthStatus object
+- Set status to 'HEALTHY' (the application is running if this code executes)
+- Set checkedAt to new Date() (current timestamp)
+- Set message to undefined (or optionally a simple message like 'All systems operational')
 
-Create src/modules/policy/policy.service.ts and tests/unit/modules/policy/policy.service.test.ts. Implement IPolicyService from src/modules/policy/policy.service.interface.ts (Phase 2). Use domain entity LeavePolicy from src/shared/types/index.ts. This phase depends on Phase 2 interface.
+This phase depends on src/modules/health/health.model.ts and src/modules/health/health.service.interface.ts from Phase 1 — read them before generating code to use the exact type names HealthStatus, HealthState, and IHealthService.
 
-### Phase 5: Implement notification and audit services [deployed]
+Follow the pattern from src/modules/uptime/uptime.service.ts which already exists.
 
-Create src/modules/notification/notification.service.ts and tests/unit/modules/notification/notification.service.test.ts. Implement INotificationService from src/modules/notification/notification.service.interface.ts (Phase 2). Create src/modules/audit/audit.service.ts and tests/unit/modules/audit/audit.service.test.ts. Implement IAuditService from src/modules/audit/audit.service.interface.ts (Phase 2). Use domain entities Notification, AuditRecord from src/shared/types/index.ts. This phase depends on Phase 2 interfaces.
+## Phase 3: Create Health routes and module index
 
-### Phase 6: Implement leave application service [deployed]
+Create the health routes and module barrel export in src/modules/health/.
 
-Create src/modules/leave/leave.service.ts and tests/unit/modules/leave/leave.service.test.ts. Implement ILeaveService from src/modules/leave/leave.service.interface.ts (Phase 1). Orchestrate leave request lifecycle using IBalanceService, IEmployeeService, IPolicyService, INotificationService, IAuditService (injected via constructor). Use domain entity LeaveRequest from src/shared/types/index.ts. This phase depends on all prior service interfaces and implementations (Phases 1-5).
+Create src/modules/health/health.routes.ts:
+- Export async function healthRoutes(fastify: FastifyInstance): Promise<void>
+- Register GET /health endpoint
+- Instantiate HealthService and call getHealth()
+- Return 200 status with the HealthStatus object
+- Handle errors with 500 status and error message
 
-### Phase 7: Create leave validation schemas [pending]
+Create src/modules/health/index.ts:
+- Export HealthStatus from './health.model'
+- Export IHealthService from './health.service.interface'
+- Export HealthService from './health.service'
+- Export healthRoutes from './health.routes'
 
-Create src/modules/leave/leave.validation.ts with Zod schemas for leave request creation, approval, rejection, cancellation, retrieval, and balance lookup.
+This phase depends on src/modules/health/health.model.ts, src/modules/health/health.service.interface.ts, and src/modules/health/health.service.ts from Phases 1-2 — read them before generating code.
 
-### Phase 8: Create leave controller [pending]
+Follow the exact pattern from src/modules/uptime/uptime.routes.ts and src/modules/uptime/index.ts which already exist.
 
-Create src/modules/leave/leave.controller.ts with the LeaveController class implementing ILeaveController, using ILeaveService from Phase 6.
+## Phase 4: Create Version domain model and service interface
 
-### Phase 9: Create leave routes [pending]
+Create the version module domain types in src/modules/version/.
 
-Create src/modules/leave/leave.routes.ts that registers all leave endpoints on a Fastify instance, applying Zod validation schemas and RBAC middleware.
+Create src/modules/version/version.model.ts with:
+- VersionInfo interface with attributes: version (string), name (string), nodeVersion (string), environment (string)
+
+Create src/modules/version/version.service.interface.ts with:
+- IVersionService interface defining method: getVersion(): VersionInfo
+
+Follow the exact pattern from src/modules/uptime/uptime.model.ts and src/modules/uptime/uptime.service.interface.ts which already exist in the project.
+
+This phase depends on no prior phases — only existing files for reference pattern.
+
+## Phase 5: Implement Version service
+
+Create the version service implementation in src/modules/version/version.service.ts.
+
+Implement VersionService class that implements IVersionService interface. The getVersion() method should:
+- Return a VersionInfo object
+- Read version and name from package.json (use require('../../../package.json') or similar relative path)
+- Set nodeVersion to process.version
+- Set environment to process.env.NODE_ENV || 'development'
+
+This phase depends on src/modules/version/version.model.ts and src/modules/version/version.service.interface.ts from Phase 4 — read them before generating code to use the exact type name VersionInfo and IVersionService.
+
+Follow the pattern from src/modules/uptime/uptime.service.ts which already exists.
+
+## Phase 6: Create Version routes and module index
+
+Create the version routes and module barrel export in src/modules/version/.
+
+Create src/modules/version/version.routes.ts:
+- Export async function versionRoutes(fastify: FastifyInstance): Promise<void>
+- Register GET /version endpoint
+- Instantiate VersionService and call getVersion()
+- Return 200 status with the VersionInfo object
+- Handle errors with 500 status and error message
+
+Create src/modules/version/index.ts:
+- Export VersionInfo from './version.model'
+- Export IVersionService from './version.service.interface'
+- Export VersionService from './version.service'
+- Export versionRoutes from './version.routes'
+
+This phase depends on src/modules/version/version.model.ts, src/modules/version/version.service.interface.ts, and src/modules/version/version.service.ts from Phases 4-5 — read them before generating code.
+
+Follow the exact pattern from src/modules/uptime/uptime.routes.ts and src/modules/uptime/index.ts which already exist.
+
+## Phase 7: Register health and version routes in app
+
+Update src/app.ts to register the new health and version route modules.
+
+Add imports:
+- import { healthRoutes } from './modules/health/health.routes';
+- import { versionRoutes } from './modules/version/version.routes';
+
+Register the routes after the existing uptimeRoutes registration:
+- app.register(healthRoutes);
+- app.register(versionRoutes);
+
+This phase depends on src/modules/health/health.routes.ts from Phase 3 and src/modules/version/version.routes.ts from Phase 6 — read them before generating code to use the exact exported function names healthRoutes and versionRoutes.
+
+Read src/app.ts first to understand the existing registration pattern with uptimeRoutes.

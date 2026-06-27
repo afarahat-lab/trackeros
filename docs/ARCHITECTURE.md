@@ -856,3 +856,178 @@ CREATE INDEX idx_notifications_status ON notifications(status);
 
 **LeaveRequest**
 - Represents a leave application submitted by an employee
+
+
+# Feature Architecture: health+version (§9 verify)
+
+## Overview
+
+This feature adds two operational endpoints to the trackeros application:
+
+- **GET /health** — Returns the current system health status by evaluating critical and non-critical dependencies (database connectivity). Returns one of three states: HEALTHY, DEGRADED, or UNHEALTHY.
+- **GET /version** — Returns the application version metadata sourced from `package.json` and runtime environment.
+
+Both endpoints are publicly accessible (no authentication) to support load balancer health checks and monitoring infrastructure. They are read-only, stateless operations that do not require audit logging.
+
+## Reconciliation Decisions
+
+| Decision | Chosen Approach | Rationale |
+|----------|----------------|-----------|
+| Module structure | Two separate modules (health, version) | Better separation of concerns; each endpoint has distinct domain semantics |
+| Health model richness | Three-state enum (HEALTHY/DEGRADED/UNHEALTHY) | Supports load balancer routing decisions and operator alerting |
+| Version model richness | Full metadata (version, name, nodeVersion, environment) | Operators need complete deployment context for verification |
+| Legacy SystemStatus | Kept but deprecated | Backward compatibility; new modules supersede it |
+| Persistence | None (no SQL schemas, no repositories) | Both endpoints compute state on demand from runtime; no data to persist |
+| Database check | Health service uses existing `pool` from `src/shared/db/connection.ts` | Validates critical dependency without introducing new infrastructure |
+
+## Domain Entities
+
+### HealthStatus
+
+Computed on demand to reflect the operational state of the application.
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `status` | `HealthState` | Overall health state: `HEALTHY` \| `DEGRADED` \| `UNHEALTHY` |
+| `checkedAt` | `Date` | Timestamp when the health check was performed |
+| `message` | `string \| undefined` | Optional human-readable detail about the current health state |
+
+**Lifecycle States:**
+- **HEALTHY** — All critical subsystems are operational and responding normally
+- **DEGRADED** — The application is running but one or more non-critical dependencies are unavailable or impaired
+- **UNHEALTHY** — A critical subsystem has failed and the application cannot serve requests reliably
+
+**State Transitions:** Each health check request computes a fresh `HealthStatus`; there is no persisted state machine. The computed state is determined by dependency evaluation at request time.
+
+### VersionInfo
+
+Immutable metadata about the running application version.
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `version` | `string` | Semantic version (e.g. `'1.0.0'`), sourced from `package.json` |
+| `name` | `string` | Application name, sourced from `package.json` |
+| `nodeVersion` | `string` | Node.js runtime version (`process.version`) |
+| `environment` | `string` | Deployment environment (`NODE_ENV`) |
+
+**Lifecycle States:**
+- **RESOLVED** — Version metadata has been successfully read from `package.json` and is available for reporting
+
+**State Transitions:** Version metadata is resolved once (at startup or first request) and remains in RESOLVED state for the process lifetime. No further transitions.
+
+## Data Layer
+
+**No SQL schemas or repositories are required.** Both endpoints are stateless, read-only operations that compute their response from runtime state (process info, database connectivity checks, `package.json` contents). No data is persisted.
+
+## Module Boundaries
+
+### health module (`src/modules/health`)
+
+| File | Responsibility |
+|------|---------------|
+| `health.model.ts` | `HealthState` enum, `HealthStatus` interface |
+| `health.service.interface.ts` | `IHealthService` interface |
+| `health.service.ts` | `HealthService` concrete implementation |
+| `health.routes.ts` | Fastify route handler for `GET /health` |
+| `index.ts` | Barrel export |
+
+### version module (`src/modules/version`)
+
+| File | Responsibility |
+|------|---------------|
+| `version.model.ts` | `VersionInfo` interface |
+| `version.service.interface.ts` | `IVersionService` interface |
+| `version.service.ts` | `VersionService` concrete implementation |
+| `version.routes.ts` | Fastify route handler for `GET /version` |
+| `index.ts` | Barrel export |
+
+## Service Interfaces and Implementations
+
+### IHealthService
+
+```typescript
+// src/modules/health/health.service.interface.ts
+export interface IHealthService {
+  getHealth(): Promise<HealthStatus>;
+}
+```
+
+**Concrete implementation:** `HealthService` in `src/modules/health/health.service.ts`
+- Checks database connectivity via `pool.query('SELECT 1')` from `src/shared/db/connection.ts`
+- Returns `HEALTHY` if DB is reachable, `UNHEALTHY` if DB check fails
+- Catches unexpected errors and returns `UNHEALTHY` with descriptive message
+- HTTP 503 for UNHEALTHY, HTTP 200 for HEALTHY/DEGRADED
+
+### IVersionService
+
+```typescript
+// src/modules/version/version.service.interface.ts
+export interface IVersionService {
+  getVersion(): VersionInfo;
+}
+```
+
+**Concrete implementation:** `VersionService` in `src/modules/version/version.service.ts`
+- Reads `package.json` at startup (or first request) and caches for process lifetime
+- Returns `{ version, name, nodeVersion, environment }`
+- HTTP 500 if `package.json` cannot be read or parsed
+
+## Dependency Map
+
+```
+src/app.ts → src/modules/health
+src/app.ts → src/modules/version
+src/modules/health → src/shared/db/connection.ts
+```
+
+Both modules are leaf modules with no inter-module dependencies. The health module depends on the shared database connection pool for connectivity checks.
+
+## Business Rules
+
+1. **Health state determination** — Critical dependency (database) evaluation drives HEALTHY/DEGRADED/UNHEALTHY classification. If DB is reachable → HEALTHY. If DB is unreachable → UNHEALTHY.
+2. **Version resolution** — Sourced from `package.json` at startup, cached for process lifetime, must be semver-compliant.
+3. **RBAC exemption** — Both endpoints are publicly accessible (no authentication) to support load balancers and monitoring. Rate limiting applies.
+4. **Audit exemption** — Read-only operational endpoints do not require audit logging (GP-002 does not apply to pure reads).
+5. **Health check error handling** — Unexpected errors during health evaluation yield UNHEALTHY + HTTP 503.
+6. **Version resolution error handling** — Failure to read `package.json` yields HTTP 500.
+
+## Golden Principle Compliance
+
+| Principle | Status | Notes |
+|-----------|--------|-------|
+| GP-001 Repository pattern | N/A | No database writes; health check reads DB directly for connectivity probe only |
+| GP-002 Audit records | Exempted | Read-only endpoints do not change state |
+| GP-003 Input validation | N/A | No user input on these endpoints |
+| GP-004 No sensitive data in logs | Compliant | Health status and version info contain no PII or secrets |
+| GP-005 RBAC enforcement | Exempted | Public operational endpoints for monitoring infrastructure |
+| GP-006 Error handling | Compliant | All async errors caught and mapped to appropriate HTTP responses |
+
+## Stack Compliance
+
+- **TypeScript** with strict mode ✓
+- **Fastify** framework for route handlers ✓
+- **PostgreSQL** connectivity check via existing `pg` pool ✓
+- **Jest** test framework for unit tests ✓
+- **Modular-monolith** architecture following existing module pattern (status, uptime) ✓
+- **Node 20** runtime ✓
+
+## Legacy Deprecation
+
+The existing `SystemStatus` entity in `src/modules/status/status.model.ts` (with `up: boolean` and `version: string`) is a legacy combined model. The new `HealthStatus` and `VersionInfo` entities replace the combined `SystemStatus` concept with separate, richer concerns. The `status` module should be deprecated in a future release.
+
+## Phase Recommendations
+
+### Phase 1: Health Module (5 files)
+Create the health module with model, service interface, service implementation, routes, and barrel export. Register health routes in `app.ts`. This phase is independently deployable and provides the `/health` endpoint. No dependencies on other new modules.
+
+### Phase 2: Version Module (5 files)
+Create the version module with model, service interface, service implementation, routes, and barrel export. Register version routes in `app.ts`. This phase is independently deployable and provides the `/version` endpoint. No dependencies on the health module.
+
+## Lifecycle State Tracking
+
+All lifecycle states introduced by the domain architect are reflected in this architecture:
+
+- **HealthStatus.HEALTHY** — Returned when all critical dependencies (database) are operational
+- **HealthStatus.DEGRADED** — Reserved for future non-critical dependency checks; current implementation returns HEALTHY or UNHEALTHY
+- **HealthStatus.UNHEALTHY** — Returned when database connectivity check fails or unexpected error occurs
+- **VersionInfo.RESOLVED** — Version metadata successfully read from `package.json` and cached for process lifetime
