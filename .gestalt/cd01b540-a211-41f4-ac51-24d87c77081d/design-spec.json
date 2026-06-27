@@ -1,0 +1,59 @@
+{
+  "domainChanges": [
+    {
+      "entityName": "HealthState",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "HEALTHY",
+          "type": "literal",
+          "required": true
+        },
+        {
+          "name": "DEGRADED",
+          "type": "literal",
+          "required": true
+        },
+        {
+          "name": "UNHEALTHY",
+          "type": "literal",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "HealthStatus",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "status",
+          "type": "HealthState",
+          "required": true
+        },
+        {
+          "name": "checkedAt",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "message",
+          "type": "string | undefined",
+          "required": false
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": [
+    {
+      "name": "IHealthService",
+      "type": "service",
+      "description": "Service interface for health checks. Defines a single method getHealth() that returns a HealthStatus object containing the current system health state, timestamp, and optional message. Follows the same pattern as IUptimeService.",
+      "props": {
+        "getHealth": "() => HealthStatus"
+      }
+    }
+  ]
+}
