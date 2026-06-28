@@ -2,21 +2,21 @@
   "domainChanges": [
     {
       "entityName": "LeaveType",
-      "operation": "create",
+      "operation": "update",
       "fields": [
         {
           "name": "ANNUAL",
-          "type": "string (enum member)",
+          "type": "string enum member",
           "required": true
         },
         {
           "name": "SICK",
-          "type": "string (enum member)",
+          "type": "string enum member",
           "required": true
         },
         {
           "name": "EMERGENCY",
-          "type": "string (enum member)",
+          "type": "string enum member",
           "required": true
         }
       ],
@@ -24,26 +24,26 @@
     },
     {
       "entityName": "LeaveStatus",
-      "operation": "create",
+      "operation": "update",
       "fields": [
         {
           "name": "PENDING",
-          "type": "string (enum member)",
+          "type": "string enum member",
           "required": true
         },
         {
           "name": "APPROVED",
-          "type": "string (enum member)",
+          "type": "string enum member",
           "required": true
         },
         {
           "name": "REJECTED",
-          "type": "string (enum member)",
+          "type": "string enum member",
           "required": true
         },
         {
           "name": "CANCELLED",
-          "type": "string (enum member)",
+          "type": "string enum member",
           "required": true
         }
       ],
