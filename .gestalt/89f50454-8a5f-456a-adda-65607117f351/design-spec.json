@@ -3,50 +3,13 @@
     {
       "entityName": "LeaveType",
       "operation": "create",
-      "fields": [
-        {
-          "name": "ANNUAL",
-          "type": "string enum member",
-          "required": true
-        },
-        {
-          "name": "SICK",
-          "type": "string enum member",
-          "required": true
-        },
-        {
-          "name": "EMERGENCY",
-          "type": "string enum member",
-          "required": true
-        }
-      ],
+      "fields": [],
       "relationships": []
     },
     {
       "entityName": "LeaveStatus",
       "operation": "create",
-      "fields": [
-        {
-          "name": "PENDING",
-          "type": "string enum member",
-          "required": true
-        },
-        {
-          "name": "APPROVED",
-          "type": "string enum member",
-          "required": true
-        },
-        {
-          "name": "REJECTED",
-          "type": "string enum member",
-          "required": true
-        },
-        {
-          "name": "CANCELLED",
-          "type": "string enum member",
-          "required": true
-        }
-      ],
+      "fields": [],
       "relationships": []
     }
   ],
