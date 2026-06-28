@@ -1,9 +1,9 @@
 /**
- * Canonical leave type enumerations for the leave management module.
+ * Canonical enumerations for the leave management module.
  *
  * These enums are the foundational type dependency for every subsequent phase
  * of the leave management feature. They define the allowed leave types and
- * request statuses used throughout the system.
+ * the lifecycle states of a leave request.
  */
 
 /**
