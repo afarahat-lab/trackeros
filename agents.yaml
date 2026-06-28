@@ -300,14 +300,15 @@ agents:
 
   data-architect-agent:
     role: "Data architect"
-    goal: "Define the persistence layer: SQL schema, indices, constraints, repository interfaces, and concrete implementations for this feature"
+    goal: "Define the persistence layer: conceptual table specifications (no DDL), repository interfaces, and concrete implementations for this feature"
     llm:
       model: fireworks/FireworkAI-Deepseek-v4-pro
       temperature: 0.1
     prompt_extensions:
-      - "Every persistent entity must have a complete SQL CREATE TABLE statement"
+      - "Describe each table CONCEPTUALLY: name, field names (no SQL types), primary key, foreign-key relationships, index rationale"
+      - "Do NOT write SQL DDL — no CREATE TABLE statements; the code agent generates migrations from this specification"
       - "Every repository interface must name its concrete backing implementation using the declared stack — PostgreSQL via pg Pool"
-      - "Indices and constraints must reflect the entity's lifecycle and access patterns"
+      - "Index rationale must reflect the entity's lifecycle and access patterns"
 
   app-architect-agent:
     role: "Application architect"
@@ -316,6 +317,7 @@ agents:
       model: fireworks/FireworkAI-Deepseek-v4-pro
       temperature: 0.1
     prompt_extensions:
+      - "Service methods are NAMES WITH PARAMETER NAMES ONLY — e.g. deductBalance(employeeId, leaveType, days, fiscalYear); no TypeScript types or return types (the design agent adds types)"
       - "Dependencies flow inward only — outer layers toward inner layers; never the reverse"
       - "No circular dependencies between modules — verify dependencyMap before returning"
       - "Recommended phases should each fit within Aider's effective context window"
@@ -335,6 +337,7 @@ agents:
       - "Resolve naming conflicts by choosing the most semantically correct name and applying it consistently"
       - "If any specialist missed a stack compliance requirement, correct it"
       - "If a specialist slice is missing, supply the smallest reconciliation that keeps the feature buildable"
+      - "Keep SQL schemas CONCEPTUAL (table name, field names, keys, index rationale) — do NOT write CREATE TABLE / SQL DDL"
 
   planner-agent:
     role: "Technical project planner"

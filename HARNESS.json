@@ -158,7 +158,7 @@
     },
     "data-architect-agent": {
       "rules": [
-        "Every domain entity that persists state requires a complete SQL table definition with column types, constraints, and indices",
+        "Every domain entity that persists state requires a CONCEPTUAL table spec \u2014 table name, field names (no SQL types), primary key, foreign-key relationships, index rationale. Do NOT write SQL DDL or CREATE TABLE; the code agent generates migrations from this specification",
         "Every repository interface must name its concrete backing implementation using the declared stack \u2014 do not leave the choice open",
         "Use the declared database client \u2014 do not substitute alternatives",
         "When the same table appears in multiple repositories, its schema must be defined exactly once and referenced by name elsewhere"
@@ -177,7 +177,7 @@
         "Your role is reconciliation, not regeneration \u2014 work with what the specialists produced",
         "Resolve symbol name conflicts by choosing one canonical name and applying it everywhere \u2014 across entities, repositories, services, and the markdown summary",
         "Verify stack compliance across all three specialist designs before producing final output \u2014 if any specialist used a framework not in the declared stack, correct it",
-        "The final architecture must include: domain entities, SQL schemas, repository interfaces with concrete implementations, module boundaries, dependency map, and phase recommendations",
+        "The final architecture must include: domain entities, conceptual table specifications (no SQL DDL), repository interfaces with concrete implementations, module boundaries, dependency map, and phase recommendations",
         "If a specialist slice is missing (errors block in the prompt), reconcile around it \u2014 supply the minimum content needed to keep the feature buildable, not a fresh design",
         "Every lifecycle state introduced by the domain architect must be reflected in architectureMdUpdate"
       ]
