@@ -1,17 +1,17 @@
 import { LeaveType, LeaveStatus } from '../../../../src/shared/types/leave.types';
 
 describe('LeaveType enum', () => {
-  it('should define ANNUAL', () => {
+  it('should have ANNUAL defined', () => {
     expect(LeaveType.ANNUAL).toBeDefined();
     expect(LeaveType.ANNUAL).toBe('ANNUAL');
   });
 
-  it('should define SICK', () => {
+  it('should have SICK defined', () => {
     expect(LeaveType.SICK).toBeDefined();
     expect(LeaveType.SICK).toBe('SICK');
   });
 
-  it('should define EMERGENCY', () => {
+  it('should have EMERGENCY defined', () => {
     expect(LeaveType.EMERGENCY).toBeDefined();
     expect(LeaveType.EMERGENCY).toBe('EMERGENCY');
   });
@@ -26,22 +26,22 @@ describe('LeaveType enum', () => {
 });
 
 describe('LeaveStatus enum', () => {
-  it('should define PENDING', () => {
+  it('should have PENDING defined', () => {
     expect(LeaveStatus.PENDING).toBeDefined();
     expect(LeaveStatus.PENDING).toBe('PENDING');
   });
 
-  it('should define APPROVED', () => {
+  it('should have APPROVED defined', () => {
     expect(LeaveStatus.APPROVED).toBeDefined();
     expect(LeaveStatus.APPROVED).toBe('APPROVED');
   });
 
-  it('should define REJECTED', () => {
+  it('should have REJECTED defined', () => {
     expect(LeaveStatus.REJECTED).toBeDefined();
     expect(LeaveStatus.REJECTED).toBe('REJECTED');
   });
 
-  it('should define CANCELLED', () => {
+  it('should have CANCELLED defined', () => {
     expect(LeaveStatus.CANCELLED).toBeDefined();
     expect(LeaveStatus.CANCELLED).toBe('CANCELLED');
   });
