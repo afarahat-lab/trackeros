@@ -1,41 +1,52 @@
-# PLAN.md — Build the leave management module
+# PLAN.md
 
-_Phase plan updated by autonomous phase-split at 2026-06-20T21:10:54.197Z._
+## Phase 1: Phase 1: Ping domain model and service
 
-## Phases
+Create the core ping domain layer following the existing uptime module pattern.
 
-### Phase 1: Define core service interfaces (leave, balance, employee) [deployed]
+Create three new files:
 
-Create src/modules/leave/leave.service.interface.ts, src/modules/balance/balance.service.interface.ts, src/modules/employee/employee.service.interface.ts. Define ILeaveService, IBalanceService, IEmployeeService interfaces. Use domain types LeaveRequest, LeaveBalance, Employee from src/shared/types/index.ts (already exists). Each interface declares method signatures for the respective domain operations.
+1. **src/modules/ping/ping.model.ts** — Define the PingResponse interface:
+   - `export interface PingResponse { status: string; }`
+   - This is a stateless value object with no identity or lifecycle.
 
-### Phase 2: Define supporting service interfaces (policy, notification, audit) [deployed]
+2. **src/modules/ping/ping.service.interface.ts** — Define the IPingService interface:
+   - Import `PingResponse` from `./ping.model`
+   - `export interface IPingService { getPing(): PingResponse; }`
 
-Create src/modules/policy/policy.service.interface.ts, src/modules/notification/notification.service.interface.ts, src/modules/audit/audit.service.interface.ts. Define IPolicyService, INotificationService, IAuditService interfaces. Use domain types LeavePolicy, Notification, AuditRecord from src/shared/types/index.ts (already exists).
+3. **src/modules/ping/ping.service.ts** — Implement PingService:
+   - Import `IPingService` from `./ping.service.interface`
+   - Import `PingResponse` from `./ping.model`
+   - `export class PingService implements IPingService { getPing(): PingResponse { return { status: 'ok' }; } }`
 
-### Phase 3: Implement balance and employee services [deployed]
+Follow the exact pattern from src/modules/uptime/uptime.model.ts, src/modules/uptime/uptime.service.interface.ts, and src/modules/uptime/uptime.service.ts. This phase has zero dependencies on other modules — the ping module is self-contained.
 
-Create src/modules/balance/balance.service.ts and tests/unit/modules/balance/balance.service.test.ts. Implement IBalanceService from src/modules/balance/balance.service.interface.ts (Phase 1). Create src/modules/employee/employee.service.ts and tests/unit/modules/employee/employee.service.test.ts. Implement IEmployeeService from src/modules/employee/employee.service.interface.ts (Phase 1). Use domain entities LeaveBalance, Employee from src/shared/types/index.ts. This phase depends on Phase 1 interfaces.
+## Phase 2: Phase 2: Ping route, barrel export, and app registration
 
-### Phase 4: Implement policy service [deployed]
+Create the Fastify route handler for GET /ping, the barrel index.ts, and register the route in src/app.ts.
 
-Create src/modules/policy/policy.service.ts and tests/unit/modules/policy/policy.service.test.ts. Implement IPolicyService from src/modules/policy/policy.service.interface.ts (Phase 2). Use domain entity LeavePolicy from src/shared/types/index.ts. This phase depends on Phase 2 interface.
+Create two new files:
 
-### Phase 5: Implement notification and audit services [deployed]
+1. **src/modules/ping/ping.routes.ts** — Fastify route plugin:
+   - Import `FastifyInstance` from `fastify`
+   - Import `PingService` from `./ping.service` (created in Phase 1)
+   - `export async function pingRoutes(fastify: FastifyInstance): Promise<void>`
+   - Register `fastify.get('/ping', async (request, reply) => { ... })`
+   - Inside the handler: instantiate `new PingService()`, call `getPing()`, return `reply.status(200).send(result)`
+   - Wrap in try/catch with `request.log.error(error)` and `reply.status(500).send({ error: 'Internal Server Error' })` per GP-006
+   - Follow the exact pattern from src/modules/uptime/uptime.routes.ts
 
-Create src/modules/notification/notification.service.ts and tests/unit/modules/notification/notification.service.test.ts. Implement INotificationService from src/modules/notification/notification.service.interface.ts (Phase 2). Create src/modules/audit/audit.service.ts and tests/unit/modules/audit/audit.service.test.ts. Implement IAuditService from src/modules/audit/audit.service.interface.ts (Phase 2). Use domain entities Notification, AuditRecord from src/shared/types/index.ts. This phase depends on Phase 2 interfaces.
+2. **src/modules/ping/index.ts** — Barrel export:
+   - Re-export `PingResponse` from `./ping.model`
+   - Re-export `IPingService` from `./ping.service.interface`
+   - Re-export `PingService` from `./ping.service`
+   - Re-export `pingRoutes` from `./ping.routes`
+   - Follow the exact pattern from src/modules/uptime/index.ts
 
-### Phase 6: Implement leave application service [deployed]
+Modify one existing file:
 
-Create src/modules/leave/leave.service.ts and tests/unit/modules/leave/leave.service.test.ts. Implement ILeaveService from src/modules/leave/leave.service.interface.ts (Phase 1). Orchestrate leave request lifecycle using IBalanceService, IEmployeeService, IPolicyService, INotificationService, IAuditService (injected via constructor). Use domain entity LeaveRequest from src/shared/types/index.ts. This phase depends on all prior service interfaces and implementations (Phases 1-5).
+3. **src/app.ts** — Register the ping route plugin:
+   - Add `import { pingRoutes } from './modules/ping/ping.routes';` alongside the existing uptimeRoutes import
+   - Add `app.register(pingRoutes);` alongside the existing `app.register(uptimeRoutes);`
 
-### Phase 7: Create leave validation schemas [pending]
-
-Create src/modules/leave/leave.validation.ts with Zod schemas for leave request creation, approval, rejection, cancellation, retrieval, and balance lookup.
-
-### Phase 8: Create leave controller [pending]
-
-Create src/modules/leave/leave.controller.ts with the LeaveController class implementing ILeaveController, using ILeaveService from Phase 6.
-
-### Phase 9: Create leave routes [pending]
-
-Create src/modules/leave/leave.routes.ts that registers all leave endpoints on a Fastify instance, applying Zod validation schemas and RBAC middleware.
+This phase depends on Phase 1 files: src/modules/ping/ping.model.ts, src/modules/ping/ping.service.interface.ts, src/modules/ping/ping.service.ts — read them before generating any code that references their types.

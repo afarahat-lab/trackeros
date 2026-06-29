@@ -856,3 +856,45 @@ CREATE INDEX idx_notifications_status ON notifications(status);
 
 **LeaveRequest**
 - Represents a leave application submitted by an employee
+
+
+## Ping Module
+
+### Domain Entities
+
+**PingResponse**
+- Represents the system's response to a ping health-check request.
+- A stateless value object with no identity or lifecycle.
+- Attributes: `status` — always the literal string `"ok"`.
+- Not derived from any system state, database query, or external dependency.
+
+### Module Ownership
+
+- `src/modules/ping/` owns PingResponse (model), IPingService (interface), PingService (implementation), the GET /ping Fastify route, and the barrel index.ts.
+
+### Dependency Direction
+
+- `src/modules/ping/` → (none — self-contained leaf module with zero cross-module dependencies)
+
+### Relationship to Existing Health-Check Modules
+
+- The `/ping` endpoint is a simpler, narrower contract than the existing `/uptime` endpoint (`src/modules/uptime/`) and the `status` module (`src/modules/status/`). It returns a hardcoded `{"status": "ok"}` with no computation or state access.
+- The ping module follows the same structural pattern as `uptime`: model → service interface → service → routes → barrel export.
+
+### Persistence
+
+- No persistence layer. The endpoint is entirely stateless — no tables, no repositories, no database access.
+
+### Golden Principles Compliance
+
+- **GP-001 (Repository pattern)**: N/A — no database access.
+- **GP-002 (Audit records)**: N/A — no state-changing operations.
+- **GP-003 (Input validation)**: N/A — no request body or query parameters.
+- **GP-004 (No sensitive data in logs)**: Satisfied — the response contains only the literal `{"status": "ok"}`.
+- **GP-005 (RBAC enforcement)**: N/A — public health-check endpoint.
+- **GP-006 (Error handling)**: Satisfied — the route handler wraps the service call in try/catch per the existing uptime.routes.ts pattern.
+
+### Implementation Phases
+
+1. **Phase 1: Ping domain model and service** — Create `ping.model.ts` (PingResponse interface), `ping.service.interface.ts` (IPingService with `getPing()`), and `ping.service.ts` (PingService returning `{ status: "ok" }`). Zero dependencies.
+2. **Phase 2: Ping route and barrel export** — Create `ping.routes.ts` (Fastify route plugin for GET /ping), `index.ts` (barrel export), and register the route in `src/app.ts`. Depends on Phase 1's service contract.
