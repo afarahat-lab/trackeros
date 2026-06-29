@@ -1,0 +1,35 @@
+{
+  "domainChanges": [
+    {
+      "entityName": "PingResponse",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "status",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [
+    {
+      "method": "GET",
+      "path": "/ping",
+      "description": "Stateless liveness-probe endpoint. Returns HTTP 200 with body {\"status\": \"ok\"}. No authentication required — this is a public health-check endpoint. No request parameters, no request body. Implemented by PingService.getPing() behind pingRoutes (Fastify route registration, Phase 3).",
+      "requestBody": null,
+      "responseBody": null,
+      "authRequired": false,
+      "roles": []
+    }
+  ],
+  "componentSpecs": [
+    {
+      "name": "IPingService",
+      "type": "service",
+      "description": "Service interface for the ping health-check module. Defines a single method getPing() that returns a PingResponse with status 'ok'. The concrete implementation (PingService, Phase 2) is stateless — no constructor dependencies, no database access. Follows the exact pattern of IUptimeService in the uptime module.",
+      "props": null
+    }
+  ]
+}
