@@ -1,27 +1,29 @@
-# Implement this phase: Phase 1: Create ping model and service interface
+# Implement this phase: Phase 2: Create PingService implementation
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/76e54c06-7df3-48e6-8f3f-1d9bc8d28301/1`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/retry/76e54c06-7df3-48e6-8f3f-1d9bc8d28301/2/1`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-[Feature: Add a /ping endpoint that returns HTTP 200 with body {"status": "ok"} — Phase 1: Phase 1: Create ping model and service interface]
+[Feature: Add a /ping endpoint that returns HTTP 200 with body {"status": "ok"} — Phase 2: Phase 2: Create PingService implementation]
 
-Create two files in src/modules/ping/:
+Create **src/modules/ping/ping.service.ts** — the concrete `PingService` class:
 
-1. **src/modules/ping/ping.model.ts** — Define the `PingResponse` interface:
-   - `status: string` (the literal `"ok"`)
+- Import `IPingService` from `./ping.service.interface`
+- Import `PingResponse` from `./ping.model`
+- Export class `PingService implements IPingService`
+- Implement `getPing(): PingResponse` returning `{ status: 'ok' }`
 
-2. **src/modules/ping/ping.service.interface.ts** — Define the `IPingService` interface:
-   - Import `PingResponse` from `./ping.model`
-   - Single method: `getPing(): PingResponse`
+Before generating, read the existing files this phase depends on:
+- src/modules/ping/ping.model.ts (from Phase 1)
+- src/modules/ping/ping.service.interface.ts (from Phase 1)
+- src/modules/uptime/uptime.service.ts (existing pattern to follow)
 
-Follow the pattern in the existing uptime module at src/modules/uptime/uptime.model.ts and src/modules/uptime/uptime.service.interface.ts. Read those files before generating to match conventions exactly. No dependencies on any other module — this is a pure leaf module.
+This phase depends on: Phase 1: src/modules/ping/ping.model.ts, Phase 1: src/modules/ping/ping.service.interface.ts.
 
 ## Deferred to later phases
 The following concerns are intentionally OUT OF SCOPE for this phase and will be addressed in subsequent phases:
-- Phase 2 — Phase 2: Create PingService implementation: Create **src/modules/ping/ping.service.ts** — the concrete `PingService` class: - Import `IPingServi
 - Phase 3 — Phase 3: Create ping routes: Create **src/modules/ping/ping.routes.ts** — the Fastify route registration for GET /ping: - Import 
 - Phase 4 — Phase 4: Create ping module barrel export: Create **src/modules/ping/index.ts** — the barrel re-export file: - Re-export `PingResponse` from `.
 - Phase 5 — Phase 5: Register ping routes in app.ts: Update **src/app.ts** to register the ping routes alongside the existing uptime routes: - Add import
