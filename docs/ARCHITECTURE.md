@@ -856,3 +856,56 @@ CREATE INDEX idx_notifications_status ON notifications(status);
 
 **LeaveRequest**
 - Represents a leave application submitted by an employee
+
+
+## Ping Module
+
+### Purpose
+The `/ping` endpoint is a public liveness probe. It returns HTTP 200 with body `{"status": "ok"}` as long as the server process is running. There is no error path — if the server is down, the caller receives a network-level failure, not an application-level error response.
+
+### Domain Entity
+- **PingStatus**: transient value object with a single field `status` whose value is always the literal string `"ok"`. No lifecycle states — this is a stateless liveness probe.
+
+### Module Ownership
+- `src/modules/ping/` owns the entire GET /ping concern: `PingStatus` model, `IPingService` interface, `PingService` implementation, `pingRoutes` Fastify plugin, and barrel export (`index.ts`).
+
+### Module Pattern
+The ping module follows the exact pattern established by the existing `src/modules/uptime/` module:
+- `ping.model.ts` — `PingStatus` interface
+- `ping.service.interface.ts` — `IPingService` with method `getStatus()`
+- `ping.service.ts` — `PingService` implementing `IPingService`
+- `ping.routes.ts` — Fastify plugin registering `GET /ping`
+- `index.ts` — barrel export
+
+### Persistence
+None. The endpoint is stateless — it returns a hardcoded response with no database interaction. No tables, repositories, or SQL schemas are needed.
+
+### Dependency Direction
+None. The ping module is a self-contained leaf module with zero cross-module dependencies.
+
+### Golden Principle Exemptions
+The `/ping` endpoint is a public infrastructure probe, not a business operation. The following GPs do not apply:
+- **GP-001 (Repository pattern)**: no persistence
+- **GP-002 (Audit records)**: no state-changing operations
+- **GP-003 (Input validation)**: no request inputs
+- **GP-004 (No sensitive data in logs)**: no sensitive data involved
+- **GP-005 (RBAC enforcement)**: public health check, no authentication required
+
+**GP-006 (Error handling)** is addressed by wrapping the route handler in try/catch following the `uptime` module pattern.
+
+### Relationship to Existing Modules
+The existing `SystemStatus` entity (in `src/modules/status/`) reports version and up/down status — a separate concern. `PingStatus` is a minimal liveness-only contract with no overlap.
+
+### Implementation Phases
+
+**Phase 1: Ping domain model, service interface, and service implementation** (4 files)
+- `src/modules/ping/ping.model.ts` — `PingStatus` interface
+- `src/modules/ping/ping.service.interface.ts` — `IPingService` interface
+- `src/modules/ping/ping.service.ts` — `PingService` implementation
+- `src/modules/ping/index.ts` — barrel export
+
+**Phase 2: Ping routes and Fastify registration** (2 files)
+- `src/modules/ping/ping.routes.ts` — Fastify plugin registering `GET /ping`
+- `src/app.ts` — register `pingRoutes` plugin (alongside existing `uptimeRoutes`)
+
+Phase 2 depends on all Phase 1 files. Each phase fits within Aider's context window.

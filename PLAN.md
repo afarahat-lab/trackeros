@@ -1,41 +1,27 @@
-# PLAN.md — Build the leave management module
+# PLAN.md
 
-_Phase plan updated by autonomous phase-split at 2026-06-20T21:10:54.197Z._
+## Phase 1: Phase 1: Ping domain model, service interface, and service implementation
 
-## Phases
+Create the core ping module files following the exact pattern established by src/modules/uptime/:
 
-### Phase 1: Define core service interfaces (leave, balance, employee) [deployed]
+1. **src/modules/ping/ping.model.ts** — Define the `PingStatus` interface with a single field `status: "ok"` (literal string type, always "ok"). This is a transient value object representing the GET /ping response body.
 
-Create src/modules/leave/leave.service.interface.ts, src/modules/balance/balance.service.interface.ts, src/modules/employee/employee.service.interface.ts. Define ILeaveService, IBalanceService, IEmployeeService interfaces. Use domain types LeaveRequest, LeaveBalance, Employee from src/shared/types/index.ts (already exists). Each interface declares method signatures for the respective domain operations.
+2. **src/modules/ping/ping.service.interface.ts** — Define the `IPingService` interface with a single method `getStatus(): PingStatus`. Import `PingStatus` from `./ping.model`.
 
-### Phase 2: Define supporting service interfaces (policy, notification, audit) [deployed]
+3. **src/modules/ping/ping.service.ts** — Implement `PingService` class that implements `IPingService`. The `getStatus()` method returns `{ status: "ok" }`. Import `IPingService` from `./ping.service.interface` and `PingStatus` from `./ping.model`.
 
-Create src/modules/policy/policy.service.interface.ts, src/modules/notification/notification.service.interface.ts, src/modules/audit/audit.service.interface.ts. Define IPolicyService, INotificationService, IAuditService interfaces. Use domain types LeavePolicy, Notification, AuditRecord from src/shared/types/index.ts (already exists).
+4. **src/modules/ping/index.ts** — Barrel export file re-exporting `PingStatus`, `IPingService`, and `PingService` from their respective files.
 
-### Phase 3: Implement balance and employee services [deployed]
+Reference the existing uptime module files for the exact patterns: src/modules/uptime/uptime.model.ts, src/modules/uptime/uptime.service.interface.ts, src/modules/uptime/uptime.service.ts, and src/modules/uptime/index.ts. This module is self-contained with no cross-module dependencies.
 
-Create src/modules/balance/balance.service.ts and tests/unit/modules/balance/balance.service.test.ts. Implement IBalanceService from src/modules/balance/balance.service.interface.ts (Phase 1). Create src/modules/employee/employee.service.ts and tests/unit/modules/employee/employee.service.test.ts. Implement IEmployeeService from src/modules/employee/employee.service.interface.ts (Phase 1). Use domain entities LeaveBalance, Employee from src/shared/types/index.ts. This phase depends on Phase 1 interfaces.
+## Phase 2: Phase 2: Ping routes and Fastify registration
 
-### Phase 4: Implement policy service [deployed]
+Create the Fastify route plugin and register it in the app:
 
-Create src/modules/policy/policy.service.ts and tests/unit/modules/policy/policy.service.test.ts. Implement IPolicyService from src/modules/policy/policy.service.interface.ts (Phase 2). Use domain entity LeavePolicy from src/shared/types/index.ts. This phase depends on Phase 2 interface.
+1. **src/modules/ping/ping.routes.ts** — Create a Fastify plugin that registers `GET /ping`. Instantiate `PingService`, call `getStatus()`, and return HTTP 200 with the `{ status: "ok" }` body. Follow the exact pattern from src/modules/uptime/uptime.routes.ts (import FastifyInstance, export async function pingRoutes, use try/catch with error logging). Import `PingService` from `./ping.service`.
 
-### Phase 5: Implement notification and audit services [deployed]
+2. **src/modules/ping/index.ts** — Update the barrel export to also re-export `pingRoutes` from `./ping.routes`.
 
-Create src/modules/notification/notification.service.ts and tests/unit/modules/notification/notification.service.test.ts. Implement INotificationService from src/modules/notification/notification.service.interface.ts (Phase 2). Create src/modules/audit/audit.service.ts and tests/unit/modules/audit/audit.service.test.ts. Implement IAuditService from src/modules/audit/audit.service.interface.ts (Phase 2). Use domain entities Notification, AuditRecord from src/shared/types/index.ts. This phase depends on Phase 2 interfaces.
+3. **src/app.ts** — Register the `pingRoutes` plugin alongside the existing `uptimeRoutes`. Import `pingRoutes` from `./modules/ping/ping.routes` and call `app.register(pingRoutes)`.
 
-### Phase 6: Implement leave application service [deployed]
-
-Create src/modules/leave/leave.service.ts and tests/unit/modules/leave/leave.service.test.ts. Implement ILeaveService from src/modules/leave/leave.service.interface.ts (Phase 1). Orchestrate leave request lifecycle using IBalanceService, IEmployeeService, IPolicyService, INotificationService, IAuditService (injected via constructor). Use domain entity LeaveRequest from src/shared/types/index.ts. This phase depends on all prior service interfaces and implementations (Phases 1-5).
-
-### Phase 7: Create leave validation schemas [pending]
-
-Create src/modules/leave/leave.validation.ts with Zod schemas for leave request creation, approval, rejection, cancellation, retrieval, and balance lookup.
-
-### Phase 8: Create leave controller [pending]
-
-Create src/modules/leave/leave.controller.ts with the LeaveController class implementing ILeaveController, using ILeaveService from Phase 6.
-
-### Phase 9: Create leave routes [pending]
-
-Create src/modules/leave/leave.routes.ts that registers all leave endpoints on a Fastify instance, applying Zod validation schemas and RBAC middleware.
+This phase depends on Phase 1 files: src/modules/ping/ping.model.ts, src/modules/ping/ping.service.interface.ts, src/modules/ping/ping.service.ts — read them before generating any code that references their types. Also read src/modules/uptime/uptime.routes.ts and src/app.ts for the exact registration pattern.
