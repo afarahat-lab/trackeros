@@ -272,6 +272,18 @@ Represents validation data managed by the `validation` module, including validat
 | isValid | boolean | true |
 | errors | string[] | true |
 
+## ping
+
+Represents the system's response to a ping health-check request. Managed by the `ping` module (`src/modules/ping/`). A stateless value object with no identity, lifecycle, or persistence.
+
+### PingResponse
+
+| Field | Type | Required |
+|-------|------|----------|
+| status | string | true |
+
+The `status` field is always the literal string `"ok"`. The response is hardcoded — not derived from any system state, database query, or external dependency. The ping module is a self-contained leaf module with zero cross-module dependencies.
+
 ## system
 
 Represents system-level status information, including health-check and version data.
