@@ -856,3 +856,55 @@ CREATE INDEX idx_notifications_status ON notifications(status);
 
 **LeaveRequest**
 - Represents a leave application submitted by an employee
+
+
+## Ping Health-Check Module
+
+### Overview
+
+The ping module provides a stateless liveness-probe endpoint (`GET /ping`) that returns HTTP 200 with body `{"status": "ok"}`. It is a pure leaf module with zero dependencies on any other module, shared infrastructure, or database — following the same pattern as the existing `uptime` module.
+
+### Domain Entities
+
+None. The `/ping` endpoint is a purely infrastructural health-check with no persistent state, no entity lifecycle, and no business rules.
+
+### Module Ownership
+
+- **`src/modules/ping/`** owns everything about the `/ping` endpoint:
+  - `ping.model.ts` — `PingResponse` interface (`{ status: string }`)
+  - `ping.service.interface.ts` — `IPingService` interface with `getPing()` method
+  - `ping.service.ts` — `PingService` concrete implementation returning `{ status: 'ok' }`
+  - `ping.routes.ts` — Fastify route registration for `GET /ping`
+  - `index.ts` — barrel export re-exporting the public surface
+
+### Dependency Direction
+
+- `src/app.ts` → `src/modules/ping/` (composition root registers `pingRoutes`)
+- `src/modules/ping/` → (none — leaf module, zero dependencies)
+
+No reverse dependencies. The ping module sits at the innermost leaf of the dependency graph.
+
+### Persistence
+
+None. No database tables, no repositories, no SQL schemas. The endpoint is entirely stateless.
+
+### Golden Principles Assessment
+
+- **GP-001 (Repository pattern)**: Not applicable — no database access.
+- **GP-002 (Audit records)**: Not applicable — no state-changing operations.
+- **GP-003 (Input validation)**: Not applicable — endpoint takes no parameters.
+- **GP-004 (No sensitive data in logs)**: Satisfied — response contains only `{ status: 'ok' }`.
+- **GP-005 (RBAC enforcement)**: Not applicable — public health-check endpoint.
+- **GP-006 (Error handling)**: Satisfied — route handler wraps logic in try/catch following the uptime module pattern.
+
+### Registration in app.ts
+
+`src/app.ts` must be updated to import and register `pingRoutes` alongside the existing `uptimeRoutes`:
+
+```typescript
+import { pingRoutes } from './modules/ping/ping.routes';
+// ...
+app.register(pingRoutes);
+```
+
+This is a one-line addition in the composition root and does not create a new module dependency.
