@@ -856,3 +856,49 @@ CREATE INDEX idx_notifications_status ON notifications(status);
 
 **LeaveRequest**
 - Represents a leave application submitted by an employee
+
+
+## Ping Module
+
+### Domain Entities
+
+**PingStatus**
+- Represents the response body of the /ping health-check (liveness probe) endpoint
+- A stateless value object created per-request and immediately returned — no persistence, no side effects
+- Attributes: `status: string` (always the literal `"ok"`)
+- Lifecycle states: none (stateless value object)
+
+### Business Rules
+- The /ping endpoint MUST return HTTP 200 with body `{"status": "ok"}` on every successful invocation
+- The /ping endpoint is a liveness probe. It MUST NOT depend on any external service (database, queue, downstream API) to produce its response. It must succeed as long as the Fastify server process is running and able to handle HTTP requests.
+- Distinct from the existing `SystemStatus` (which reports version info) and `UptimeStatus` (which reports process uptime).
+
+### Module Ownership
+- `src/modules/ping/` owns the PingStatus model, IPingService interface, PingService implementation, ping routes, and barrel exports
+
+### Module Structure
+```
+src/modules/ping/
+  ping.model.ts              — PingStatus interface
+  ping.service.interface.ts  — IPingService interface
+  ping.service.ts            — PingService concrete implementation
+  ping.routes.ts             — Fastify route handler (GET /ping)
+  index.ts                   — barrel exports
+```
+
+### Dependency Direction
+- `src/app.ts` (composition root) → `src/modules/ping/` (registers GET /ping route)
+- The ping module has zero dependencies on other modules — it is fully self-contained
+- No circular dependencies are possible
+
+### Cross-Cutting Concerns
+- No database access — no repository layer needed (GP-001 not applicable)
+- No state-changing operations — no audit records needed (GP-002 not applicable)
+- No inputs to validate (GP-003 not applicable)
+- No sensitive data (GP-004 not applicable)
+- Health-check endpoints are intentionally unauthenticated (GP-005 not applicable)
+- Explicit error handling in the route handler per GP-006
+
+### Implementation Pattern
+Follows the exact same module pattern established by the existing `uptime` module:
+model → service interface → service → routes → barrel index → app registration
