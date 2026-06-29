@@ -1,0 +1,18 @@
+{
+  "domainChanges": [
+    {
+      "entityName": "PingStatus",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "status",
+          "type": "\"ok\" (string literal, not general string)",
+          "required": true
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}
