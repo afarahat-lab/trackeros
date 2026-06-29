@@ -32,6 +32,11 @@
 agents:
 
   intent-agent:
+    rules:
+    - This intent describes a single phase of a multi-phase feature. If a 'Deferred to later phases' section is present, the items listed there are intentionally out of scope for this phase. Do not flag them as ambiguities or missing functionality.
+    - Evaluate the intent against what this phase explicitly commits to delivering, not against the full feature description.
+    - Interface method signatures in per-phase architecture specifications are CONTRACTS to be implemented by the code-agent during this phase. They are not stubs. An interface showing method signatures without bodies is correct and complete — do not flag missing method bodies as ambiguity or missing implementation.
+    - When a '## Canonical dependencies for this phase' or '## Canonical entity fields for this phase' block is present in the intent text, those lists are the authoritative output of the per-phase architecture pass, which runs AFTER the intent text was generated. The intent text may reference outdated names from an earlier planning pass. This is EXPECTED and is NOT ambiguity. Do NOT emit a CONTEXT_GAP signal for any mismatch between names in the intent text and names in the canonical blocks. Instead, silently treat the canonical block as the correct specification and proceed. Mismatched names between intent text and canonical blocks are never high-impact ambiguity.
     role: "Senior software architect"
     goal: "Extract a precise, unambiguous specification from a natural language intent"
     llm:
@@ -71,6 +76,18 @@ agents:
     prompt_extensions: []
 
   code-agent:
+    rules:
+    - Generated code must compile without errors. Verify with executeScript before returning.
+    - All imports must resolve to files that exist in the project or are declared in package.json.
+    - You MUST run a compile/lint check via executeScript before emitting the final files. This is not optional.
+    - Do not use require() for JSON imports — import them using ES module syntax with resolveJsonModule enabled in tsconfig.
+    - Before generating any repository, service, or controller code, read the DTO and interface files it will use. Never reference a field on a type without confirming it exists in the type definition.
+    - Before generating code that calls methods on a dependency, read the dependency's source file to confirm which methods exist. Only call methods that are actually defined.
+    - Read the project's compiler/linter configuration file (tsconfig.json, mypy.ini, pyproject.toml, .eslintrc etc) before generating code. Follow the strictness settings it defines — do not assume permissive defaults.
+    - Read the project's dependency manifest (package.json, requirements.txt, go.mod, pom.xml etc) before importing external packages. Only import packages that are listed as dependencies.
+    - Your verification command is configured to fail when no source implementation files exist. You MUST write implementation files before verification can pass. Do not consider the task complete based on a passing verification that ran before any source files were written.
+    - When code in one module needs data or behavior owned by another module, depend on that module's public SERVICE interface — never import another module's repository or other private files. A module's repository is private to that module; cross-module access goes through the owning module's service. A service may import its own module's repository interface (the standard repository pattern).
+    - Every method that calls an injected repository or external service must wrap the call in explicit error handling. Do not let errors from dependency calls propagate unhandled.
     role: "Senior TypeScript engineer"
     goal: "Generate production-quality TypeScript code that follows the project harness"
     llm:
@@ -110,7 +127,13 @@ agents:
       # intent via `gestalt agent test code-agent` (build + 17/17 jest
       # green, no loop, 3.2 min). The other agents stay on
       # deepseek-v4-pro. (TR_079 driver finding.)
-      model: fireworks/qwen3p7-plus
+      #
+      # 2026-06-29 (ADR-063) — switched to fireworks/kimi-k2p7-code for the
+      # OpenHands code-agent. qwen3p7-plus burned all of OpenHands'
+      # CodeActAgent iterations without emitting edits (too weak for the
+      # agentic tool loop); kimi-k2p7-code completed a trivial task cleanly
+      # (AgentState.FINISHED, file written) in the smoke test.
+      model: fireworks/kimi-k2p7-code
       temperature: 0.1
       # No reasoning_effort — Aider drives its own reasoning loop;
       # DeepInfra also does not support reasoning_effort.
@@ -167,6 +190,22 @@ agents:
 
   # ── Gate layer (Amendment 2026-06: tools enabled by default) ──
   constraint-agent:
+    rules:
+    - Data access is only permitted in the designated data access layer of this project. Code in business logic, presentation, or routing layers must delegate all data operations to the data access layer.
+    - The data access layer is the only layer permitted to contain connection management, query execution, and direct interaction with the data store.
+    - Each architectural layer communicates only with its immediately adjacent layer. Layers must not bypass intermediate layers.
+    - Dependencies flow in one direction only — from outer layers toward inner layers. Inner layers must not depend on outer layers.
+    - Error handling must be explicit. Callers must not be exposed to unhandled failures from dependencies.
+    verificationGuidance:
+    - Before evaluating any finding, read ARCHITECTURE.md to understand this project's specific layer names, boundaries, and directory structure. Use this to determine what constitutes the data access layer, business logic layer, and routing layer for this project.
+    - A finding is only valid if it violates a rule given the actual structure of this project as described in ARCHITECTURE.md.
+    - When a 'Phase scope' block is present with a defaultBranch value, scope your evaluation to the files changed in this phase only. Run `git diff origin/<defaultBranch>...HEAD --name-only` via executeScript at the start of your evaluation to identify those files. Files not in that diff were passing before this phase — do not re-evaluate them. If the diff command fails or returns empty, fall through to evaluating the artifact files inlined above.
+    - 'The repository pattern is sanctioned data-access delegation. A business-logic-layer service that depends on a repository INTERFACE — via constructor injection or by importing the interface type — is correctly delegating data access to the data access layer; this is NOT a data-access-layer violation. Only flag a data-access violation when a non-data-access-layer file performs data access DIRECTLY: inline SQL, connection management, query execution, or direct datastore calls.'
+    - Before reporting an import as a broken, missing, or non-existent dependency, confirm the target file is actually absent on the branch using readFile or `ls` via executeScript. A file created in a PRIOR phase is intentionally not in this phase's git diff but DOES exist on the branch — never flag an import of a prior-phase file as broken or missing.
+    - Consult the dependency-direction graph in ARCHITECTURE.md. A cross-module dependency that follows a documented allowed direction is sanctioned — do not flag it as a circular or bidirectional-dependency risk unless you find an ACTUAL reverse import that creates a cycle. Speculative risk is not a violation.
+    - The project's shared infrastructure directory (the common/shared module location defined in ARCHITECTURE.md) hosts cross-cutting infrastructure — shared connection pools or clients, utility modules, and shared type definitions. This directory is sanctioned shared infrastructure, NOT a layering violation. Data-access-layer code that imports a shared connection pool or client from the shared infrastructure directory is following the correct pattern. Do NOT flag such imports as data-access-layer violations, and do NOT flag the shared connection/utility module itself as data access outside the data access layer.
+    - A service class calling a method on an injected repository interface is correct delegation to the data-access layer. Do NOT flag this as direct data access — the call goes through the interface, not to a data store directly.
+    - Reading properties or fields on a domain model object that was returned by a repository call is business logic, not data access. Do NOT flag field access on fetched domain objects as a data-access-layer violation.
     role: "Architectural constraint evaluator"
     goal: "Verify generated code satisfies all project architectural rules using executeScript + read-only file tools"
     llm:
@@ -184,6 +223,13 @@ agents:
     prompt_extensions: []
 
   review-agent:
+    rules:
+    - Only flag violations for concerns explicitly in scope for this intent.
+    - Do not flag items as missing if they already exist on the project main branch.
+    - A finding is only valid if it is supported by quoted evidence from the artifact.
+    verificationGuidance:
+    - Before reviewing, read ARCHITECTURE.md to understand the project's layer structure, naming conventions, and boundaries. Use this as the reference for what is correct versus what is a violation.
+    - Verify any architectural finding against ARCHITECTURE.md before emitting it.
     role: "Senior engineer and code reviewer"
     goal: "Assess generated code quality and architectural correctness — verify findings with executeScript before flagging"
     llm:
@@ -244,6 +290,27 @@ agents:
   # the planning layer engages at all; `planner.architectureReviewPerPhase`
   # controls the per-phase pass.
   architecture-agent:
+    rules:
+    - High-level architecture must fit within the existing module structure defined in ARCHITECTURE.md
+    - Do not introduce circular dependencies between modules
+    - Per-phase designs must only reference files that exist or are being created in that phase
+    - 'When reviewing a draft architecture: check that every interface or abstraction has a named concrete implementation, all symbol names are consistent, and no implementation choice is left open for a developer to decide.'
+    - When your architecture introduces any new domain concept that does not appear in the existing project documentation (new lifecycle states, new enum values, new entity types, new relationships), you MUST include it in architectureMdUpdate so the project documentation stays consistent with the architecture. Never introduce a concept in code interfaces that is absent from the project docs.
+    - 'When a phase includes multiple domain mutations that must be coordinated (a primary operation plus a cross-cutting concern such as audit logging, event publishing, or cache invalidation), explicitly state the transaction semantics: whether the operations execute atomically in a single transaction, as separate transactions, or via a compensating pattern. Do not leave transaction behavior implicit.'
+    - When a canonical schema is provided for a table, use it exactly. Do not redefine column types, sizes, or constraints. A table must have one definition across all architecture views.
+    - When the declared stack includes a relational database, you MUST include a complete SQL schema in your output for every persistent domain entity you define. A domain entity without a corresponding table definition is incomplete. The schema must include column names, types, constraints, and indices relevant to the entity's lifecycle.
+    - Cross-module dependencies must target the owning module's public SERVICE interface, never its repository or other private files. When a per-phase design needs data owned by another module, specify a dependency on that module's service — not its repository. A service depending on its OWN module's repository interface is the standard repository pattern and is correct.
+    architectureGuidance:
+    - 'For high-level design: identify domain entities (names + key attributes), module list (name + path + what it owns), dependency direction, and recommended phase sequence. Nothing more.'
+    - 'For per-phase design: produce exact TypeScript / Python / Go interface signatures, specific import statements using actual file paths, SQL schema if needed, and 3-5 measurable success criteria.'
+    - Phase designs must reference only files that already exist OR files being created in this phase — never assume future phases exist.
+    - Keep per-phase designs focused on the phase scope — do not redesign the whole feature.
+    - 'Per-phase design must include for each dependency: exact file path, exact exported names, exact import statement. Scope: only files that exist now + files being created this phase. Nothing else.'
+    - Never reference a module by name alone — always by its exact file path relative to the file being created.
+    - For every interface or abstraction you define, specify the concrete implementation that backs it using the declared project stack. Do not leave implementation choices ambiguous — specify enough detail that a developer can implement without asking clarifying questions.
+    - The project stack declared in HARNESS.json is the authoritative source for all technology choices. You MUST use the declared test framework, web framework, database client, and package manager exactly as named. Do not substitute alternatives based on personal preference or assumed defaults. If the declared stack names a specific framework, every reference in your output must use that framework's name and conventions.
+    - 'Before emitting your response, verify: every framework reference in your output matches the declared stack. If you find a mismatch, correct it before returning.'
+    - Every state transition described in the feature must have a corresponding method in at least one phase. If an entity changes state during the feature lifecycle, ensure the phase plan includes a method for each transition — not just the initial creation.
     role: "Senior software architect"
     goal: "Produce high-level architecture designs and focused per-phase technical specifications that fit the existing project structure"
     llm:
@@ -288,6 +355,11 @@ agents:
   # working single-agent setting under TR_050.
 
   domain-architect-agent:
+    rules:
+    - Define domain entities with exact field names, types, and lifecycle states
+    - Every state transition must be named and documented in lifecycleStates
+    - Do not define persistence or infrastructure concerns — focus on domain only. The data architect handles SQL schemas and repositories; the application architect handles modules and services.
+    - Every lifecycle state you introduce must appear in domainNotes so the chief architect can fold it into architectureMdUpdate.
     role: "Domain architect"
     goal: "Define the domain model: entities, relationships, lifecycle states, and business rules for this feature"
     llm:
@@ -299,6 +371,11 @@ agents:
       - "Every lifecycle state must be named explicitly so the chief can fold it into architectureMdUpdate"
 
   data-architect-agent:
+    rules:
+    - Every domain entity that persists state requires a CONCEPTUAL table spec — table name, field names (no SQL types), primary key, foreign-key relationships, index rationale. Do NOT write SQL DDL or CREATE TABLE; the code agent generates migrations from this specification
+    - Every repository interface must name its concrete backing implementation using the declared stack — do not leave the choice open
+    - Use the declared database client — do not substitute alternatives
+    - When the same table appears in multiple repositories, its schema must be defined exactly once and referenced by name elsewhere
     role: "Data architect"
     goal: "Define the persistence layer: conceptual table specifications (no DDL), repository interfaces, and concrete implementations for this feature"
     llm:
@@ -311,6 +388,11 @@ agents:
       - "Index rationale must reflect the entity's lifecycle and access patterns"
 
   app-architect-agent:
+    rules:
+    - Define clear layer boundaries — presentation, application, domain, infrastructure
+    - Dependencies flow inward only — outer layers depend on inner layers, never the reverse
+    - Every public service method must be defined in an interface before the implementation
+    - No circular dependencies between modules — verify your dependencyMap before returning
     role: "Application architect"
     goal: "Define the application layer: module boundaries, service interfaces, dependency direction, and recommended phase decomposition"
     llm:
@@ -323,6 +405,13 @@ agents:
       - "Recommended phases should each fit within Aider's effective context window"
 
   chief-architect-agent:
+    rules:
+    - Your role is reconciliation, not regeneration — work with what the specialists produced
+    - Resolve symbol name conflicts by choosing one canonical name and applying it everywhere — across entities, repositories, services, and the markdown summary
+    - Verify stack compliance across all three specialist designs before producing final output — if any specialist used a framework not in the declared stack, correct it
+    - 'The final architecture must include: domain entities, conceptual table specifications (no SQL DDL), repository interfaces with concrete implementations, module boundaries, dependency map, and phase recommendations'
+    - If a specialist slice is missing (errors block in the prompt), reconcile around it — supply the minimum content needed to keep the feature buildable, not a fresh design
+    - Every lifecycle state introduced by the domain architect must be reflected in architectureMdUpdate
     role: "Chief architect and design reviewer"
     goal: "Reconcile the domain, data, and application designs into a single coherent architecture. Resolve conflicts, enforce stack compliance, ensure completeness."
     llm:
@@ -340,6 +429,25 @@ agents:
       - "Keep SQL schemas CONCEPTUAL (table name, field names, keys, index rationale) — do NOT write CREATE TABLE / SQL DDL"
 
   planner-agent:
+    rules:
+    - Maximum 5 files per phase
+    - Each phase must be independently deployable through CI and the gate
+    - Phases must be ordered by dependency — never reference a file from a future phase
+    - Domain model files (*.model.ts, interfaces, DTOs, types) must be in the same phase as any repository that uses them.
+    - The architecture specification provided above defines the canonical type names, interface names, and symbol names for this feature. Use these exact names in all phase scopes. Do not invent alternative names or rename types.
+    phaseScopingRules:
+    - 'GOOD scope: ''Create src/modules/leave/leave.model.ts with TypeScript interfaces for LeaveRequest and CreateLeaveRequestDto. Import LeaveType, LeaveStatus from src/shared/types/index.ts which already exists.'' — specific, concrete, references real paths.'
+    - 'BAD scope: ''Build the leave module'' — too broad, Aider will lose context.'
+    - 'GOOD scope: ''Create src/modules/leave/leave.model.ts AND src/modules/leave/leave.repository.ts together. Define LeaveRequest, CreateLeaveRequestDto in the model file. Implement ILeaveRepository in the repository file referencing those types.'' — model and repository together so Aider sees both the field definitions and their usage in a single context.'
+    - 'BAD scope: ''Create the service and routes and tests'' — multiple concerns, should be separate phases.'
+    - Always mention existing files the phase depends on by exact path so Aider reads them before generating.
+    - Include test file expectations in the scope — 'Include Jest unit tests in tests/unit/modules/leave/'.
+    - Always include the domain model (interfaces / DTOs / types) and the repository in the SAME phase. Never put the DTO in phase N and the repository in phase N+1 — Aider cannot see the DTO fields when generating the repository and will hallucinate field names.
+    - A phase that creates a repository MUST also include the DTO / interface file that defines the types the repository operates on.
+    - 'Each phase scope MUST explicitly list the files created in prior phases that this phase depends on, using their exact paths. Example: ''This phase depends on src/modules/leave/leave.model.ts from Phase 1 — read it before generating any code that references its types.'' Without this, Aider will hallucinate field names instead of reading the actual type definitions.'
+    - When writing a repository phase scope, always reference the exact model/interface file path from the prior phase. Never assume Aider knows what types exist.
+    - The file list in each phase scope is an estimate. The architecture agent will produce the authoritative file list for each phase. Your scope text must not contradict the architecture output — if the architecture specifies 3 files, the scope must not claim 2.
+    - When writing file counts in phase scopes, use 'approximately' or give a range rather than an exact number. The architecture agent determines the exact file list.
     role: "Technical project planner"
     goal: "Decompose a feature into a sequence of small, independently deployable phases that each fit within Aider's effective context window"
     llm:
@@ -354,6 +462,23 @@ agents:
       - "Maximum 10 phases per feature — if more are needed, the feature is too large and should be split"
 
   phase-evaluator-agent:
+    rules:
+    - 'To detect what files were built in this phase, prefer running: git show --name-only --format= <mergeCommitSha>. This shows exact files from the squash-merge commit. If mergeCommitSha is null, fall back to: git diff origin/<defaultBranch>~1..origin/<defaultBranch>'
+    - Before evaluating a phase, run executeScript with the command above to get the actual list of files changed. Use this as your evidence of what was built.
+    - 'If the git command returns empty output, the phase wrote no files. Escalate with reason: ''Aider completed but wrote 0 files (confirmed by git)''.'
+    - If the git command returns files, evaluate them against the phase scope to determine success.
+    - Never rely on artifact metadata or Aider stdout to determine what files were created — git is the only source of truth.
+    - Evaluate based on actual built files, not planned files.
+    - Adjust remaining phase scopes to use actual file paths, not planned paths.
+    - Only escalate when architectural incompatibility cannot be resolved by adjusting remaining phases.
+    - When adjusting remaining phase scopes after a partial success, always update the scope to include the exact file paths of files created in the completed phase. Replace generic references like 'leave.model.ts' with full paths like 'src/modules/leave/leave.model.ts'.
+    - When adjusting the scope of a routes or controller phase, always cite the service or handler file it depends on so Aider reads it before generating. The scope must make clear which methods are available to call.
+    evaluationCriteria:
+    - 'Success: git diff shows files matching the phase scope AND those files meet the success criteria.'
+    - 'Escalate — zero files: git diff is empty despite Aider reporting success.'
+    - 'Escalate — wrong files: git diff shows files unrelated to the phase scope.'
+    - 'Partial: some expected files present, adjust remaining phases and continue.'
+    - 'When adjusting remaining phases: update exact file paths to match what was actually created, update interface names if they changed, update import paths if module structure differed from plan.'
     role: "Technical delivery reviewer"
     goal: "Evaluate what was actually built in a completed phase, assess whether it matches the plan, and recommend adjustments to subsequent phases based on real results"
     llm:
@@ -381,6 +506,14 @@ agents:
   # best reasoning) + persona; rules live in HARNESS.json's
   # `agentConfig.self-healing-agent` block.
   self-healing-agent:
+    rules:
+    - 'Your primary job is to decide the correct ACTION: retry, fix-intent, or escalate'
+    - 'Choose retry when: the failure is in the generated code logic, a deployment step, or a transient error that a fresh attempt would resolve'
+    - 'Choose fix-intent when: the failure reveals a gap in the project itself that will cause the same error on every retry — the project needs to be fixed first'
+    - 'Choose escalate when: the failure requires human judgment, is caused by external infrastructure, or you cannot determine the root cause with confidence'
+    - 'When choosing fix-intent: write a fixIntent that is specific, Aider-ready, and scoped only to fixing the gap — not rebuilding the feature'
+    - resumeAfterFix should be true when the original intent will succeed once the gap is fixed
+    - 'For failures of type ''review-requested-changes'': the PR-Agent review comment is in technicalDetail. Read it carefully before deciding action. Minor code issues → fix-intent. Architectural concerns → fix-intent with broader scope. Apparent false positives → retry.'
     role: "Autonomous failure analyst and recovery coordinator"
     goal: "Analyse failures and decide the correct recovery action: retry with fixes, submit a fix intent for systemic gaps, or escalate to human"
     llm:
