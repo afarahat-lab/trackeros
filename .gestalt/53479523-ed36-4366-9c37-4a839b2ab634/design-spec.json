@@ -1,0 +1,22 @@
+{
+  "domainChanges": [],
+  "apiContracts": [
+    {
+      "method": "GET",
+      "path": "/ping",
+      "description": "Stateless liveness-probe health-check endpoint. Returns HTTP 200 with body { status: 'ok' }. On unexpected error, returns HTTP 500 with { error: 'Internal Server Error' }. No authentication required — this is a public infrastructure endpoint.",
+      "requestBody": null,
+      "responseBody": null,
+      "authRequired": false,
+      "roles": []
+    }
+  ],
+  "componentSpecs": [
+    {
+      "name": "pingRoutes",
+      "type": "service",
+      "description": "Fastify route registration function exported as `async function pingRoutes(fastify: FastifyInstance): Promise<void>`. Registers `fastify.get('/ping', ...)` with a handler that instantiates `PingService` inline, calls `getPing()`, and returns `reply.status(200).send(status)`. The handler body is wrapped in try/catch: on error, logs via `request.log.error(error)` and returns `reply.status(500).send({ error: 'Internal Server Error' })`. Follows the exact structural pattern of `src/modules/uptime/uptime.routes.ts`. File: `src/modules/ping/ping.routes.ts`.",
+      "props": null
+    }
+  ]
+}
