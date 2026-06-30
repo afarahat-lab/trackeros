@@ -6,32 +6,32 @@
       "fields": [
         {
           "name": "ANNUAL",
-          "type": "enum-member",
+          "type": "string enum member",
           "required": true
         },
         {
           "name": "SICK",
-          "type": "enum-member",
+          "type": "string enum member",
           "required": true
         },
         {
           "name": "MATERNITY",
-          "type": "enum-member",
+          "type": "string enum member",
           "required": true
         },
         {
           "name": "PATERNITY",
-          "type": "enum-member",
+          "type": "string enum member",
           "required": true
         },
         {
           "name": "UNPAID",
-          "type": "enum-member",
+          "type": "string enum member",
           "required": true
         },
         {
           "name": "OTHER",
-          "type": "enum-member",
+          "type": "string enum member",
           "required": true
         }
       ],
@@ -43,22 +43,22 @@
       "fields": [
         {
           "name": "PENDING",
-          "type": "enum-member",
+          "type": "string enum member",
           "required": true
         },
         {
           "name": "APPROVED",
-          "type": "enum-member",
+          "type": "string enum member",
           "required": true
         },
         {
           "name": "REJECTED",
-          "type": "enum-member",
+          "type": "string enum member",
           "required": true
         },
         {
           "name": "CANCELLED",
-          "type": "enum-member",
+          "type": "string enum member",
           "required": true
         }
       ],
@@ -70,22 +70,22 @@
       "fields": [
         {
           "name": "LEAVE_REQUESTED",
-          "type": "enum-member",
+          "type": "string enum member",
           "required": true
         },
         {
           "name": "LEAVE_APPROVED",
-          "type": "enum-member",
+          "type": "string enum member",
           "required": true
         },
         {
           "name": "LEAVE_REJECTED",
-          "type": "enum-member",
+          "type": "string enum member",
           "required": true
         },
         {
           "name": "LEAVE_CANCELLED",
-          "type": "enum-member",
+          "type": "string enum member",
           "required": true
         }
       ],
@@ -97,32 +97,32 @@
       "fields": [
         {
           "name": "CREATED",
-          "type": "enum-member",
+          "type": "string enum member",
           "required": true
         },
         {
           "name": "UPDATED",
-          "type": "enum-member",
+          "type": "string enum member",
           "required": true
         },
         {
           "name": "DELETED",
-          "type": "enum-member",
+          "type": "string enum member",
           "required": true
         },
         {
           "name": "APPROVED",
-          "type": "enum-member",
+          "type": "string enum member",
           "required": true
         },
         {
           "name": "REJECTED",
-          "type": "enum-member",
+          "type": "string enum member",
           "required": true
         },
         {
           "name": "CANCELLED",
-          "type": "enum-member",
+          "type": "string enum member",
           "required": true
         }
       ],
@@ -134,22 +134,22 @@
       "fields": [
         {
           "name": "LEAVE_REQUEST",
-          "type": "enum-member",
+          "type": "string enum member",
           "required": true
         },
         {
           "name": "LEAVE_BALANCE",
-          "type": "enum-member",
+          "type": "string enum member",
           "required": true
         },
         {
           "name": "LEAVE_POLICY",
-          "type": "enum-member",
+          "type": "string enum member",
           "required": true
         },
         {
           "name": "EMPLOYEE",
-          "type": "enum-member",
+          "type": "string enum member",
           "required": true
         }
       ],
@@ -161,17 +161,17 @@
       "fields": [
         {
           "name": "EMPLOYEE",
-          "type": "enum-member",
+          "type": "string enum member",
           "required": true
         },
         {
           "name": "MANAGER",
-          "type": "enum-member",
+          "type": "string enum member",
           "required": true
         },
         {
           "name": "HR_ADMIN",
-          "type": "enum-member",
+          "type": "string enum member",
           "required": true
         }
       ],
@@ -183,162 +183,22 @@
       "fields": [
         {
           "name": "ACTIVE",
-          "type": "enum-member",
+          "type": "string enum member",
           "required": true
         },
         {
           "name": "INACTIVE",
-          "type": "enum-member",
+          "type": "string enum member",
           "required": true
         },
         {
           "name": "TERMINATED",
-          "type": "enum-member",
+          "type": "string enum member",
           "required": true
         },
         {
           "name": "ON_LEAVE",
-          "type": "enum-member",
-          "required": true
-        }
-      ],
-      "relationships": []
-    },
-    {
-      "entityName": "NotFoundError",
-      "operation": "create",
-      "fields": [
-        {
-          "name": "entityName",
-          "type": "string",
-          "required": true
-        },
-        {
-          "name": "id",
-          "type": "string",
-          "required": true
-        },
-        {
-          "name": "message",
-          "type": "string (inherited)",
-          "required": true
-        },
-        {
-          "name": "name",
-          "type": "string (inherited)",
-          "required": true
-        }
-      ],
-      "relationships": [
-        {
-          "entity": "Error",
-          "type": "extends"
-        }
-      ]
-    },
-    {
-      "entityName": "ValidationError",
-      "operation": "create",
-      "fields": [
-        {
-          "name": "message",
-          "type": "string",
-          "required": true
-        },
-        {
-          "name": "fieldErrors",
-          "type": "{ field: string; message: string }[] | undefined",
-          "required": false
-        },
-        {
-          "name": "name",
-          "type": "string (inherited)",
-          "required": true
-        }
-      ],
-      "relationships": [
-        {
-          "entity": "Error",
-          "type": "extends"
-        }
-      ]
-    },
-    {
-      "entityName": "ForbiddenError",
-      "operation": "create",
-      "fields": [
-        {
-          "name": "message",
-          "type": "string",
-          "required": true
-        },
-        {
-          "name": "name",
-          "type": "string (inherited)",
-          "required": true
-        }
-      ],
-      "relationships": [
-        {
-          "entity": "Error",
-          "type": "extends"
-        }
-      ]
-    },
-    {
-      "entityName": "ConflictError",
-      "operation": "create",
-      "fields": [
-        {
-          "name": "message",
-          "type": "string",
-          "required": true
-        },
-        {
-          "name": "name",
-          "type": "string (inherited)",
-          "required": true
-        }
-      ],
-      "relationships": [
-        {
-          "entity": "Error",
-          "type": "extends"
-        }
-      ]
-    },
-    {
-      "entityName": "BaseRepository&lt;T&gt;",
-      "operation": "create",
-      "fields": [
-        {
-          "name": "knex",
-          "type": "Knex (protected, constructor-injected)",
-          "required": true
-        },
-        {
-          "name": "findById(id: string)",
-          "type": "Promise<T | null>",
-          "required": true
-        },
-        {
-          "name": "findAll(filter?: Partial<T>)",
-          "type": "Promise<T[]>",
-          "required": true
-        },
-        {
-          "name": "create(entity: Omit<T, 'id'>)",
-          "type": "Promise<T>",
-          "required": true
-        },
-        {
-          "name": "update(id: string, entity: Partial<T>)",
-          "type": "Promise<T>",
-          "required": true
-        },
-        {
-          "name": "delete(id: string)",
-          "type": "Promise<void>",
+          "type": "string enum member",
           "required": true
         }
       ],
