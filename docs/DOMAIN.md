@@ -16,13 +16,36 @@ Represents a leave record managed by the `leave` module, including leave request
 
 ### LeaveStatus
 
+Canonical per Phase 1 (`src/shared/types/leave.types.ts`). The original domain model used DRAFT/SUBMITTED; PENDING replaces SUBMITTED and DRAFT is deferred to a later phase.
+
 | Value | Description |
 |-------|-------------|
-| DRAFT | Leave request is in draft state |
-| SUBMITTED | Leave request has been submitted |
+| PENDING | Leave request has been submitted and is pending review |
 | APPROVED | Leave request has been approved |
 | REJECTED | Leave request has been rejected |
 | CANCELLED | Leave request has been cancelled |
+
+### NotificationType
+
+Canonical per Phase 1 (`src/shared/types/leave.types.ts`).
+
+| Value | Description |
+|-------|-------------|
+| LEAVE_REQUESTED | A new leave request has been submitted |
+| LEAVE_APPROVED | A leave request has been approved |
+| LEAVE_REJECTED | A leave request has been rejected |
+| LEAVE_CANCELLED | A leave request has been cancelled |
+
+### EntityType
+
+Canonical per Phase 1 (`src/shared/types/leave.types.ts`). Used by audit logs and notifications to reference the type of entity involved.
+
+| Value | Description |
+|-------|-------------|
+| LEAVE_REQUEST | A leave request entity |
+| LEAVE_BALANCE | A leave balance entity |
+| LEAVE_POLICY | A leave policy entity |
+| EMPLOYEE | An employee entity |
 
 ### LeaveRequest
 
@@ -120,6 +143,27 @@ Represents leave balance data managed by the `balance` module, including tracked
 
 Represents employee data managed by the `employee` module, including employee records and related personnel information.
 
+### EmployeeRole
+
+Canonical per Phase 1 (`src/shared/types/leave.types.ts`).
+
+| Value | Description |
+|-------|-------------|
+| EMPLOYEE | Standard employee with self-service access |
+| MANAGER | Manager with approval authority over direct reports |
+| HR_ADMIN | HR administrator with full system access |
+
+### EmploymentStatus
+
+Canonical per Phase 1 (`src/shared/types/leave.types.ts`). ON_LEAVE added as an extension beyond the original domain model (ACTIVE, INACTIVE, TERMINATED).
+
+| Value | Description |
+|-------|-------------|
+| ACTIVE | Currently employed and active |
+| INACTIVE | Employed but inactive (e.g. suspended) |
+| TERMINATED | No longer employed (terminal state) |
+| ON_LEAVE | Currently on an approved leave; may have restricted access |
+
 ### Employee
 
 | Field | Type | Required |
@@ -133,7 +177,7 @@ Represents employee data managed by the `employee` module, including employee re
 | department | string \| null | false |
 | hireDate | Date | true |
 | terminationDate | Date \| null | false |
-| employmentStatus | 'ACTIVE' \| 'INACTIVE' \| 'TERMINATED' | true |
+| employmentStatus | 'ACTIVE' \| 'INACTIVE' \| 'TERMINATED' \| 'ON_LEAVE' | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 | deletedAt | Date \| null | false |
@@ -141,6 +185,19 @@ Represents employee data managed by the `employee` module, including employee re
 ## policy
 
 Represents leave policy data managed by the `policy` module, including policy definitions, rules, and leave entitlement configurations.
+
+### LeaveType
+
+Canonical per Phase 1 (`src/shared/types/leave.types.ts`). Values use UPPERCASE string enums. The original domain model used lowercase and included `emergency`; Phase 1 replaces `emergency` with `OTHER`.
+
+| Value | Description |
+|-------|-------------|
+| ANNUAL | Annual leave |
+| SICK | Sick leave |
+| MATERNITY | Maternity leave |
+| PATERNITY | Paternity leave |
+| UNPAID | Unpaid leave |
+| OTHER | Other leave type |
 
 ### Policy
 
@@ -157,17 +214,6 @@ Represents leave policy data managed by the `policy` module, including policy de
 | isActive | boolean | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
-
-### LeaveType
-
-| Value | Description |
-|-------|-------------|
-| annual | Annual leave |
-| sick | Sick leave |
-| emergency | Emergency leave |
-| unpaid | Unpaid leave |
-| maternity | Maternity leave |
-| paternity | Paternity leave |
 
 ### LeavePolicy
 
@@ -208,6 +254,19 @@ Represents notification data managed by the `notification` module, including not
 
 Represents audit data managed by the `audit` module, including audit records, change history, and activity tracking information.
 
+### AuditAction
+
+Canonical per Phase 1 (`src/shared/types/leave.types.ts`). Values use past tense. The original domain model used present tense (CREATE, UPDATE, DELETE, APPROVE, REJECT); Phase 1 uses past tense and adds CANCELLED.
+
+| Value | Description |
+|-------|-------------|
+| CREATED | Entity was created |
+| UPDATED | Entity was updated |
+| DELETED | Entity was deleted |
+| APPROVED | Entity was approved |
+| REJECTED | Entity was rejected |
+| CANCELLED | Entity was cancelled |
+
 ### Audit
 
 | Field | Type | Required |
@@ -215,7 +274,7 @@ Represents audit data managed by the `audit` module, including audit records, ch
 | id | string | true |
 | entityType | string | true |
 | entityId | string | true |
-| action | 'CREATE' \| 'UPDATE' \| 'DELETE' \| 'APPROVE' \| 'REJECT' | true |
+| action | 'CREATED' \| 'UPDATED' \| 'DELETED' \| 'APPROVED' \| 'REJECTED' \| 'CANCELLED' | true |
 | oldValues | Record<string, any> \| null | false |
 | newValues | Record<string, any> \| null | false |
 | performedBy | string \| null | false |
@@ -230,7 +289,7 @@ Represents audit data managed by the `audit` module, including audit records, ch
 | id | string | true |
 | entityType | string | true |
 | entityId | string | true |
-| action | 'CREATE' \| 'UPDATE' \| 'DELETE' \| 'APPROVE' \| 'REJECT' | true |
+| action | 'CREATED' \| 'UPDATED' \| 'DELETED' \| 'APPROVED' \| 'REJECTED' \| 'CANCELLED' | true |
 | oldValues | Record<string, any> \| null | false |
 | newValues | Record<string, any> \| null | false |
 | performedBy | string \| null | false |
