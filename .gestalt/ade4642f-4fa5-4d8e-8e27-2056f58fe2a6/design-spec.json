@@ -220,7 +220,12 @@
         },
         {
           "name": "message",
-          "type": "string (computed)",
+          "type": "string (inherited)",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "string (inherited)",
           "required": true
         }
       ],
@@ -242,8 +247,13 @@
         },
         {
           "name": "fieldErrors",
-          "type": "Array<{ field: string; message: string }> | undefined",
+          "type": "{ field: string; message: string }[] | undefined",
           "required": false
+        },
+        {
+          "name": "name",
+          "type": "string (inherited)",
+          "required": true
         }
       ],
       "relationships": [
@@ -260,6 +270,11 @@
         {
           "name": "message",
           "type": "string",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "string (inherited)",
           "required": true
         }
       ],
@@ -278,6 +293,11 @@
           "name": "message",
           "type": "string",
           "required": true
+        },
+        {
+          "name": "name",
+          "type": "string (inherited)",
+          "required": true
         }
       ],
       "relationships": [
@@ -286,6 +306,43 @@
           "type": "extends"
         }
       ]
+    },
+    {
+      "entityName": "BaseRepository&lt;T&gt;",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "knex",
+          "type": "Knex (protected, constructor-injected)",
+          "required": true
+        },
+        {
+          "name": "findById(id: string)",
+          "type": "Promise<T | null>",
+          "required": true
+        },
+        {
+          "name": "findAll(filter?: Partial<T>)",
+          "type": "Promise<T[]>",
+          "required": true
+        },
+        {
+          "name": "create(entity: Omit<T, 'id'>)",
+          "type": "Promise<T>",
+          "required": true
+        },
+        {
+          "name": "update(id: string, entity: Partial<T>)",
+          "type": "Promise<T>",
+          "required": true
+        },
+        {
+          "name": "delete(id: string)",
+          "type": "Promise<void>",
+          "required": true
+        }
+      ],
+      "relationships": []
     }
   ],
   "apiContracts": [],
