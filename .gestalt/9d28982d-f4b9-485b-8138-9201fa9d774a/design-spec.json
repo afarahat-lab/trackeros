@@ -1,0 +1,70 @@
+{
+  "domainChanges": [
+    {
+      "entityName": "LeaveTypes",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "LeaveStatus",
+          "type": "enum",
+          "required": true
+        },
+        {
+          "name": "EmploymentStatus",
+          "type": "enum",
+          "required": true
+        },
+        {
+          "name": "AuditAction",
+          "type": "enum",
+          "required": true
+        },
+        {
+          "name": "NotificationType",
+          "type": "enum",
+          "required": true
+        },
+        {
+          "name": "EntityType",
+          "type": "enum",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "DomainErrors",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "NotFoundError",
+          "type": "class (extends Error)",
+          "required": true
+        },
+        {
+          "name": "ValidationError",
+          "type": "class (extends Error)",
+          "required": true
+        },
+        {
+          "name": "ConflictError",
+          "type": "class (extends Error)",
+          "required": true
+        },
+        {
+          "name": "UnauthorizedError",
+          "type": "class (extends Error)",
+          "required": true
+        },
+        {
+          "name": "ForbiddenError",
+          "type": "class (extends Error)",
+          "required": true
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}
