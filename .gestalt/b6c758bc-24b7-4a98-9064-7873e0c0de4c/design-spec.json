@@ -1,0 +1,59 @@
+{
+  "domainChanges": [
+    {
+      "entityName": "SharedEnums",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "LeaveType",
+          "type": "enum (string members: ANNUAL, SICK, MATERNITY, PATERNITY, UNPAID, OTHER)",
+          "required": true
+        },
+        {
+          "name": "LeaveStatus",
+          "type": "enum (string members: PENDING, APPROVED, REJECTED, CANCELLED)",
+          "required": true
+        },
+        {
+          "name": "NotificationType",
+          "type": "enum (string members: LEAVE_REQUEST_CREATED, LEAVE_REQUEST_APPROVED, LEAVE_REQUEST_REJECTED, LEAVE_REQUEST_CANCELLED, LEAVE_BALANCE_LOW, LEAVE_BALANCE_EXPIRING)",
+          "required": true
+        },
+        {
+          "name": "AuditAction",
+          "type": "enum (string members: CREATE, UPDATE, DELETE)",
+          "required": true
+        },
+        {
+          "name": "EntityType",
+          "type": "enum (string members: LEAVE_REQUEST, LEAVE_BALANCE, LEAVE_POLICY, EMPLOYEE, NOTIFICATION)",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "LeaveRequest",
+          "type": "uses LeaveType, LeaveStatus"
+        },
+        {
+          "entity": "LeaveBalance",
+          "type": "uses LeaveType"
+        },
+        {
+          "entity": "LeavePolicy",
+          "type": "uses LeaveType (aliased as LeaveTypeCode in later phases)"
+        },
+        {
+          "entity": "Notification",
+          "type": "uses NotificationType"
+        },
+        {
+          "entity": "AuditLog",
+          "type": "uses AuditAction, EntityType"
+        }
+      ]
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}
