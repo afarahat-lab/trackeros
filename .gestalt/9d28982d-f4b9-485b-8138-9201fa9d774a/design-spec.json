@@ -1,68 +1,309 @@
 {
   "domainChanges": [
     {
-      "entityName": "LeaveTypes",
+      "entityName": "LeaveStatus",
       "operation": "create",
       "fields": [
         {
-          "name": "LeaveStatus",
-          "type": "enum",
+          "name": "PENDING",
+          "type": "enum-member",
           "required": true
         },
         {
-          "name": "EmploymentStatus",
-          "type": "enum",
+          "name": "APPROVED",
+          "type": "enum-member",
           "required": true
         },
         {
-          "name": "AuditAction",
-          "type": "enum",
+          "name": "REJECTED",
+          "type": "enum-member",
           "required": true
         },
         {
-          "name": "NotificationType",
-          "type": "enum",
+          "name": "CANCELLED",
+          "type": "enum-member",
           "required": true
         },
         {
-          "name": "EntityType",
-          "type": "enum",
+          "name": "IN_PROGRESS",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "COMPLETED",
+          "type": "enum-member",
           "required": true
         }
       ],
       "relationships": []
     },
     {
-      "entityName": "DomainErrors",
+      "entityName": "EmploymentStatus",
       "operation": "create",
       "fields": [
         {
-          "name": "NotFoundError",
-          "type": "class (extends Error)",
+          "name": "ACTIVE",
+          "type": "enum-member",
           "required": true
         },
         {
-          "name": "ValidationError",
-          "type": "class (extends Error)",
+          "name": "INACTIVE",
+          "type": "enum-member",
           "required": true
         },
         {
-          "name": "ConflictError",
-          "type": "class (extends Error)",
+          "name": "TERMINATED",
+          "type": "enum-member",
           "required": true
         },
         {
-          "name": "UnauthorizedError",
-          "type": "class (extends Error)",
-          "required": true
-        },
-        {
-          "name": "ForbiddenError",
-          "type": "class (extends Error)",
+          "name": "ON_LEAVE",
+          "type": "enum-member",
           "required": true
         }
       ],
       "relationships": []
+    },
+    {
+      "entityName": "AuditAction",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "CREATED",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "UPDATED",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "DELETED",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "APPROVED",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "REJECTED",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "CANCELLED",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "SUBMITTED",
+          "type": "enum-member",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "NotificationType",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "LEAVE_REQUEST_SUBMITTED",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "LEAVE_APPROVED",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "LEAVE_REJECTED",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "LEAVE_CANCELLED",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "BALANCE_UPDATED",
+          "type": "enum-member",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "EntityType",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "EMPLOYEE",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "LEAVE_TYPE",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "LEAVE_POLICY",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "LEAVE_REQUEST",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "LEAVE_BALANCE",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "AUDIT_LOG",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "NOTIFICATION",
+          "type": "enum-member",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "NotFoundError",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "entityName",
+          "type": "string (public readonly)",
+          "required": true
+        },
+        {
+          "name": "id",
+          "type": "string (public readonly)",
+          "required": true
+        },
+        {
+          "name": "message",
+          "type": "string (inherited from Error)",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "string (set to 'NotFoundError')",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "Error",
+          "type": "extends"
+        }
+      ]
+    },
+    {
+      "entityName": "ValidationError",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "details",
+          "type": "unknown[] | undefined (public readonly)",
+          "required": false
+        },
+        {
+          "name": "message",
+          "type": "string (inherited from Error)",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "string (set to 'ValidationError')",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "Error",
+          "type": "extends"
+        }
+      ]
+    },
+    {
+      "entityName": "ConflictError",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "message",
+          "type": "string (inherited from Error)",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "string (set to 'ConflictError')",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "Error",
+          "type": "extends"
+        }
+      ]
+    },
+    {
+      "entityName": "UnauthorizedError",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "message",
+          "type": "string (inherited from Error)",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "string (set to 'UnauthorizedError')",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "Error",
+          "type": "extends"
+        }
+      ]
+    },
+    {
+      "entityName": "ForbiddenError",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "message",
+          "type": "string (inherited from Error)",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "string (set to 'ForbiddenError')",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "Error",
+          "type": "extends"
+        }
+      ]
     }
   ],
   "apiContracts": [],
