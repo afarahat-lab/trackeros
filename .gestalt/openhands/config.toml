@@ -1,0 +1,3 @@
+[core]
+workspace_base = "/tmp/gestalt/phase/ef3e388c-4f35-40d1-8fba-2cc36a91c777/1"
+runtime = "cli"
