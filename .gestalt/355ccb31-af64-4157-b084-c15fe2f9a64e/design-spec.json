@@ -1,0 +1,30 @@
+{
+  "domainChanges": [
+    {
+      "entityName": "BaseRepository",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "knex",
+          "type": "Knex (import type { Knex } from 'knex')",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "Knex (from knex package)",
+          "type": "dependency — constructor parameter, stored as protected readonly field"
+        }
+      ]
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": [
+    {
+      "name": "BaseRepository",
+      "type": "service",
+      "description": "Abstract generic repository class in src/shared/base.repository.ts. Accepts a Knex instance via constructor (import type { Knex } from 'knex') and stores it as protected readonly knex: Knex. Declares abstract CRUD method signatures: findById, findAll, create, update, delete. Concrete repository implementations in domain modules extend this class and use this.knex for query building. The Knex type is imported directly from the knex package (knex@^3.1.0). No project-owned wrapper interface is needed. The Knex instance itself is deferred to a later phase; only the type is resolved now.",
+      "props": null
+    }
+  ]
+}
