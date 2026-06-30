@@ -21,17 +21,10 @@ src/modules/balance/balance.{model,repository,service,controller,routes}.ts
 src/modules/employee/employee.{model,repository,service,controller,routes}.ts
 src/modules/policy/policy.{model,repository,service,controller,routes}.ts
 src/modules/notification/notification.{model,repository,service,controller,routes}.ts
-src/modules/LeaveStatus/    — LeaveStatus module
-src/modules/BaseEntity/    — BaseEntity module
-src/modules/LeaveRequest/    — LeaveRequest module
-src/modules/LeaveType/    — LeaveType module
-src/modules/LeavePolicy/    — LeavePolicy module
-src/modules/AuditLog/    — AuditLog module
-src/modules/AuditRecord/    — AuditRecord module
-src/modules/AuditServiceInterface/    — AuditServiceInterface module
-src/shared/db connection.ts
-src/shared/base repository.ts
-src/shared/error types.ts
+src/shared/db/connection.ts
+src/shared/base.repository.ts
+src/shared/error.types.ts
+src/shared/types/leave.types.ts
 ```
 
 ## Key patterns
@@ -63,9 +56,10 @@ src/
 ├── shared/
 │   ├── db/
 │   │   └── connection.ts              # PostgreSQL connection pool (pg)
-│   ├── baseEntity.ts                  # BaseEntity abstract (id, createdAt, updatedAt)
-│   ├── baseRepository.ts             # BaseRepository abstract class
-│   ├── errors.ts                      # AppError, NotFoundError, ValidationError, ConflictError, UnauthorizedError
+│   ├── types/
+│   │   └── leave.types.ts             # Shared enums: LeaveType, LeaveStatus, NotificationType, AuditAction, EntityType, EmployeeRole, EmploymentStatus
+│   ├── base.repository.ts             # BaseRepository<T> abstract class
+│   ├── error.types.ts                 # NotFoundError, ValidationError, ForbiddenError, ConflictError
 │   ├── validation.ts                  # Input validation helpers (GP-003)
 │   └── logger.ts                      # Structured logger (no PII — GP-004)
 │
@@ -271,9 +265,9 @@ ACTIVE ⇄ EXHAUSTED
 
 ### Stack Compliance Notes
 
-- **Test framework**: Jest (as declared in stack; existing ARCHITECTURE.md references Vitest — Jest takes precedence per stack declaration)
+- **Test framework**: Vitest (per AGENTS.md and the Phase 1 intent; HARNESS.json declares Jest but the more specific directives take precedence)
 - **Backend**: Fastify (route handlers in `*.routes.ts`, preHandler hooks for RBAC middleware)
-- **Database**: PostgreSQL via `pg` Pool (`src/shared/db/connection.ts`)
+- **Database**: PostgreSQL via `pg` Pool (`src/shared/db/connection.ts`); Knex for migrations and repository layer
 - **Language**: TypeScript, Node 20, npm
 - **Architecture style**: Modular monolith — all modules in-process, no microservices
 - **Frontend**: React Native (out of scope for this backend feature; contracts to be shared)
@@ -303,4 +297,10 @@ ACTIVE ⇄ EXHAUSTED
 11. **Notification and AuditLog are fire-and-forget**: `LeaveRequestService` calls them but does not await their result for the primary flow — failures are logged but do not block the leave operation. This prevents notification/audit failures from breaking the core workflow.
 
 12. **All lifecycle states from domain architect are preserved** and reflected in the reconciled entities, including the terminal states (TERMINATED for Employee, CANCELLED/REJECTED for LeaveRequest, FROZEN for LeaveBalance, RECORDED for AuditLog and LeaveBalanceTransaction).
+
+13. **Phase 1 file naming**: The Phase 1 intent uses dot-separated file names (`src/shared/types/leave.types.ts`, `src/shared/error.types.ts`, `src/shared/base.repository.ts`). These are authoritative for the shared layer. Module files follow the `moduleName.{model,repository,service,controller,routes}.ts` convention.
+
+14. **LeaveStatus naming**: The Phase 1 intent defines `LeaveStatus.PENDING` as the state after an employee submits a leave request. The ARCHITECTURE.md lifecycle diagram uses `SUBMITTED` for the same state. `PENDING` is the canonical name per the Phase 1 intent; the lifecycle diagram's `SUBMITTED` label is an alias for `PENDING`.
+
+15. **EmploymentStatus.ON_LEAVE**: The Phase 1 intent defines `EmploymentStatus.ON_LEAVE` as an additional status beyond the ARCHITECTURE.md Employee lifecycle (ACTIVE, INACTIVE, TERMINATED). This is an extension to the architecture — `ON_LEAVE` represents an employee who is currently on an approved leave and may have restricted system access.
 <!-- gestalt:architecture feature=6d4545cd-a047-4fa8-937f-9443038eb8ea END -->
