@@ -10,19 +10,113 @@ Base entity providing common fields for domain models.
 | created_at | Date | true |
 | updated_at | Date | true |
 
-## leave
+## shared — enums
 
-Represents a leave record managed by the `leave` module, including leave requests and related leave-tracking data.
+Shared enumerations used across all leave-management modules. Defined in `src/shared/types/leave.types.ts`.
 
 ### LeaveStatus
 
 | Value | Description |
 |-------|-------------|
-| DRAFT | Leave request is in draft state |
-| SUBMITTED | Leave request has been submitted |
+| PENDING | Leave request is pending review |
 | APPROVED | Leave request has been approved |
 | REJECTED | Leave request has been rejected |
 | CANCELLED | Leave request has been cancelled |
+| IN_PROGRESS | Leave is currently in progress (active) |
+| COMPLETED | Leave period has completed |
+
+### EmploymentStatus
+
+| Value | Description |
+|-------|-------------|
+| ACTIVE | Employee is actively employed |
+| INACTIVE | Employee is inactive (e.g. suspended) |
+| TERMINATED | Employee has been terminated |
+| ON_LEAVE | Employee is currently on leave |
+
+### AuditAction
+
+| Value | Description |
+|-------|-------------|
+| CREATED | Entity was created |
+| UPDATED | Entity was updated |
+| DELETED | Entity was deleted |
+| APPROVED | Entity was approved |
+| REJECTED | Entity was rejected |
+| CANCELLED | Entity was cancelled |
+| SUBMITTED | Entity was submitted for review |
+
+### NotificationType
+
+| Value | Description |
+|-------|-------------|
+| LEAVE_REQUEST_SUBMITTED | A leave request was submitted |
+| LEAVE_APPROVED | A leave request was approved |
+| LEAVE_REJECTED | A leave request was rejected |
+| LEAVE_CANCELLED | A leave request was cancelled |
+| BALANCE_UPDATED | A leave balance was updated |
+
+### EntityType
+
+| Value | Description |
+|-------|-------------|
+| EMPLOYEE | Employee entity |
+| LEAVE_TYPE | Leave type entity |
+| LEAVE_POLICY | Leave policy entity |
+| LEAVE_REQUEST | Leave request entity |
+| LEAVE_BALANCE | Leave balance entity |
+| AUDIT_LOG | Audit log entity |
+| NOTIFICATION | Notification entity |
+
+## shared — errors
+
+Domain error classes defined in `src/shared/error.types.ts`.
+
+### NotFoundError
+
+Extends `Error`. Constructor: `(entityName: string, id: string)`.
+
+| Property | Type | Description |
+|----------|------|-------------|
+| entityName | string | Name of the entity that was not found |
+| id | string | ID that was looked up |
+
+### ValidationError
+
+Extends `Error`. Constructor: `(message: string, details?: unknown[])`.
+
+| Property | Type | Description |
+|----------|------|-------------|
+| message | string | Human-readable validation error message |
+| details | unknown[] \| undefined | Optional array of validation failure details |
+
+### ConflictError
+
+Extends `Error`. Constructor: `(message: string)`.
+
+| Property | Type | Description |
+|----------|------|-------------|
+| message | string | Human-readable conflict description |
+
+### UnauthorizedError
+
+Extends `Error`. Constructor: `(message: string)`.
+
+| Property | Type | Description |
+|----------|------|-------------|
+| message | string | Human-readable unauthorized access description |
+
+### ForbiddenError
+
+Extends `Error`. Constructor: `(message: string)`.
+
+| Property | Type | Description |
+|----------|------|-------------|
+| message | string | Human-readable forbidden access description |
+
+## leave
+
+Represents a leave record managed by the `leave` module, including leave requests and related leave-tracking data.
 
 ### LeaveRequest
 
@@ -34,7 +128,7 @@ Represents a leave record managed by the `leave` module, including leave request
 | startDate | Date | true |
 | endDate | Date | true |
 | reason | string \| undefined | false |
-| status | LeaveRequestStatus | true |
+| status | LeaveStatus | true |
 | approvedBy | string \| null | false |
 | approvedAt | Date \| null | false |
 | createdAt | Date | true |
@@ -65,7 +159,7 @@ Represents a leave record managed by the `leave` module, including leave request
 
 | Field | Type | Required |
 |-------|------|----------|
-| status | LeaveRequestStatus | false |
+| status | LeaveStatus | false |
 | leaveTypeId | string | false |
 | startDateFrom | Date | false |
 | startDateTo | Date | false |
@@ -133,7 +227,7 @@ Represents employee data managed by the `employee` module, including employee re
 | department | string \| null | false |
 | hireDate | Date | true |
 | terminationDate | Date \| null | false |
-| employmentStatus | 'ACTIVE' \| 'INACTIVE' \| 'TERMINATED' | true |
+| employmentStatus | EmploymentStatus | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 | deletedAt | Date \| null | false |
@@ -195,7 +289,7 @@ Represents notification data managed by the `notification` module, including not
 |-------|------|----------|
 | id | string | true |
 | recipientId | string | true |
-| type | string | true |
+| type | NotificationType | true |
 | title | string | true |
 | message | string | true |
 | relatedEntityType | string \| null | false |
@@ -213,9 +307,9 @@ Represents audit data managed by the `audit` module, including audit records, ch
 | Field | Type | Required |
 |-------|------|----------|
 | id | string | true |
-| entityType | string | true |
+| entityType | EntityType | true |
 | entityId | string | true |
-| action | 'CREATE' \| 'UPDATE' \| 'DELETE' \| 'APPROVE' \| 'REJECT' | true |
+| action | AuditAction | true |
 | oldValues | Record<string, any> \| null | false |
 | newValues | Record<string, any> \| null | false |
 | performedBy | string \| null | false |
@@ -228,9 +322,9 @@ Represents audit data managed by the `audit` module, including audit records, ch
 | Field | Type | Required |
 |-------|------|----------|
 | id | string | true |
-| entityType | string | true |
+| entityType | EntityType | true |
 | entityId | string | true |
-| action | 'CREATE' \| 'UPDATE' \| 'DELETE' \| 'APPROVE' \| 'REJECT' | true |
+| action | AuditAction | true |
 | oldValues | Record<string, any> \| null | false |
 | newValues | Record<string, any> \| null | false |
 | performedBy | string \| null | false |

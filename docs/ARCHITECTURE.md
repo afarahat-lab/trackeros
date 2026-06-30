@@ -8,7 +8,7 @@ The architecture is modular, with a clear separation of concerns between models,
 
 - Runtime: Node 20 LTS
 - Package manager: npm
-- Test framework: Vitest
+- Test framework: Jest
 - Backend: Fastify
 - Frontend: React Native
 - Database: PostgreSQL
@@ -21,17 +21,9 @@ src/modules/balance/balance.{model,repository,service,controller,routes}.ts
 src/modules/employee/employee.{model,repository,service,controller,routes}.ts
 src/modules/policy/policy.{model,repository,service,controller,routes}.ts
 src/modules/notification/notification.{model,repository,service,controller,routes}.ts
-src/modules/LeaveStatus/    — LeaveStatus module
-src/modules/BaseEntity/    — BaseEntity module
-src/modules/LeaveRequest/    — LeaveRequest module
-src/modules/LeaveType/    — LeaveType module
-src/modules/LeavePolicy/    — LeavePolicy module
-src/modules/AuditLog/    — AuditLog module
-src/modules/AuditRecord/    — AuditRecord module
-src/modules/AuditServiceInterface/    — AuditServiceInterface module
-src/shared/db connection.ts
-src/shared/base repository.ts
-src/shared/error types.ts
+src/shared/db/connection.ts
+src/shared/types/leave.types.ts          — shared enums (LeaveStatus, EmploymentStatus, AuditAction, NotificationType, EntityType)
+src/shared/error.types.ts                — domain error classes (NotFoundError, ValidationError, ConflictError, UnauthorizedError, ForbiddenError)
 ```
 
 ## Key patterns

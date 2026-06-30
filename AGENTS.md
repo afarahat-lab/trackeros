@@ -27,7 +27,7 @@ Trackeros — a corporate operations web and mobile platform for
   backend's /auth endpoints; identity comes from corporate
   OIDC in production and from local users in development.
   
-  Tests: Vitest for unit + integration. CI on GitHub Actions
+  Tests: Jest for unit + integration. CI on GitHub Actions
   runs lint (ESLint) + typecheck (tsc --noEmit) + unit tests +
   a Semgrep security pass on every PR. Conventional Commits +
   squash-merge. Strict TypeScript (no implicit any, strict
@@ -37,7 +37,7 @@ Trackeros — a corporate operations web and mobile platform for
 
 - Runtime: Node 20 LTS
 - Package manager: npm
-- Test framework: Vitest
+- Test framework: Jest
 - Backend: Fastify
 - Frontend: React Native
 - Database: PostgreSQL
@@ -53,8 +53,8 @@ user projects use whatever stack matches their description.
 
 1. Modules never import from each other's internals — only from index.ts
 2. All database access through the repository pattern
-3. Every state-changing operation produces an audit record (GP-001)
-4. RBAC enforced at middleware, never inline (GP-002)
+3. Every state-changing operation produces an audit record (GP-002)
+4. RBAC enforced at middleware, never inline (GP-005)
 
 ## What agents must never do
 
