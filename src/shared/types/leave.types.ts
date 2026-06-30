@@ -1,0 +1,51 @@
+export enum LeaveType {
+  ANNUAL = 'ANNUAL',
+  SICK = 'SICK',
+  MATERNITY = 'MATERNITY',
+  PATERNITY = 'PATERNITY',
+  UNPAID = 'UNPAID',
+  OTHER = 'OTHER',
+}
+
+export enum LeaveStatus {
+  PENDING = 'PENDING',
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED',
+  CANCELLED = 'CANCELLED',
+}
+
+export enum NotificationType {
+  LEAVE_REQUESTED = 'LEAVE_REQUESTED',
+  LEAVE_APPROVED = 'LEAVE_APPROVED',
+  LEAVE_REJECTED = 'LEAVE_REJECTED',
+  LEAVE_CANCELLED = 'LEAVE_CANCELLED',
+}
+
+export enum AuditAction {
+  CREATED = 'CREATED',
+  UPDATED = 'UPDATED',
+  DELETED = 'DELETED',
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED',
+  CANCELLED = 'CANCELLED',
+}
+
+export enum EntityType {
+  LEAVE_REQUEST = 'LEAVE_REQUEST',
+  LEAVE_BALANCE = 'LEAVE_BALANCE',
+  LEAVE_POLICY = 'LEAVE_POLICY',
+  EMPLOYEE = 'EMPLOYEE',
+}
+
+export enum EmployeeRole {
+  EMPLOYEE = 'EMPLOYEE',
+  MANAGER = 'MANAGER',
+  HR_ADMIN = 'HR_ADMIN',
+}
+
+export enum EmploymentStatus {
+  ACTIVE = 'ACTIVE',
+  INACTIVE = 'INACTIVE',
+  TERMINATED = 'TERMINATED',
+  ON_LEAVE = 'ON_LEAVE',
+}
