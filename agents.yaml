@@ -133,7 +133,18 @@ agents:
       # CodeActAgent iterations without emitting edits (too weak for the
       # agentic tool loop); kimi-k2p7-code completed a trivial task cleanly
       # (AgentState.FINISHED, file written) in the smoke test.
-      model: fireworks/kimi-k2p7-code
+      #
+      # 2026-06-30 — switched off kimi-k2p7-code onto
+      # FireworkAI-Deepseek-v4-pro for OpenHands. Root cause isolated:
+      # OpenHands 1.6.0's str_replace_editor hardcodes a REQUIRED
+      # `security_risk` param; kimi-k2p7-code never emits it on the
+      # non-native function-calling path → every edit rejected
+      # ("Missing required parameters: {'security_risk'}") → 0 files.
+      # DeepSeek-V4-Pro SUPPLIES security_risk → validated on the real
+      # platform path (clean main clone): 0 errors, 4 files written via
+      # str_replace_editor, persisted + discovered. So it's the right
+      # OpenHands code-agent model.
+      model: fireworks/FireworkAI-Deepseek-v4-pro
       temperature: 0.1
       # No reasoning_effort — Aider drives its own reasoning loop;
       # DeepInfra also does not support reasoning_effort.
