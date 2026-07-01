@@ -1,57 +1,159 @@
 {
   "domainChanges": [
     {
-      "entityName": "SharedEnums",
+      "entityName": "LeaveType",
       "operation": "create",
       "fields": [
         {
-          "name": "LeaveType",
-          "type": "enum (string members: ANNUAL, SICK, MATERNITY, PATERNITY, UNPAID, OTHER)",
+          "name": "ANNUAL",
+          "type": "enum-member",
           "required": true
         },
         {
-          "name": "LeaveStatus",
-          "type": "enum (string members: PENDING, APPROVED, REJECTED, CANCELLED)",
+          "name": "SICK",
+          "type": "enum-member",
           "required": true
         },
         {
-          "name": "NotificationType",
-          "type": "enum (string members: LEAVE_REQUEST_CREATED, LEAVE_REQUEST_APPROVED, LEAVE_REQUEST_REJECTED, LEAVE_REQUEST_CANCELLED, LEAVE_BALANCE_LOW, LEAVE_BALANCE_EXPIRING)",
+          "name": "MATERNITY",
+          "type": "enum-member",
           "required": true
         },
         {
-          "name": "AuditAction",
-          "type": "enum (string members: CREATE, UPDATE, DELETE)",
+          "name": "PATERNITY",
+          "type": "enum-member",
           "required": true
         },
         {
-          "name": "EntityType",
-          "type": "enum (string members: LEAVE_REQUEST, LEAVE_BALANCE, LEAVE_POLICY, EMPLOYEE, NOTIFICATION)",
+          "name": "UNPAID",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "OTHER",
+          "type": "enum-member",
           "required": true
         }
       ],
-      "relationships": [
+      "relationships": []
+    },
+    {
+      "entityName": "LeaveStatus",
+      "operation": "create",
+      "fields": [
         {
-          "entity": "LeaveRequest",
-          "type": "uses LeaveType, LeaveStatus"
+          "name": "PENDING",
+          "type": "enum-member",
+          "required": true
         },
         {
-          "entity": "LeaveBalance",
-          "type": "uses LeaveType"
+          "name": "APPROVED",
+          "type": "enum-member",
+          "required": true
         },
         {
-          "entity": "LeavePolicy",
-          "type": "uses LeaveType (aliased as LeaveTypeCode in later phases)"
+          "name": "REJECTED",
+          "type": "enum-member",
+          "required": true
         },
         {
-          "entity": "Notification",
-          "type": "uses NotificationType"
-        },
-        {
-          "entity": "AuditLog",
-          "type": "uses AuditAction, EntityType"
+          "name": "CANCELLED",
+          "type": "enum-member",
+          "required": true
         }
-      ]
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "NotificationType",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "LEAVE_REQUEST_CREATED",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "LEAVE_REQUEST_APPROVED",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "LEAVE_REQUEST_REJECTED",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "LEAVE_REQUEST_CANCELLED",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "LEAVE_BALANCE_LOW",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "LEAVE_BALANCE_EXPIRING",
+          "type": "enum-member",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "AuditAction",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "CREATE",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "UPDATE",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "DELETE",
+          "type": "enum-member",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "EntityType",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "LEAVE_REQUEST",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "LEAVE_BALANCE",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "LEAVE_POLICY",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "EMPLOYEE",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "NOTIFICATION",
+          "type": "enum-member",
+          "required": true
+        }
+      ],
+      "relationships": []
     }
   ],
   "apiContracts": [],
