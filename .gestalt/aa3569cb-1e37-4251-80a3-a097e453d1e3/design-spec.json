@@ -6,22 +6,22 @@
       "fields": [
         {
           "name": "Active",
-          "type": "enum-member",
+          "type": "string enum member",
           "required": true
         },
         {
           "name": "Inactive",
-          "type": "enum-member",
+          "type": "string enum member",
           "required": true
         },
         {
           "name": "Terminated",
-          "type": "enum-member",
+          "type": "string enum member",
           "required": true
         },
         {
           "name": "OnLeave",
-          "type": "enum-member",
+          "type": "string enum member",
           "required": true
         }
       ],
@@ -33,22 +33,22 @@
       "fields": [
         {
           "name": "Pending",
-          "type": "enum-member",
+          "type": "string enum member",
           "required": true
         },
         {
           "name": "Approved",
-          "type": "enum-member",
+          "type": "string enum member",
           "required": true
         },
         {
           "name": "Rejected",
-          "type": "enum-member",
+          "type": "string enum member",
           "required": true
         },
         {
           "name": "Cancelled",
-          "type": "enum-member",
+          "type": "string enum member",
           "required": true
         }
       ],
@@ -60,7 +60,7 @@
       "fields": [
         {
           "name": "id",
-          "type": "string",
+          "type": "string (UUID)",
           "required": true
         },
         {
@@ -82,35 +82,6 @@
       "relationships": []
     }
   ],
-  "apiContracts": [
-    {
-      "method": "GET",
-      "path": "N/A — Phase 1 has no API endpoints",
-      "description": "Phase 1 is limited to shared TypeScript types and the abstract BaseRepository class. No HTTP API contracts are introduced in this phase. API endpoints will be defined in Phase 9 (LeaveRequest routes and controller).",
-      "requestBody": null,
-      "responseBody": null,
-      "authRequired": false,
-      "roles": []
-    }
-  ],
-  "componentSpecs": [
-    {
-      "name": "SharedTypes",
-      "type": "component",
-      "description": "Barrel file at src/shared/types/index.ts exporting EmploymentStatus enum (Active, Inactive, Terminated, OnLeave), LeaveStatus enum (Pending, Approved, Rejected, Cancelled), and BaseEntity interface (id: string, createdAt: Date, updatedAt: Date, deletedAt: Date | null). No dependencies on other project modules.",
-      "props": null
-    },
-    {
-      "name": "BaseRepository",
-      "type": "service",
-      "description": "Abstract generic class at src/shared/base.repository.ts: BaseRepository<T extends BaseEntity>. Imports pg Pool from src/shared/db/connection.ts. Declares protected abstract tableName: string. Provides five CRUD methods — findById(id): Promise<T | null> (SELECT by id WHERE deleted_at IS NULL), findAll(): Promise<T[]> (SELECT all WHERE deleted_at IS NULL), create(entity: Omit<T, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt'>): Promise<T> (INSERT with RETURNING *, auto-generates UUID id via gen_random_uuid(), sets createdAt/updatedAt to NOW(), deletedAt to null), update(id, partial: Partial<Omit<T, 'id' | 'createdAt'>>): Promise<T | null> (UPDATE with RETURNING *, sets updatedAt to NOW()), softDelete(id): Promise<boolean> (UPDATE SET deleted_at = NOW(), returns true if rowCount > 0). All methods use parameterized queries. Subclasses in later phases (EmployeeRepository, LeaveTypeRepository, etc.) extend this class and set tableName.",
-      "props": null
-    },
-    {
-      "name": "SharedUnitTests",
-      "type": "component",
-      "description": "Jest unit tests at tests/unit/shared/ covering: (a) type tests — EmploymentStatus enum has exactly four members (Active, Inactive, Terminated, OnLeave), LeaveStatus enum has exactly four members (Pending, Approved, Rejected, Cancelled), BaseEntity interface shape verification; (b) BaseRepository CRUD method tests — mock the pg Pool from src/shared/db/connection.ts, test findById returns entity or null, findAll returns array excluding soft-deleted, create inserts and returns entity with generated id/timestamps, update modifies fields and returns updated entity or null, softDelete sets deletedAt and returns boolean. Uses ts-jest preset.",
-      "props": null
-    }
-  ]
+  "apiContracts": [],
+  "componentSpecs": []
 }
