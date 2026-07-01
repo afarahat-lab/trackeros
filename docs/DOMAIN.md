@@ -281,9 +281,25 @@ Represents validation data managed by the `validation` module, including validat
 | isValid | boolean | true |
 | errors | string[] | true |
 
+## uptime
+
+Represents system uptime information served by the `uptime` module at `GET /uptime`. This is a read-only health-check endpoint that does not touch the database.
+
+### UptimeStatus
+
+| Field | Type | Required |
+|-------|------|----------|
+| uptimeSeconds | number | true |
+
+### IUptimeService
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| getUptime() | UptimeStatus | Returns the process uptime in seconds |
+
 ## system
 
-Represents system-level status information, including health-check and version data.
+Represents system-level status information from the `status` module (not yet wired into the application). Includes health-check and version data.
 
 ### SystemStatus
 

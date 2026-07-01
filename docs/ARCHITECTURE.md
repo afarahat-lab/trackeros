@@ -23,6 +23,7 @@ src/modules/leaveBalance/leaveBalance.{model,repository,service}.ts
 src/modules/leaveRequest/leaveRequest.{model,repository,service,controller,routes}.ts
 src/modules/auditLog/auditLog.{model,repository,service}.ts
 src/modules/notification/notification.{model,repository,service}.ts
+src/modules/uptime/uptime.{model,service.interface,service,routes}.ts
 src/shared/db/connection.ts
 src/shared/types/index.ts
 src/shared/base.repository.ts
