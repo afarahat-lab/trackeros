@@ -1,0 +1,22 @@
+{
+  "domainChanges": [],
+  "apiContracts": [
+    {
+      "method": "GET",
+      "path": "/uptime",
+      "description": "Health-check endpoint returning the server process uptime in seconds. Read-only, no side effects. Delegates to UptimeService.getUptime() which wraps process.uptime().",
+      "requestBody": null,
+      "responseBody": null,
+      "authRequired": false,
+      "roles": []
+    }
+  ],
+  "componentSpecs": [
+    {
+      "name": "uptimeRoutes",
+      "type": "component",
+      "description": "Fastify plugin that registers a GET /uptime route. Instantiates UptimeService and delegates to getUptime(), returning { uptimeSeconds: number } with HTTP 200. Catches errors and returns 500 with { error: string }. Follows the existing module pattern: imports service interface and implementation from the module barrel (index.ts), exports an async plugin function accepting FastifyInstance.",
+      "props": null
+    }
+  ]
+}
