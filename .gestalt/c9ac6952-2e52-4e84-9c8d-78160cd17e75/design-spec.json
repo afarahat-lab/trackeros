@@ -1,0 +1,215 @@
+{
+  "domainChanges": [
+    {
+      "entityName": "LeaveType",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "ANNUAL",
+          "type": "string enum member",
+          "required": true
+        },
+        {
+          "name": "SICK",
+          "type": "string enum member",
+          "required": true
+        },
+        {
+          "name": "EMERGENCY",
+          "type": "string enum member",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "LeaveStatus",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "DRAFT",
+          "type": "string enum member",
+          "required": true
+        },
+        {
+          "name": "SUBMITTED",
+          "type": "string enum member",
+          "required": true
+        },
+        {
+          "name": "APPROVED",
+          "type": "string enum member",
+          "required": true
+        },
+        {
+          "name": "REJECTED",
+          "type": "string enum member",
+          "required": true
+        },
+        {
+          "name": "CANCELLED",
+          "type": "string enum member",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "LeaveRequestStatus",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "DRAFT",
+          "type": "string enum member",
+          "required": true
+        },
+        {
+          "name": "SUBMITTED",
+          "type": "string enum member",
+          "required": true
+        },
+        {
+          "name": "APPROVED",
+          "type": "string enum member",
+          "required": true
+        },
+        {
+          "name": "REJECTED",
+          "type": "string enum member",
+          "required": true
+        },
+        {
+          "name": "CANCELLED",
+          "type": "string enum member",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "BalanceStatus",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "ACTIVE",
+          "type": "string enum member",
+          "required": true
+        },
+        {
+          "name": "EXHAUSTED",
+          "type": "string enum member",
+          "required": true
+        },
+        {
+          "name": "FROZEN",
+          "type": "string enum member",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "NotificationType",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "LEAVE_SUBMITTED",
+          "type": "string enum member",
+          "required": true
+        },
+        {
+          "name": "LEAVE_APPROVED",
+          "type": "string enum member",
+          "required": true
+        },
+        {
+          "name": "LEAVE_REJECTED",
+          "type": "string enum member",
+          "required": true
+        },
+        {
+          "name": "LEAVE_CANCELLED",
+          "type": "string enum member",
+          "required": true
+        },
+        {
+          "name": "BALANCE_EXHAUSTED",
+          "type": "string enum member",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "AuditAction",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "CREATE",
+          "type": "string enum member",
+          "required": true
+        },
+        {
+          "name": "UPDATE",
+          "type": "string enum member",
+          "required": true
+        },
+        {
+          "name": "DELETE",
+          "type": "string enum member",
+          "required": true
+        },
+        {
+          "name": "SUBMIT",
+          "type": "string enum member",
+          "required": true
+        },
+        {
+          "name": "APPROVE",
+          "type": "string enum member",
+          "required": true
+        },
+        {
+          "name": "REJECT",
+          "type": "string enum member",
+          "required": true
+        },
+        {
+          "name": "CANCEL",
+          "type": "string enum member",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "EntityType",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "LEAVE_REQUEST",
+          "type": "string enum member",
+          "required": true
+        },
+        {
+          "name": "LEAVE_POLICY",
+          "type": "string enum member",
+          "required": true
+        },
+        {
+          "name": "LEAVE_BALANCE",
+          "type": "string enum member",
+          "required": true
+        },
+        {
+          "name": "EMPLOYEE",
+          "type": "string enum member",
+          "required": true
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}
