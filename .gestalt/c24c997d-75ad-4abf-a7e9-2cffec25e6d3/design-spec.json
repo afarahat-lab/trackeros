@@ -1,0 +1,28 @@
+{
+  "domainChanges": [
+    {
+      "entityName": "SharedTypes",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "LeaveType",
+          "type": "string enum (ANNUAL | SICK | EMERGENCY)",
+          "required": true
+        },
+        {
+          "name": "LeaveRequestStatus",
+          "type": "string enum (DRAFT | SUBMITTED | APPROVED | REJECTED | CANCELLED | REVOKED)",
+          "required": true
+        },
+        {
+          "name": "BalanceStatus",
+          "type": "string enum (ACTIVE | EXHAUSTED | FROZEN)",
+          "required": true
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}
