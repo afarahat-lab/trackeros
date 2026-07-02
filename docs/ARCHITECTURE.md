@@ -8,7 +8,7 @@ The architecture is modular, with a clear separation of concerns between models,
 
 - Runtime: Node 20 LTS
 - Package manager: npm
-- Test framework: Vitest
+- Test framework: Jest
 - Backend: Fastify
 - Frontend: React Native
 - Database: PostgreSQL
