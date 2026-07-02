@@ -7,19 +7,18 @@ Base entity providing common fields for domain models.
 | Field | Type | Required |
 |-------|------|----------|
 | id | string | true |
-| created_at | Date | true |
-| updated_at | Date | true |
+| createdAt | Date | true |
+| updatedAt | Date | true |
 
 ## leave
 
 Represents a leave record managed by the `leave` module, including leave requests and related leave-tracking data.
 
-### LeaveStatus
+### LeaveRequestStatus
 
 | Value | Description |
 |-------|-------------|
-| DRAFT | Leave request is in draft state |
-| SUBMITTED | Leave request has been submitted |
+| PENDING | Leave request is pending approval |
 | APPROVED | Leave request has been approved |
 | REJECTED | Leave request has been rejected |
 | CANCELLED | Leave request has been cancelled |
@@ -162,12 +161,9 @@ Represents leave policy data managed by the `policy` module, including policy de
 
 | Value | Description |
 |-------|-------------|
-| annual | Annual leave |
-| sick | Sick leave |
-| emergency | Emergency leave |
-| unpaid | Unpaid leave |
-| maternity | Maternity leave |
-| paternity | Paternity leave |
+| ANNUAL | Annual leave |
+| SICK | Sick leave |
+| EMERGENCY | Emergency leave |
 
 ### LeavePolicy
 
