@@ -10,11 +10,23 @@ Base entity providing common fields for domain models.
 | created_at | Date | true |
 | updated_at | Date | true |
 
-## leave
+## shared types
 
-Represents a leave record managed by the `leave` module, including leave requests and related leave-tracking data.
+Canonical enums defined in `src/shared/types/leave.types.ts`. These are the foundational shared types referenced by all downstream modules.
+
+### LeaveType
+
+String enum. Exactly three members:
+
+| Value | Description |
+|-------|-------------|
+| ANNUAL | Annual leave |
+| SICK | Sick leave |
+| EMERGENCY | Emergency leave |
 
 ### LeaveStatus
+
+String enum. Lifecycle states for a leave request (domain-internal).
 
 | Value | Description |
 |-------|-------------|
@@ -23,6 +35,69 @@ Represents a leave record managed by the `leave` module, including leave request
 | APPROVED | Leave request has been approved |
 | REJECTED | Leave request has been rejected |
 | CANCELLED | Leave request has been cancelled |
+
+### LeaveRequestStatus
+
+String enum. Lifecycle states for a leave request (API/transport layer). Members are identical to LeaveStatus but kept as an independent enum for separation of concerns between domain internals and the API surface.
+
+| Value | Description |
+|-------|-------------|
+| DRAFT | Leave request is in draft state |
+| SUBMITTED | Leave request has been submitted |
+| APPROVED | Leave request has been approved |
+| REJECTED | Leave request has been rejected |
+| CANCELLED | Leave request has been cancelled |
+
+### BalanceStatus
+
+String enum. States for a leave balance record.
+
+| Value | Description |
+|-------|-------------|
+| ACTIVE | Balance is active and usable |
+| EXHAUSTED | Balance has no remaining days |
+| FROZEN | Balance is frozen (e.g. policy deactivated) |
+
+### NotificationType
+
+String enum. Types of notifications emitted by the leave workflow.
+
+| Value | Description |
+|-------|-------------|
+| LEAVE_SUBMITTED | A leave request was submitted |
+| LEAVE_APPROVED | A leave request was approved |
+| LEAVE_REJECTED | A leave request was rejected |
+| LEAVE_CANCELLED | A leave request was cancelled |
+| BALANCE_EXHAUSTED | An employee's leave balance is exhausted |
+
+### AuditAction
+
+String enum. Actions recorded in the audit log.
+
+| Value | Description |
+|-------|-------------|
+| CREATE | Entity was created |
+| UPDATE | Entity was updated |
+| DELETE | Entity was deleted |
+| SUBMIT | Entity was submitted for review |
+| APPROVE | Entity was approved |
+| REJECT | Entity was rejected |
+| CANCEL | Entity was cancelled |
+
+### EntityType
+
+String enum. Domain entity types tracked in audit records.
+
+| Value | Description |
+|-------|-------------|
+| LEAVE_REQUEST | A leave request entity |
+| LEAVE_POLICY | A leave policy entity |
+| LEAVE_BALANCE | A leave balance entity |
+| EMPLOYEE | An employee entity |
+
+## leave
+
+Represents a leave record managed by the `leave` module, including leave requests and related leave-tracking data.
 
 ### LeaveRequest
 
@@ -89,7 +164,7 @@ Represents leave balance data managed by the `balance` module, including tracked
 | usedDays | number | true |
 | remainingDays | number | true |
 | fiscalYear | number | true |
-| status | string | true |
+| status | BalanceStatus | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
@@ -108,7 +183,7 @@ Represents leave balance data managed by the `balance` module, including tracked
 | usedDays | number | true |
 | remainingDays | number | true |
 | fiscalYear | number | true |
-| status | string | true |
+| status | BalanceStatus | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
@@ -148,7 +223,7 @@ Represents leave policy data managed by the `policy` module, including policy de
 |-------|------|----------|
 | id | string | true |
 | policyName | string | true |
-| leaveType | string | true |
+| leaveType | LeaveType | true |
 | entitlementDays | number | true |
 | accrualRate | number | false |
 | maxAccumulation | number | false |
@@ -158,24 +233,13 @@ Represents leave policy data managed by the `policy` module, including policy de
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
-### LeaveType
-
-| Value | Description |
-|-------|-------------|
-| annual | Annual leave |
-| sick | Sick leave |
-| emergency | Emergency leave |
-| unpaid | Unpaid leave |
-| maternity | Maternity leave |
-| paternity | Paternity leave |
-
 ### LeavePolicy
 
 | Field | Type | Required |
 |-------|------|----------|
 | id | string | true |
 | policyName | string | true |
-| leaveType | string | true |
+| leaveType | LeaveType | true |
 | entitlementDays | number | true |
 | accrualRate | number | false |
 | maxAccumulation | number | false |
@@ -195,10 +259,10 @@ Represents notification data managed by the `notification` module, including not
 |-------|------|----------|
 | id | string | true |
 | recipientId | string | true |
-| type | string | true |
+| type | NotificationType | true |
 | title | string | true |
 | message | string | true |
-| relatedEntityType | string \| null | false |
+| relatedEntityType | EntityType \| null | false |
 | relatedEntityId | string \| null | false |
 | status | 'PENDING' \| 'SENT' \| 'READ' \| 'ARCHIVED' | true |
 | createdAt | Date | true |
@@ -213,9 +277,9 @@ Represents audit data managed by the `audit` module, including audit records, ch
 | Field | Type | Required |
 |-------|------|----------|
 | id | string | true |
-| entityType | string | true |
+| entityType | EntityType | true |
 | entityId | string | true |
-| action | 'CREATE' \| 'UPDATE' \| 'DELETE' \| 'APPROVE' \| 'REJECT' | true |
+| action | AuditAction | true |
 | oldValues | Record<string, any> \| null | false |
 | newValues | Record<string, any> \| null | false |
 | performedBy | string \| null | false |
@@ -228,9 +292,9 @@ Represents audit data managed by the `audit` module, including audit records, ch
 | Field | Type | Required |
 |-------|------|----------|
 | id | string | true |
-| entityType | string | true |
+| entityType | EntityType | true |
 | entityId | string | true |
-| action | 'CREATE' \| 'UPDATE' \| 'DELETE' \| 'APPROVE' \| 'REJECT' | true |
+| action | AuditAction | true |
 | oldValues | Record<string, any> \| null | false |
 | newValues | Record<string, any> \| null | false |
 | performedBy | string \| null | false |

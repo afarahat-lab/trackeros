@@ -32,6 +32,7 @@ src/modules/AuditServiceInterface/    — AuditServiceInterface module
 src/shared/db connection.ts
 src/shared/base repository.ts
 src/shared/error types.ts
+src/shared/types/          — shared TypeScript enums and interfaces (leave.types.ts + barrel index.ts)
 ```
 
 ## Key patterns
