@@ -33,6 +33,7 @@ src/shared/db/connection.ts
 src/shared/db/base.repository.ts
 src/shared/errors/index.ts
 src/shared/types/index.ts
+src/shared/utils/case-conversion.ts
 ```
 
 ## Key patterns
@@ -49,6 +50,21 @@ src/shared/types/index.ts
 - All database access goes through a repository layer — no inline SQL
   / ORM calls in route handlers or business logic
 - No circular dependencies between modules
+
+## Shared utilities
+
+### `src/shared/utils/case-conversion.ts`
+
+A pure utility function `camelToSnakeCase(str: string): string` that converts camelCase strings to snake_case. Used by `BaseRepository.findAll()` to translate filter keys (e.g., `employeeId` → `employee_id`) before constructing SQL WHERE clauses. The function:
+
+- Inserts underscores before uppercase letters and lowercases the result
+- Passes through already-snake_case keys unchanged
+- Handles single-word keys (`id` → `id`) and multi-segment keys (`leaveTypeId` → `leave_type_id`)
+- Does not mutate its input — returns a new string
+
+### `BaseRepository.findAll()` filter-key conversion
+
+The `findAll` method in `BaseRepository` applies `camelToSnakeCase` to every filter key before building the WHERE clause. This allows domain code to use camelCase filter keys (matching TypeScript conventions) while the generated SQL uses snake_case column names (matching PostgreSQL conventions). Filter values continue to use parameterized placeholders (`$1`, `$2`, …).
 
 <!-- gestalt:architecture feature=dad4001c-2c9a-4970-bffb-a47ff1ea15f5 START -->
 ## Leave Management Module — Reconciled Architecture
