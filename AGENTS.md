@@ -19,7 +19,7 @@ Trackeros — a corporate operations web and mobile platform for
   repository,service,controller,routes}.ts. Domain modules
   include leave, balance, employee, policy, notification.
   Shared utilities under src/shared/ (db connection, base
-  repository, error types).
+  repository, error types, shared domain enums).
   
   Frontend: React + Vite SPA for the web client, React Native
   for the mobile client (shared @trackeros/contracts package

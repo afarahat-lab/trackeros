@@ -10,11 +10,23 @@ Base entity providing common fields for domain models.
 | created_at | Date | true |
 | updated_at | Date | true |
 
-## leave
+## shared
 
-Represents a leave record managed by the `leave` module, including leave requests and related leave-tracking data.
+Shared domain types used across all modules. Defined in `src/shared/types/index.ts`.
 
-### LeaveStatus
+### LeaveType
+
+String enum. Canonical values:
+
+| Value | Description |
+|-------|-------------|
+| ANNUAL | Annual leave |
+| SICK | Sick leave |
+| EMERGENCY | Emergency leave |
+
+### LeaveRequestStatus
+
+String enum. Canonical values:
 
 | Value | Description |
 |-------|-------------|
@@ -23,6 +35,21 @@ Represents a leave record managed by the `leave` module, including leave request
 | APPROVED | Leave request has been approved |
 | REJECTED | Leave request has been rejected |
 | CANCELLED | Leave request has been cancelled |
+| REVOKED | Leave request has been revoked after approval |
+
+### BalanceStatus
+
+String enum. Canonical values:
+
+| Value | Description |
+|-------|-------------|
+| ACTIVE | Balance is active and usable |
+| EXHAUSTED | Balance has no remaining days |
+| FROZEN | Balance is frozen (e.g. employee on leave of absence) |
+
+## leave
+
+Represents a leave record managed by the `leave` module, including leave requests and related leave-tracking data.
 
 ### LeaveRequest
 
@@ -89,7 +116,7 @@ Represents leave balance data managed by the `balance` module, including tracked
 | usedDays | number | true |
 | remainingDays | number | true |
 | fiscalYear | number | true |
-| status | string | true |
+| status | BalanceStatus | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
@@ -108,7 +135,7 @@ Represents leave balance data managed by the `balance` module, including tracked
 | usedDays | number | true |
 | remainingDays | number | true |
 | fiscalYear | number | true |
-| status | string | true |
+| status | BalanceStatus | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
@@ -148,7 +175,7 @@ Represents leave policy data managed by the `policy` module, including policy de
 |-------|------|----------|
 | id | string | true |
 | policyName | string | true |
-| leaveType | string | true |
+| leaveType | LeaveType | true |
 | entitlementDays | number | true |
 | accrualRate | number | false |
 | maxAccumulation | number | false |
@@ -158,24 +185,13 @@ Represents leave policy data managed by the `policy` module, including policy de
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
-### LeaveType
-
-| Value | Description |
-|-------|-------------|
-| annual | Annual leave |
-| sick | Sick leave |
-| emergency | Emergency leave |
-| unpaid | Unpaid leave |
-| maternity | Maternity leave |
-| paternity | Paternity leave |
-
 ### LeavePolicy
 
 | Field | Type | Required |
 |-------|------|----------|
 | id | string | true |
 | policyName | string | true |
-| leaveType | string | true |
+| leaveType | LeaveType | true |
 | entitlementDays | number | true |
 | accrualRate | number | false |
 | maxAccumulation | number | false |
