@@ -29,9 +29,10 @@ src/modules/LeavePolicy/    — LeavePolicy module
 src/modules/AuditLog/    — AuditLog module
 src/modules/AuditRecord/    — AuditRecord module
 src/modules/AuditServiceInterface/    — AuditServiceInterface module
-src/shared/db connection.ts
+src/shared/db/connection.ts
 src/shared/base repository.ts
 src/shared/error types.ts
+src/shared/types/index.ts    — shared domain enums (LeaveType, LeaveRequestStatus, BalanceStatus)
 ```
 
 ## Key patterns
