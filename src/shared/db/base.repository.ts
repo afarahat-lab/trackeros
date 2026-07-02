@@ -31,7 +31,9 @@ export abstract class BaseRepository<T extends BaseEntity> {
     }
 
     const entries = Object.entries(filters);
-    const clauses = entries.map(([key], index) => `${key} = $${index + 1}`);
+    const clauses = entries.map(
+      ([key], index) => `${this.toSnakeCase(key)} = $${index + 1}`,
+    );
     const values = entries.map(([, value]) => value);
 
     const result: QueryResult<T> = await this.pool.query(
@@ -39,6 +41,10 @@ export abstract class BaseRepository<T extends BaseEntity> {
       values,
     );
     return result.rows;
+  }
+
+  private toSnakeCase(str: string): string {
+    return str.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
   }
 
   async create(
