@@ -1,0 +1,133 @@
+{
+  "domainChanges": [
+    {
+      "entityName": "LeaveRequestStatus",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "DRAFT",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "SUBMITTED",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "APPROVED",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "REJECTED",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "CANCELLED",
+          "type": "enum-member",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "EmploymentStatus",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "ACTIVE",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "INACTIVE",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "TERMINATED",
+          "type": "enum-member",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "NotFoundError",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "entityName",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "message",
+          "type": "string (derived)",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "ValidationError",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "message",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "fieldErrors",
+          "type": "Record<string, string[]> | undefined",
+          "required": false
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "ConflictError",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "message",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "BaseEntity",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": true
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}

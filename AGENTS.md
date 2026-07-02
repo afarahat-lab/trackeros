@@ -19,7 +19,7 @@ Trackeros — a corporate operations web and mobile platform for
   repository,service,controller,routes}.ts. Domain modules
   include leave, balance, employee, policy, notification.
   Shared utilities under src/shared/ (db connection, base
-  repository, error types).
+  repository, error types, case-conversion utility).
   
   Frontend: React + Vite SPA for the web client, React Native
   for the mobile client (shared @trackeros/contracts package
@@ -55,6 +55,12 @@ user projects use whatever stack matches their description.
 2. All database access through the repository pattern
 3. Every state-changing operation produces an audit record (GP-001)
 4. RBAC enforced at middleware, never inline (GP-002)
+
+## Shared conventions
+
+### Filter-key conversion in BaseRepository
+
+`BaseRepository.findAll()` automatically converts camelCase filter keys to snake_case before constructing SQL WHERE clauses. This means domain code passes filters like `{ employeeId: '123' }` and the repository generates `WHERE employee_id = $1`. The conversion is handled by `src/shared/utils/case-conversion.ts` (pure function, no side effects). Only `findAll` applies this conversion — other repository methods (`findById`, `create`, `update`, `delete`) are not affected.
 
 ## What agents must never do
 
