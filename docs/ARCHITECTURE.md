@@ -29,9 +29,10 @@ src/modules/LeavePolicy/    — LeavePolicy module
 src/modules/AuditLog/    — AuditLog module
 src/modules/AuditRecord/    — AuditRecord module
 src/modules/AuditServiceInterface/    — AuditServiceInterface module
-src/shared/db connection.ts
-src/shared/base repository.ts
-src/shared/error types.ts
+src/shared/db/connection.ts
+src/shared/db/base.repository.ts
+src/shared/errors/index.ts
+src/shared/types/index.ts
 ```
 
 ## Key patterns
@@ -212,7 +213,7 @@ All repositories backed by PostgreSQL via `src/shared/db/connection.ts` (pg Pool
 | **GP-003** (Input validation) | Controllers validate all inputs at the HTTP boundary before delegating to services. |
 | **GP-004** (No sensitive data in logs) | AuditLog captures entity state changes, not PII. Logging in services excludes sensitive fields. |
 | **GP-005** (RBAC enforcement) | Controllers enforce role checks: only managers can approve/reject; only the owning employee can submit/cancel their own requests. |
-| **GP-006** (Error handling) | All async service methods use try/catch with structured error types from `src/shared/errorTypes.ts`. |
+| **GP-006** (Error handling) | All async service methods use try/catch with structured error types from `src/shared/errors/index.ts`. |
 
 ### Stack Compliance
 
