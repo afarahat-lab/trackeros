@@ -100,6 +100,12 @@ Represents a leave record managed by the `leave` module, including leave request
 | status | LeaveStatus | true |
 | approvedBy | string \| null | false |
 | approvedAt | Date \| null | false |
+| rejectedBy | string \| null | false |
+| rejectedAt | Date \| null | false |
+| rejectionReason | string \| null | false |
+| cancelledBy | string \| null | false |
+| cancelledAt | Date \| null | false |
+| cancellationReason | string \| null | false |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
@@ -118,24 +124,28 @@ Represents a leave record managed by the `leave` module, including leave request
 
 ### UpdateLeaveRequestDto
 
+Partial update payload for status transitions and reason fields. All fields are optional.
+
 | Field | Type | Required |
 |-------|------|----------|
-| startDate | Date | false |
-| endDate | Date | false |
-| reason | string \| undefined | false |
+| status | LeaveStatus | false |
+| approvedBy | string | false |
+| approvedAt | Date | false |
+| rejectedBy | string | false |
+| rejectedAt | Date | false |
+| rejectionReason | string | false |
+| cancelledBy | string | false |
+| cancelledAt | Date | false |
+| cancellationReason | string | false |
 
 ### LeaveRequestQueryParams
 
 | Field | Type | Required |
 |-------|------|----------|
+| employeeId | string | false |
 | status | LeaveStatus | false |
-| leaveTypeId | string | false |
-| startDateFrom | Date | false |
-| startDateTo | Date | false |
-| endDateFrom | Date | false |
-| endDateTo | Date | false |
-| limit | number | false |
-| offset | number | false |
+| startDate | Date | false |
+| endDate | Date | false |
 
 ## balance
 
