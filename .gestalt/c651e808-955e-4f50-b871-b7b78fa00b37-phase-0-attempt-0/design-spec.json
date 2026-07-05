@@ -1,0 +1,214 @@
+{
+  "domainChanges": [
+    {
+      "entityName": "LeaveType",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "ANNUAL",
+          "type": "string enum member",
+          "required": true
+        },
+        {
+          "name": "SICK",
+          "type": "string enum member",
+          "required": true
+        },
+        {
+          "name": "EMERGENCY",
+          "type": "string enum member",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "LeaveRequestStatus",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "DRAFT",
+          "type": "string enum member",
+          "required": true
+        },
+        {
+          "name": "SUBMITTED",
+          "type": "string enum member",
+          "required": true
+        },
+        {
+          "name": "APPROVED",
+          "type": "string enum member",
+          "required": true
+        },
+        {
+          "name": "REJECTED",
+          "type": "string enum member",
+          "required": true
+        },
+        {
+          "name": "CANCELLED",
+          "type": "string enum member",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "LeaveBalanceStatus",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "ACTIVE",
+          "type": "string enum member",
+          "required": true
+        },
+        {
+          "name": "EXHAUSTED",
+          "type": "string enum member",
+          "required": true
+        },
+        {
+          "name": "EXPIRED",
+          "type": "string enum member",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "AppError",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "statusCode",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "code",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "message",
+          "type": "string (inherited from Error)",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "NotFoundError",
+          "type": "parent-of"
+        },
+        {
+          "entity": "ValidationError",
+          "type": "parent-of"
+        },
+        {
+          "entity": "ConflictError",
+          "type": "parent-of"
+        },
+        {
+          "entity": "UnauthorizedError",
+          "type": "parent-of"
+        }
+      ]
+    },
+    {
+      "entityName": "NotFoundError",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "statusCode",
+          "type": "number (404)",
+          "required": true
+        },
+        {
+          "name": "code",
+          "type": "string ('NOT_FOUND')",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "AppError",
+          "type": "extends"
+        }
+      ]
+    },
+    {
+      "entityName": "ValidationError",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "statusCode",
+          "type": "number (400)",
+          "required": true
+        },
+        {
+          "name": "code",
+          "type": "string ('VALIDATION_ERROR')",
+          "required": true
+        },
+        {
+          "name": "details",
+          "type": "unknown[]",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "AppError",
+          "type": "extends"
+        }
+      ]
+    },
+    {
+      "entityName": "ConflictError",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "statusCode",
+          "type": "number (409)",
+          "required": true
+        },
+        {
+          "name": "code",
+          "type": "string ('CONFLICT')",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "AppError",
+          "type": "extends"
+        }
+      ]
+    },
+    {
+      "entityName": "UnauthorizedError",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "statusCode",
+          "type": "number (401)",
+          "required": true
+        },
+        {
+          "name": "code",
+          "type": "string ('UNAUTHORIZED')",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "AppError",
+          "type": "extends"
+        }
+      ]
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}
