@@ -1,41 +1,93 @@
-# PLAN.md — Build the leave management module
+# PLAN.md
 
-_Phase plan updated by autonomous phase-split at 2026-06-20T21:10:54.197Z._
+## Phase 1: Phase 1: Shared type enums
 
-## Phases
+Create src/shared/types/leave.types.ts with the canonical enums defined in ARCHITECTURE.md:
 
-### Phase 1: Define core service interfaces (leave, balance, employee) [deployed]
+- `LeaveType` enum: ANNUAL, SICK, MATERNITY, PATERNITY, UNPAID, OTHER
+- `LeaveStatus` enum: PENDING, APPROVED, REJECTED, CANCELLED
+- `NotificationType` enum: LEAVE_REQUEST_CREATED, LEAVE_REQUEST_APPROVED, LEAVE_REQUEST_REJECTED, LEAVE_REQUEST_CANCELLED, LEAVE_BALANCE_LOW, LEAVE_BALANCE_EXPIRING
+- `AuditAction` enum: CREATE, UPDATE, DELETE
+- `EntityType` enum: LEAVE_REQUEST, LEAVE_BALANCE, LEAVE_POLICY, EMPLOYEE, NOTIFICATION
 
-Create src/modules/leave/leave.service.interface.ts, src/modules/balance/balance.service.interface.ts, src/modules/employee/employee.service.interface.ts. Define ILeaveService, IBalanceService, IEmployeeService interfaces. Use domain types LeaveRequest, LeaveBalance, Employee from src/shared/types/index.ts (already exists). Each interface declares method signatures for the respective domain operations.
+Include Jest unit tests in tests/unit/shared/types/leave.types.spec.ts verifying each enum has the correct members. This phase has no dependencies on any other phase — it is the foundation all other phases build on.
 
-### Phase 2: Define supporting service interfaces (policy, notification, audit) [deployed]
+## Phase 2: Phase 2: LeavePolicy model and repository
 
-Create src/modules/policy/policy.service.interface.ts, src/modules/notification/notification.service.interface.ts, src/modules/audit/audit.service.interface.ts. Define IPolicyService, INotificationService, IAuditService interfaces. Use domain types LeavePolicy, Notification, AuditRecord from src/shared/types/index.ts (already exists).
+Create src/modules/policy/policy.model.ts with the `LeavePolicy` interface and `LeavePolicyQueryParams` DTO. The `LeavePolicy` interface must include: id, policyName, leaveType (import LeaveType from src/shared/types/leave.types.ts), entitlementDays, accrualRate, maxAccumulation, minimumNoticeDays, requiresManagerApproval, isActive, allowNegativeBalance, maxConsecutiveDays, fiscalYear, createdAt, updatedAt.
 
-### Phase 3: Implement balance and employee services [deployed]
+Create src/modules/policy/policy.repository.ts with the `ILeavePolicyRepository` interface defining: findById, findByLeaveType, findActivePolicies, create, update, delete. Implement `LeavePolicyRepository` class using the pg Pool from src/shared/db/connection.ts.
 
-Create src/modules/balance/balance.service.ts and tests/unit/modules/balance/balance.service.test.ts. Implement IBalanceService from src/modules/balance/balance.service.interface.ts (Phase 1). Create src/modules/employee/employee.service.ts and tests/unit/modules/employee/employee.service.test.ts. Implement IEmployeeService from src/modules/employee/employee.service.interface.ts (Phase 1). Use domain entities LeaveBalance, Employee from src/shared/types/index.ts. This phase depends on Phase 1 interfaces.
+This phase depends on src/shared/types/leave.types.ts from Phase 1 — read it before generating any code that references LeaveType. Include Jest unit tests in tests/unit/modules/policy/.
 
-### Phase 4: Implement policy service [deployed]
+## Phase 3: Phase 3: LeaveBalance model and repository
 
-Create src/modules/policy/policy.service.ts and tests/unit/modules/policy/policy.service.test.ts. Implement IPolicyService from src/modules/policy/policy.service.interface.ts (Phase 2). Use domain entity LeavePolicy from src/shared/types/index.ts. This phase depends on Phase 2 interface.
+Create src/modules/balance/balance.model.ts with the `LeaveBalance` interface and `LeaveBalanceQueryParams` DTO. The `LeaveBalance` interface must include: id, employeeId, policyId, totalEntitlement, usedDays, pendingDays, availableDays, fiscalYear, createdAt, updatedAt.
 
-### Phase 5: Implement notification and audit services [deployed]
+Create src/modules/balance/balance.repository.ts with the `ILeaveBalanceRepository` interface defining: findByEmployeeId, findByEmployeeAndPolicy, findByEmployeeAndFiscalYear, create, update, deductDays, restoreDays. Implement `LeaveBalanceRepository` class using the pg Pool from src/shared/db/connection.ts.
 
-Create src/modules/notification/notification.service.ts and tests/unit/modules/notification/notification.service.test.ts. Implement INotificationService from src/modules/notification/notification.service.interface.ts (Phase 2). Create src/modules/audit/audit.service.ts and tests/unit/modules/audit/audit.service.test.ts. Implement IAuditService from src/modules/audit/audit.service.interface.ts (Phase 2). Use domain entities Notification, AuditRecord from src/shared/types/index.ts. This phase depends on Phase 2 interfaces.
+This phase depends on src/shared/types/leave.types.ts from Phase 1 and src/modules/policy/policy.model.ts from Phase 2 — read both before generating any code. Include Jest unit tests in tests/unit/modules/balance/.
 
-### Phase 6: Implement leave application service [deployed]
+## Phase 4: Phase 4: LeaveRequest model and repository
 
-Create src/modules/leave/leave.service.ts and tests/unit/modules/leave/leave.service.test.ts. Implement ILeaveService from src/modules/leave/leave.service.interface.ts (Phase 1). Orchestrate leave request lifecycle using IBalanceService, IEmployeeService, IPolicyService, INotificationService, IAuditService (injected via constructor). Use domain entity LeaveRequest from src/shared/types/index.ts. This phase depends on all prior service interfaces and implementations (Phases 1-5).
+Create src/modules/leave/leave.model.ts with the `LeaveRequest` interface, `CreateLeaveRequestDto`, `UpdateLeaveRequestDto`, and `LeaveRequestQueryParams` DTOs. The `LeaveRequest` interface must include: id, employeeId, leaveTypeId, startDate, endDate, reason, status (import LeaveStatus from src/shared/types/leave.types.ts), approvedBy, approvedAt, rejectedBy, rejectedAt, rejectionReason, cancelledBy, cancelledAt, cancellationReason, createdAt, updatedAt.
 
-### Phase 7: Create leave validation schemas [pending]
+Create src/modules/leave/leave.repository.ts with the `ILeaveRepository` interface defining: findById, findByEmployeeId, findByStatus, findByDateRange, findPendingForManager, create, update, updateStatus. Implement `LeaveRepository` class using the pg Pool from src/shared/db/connection.ts.
 
-Create src/modules/leave/leave.validation.ts with Zod schemas for leave request creation, approval, rejection, cancellation, retrieval, and balance lookup.
+This phase depends on src/shared/types/leave.types.ts from Phase 1 — read it before generating any code that references LeaveStatus. Include Jest unit tests in tests/unit/modules/leave/.
 
-### Phase 8: Create leave controller [pending]
+## Phase 5: Phase 5: LeavePolicy service
 
-Create src/modules/leave/leave.controller.ts with the LeaveController class implementing ILeaveController, using ILeaveService from Phase 6.
+Create src/modules/policy/policy.service.interface.ts with the `ILeavePolicyService` interface defining: getPolicyById, getPolicyByLeaveType, getActivePolicies, createPolicy, updatePolicy, deactivatePolicy, validateEntitlement.
 
-### Phase 9: Create leave routes [pending]
+Create src/modules/policy/policy.service.ts with the `LeavePolicyService` class implementing `ILeavePolicyService`. The service must import and use `ILeavePolicyRepository` from src/modules/policy/policy.repository.ts and `LeavePolicy` from src/modules/policy/policy.model.ts.
 
-Create src/modules/leave/leave.routes.ts that registers all leave endpoints on a Fastify instance, applying Zod validation schemas and RBAC middleware.
+This phase depends on src/modules/policy/policy.model.ts and src/modules/policy/policy.repository.ts from Phase 2 — read both before generating any code. Include Jest unit tests in tests/unit/modules/policy/.
+
+## Phase 6: Phase 6: LeaveBalance service
+
+Create src/modules/balance/balance.service.interface.ts with the `ILeaveBalanceService` interface defining: getBalanceByEmployee, getBalancesByEmployeeAndFiscalYear, initializeBalance, getAvailableDays, deductDays, restoreDays, checkSufficientBalance.
+
+Create src/modules/balance/balance.service.ts with the `LeaveBalanceService` class implementing `ILeaveBalanceService`. The service must import and use `ILeaveBalanceRepository` from src/modules/balance/balance.repository.ts and `LeaveBalance` from src/modules/balance/balance.model.ts.
+
+This phase depends on src/modules/balance/balance.model.ts and src/modules/balance/balance.repository.ts from Phase 3 — read both before generating any code. Include Jest unit tests in tests/unit/modules/balance/.
+
+## Phase 7: Phase 7: LeaveRequest service
+
+Create src/modules/leave/leave.service.interface.ts with the `ILeaveService` interface defining: submitLeaveRequest, getLeaveRequestById, getEmployeeLeaveRequests, getPendingRequestsForManager, approveLeaveRequest, rejectLeaveRequest, cancelLeaveRequest.
+
+Create src/modules/leave/leave.service.ts with the `LeaveService` class implementing `ILeaveService`. The service must import and use `ILeaveRepository` from src/modules/leave/leave.repository.ts, `LeaveRequest`/`CreateLeaveRequestDto` from src/modules/leave/leave.model.ts, `ILeavePolicyService` from src/modules/policy/policy.service.interface.ts, and `ILeaveBalanceService` from src/modules/balance/balance.service.interface.ts. The approve/reject/cancel methods must validate the transition is legal (e.g., only PENDING requests can be approved/rejected) and update the status with the actor and timestamp fields.
+
+This phase depends on src/modules/leave/leave.model.ts and src/modules/leave/leave.repository.ts from Phase 4, src/modules/policy/policy.service.interface.ts from Phase 5, and src/modules/balance/balance.service.interface.ts from Phase 6 — read all before generating any code. Include Jest unit tests in tests/unit/modules/leave/.
+
+## Phase 8: Phase 8: LeavePolicy routes
+
+Create src/modules/policy/policy.routes.ts with Fastify route handlers for the leave policy CRUD endpoints. Register routes under a `/policies` prefix. Endpoints: GET /policies (list active policies), GET /policies/:id, GET /policies/type/:leaveType, POST /policies, PUT /policies/:id, DELETE /policies/:id.
+
+The routes must import `LeavePolicyService` from src/modules/policy/policy.service.ts and instantiate it with the repository. Follow the pattern established in src/modules/uptime/uptime.routes.ts — export an async function that accepts FastifyInstance.
+
+Create src/modules/policy/index.ts as the module barrel export, re-exporting from policy.model.ts, policy.repository.ts, policy.service.interface.ts, policy.service.ts, and policy.routes.ts.
+
+This phase depends on src/modules/policy/policy.service.ts from Phase 5 — read it before generating routes. Include Jest integration tests in tests/integration/modules/policy/.
+
+## Phase 9: Phase 9: LeaveBalance routes
+
+Create src/modules/balance/balance.routes.ts with Fastify route handlers for leave balance endpoints. Register routes under a `/balances` prefix. Endpoints: GET /balances/employee/:employeeId, GET /balances/employee/:employeeId/fiscal-year/:year.
+
+The routes must import `LeaveBalanceService` from src/modules/balance/balance.service.ts and instantiate it with the repository. Follow the pattern established in src/modules/uptime/uptime.routes.ts.
+
+Create src/modules/balance/index.ts as the module barrel export, re-exporting from balance.model.ts, balance.repository.ts, balance.service.interface.ts, balance.service.ts, and balance.routes.ts.
+
+This phase depends on src/modules/balance/balance.service.ts from Phase 6 — read it before generating routes. Include Jest integration tests in tests/integration/modules/balance/.
+
+## Phase 10: Phase 10: LeaveRequest routes and app registration
+
+Create src/modules/leave/leave.routes.ts with Fastify route handlers for the leave request endpoints. Register routes under a `/leaves` prefix. Endpoints: POST /leaves (submit a new leave request), GET /leaves/:id, GET /leaves/employee/:employeeId, GET /leaves/pending (manager view of pending requests), PATCH /leaves/:id/approve, PATCH /leaves/:id/reject, PATCH /leaves/:id/cancel.
+
+The routes must import `LeaveService` from src/modules/leave/leave.service.ts and instantiate it with the repository, policy service, and balance service. Follow the pattern established in src/modules/uptime/uptime.routes.ts.
+
+Create src/modules/leave/index.ts as the module barrel export, re-exporting from leave.model.ts, leave.repository.ts, leave.service.interface.ts, leave.service.ts, and leave.routes.ts.
+
+Update src/app.ts to register the new route modules: import and call app.register() for policyRoutes, balanceRoutes, and leaveRoutes alongside the existing uptimeRoutes registration.
+
+This phase depends on src/modules/leave/leave.service.ts from Phase 7, src/modules/policy/policy.routes.ts from Phase 8, and src/modules/balance/balance.routes.ts from Phase 9 — read all before generating any code. Include Jest integration tests in tests/integration/modules/leave/.
