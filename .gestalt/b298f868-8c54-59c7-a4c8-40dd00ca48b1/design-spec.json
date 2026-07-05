@@ -1,0 +1,268 @@
+{
+  "domainChanges": [
+    {
+      "entityName": "LeaveRequest",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string (UUID)",
+          "required": true
+        },
+        {
+          "name": "employeeId",
+          "type": "string (UUID)",
+          "required": true
+        },
+        {
+          "name": "leaveTypeId",
+          "type": "string (UUID)",
+          "required": true
+        },
+        {
+          "name": "startDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "endDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "reason",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "status",
+          "type": "LeaveStatus",
+          "required": true
+        },
+        {
+          "name": "approvedBy",
+          "type": "string (UUID) | null",
+          "required": false
+        },
+        {
+          "name": "approvedAt",
+          "type": "Date | null",
+          "required": false
+        },
+        {
+          "name": "rejectedBy",
+          "type": "string (UUID) | null",
+          "required": false
+        },
+        {
+          "name": "rejectedAt",
+          "type": "Date | null",
+          "required": false
+        },
+        {
+          "name": "rejectionReason",
+          "type": "string | null",
+          "required": false
+        },
+        {
+          "name": "cancelledBy",
+          "type": "string (UUID) | null",
+          "required": false
+        },
+        {
+          "name": "cancelledAt",
+          "type": "Date | null",
+          "required": false
+        },
+        {
+          "name": "cancellationReason",
+          "type": "string | null",
+          "required": false
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "Employee",
+          "type": "many-to-one (via employeeId)"
+        },
+        {
+          "entity": "LeaveType",
+          "type": "many-to-one (via leaveTypeId)"
+        },
+        {
+          "entity": "Employee",
+          "type": "many-to-one nullable (via approvedBy)"
+        },
+        {
+          "entity": "Employee",
+          "type": "many-to-one nullable (via rejectedBy)"
+        },
+        {
+          "entity": "Employee",
+          "type": "many-to-one nullable (via cancelledBy)"
+        }
+      ]
+    },
+    {
+      "entityName": "CreateLeaveRequestDto",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "employeeId",
+          "type": "string (UUID)",
+          "required": true
+        },
+        {
+          "name": "leaveTypeId",
+          "type": "string (UUID)",
+          "required": true
+        },
+        {
+          "name": "startDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "endDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "reason",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "UpdateLeaveRequestDto",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "status",
+          "type": "LeaveStatus",
+          "required": false
+        },
+        {
+          "name": "approvedBy",
+          "type": "string (UUID) | null",
+          "required": false
+        },
+        {
+          "name": "approvedAt",
+          "type": "Date | null",
+          "required": false
+        },
+        {
+          "name": "rejectedBy",
+          "type": "string (UUID) | null",
+          "required": false
+        },
+        {
+          "name": "rejectedAt",
+          "type": "Date | null",
+          "required": false
+        },
+        {
+          "name": "rejectionReason",
+          "type": "string | null",
+          "required": false
+        },
+        {
+          "name": "cancelledBy",
+          "type": "string (UUID) | null",
+          "required": false
+        },
+        {
+          "name": "cancelledAt",
+          "type": "Date | null",
+          "required": false
+        },
+        {
+          "name": "cancellationReason",
+          "type": "string | null",
+          "required": false
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "LeaveRequestQueryParams",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "employeeId",
+          "type": "string (UUID)",
+          "required": false
+        },
+        {
+          "name": "status",
+          "type": "LeaveStatus",
+          "required": false
+        },
+        {
+          "name": "startDate",
+          "type": "Date",
+          "required": false
+        },
+        {
+          "name": "endDate",
+          "type": "Date",
+          "required": false
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [
+    {
+      "method": "GET",
+      "path": "ILeaveRepository.findById(id: string)",
+      "description": "Find a leave request by its UUID. Returns Promise<LeaveRequest | null>. Maps to SQL: SELECT * FROM leave_requests WHERE id = $1.",
+      "requestBody": null,
+      "responseBody": null,
+      "authRequired": false,
+      "roles": []
+    },
+    {
+      "method": "GET",
+      "path": "ILeaveRepository.findByEmployeeId(employeeId: string)",
+      "description": "Find all leave requests for a given employee. Returns Promise<LeaveRequest[]>. Maps to SQL: SELECT * FROM leave_requests WHERE employee_id = $1 ORDER BY created_at DESC.",
+      "requestBody": null,
+      "responseBody": null,
+      "authRequired": false,
+      "roles": []
+    }
+  ],
+  "componentSpecs": [
+    {
+      "name": "LeaveRequest (model)",
+      "type": "component",
+      "description": "Domain model interface for a leave request in src/modules/leave/leave.model.ts. Fields: id (string UUID), employeeId (string UUID FK), leaveTypeId (string UUID FK), startDate (Date), endDate (Date), reason (string, optional), status (LeaveStatus, default PENDING), approvedBy (string UUID | null), approvedAt (Date | null), rejectedBy (string UUID | null), rejectedAt (Date | null), rejectionReason (string | null), cancelledBy (string UUID | null), cancelledAt (Date | null), cancellationReason (string | null), createdAt (Date), updatedAt (Date). Imports LeaveStatus from src/shared/types/leave.types.ts.",
+      "props": null
+    },
+    {
+      "name": "CreateLeaveRequestDto",
+      "type": "component",
+      "description": "DTO for creating a leave request in src/modules/leave/leave.model.ts. Fields: employeeId (string UUID, required), leaveTypeId (string UUID, required), startDate (Date, required), endDate (Date, required), reason (string, optional).",
+      "props": null
+    },
+    {
+      "name": "UpdateLeaveRequestDto",
+      "type": "component",
+      "description": "DTO for updating a leave request in src/modules/leave/leave.model.ts. All fields optional: status (LeaveStatus), approvedBy (string UUID | null), approvedAt (Date | null), rejectedBy (string UUID | null), rejectedAt (Date | null), rejectionReason (string | null), cancelledBy (string UUID | null), cancelledAt (Date | null), cancellationReason (string | null). Grouping rules (e.g., rejection fields must be set together) enforced by the service layer in Phase 3.",
+      "props": null
+    }
+  ]
+}
