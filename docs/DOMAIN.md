@@ -178,22 +178,34 @@ Represents leave policy data managed by the `policy` module, including policy de
 
 ### LeavePolicy
 
+Defined in `src/modules/policy/policy.model.ts`.
+
 | Field | Type | Required |
 |-------|------|----------|
-| id | string | true |
+| id | number | true |
 | policyName | string | true |
 | leaveType | LeaveType | true |
 | entitlementDays | number | true |
-| accrualRate | number | false |
-| maxAccumulation | number | false |
-| minimumNoticeDays | number | false |
+| accrualRate | number | true |
+| maxAccumulation | number | true |
+| minimumNoticeDays | number | true |
 | requiresManagerApproval | boolean | true |
 | isActive | boolean | true |
-| allowNegativeBalance | boolean | false |
-| maxConsecutiveDays | number | false |
-| fiscalYear | number | false |
+| allowNegativeBalance | boolean | true |
+| maxConsecutiveDays | number | true |
+| fiscalYear | number | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
+
+### LeavePolicyQueryParams
+
+Defined in `src/modules/policy/policy.model.ts`. Optional filter parameters for querying policies.
+
+| Field | Type | Required |
+|-------|------|----------|
+| leaveType | LeaveType | false |
+| isActive | boolean | false |
+| fiscalYear | number | false |
 
 ## notification
 
