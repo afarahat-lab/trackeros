@@ -1,0 +1,125 @@
+{
+  "domainChanges": [
+    {
+      "entityName": "LeavePolicy",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string (UUID v4)",
+          "required": true
+        },
+        {
+          "name": "policyName",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "leaveType",
+          "type": "LeaveType (enum from src/shared/types/leave.types.ts)",
+          "required": true
+        },
+        {
+          "name": "entitlementDays",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "accrualRate",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "maxAccumulation",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "minimumNoticeDays",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "requiresManagerApproval",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "isActive",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "allowNegativeBalance",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "maxConsecutiveDays",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "fiscalYear",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "string (ISO 8601)",
+          "required": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "string (ISO 8601)",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "LeaveType",
+          "type": "uses enum from src/shared/types/leave.types.ts"
+        }
+      ]
+    },
+    {
+      "entityName": "LeavePolicyQueryParams",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "leaveType",
+          "type": "LeaveType | undefined",
+          "required": false
+        },
+        {
+          "name": "isActive",
+          "type": "boolean | undefined",
+          "required": false
+        },
+        {
+          "name": "fiscalYear",
+          "type": "number | undefined",
+          "required": false
+        },
+        {
+          "name": "limit",
+          "type": "number | undefined",
+          "required": false
+        },
+        {
+          "name": "offset",
+          "type": "number | undefined",
+          "required": false
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "LeavePolicy",
+          "type": "filters a subset of LeavePolicy queryable fields"
+        }
+      ]
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}
