@@ -1,0 +1,115 @@
+{
+  "domainChanges": [
+    {
+      "entityName": "LeavePolicy",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "policyName",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "leaveType",
+          "type": "LeaveType (imported from src/shared/types/leave.types.ts)",
+          "required": true
+        },
+        {
+          "name": "entitlementDays",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "accrualRate",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "maxAccumulation",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "minimumNoticeDays",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "requiresManagerApproval",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "isActive",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "allowNegativeBalance",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "maxConsecutiveDays",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "fiscalYear",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "LeaveType",
+          "type": "references enum from shared/types/leave.types.ts"
+        }
+      ]
+    },
+    {
+      "entityName": "LeavePolicyQueryParams",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "leaveType",
+          "type": "LeaveType | undefined",
+          "required": false
+        },
+        {
+          "name": "isActive",
+          "type": "boolean | undefined",
+          "required": false
+        },
+        {
+          "name": "fiscalYear",
+          "type": "number | undefined",
+          "required": false
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "LeaveType",
+          "type": "references enum from shared/types/leave.types.ts"
+        }
+      ]
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}
