@@ -1,0 +1,128 @@
+{
+  "domainChanges": [
+    {
+      "entityName": "LeavePolicy",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "policyName",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "leaveType",
+          "type": "LeaveType (enum from src/shared/types/leave.types.ts)",
+          "required": true
+        },
+        {
+          "name": "entitlementDays",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "accrualRate",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "maxAccumulation",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "minimumNoticeDays",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "requiresManagerApproval",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "isActive",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "allowNegativeBalance",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "maxConsecutiveDays",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "fiscalYear",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "LeaveType",
+          "type": "references enum from src/shared/types/leave.types.ts"
+        }
+      ]
+    },
+    {
+      "entityName": "LeavePolicyQueryParams",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "leaveType",
+          "type": "LeaveType | undefined",
+          "required": false
+        },
+        {
+          "name": "isActive",
+          "type": "boolean | undefined",
+          "required": false
+        },
+        {
+          "name": "fiscalYear",
+          "type": "number | undefined",
+          "required": false
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "LeaveType",
+          "type": "references enum from src/shared/types/leave.types.ts"
+        }
+      ]
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": [
+    {
+      "name": "ILeavePolicyRepository",
+      "type": "service",
+      "description": "Repository interface for LeavePolicy persistence. Defines: findById(id: number): Promise<LeavePolicy | null>, findByLeaveType(leaveType: LeaveType): Promise<LeavePolicy[]>, findActivePolicies(params?: LeavePolicyQueryParams): Promise<LeavePolicy[]>, create(policy: Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeavePolicy>, update(id: number, policy: Partial<Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>>): Promise<LeavePolicy | null>, delete(id: number): Promise<boolean>. All methods are async and return Promises. Located at src/modules/policy/policy.repository.ts.",
+      "props": null
+    },
+    {
+      "name": "LeavePolicyRepository",
+      "type": "service",
+      "description": "Concrete implementation of ILeavePolicyRepository using the pg Pool. Constructor accepts an optional Pool parameter (defaults to the shared pool from src/shared/db/connection.ts) enabling test injection. Uses snake_case column names in SQL queries (leave_policies table, columns: policy_name, leave_type, entitlement_days, accrual_rate, max_accumulation, minimum_notice_days, requires_manager_approval, is_active, allow_negative_balance, max_consecutive_days, fiscal_year, created_at, updated_at) mapping to camelCase TypeScript interface fields. The update method builds dynamic SET clauses from provided partial fields and sets updated_at = NOW(). The delete method returns boolean based on rowCount. Located at src/modules/policy/policy.repository.ts.",
+      "props": null
+    }
+  ]
+}
