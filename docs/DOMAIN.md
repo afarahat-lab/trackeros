@@ -10,6 +10,40 @@ Base entity providing common fields for domain models.
 | created_at | Date | true |
 | updated_at | Date | true |
 
+## shared types
+
+Canonical TypeScript string enums live in `src/shared/types/index.ts` (Phase 1 foundation). All modules import from this single source of truth.
+
+### LeaveType
+
+| Value | Description |
+|-------|-------------|
+| ANNUAL | Annual leave |
+| SICK | Sick leave |
+| EMERGENCY | Emergency leave |
+
+> **Note**: UNPAID, MATERNITY, and PATERNITY are deferred to later phases. The canonical `leave_types` table will eventually hold all six values, but the Phase 1 enum only exports the three above.
+
+### LeaveRequestStatus
+
+| Value | Description |
+|-------|-------------|
+| DRAFT | Leave request is in draft state |
+| SUBMITTED | Leave request has been submitted |
+| APPROVED | Leave request has been approved |
+| REJECTED | Leave request has been rejected |
+| CANCELLED | Leave request has been cancelled |
+
+### LeaveBalanceStatus
+
+| Value | Description |
+|-------|-------------|
+| ACTIVE | Balance is active and usable |
+| EXHAUSTED | Balance has been fully consumed |
+| EXPIRED | Balance has expired (e.g. fiscal year rollover) |
+
+> **Note**: FROZEN and CLOSED lifecycle states (referenced in ARCHITECTURE.md) are deferred to later phases.
+
 ## leave
 
 Represents a leave record managed by the `leave` module, including leave requests and related leave-tracking data.
@@ -23,6 +57,8 @@ Represents a leave record managed by the `leave` module, including leave request
 | APPROVED | Leave request has been approved |
 | REJECTED | Leave request has been rejected |
 | CANCELLED | Leave request has been cancelled |
+
+> **Note**: `LeaveStatus` is an alias for the canonical `LeaveRequestStatus` enum in `src/shared/types/index.ts`. Prefer `LeaveRequestStatus` in new code.
 
 ### LeaveRequest
 
@@ -168,6 +204,8 @@ Represents leave policy data managed by the `policy` module, including policy de
 | unpaid | Unpaid leave |
 | maternity | Maternity leave |
 | paternity | Paternity leave |
+
+> **Note**: The canonical `LeaveType` enum in `src/shared/types/index.ts` currently exports only ANNUAL, SICK, EMERGENCY. UNPAID, MATERNITY, and PATERNITY are deferred to later phases.
 
 ### LeavePolicy
 
