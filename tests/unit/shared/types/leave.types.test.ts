@@ -1,0 +1,102 @@
+import {
+  LeaveType,
+  LeaveStatus,
+  LeaveBalanceStatus,
+  EmploymentStatus,
+  NotificationType,
+  AuditAction,
+  EntityType,
+} from '../../../../src/shared/types/leave.types';
+
+describe('LeaveType', () => {
+  it('should have the correct members', () => {
+    expect(LeaveType.ANNUAL).toBe('ANNUAL');
+    expect(LeaveType.SICK).toBe('SICK');
+    expect(LeaveType.MATERNITY).toBe('MATERNITY');
+    expect(LeaveType.PATERNITY).toBe('PATERNITY');
+    expect(LeaveType.UNPAID).toBe('UNPAID');
+    expect(LeaveType.OTHER).toBe('OTHER');
+  });
+
+  it('should have exactly 6 members', () => {
+    expect(Object.keys(LeaveType).length).toBe(6);
+  });
+});
+
+describe('LeaveStatus', () => {
+  it('should have the correct members', () => {
+    expect(LeaveStatus.PENDING).toBe('PENDING');
+    expect(LeaveStatus.APPROVED).toBe('APPROVED');
+    expect(LeaveStatus.REJECTED).toBe('REJECTED');
+    expect(LeaveStatus.CANCELLED).toBe('CANCELLED');
+  });
+
+  it('should have exactly 4 members', () => {
+    expect(Object.keys(LeaveStatus).length).toBe(4);
+  });
+});
+
+describe('LeaveBalanceStatus', () => {
+  it('should have the correct members', () => {
+    expect(LeaveBalanceStatus.ACTIVE).toBe('ACTIVE');
+    expect(LeaveBalanceStatus.EXHAUSTED).toBe('EXHAUSTED');
+    expect(LeaveBalanceStatus.EXPIRED).toBe('EXPIRED');
+  });
+
+  it('should have exactly 3 members', () => {
+    expect(Object.keys(LeaveBalanceStatus).length).toBe(3);
+  });
+});
+
+describe('EmploymentStatus', () => {
+  it('should have the correct members', () => {
+    expect(EmploymentStatus.ACTIVE).toBe('ACTIVE');
+    expect(EmploymentStatus.TERMINATED).toBe('TERMINATED');
+    expect(EmploymentStatus.ON_LEAVE).toBe('ON_LEAVE');
+  });
+
+  it('should have exactly 3 members', () => {
+    expect(Object.keys(EmploymentStatus).length).toBe(3);
+  });
+});
+
+describe('NotificationType', () => {
+  it('should have the correct members', () => {
+    expect(NotificationType.LEAVE_REQUEST_CREATED).toBe('LEAVE_REQUEST_CREATED');
+    expect(NotificationType.LEAVE_REQUEST_APPROVED).toBe('LEAVE_REQUEST_APPROVED');
+    expect(NotificationType.LEAVE_REQUEST_REJECTED).toBe('LEAVE_REQUEST_REJECTED');
+    expect(NotificationType.LEAVE_REQUEST_CANCELLED).toBe('LEAVE_REQUEST_CANCELLED');
+    expect(NotificationType.LEAVE_BALANCE_LOW).toBe('LEAVE_BALANCE_LOW');
+    expect(NotificationType.LEAVE_BALANCE_EXPIRING).toBe('LEAVE_BALANCE_EXPIRING');
+  });
+
+  it('should have exactly 6 members', () => {
+    expect(Object.keys(NotificationType).length).toBe(6);
+  });
+});
+
+describe('AuditAction', () => {
+  it('should have the correct members', () => {
+    expect(AuditAction.CREATE).toBe('CREATE');
+    expect(AuditAction.UPDATE).toBe('UPDATE');
+    expect(AuditAction.DELETE).toBe('DELETE');
+  });
+
+  it('should have exactly 3 members', () => {
+    expect(Object.keys(AuditAction).length).toBe(3);
+  });
+});
+
+describe('EntityType', () => {
+  it('should have the correct members', () => {
+    expect(EntityType.LEAVE_REQUEST).toBe('LEAVE_REQUEST');
+    expect(EntityType.LEAVE_BALANCE).toBe('LEAVE_BALANCE');
+    expect(EntityType.LEAVE_POLICY).toBe('LEAVE_POLICY');
+    expect(EntityType.EMPLOYEE).toBe('EMPLOYEE');
+    expect(EntityType.NOTIFICATION).toBe('NOTIFICATION');
+  });
+
+  it('should have exactly 5 members', () => {
+    expect(Object.keys(EntityType).length).toBe(5);
+  });
+});
