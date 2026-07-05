@@ -1,0 +1,58 @@
+{
+  "domainChanges": [
+    {
+      "entityName": "DomainError",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "message",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "code",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "LeaveDomainError",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "message",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "code",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "DomainError",
+          "type": "extends"
+        }
+      ]
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": [
+    {
+      "name": "ILeaveService",
+      "type": "service",
+      "description": "Interface defining the leave service contract with 7 methods: createLeaveRequest(dto: CreateLeaveRequestDto): Promise<LeaveRequest>, approveLeave(id: string, approverId: string): Promise<LeaveRequest>, rejectLeave(id: string, rejecterId: string, reason: string): Promise<LeaveRequest>, cancelLeave(id: string, cancellerId: string, reason: string): Promise<LeaveRequest>, getLeaveRequestById(id: string): Promise<LeaveRequest | null>, getLeaveRequestsByEmployee(employeeId: string): Promise<LeaveRequest[]>, getLeaveRequestsByStatus(status: LeaveStatus): Promise<LeaveRequest[]>. Defined in src/modules/leave/leave.service.interface.ts.",
+      "props": null
+    },
+    {
+      "name": "LeaveService",
+      "type": "service",
+      "description": "Implements ILeaveService. Injects ILeaveRepository via constructor. Business logic: validates date ranges (startDate before endDate, throws LeaveDomainError if invalid), enforces status transition rules (only PENDING → APPROVED/REJECTED, only APPROVED → CANCELLED, throws LeaveDomainError on invalid transitions), sets timestamps and actor IDs on transitions (approvedBy + approvedAt on approve, rejectedBy + rejectedAt + rejectionReason on reject, cancelledBy + cancelledAt + cancellationReason on cancel). All async errors caught per GP-006. Defined in src/modules/leave/leave.service.ts.",
+      "props": null
+    }
+  ]
+}
