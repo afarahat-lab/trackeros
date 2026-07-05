@@ -1,0 +1,161 @@
+{
+  "domainChanges": [
+    {
+      "entityName": "LeaveType",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "ANNUAL",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "SICK",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "MATERNITY",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "PATERNITY",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "UNPAID",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "OTHER",
+          "type": "enum-member",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "LeaveStatus",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "PENDING",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "APPROVED",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "REJECTED",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "CANCELLED",
+          "type": "enum-member",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "NotificationType",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "LEAVE_REQUEST_CREATED",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "LEAVE_REQUEST_APPROVED",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "LEAVE_REQUEST_REJECTED",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "LEAVE_REQUEST_CANCELLED",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "LEAVE_BALANCE_LOW",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "LEAVE_BALANCE_EXPIRING",
+          "type": "enum-member",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "AuditAction",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "CREATE",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "UPDATE",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "DELETE",
+          "type": "enum-member",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "EntityType",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "LEAVE_REQUEST",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "LEAVE_BALANCE",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "LEAVE_POLICY",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "EMPLOYEE",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "NOTIFICATION",
+          "type": "enum-member",
+          "required": true
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}
