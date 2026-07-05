@@ -19,7 +19,7 @@ Trackeros — a corporate operations web and mobile platform for
   repository,service,controller,routes}.ts. Domain modules
   include leave, balance, employee, policy, notification.
   Shared utilities under src/shared/ (db connection, base
-  repository, error types).
+  repository, error types, shared types).
   
   Frontend: React + Vite SPA for the web client, React Native
   for the mobile client (shared @trackeros/contracts package
@@ -55,6 +55,7 @@ user projects use whatever stack matches their description.
 2. All database access through the repository pattern
 3. Every state-changing operation produces an audit record (GP-001)
 4. RBAC enforced at middleware, never inline (GP-002)
+5. Shared domain enums live in `src/shared/types/leave.types.ts` — this file has zero project-internal dependencies and is the single source of truth for `LeaveType`, `LeaveStatus`, `LeaveBalanceStatus`, `EmploymentStatus`, `NotificationType`, `AuditAction`, and `EntityType`
 
 ## What agents must never do
 

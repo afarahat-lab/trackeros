@@ -32,6 +32,7 @@ src/modules/AuditServiceInterface/    — AuditServiceInterface module
 src/shared/db connection.ts
 src/shared/base repository.ts
 src/shared/error types.ts
+src/shared/types/leave.types.ts    — shared enums: LeaveType, LeaveStatus, LeaveBalanceStatus, EmploymentStatus, NotificationType, AuditAction, EntityType
 ```
 
 ## Key patterns
@@ -48,3 +49,4 @@ src/shared/error types.ts
 - All database access goes through a repository layer — no inline SQL
   / ORM calls in route handlers or business logic
 - No circular dependencies between modules
+- `src/shared/types/leave.types.ts` is a leaf dependency with zero project-internal imports — all modules may depend on it
