@@ -1,0 +1,207 @@
+{
+  "domainChanges": [
+    {
+      "entityName": "LeaveRequest",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "employeeId",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "leaveTypeId",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "startDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "endDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "reason",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "status",
+          "type": "LeaveStatus",
+          "required": true
+        },
+        {
+          "name": "approvedBy",
+          "type": "number | null",
+          "required": true
+        },
+        {
+          "name": "approvedAt",
+          "type": "Date | null",
+          "required": true
+        },
+        {
+          "name": "rejectedBy",
+          "type": "number | null",
+          "required": true
+        },
+        {
+          "name": "rejectedAt",
+          "type": "Date | null",
+          "required": true
+        },
+        {
+          "name": "rejectionReason",
+          "type": "string | null",
+          "required": true
+        },
+        {
+          "name": "cancelledBy",
+          "type": "number | null",
+          "required": true
+        },
+        {
+          "name": "cancelledAt",
+          "type": "Date | null",
+          "required": true
+        },
+        {
+          "name": "cancellationReason",
+          "type": "string | null",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "LeaveStatus",
+          "type": "imports enum from src/shared/types/leave.types.ts"
+        },
+        {
+          "entity": "Employee",
+          "type": "references employeeId (foreign key to employees table)"
+        },
+        {
+          "entity": "LeavePolicy",
+          "type": "references leaveTypeId (foreign key to leave_policies table)"
+        }
+      ]
+    },
+    {
+      "entityName": "CreateLeaveRequestDto",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "employeeId",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "leaveTypeId",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "startDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "endDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "reason",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "UpdateLeaveRequestDto",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "startDate",
+          "type": "Date",
+          "required": false
+        },
+        {
+          "name": "endDate",
+          "type": "Date",
+          "required": false
+        },
+        {
+          "name": "reason",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "leaveTypeId",
+          "type": "number",
+          "required": false
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "LeaveRequestQueryParams",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "employeeId",
+          "type": "number",
+          "required": false
+        },
+        {
+          "name": "leaveTypeId",
+          "type": "number",
+          "required": false
+        },
+        {
+          "name": "status",
+          "type": "LeaveStatus",
+          "required": false
+        },
+        {
+          "name": "startDate",
+          "type": "Date",
+          "required": false
+        },
+        {
+          "name": "endDate",
+          "type": "Date",
+          "required": false
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "LeaveStatus",
+          "type": "imports enum from src/shared/types/leave.types.ts"
+        }
+      ]
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}
