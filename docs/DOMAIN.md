@@ -79,17 +79,25 @@ Represents a leave record managed by the `leave` module, including leave request
 
 ### LeaveRequest
 
+Defined in `src/modules/leave/leave.model.ts`.
+
 | Field | Type | Required |
 |-------|------|----------|
-| id | string | true |
-| employeeId | string | true |
-| leaveTypeId | string | true |
+| id | number | true |
+| employeeId | number | true |
+| leaveTypeId | number | true |
 | startDate | Date | true |
 | endDate | Date | true |
-| reason | string \| undefined | false |
+| reason | string | true |
 | status | LeaveStatus | true |
-| approvedBy | string \| null | false |
+| approvedBy | number \| null | false |
 | approvedAt | Date \| null | false |
+| rejectedBy | number \| null | false |
+| rejectedAt | Date \| null | false |
+| rejectionReason | string \| null | false |
+| cancelledBy | number \| null | false |
+| cancelledAt | Date \| null | false |
+| cancellationReason | string \| null | false |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
@@ -98,34 +106,38 @@ Represents a leave record managed by the `leave` module, including leave request
 
 ### CreateLeaveRequestDto
 
+Defined in `src/modules/leave/leave.model.ts`.
+
 | Field | Type | Required |
 |-------|------|----------|
-| employeeId | string | true |
-| leaveTypeId | string | true |
+| employeeId | number | true |
+| leaveTypeId | number | true |
 | startDate | Date | true |
 | endDate | Date | true |
-| reason | string \| undefined | false |
+| reason | string | true |
 
 ### UpdateLeaveRequestDto
+
+Defined in `src/modules/leave/leave.model.ts`. All fields optional for partial updates.
 
 | Field | Type | Required |
 |-------|------|----------|
 | startDate | Date | false |
 | endDate | Date | false |
-| reason | string \| undefined | false |
+| reason | string | false |
+| leaveTypeId | number | false |
 
 ### LeaveRequestQueryParams
 
+Defined in `src/modules/leave/leave.model.ts`. Optional filter parameters for querying leave requests.
+
 | Field | Type | Required |
 |-------|------|----------|
+| employeeId | number | false |
+| leaveTypeId | number | false |
 | status | LeaveStatus | false |
-| leaveTypeId | string | false |
-| startDateFrom | Date | false |
-| startDateTo | Date | false |
-| endDateFrom | Date | false |
-| endDateTo | Date | false |
-| limit | number | false |
-| offset | number | false |
+| startDate | Date | false |
+| endDate | Date | false |
 
 ## balance
 
