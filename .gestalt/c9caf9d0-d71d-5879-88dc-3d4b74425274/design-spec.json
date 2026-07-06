@@ -1,0 +1,94 @@
+{
+  "domainChanges": [
+    {
+      "entityName": "LeaveBalance",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "employeeId",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "policyId",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "totalEntitlement",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "usedDays",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "pendingDays",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "availableDays",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "fiscalYear",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "LeavePolicy",
+          "type": "belongs-to (via policyId)"
+        },
+        {
+          "entity": "Employee",
+          "type": "belongs-to (via employeeId)"
+        }
+      ]
+    },
+    {
+      "entityName": "LeaveBalanceQueryParams",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "employeeId",
+          "type": "number",
+          "required": false
+        },
+        {
+          "name": "policyId",
+          "type": "number",
+          "required": false
+        },
+        {
+          "name": "fiscalYear",
+          "type": "number",
+          "required": false
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}
