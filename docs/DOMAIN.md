@@ -133,11 +133,13 @@ Represents leave balance data managed by the `balance` module, including tracked
 
 ### LeaveBalance
 
+Defined in `src/modules/balance/balance.model.ts`.
+
 | Field | Type | Required |
 |-------|------|----------|
-| id | string | true |
-| employeeId | string | true |
-| policyId | string | true |
+| id | number | true |
+| employeeId | number | true |
+| policyId | number | true |
 | totalEntitlement | number | true |
 | usedDays | number | true |
 | pendingDays | number | true |
@@ -149,6 +151,16 @@ Represents leave balance data managed by the `balance` module, including tracked
 **Relationships**
 - `Employee` — many-to-one
 - `LeavePolicy` — many-to-one
+
+### LeaveBalanceQueryParams
+
+Defined in `src/modules/balance/balance.model.ts`. Optional filter parameters for querying balances.
+
+| Field | Type | Required |
+|-------|------|----------|
+| employeeId | number | false |
+| policyId | number | false |
+| fiscalYear | number | false |
 
 ## employee
 
