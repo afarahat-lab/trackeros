@@ -58,3 +58,38 @@ Rationale:
 Alternatives considered:
 - Hard delete (`DELETE FROM employees WHERE id = $1`) — rejected because
   it would orphan related records and violate referential integrity.
+
+## ADR-003 — Raw pg driver for repository layer (Knex deferred to migrations)
+
+Date: 2026-06-10
+Status: Accepted
+
+Decision: The repository layer uses the raw `pg` driver (`Pool` from
+`src/shared/db/connection.ts`) with parameterized SQL queries. Knex is
+deferred to Phase 10 for database migrations only.
+
+Rationale:
+- `src/shared/db/connection.ts` already exports a raw `pg.Pool` instance,
+  and the Phase 2 EmployeeRepository was implemented against it with
+  parameterized queries (`$1`, `$2`, …).
+- The intent specification explicitly directs repositories to use "the pg
+  pool from `src/shared/db/connection.ts`", making the raw driver
+  authoritative for the repository layer.
+- Knex remains the planned tool for schema migrations (Phase 10), where
+  its migration runner and seed support add value. The repository layer
+  does not need Knex's query builder — parameterized SQL is sufficient
+  and avoids an unnecessary abstraction.
+
+Alternatives considered:
+- Switch `connection.ts` to export a Knex instance and rewrite all
+  repositories to use the Knex query builder — rejected because it would
+  require refactoring the already-implemented EmployeeRepository and adds
+  complexity without clear benefit at the repository layer.
+- Use Knex for both migrations and repositories — rejected for the same
+  reason; the raw pg driver is simpler and already in place.
+
+Consequences:
+- If Knex is later introduced as the primary query interface, all
+  repositories will need refactoring. This is acceptable because the
+  repository pattern isolates database access behind interfaces, making
+  such a change contained.
