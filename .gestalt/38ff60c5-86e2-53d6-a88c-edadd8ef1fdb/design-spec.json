@@ -1,0 +1,102 @@
+{
+  "domainChanges": [
+    {
+      "entityName": "Employee",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string (UUID)",
+          "required": true
+        },
+        {
+          "name": "employeeNumber",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "firstName",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "lastName",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "email",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "managerId",
+          "type": "string | null",
+          "required": false
+        },
+        {
+          "name": "department",
+          "type": "string | null",
+          "required": false
+        },
+        {
+          "name": "hireDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "terminationDate",
+          "type": "Date | null",
+          "required": false
+        },
+        {
+          "name": "employmentStatus",
+          "type": "EmploymentStatus (from src/shared/types)",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "deletedAt",
+          "type": "Date | null",
+          "required": false
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "EmploymentStatus",
+          "type": "enum-reference (imported from src/shared/types/index.ts)"
+        }
+      ]
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": [
+    {
+      "name": "EmployeeRepository",
+      "type": "service",
+      "description": "Implements IEmployeeRepository (extends IBaseRepository) using the pg pool from src/shared/db/connection.ts. All SQL queries use parameterized placeholders. The repository maps snake_case database columns to camelCase Employee interface fields via a private mapRow helper. All read queries filter out soft-deleted rows. The findActive method filters by both employment_status = ACTIVE AND deleted_at IS NULL. The delete method performs a soft delete. The update method appends updated_at = NOW() automatically and throws ValidationError when no fields are provided, or NotFoundError when the row does not exist.",
+      "props": null
+    },
+    {
+      "name": "IEmployeeRepository",
+      "type": "service",
+      "description": "Interface extending IBaseRepository<Employee> with four employee-specific query methods: findByEmployeeNumber (lookup by unique employee number), findByEmail (lookup by unique email), findByManagerId (list direct reports for a manager), and findActive (list all employees with employmentStatus = ACTIVE and not soft-deleted). All methods return promises and follow the repository pattern mandated by GP-001.",
+      "props": null
+    },
+    {
+      "name": "EmployeeRepositoryUnitTests",
+      "type": "component",
+      "description": "Jest unit tests for EmployeeRepository in tests/unit/modules/employee/employee.repository.spec.ts. Uses a mocked pg pool (jest.mock on src/shared/db/connection). Covers findById (found, not found, soft-delete exclusion), findByEmployeeNumber (found, not found), findByEmail (found, not found), create (insert and return), and update (success, no-fields error). Uses helper factories makeEmployee and makeRow to construct test data and expected database row shapes.",
+      "props": null
+    }
+  ]
+}
