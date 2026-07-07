@@ -1,0 +1,207 @@
+{
+  "domainChanges": [
+    {
+      "entityName": "LeaveType",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "ANNUAL",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "SICK",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "EMERGENCY",
+          "type": "enum-member",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "LeaveRequestStatus",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "DRAFT",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "SUBMITTED",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "APPROVED",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "REJECTED",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "CANCELLED",
+          "type": "enum-member",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "EmploymentStatus",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "ACTIVE",
+          "type": "string-literal",
+          "required": true
+        },
+        {
+          "name": "INACTIVE",
+          "type": "string-literal",
+          "required": true
+        },
+        {
+          "name": "TERMINATED",
+          "type": "string-literal",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "AppError",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "message",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "statusCode",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "code",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "details",
+          "type": "unknown",
+          "required": false
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "NotFoundError",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "statusCode",
+          "type": "404 (fixed)",
+          "required": true
+        },
+        {
+          "name": "code",
+          "type": "NOT_FOUND (fixed)",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "AppError",
+          "type": "extends"
+        }
+      ]
+    },
+    {
+      "entityName": "ValidationError",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "statusCode",
+          "type": "400 (fixed)",
+          "required": true
+        },
+        {
+          "name": "code",
+          "type": "VALIDATION_ERROR (fixed)",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "AppError",
+          "type": "extends"
+        }
+      ]
+    },
+    {
+      "entityName": "ConflictError",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "statusCode",
+          "type": "409 (fixed)",
+          "required": true
+        },
+        {
+          "name": "code",
+          "type": "CONFLICT (fixed)",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "AppError",
+          "type": "extends"
+        }
+      ]
+    },
+    {
+      "entityName": "IBaseRepository&lt;T&gt;",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "findById(id: string): Promise<T | null>",
+          "type": "method-signature",
+          "required": true
+        },
+        {
+          "name": "findAll(filter?: Partial<T>): Promise<T[]>",
+          "type": "method-signature",
+          "required": true
+        },
+        {
+          "name": "create(entity: Partial<T>): Promise<T>",
+          "type": "method-signature",
+          "required": true
+        },
+        {
+          "name": "update(id: string, entity: Partial<T>): Promise<T>",
+          "type": "method-signature",
+          "required": true
+        },
+        {
+          "name": "delete(id: string): Promise<void>",
+          "type": "method-signature",
+          "required": true
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}
