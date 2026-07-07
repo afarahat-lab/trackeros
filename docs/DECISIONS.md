@@ -35,3 +35,26 @@ Description: Trackeros — a corporate operations web and mobile platform for
   null checks).
 Stack: TypeScript / Node.js / React / PostgreSQL
 Architecture: Modular monolith (corporate-ops-web-mobile template, tier 1)
+
+## ADR-002 — Soft delete for Employee records
+
+Date: 2026-06-10
+Status: Accepted
+
+Decision: `EmployeeRepository.delete()` performs a **soft delete** — it sets
+`deleted_at = NOW()` rather than issuing a hard `DELETE FROM employees`.
+
+Rationale:
+- The `Employee` model includes a `deletedAt: Date | null` field, which
+  signals soft-delete semantics.
+- Soft deletes preserve referential integrity for related records (leave
+  requests, balances, audit logs) that reference the employee.
+- All `find*` queries in `EmployeeRepository` filter out soft-deleted rows
+  with `WHERE deleted_at IS NULL`, so deleted employees are invisible to
+  normal application queries.
+- If hard-delete semantics are ever needed, a separate `purge` method can
+  be added without changing the existing contract.
+
+Alternatives considered:
+- Hard delete (`DELETE FROM employees WHERE id = $1`) — rejected because
+  it would orphan related records and violate referential integrity.
