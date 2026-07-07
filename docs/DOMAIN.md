@@ -1,3 +1,68 @@
+## shared
+
+Shared types, errors, and repository contract used across all domain modules.
+
+### LeaveType
+
+Enum defined in `src/shared/types/index.ts`.
+
+| Value | Description |
+|-------|-------------|
+| ANNUAL | Annual leave |
+| SICK | Sick leave |
+| EMERGENCY | Emergency leave |
+
+### LeaveRequestStatus
+
+Enum defined in `src/shared/types/index.ts`.
+
+| Value | Description |
+|-------|-------------|
+| DRAFT | Leave request is in draft state |
+| SUBMITTED | Leave request has been submitted |
+| APPROVED | Leave request has been approved |
+| REJECTED | Leave request has been rejected |
+| CANCELLED | Leave request has been cancelled |
+
+### EmploymentStatus
+
+Type alias defined in `src/shared/types/index.ts` as the string literal union `'ACTIVE' | 'INACTIVE' | 'TERMINATED'`.
+
+### AppError
+
+Abstract base error class defined in `src/shared/errors/index.ts`.
+
+| Field | Type | Required |
+|-------|------|----------|
+| message | string | true |
+| statusCode | number | true |
+| code | string | true |
+| details | unknown | false |
+
+### NotFoundError
+
+Extends `AppError` with `statusCode: 404` and `code: 'NOT_FOUND'`.
+
+### ValidationError
+
+Extends `AppError` with `statusCode: 400` and `code: 'VALIDATION_ERROR'`.
+
+### ConflictError
+
+Extends `AppError` with `statusCode: 409` and `code: 'CONFLICT'`.
+
+### IBaseRepository\<T\>
+
+Generic repository interface defined in `src/shared/base.repository.ts`.
+
+| Method | Signature |
+|--------|-----------|
+| findById | `(id: string) => Promise<T \| null>` |
+| findAll | `(filter?: Partial<T>) => Promise<T[]>` |
+| create | `(entity: Partial<T>) => Promise<T>` |
+| update | `(id: string, entity: Partial<T>) => Promise<T>` |
+| delete | `(id: string) => Promise<void>` |
+
 ## base
 
 Base entity providing common fields for domain models.
@@ -14,16 +79,6 @@ Base entity providing common fields for domain models.
 
 Represents a leave record managed by the `leave` module, including leave requests and related leave-tracking data.
 
-### LeaveStatus
-
-| Value | Description |
-|-------|-------------|
-| DRAFT | Leave request is in draft state |
-| SUBMITTED | Leave request has been submitted |
-| APPROVED | Leave request has been approved |
-| REJECTED | Leave request has been rejected |
-| CANCELLED | Leave request has been cancelled |
-
 ### LeaveRequest
 
 | Field | Type | Required |
@@ -37,6 +92,9 @@ Represents a leave record managed by the `leave` module, including leave request
 | status | LeaveRequestStatus | true |
 | approvedBy | string \| null | false |
 | approvedAt | Date \| null | false |
+| cancelledBy | string \| null | false |
+| cancelledAt | Date \| null | false |
+| cancellationReason | string \| undefined | false |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
@@ -49,30 +107,18 @@ Represents a leave record managed by the `leave` module, including leave request
 |-------|------|----------|
 | employeeId | string | true |
 | leaveTypeId | string | true |
-| startDate | Date | true |
-| endDate | Date | true |
+| startDate | string (ISO date) | true |
+| endDate | string (ISO date) | true |
 | reason | string \| undefined | false |
 
-### UpdateLeaveRequestDto
+### UpdateLeaveRequestStatusDto
 
 | Field | Type | Required |
 |-------|------|----------|
-| startDate | Date | false |
-| endDate | Date | false |
-| reason | string \| undefined | false |
-
-### LeaveRequestQueryParams
-
-| Field | Type | Required |
-|-------|------|----------|
-| status | LeaveRequestStatus | false |
-| leaveTypeId | string | false |
-| startDateFrom | Date | false |
-| startDateTo | Date | false |
-| endDateFrom | Date | false |
-| endDateTo | Date | false |
-| limit | number | false |
-| offset | number | false |
+| status | LeaveRequestStatus | true |
+| approvedBy | string \| undefined | false |
+| cancelledBy | string \| undefined | false |
+| cancellationReason | string \| undefined | false |
 
 ## balance
 
@@ -103,18 +149,34 @@ Represents leave balance data managed by the `balance` module, including tracked
 |-------|------|----------|
 | id | string | true |
 | employeeId | string | true |
-| policyId | string | true |
-| totalEntitlement | number | true |
+| leaveTypeId | string | true |
+| entitledDays | number | true |
 | usedDays | number | true |
-| remainingDays | number | true |
-| fiscalYear | number | true |
-| status | string | true |
+| pendingDays | number | true |
+| availableDays | number | true (computed: entitledDays - usedDays - pendingDays) |
+| year | number | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
 **Relationships**
 - `Employee` — many-to-one
 - `LeavePolicy` — many-to-one
+
+### CreateLeaveBalanceDto
+
+| Field | Type | Required |
+|-------|------|----------|
+| employeeId | string | true |
+| leaveTypeId | string | true |
+| entitledDays | number | true |
+| year | number | true |
+
+### UpdateLeaveBalanceDto
+
+| Field | Type | Required |
+|-------|------|----------|
+| usedDays | number \| undefined | false |
+| pendingDays | number \| undefined | false |
 
 ## employee
 
@@ -133,7 +195,7 @@ Represents employee data managed by the `employee` module, including employee re
 | department | string \| null | false |
 | hireDate | Date | true |
 | terminationDate | Date \| null | false |
-| employmentStatus | 'ACTIVE' \| 'INACTIVE' \| 'TERMINATED' | true |
+| employmentStatus | EmploymentStatus | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 | deletedAt | Date \| null | false |
@@ -158,28 +220,17 @@ Represents leave policy data managed by the `policy` module, including policy de
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
-### LeaveType
-
-| Value | Description |
-|-------|-------------|
-| annual | Annual leave |
-| sick | Sick leave |
-| emergency | Emergency leave |
-| unpaid | Unpaid leave |
-| maternity | Maternity leave |
-| paternity | Paternity leave |
-
 ### LeavePolicy
 
 | Field | Type | Required |
 |-------|------|----------|
 | id | string | true |
 | policyName | string | true |
-| leaveType | string | true |
+| leaveType | LeaveType | true |
 | entitlementDays | number | true |
-| accrualRate | number | false |
-| maxAccumulation | number | false |
-| minimumNoticeDays | number | false |
+| accrualRate | number \| undefined | false |
+| maxAccumulation | number \| undefined | false |
+| minimumNoticeDays | number \| undefined | false |
 | requiresManagerApproval | boolean | true |
 | isActive | boolean | true |
 | createdAt | Date | true |

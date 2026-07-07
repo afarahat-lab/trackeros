@@ -21,17 +21,15 @@ src/modules/balance/balance.{model,repository,service,controller,routes}.ts
 src/modules/employee/employee.{model,repository,service,controller,routes}.ts
 src/modules/policy/policy.{model,repository,service,controller,routes}.ts
 src/modules/notification/notification.{model,repository,service,controller,routes}.ts
-src/modules/LeaveStatus/    — LeaveStatus module
-src/modules/BaseEntity/    — BaseEntity module
-src/modules/LeaveRequest/    — LeaveRequest module
-src/modules/LeaveType/    — LeaveType module
-src/modules/LeavePolicy/    — LeavePolicy module
-src/modules/AuditLog/    — AuditLog module
-src/modules/AuditRecord/    — AuditRecord module
-src/modules/AuditServiceInterface/    — AuditServiceInterface module
-src/shared/db connection.ts
-src/shared/base repository.ts
-src/shared/error types.ts
+```
+
+## Shared utilities
+
+```
+src/shared/types/index.ts          — Canonical enums and type aliases (LeaveType, LeaveRequestStatus, EmploymentStatus)
+src/shared/errors/index.ts         — AppError base class + NotFoundError, ValidationError, ConflictError
+src/shared/base.repository.ts      — Generic IBaseRepository<T> interface contract
+src/shared/db/connection.ts        — PostgreSQL connection pool (Knex)
 ```
 
 ## Key patterns
