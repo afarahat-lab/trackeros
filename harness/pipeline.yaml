@@ -1,0 +1,187 @@
+# pipeline.yaml — corporate-ops-web-mobile pipeline topology (ADR-067)
+#
+# Phase 3 lifts the per-phase loop into an explicit `type: loop` node (the general
+# replacement for `repeats_per_phase`). The loop iterates `phase_plan` (produced by
+# the planner), binding each phase to `current_phase`, and runs the generate / gate /
+# deploy composites per phase. The phase-evaluator is now the loop's CONTROLLER
+# (`gestalt/phase-evaluator`) — it runs as its own activity BETWEEN iterations and
+# returns a verdict (continue / adjust / escalate), subsuming the old `integrate`
+# phase. `max_iterations` (the platform phase cap) is enforced by the interpreter.
+#
+# A loop body — like a composite — is OPAQUE: workflow-level inputs are NOT
+# auto-visible inside it, so the loop declares every workflow value its steps consume
+# (feature_id / base_branch / feature_branch); the per-phase index + scope arrive via
+# the `current_phase` item binding. Each step at every nesting level is its own
+# Temporal activity (ADR-066 checkpoint granularity). Failures inside the loop body
+# RAISE a typed signal into the platform failure envelope (self-heal / park) — the
+# controller steers the happy path only.
+#
+# FeatureCycleWorkflow.run() INTERPRETS this file (the ADR-067 Phase 3 §7 switchover is
+# live — see test_run_uses_interpreter_path). This file is the ground-truth topology; the
+# prior hardcoded orchestration is preserved as _run_hardcoded (intact, unused) until §8.
+# Every `action` node here must have a runtime impl reachable from
+# workflows.dispatchable_action_names() (registry ∪ verdict ∪ code-provider) — enforced by
+# test_action_dispatch, so a validated action can never again die at dispatch.
+
+name: corporate-ops-web-mobile
+version: "3.0.0"
+
+phases:
+  # ── Planning: architecture crew → planner → persist (runs once) ──
+  planning:
+    repeats_per_phase: false
+    stages:
+      - id: architecture-crew
+        type: parallel
+        parallel:
+          - id: domain-design
+            type: agent
+            agent: domain-architect-agent
+            inputs: [feature_description]
+            output: { name: domain_spec, channel: workflow_state }
+          - id: data-design
+            type: agent
+            agent: data-architect-agent
+            inputs: [feature_description]
+            output: { name: data_spec, channel: workflow_state }
+          - id: app-design
+            type: agent
+            agent: app-architect-agent
+            inputs: [feature_description]
+            output: { name: app_spec, channel: workflow_state }
+      - id: reconcile
+        type: agent
+        agent: chief-architect-agent
+        inputs: [domain_spec, data_spec, app_spec]
+        output: { name: architecture, channel: workflow_state }
+      - id: plan
+        type: agent
+        agent: planner-agent
+        inputs: [architecture]
+        output: { name: phase_plan, channel: workflow_state }
+      - id: persist-plan
+        type: action
+        action: persist_plan
+        inputs: [phase_plan, architecture, domain_spec, data_spec, app_spec]
+        output: { name: plan_files, channel: files }
+
+  # ── Build: the per-phase loop. Iterate phase_plan; the phase-evaluator controls
+  #    the loop between iterations (continue / adjust / escalate). ──
+  build:
+    repeats_per_phase: false
+    stages:
+      - id: phase-loop
+        type: loop
+        over: phase_plan
+        # `architecture` (the reconciled full system design) is threaded into the loop
+        # body so intent-agent can cross-check + consult it (ADR-069). It is REFERENCE
+        # context only — every consuming agent's task scope stays its own phase.
+        inputs: [feature_id, base_branch, feature_branch, architecture]
+        item: current_phase
+        output: { name: deploy_result, channel: workflow_state }
+        controller:
+          agent: gestalt/phase-evaluator
+          max_iterations: 10
+        steps:
+          - id: phase-branch
+            type: action
+            action: branch_create
+            inputs: [feature_id, current_phase, base_branch]
+            output: { name: phase_branch, channel: workflow_state }
+          - id: prepare-phase
+            type: action
+            action: prepare_phase
+            inputs: [feature_id, current_phase]
+            output: { name: intent_id, channel: workflow_state }
+          - id: intent
+            type: agent
+            agent: intent-agent
+            # `architecture` is REFERENCE context (ADR-069) — for cross-checking + consulting
+            # chief-architect on cross-phase concerns; intent-agent's task scope is strictly
+            # current_phase. It also makes chief-architect a real data-flow consult predecessor.
+            inputs: [current_phase, intent_id, architecture]
+            output: { name: intent_spec, channel: workflow_state }
+          - id: design
+            type: agent
+            agent: design-agent
+            inputs: [intent_spec]
+            output: { name: design_spec, channel: workflow_state }
+          - id: context
+            type: agent
+            agent: context-agent
+            inputs: [intent_spec]
+            output: { name: context_files, channel: files }
+          # Code-generation composite (ADR-067 Phase 3 amendment A1/A2) — a `work_dir`
+          # composite: every step shares ONE persistent work dir derived from
+          # `phase_branch` (no ephemeral per-step re-clone). The provider action
+          # (openhands_code_agent — swap to aider_code_agent for the Aider backend, a
+          # one-line edit) generates into the shared dir but does NOT discover or commit;
+          # git_status then git_commit_push are separate, reusable, work-dir-scoped steps.
+          # The provider is a VERDICT action: cap-hit-incomplete / zero-write raises a
+          # typed signal into the loop's self-heal envelope. Declares current_phase so the
+          # interpreter can thread the phase index inside this opaque composite.
+          - id: code-generation
+            type: composite
+            work_dir: phase_branch
+            inputs: [intent_spec, design_spec, current_phase, phase_branch]
+            output: { name: commit_sha, channel: workflow_state }
+            steps:
+              - id: generate
+                type: action
+                action: openhands_code_agent
+                inputs: [intent_spec, design_spec, current_phase]
+                output: { name: generation_result, channel: workflow_state }
+              - id: discover
+                type: action
+                action: git_status
+                output: { name: source_writes, channel: workflow_state }
+              - id: commit
+                type: action
+                action: git_commit_push
+                inputs: [source_writes]
+                output: { name: commit_sha, channel: workflow_state }
+          # Deploy + gate — open PR → poll CI → GATE (after CI, ADR-041) → merge.
+          # create_pr / poll_ci / gate are VERDICT nodes: a non-ok result RAISES a
+          # typed signal into the loop's self-heal envelope. The gate is a single
+          # platform action (gate_activity runs constraint + review + synthesis + §2
+          # false-positive detection — those are class-(c) specialized runtimes, not
+          # generic agent nodes), and it runs AFTER CI passes.
+          - id: open-pr
+            type: action
+            action: create_pr
+            inputs: [phase_branch, feature_branch, intent_id]
+            output: { name: pr_ref, channel: workflow_state }
+          - id: poll-ci
+            type: action
+            action: poll_ci
+            inputs: [pr_ref]
+            output: { name: ci_result, channel: workflow_state }
+          - id: gate
+            type: action
+            action: gate
+            inputs: [phase_branch, intent_id, commit_sha, ci_result]
+            output: { name: gate_verdict, channel: workflow_state }
+          # gap-B — the merge MODE is a static param (not a workflow value): a phase
+          # branch merges INTO the feature branch here.
+          - id: merge-phase
+            type: action
+            action: branch_merge
+            inputs: [phase_branch, gate_verdict]
+            params: { kind: phase-to-feature }
+            output: { name: deploy_result, channel: workflow_state }
+
+  # ── Finalize: merge feature→main → mark completed (runs once) ──
+  finalize:
+    repeats_per_phase: false
+    stages:
+      - id: merge-feature
+        type: action
+        action: branch_merge
+        inputs: [feature_branch]
+        params: { kind: feature-to-main }
+        output: { name: feature_merge_sha, channel: workflow_state }
+      - id: mark-complete
+        type: action
+        action: mark_feature_status
+        inputs: [feature_id]
+        output: { name: feature_status, channel: workflow_state }
