@@ -2,6 +2,7 @@
 import { pool } from '../../shared/db/connection';
 import { IBaseRepository } from '../../shared/base.repository';
 import { Employee } from './employee.model';
+import { NotFoundError, ValidationError } from '../../shared/errors';
 
 export interface IEmployeeRepository extends IBaseRepository<Employee> {
   findByEmployeeNumber(employeeNumber: string): Promise<Employee | null>;
@@ -111,6 +112,9 @@ export class EmployeeRepository implements IEmployeeRepository {
       `INSERT INTO employees (${columns.join(', ')}) VALUES (${placeholders.join(', ')}) RETURNING ${EMPLOYEE_COLUMNS.join(', ')}`,
       values,
     );
+    if (result.rows.length === 0) {
+      throw new Error('Failed to create employee');
+    }
     return mapRow(result.rows[0]);
   }
 
@@ -139,7 +143,7 @@ export class EmployeeRepository implements IEmployeeRepository {
     }
 
     if (setClauses.length === 0) {
-      throw new Error('No fields to update');
+      throw new ValidationError('No fields to update');
     }
 
     setClauses.push(`updated_at = NOW()`);
@@ -149,6 +153,9 @@ export class EmployeeRepository implements IEmployeeRepository {
       `UPDATE employees SET ${setClauses.join(', ')} WHERE id = $${paramIndex} AND deleted_at IS NULL RETURNING ${EMPLOYEE_COLUMNS.join(', ')}`,
       values,
     );
+    if (result.rows.length === 0) {
+      throw new NotFoundError('Employee', id);
+    }
     return mapRow(result.rows[0]);
   }
 
