@@ -1,0 +1,95 @@
+{
+  "domainChanges": [
+    {
+      "entityName": "LeavePolicy",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "policyName",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "leaveType",
+          "type": "LeaveType",
+          "required": true
+        },
+        {
+          "name": "entitlementDays",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "accrualRate",
+          "type": "number | null",
+          "required": true
+        },
+        {
+          "name": "maxAccumulation",
+          "type": "number | null",
+          "required": true
+        },
+        {
+          "name": "minimumNoticeDays",
+          "type": "number | null",
+          "required": true
+        },
+        {
+          "name": "requiresManagerApproval",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "isActive",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "LeaveType",
+          "type": "references enum from src/shared/types/leave.types.ts"
+        }
+      ]
+    },
+    {
+      "entityName": "LeavePolicyQueryParams",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "leaveType",
+          "type": "LeaveType",
+          "required": false
+        },
+        {
+          "name": "isActive",
+          "type": "boolean",
+          "required": false
+        },
+        {
+          "name": "policyName",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}
