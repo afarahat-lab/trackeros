@@ -36,8 +36,8 @@ src/shared/error.types.ts
 
 ### Shared layer
 
-- **`src/shared/error.types.ts`** — domain error classes (`NotFoundError`, `ValidationError`, `ConflictError`) extending the native `Error` with correct prototype-chain setup so `instanceof` checks work reliably.
-- **`src/shared/base.repository.ts`** — generic `IBaseRepository<T>` interface declaring `findById`, `findAll`, `create`, `update`, `delete`, and an abstract `BaseKnexRepository<T>` class that accepts a Knex instance and provides partial implementations for subclasses.
+- **`src/shared/error.types.ts`** — domain error classes (`NotFoundError`, `ValidationError`, `ConflictError`) extending the native `Error` with correct prototype-chain setup (`Object.setPrototypeOf`) so `instanceof` checks work reliably.
+- **`src/shared/base.repository.ts`** — generic `IBaseRepository<T>` interface declaring `findById`, `findAll`, `create`, `update`, `delete`, and an abstract `BaseKnexRepository<T extends { id: string }>` class that accepts a Knex instance and `tableName` via constructor and provides concrete implementations of all five `IBaseRepository<T>` methods using the Knex query builder.
 - **`src/shared/db.connection.ts`** — Knex instance factory reading `DATABASE_URL` (Phase 7).
 
 ## Key patterns
