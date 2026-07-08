@@ -1,0 +1,34 @@
+{
+  "domainChanges": [
+    {
+      "entityName": "LeavePolicy",
+      "operation": "update",
+      "fields": [
+        {
+          "name": "accrualRate",
+          "type": "number | null",
+          "required": true
+        },
+        {
+          "name": "maxAccumulation",
+          "type": "number | null",
+          "required": true
+        },
+        {
+          "name": "minimumNoticeDays",
+          "type": "number | null",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "ILeavePolicyRepository",
+      "operation": "update",
+      "fields": [],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}
