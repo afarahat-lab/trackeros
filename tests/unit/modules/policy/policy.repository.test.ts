@@ -5,8 +5,8 @@ import { LeaveType } from '../../../../src/shared/types/leave.types';
 class MockLeavePolicyRepository implements ILeavePolicyRepository {
   private policies: LeavePolicy[] = [];
 
-  async findByLeaveType(leaveType: LeaveType): Promise<LeavePolicy | null> {
-    return this.policies.find((p) => p.leaveType === leaveType) ?? null;
+  async findByLeaveType(leaveType: LeaveType): Promise<LeavePolicy[]> {
+    return this.policies.filter((p) => p.leaveType === leaveType);
   }
 
   async findById(id: string): Promise<LeavePolicy | null> {
@@ -115,19 +115,19 @@ describe('ILeavePolicyRepository', () => {
   });
 
   describe('findByLeaveType', () => {
-    it('should return the policy matching the leave type', async () => {
+    it('should return policies matching the leave type', async () => {
       await repo.create(makePolicyData({ leaveType: LeaveType.ANNUAL }));
       await repo.create(makePolicyData({ leaveType: LeaveType.SICK, policyName: 'Sick Leave Policy' }));
 
-      const found = await repo.findByLeaveType(LeaveType.SICK);
-      expect(found).not.toBeNull();
-      expect(found!.leaveType).toBe(LeaveType.SICK);
-      expect(found!.policyName).toBe('Sick Leave Policy');
+      const results = await repo.findByLeaveType(LeaveType.SICK);
+      expect(results).toHaveLength(1);
+      expect(results[0].leaveType).toBe(LeaveType.SICK);
+      expect(results[0].policyName).toBe('Sick Leave Policy');
     });
 
-    it('should return null when no policy matches the leave type', async () => {
-      const found = await repo.findByLeaveType(LeaveType.EMERGENCY);
-      expect(found).toBeNull();
+    it('should return empty array when no policy matches the leave type', async () => {
+      const results = await repo.findByLeaveType(LeaveType.EMERGENCY);
+      expect(results).toEqual([]);
     });
   });
 
