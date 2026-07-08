@@ -150,44 +150,45 @@ Represents employee data managed by the `employee` module, including employee re
 
 Represents leave policy data managed by the `policy` module, including policy definitions, rules, and leave entitlement configurations.
 
-### Policy
-
-| Field | Type | Required |
-|-------|------|----------|
-| id | string | true |
-| policyName | string | true |
-| leaveType | string | true |
-| entitlementDays | number | true |
-| accrualRate | number | false |
-| maxAccumulation | number | false |
-| minimumNoticeDays | number | false |
-| requiresManagerApproval | boolean | true |
-| isActive | boolean | true |
-| createdAt | Date | true |
-| updatedAt | Date | true |
-
 ### LeaveType
+
+Defined in `src/shared/types/leave.types.ts`.
 
 | Value | Description |
 |-------|-------------|
 | ANNUAL | Annual leave |
 | SICK | Sick leave |
 | EMERGENCY | Emergency leave |
-| UNPAID | Unpaid leave |
-| MATERNITY | Maternity leave |
-| PATERNITY | Paternity leave |
 
-### LeavePolicy
+### Policy
 
 | Field | Type | Required |
 |-------|------|----------|
 | id | string | true |
 | policyName | string | true |
-| leaveType | string | true |
+| leaveType | LeaveType | true |
 | entitlementDays | number | true |
-| accrualRate | number | false |
-| maxAccumulation | number | false |
-| minimumNoticeDays | number | false |
+| accrualRate | number \| null | false |
+| maxAccumulation | number \| null | false |
+| minimumNoticeDays | number \| null | false |
+| requiresManagerApproval | boolean | true |
+| isActive | boolean | true |
+| createdAt | Date | true |
+| updatedAt | Date | true |
+
+### LeavePolicy
+
+Canonical name for the policy entity (see ARCHITECTURE.md reconciliation).
+
+| Field | Type | Required |
+|-------|------|----------|
+| id | string | true |
+| policyName | string | true |
+| leaveType | LeaveType | true |
+| entitlementDays | number | true |
+| accrualRate | number \| null | false |
+| maxAccumulation | number \| null | false |
+| minimumNoticeDays | number \| null | false |
 | requiresManagerApproval | boolean | true |
 | isActive | boolean | true |
 | createdAt | Date | true |
