@@ -1,0 +1,159 @@
+{
+  "domainChanges": [
+    {
+      "entityName": "NotFoundError",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "message",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "entityName",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "entityId",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "ValidationError",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "message",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "validationErrors",
+          "type": "Record<string, string[]>",
+          "required": false
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "ConflictError",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "message",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "conflictingEntity",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "conflictingField",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "IBaseRepository&lt;T&gt;",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "findById",
+          "type": "(id: string) => Promise<T | null>",
+          "required": true
+        },
+        {
+          "name": "findAll",
+          "type": "() => Promise<T[]>",
+          "required": true
+        },
+        {
+          "name": "create",
+          "type": "(entity: Omit<T, 'id'>) => Promise<T>",
+          "required": true
+        },
+        {
+          "name": "update",
+          "type": "(id: string, entity: Partial<T>) => Promise<T>",
+          "required": true
+        },
+        {
+          "name": "delete",
+          "type": "(id: string) => Promise<void>",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "BaseKnexRepository&lt;T&gt;",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "knex",
+          "type": "Knex",
+          "required": true
+        },
+        {
+          "name": "getTableName",
+          "type": "() => string",
+          "required": true
+        },
+        {
+          "name": "findById",
+          "type": "(id: string) => Promise<T | null>",
+          "required": true
+        },
+        {
+          "name": "findAll",
+          "type": "() => Promise<T[]>",
+          "required": true
+        },
+        {
+          "name": "create",
+          "type": "(entity: Omit<T, 'id'>) => Promise<T>",
+          "required": true
+        },
+        {
+          "name": "update",
+          "type": "(id: string, entity: Partial<T>) => Promise<T>",
+          "required": true
+        },
+        {
+          "name": "delete",
+          "type": "(id: string) => Promise<void>",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "IBaseRepository<T>",
+          "type": "implements"
+        }
+      ]
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": [
+    {
+      "name": "NotFoundError",
+      "type": "service",
+      "description": "Error class extending native Error for entity-not-found scenarios. Constructor accepts message, optional entityName and entityId. Uses Object.setPrototypeOf for correct prototype chain so instanceof checks work. Captures stack trace via Error.captureStackTrace.",
+      "props": null
+    },
+    {
+      "name": "ValidationError",
+      "type": "service",
+      "description": "Error class extending native Error for input validation failures. Constructor accepts message and optional validationErrors map (field -> error messages). Uses Object.setPrototypeOf for correct prototype chain. Used by services and controllers to signal invalid state transitions or bad input.",
+      "props": null
+    }
+  ]
+}
