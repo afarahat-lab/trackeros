@@ -37,8 +37,9 @@ function createMockKnex(): jest.Mocked<Knex> {
 }
 
 describe('IBaseRepository interface', () => {
-  it('should define the expected method signatures', () => {
-    const repo = {} as IBaseRepository<TestEntity>;
+  it('should be satisfied by BaseKnexRepository concrete implementation', () => {
+    const mockKnex = createMockKnex();
+    const repo: IBaseRepository<TestEntity> = new TestRepository(mockKnex);
     expect(typeof repo.findById).toBe('function');
     expect(typeof repo.findAll).toBe('function');
     expect(typeof repo.create).toBe('function');
