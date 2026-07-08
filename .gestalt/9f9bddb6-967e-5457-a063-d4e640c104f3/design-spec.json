@@ -1,0 +1,24 @@
+{
+  "domainChanges": [],
+  "apiContracts": [],
+  "componentSpecs": [
+    {
+      "name": "IPolicyService",
+      "type": "service",
+      "description": "Service interface for policy module. Declares six methods: getPolicyByLeaveType(leaveType: LeaveType): Promise<LeavePolicy[]> — returns all policies matching a leave type; getPolicyById(id: string): Promise<LeavePolicy | null> — single-policy lookup; getAllActivePolicies(): Promise<LeavePolicy[]> — returns only active policies; createPolicy(policy: Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeavePolicy> — creates a new policy; updatePolicy(id: string, policy: Partial<Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>>): Promise<LeavePolicy | null> — partial update, returns null if not found; deactivatePolicy(id: string): Promise<LeavePolicy | null> — sets isActive to false via repository update (not softDelete), returns updated policy or null. File: src/modules/policy/policy.service.interface.ts. Imports LeavePolicy from ./policy.model.ts and LeaveType from ../../shared/types/leave.types.ts.",
+      "props": null
+    },
+    {
+      "name": "PolicyService",
+      "type": "service",
+      "description": "Concrete implementation of IPolicyService. Injects ILeavePolicyRepository via constructor (GP-001). Each method delegates directly to the corresponding repository method: getPolicyByLeaveType → repository.findByLeaveType, getPolicyById → repository.findById, getAllActivePolicies → repository.findAll({ isActive: true }), createPolicy → repository.create, updatePolicy → repository.update, deactivatePolicy → repository.update(id, { isActive: false }). No audit logging at this layer — audit is deferred to controller/route layer per ambiguity resolution. File: src/modules/policy/policy.service.ts. Imports IPolicyService from ./policy.service.interface.ts, ILeavePolicyRepository from ./policy.repository.ts, LeavePolicy from ./policy.model.ts, and LeaveType from ../../shared/types/leave.types.ts.",
+      "props": null
+    },
+    {
+      "name": "PolicyServiceUnitTests",
+      "type": "service",
+      "description": "Jest unit tests for PolicyService covering all six IPolicyService methods. File: tests/unit/modules/policy/policy.service.test.ts. Mocks ILeavePolicyRepository. Test cases: (1) getPolicyByLeaveType returns policies for a valid LeaveType; (2) getPolicyById returns policy when found and null when not found; (3) getAllActivePolicies calls findAll with { isActive: true }; (4) createPolicy delegates to repository create and returns the created policy; (5) updatePolicy delegates to repository update and returns updated policy or null; (6) deactivatePolicy calls update with { isActive: false } and returns the updated policy or null. Strict TypeScript — no any, strict null checks, proper return types.",
+      "props": null
+    }
+  ]
+}
