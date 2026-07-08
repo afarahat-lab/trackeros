@@ -1,0 +1,146 @@
+{
+  "domainChanges": [
+    {
+      "entityName": "NotFoundError",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "message",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "ValidationError",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "message",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "ConflictError",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "message",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "IBaseRepository&lt;T&gt;",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "findById",
+          "type": "(id: string) => Promise<T | null>",
+          "required": true
+        },
+        {
+          "name": "findAll",
+          "type": "() => Promise<T[]>",
+          "required": true
+        },
+        {
+          "name": "create",
+          "type": "(entity: Omit<T, 'id'>) => Promise<T>",
+          "required": true
+        },
+        {
+          "name": "update",
+          "type": "(id: string, entity: Partial<T>) => Promise<T>",
+          "required": true
+        },
+        {
+          "name": "delete",
+          "type": "(id: string) => Promise<void>",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "BaseKnexRepository&lt;T extends { id: string }&gt;",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "knex",
+          "type": "Knex",
+          "required": true
+        },
+        {
+          "name": "tableName",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "IBaseRepository<T>",
+          "type": "implements"
+        }
+      ]
+    }
+  ],
+  "apiContracts": [
+    {
+      "method": "GET",
+      "path": "N/A — no REST endpoints in this phase",
+      "description": "Phase 1 produces shared TypeScript interfaces and classes only (error types, base repository). No HTTP API contracts are introduced.",
+      "requestBody": null,
+      "responseBody": null,
+      "authRequired": false,
+      "roles": []
+    }
+  ],
+  "componentSpecs": [
+    {
+      "name": "src/shared/error.types.ts",
+      "type": "service",
+      "description": "Exports three domain error classes — NotFoundError, ValidationError, ConflictError — each extending native Error with Object.setPrototypeOf for correct instanceof behavior. Used across all modules per GP-006.",
+      "props": null
+    },
+    {
+      "name": "src/shared/base.repository.ts",
+      "type": "service",
+      "description": "Exports generic IBaseRepository<T> interface (findById, findAll, create, update, delete) and abstract BaseKnexRepository<T extends { id: string }> class with Knex-based concrete implementations. Constructor accepts Knex instance and tableName string. Foundation for all module repositories per GP-001.",
+      "props": null
+    },
+    {
+      "name": "tests/unit/shared/error.types.test.ts",
+      "type": "service",
+      "description": "Jest unit tests covering instanceof checks, name, message, and cross-type discrimination for NotFoundError, ValidationError, and ConflictError.",
+      "props": null
+    },
+    {
+      "name": "tests/unit/shared/base.repository.test.ts",
+      "type": "service",
+      "description": "Jest unit tests covering findById (found and not-found), findAll, create, update, and delete methods of BaseKnexRepository using a mocked Knex instance.",
+      "props": null
+    }
+  ]
+}
