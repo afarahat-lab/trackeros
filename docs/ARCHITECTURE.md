@@ -29,10 +29,16 @@ src/modules/LeavePolicy/    — LeavePolicy module
 src/modules/AuditLog/    — AuditLog module
 src/modules/AuditRecord/    — AuditRecord module
 src/modules/AuditServiceInterface/    — AuditServiceInterface module
-src/shared/db connection.ts
-src/shared/base repository.ts
-src/shared/error types.ts
+src/shared/db.connection.ts
+src/shared/base.repository.ts
+src/shared/error.types.ts
 ```
+
+### Shared layer
+
+- **`src/shared/error.types.ts`** — domain error classes (`NotFoundError`, `ValidationError`, `ConflictError`) extending the native `Error` with correct prototype-chain setup so `instanceof` checks work reliably.
+- **`src/shared/base.repository.ts`** — generic `IBaseRepository<T>` interface declaring `findById`, `findAll`, `create`, `update`, `delete`, and an abstract `BaseKnexRepository<T>` class that accepts a Knex instance and provides partial implementations for subclasses.
+- **`src/shared/db.connection.ts`** — Knex instance factory reading `DATABASE_URL` (Phase 7).
 
 ## Key patterns
 
@@ -112,15 +118,15 @@ Six tables:
 
 ### Repository interfaces (with concrete implementations)
 
-All repositories use `src/shared/db/connection.ts` (pg Pool). Interfaces defined in each module's `*.repository.ts`:
+All repositories use `src/shared/db.connection.ts` (Knex). Interfaces defined in each module's `*.repository.ts`. Concrete implementations extend `BaseKnexRepository<T>` from `src/shared/base.repository.ts`:
 
 | Interface | Concrete | Module |
 |---|---|---|
-| `ILeaveRequestRepository` | `PgLeaveRequestRepository` | leave |
-| `ILeaveBalanceRepository` | `PgLeaveBalanceRepository` | balance |
-| `ILeavePolicyRepository` | `PgLeavePolicyRepository` | policy |
-| `IEmployeeRepository` | `PgEmployeeRepository` | employee |
-| `IAuditLogRepository` | `PgAuditLogRepository` | audit |
+| `ILeaveRequestRepository` | `KnexLeaveRepository` | leave |
+| `ILeaveBalanceRepository` | `KnexLeaveBalanceRepository` | balance |
+| `ILeavePolicyRepository` | `KnexLeavePolicyRepository` | policy |
+| `IEmployeeRepository` | `KnexEmployeeRepository` | employee |
+| `IAuditLogRepository` | `KnexAuditLogRepository` | audit |
 
 Key repository methods:
 - `ILeaveRequestRepository.findOverlapping(employeeId, startDate, endDate, excludeId?)` — supports BR-002 overlap detection
@@ -170,12 +176,12 @@ No circular edges. Dependencies flow inward. All modules import only through `in
 
 ### Golden Principles compliance
 
-- **GP-001 (Repository pattern)**: All database access through repository interfaces; concrete implementations use `src/shared/db/connection.ts`.
+- **GP-001 (Repository pattern)**: All database access through repository interfaces; concrete implementations extend `BaseKnexRepository<T>` from `src/shared/base.repository.ts`.
 - **GP-002 (Audit records)**: `IAuditService.recordEvent` called on every state-changing operation (submit, approve, reject, cancel, balance deduct/restore).
 - **GP-003 (Input validation)**: Controllers validate inputs before delegating to services; Fastify schema validation on routes.
 - **GP-004 (No sensitive data in logs)**: Audit logs capture entity state changes, not PII.
 - **GP-005 (RBAC enforcement)**: `IEmployeeService.hasRole` checked at controller layer; manager-only endpoints gated by `managerId` match or `HR_ADMIN` role.
-- **GP-006 (Error handling)**: All async service methods wrapped; repository errors surfaced as domain errors.
+- **GP-006 (Error handling)**: All async service methods wrapped; repository errors surfaced as domain errors (`NotFoundError`, `ValidationError`, `ConflictError` from `src/shared/error.types.ts`).
 
 ### Recommended build phases
 
