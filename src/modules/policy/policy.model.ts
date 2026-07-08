@@ -5,9 +5,9 @@ export interface LeavePolicy {
   policyName: string;
   leaveType: LeaveType;
   entitlementDays: number;
-  accrualRate: number;
-  maxAccumulation: number;
-  minimumNoticeDays: number;
+  accrualRate: number | null;
+  maxAccumulation: number | null;
+  minimumNoticeDays: number | null;
   requiresManagerApproval: boolean;
   isActive: boolean;
   createdAt: Date;
