@@ -14,7 +14,7 @@ Base entity providing common fields for domain models.
 
 Represents a leave record managed by the `leave` module, including leave requests and related leave-tracking data.
 
-### LeaveStatus
+### LeaveRequestStatus
 
 | Value | Description |
 |-------|-------------|
@@ -78,6 +78,14 @@ Represents a leave record managed by the `leave` module, including leave request
 
 Represents leave balance data managed by the `balance` module, including tracked entitlement, accrual, and remaining leave amounts.
 
+### BalanceStatus
+
+| Value | Description |
+|-------|-------------|
+| ACTIVE | Balance is active and usable |
+| EXHAUSTED | Balance has no remaining days |
+| FROZEN | Balance is frozen (e.g. employee on long-term leave) |
+
 ### Balance
 
 | Field | Type | Required |
@@ -89,7 +97,7 @@ Represents leave balance data managed by the `balance` module, including tracked
 | usedDays | number | true |
 | remainingDays | number | true |
 | fiscalYear | number | true |
-| status | string | true |
+| status | BalanceStatus | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
@@ -108,7 +116,7 @@ Represents leave balance data managed by the `balance` module, including tracked
 | usedDays | number | true |
 | remainingDays | number | true |
 | fiscalYear | number | true |
-| status | string | true |
+| status | BalanceStatus | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
@@ -162,12 +170,12 @@ Represents leave policy data managed by the `policy` module, including policy de
 
 | Value | Description |
 |-------|-------------|
-| annual | Annual leave |
-| sick | Sick leave |
-| emergency | Emergency leave |
-| unpaid | Unpaid leave |
-| maternity | Maternity leave |
-| paternity | Paternity leave |
+| ANNUAL | Annual leave |
+| SICK | Sick leave |
+| EMERGENCY | Emergency leave |
+| UNPAID | Unpaid leave |
+| MATERNITY | Maternity leave |
+| PATERNITY | Paternity leave |
 
 ### LeavePolicy
 
