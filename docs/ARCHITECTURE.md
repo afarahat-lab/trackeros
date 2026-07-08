@@ -19,7 +19,7 @@ The architecture is modular, with a clear separation of concerns between models,
 src/modules/leave/leave.{model,repository,service,controller,routes}.ts
 src/modules/balance/balance.{model,repository,service,controller,routes}.ts
 src/modules/employee/employee.{model,repository,service,controller,routes}.ts
-src/modules/policy/policy.{model,repository,service,controller,routes}.ts
+src/modules/policy/policy.{model,repository,service,service.interface,controller,routes}.ts
 src/modules/notification/notification.{model,repository,service,controller,routes}.ts
 src/shared/db/connection.ts
 src/shared/db/base repository.ts
@@ -174,7 +174,7 @@ employee ←── balance ←── policy
 | Service | Key Methods |
 |---------|------------|
 | **IEmployeeService** | `getEmployee`, `getManager`, `getEmployeesByManager`, `isManagerOf` |
-| **IPolicyService** | `getPolicy`, `getAllPolicies`, `getDefaultEntitlement`, `validateLeaveRequest`, `isLeaveTypeAllowed` |
+| **IPolicyService** | `getPolicyByLeaveType(leaveType)`, `getPolicyById(id)`, `getAllActivePolicies()`, `createPolicy(policy)`, `updatePolicy(id, policy)`, `deactivatePolicy(id)` |
 | **IBalanceService** | `getBalance`, `getAllBalances`, `deductBalance`, `creditBalance`, `initializeBalances`, `hasSufficientBalance` |
 | **INotificationService** | `notifyLeaveApplied`, `notifyLeaveApproved`, `notifyLeaveRejected`, `notifyLeaveCancelled`, `notifyBalanceLow` |
 | **ILeaveService** | `applyLeave`, `approveLeave`, `rejectLeave`, `cancelLeave`, `getLeaveRequest`, `getLeaveRequestsByEmployee`, `getPendingLeaveRequests`, `getLeaveRequestsByStatus` |
