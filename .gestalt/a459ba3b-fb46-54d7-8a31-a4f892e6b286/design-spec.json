@@ -1,0 +1,91 @@
+{
+  "domainChanges": [
+    {
+      "entityName": "LeavePolicy",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "policyName",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "leaveType",
+          "type": "LeaveType (enum: ANNUAL | SICK | EMERGENCY)",
+          "required": true
+        },
+        {
+          "name": "entitlementDays",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "accrualRate",
+          "type": "number | null",
+          "required": true
+        },
+        {
+          "name": "maxAccumulation",
+          "type": "number | null",
+          "required": true
+        },
+        {
+          "name": "minimumNoticeDays",
+          "type": "number | null",
+          "required": true
+        },
+        {
+          "name": "requiresManagerApproval",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "isActive",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": true
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [
+    {
+      "method": "GET",
+      "path": "N/A — no API contracts in this phase (controllers/routes deferred to Phase 5+)",
+      "description": "This phase is model + repository interface only. No HTTP endpoints are defined.",
+      "requestBody": null,
+      "responseBody": null,
+      "authRequired": false,
+      "roles": []
+    }
+  ],
+  "componentSpecs": [
+    {
+      "name": "LeavePolicy (model)",
+      "type": "component",
+      "description": "TypeScript interface at src/modules/policy/policy.model.ts. Defines 11 attributes: id (string), policyName (string), leaveType (LeaveType enum from src/shared/types/leave.types.ts), entitlementDays (number), accrualRate (number | null), maxAccumulation (number | null), minimumNoticeDays (number | null), requiresManagerApproval (boolean), isActive (boolean), createdAt (Date), updatedAt (Date). Also exports LeavePolicyQueryParams = Partial<Pick<LeavePolicy, 'leaveType' | 'isActive'>>. Leaf module — no internal dependencies beyond shared types.",
+      "props": null
+    },
+    {
+      "name": "ILeavePolicyRepository (interface)",
+      "type": "component",
+      "description": "Repository interface at src/modules/policy/policy.repository.ts. Declares 6 methods: findByLeaveType(leaveType: LeaveType): Promise<LeavePolicy[]>, findById(id: string): Promise<LeavePolicy | null>, findAll(params?: LeavePolicyQueryParams): Promise<LeavePolicy[]>, create(policy: Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeavePolicy>, update(id: string, policy: Partial<Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>>): Promise<LeavePolicy | null>, softDelete(id: string): Promise<boolean>. Concrete PgLeavePolicyRepository implementation deferred to later phase. Unit tests at tests/unit/modules/policy/policy.repository.test.ts use a MockLeavePolicyRepository to verify all 6 method contracts.",
+      "props": null
+    }
+  ]
+}
