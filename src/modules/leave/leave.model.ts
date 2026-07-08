@@ -24,10 +24,12 @@ export interface LeavePolicy {
   leaveTypeId: string;
   entitlementDays: number;
   accrualRate: number;
-  maxCarryoverDays: number;
-  minRequestDays: number;
+  maxAccumulation: number;
+  minimumNoticeDays: number;
   maxConsecutiveDays: number;
   requiresDocumentation: boolean;
+  requiresManagerApproval: boolean;
+  allowNegativeBalance: boolean;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -39,7 +41,7 @@ export interface LeaveRequest {
   leaveTypeId: string;
   startDate: Date;
   endDate: Date;
-  reason: string;
+  reason: string | null;
   status: LeaveRequestStatus;
   approvedBy: string | null;
   approvedAt: Date | null;
@@ -58,17 +60,12 @@ export interface CreateLeaveRequestDto {
   leaveTypeId: string;
   startDate: Date;
   endDate: Date;
-  reason: string;
+  reason?: string;
 }
 
 export interface UpdateLeaveRequestStatusDto {
   status: LeaveRequestStatus;
-  approvedBy?: string;
-  approvedAt?: Date;
-  rejectedBy?: string;
-  rejectedAt?: Date;
+  actorId: string;
   rejectionReason?: string;
-  cancelledBy?: string;
-  cancelledAt?: Date;
   cancellationReason?: string;
 }

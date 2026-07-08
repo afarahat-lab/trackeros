@@ -1,6 +1,6 @@
 import { Knex } from 'knex';
 import {
-  ILeaveRepository,
+  ILeaveRequestRepository,
   KnexLeaveRepository,
 } from '../../../../src/modules/leave/leave.repository';
 import {
@@ -60,10 +60,10 @@ function makeLeaveRequest(overrides: Partial<LeaveRequest> = {}): LeaveRequest {
   };
 }
 
-describe('ILeaveRepository interface', () => {
+describe('ILeaveRequestRepository interface', () => {
   it('should be satisfied by KnexLeaveRepository concrete implementation', () => {
     const mockKnex = createMockKnex();
-    const repo: ILeaveRepository = new KnexLeaveRepository(mockKnex);
+    const repo: ILeaveRequestRepository = new KnexLeaveRepository(mockKnex);
 
     expect(typeof repo.findById).toBe('function');
     expect(typeof repo.findAll).toBe('function');
@@ -205,8 +205,7 @@ describe('KnexLeaveRepository', () => {
     it('should update the status and related fields', async () => {
       const dto: UpdateLeaveRequestStatusDto = {
         status: LeaveRequestStatus.APPROVED,
-        approvedBy: 'mgr-1',
-        approvedAt: new Date('2026-07-05'),
+        actorId: 'mgr-1',
       };
       const updated = makeLeaveRequest({
         status: LeaveRequestStatus.APPROVED,
