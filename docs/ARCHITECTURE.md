@@ -129,7 +129,7 @@ All repositories backed by PostgreSQL via shared connection pool at `src/shared/
 **Key repository methods** (reconciled from data design):
 
 - **ILeaveRequestRepository**: `findById`, `findByEmployeeId`, `findByApproverId`, `findOverlapping`, `create`, `updateStatus`, `update`, `cancel`
-- **ILeaveBalanceRepository**: `findByEmployeeAndPolicy`, `findByEmployeeId`, `create`, `deductDays`, `restoreDays`, `updateEntitlement`
+- **ILeaveBalanceRepository**: `findByEmployeeId`, `findByEmployeeAndPolicy`, `create`, `update`, `deductDays`, `addPendingDays`
 - **ILeavePolicyRepository**: `findById`, `findAllActive`, `findByLeaveType`, `create`, `update`, `deactivate`
 - **IEmployeeRepository**: `findById`, `findByEmail`, `findByManagerId`, `findByDepartment`, `findActive`
 - **IAuditLogRepository**: `create`, `findByEntity`, `findByPerformer`, `findByDateRange`
