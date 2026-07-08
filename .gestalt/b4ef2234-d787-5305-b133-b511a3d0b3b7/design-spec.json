@@ -1,0 +1,119 @@
+{
+  "domainChanges": [
+    {
+      "entityName": "LeaveRequest",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "employeeId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "leavePolicyId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "startDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "endDate",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "reason",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "status",
+          "type": "LeaveRequestStatus",
+          "required": true
+        },
+        {
+          "name": "approvedBy",
+          "type": "string | null",
+          "required": false
+        },
+        {
+          "name": "approvedAt",
+          "type": "Date | null",
+          "required": false
+        },
+        {
+          "name": "rejectedBy",
+          "type": "string | null",
+          "required": false
+        },
+        {
+          "name": "rejectedAt",
+          "type": "Date | null",
+          "required": false
+        },
+        {
+          "name": "rejectionReason",
+          "type": "string | null",
+          "required": false
+        },
+        {
+          "name": "cancelledBy",
+          "type": "string | null",
+          "required": false
+        },
+        {
+          "name": "cancelledAt",
+          "type": "Date | null",
+          "required": false
+        },
+        {
+          "name": "cancellationReason",
+          "type": "string | null",
+          "required": false
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "Employee",
+          "type": "many-to-one (employeeId → Employee.id)"
+        },
+        {
+          "entity": "LeavePolicy",
+          "type": "many-to-one (leavePolicyId → LeavePolicy.id)"
+        },
+        {
+          "entity": "Employee",
+          "type": "many-to-one (approvedBy → Employee.id, nullable)"
+        },
+        {
+          "entity": "Employee",
+          "type": "many-to-one (rejectedBy → Employee.id, nullable)"
+        },
+        {
+          "entity": "Employee",
+          "type": "many-to-one (cancelledBy → Employee.id, nullable)"
+        }
+      ]
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}
