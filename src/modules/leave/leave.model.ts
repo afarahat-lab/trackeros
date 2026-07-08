@@ -24,12 +24,10 @@ export interface LeavePolicy {
   leaveTypeId: string;
   entitlementDays: number;
   accrualRate: number;
-  maxAccumulation: number;
-  minimumNoticeDays: number;
+  maxCarryoverDays: number;
+  minRequestDays: number;
   maxConsecutiveDays: number;
   requiresDocumentation: boolean;
-  requiresManagerApproval: boolean;
-  allowNegativeBalance: boolean;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;

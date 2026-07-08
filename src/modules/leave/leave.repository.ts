@@ -1,6 +1,6 @@
 import { Knex } from 'knex';
 import { BaseKnexRepository, IBaseRepository } from '../../shared/base.repository';
-import { LeaveRequest, CreateLeaveRequestDto, UpdateLeaveRequestStatusDto } from './leave.model';
+import { LeaveRequest, UpdateLeaveRequestStatusDto } from './leave.model';
 
 export interface ILeaveRequestRepository extends IBaseRepository<LeaveRequest> {
   findByEmployeeId(employeeId: string): Promise<LeaveRequest[]>;
@@ -11,7 +11,6 @@ export interface ILeaveRequestRepository extends IBaseRepository<LeaveRequest> {
     endDate: Date,
     excludeId?: string,
   ): Promise<LeaveRequest[]>;
-  create(dto: CreateLeaveRequestDto): Promise<LeaveRequest>;
   updateStatus(id: string, dto: UpdateLeaveRequestStatusDto): Promise<LeaveRequest>;
 }
 
@@ -51,16 +50,6 @@ export class KnexLeaveRepository
     }
 
     return query.select('*');
-  }
-
-  async create(dto: CreateLeaveRequestDto): Promise<LeaveRequest> {
-    const [row] = await this.knex(this.tableName)
-      .insert({
-        ...dto,
-        status: 'DRAFT',
-      })
-      .returning('*');
-    return row;
   }
 
   async updateStatus(id: string, dto: UpdateLeaveRequestStatusDto): Promise<LeaveRequest> {

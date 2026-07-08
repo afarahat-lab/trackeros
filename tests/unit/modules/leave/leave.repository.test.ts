@@ -6,7 +6,6 @@ import {
 import {
   LeaveRequest,
   LeaveRequestStatus,
-  CreateLeaveRequestDto,
   UpdateLeaveRequestStatusDto,
 } from '../../../../src/modules/leave/leave.model';
 
@@ -167,23 +166,31 @@ describe('KnexLeaveRepository', () => {
   });
 
   describe('create', () => {
-    it('should insert a new leave request with DRAFT status', async () => {
-      const dto: CreateLeaveRequestDto = {
+    it('should insert a new leave request', async () => {
+      const input = {
         employeeId: 'emp-1',
         leaveTypeId: 'lt-1',
         startDate: new Date('2026-07-10'),
         endDate: new Date('2026-07-12'),
         reason: 'Vacation',
+        status: LeaveRequestStatus.DRAFT,
+        approvedBy: null,
+        approvedAt: null,
+        rejectedBy: null,
+        rejectedAt: null,
+        rejectionReason: null,
+        cancelledBy: null,
+        cancelledAt: null,
+        cancellationReason: null,
+        createdAt: new Date('2026-07-01'),
+        updatedAt: new Date('2026-07-01'),
       };
       const created = makeLeaveRequest();
       chain().returning.mockResolvedValue([created]);
 
-      const result = await repo.create(dto);
+      const result = await repo.create(input);
       expect(result).toEqual(created);
-      expect(chain().insert).toHaveBeenCalledWith({
-        ...dto,
-        status: 'DRAFT',
-      });
+      expect(chain().insert).toHaveBeenCalledWith(input);
       expect(chain().returning).toHaveBeenCalledWith('*');
     });
   });
