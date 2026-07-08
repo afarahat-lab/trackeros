@@ -1,41 +1,33 @@
-# PLAN.md — Build the leave management module
+# PLAN.md
 
-_Phase plan updated by autonomous phase-split at 2026-06-20T21:10:54.197Z._
+## Phase 1: Phase 1: Shared error types and base repository
 
-## Phases
+Create src/shared/error.types.ts with NotFoundError, ValidationError, ConflictError classes extending Error. Create src/shared/base.repository.ts with a generic IBaseRepository<T> interface defining findById, findAll, create, update, delete methods, and an abstract BaseKnexRepository<T> class that accepts a Knex instance and provides partial implementations. These are prerequisites for the leave module repository. Include Jest unit tests in tests/unit/shared/.
 
-### Phase 1: Define core service interfaces (leave, balance, employee) [deployed]
+## Phase 2: Phase 2: Leave domain model and repository
 
-Create src/modules/leave/leave.service.interface.ts, src/modules/balance/balance.service.interface.ts, src/modules/employee/employee.service.interface.ts. Define ILeaveService, IBalanceService, IEmployeeService interfaces. Use domain types LeaveRequest, LeaveBalance, Employee from src/shared/types/index.ts (already exists). Each interface declares method signatures for the respective domain operations.
+Create src/modules/leave/leave.model.ts with: LeaveRequestStatus enum (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED), LeaveType interface (id, code, name, description, isPaid, requiresDocumentation, isActive, createdAt, updatedAt), LeavePolicy interface (id, policyName, leaveTypeId, entitlementDays, accrualRate, maxCarryoverDays, minRequestDays, maxConsecutiveDays, requiresDocumentation, isActive, createdAt, updatedAt), LeaveRequest interface (id, employeeId, leaveTypeId, startDate, endDate, reason, status: LeaveRequestStatus, approvedBy, approvedAt, rejectedBy, rejectedAt, rejectionReason, cancelledBy, cancelledAt, cancellationReason, createdAt, updatedAt), CreateLeaveRequestDto, and UpdateLeaveRequestStatusDto. Create src/modules/leave/leave.repository.ts with ILeaveRepository interface and KnexLeaveRepository class extending BaseKnexRepository from src/shared/base.repository.ts. This phase depends on src/shared/base.repository.ts and src/shared/error.types.ts from Phase 1 — read them before generating. Include Jest unit tests in tests/unit/modules/leave/leave.repository.test.ts.
 
-### Phase 2: Define supporting service interfaces (policy, notification, audit) [deployed]
+## Phase 3: Phase 3: Leave service interface and implementation
 
-Create src/modules/policy/policy.service.interface.ts, src/modules/notification/notification.service.interface.ts, src/modules/audit/audit.service.interface.ts. Define IPolicyService, INotificationService, IAuditService interfaces. Use domain types LeavePolicy, Notification, AuditRecord from src/shared/types/index.ts (already exists).
+Create src/modules/leave/leave.service.interface.ts with ILeaveService interface declaring: submitLeaveRequest(dto: CreateLeaveRequestDto): Promise<LeaveRequest>, approveLeave(id: string, approverId: string): Promise<LeaveRequest>, rejectLeave(id: string, rejectorId: string, reason: string): Promise<LeaveRequest>, cancelLeave(id: string, cancellerId: string, reason: string): Promise<LeaveRequest>, getLeaveById(id: string): Promise<LeaveRequest>, getLeavesByEmployee(employeeId: string): Promise<LeaveRequest[]>, getPendingLeaves(): Promise<LeaveRequest[]>. Create src/modules/leave/leave.service.ts with LeaveService class implementing ILeaveService. Inject ILeaveRepository via constructor. Implement state-transition validation: DRAFT→SUBMITTED, SUBMITTED→APPROVED|REJECTED, SUBMITTED→CANCELLED. Throw ValidationError from src/shared/error.types.ts for invalid transitions. This phase depends on src/modules/leave/leave.model.ts and src/modules/leave/leave.repository.ts from Phase 2 — read them before generating. Include Jest unit tests in tests/unit/modules/leave/leave.service.test.ts.
 
-### Phase 3: Implement balance and employee services [deployed]
+## Phase 4: Phase 4: Leave controller
 
-Create src/modules/balance/balance.service.ts and tests/unit/modules/balance/balance.service.test.ts. Implement IBalanceService from src/modules/balance/balance.service.interface.ts (Phase 1). Create src/modules/employee/employee.service.ts and tests/unit/modules/employee/employee.service.test.ts. Implement IEmployeeService from src/modules/employee/employee.service.interface.ts (Phase 1). Use domain entities LeaveBalance, Employee from src/shared/types/index.ts. This phase depends on Phase 1 interfaces.
+Create src/modules/leave/leave.controller.ts with LeaveController class. Constructor injects ILeaveService. Methods: submit(req, reply), approve(req, reply), reject(req, reply), cancel(req, reply), getById(req, reply), getByEmployee(req, reply), getPending(req, reply). Each method extracts params/body from the Fastify request, calls the corresponding service method, and sends the appropriate HTTP response (201 for create, 200 for updates/queries). Map domain errors (NotFoundError, ValidationError) to HTTP status codes (404, 400). This phase depends on src/modules/leave/leave.service.interface.ts and src/modules/leave/leave.model.ts from Phases 2-3 — read them before generating. Include Jest unit tests in tests/unit/modules/leave/leave.controller.test.ts mocking ILeaveService.
 
-### Phase 4: Implement policy service [deployed]
+## Phase 5: Phase 5: Leave routes and module registration
 
-Create src/modules/policy/policy.service.ts and tests/unit/modules/policy/policy.service.test.ts. Implement IPolicyService from src/modules/policy/policy.service.interface.ts (Phase 2). Use domain entity LeavePolicy from src/shared/types/index.ts. This phase depends on Phase 2 interface.
+Create src/modules/leave/leave.routes.ts exporting an async function leaveRoutes(fastify: FastifyInstance). Register routes: POST /leaves (submit), PATCH /leaves/:id/approve, PATCH /leaves/:id/reject, PATCH /leaves/:id/cancel, GET /leaves/:id, GET /leaves/employee/:employeeId, GET /leaves/pending. Instantiate KnexLeaveRepository and LeaveService inside the route handler or via fastify.decorate. Create src/modules/leave/index.ts barrel export. Update src/app.ts to register leaveRoutes. This phase depends on src/modules/leave/leave.controller.ts from Phase 4 — read it before generating. Include Jest integration tests in tests/integration/modules/leave/leave.routes.test.ts.
 
-### Phase 5: Implement notification and audit services [deployed]
+## Phase 6: Phase 6: Database migration for leave tables
 
-Create src/modules/notification/notification.service.ts and tests/unit/modules/notification/notification.service.test.ts. Implement INotificationService from src/modules/notification/notification.service.interface.ts (Phase 2). Create src/modules/audit/audit.service.ts and tests/unit/modules/audit/audit.service.test.ts. Implement IAuditService from src/modules/audit/audit.service.interface.ts (Phase 2). Use domain entities Notification, AuditRecord from src/shared/types/index.ts. This phase depends on Phase 2 interfaces.
+Create a Knex migration file in src/db/migrations/ (create the directory if needed) for leave_requests, leave_types, and leave_policies tables. leave_requests columns: id (uuid PK), employee_id, leave_type_id (FK→leave_types), start_date, end_date, reason (nullable), status (enum leave_request_status), approved_by, approved_at, rejected_by, rejected_at, rejection_reason, cancelled_by, cancelled_at, cancellation_reason, created_at, updated_at. leave_types columns: id (uuid PK), code (unique), name, description, is_paid, requires_documentation, is_active, created_at, updated_at. leave_policies columns: id (uuid PK), policy_name, leave_type_id (FK→leave_types), entitlement_days, accrual_rate, max_carryover_days, min_request_days, max_consecutive_days, requires_documentation, is_active, created_at, updated_at. Also create a seed file in src/db/seeds/ with default leave types (annual, sick, emergency). This phase depends on src/modules/leave/leave.model.ts from Phase 2 for the exact field names and types.
 
-### Phase 6: Implement leave application service [deployed]
+## Phase 7: Phase 7: Database connection and Knex configuration
 
-Create src/modules/leave/leave.service.ts and tests/unit/modules/leave/leave.service.test.ts. Implement ILeaveService from src/modules/leave/leave.service.interface.ts (Phase 1). Orchestrate leave request lifecycle using IBalanceService, IEmployeeService, IPolicyService, INotificationService, IAuditService (injected via constructor). Use domain entity LeaveRequest from src/shared/types/index.ts. This phase depends on all prior service interfaces and implementations (Phases 1-5).
+Create src/shared/db.connection.ts exporting a function getDb() that returns a configured Knex instance reading from DATABASE_URL environment variable. Create knexfile.ts at project root exporting the Knex configuration for migrations (pointing to src/db/migrations/ and src/db/seeds/). Add dotenv loading so migrations work from CLI. This phase depends on the migration files from Phase 6 existing at src/db/migrations/. Include a Jest unit test in tests/unit/shared/db.connection.test.ts verifying the Knex instance is created with correct configuration.
 
-### Phase 7: Create leave validation schemas [pending]
+## Phase 8: Phase 5: Leave routes and module registration
 
-Create src/modules/leave/leave.validation.ts with Zod schemas for leave request creation, approval, rejection, cancellation, retrieval, and balance lookup.
-
-### Phase 8: Create leave controller [pending]
-
-Create src/modules/leave/leave.controller.ts with the LeaveController class implementing ILeaveController, using ILeaveService from Phase 6.
-
-### Phase 9: Create leave routes [pending]
-
-Create src/modules/leave/leave.routes.ts that registers all leave endpoints on a Fastify instance, applying Zod validation schemas and RBAC middleware.
+Create src/modules/leave/leave.routes.ts exporting an async function leaveRoutes(fastify: FastifyInstance). Register routes: POST /leaves (submit), PATCH /leaves/:id/approve, PATCH /leaves/:id/reject, PATCH /leaves/:id/cancel, GET /leaves/:id, GET /leaves/employee/:employeeId, GET /leaves/pending. Use getDb() from src/shared/db.connection.ts to instantiate KnexLeaveRepository, then LeaveService, then LeaveController. Create src/modules/leave/index.ts barrel export. Update src/app.ts to register leaveRoutes. This phase depends on src/modules/leave/leave.controller.ts from Phase 4 and src/shared/db.connection.ts from Phase 7 — read them before generating. Include Jest integration tests in tests/integration/modules/leave/leave.routes.test.ts.
