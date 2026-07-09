@@ -1,20 +1,26 @@
-# Implement this phase: Phase 1: Shared foundation — types, base repository, error types
+# Implement this phase: Phase 2: Employee module — model, repository, and tests
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/b05db51f-a0dc-4cb4-93b3-8c6655f6f6af/1`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/b05db51f-a0dc-4cb4-93b3-8c6655f6f6af/2`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create three files that all downstream modules depend on:
+Create the employee domain model and repository together so Aider sees field definitions and their usage in a single context.
 
-1. `src/shared/types/index.ts` — Define the canonical enums: `LeaveType` (values: ANNUAL, SICK, EMERGENCY), `LeaveRequestStatus` (values: PENDING, APPROVED, REJECTED, CANCELLED), and `EmployeeStatus` (values: ACTIVE, INACTIVE, TERMINATED, ON_LEAVE). Export all from a barrel.
+This phase depends on:
+- `src/shared/types/index.ts` from Phase 1 (for `EmployeeStatus`)
+- `src/shared/base.repository.ts` from Phase 1 (for `BaseRepository<T>`)
+- `src/shared/db/connection.ts` (already exists)
 
-2. `src/shared/base.repository.ts` — Define a generic abstract class `BaseRepository<T>` with common CRUD methods: `findById(id: string): Promise<T | null>`, `findAll(filters?: Record<string, unknown>): Promise<T[]>`, `create(entity: Partial<T>): Promise<T>`, `update(id: string, updates: Partial<T>): Promise<T>`, `delete(id: string): Promise<void>`. Accept a `pool: Pool` in the constructor. Import `Pool` from `pg` and the pool from `src/shared/db/connection.ts` (already exists).
+Files to create:
+1. `src/modules/employee/employee.model.ts` — Define the `Employee` interface with exact attributes from the architecture: `id: string`, `employeeNumber: string`, `firstName: string`, `lastName: string`, `email: string`, `managerId: string | null`, `department: string | null`, `hireDate: Date`, `terminationDate: Date | null`, `employmentStatus: EmployeeStatus`, `createdAt: Date`, `updatedAt: Date`. Import `EmployeeStatus` from `src/shared/types/index.ts`.
 
-3. `src/shared/error-types.ts` — Define custom error classes: `NotFoundError`, `ValidationError`, `ConflictError`, `UnauthorizedError`. Each extends `Error` and accepts a message string.
+2. `src/modules/employee/employee.repository.ts` — Define `IEmployeeRepository` interface and `EmployeeRepository` class extending `BaseRepository<Employee>`. Add employee-specific methods: `findByEmployeeNumber(employeeNumber: string): Promise<Employee | null>`, `findByManagerId(managerId: string): Promise<Employee[]>`, `findByDepartment(department: string): Promise<Employee[]>`. Import `Employee` from `./employee.model.ts` and `BaseRepository` from `src/shared/base.repository.ts`.
 
-Include Jest unit tests in `tests/unit/shared/` for the base repository (mock the pool) and error types.
+3. `src/modules/employee/index.ts` — Barrel export of `Employee`, `IEmployeeRepository`, `EmployeeRepository`.
+
+Include Jest unit tests in `tests/unit/modules/employee/` for the repository methods (mock the pool).
 
 ## Project stack
 Before writing code, read `HARNESS.json` in the working directory to learn the project's language, framework, and test runner, and follow the existing conventions in the repository. Read `docs/ARCHITECTURE.md` and `PLAN.md` if present.
