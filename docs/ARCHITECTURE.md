@@ -30,6 +30,7 @@ src/modules/AuditLog/    — AuditLog module
 src/modules/AuditRecord/    — AuditRecord module
 src/modules/AuditServiceInterface/    — AuditServiceInterface module
 src/shared/db connection.ts
+src/shared/types/index.ts
 src/shared/base repository.ts
 src/shared/error types.ts
 ```
