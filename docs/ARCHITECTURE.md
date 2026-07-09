@@ -196,4 +196,10 @@ No circular edges. Dependencies flow inward. All modules import only through `in
 ### Migration notes
 
 The existing PascalCase directories under `src/modules/` (`LeaveStatus`, `LeaveRequest`, `LeaveType`, `LeavePolicy`, `AuditLog`, `AuditRecord`, `AuditServiceInterface`, `BaseEntity`) are superseded by the flat-file module structure defined here. They should be removed or migrated during Phase 1–5 implementation. The existing `status` and `uptime` modules are unrelated and preserved as-is.
+
+### Implementation status (Phase 2 complete)
+
+- **`src/modules/leave/leave.model.ts`** — implemented: `LeaveRequestStatus` enum, `LeaveType`, `LeavePolicy`, `LeaveRequest`, `CreateLeaveRequestDto`, `UpdateLeaveRequestStatusDto` interfaces.
+- **`src/modules/leave/leave.repository.ts`** — implemented: `ILeaveRequestRepository` interface (extends `IBaseRepository<LeaveRequest>`) with `findByEmployeeId`, `findByStatus`, `findOverlapping`, `updateStatus`; `KnexLeaveRepository` class extending `BaseKnexRepository<LeaveRequest>` using table `leave_requests`.
+- **`tests/unit/modules/leave/leave.repository.test.ts`** — implemented: Jest unit tests covering all repository methods with mocked Knex.
 <!-- gestalt:architecture feature=be7ddf67-d8cd-4b4b-9a8e-9a007adf8c79 END -->

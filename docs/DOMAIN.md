@@ -14,7 +14,7 @@ Base entity providing common fields for domain models.
 
 Represents a leave record managed by the `leave` module, including leave requests and related leave-tracking data.
 
-### LeaveStatus
+### LeaveRequestStatus
 
 | Value | Description |
 |-------|-------------|
@@ -23,6 +23,37 @@ Represents a leave record managed by the `leave` module, including leave request
 | APPROVED | Leave request has been approved |
 | REJECTED | Leave request has been rejected |
 | CANCELLED | Leave request has been cancelled |
+
+### LeaveType
+
+| Field | Type | Required |
+|-------|------|----------|
+| id | string | true |
+| code | string | true |
+| name | string | true |
+| description | string | true |
+| isPaid | boolean | true |
+| requiresDocumentation | boolean | true |
+| isActive | boolean | true |
+| createdAt | Date | true |
+| updatedAt | Date | true |
+
+### LeavePolicy
+
+| Field | Type | Required |
+|-------|------|----------|
+| id | string | true |
+| policyName | string | true |
+| leaveTypeId | string | true |
+| entitlementDays | number | true |
+| accrualRate | number | true |
+| maxCarryoverDays | number | true |
+| minRequestDays | number | true |
+| maxConsecutiveDays | number | true |
+| requiresDocumentation | boolean | true |
+| isActive | boolean | true |
+| createdAt | Date | true |
+| updatedAt | Date | true |
 
 ### LeaveRequest
 
@@ -33,15 +64,22 @@ Represents a leave record managed by the `leave` module, including leave request
 | leaveTypeId | string | true |
 | startDate | Date | true |
 | endDate | Date | true |
-| reason | string \| undefined | false |
+| reason | string \| null | false |
 | status | LeaveRequestStatus | true |
 | approvedBy | string \| null | false |
 | approvedAt | Date \| null | false |
+| rejectedBy | string \| null | false |
+| rejectedAt | Date \| null | false |
+| rejectionReason | string \| null | false |
+| cancelledBy | string \| null | false |
+| cancelledAt | Date \| null | false |
+| cancellationReason | string \| null | false |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
 **Relationships**
 - `Employee` — many-to-one
+- `LeaveType` — many-to-one
 
 ### CreateLeaveRequestDto
 
@@ -53,13 +91,14 @@ Represents a leave record managed by the `leave` module, including leave request
 | endDate | Date | true |
 | reason | string \| undefined | false |
 
-### UpdateLeaveRequestDto
+### UpdateLeaveRequestStatusDto
 
 | Field | Type | Required |
 |-------|------|----------|
-| startDate | Date | false |
-| endDate | Date | false |
-| reason | string \| undefined | false |
+| status | LeaveRequestStatus | true |
+| actorId | string | true |
+| rejectionReason | string \| undefined | false |
+| cancellationReason | string \| undefined | false |
 
 ### LeaveRequestQueryParams
 
