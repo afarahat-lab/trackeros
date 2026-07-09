@@ -100,7 +100,7 @@ The leave management module enables employees to apply for annual, sick, emergen
 
 | Interface | Concrete | Module | Key Methods |
 |---|---|---|---|
-| IEmployeeRepository | PgEmployeeRepository | employee | findById, findByEmail, findByManagerId, findAll, create, update |
+| IEmployeeRepository | EmployeeRepository | employee | findById, findAll, create, update, delete, findByEmployeeNumber, findByManagerId, findByDepartment |
 | ILeaveRepository | PgLeaveRepository | leave | findById, findByEmployee, findPendingByManager, findOverlapping, create, updateStatus |
 | IBalanceRepository | PgBalanceRepository | balance | findByEmployeeAndYear, findByEmployeeYearAndPolicy, create, updateUsed, initializeForEmployee |
 | IPolicyRepository | PgPolicyRepository | policy | findByLeaveType, findActive, create, update, deactivate |
