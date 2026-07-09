@@ -2,7 +2,7 @@ import { Knex } from 'knex';
 import { BaseKnexRepository, IBaseRepository } from '../../shared/base.repository';
 import { LeaveRequest, UpdateLeaveRequestStatusDto } from './leave.model';
 
-export interface ILeaveRequestRepository extends IBaseRepository<LeaveRequest> {
+export interface ILeaveRepository extends IBaseRepository<LeaveRequest> {
   findByEmployeeId(employeeId: string): Promise<LeaveRequest[]>;
   findByStatus(status: string): Promise<LeaveRequest[]>;
   findOverlapping(
@@ -16,7 +16,7 @@ export interface ILeaveRequestRepository extends IBaseRepository<LeaveRequest> {
 
 export class KnexLeaveRepository
   extends BaseKnexRepository<LeaveRequest>
-  implements ILeaveRequestRepository
+  implements ILeaveRepository
 {
   constructor(knex: Knex, tableName: string = 'leave_requests') {
     super(knex, tableName);

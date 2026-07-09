@@ -1,6 +1,6 @@
 import { Knex } from 'knex';
 import {
-  ILeaveRequestRepository,
+  ILeaveRepository,
   KnexLeaveRepository,
 } from '../../../../src/modules/leave/leave.repository';
 import {
@@ -59,10 +59,10 @@ function makeLeaveRequest(overrides: Partial<LeaveRequest> = {}): LeaveRequest {
   };
 }
 
-describe('ILeaveRequestRepository interface', () => {
+describe('ILeaveRepository interface', () => {
   it('should be satisfied by KnexLeaveRepository concrete implementation', () => {
     const mockKnex = createMockKnex();
-    const repo: ILeaveRequestRepository = new KnexLeaveRepository(mockKnex);
+    const repo: ILeaveRepository = new KnexLeaveRepository(mockKnex);
 
     expect(typeof repo.findById).toBe('function');
     expect(typeof repo.findAll).toBe('function');
