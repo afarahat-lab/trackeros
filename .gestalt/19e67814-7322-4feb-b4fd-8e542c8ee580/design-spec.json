@@ -1,0 +1,97 @@
+{
+  "domainChanges": [
+    {
+      "entityName": "LeaveType",
+      "operation": "update",
+      "fields": [
+        {
+          "name": "ANNUAL",
+          "type": "enum",
+          "required": true
+        },
+        {
+          "name": "SICK",
+          "type": "enum",
+          "required": true
+        },
+        {
+          "name": "EMERGENCY",
+          "type": "enum",
+          "required": true
+        },
+        {
+          "name": "UNPAID",
+          "type": "enum",
+          "required": true
+        },
+        {
+          "name": "MATERNITY",
+          "type": "enum",
+          "required": true
+        },
+        {
+          "name": "PATERNITY",
+          "type": "enum",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "LeaveRequestStatus",
+      "operation": "update",
+      "fields": [
+        {
+          "name": "DRAFT",
+          "type": "enum",
+          "required": true
+        },
+        {
+          "name": "SUBMITTED",
+          "type": "enum",
+          "required": true
+        },
+        {
+          "name": "APPROVED",
+          "type": "enum",
+          "required": true
+        },
+        {
+          "name": "REJECTED",
+          "type": "enum",
+          "required": true
+        },
+        {
+          "name": "CANCELLED",
+          "type": "enum",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "EmployeeStatus",
+      "operation": "update",
+      "fields": [
+        {
+          "name": "ACTIVE",
+          "type": "enum",
+          "required": true
+        },
+        {
+          "name": "INACTIVE",
+          "type": "enum",
+          "required": true
+        },
+        {
+          "name": "TERMINATED",
+          "type": "enum",
+          "required": true
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}
