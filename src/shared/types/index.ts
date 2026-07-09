@@ -2,14 +2,10 @@ export enum LeaveType {
   ANNUAL = 'ANNUAL',
   SICK = 'SICK',
   EMERGENCY = 'EMERGENCY',
-  UNPAID = 'UNPAID',
-  MATERNITY = 'MATERNITY',
-  PATERNITY = 'PATERNITY',
 }
 
 export enum LeaveRequestStatus {
-  DRAFT = 'DRAFT',
-  SUBMITTED = 'SUBMITTED',
+  PENDING = 'PENDING',
   APPROVED = 'APPROVED',
   REJECTED = 'REJECTED',
   CANCELLED = 'CANCELLED',
@@ -19,4 +15,5 @@ export enum EmployeeStatus {
   ACTIVE = 'ACTIVE',
   INACTIVE = 'INACTIVE',
   TERMINATED = 'TERMINATED',
+  ON_LEAVE = 'ON_LEAVE',
 }

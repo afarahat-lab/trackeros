@@ -1,48 +1,25 @@
-# Fix specific quality-gate violations: Phase 1: Shared foundation — types, base repository, error types
+# Implement this phase: Phase 1: Shared foundation — types, base repository, error types
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/fix/b05db51f-a0dc-4cb4-93b3-8c6655f6f6af/1/1`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/b05db51f-a0dc-4cb4-93b3-8c6655f6f6af/1`. Do not clone anything; work only in this directory.
 
-You are fixing SPECIFIC violations the quality gate found in EXISTING, already-committed files. Make ONLY the targeted edits listed below — do NOT refactor, regenerate, or change anything else.
+## What to build
+(no phase architecture provided — infer from the success criteria below)
 
-The files ALREADY EXIST. You MUST edit them in place with the `str_replace_editor` tool. Reading or viewing a file is NOT sufficient — you have NOT finished until you have edited EVERY file listed below.
+## Success criteria
+Create three files that all downstream modules depend on:
 
-## Required edits
+1. `src/shared/types/index.ts` — Define the canonical enums: `LeaveType` (values: ANNUAL, SICK, EMERGENCY), `LeaveRequestStatus` (values: PENDING, APPROVED, REJECTED, CANCELLED), and `EmployeeStatus` (values: ACTIVE, INACTIVE, TERMINATED, ON_LEAVE). Export all from a barrel.
 
-### Coherent change 1 — apply as ONE atomic edit across ALL sites below
+2. `src/shared/base.repository.ts` — Define a generic abstract class `BaseRepository<T>` with common CRUD methods: `findById(id: string): Promise<T | null>`, `findAll(filters?: Record<string, unknown>): Promise<T[]>`, `create(entity: Partial<T>): Promise<T>`, `update(id: string, updates: Partial<T>): Promise<T>`, `delete(id: string): Promise<void>`. Accept a `pool: Pool` in the constructor. Import `Pool` from `pg` and the pool from `src/shared/db/connection.ts` (already exists).
 
-Unifying change (do this now): Rewrite all three enums in src/shared/types/index.ts to match ARCHITECTURE.md exactly: LeaveType gains UNPAID, MATERNITY, PATERNITY; LeaveRequestStatus replaces PENDING with DRAFT and SUBMITTED; EmployeeStatus drops ON_LEAVE. Update the corresponding Jest tests to use the corrected enum values.
+3. `src/shared/error-types.ts` — Define custom error classes: `NotFoundError`, `ValidationError`, `ConflictError`, `UnauthorizedError`. Each extends `Error` and accepts a message string.
 
-The sites below are the SAME underlying issue. Fixing some but not others leaves the code incoherent and the quality gate WILL re-flag it — apply the one change above consistently to EVERY site:
+Include Jest unit tests in `tests/unit/shared/` for the base repository (mock the pool) and error types.
 
-- Site 1
-File: src/shared/types/index.ts
-Line: 4
-Offending code: `EMERGENCY = 'EMERGENCY',`
-Rule violated: review/architecture
-Action (do this now): Edit `src/shared/types/index.ts` at line 4 in place to fix the `review/architecture` violation.
-What the quality gate found — apply this: [review/architecture] LeaveType enum is missing three values declared in ARCHITECTURE.md: UNPAID, MATERNITY, PATERNITY. The architecture specifies six leave types; only three are implemented.
-
-- Site 2
-File: src/shared/types/index.ts
-Line: 8
-Offending code: `PENDING = 'PENDING',`
-Rule violated: review/architecture
-Action (do this now): Edit `src/shared/types/index.ts` at line 8 in place to fix the `review/architecture` violation.
-What the quality gate found — apply this: [review/architecture] LeaveRequestStatus uses 'PENDING' but ARCHITECTURE.md defines the lifecycle as DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED. The 'PENDING' value conflates DRAFT and SUBMITTED into a single state, breaking BR-013 notification rules which distinguish DRAFT→SUBMITTED transitions.
-
-- Site 3
-File: src/shared/types/index.ts
-Line: 18
-Offending code: `ON_LEAVE = 'ON_LEAVE',`
-Rule violated: review/architecture
-Action (do this now): Edit `src/shared/types/index.ts` at line 18 in place to fix the `review/architecture` violation.
-What the quality gate found — apply this: [review/architecture] EmployeeStatus includes 'ON_LEAVE' which is not declared in ARCHITECTURE.md. The canonical Employee lifecycle states are ACTIVE, INACTIVE, TERMINATED only. The extra value may cause confusion with the ACTIVE state for eligibility checks (BR-001).
-
-Then check the rest of these files (and the surrounding module) for ANY OTHER occurrence of the same pattern beyond the specific lines listed above, and apply the same change there too — do NOT limit the fix to only the enumerated sites.
+## Project stack
+Before writing code, read `HARNESS.json` in the working directory to learn the project's language, framework, and test runner, and follow the existing conventions in the repository. Read `docs/ARCHITECTURE.md` and `PLAN.md` if present.
 
 ## Constraints (mandatory)
-- Edit ONLY the files listed above; do not add, delete, or rename files.
-- Do not modify imports unless a required change above needs it.
-- Do NOT run `git commit`, `git push`, `git add`, or any git command. The platform handles all git operations.
-- Do not run tests or build commands.
-- When all the listed edits are made, stop.
+- Write and modify source files ONLY. Do NOT run `git commit`, `git push`, `git add`, or any other git command. The platform handles all git operations.
+- Do not create a new repository or change the git remote.
+- Stay within the scope of this phase; do not implement deferred/later work.
