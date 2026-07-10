@@ -1,0 +1,75 @@
+{
+  "domainChanges": [
+    {
+      "entityName": "LeaveType",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "ANNUAL",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "SICK",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "EMERGENCY",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "UNPAID",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "MATERNITY",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "PATERNITY",
+          "type": "enum-member",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "LeaveStatus",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "DRAFT",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "SUBMITTED",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "APPROVED",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "REJECTED",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "CANCELLED",
+          "type": "enum-member",
+          "required": true
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}
