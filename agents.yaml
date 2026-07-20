@@ -43,7 +43,7 @@ agents:
       # TR_050 — DeepInfra-hosted DeepSeek-V3.2 (chat-completions
       # apiShape); reasoning_effort intentionally omitted (not
       # supported by DeepInfra OpenAI-compatible endpoint).
-      model: fireworks/FireworkAI-Deepseek-v4-pro
+      model: fireworks/Deepseek-v4-pro
       temperature: 0.1
     prompt_extensions: []
 
@@ -52,7 +52,7 @@ agents:
     goal: "Produce domain model changes, API contracts, and component specs"
     llm:
       # TR_050 — DeepInfra DeepSeek-V3.2
-      model: fireworks/FireworkAI-Deepseek-v4-pro
+      model: fireworks/Deepseek-v4-pro
       temperature: 0.1
     prompt_extensions: []
 
@@ -65,7 +65,7 @@ agents:
       # tool-loop because the env LLM_MODEL fallback resolved to Kimi
       # before the registry default could take over. Pin to V4-Pro
       # explicitly to bypass the env-fallthrough.
-      model: fireworks/FireworkAI-Deepseek-v4-pro
+      model: fireworks/Deepseek-v4-pro
       temperature: 0.1
     tools:
       builtin:
@@ -144,7 +144,7 @@ agents:
       # platform path (clean main clone): 0 errors, 4 files written via
       # str_replace_editor, persisted + discovered. So it's the right
       # OpenHands code-agent model.
-      model: fireworks/FireworkAI-Deepseek-v4-pro
+      model: fireworks/Deepseek-v4-pro
       temperature: 0.1
       # No reasoning_effort — Aider drives its own reasoning loop;
       # DeepInfra also does not support reasoning_effort.
@@ -195,7 +195,7 @@ agents:
       # TR_061-followup — pin off env-default fallthrough to Kimi-K2.6.
       # test-agent is skipped under Aider backend (ADR-043) but the pin
       # is harmless and consistent.
-      model: fireworks/FireworkAI-Deepseek-v4-pro
+      model: fireworks/Deepseek-v4-pro
       temperature: 0.1
     prompt_extensions: []
 
@@ -226,7 +226,7 @@ agents:
       # effort for deterministic gate checks; V4-Pro's higher
       # per-turn throughput + the §1 cap raise + the §2 git-diff
       # scoping should bring constraint-agent under 90s typical.
-      model: fireworks/FireworkAI-Deepseek-v4-pro
+      model: fireworks/Deepseek-v4-pro
       reasoning_effort: low
       temperature: 0.0
     tools:
@@ -246,7 +246,7 @@ agents:
     llm:
       # TR_050 — DeepInfra DeepSeek-V3.2 (no reasoning_effort —
       # not supported by DeepInfra).
-      model: fireworks/FireworkAI-Deepseek-v4-pro
+      model: fireworks/Deepseek-v4-pro
       temperature: 0.0
     tools:
       # TEST_REPORT_007 — gains executeScript so it can `tsc --noEmit`
@@ -263,7 +263,7 @@ agents:
     goal: "Detect when project documentation has fallen behind the codebase"
     llm:
       # TR_061-followup — pin off env-default Kimi-K2.6 fallthrough.
-      model: fireworks/FireworkAI-Deepseek-v4-pro
+      model: fireworks/Deepseek-v4-pro
       temperature: 0.1
     tools:
       builtin: [readFile, listDirectory, searchFiles, getFileTree]
@@ -274,7 +274,7 @@ agents:
     goal: "Ensure project context files are internally consistent"
     llm:
       # TR_061-followup — pin off env-default Kimi-K2.6 fallthrough.
-      model: fireworks/FireworkAI-Deepseek-v4-pro
+      model: fireworks/Deepseek-v4-pro
       temperature: 0.1
     tools:
       builtin: [readFile, listDirectory, searchFiles, getFileTree]
@@ -285,7 +285,7 @@ agents:
     goal: "Apply additive context-file edits that resolve maintenance findings"
     llm:
       # TR_061-followup — pin off env-default Kimi-K2.6 fallthrough.
-      model: fireworks/FireworkAI-Deepseek-v4-pro
+      model: fireworks/Deepseek-v4-pro
       temperature: 0.2
     tools:
       # Pared-down set — context-fixer verifies the current file
@@ -333,7 +333,7 @@ agents:
       # including the heavy Aider call (133k tokens consumed
       # without timeout). Kimi remains pinned to self-healing-
       # agent where the prompt size is much smaller.
-      model: fireworks/FireworkAI-Deepseek-v4-pro
+      model: fireworks/Deepseek-v4-pro
       temperature: 0.1
     prompt_extensions:
       - "Always ground your design in the existing ARCHITECTURE.md — extend it, never contradict it"
@@ -374,7 +374,7 @@ agents:
     role: "Domain architect"
     goal: "Define the domain model: entities, relationships, lifecycle states, and business rules for this feature"
     llm:
-      model: fireworks/FireworkAI-Deepseek-v4-pro
+      model: fireworks/Deepseek-v4-pro
       temperature: 0.1
     prompt_extensions:
       - "Focus exclusively on domain concepts — entities, attributes, lifecycle states, business rules"
@@ -390,7 +390,7 @@ agents:
     role: "Data architect"
     goal: "Define the persistence layer: conceptual table specifications (no DDL), repository interfaces, and concrete implementations for this feature"
     llm:
-      model: fireworks/FireworkAI-Deepseek-v4-pro
+      model: fireworks/Deepseek-v4-pro
       temperature: 0.1
     prompt_extensions:
       - "Describe each table CONCEPTUALLY: name, field names (no SQL types), primary key, foreign-key relationships, index rationale"
@@ -407,7 +407,7 @@ agents:
     role: "Application architect"
     goal: "Define the application layer: module boundaries, service interfaces, dependency direction, and recommended phase decomposition"
     llm:
-      model: fireworks/FireworkAI-Deepseek-v4-pro
+      model: fireworks/Deepseek-v4-pro
       temperature: 0.1
     prompt_extensions:
       - "Service methods are NAMES WITH PARAMETER NAMES ONLY — e.g. deductBalance(employeeId, leaveType, days, fiscalYear); no TypeScript types or return types (the design agent adds types)"
@@ -430,7 +430,7 @@ agents:
       # chief calls (~50% timeout rate observed). Switch chief to
       # DeepSeek-V3.2 to keep verification cycles flowing. Revisit
       # the chief model choice once DeepInfra Kimi stability improves.
-      model: fireworks/FireworkAI-Deepseek-v4-pro
+      model: fireworks/Deepseek-v4-pro
       temperature: 0.1
     prompt_extensions:
       - "You receive three specialist designs. Your job is to reconcile them, not regenerate them."
@@ -463,7 +463,7 @@ agents:
     goal: "Decompose a feature into a sequence of small, independently deployable phases that each fit within Aider's effective context window"
     llm:
       # TR_050 — DeepInfra DeepSeek-V3.2 (no reasoning_effort).
-      model: fireworks/FireworkAI-Deepseek-v4-pro
+      model: fireworks/Deepseek-v4-pro
       temperature: 0.1
     prompt_extensions:
       - "Each phase must touch at most 5 files — prefer 2-3 files per phase"
@@ -494,7 +494,7 @@ agents:
     goal: "Evaluate what was actually built in a completed phase, assess whether it matches the plan, and recommend adjustments to subsequent phases based on real results"
     llm:
       # TR_050 — DeepInfra DeepSeek-V3.2 (no reasoning_effort).
-      model: fireworks/FireworkAI-Deepseek-v4-pro
+      model: fireworks/Deepseek-v4-pro
       temperature: 0.1
     tools:
       # TR_026 — executeScript is mandatory: the agent runs `git diff`
@@ -531,7 +531,7 @@ agents:
       # TR_050 — DeepInfra-hosted moonshotai/Kimi-K2.6 for the
       # routing-quality bar (retry vs fix-intent vs escalate).
       # reasoning_effort intentionally omitted.
-      model: fireworks/FireworkAI-Deepseek-v4-pro
+      model: fireworks/Deepseek-v4-pro
       temperature: 0.0
     prompt_extensions:
       - "Always ground your diagnosis in the actual error output — do not infer failures not evidenced in the provided context"
