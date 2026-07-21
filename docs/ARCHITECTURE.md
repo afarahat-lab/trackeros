@@ -48,3 +48,94 @@ src/shared/error types.ts
 - All database access goes through a repository layer — no inline SQL
   / ORM calls in route handlers or business logic
 - No circular dependencies between modules
+
+<!-- gestalt:architecture feature=989933e7-8d91-4995-8c4e-365f6d0b898b START -->
+## Leave Management Feature Architecture
+
+### Overview
+
+The leave management module enables employees to apply for annual, sick, and emergency leave, managers to approve or reject requests, and the system to track leave balances. It is implemented as a modular monolith using TypeScript, Fastify, React Native, and PostgreSQL, following the existing architectural principles defined in `docs/ARCHITECTURE.md` and `docs/GOLDEN_PRINCIPLES.md`.
+
+### Domain Entities
+
+- **LeaveRequest** — aggregate root; lifecycle: DRAFT → SUBMITTED → APPROVED/REJECTED/CANCELLED.
+- **LeavePolicy** — defines rules per leave type; lifecycle: ACTIVE, INACTIVE.
+- **Employee** — owns requests and balances; lifecycle: ACTIVE, INACTIVE, TERMINATED.
+- **LeaveBalance** — tracks entitlement per employee per policy per fiscal year; lifecycle: ACTIVE, EXHAUSTED, FROZEN, CLOSED.
+- **LeaveType** — enum: annual, sick, emergency, unpaid, maternity, paternity.
+- **LeaveStatus** — enum: DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED.
+- **AuditLog** — immutable record of all state changes (GP-002).
+
+### Module Boundaries
+
+| Module | Path | Responsibility |
+|--------|------|----------------|
+| `shared` | `src/shared/` | BaseEntity, BaseRepository, error types, DB connection |
+| `leave-type` | `src/modules/leave-type/` | LeaveType enum |
+| `leave-status` | `src/modules/leave-status/` | LeaveStatus enum |
+| `employee` | `src/modules/employee/` | Employee model, service, repository, controller, routes |
+| `audit` | `src/modules/audit/` | AuditLog model, service, repository |
+| `policy` | `src/modules/policy/` | LeavePolicy model, service, repository |
+| `balance` | `src/modules/balance/` | LeaveBalance model, service, repository |
+| `notification` | `src/modules/notification/` | Notification model, service |
+| `leave` | `src/modules/leave/` | LeaveRequest aggregate, service, repository, controller, routes, validation |
+
+### Conceptual Data Model
+
+Six tables (no DDL — migrations generated from this spec):
+
+- **employees** — core employee data with self-referencing manager hierarchy.
+- **leave_types** — lookup table for leave type codes.
+- **leave_policies** — per-type entitlement rules, linked to leave_types.
+- **leave_requests** — the core leave application entity with status lifecycle.
+- **leave_balances** — per-employee, per-type, per-fiscal-year tracking.
+- **audit_logs** — immutable audit trail for all state-changing operations.
+
+All tables use UUID primary keys and standard timestamp columns (`created_at`, `updated_at`). Foreign keys enforce referential integrity. Indexes are defined for common query patterns: employee lookups, status filtering, date-range overlap detection, and audit retrieval.
+
+### Service Interfaces
+
+- **ILeaveService** — submit, approve, reject, cancel, get requests.
+- **IBalanceService** — get/deduct/credit/initialize balances.
+- **IPolicyService** — get policies, validate requests.
+- **IAuditService** — record and retrieve audit entries.
+- **IEmployeeService** — get employee, manager, direct reports, authorization checks.
+- **INotificationService** — notify employees and managers of status changes.
+
+### Dependency Map
+
+```
+leave → shared, leave-type, leave-status, employee, policy, balance, audit, notification
+balance → shared, leave-type, employee
+policy → shared, leave-type
+employee → shared
+audit → shared
+notification → shared, employee
+```
+
+### Implementation Phases
+
+1. **Foundation** — shared, leave-type, leave-status (zero-dependency leaf modules).
+2. **Supporting Services** — employee, audit, policy (can be built in parallel).
+3. **Balance & Notification** — balance and notification (depend on employee from Phase 2).
+4. **Leave Orchestration** — leave module as aggregate root, wiring all services together.
+
+### Key Business Rules Enforced
+
+- State transitions are strictly validated (BR-001).
+- Balance sufficiency checked before approval (BR-002).
+- Balance deducted on approval, restored on revocation (BR-003, BR-004).
+- Only the designated manager can approve/reject (BR-005).
+- Only active employees can submit requests (BR-006).
+- Only active policies can be used (BR-007).
+- No overlapping approved leave (BR-008).
+- Date range validity and minimum notice period enforced (BR-009, BR-010).
+
+### Compliance with Golden Principles
+
+- **GP-002 (Audit)**: Every state change on leave_requests and leave_balances is recorded in audit_logs via IAuditService.
+- **GP-003 (Input Validation)**: All inputs validated at the controller boundary using leave.validation.ts.
+- **GP-005 (RBAC)**: Controller methods enforce that the authenticated user is the employee (for submit/cancel) or the manager (for approve/reject) via IEmployeeService.isManagerOf().
+
+This architecture replaces the previous flat-file module sketches and consolidates the domain, data, and application designs into a single coherent specification.
+<!-- gestalt:architecture feature=989933e7-8d91-4995-8c4e-365f6d0b898b END -->
