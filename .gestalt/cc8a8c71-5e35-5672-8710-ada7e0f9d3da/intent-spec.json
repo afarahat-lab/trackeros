@@ -1,0 +1,40 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared"
+    ],
+    "affectedLayers": [
+      "types",
+      "tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "src/shared/types/index.ts exists and exports a TypeScript string enum LeaveStatus with exactly four members: Pending = 'pending', Approved = 'approved', Rejected = 'rejected', Cancelled = 'cancelled'",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/shared/types/index.ts exports a TypeScript string enum LeaveType with exactly three members: Annual = 'annual', Sick = 'sick', Emergency = 'emergency'",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/shared/types/index.ts exports a TypeScript string enum EmploymentStatus with exactly three members: Active = 'active', Inactive = 'inactive', Terminated = 'terminated'",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "tests/unit/shared/types.test.ts contains Jest tests that verify each enum has the correct members and correct member count (4 for LeaveStatus, 3 for LeaveType, 3 for EmploymentStatus)",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Enums must be TypeScript string enums (not numeric, not const enums) \u2014 each member maps to its lowercase string value"
+  ],
+  "outOfScope": [],
+  "ambiguities": []
+}
