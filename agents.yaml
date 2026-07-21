@@ -45,6 +45,8 @@ agents:
       # supported by DeepInfra OpenAI-compatible endpoint).
       model: fireworks/Deepseek-v4-pro
       temperature: 0.1
+    tools:
+      builtin: [readFile, searchFiles]   # §config-migration — explicit platform grant
     prompt_extensions: []
 
   design-agent:
@@ -54,6 +56,8 @@ agents:
       # TR_050 — DeepInfra DeepSeek-V3.2
       model: fireworks/Deepseek-v4-pro
       temperature: 0.1
+    tools:
+      builtin: [readFile, listDirectory, searchFiles]   # §config-migration — explicit platform grant
     prompt_extensions: []
 
   context-agent:
@@ -336,6 +340,8 @@ agents:
       # agent where the prompt size is much smaller.
       model: fireworks/Deepseek-v4-pro
       temperature: 0.1
+    tools:
+      builtin: [readFile, listDirectory, searchFiles, getFileTree]   # §config-migration — explicit platform grant
     prompt_extensions:
       - "Always ground your design in the existing ARCHITECTURE.md — extend it, never contradict it"
       - "High-level designs focus on domain entities, module boundaries, and dependency direction only — not implementation details"
@@ -377,6 +383,8 @@ agents:
     llm:
       model: fireworks/Deepseek-v4-pro
       temperature: 0.1
+    tools:
+      builtin: [readFile, searchFiles, getFileTree]   # §config-migration — explicit platform grant
     prompt_extensions:
       - "Focus exclusively on domain concepts — entities, attributes, lifecycle states, business rules"
       - "Do not specify persistence (data architect handles that) or modules / APIs (application architect handles that)"
@@ -393,6 +401,8 @@ agents:
     llm:
       model: fireworks/Deepseek-v4-pro
       temperature: 0.1
+    tools:
+      builtin: [readFile, searchFiles, getFileTree]   # §config-migration — explicit platform grant
     prompt_extensions:
       - "Describe each table CONCEPTUALLY: name, field names (no SQL types), primary key, foreign-key relationships, index rationale"
       - "Do NOT write SQL DDL — no CREATE TABLE statements; the code agent generates migrations from this specification"
@@ -410,6 +420,8 @@ agents:
     llm:
       model: fireworks/Deepseek-v4-pro
       temperature: 0.1
+    tools:
+      builtin: [readFile, searchFiles, getFileTree]   # §config-migration — explicit platform grant
     prompt_extensions:
       - "Service methods are NAMES WITH PARAMETER NAMES ONLY — e.g. deductBalance(employeeId, leaveType, days, fiscalYear); no TypeScript types or return types (the design agent adds types)"
       - "Dependencies flow inward only — outer layers toward inner layers; never the reverse"
@@ -433,6 +445,8 @@ agents:
       # the chief model choice once DeepInfra Kimi stability improves.
       model: fireworks/Deepseek-v4-pro
       temperature: 0.1
+    tools:
+      builtin: []   # §config-migration — explicit platform grant
     prompt_extensions:
       - "You receive three specialist designs. Your job is to reconcile them, not regenerate them."
       - "Resolve naming conflicts by choosing the most semantically correct name and applying it consistently"
@@ -466,6 +480,8 @@ agents:
       # TR_050 — DeepInfra DeepSeek-V3.2 (no reasoning_effort).
       model: fireworks/Deepseek-v4-pro
       temperature: 0.1
+    tools:
+      builtin: [readFile, listDirectory, searchFiles, getFileTree]   # §config-migration — explicit platform grant
     prompt_extensions:
       - "Each phase must touch at most 5 files — prefer 2-3 files per phase"
       - "Each phase must have a single clear concern (model, repository, service, routes — not combined)"
