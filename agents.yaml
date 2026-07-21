@@ -73,6 +73,7 @@ agents:
         - listDirectory     # explore the docs/ structure
         - searchFiles       # find where references need to change
         - getFileTree       # understand project layout
+        - gitDiff           # see this phase's diff before updating docs
     prompt_extensions: []
 
   code-agent:
@@ -230,7 +231,7 @@ agents:
       reasoning_effort: low
       temperature: 0.0
     tools:
-      builtin: [executeScript, readFile, searchFiles]
+      builtin: [executeScript, readFile, searchFiles, getFileTree]
     prompt_extensions: []
 
   review-agent:
@@ -254,7 +255,7 @@ agents:
       # resolved" findings. searchFiles + readFile are the legacy
       # spot-check toolset. Same hard blocklist as code-agent (no rm
       # -rf / no git push / no sudo / no curl|bash / etc.) applies.
-      builtin: [executeScript, readFile, searchFiles]
+      builtin: [gitDiff, executeScript, readFile, searchFiles]
     prompt_extensions: []
 
   # ── Maintenance layer (Amendment 2026-06: tools enabled) ──────
