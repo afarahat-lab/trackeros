@@ -1,0 +1,71 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared"
+    ],
+    "affectedLayers": [
+      "domain",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "src/shared/types/index.ts exists and exports three TypeScript string enums: LeaveStatus, LeaveType, EmploymentStatus",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "LeaveStatus enum has exactly four members: 'pending', 'approved', 'rejected', 'cancelled'",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "LeaveType enum has exactly three members: 'annual', 'sick', 'emergency'",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "EmploymentStatus enum has exactly three members: 'active', 'inactive', 'terminated'",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "tests/unit/shared/types.test.ts contains Jest tests that verify each enum has the correct members and values",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Enums must be TypeScript string enums (not numeric, not const objects, not union types)",
+    "File must be at src/shared/types/index.ts \u2014 a barrel export from the shared module",
+    "Tests must use Jest and be placed at tests/unit/shared/types.test.ts",
+    "Must comply with strict TypeScript settings: no implicit any, strict null checks"
+  ],
+  "outOfScope": [
+    "Database migrations, Knex configuration, or any database access (Phase 2+)",
+    "Employee, LeavePolicy, LeaveRequest, LeaveBalance models or repositories (Phases 3-5, 9)",
+    "Leave service, controller, routes, or Fastify app registration (Phases 6-8)",
+    "Audit logging, RBAC enforcement, or input validation \u2014 not applicable to enum definitions",
+    "Runtime behavior, API endpoints, or any code that consumes these enums"
+  ],
+  "ambiguities": [
+    {
+      "description": "ARCHITECTURE.md defines LeaveType and LeaveStatus as separate zero-dependency leaf modules (src/modules/leave-type/, src/modules/leave-status/), but this phase consolidates all three enums into src/shared/types/index.ts. The PLAN.md Phase 1 is the authoritative phase-level spec, so shared/types wins, but this creates a divergence from the architecture's module boundaries that later phases must reconcile.",
+      "options": [
+        "Follow PLAN.md Phase 1: place all three enums in src/shared/types/index.ts (architecture module boundaries for leave-type/leave-status are deferred to later phases)",
+        "Follow ARCHITECTURE.md: create separate modules for LeaveType and LeaveStatus, keeping only EmploymentStatus in shared/types"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "ARCHITECTURE.md defines LeaveStatus values as DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED (UPPER_CASE) and LeaveType as annual, sick, emergency, unpaid, maternity, paternity (6 members). This phase specifies LeaveStatus as 'pending', 'approved', 'rejected', 'cancelled' (4 members, lowercase) and LeaveType as 'annual', 'sick', 'emergency' (3 members). The reduced sets are intentional for Phase 1 but later phases (e.g., Phase 5 leave service) reference status values like 'pending' that don't exist in the architecture's DRAFT/SUBMITTED model.",
+      "options": [
+        "Use Phase 1 values as specified (pending/approved/rejected/cancelled); later phases will extend or reconcile",
+        "Use ARCHITECTURE.md values (DRAFT/SUBMITTED/APPROVED/REJECTED/CANCELLED) to avoid future rework"
+      ],
+      "impactIfWrong": "medium"
+    }
+  ]
+}
