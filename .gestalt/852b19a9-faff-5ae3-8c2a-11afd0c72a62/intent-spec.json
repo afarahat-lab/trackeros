@@ -1,0 +1,56 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared"
+    ],
+    "affectedLayers": [
+      "types",
+      "tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "src/shared/types/index.ts exists and exports three string enums: LeaveStatus, LeaveType, EmploymentStatus",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "LeaveStatus enum has exactly 4 members with string values: 'pending', 'approved', 'rejected', 'cancelled'",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "LeaveType enum has exactly 3 members with string values: 'annual', 'sick', 'emergency'",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "EmploymentStatus enum has exactly 3 members with string values: 'active', 'inactive', 'terminated'",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "tests/unit/shared/types.test.ts exists with Jest tests that verify each enum has the correct members and pass",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Enums must be TypeScript string enums (not numeric enums, not const objects, not union types)",
+    "All three enums must be defined in and exported from src/shared/types/index.ts (the shared barrel)",
+    "Tests must use Jest and be placed in tests/unit/shared/types.test.ts"
+  ],
+  "outOfScope": [
+    "No models, repositories, services, controllers, routes, migrations, or database connections \u2014 this is Phase 1 (Foundation), purely type definitions",
+    "No runtime validation, no business logic, no API endpoints \u2014 enums are compile-time constructs only"
+  ],
+  "ambiguities": [
+    {
+      "description": "None \u2014 the intent is unambiguous: three string enums with exact member lists, barrel export, Jest tests. All names and values are explicitly specified and match ARCHITECTURE.md.",
+      "options": [],
+      "impactIfWrong": "low"
+    }
+  ]
+}
