@@ -21,10 +21,8 @@ src/modules/balance/balance.{model,repository,service,controller,routes}.ts
 src/modules/employee/employee.{model,repository,service,controller,routes}.ts
 src/modules/policy/policy.{model,repository,service,controller,routes}.ts
 src/modules/notification/notification.{model,repository,service,controller,routes}.ts
-src/modules/LeaveStatus/    — LeaveStatus module
 src/modules/BaseEntity/    — BaseEntity module
 src/modules/LeaveRequest/    — LeaveRequest module
-src/modules/LeaveType/    — LeaveType module
 src/modules/LeavePolicy/    — LeavePolicy module
 src/modules/AuditLog/    — AuditLog module
 src/modules/AuditRecord/    — AuditRecord module
@@ -32,6 +30,7 @@ src/modules/AuditServiceInterface/    — AuditServiceInterface module
 src/shared/db connection.ts
 src/shared/base repository.ts
 src/shared/error types.ts
+src/shared/types/index.ts    — shared enums (LeaveStatus, LeaveType, EmploymentStatus)
 ```
 
 ## Key patterns
@@ -58,21 +57,20 @@ The leave management module enables employees to apply for annual, sick, and eme
 
 ### Domain Entities
 
-- **LeaveRequest** — aggregate root; lifecycle: DRAFT → SUBMITTED → APPROVED/REJECTED/CANCELLED.
+- **LeaveRequest** — aggregate root; lifecycle: pending → approved/rejected/cancelled.
 - **LeavePolicy** — defines rules per leave type; lifecycle: ACTIVE, INACTIVE.
-- **Employee** — owns requests and balances; lifecycle: ACTIVE, INACTIVE, TERMINATED.
+- **Employee** — owns requests and balances; lifecycle: active, inactive, terminated.
 - **LeaveBalance** — tracks entitlement per employee per policy per fiscal year; lifecycle: ACTIVE, EXHAUSTED, FROZEN, CLOSED.
-- **LeaveType** — enum: annual, sick, emergency, unpaid, maternity, paternity.
-- **LeaveStatus** — enum: DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED.
+- **LeaveType** — enum (src/shared/types/index.ts): 'annual', 'sick', 'emergency'.
+- **LeaveStatus** — enum (src/shared/types/index.ts): 'pending', 'approved', 'rejected', 'cancelled'.
+- **EmploymentStatus** — enum (src/shared/types/index.ts): 'active', 'inactive', 'terminated'.
 - **AuditLog** — immutable record of all state changes (GP-002).
 
 ### Module Boundaries
 
 | Module | Path | Responsibility |
 |--------|------|----------------|
-| `shared` | `src/shared/` | BaseEntity, BaseRepository, error types, DB connection |
-| `leave-type` | `src/modules/leave-type/` | LeaveType enum |
-| `leave-status` | `src/modules/leave-status/` | LeaveStatus enum |
+| `shared` | `src/shared/` | BaseEntity, BaseRepository, error types, DB connection, shared enums (LeaveStatus, LeaveType, EmploymentStatus) |
 | `employee` | `src/modules/employee/` | Employee model, service, repository, controller, routes |
 | `audit` | `src/modules/audit/` | AuditLog model, service, repository |
 | `policy` | `src/modules/policy/` | LeavePolicy model, service, repository |
@@ -105,9 +103,9 @@ All tables use UUID primary keys and standard timestamp columns (`created_at`, `
 ### Dependency Map
 
 ```
-leave → shared, leave-type, leave-status, employee, policy, balance, audit, notification
-balance → shared, leave-type, employee
-policy → shared, leave-type
+leave → shared, employee, policy, balance, audit, notification
+balance → shared, employee
+policy → shared
 employee → shared
 audit → shared
 notification → shared, employee
@@ -115,7 +113,7 @@ notification → shared, employee
 
 ### Implementation Phases
 
-1. **Foundation** — shared, leave-type, leave-status (zero-dependency leaf modules).
+1. **Foundation** — shared enums (LeaveStatus, LeaveType, EmploymentStatus) in `src/shared/types/index.ts`.
 2. **Supporting Services** — employee, audit, policy (can be built in parallel).
 3. **Balance & Notification** — balance and notification (depend on employee from Phase 2).
 4. **Leave Orchestration** — leave module as aggregate root, wiring all services together.
