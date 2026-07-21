@@ -1,0 +1,77 @@
+{
+  "domainChanges": [
+    {
+      "entityName": "LeaveStatus",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "Pending",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "Approved",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "Rejected",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "Cancelled",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "LeaveType",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "Annual",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "Sick",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "Emergency",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "EmploymentStatus",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "Active",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "Inactive",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "Terminated",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}
