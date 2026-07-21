@@ -1,0 +1,47 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared"
+    ],
+    "affectedLayers": [
+      "types",
+      "tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "src/shared/types/index.ts exists and exports a TypeScript string enum LeaveStatus with exactly four members: 'pending', 'approved', 'rejected', 'cancelled'",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/shared/types/index.ts exports a TypeScript string enum LeaveType with exactly three members: 'annual', 'sick', 'emergency'",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/shared/types/index.ts exports a TypeScript string enum EmploymentStatus with exactly three members: 'active', 'inactive', 'terminated'",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "tests/unit/shared/types.test.ts contains Jest unit tests that verify each enum (LeaveStatus, LeaveType, EmploymentStatus) has the correct members as specified",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Enums must be TypeScript string enums (enum keyword with string literal values), not const enums, numeric enums, or union types",
+    "All three enums must be exported from the barrel file src/shared/types/index.ts",
+    "Tests must use Jest as the test framework (per HARNESS.json stack)",
+    "Test file must be at tests/unit/shared/types.test.ts"
+  ],
+  "outOfScope": [
+    "Database tables, migrations, Knex configuration (Phase 2)",
+    "Models, repositories, services, controllers, or routes for any module (Phases 3\u201310)",
+    "Any module importing or depending on these enums \u2014 this phase only creates the enums themselves"
+  ],
+  "ambiguities": []
+}
