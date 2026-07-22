@@ -1,0 +1,94 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "balance"
+    ],
+    "affectedLayers": [
+      "domain",
+      "repository-interface"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "LeaveBalanceStatus enum contains exactly ACTIVE, EXHAUSTED, FROZEN, CLOSED",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "BalanceAdjustmentStatus enum contains exactly PENDING, APPLIED, REVERSED",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "AdjustmentType type alias accepts only 'DEBIT' | 'CREDIT'",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "remainingDays is derived as totalEntitlement - usedDays (verified by unit test)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "CreateLeaveBalanceDto has exactly fields: employeeId, policyId, totalEntitlement, fiscalYear",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "CreateBalanceAdjustmentDto has exactly fields: leaveBalanceId, leaveRequestId (optional), adjustmentType, amountDays, reason, performedBy (optional)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "ILeaveBalanceRepository declares: findByEmployeePolicyFiscalYear, findById, create, updateUsedDays, findAllByEmployeeId with correct signatures",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "IBalanceAdjustmentRepository declares: findByLeaveBalanceId, create, updateStatus with correct signatures",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access must go through repository interfaces (GP-001) \u2014 this phase defines those interfaces",
+    "No inline SQL/ORM calls in route handlers or business logic \u2014 repository pattern enforced",
+    "Strict TypeScript: no implicit any, strict null checks \u2014 all interface fields must be explicitly typed",
+    "Modules import from each other ONLY through declared public entry points (index.ts) \u2014 not applicable this phase since no cross-module imports",
+    "No circular dependencies between modules"
+  ],
+  "outOfScope": [
+    "Database migrations (Phase 2)",
+    "Knex repository implementations (Phase 3, Phase 5)",
+    "Balance service interface and implementation (Phase 4)",
+    "Balance controller (Phase 5)",
+    "Balance routes and Fastify registration (Phase 6, Phase 7)",
+    "Audit logging (GP-002) \u2014 no state-changing operations in this phase",
+    "RBAC enforcement (GP-005) \u2014 no API endpoints in this phase",
+    "Business rule enforcement (BR-001 through BR-012) \u2014 service layer responsibility in Phase 4",
+    "CANCELLED status on LeaveBalance \u2014 ARCHITECTURE.md mentions it but Phase 1 intent explicitly lists only ACTIVE, EXHAUSTED, FROZEN, CLOSED",
+    "FAILED status on BalanceAdjustment \u2014 ARCHITECTURE.md mentions it but Phase 1 intent explicitly lists only PENDING, APPLIED, REVERSED"
+  ],
+  "ambiguities": [
+    {
+      "description": "remainingDays is listed as a field in the LeaveBalance interface but described as \"derived as totalEntitlement - usedDays.\" TypeScript interfaces cannot enforce derivation \u2014 the field will be a regular property. The unit test verifies the formula, so the code-agent should treat it as a plain field whose value is computed by consumers (or by a factory/constructor in later phases).",
+      "options": [
+        "Include remainingDays as a regular field in the interface; consumers are responsible for computing it correctly",
+        "Omit remainingDays from the interface and provide a helper function getRemainingDays(balance) instead",
+        "Define remainingDays as a readonly field and document that it must equal totalEntitlement - usedDays"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "description": "Numeric field types (totalEntitlement, usedDays, amountDays, fiscalYear) are not explicitly typed in the intent. The Phase 2 migration uses decimal for entitlement/days and integer for fiscalYear. The code-agent must infer TypeScript types: likely number for all.",
+      "options": [
+        "Use number for all numeric fields",
+        "Use number for fiscalYear and amountDays, but string for decimal fields to match PostgreSQL decimal",
+        "Match the migration types exactly: number for fiscalYear (integer), number for decimal fields"
+      ],
+      "impactIfWrong": "low"
+    }
+  ]
+}
