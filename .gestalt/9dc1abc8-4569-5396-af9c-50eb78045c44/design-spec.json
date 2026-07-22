@@ -1,0 +1,147 @@
+{
+  "domainChanges": [
+    {
+      "entityName": "LeaveBalance",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string (UUID)",
+          "required": true
+        },
+        {
+          "name": "employeeId",
+          "type": "string (UUID)",
+          "required": true
+        },
+        {
+          "name": "policyId",
+          "type": "string (UUID)",
+          "required": true
+        },
+        {
+          "name": "totalEntitlement",
+          "type": "number (decimal)",
+          "required": true
+        },
+        {
+          "name": "usedDays",
+          "type": "number (decimal)",
+          "required": true
+        },
+        {
+          "name": "remainingDays",
+          "type": "number (decimal, derived: totalEntitlement - usedDays)",
+          "required": true
+        },
+        {
+          "name": "fiscalYear",
+          "type": "number (integer)",
+          "required": true
+        },
+        {
+          "name": "status",
+          "type": "LeaveBalanceStatus",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "Employee",
+          "type": "belongs-to (via employeeId)"
+        },
+        {
+          "entity": "LeavePolicy",
+          "type": "belongs-to (via policyId)"
+        },
+        {
+          "entity": "BalanceAdjustment",
+          "type": "has-many"
+        }
+      ]
+    },
+    {
+      "entityName": "BalanceAdjustment",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string (UUID)",
+          "required": true
+        },
+        {
+          "name": "leaveBalanceId",
+          "type": "string (UUID)",
+          "required": true
+        },
+        {
+          "name": "leaveRequestId",
+          "type": "string (UUID) | null",
+          "required": true
+        },
+        {
+          "name": "adjustmentType",
+          "type": "AdjustmentType ('DEBIT' | 'CREDIT')",
+          "required": true
+        },
+        {
+          "name": "amountDays",
+          "type": "number (decimal, > 0)",
+          "required": true
+        },
+        {
+          "name": "reason",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "performedBy",
+          "type": "string (UUID) | null",
+          "required": true
+        },
+        {
+          "name": "status",
+          "type": "BalanceAdjustmentStatus",
+          "required": true
+        },
+        {
+          "name": "appliedAt",
+          "type": "Date | null",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "LeaveBalance",
+          "type": "belongs-to (via leaveBalanceId)"
+        },
+        {
+          "entity": "LeaveRequest",
+          "type": "belongs-to (via leaveRequestId, nullable)"
+        }
+      ]
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}
