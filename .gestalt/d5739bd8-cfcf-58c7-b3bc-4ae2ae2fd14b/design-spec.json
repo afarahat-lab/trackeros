@@ -1,0 +1,147 @@
+{
+  "domainChanges": [
+    {
+      "entityName": "LeaveBalance",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string (UUID)",
+          "required": true
+        },
+        {
+          "name": "employeeId",
+          "type": "string (UUID)",
+          "required": true
+        },
+        {
+          "name": "policyId",
+          "type": "string (UUID)",
+          "required": true
+        },
+        {
+          "name": "totalEntitlement",
+          "type": "number (decimal)",
+          "required": true
+        },
+        {
+          "name": "usedDays",
+          "type": "number (decimal)",
+          "required": true
+        },
+        {
+          "name": "remainingDays",
+          "type": "number (decimal, derived)",
+          "required": true
+        },
+        {
+          "name": "fiscalYear",
+          "type": "number (integer)",
+          "required": true
+        },
+        {
+          "name": "status",
+          "type": "LeaveBalanceStatus (enum: ACTIVE | EXHAUSTED | FROZEN | CLOSED)",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "BalanceAdjustment",
+          "type": "one-to-many (has many adjustments)"
+        },
+        {
+          "entity": "Employee",
+          "type": "many-to-one (belongs to employee via employeeId)"
+        },
+        {
+          "entity": "LeavePolicy",
+          "type": "many-to-one (belongs to policy via policyId)"
+        }
+      ]
+    },
+    {
+      "entityName": "BalanceAdjustment",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string (UUID)",
+          "required": true
+        },
+        {
+          "name": "leaveBalanceId",
+          "type": "string (UUID)",
+          "required": true
+        },
+        {
+          "name": "leaveRequestId",
+          "type": "string (UUID) | null",
+          "required": false
+        },
+        {
+          "name": "adjustmentType",
+          "type": "AdjustmentType ('DEBIT' | 'CREDIT')",
+          "required": true
+        },
+        {
+          "name": "amountDays",
+          "type": "number (decimal, positive)",
+          "required": true
+        },
+        {
+          "name": "reason",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "performedBy",
+          "type": "string (UUID) | null",
+          "required": false
+        },
+        {
+          "name": "status",
+          "type": "BalanceAdjustmentStatus (enum: PENDING | APPLIED | REVERSED)",
+          "required": true
+        },
+        {
+          "name": "appliedAt",
+          "type": "Date | null",
+          "required": false
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "LeaveBalance",
+          "type": "many-to-one (belongs to balance via leaveBalanceId)"
+        },
+        {
+          "entity": "LeaveRequest",
+          "type": "many-to-one (optional, via leaveRequestId)"
+        }
+      ]
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}
