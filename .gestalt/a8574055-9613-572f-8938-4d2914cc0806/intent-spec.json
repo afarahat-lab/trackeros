@@ -1,0 +1,51 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared/types"
+    ],
+    "affectedLayers": [
+      "domain"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "src/shared/types/index.ts exports LeaveType enum with exactly three string members: ANNUAL='ANNUAL', SICK='SICK', EMERGENCY='EMERGENCY'",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/shared/types/index.ts exports LeaveRequestStatus enum with exactly five string members: DRAFT='DRAFT', SUBMITTED='SUBMITTED', APPROVED='APPROVED', REJECTED='REJECTED', CANCELLED='CANCELLED'",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/shared/types/index.ts exports EmploymentStatus enum with exactly four string members: ACTIVE='ACTIVE', INACTIVE='INACTIVE', TERMINATED='TERMINATED', ON_LEAVE='ON_LEAVE'",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests in tests/unit/shared/types/types.test.ts verify each enum has the correct members and correct member count (3, 5, 4 respectively)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All Jest tests pass (npx jest tests/unit/shared/types/types.test.ts)",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Enums must be TypeScript string enums (not const enums, not union types) with explicit string value assignments",
+    "File must be at src/shared/types/index.ts \u2014 the canonical shared types barrel",
+    "Tests must be at tests/unit/shared/types/types.test.ts using Jest",
+    "No `any` type usage; strict TypeScript (no implicit any, strict null checks)"
+  ],
+  "outOfScope": [
+    "BalanceStatus enum \u2014 deferred to later phases",
+    "BaseRepository, domain models (Employee, LeavePolicy, LeaveRequest, LeaveBalance), repositories, services, controllers, routes \u2014 all deferred to Phases 2\u20139",
+    "Knex migrations, database tables, audit logging, RBAC enforcement \u2014 deferred to later phases"
+  ],
+  "ambiguities": []
+}
