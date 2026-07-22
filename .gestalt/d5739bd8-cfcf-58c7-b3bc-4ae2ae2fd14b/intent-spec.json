@@ -1,0 +1,55 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "balance"
+    ],
+    "affectedLayers": [
+      "domain",
+      "repository-interface"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "File `src/modules/balance/balance.model.ts` exists and exports: `LeaveBalanceStatus` enum (ACTIVE, EXHAUSTED, FROZEN, CLOSED), `BalanceAdjustmentStatus` enum (PENDING, APPLIED, REVERSED), `AdjustmentType` type alias (`'DEBIT' | 'CREDIT'`), `LeaveBalance` interface (id, employeeId, policyId, totalEntitlement, usedDays, remainingDays, fiscalYear, status, createdAt, updatedAt), `BalanceAdjustment` interface (id, leaveBalanceId, leaveRequestId, adjustmentType, amountDays, reason, performedBy, status, appliedAt, createdAt, updatedAt), `CreateLeaveBalanceDto` interface (employeeId, policyId, totalEntitlement, fiscalYear), `CreateBalanceAdjustmentDto` interface (leaveBalanceId, leaveRequestId optional, adjustmentType, amountDays, reason, performedBy optional).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "File `src/modules/balance/balance.repository.ts` exists and exports: `ILeaveBalanceRepository` interface with methods findByEmployeePolicyFiscalYear(employeeId, policyId, fiscalYear), findById(id), create(dto), updateUsedDays(id, usedDays), findAllByEmployeeId(employeeId); and `IBalanceAdjustmentRepository` interface with methods findByLeaveBalanceId(leaveBalanceId), create(dto), updateStatus(id, status, appliedAt).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "File `tests/unit/modules/balance/balance.model.test.ts` exists with Jest tests that: (a) verify remainingDays is correctly derived as totalEntitlement - usedDays, (b) validate CreateLeaveBalanceDto and CreateBalanceAdjustmentDto shapes, (c) verify AdjustmentType only accepts 'DEBIT' or 'CREDIT'.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All TypeScript code must use strict mode \u2014 no implicit any, strict null checks enforced.",
+    "No `any` type usage; use `unknown` with type guards instead (HARNESS.json constraint id=no-any).",
+    "Repository interfaces must be pure abstractions \u2014 no implementation, no database access, no Knex imports.",
+    "Module files must follow the naming convention: `src/modules/balance/balance.{model,repository}.ts`."
+  ],
+  "outOfScope": [
+    "Database migrations (Knex) for leave_balances and balance_adjustments tables \u2014 deferred to Phase 2.",
+    "Knex repository implementations (KnexLeaveBalanceRepository, KnexBalanceAdjustmentRepository) \u2014 deferred to Phase 3 and Phase 5.",
+    "Balance service interface (IBalanceService) and implementation (BalanceService) \u2014 deferred to Phase 4.",
+    "Balance controller, routes, module barrel export, and app registration \u2014 deferred to Phases 5\u20137.",
+    "Business rule enforcement (BR-003 through BR-012) \u2014 these are implemented in the service layer (Phase 4), not in the model/repository interfaces.",
+    "Audit logging (GP-002) \u2014 audit records are produced by the service layer, not by model definitions or repository interfaces."
+  ],
+  "ambiguities": [
+    {
+      "description": "The `remainingDays` field on `LeaveBalance` is described as \"derived as totalEntitlement - usedDays\". Since TypeScript interfaces cannot enforce derivation logic, it is ambiguous whether this should be: (a) a readonly property computed at object construction time, (b) a getter on a class implementation, or (c) simply a field that consumers are expected to compute. The ARCHITECTURE.md BR-002 clarifies it is \"never stored independently\" but does not prescribe the interface-level representation.",
+      "options": [
+        "Declare remainingDays as a readonly field in the interface; consumers compute it at construction time",
+        "Omit remainingDays from the interface and provide a helper function getRemainingDays(balance)",
+        "Keep remainingDays as a regular field in the interface and document that it must equal totalEntitlement - usedDays"
+      ],
+      "impactIfWrong": "low"
+    }
+  ]
+}
