@@ -1,0 +1,195 @@
+{
+  "domainChanges": [
+    {
+      "entityName": "LeaveRequest",
+      "operation": "update",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "employeeId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "leaveTypeId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "startDate",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "endDate",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "daysRequested",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "reason",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "status",
+          "type": "LeaveRequestStatus",
+          "required": true
+        },
+        {
+          "name": "approvedBy",
+          "type": "string | null",
+          "required": true
+        },
+        {
+          "name": "approvedAt",
+          "type": "string | null",
+          "required": true
+        },
+        {
+          "name": "rejectedBy",
+          "type": "string | null",
+          "required": true
+        },
+        {
+          "name": "rejectedAt",
+          "type": "string | null",
+          "required": true
+        },
+        {
+          "name": "rejectionReason",
+          "type": "string | null",
+          "required": true
+        },
+        {
+          "name": "cancelledBy",
+          "type": "string | null",
+          "required": true
+        },
+        {
+          "name": "cancelledAt",
+          "type": "string | null",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "Employee",
+          "type": "many-to-one"
+        },
+        {
+          "entity": "LeavePolicy",
+          "type": "many-to-one"
+        }
+      ]
+    },
+    {
+      "entityName": "LeaveRequestStatus",
+      "operation": "update",
+      "fields": [
+        {
+          "name": "DRAFT",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "SUBMITTED",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "APPROVED",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "REJECTED",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "CANCELLED",
+          "type": "enum-member",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "LeaveType",
+      "operation": "update",
+      "fields": [
+        {
+          "name": "ANNUAL",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "SICK",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "EMERGENCY",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "UNPAID",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "MATERNITY",
+          "type": "enum-member",
+          "required": true
+        },
+        {
+          "name": "PATERNITY",
+          "type": "enum-member",
+          "required": true
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": [
+    {
+      "name": "leave.model.ts",
+      "type": "service",
+      "description": "Domain model for the leave module. Exports LeaveRequestStatus enum (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED), LeaveType enum (annual, sick, emergency, unpaid, maternity, paternity with lowercase string values), LeaveRequest interface (17 fields), CreateLeaveRequestDto (5 required fields: employeeId, leaveTypeId, startDate, endDate, reason), UpdateLeaveRequestDto (3 optional fields: startDate, endDate, reason), LeaveRequestQueryParams (8 optional fields: status, leaveTypeId, startDateFrom, startDateTo, endDateFrom, endDateTo, limit, offset).",
+      "props": null
+    },
+    {
+      "name": "leave.validation.ts",
+      "type": "service",
+      "description": "Zod validation schemas for leave module inputs (GP-003). Exports createLeaveRequestSchema (validates CreateLeaveRequestDto: all 5 fields required strings with min(1)), updateLeaveRequestSchema (validates UpdateLeaveRequestDto: startDate, endDate, reason all optional strings with min(1)), leaveRequestQuerySchema (validates LeaveRequestQueryParams: status as nativeEnum(LeaveRequestStatus) optional, leaveTypeId string optional, date-range strings optional, limit/offset as coerced positive integers optional).",
+      "props": null
+    },
+    {
+      "name": "leave.repository.ts",
+      "type": "service",
+      "description": "Repository layer for leave_request persistence (GP-001). Exports ILeaveRepository interface (findById, findByEmployeeId, create, update, delete, findAll) and KnexLeaveRepository class using pg Pool from src/shared/db/connection.ts. Maps snake_case DB columns to camelCase TS fields via toLeaveRequest(). Applies query-param filtering for status, leaveTypeId, date ranges, limit, offset. create() sets status=DRAFT and days_requested=0.",
+      "props": null
+    }
+  ]
+}
