@@ -1,0 +1,28 @@
+{
+  "domainChanges": [
+    {
+      "entityName": "SharedTypes",
+      "operation": "update",
+      "fields": [
+        {
+          "name": "LeaveType",
+          "type": "enum (string members: ANNUAL, SICK, EMERGENCY)",
+          "required": true
+        },
+        {
+          "name": "LeaveRequestStatus",
+          "type": "enum (string members: DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED)",
+          "required": true
+        },
+        {
+          "name": "EmploymentStatus",
+          "type": "enum (string members: ACTIVE, INACTIVE, TERMINATED, ON_LEAVE)",
+          "required": true
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}
