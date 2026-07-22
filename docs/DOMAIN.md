@@ -42,20 +42,20 @@ Represents a leave record managed by the `leave` module, including leave request
 | id | string | true |
 | employeeId | string | true |
 | leaveTypeId | string | true |
-| startDate | Date | true |
-| endDate | Date | true |
+| startDate | string | true |
+| endDate | string | true |
 | daysRequested | number | true |
-| reason | string \| undefined | false |
+| reason | string | true |
 | status | LeaveRequestStatus | true |
 | approvedBy | string \| null | false |
-| approvedAt | Date \| null | false |
+| approvedAt | string \| null | false |
 | rejectedBy | string \| null | false |
-| rejectedAt | Date \| null | false |
+| rejectedAt | string \| null | false |
 | rejectionReason | string \| null | false |
 | cancelledBy | string \| null | false |
-| cancelledAt | Date \| null | false |
-| createdAt | Date | true |
-| updatedAt | Date | true |
+| cancelledAt | string \| null | false |
+| createdAt | string | true |
+| updatedAt | string | true |
 
 **Relationships**
 - `Employee` — many-to-one
@@ -66,17 +66,17 @@ Represents a leave record managed by the `leave` module, including leave request
 |-------|------|----------|
 | employeeId | string | true |
 | leaveTypeId | string | true |
-| startDate | Date | true |
-| endDate | Date | true |
-| reason | string \| undefined | false |
+| startDate | string | true |
+| endDate | string | true |
+| reason | string | true |
 
 ### UpdateLeaveRequestDto
 
 | Field | Type | Required |
 |-------|------|----------|
-| startDate | Date | false |
-| endDate | Date | false |
-| reason | string \| undefined | false |
+| startDate | string | false |
+| endDate | string | false |
+| reason | string | false |
 
 ### LeaveRequestQueryParams
 
@@ -84,10 +84,10 @@ Represents a leave record managed by the `leave` module, including leave request
 |-------|------|----------|
 | status | LeaveRequestStatus | false |
 | leaveTypeId | string | false |
-| startDateFrom | Date | false |
-| startDateTo | Date | false |
-| endDateFrom | Date | false |
-| endDateTo | Date | false |
+| startDateFrom | string | false |
+| startDateTo | string | false |
+| endDateFrom | string | false |
+| endDateTo | string | false |
 | limit | number | false |
 | offset | number | false |
 
