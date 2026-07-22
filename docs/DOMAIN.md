@@ -78,24 +78,29 @@ Represents a leave record managed by the `leave` module, including leave request
 
 Represents leave balance data managed by the `balance` module, including tracked entitlement, accrual, and remaining leave amounts.
 
-### Balance
+### LeaveBalanceStatus
 
-| Field | Type | Required |
-|-------|------|----------|
-| id | string | true |
-| employeeId | string | true |
-| policyId | string | true |
-| totalEntitlement | number | true |
-| usedDays | number | true |
-| remainingDays | number | true |
-| fiscalYear | number | true |
-| status | string | true |
-| createdAt | Date | true |
-| updatedAt | Date | true |
+| Value | Description |
+|-------|-------------|
+| ACTIVE | Balance is active and can accept adjustments |
+| EXHAUSTED | Balance has zero remaining days (auto-transitioned) |
+| FROZEN | Balance is frozen and rejects all adjustments |
+| CLOSED | Balance is closed (year-end) and immutable |
 
-**Relationships**
-- `Employee` — many-to-one
-- `LeavePolicy` — many-to-one
+### BalanceAdjustmentStatus
+
+| Value | Description |
+|-------|-------------|
+| PENDING | Adjustment created but not yet applied |
+| APPLIED | Adjustment has been applied to the balance |
+| REVERSED | Adjustment has been reversed/undone |
+
+### AdjustmentType
+
+Type alias: `'DEBIT' | 'CREDIT'`
+
+- `DEBIT` — Decreases remaining days (e.g., leave approval)
+- `CREDIT` — Increases remaining days (e.g., leave cancellation, accrual)
 
 ### LeaveBalance
 
@@ -108,13 +113,61 @@ Represents leave balance data managed by the `balance` module, including tracked
 | usedDays | number | true |
 | remainingDays | number | true |
 | fiscalYear | number | true |
-| status | string | true |
+| status | LeaveBalanceStatus | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
+
+**Constraints**
+- remainingDays is derived as `totalEntitlement - usedDays`; never stored independently (BR-002)
+- Uniqueness on (employeeId, policyId, fiscalYear) for active balances (BR-001)
 
 **Relationships**
 - `Employee` — many-to-one
 - `LeavePolicy` — many-to-one
+
+### BalanceAdjustment
+
+| Field | Type | Required |
+|-------|------|----------|
+| id | string | true |
+| leaveBalanceId | string | true |
+| leaveRequestId | string \| null | false |
+| adjustmentType | AdjustmentType | true |
+| amountDays | number | true |
+| reason | string | true |
+| performedBy | string \| null | false |
+| status | BalanceAdjustmentStatus | true |
+| appliedAt | Date \| null | false |
+| createdAt | Date | true |
+| updatedAt | Date | true |
+
+**Constraints**
+- amountDays must be positive (BR-012)
+- APPLIED/REVERSED adjustments are immutable (BR-009)
+
+**Relationships**
+- `LeaveBalance` — many-to-one
+- `LeaveRequest` — many-to-one (optional)
+
+### CreateLeaveBalanceDto
+
+| Field | Type | Required |
+|-------|------|----------|
+| employeeId | string | true |
+| policyId | string | true |
+| totalEntitlement | number | true |
+| fiscalYear | number | true |
+
+### CreateBalanceAdjustmentDto
+
+| Field | Type | Required |
+|-------|------|----------|
+| leaveBalanceId | string | true |
+| leaveRequestId | string \| undefined | false |
+| adjustmentType | AdjustmentType | true |
+| amountDays | number | true |
+| reason | string | true |
+| performedBy | string \| undefined | false |
 
 ## employee
 
