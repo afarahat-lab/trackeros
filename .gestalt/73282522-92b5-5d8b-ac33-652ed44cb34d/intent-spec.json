@@ -1,0 +1,96 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "model",
+      "validation",
+      "repository",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "leave.model.ts exports LeaveRequestStatus enum with values DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "leave.model.ts exports LeaveType enum with values annual, sick, emergency, unpaid, maternity, paternity",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "leave.model.ts exports LeaveRequest interface with all fields: id, employeeId, leaveTypeId, startDate, endDate, daysRequested, reason, status, approvedBy, approvedAt, rejectedBy, rejectedAt, rejectionReason, cancelledBy, cancelledAt, createdAt, updatedAt",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "leave.model.ts exports CreateLeaveRequestDto with fields employeeId, leaveTypeId, startDate, endDate, reason",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "leave.model.ts exports UpdateLeaveRequestDto with all-optional fields startDate, endDate, reason",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "leave.model.ts exports LeaveRequestQueryParams with all-optional fields status, leaveTypeId, startDateFrom, startDateTo, endDateFrom, endDateTo, limit, offset",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "leave.validation.ts exports createLeaveRequestSchema (Zod) validating CreateLeaveRequestDto with all required fields present and correctly typed",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "leave.validation.ts exports updateLeaveRequestSchema (Zod) validating UpdateLeaveRequestDto with all fields optional",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "leave.validation.ts exports leaveRequestQuerySchema (Zod) validating LeaveRequestQueryParams with all fields optional and correctly typed (limit/offset as numbers, dates as strings)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "leave.repository.ts exports ILeaveRepository interface with methods: findById(id), findByEmployeeId(employeeId, params), create(dto), update(id, dto), delete(id), findAll(params)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "leave.repository.ts exports KnexLeaveRepository class implementing ILeaveRepository, using pg Pool from src/shared/db/connection.ts via Knex",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "tests/unit/modules/leave/leave.repository.test.ts contains Jest unit tests covering all ILeaveRepository methods with mocked database",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "GP-001: All database access must go through the repository layer \u2014 KnexLeaveRepository implements ILeaveRepository using Knex over the shared pg Pool",
+    "GP-003: All inputs must be validated at boundaries \u2014 Zod schemas (createLeaveRequestSchema, updateLeaveRequestSchema, leaveRequestQuerySchema) validate DTOs and query params",
+    "No `any` type \u2014 use `unknown` with type guards; existing code uses `Record<string, unknown>` in toLeaveRequest mapping",
+    "No direct database access outside repository \u2014 KnexLeaveRepository is the sole database access point for leave_request table",
+    "Strict TypeScript (no implicit any, strict null checks) \u2014 all interface fields are explicitly typed, nullable fields use `string | null`",
+    "LeaveType enum values must be UPPERCASE per ARCHITECTURE.md canonical block: ANNUAL, SICK, EMERGENCY, UNPAID, MATERNITY, PATERNITY",
+    "Database column naming uses snake_case (employee_id, leave_type_id, start_date, etc.); TypeScript interfaces use camelCase with toLeaveRequest mapping"
+  ],
+  "outOfScope": [
+    "Business rule enforcement (BR-001 through BR-012: employee active check, date validity, balance sufficiency, overlap detection, notice periods, etc.) \u2014 deferred to Phase 2 (leave.service.ts)",
+    "Audit record creation (GP-002) on state-changing operations \u2014 deferred to Phase 2 service layer",
+    "RBAC enforcement (GP-005) at API boundaries \u2014 deferred to Phase 3 controller and Phase 4 routes",
+    "Leave balance deduction/restoration logic \u2014 deferred to Phase 2+ when balance module is integrated",
+    "Notification triggers on leave lifecycle events \u2014 deferred to Phase 2+",
+    "Fastify routes, controllers, and module registration (POST /leave, PATCH /leave/:id/approve, etc.) \u2014 deferred to Phases 3 and 4",
+    "Cross-module integration (employee, policy, balance, notification, audit modules) \u2014 this phase only establishes the leave module's own model, validation, and repository"
+  ],
+  "ambiguities": []
+}
