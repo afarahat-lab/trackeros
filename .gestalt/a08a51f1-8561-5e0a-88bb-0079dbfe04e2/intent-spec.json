@@ -1,0 +1,71 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "model",
+      "validation",
+      "repository",
+      "tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "src/modules/leave/leave.model.ts exists with: LeaveRequestStatus enum (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED), LeaveType enum (annual, sick, emergency, unpaid, maternity, paternity), LeaveRequest interface (all 17 fields), CreateLeaveRequestDto (5 required fields), UpdateLeaveRequestDto (3 optional fields), LeaveRequestQueryParams (8 optional fields)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/modules/leave/leave.validation.ts exists with: createLeaveRequestSchema (Zod schema validating CreateLeaveRequestDto \u2014 employeeId, leaveTypeId, startDate, endDate, reason all required strings), updateLeaveRequestSchema (Zod schema validating UpdateLeaveRequestDto \u2014 startDate, endDate, reason all optional strings), leaveRequestQuerySchema (Zod schema validating LeaveRequestQueryParams \u2014 all 8 fields optional with correct types)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/modules/leave/leave.repository.ts exists with: ILeaveRepository interface declaring findById(id), findByEmployeeId(employeeId, params), create(dto), update(id, dto), delete(id), findAll(params); KnexLeaveRepository class implementing ILeaveRepository using pg Pool from src/shared/db/connection.ts, with column-name mapping (snake_case DB \u2194 camelCase TS) and query-param filtering for status, leaveTypeId, date ranges, limit, offset",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "tests/unit/modules/leave/leave.repository.test.ts exists with Jest unit tests covering: findById (found and not-found), findByEmployeeId, create (returns DRAFT status), update, delete, findAll with query-param filtering",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "GP-001: All database access must go through the repository layer \u2014 KnexLeaveRepository uses pg Pool from src/shared/db/connection.ts; no inline SQL in services or controllers",
+    "GP-003: All inputs validated at API boundaries \u2014 Zod schemas (createLeaveRequestSchema, updateLeaveRequestSchema, leaveRequestQuerySchema) must validate DTOs before they reach the repository",
+    "HARNESS no-any: Use `unknown` with type guards instead of `any` \u2014 the repository's `toLeaveRequest` method uses `Record<string, unknown>` and explicit casts, which is compliant",
+    "Strict TypeScript: no implicit any, strict null checks \u2014 all interface fields are explicitly typed; nullable fields use `string | null`",
+    "Column-name mapping: DB uses snake_case (employee_id, leave_type_id, start_date, etc.); TS interfaces use camelCase (employeeId, leaveTypeId, startDate). Repository must map in both directions."
+  ],
+  "outOfScope": [
+    "Business rule enforcement (BR-001 through BR-012: employee active check, date validity, balance sufficiency, overlap detection, state transition authorization, etc.) \u2014 deferred to Phase 2 (leave.service.ts)",
+    "Audit record creation (GP-002) on state-changing operations \u2014 deferred to Phase 2 service layer",
+    "RBAC enforcement (GP-005) at API boundaries \u2014 deferred to Phase 3 controller and Phase 4 routes",
+    "Leave balance deduction/restoration logic \u2014 deferred to Phase 2 and the balance module",
+    "Notification triggers on leave lifecycle events \u2014 deferred to Phase 2 and the notification module",
+    "Fastify controller, routes, and module registration \u2014 deferred to Phases 3 and 4"
+  ],
+  "ambiguities": [
+    {
+      "description": "The intent says \"Create src/modules/leave/leave.model.ts\" and \"Create src/modules/leave/leave.repository.ts\", but both files already exist with full implementations matching the specification. The intent also says \"Create src/modules/leave/leave.validation.ts\" which does NOT exist. Should the code-agent: (a) overwrite all three files, (b) only create the missing validation file and leave existing files untouched, or (c) verify existing files match the spec and only create the missing validation file?",
+      "options": [
+        "Overwrite all three files (model, validation, repository) to ensure consistency",
+        "Only create the missing validation file; leave existing model.ts and repository.ts untouched",
+        "Verify existing model.ts and repository.ts match the spec; only create validation.ts; update existing files only if they diverge"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "ARCHITECTURE.md lists LeaveType enum values as uppercase (ANNUAL, SICK, EMERGENCY, UNPAID, MATERNITY, PATERNITY) while the intent and existing model.ts use lowercase string values ('annual', 'sick', etc.). The existing code follows the intent. Which casing is authoritative for the enum values?",
+      "options": [
+        "Follow ARCHITECTURE.md: uppercase enum values (ANNUAL = 'ANNUAL')",
+        "Follow intent and existing code: lowercase string values (ANNUAL = 'annual')"
+      ],
+      "impactIfWrong": "low"
+    }
+  ]
+}
