@@ -1,0 +1,45 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared/types"
+    ],
+    "affectedLayers": [
+      "domain"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "src/shared/types/index.ts exists and exports a TypeScript enum LeaveType with exactly the members: ANNUAL, SICK, EMERGENCY",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/shared/types/index.ts exports a TypeScript enum LeaveRequestStatus with exactly the members: DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/shared/types/index.ts exports a TypeScript enum EmploymentStatus with exactly the members: ACTIVE, INACTIVE, TERMINATED, ON_LEAVE",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "tests/unit/shared/types/types.test.ts contains Jest tests that verify each enum (LeaveType, LeaveRequestStatus, EmploymentStatus) has the correct set of members as specified",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Enums must be defined in src/shared/types/index.ts using TypeScript enum syntax",
+    "Tests must be placed in tests/unit/shared/types/types.test.ts using Jest",
+    "Must comply with strict TypeScript (no implicit any, strict null checks) per HARNESS.json"
+  ],
+  "outOfScope": [
+    "Other enums mentioned in ARCHITECTURE.md (BalanceStatus, NotificationType, AuditAction, EntityType) are not part of this phase",
+    "No database migrations, repository classes, services, controllers, or routes \u2014 this phase is enums and unit tests only",
+    "No integration tests \u2014 only unit tests for enum member verification"
+  ],
+  "ambiguities": []
+}
