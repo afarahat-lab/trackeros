@@ -1,0 +1,176 @@
+{
+  "domainChanges": [
+    {
+      "entityName": "LeaveRequestStatus",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "DRAFT",
+          "type": "enum",
+          "required": true
+        },
+        {
+          "name": "SUBMITTED",
+          "type": "enum",
+          "required": true
+        },
+        {
+          "name": "APPROVED",
+          "type": "enum",
+          "required": true
+        },
+        {
+          "name": "REJECTED",
+          "type": "enum",
+          "required": true
+        },
+        {
+          "name": "CANCELLED",
+          "type": "enum",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "LeaveType",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "ANNUAL",
+          "type": "enum",
+          "required": true
+        },
+        {
+          "name": "SICK",
+          "type": "enum",
+          "required": true
+        },
+        {
+          "name": "EMERGENCY",
+          "type": "enum",
+          "required": true
+        },
+        {
+          "name": "UNPAID",
+          "type": "enum",
+          "required": true
+        },
+        {
+          "name": "MATERNITY",
+          "type": "enum",
+          "required": true
+        },
+        {
+          "name": "PATERNITY",
+          "type": "enum",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "LeaveRequest",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "employeeId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "leaveTypeId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "startDate",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "endDate",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "daysRequested",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "reason",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "status",
+          "type": "LeaveRequestStatus",
+          "required": true
+        },
+        {
+          "name": "approvedBy",
+          "type": "string | null",
+          "required": true
+        },
+        {
+          "name": "approvedAt",
+          "type": "string | null",
+          "required": true
+        },
+        {
+          "name": "rejectedBy",
+          "type": "string | null",
+          "required": true
+        },
+        {
+          "name": "rejectedAt",
+          "type": "string | null",
+          "required": true
+        },
+        {
+          "name": "rejectionReason",
+          "type": "string | null",
+          "required": true
+        },
+        {
+          "name": "cancelledBy",
+          "type": "string | null",
+          "required": true
+        },
+        {
+          "name": "cancelledAt",
+          "type": "string | null",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "Employee",
+          "type": "many-to-one (employeeId)"
+        },
+        {
+          "entity": "LeavePolicy",
+          "type": "many-to-one (leaveTypeId -> leave_policy.id)"
+        }
+      ]
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}
