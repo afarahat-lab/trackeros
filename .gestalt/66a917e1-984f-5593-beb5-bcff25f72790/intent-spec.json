@@ -1,0 +1,51 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared/types"
+    ],
+    "affectedLayers": [
+      "domain"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "src/shared/types/index.ts exports enum LeaveType with exactly three members: ANNUAL, SICK, EMERGENCY (string-valued)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/shared/types/index.ts exports enum LeaveRequestStatus with exactly five members: DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED (string-valued)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/shared/types/index.ts exports enum EmploymentStatus with exactly four members: ACTIVE, INACTIVE, TERMINATED, ON_LEAVE (string-valued)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "tests/unit/shared/types/types.test.ts contains Jest tests verifying each enum has the correct members and correct member count",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All tests pass when run with Jest (npx jest tests/unit/shared/types/types.test.ts)",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Enums must use string values (e.g., ANNUAL = 'ANNUAL'), not numeric \u2014 consistent with the existing codebase pattern",
+    "File must be at src/shared/types/index.ts \u2014 the canonical shared types entry point referenced by all downstream domain modules",
+    "Tests must be at tests/unit/shared/types/types.test.ts and must verify both member values and member count for each enum",
+    "Must comply with HARNESS.json constraint no-any: no use of `any` type"
+  ],
+  "outOfScope": [
+    "No other types, interfaces, utility functions, or constants beyond the three enums (LeaveType, LeaveRequestStatus, EmploymentStatus)",
+    "No database migrations, repository code, service logic, controllers, or routes \u2014 those are deferred to Phases 2\u20139",
+    "No integration or e2e tests \u2014 only unit tests for enum verification"
+  ],
+  "ambiguities": []
+}
