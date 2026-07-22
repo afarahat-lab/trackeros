@@ -1,0 +1,111 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "model",
+      "validation",
+      "repository"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "LeaveRequestStatus enum with all 5 values (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED) exists in src/modules/leave/leave.model.ts",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "LeaveType enum with all 6 values (annual, sick, emergency, unpaid, maternity, paternity) exists in src/modules/leave/leave.model.ts",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "LeaveRequest interface with all 17 fields (id, employeeId, leaveTypeId, startDate, endDate, daysRequested, reason, status, approvedBy, approvedAt, rejectedBy, rejectedAt, rejectionReason, cancelledBy, cancelledAt, createdAt, updatedAt) exists in leave.model.ts",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "CreateLeaveRequestDto interface with fields (employeeId, leaveTypeId, startDate, endDate, reason) exists in leave.model.ts",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "UpdateLeaveRequestDto interface with all-optional fields (startDate, endDate, reason) exists in leave.model.ts",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "LeaveRequestQueryParams interface with all-optional fields (status, leaveTypeId, startDateFrom, startDateTo, endDateFrom, endDateTo, limit, offset) exists in leave.model.ts",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Zod schemas (createLeaveRequestSchema, updateLeaveRequestSchema, leaveRequestQuerySchema) exist in leave.validation.ts and correctly validate their corresponding DTOs",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "ILeaveRepository interface with all 6 methods (findById, findByEmployeeId, create, update, delete, findAll) exists in leave.repository.ts",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "KnexLeaveRepository class implements ILeaveRepository and uses the pg Pool from src/shared/db/connection.ts for all database operations",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests in tests/unit/modules/leave/leave.repository.test.ts cover all ILeaveRepository methods with mocked pg Pool",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "GP-001: All database access must go through the repository layer \u2014 KnexLeaveRepository is the sole database access point for leave requests",
+    "GP-003: All inputs must be validated at boundaries \u2014 Zod schemas in leave.validation.ts validate CreateLeaveRequestDto, UpdateLeaveRequestDto, and LeaveRequestQueryParams",
+    "no-any: Use unknown with type guards instead of any (HARNESS.json constraint)",
+    "no-direct-db-outside-repository: Database calls must go through repository pattern (HARNESS.json constraint)",
+    "KnexLeaveRepository must import and use the pg Pool from src/shared/db/connection.ts (not create its own connection)"
+  ],
+  "outOfScope": [
+    "Leave service layer (submitLeaveRequest, approveLeaveRequest, rejectLeaveRequest, cancelLeaveRequest) \u2014 deferred to Phase 2",
+    "Leave controller (Fastify request handlers) \u2014 deferred to Phase 3",
+    "Leave routes and module registration (Fastify route wiring, app.register) \u2014 deferred to Phase 4",
+    "Business rule enforcement (BR-001 through BR-012: employee active check, date validity, balance sufficiency, overlap detection, notice periods, etc.) \u2014 deferred to Phase 2 service layer",
+    "Audit logging (GP-002) \u2014 no AuditRecord creation in this phase; repository performs pure CRUD without audit side-effects",
+    "RBAC enforcement (GP-005) \u2014 deferred to controller/routes phases",
+    "Integration tests \u2014 only unit tests for the repository are in scope for this phase"
+  ],
+  "ambiguities": [
+    {
+      "description": "Class is named \"KnexLeaveRepository\" but the shared infrastructure at src/shared/db/connection.ts exports a raw pg Pool (not a Knex instance). The intent explicitly says \"using the pg Pool from src/shared/db/connection.ts\", so the implementation should use raw SQL via pool.query(), not Knex query builder. The class name is misleading but the spec is clear.",
+      "options": [
+        "Use raw pg Pool with pool.query() as the intent explicitly states",
+        "Rename class to PgLeaveRepository to match the actual implementation",
+        "Install and configure Knex to wrap the pg Pool"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "description": "LeaveRequest interface field types are not specified (e.g., id as string vs number, dates as string vs Date, status as LeaveRequestStatus enum vs string). The code-agent must infer types from conventions: id as string (UUID), dates as string (ISO 8601), status as LeaveRequestStatus, leaveTypeId as string, daysRequested as number.",
+      "options": [
+        "Use string for IDs and ISO date strings for date fields",
+        "Use number for IDs and Date objects for date fields",
+        "Use string for IDs and Date objects for date fields"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "The database table name for leave requests is not specified. The repository needs a table name to construct SQL queries. ARCHITECTURE.md references \"leave_request\" as the conceptual table name.",
+      "options": [
+        "Use 'leave_request' as the table name (matches ARCHITECTURE.md)",
+        "Use 'leave_requests' (pluralized)",
+        "Use 'leaves'"
+      ],
+      "impactIfWrong": "low"
+    }
+  ]
+}
