@@ -7,12 +7,12 @@ export enum LeaveRequestStatus {
 }
 
 export enum LeaveType {
-  ANNUAL = 'ANNUAL',
-  SICK = 'SICK',
-  EMERGENCY = 'EMERGENCY',
-  UNPAID = 'UNPAID',
-  MATERNITY = 'MATERNITY',
-  PATERNITY = 'PATERNITY',
+  ANNUAL = 'annual',
+  SICK = 'sick',
+  EMERGENCY = 'emergency',
+  UNPAID = 'unpaid',
+  MATERNITY = 'maternity',
+  PATERNITY = 'paternity',
 }
 
 export interface LeaveRequest {
