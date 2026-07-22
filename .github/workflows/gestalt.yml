@@ -34,6 +34,19 @@ name: gestalt
 on:
   push:
     branches: ['gestalt/**', 'feature/**', 'phase/**', 'retry/**', 'fix/**']
+    # Gestalt writes its own bookkeeping artifacts (planning specs, per-agent
+    # .gestalt/** outputs incl. openhands sessions, PLAN.md, all docs/** the
+    # context-agent maintains, AGENTS.md) as commits on these same branches.
+    # A commit touching ONLY these needs no CI. GitHub runs the job only when the
+    # push matches a branch pattern AND at least one changed file is NOT ignored,
+    # so any commit that also touches src/tests/config still triggers CI normally.
+    # This is Gestalt's FIXED platform-owned output set — the same block belongs in
+    # every Gestalt-onboarded project's CI trigger.
+    paths-ignore:
+      - '.gestalt/**'
+      - 'PLAN.md'
+      - 'docs/**'
+      - 'AGENTS.md'
   workflow_dispatch:
     inputs:
       environment:
