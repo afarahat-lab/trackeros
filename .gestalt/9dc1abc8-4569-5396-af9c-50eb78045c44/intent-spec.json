@@ -1,0 +1,101 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "balance"
+    ],
+    "affectedLayers": [
+      "domain",
+      "infrastructure"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "LeaveBalanceStatus enum defined with exactly four members: ACTIVE, EXHAUSTED, FROZEN, CLOSED",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "BalanceAdjustmentStatus enum defined with exactly three members: PENDING, APPLIED, REVERSED",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "AdjustmentType type alias defined as 'DEBIT' | 'CREDIT' (string literal union, not an enum)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "LeaveBalance interface with fields: id, employeeId, policyId, totalEntitlement, usedDays, remainingDays (derived as totalEntitlement - usedDays), fiscalYear, status (LeaveBalanceStatus), createdAt, updatedAt",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "BalanceAdjustment interface with fields: id, leaveBalanceId, leaveRequestId (string | null), adjustmentType (AdjustmentType), amountDays, reason, performedBy (string | null), status (BalanceAdjustmentStatus), appliedAt (Date | null), createdAt, updatedAt",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "CreateLeaveBalanceDto interface with fields: employeeId, policyId, totalEntitlement, fiscalYear",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "CreateBalanceAdjustmentDto interface with fields: leaveBalanceId, leaveRequestId (optional), adjustmentType, amountDays, reason, performedBy (optional)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "ILeaveBalanceRepository interface with methods: findByEmployeePolicyFiscalYear(employeeId, policyId, fiscalYear), findById(id), create(dto), updateUsedDays(id, usedDays), findAllByEmployeeId(employeeId)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "IBalanceAdjustmentRepository interface with methods: findByLeaveBalanceId(leaveBalanceId), create(dto), updateStatus(id, status, appliedAt)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit test at tests/unit/modules/balance/balance.model.test.ts verifying: (a) remainingDays = totalEntitlement - usedDays, (b) CreateLeaveBalanceDto and CreateBalanceAdjustmentDto shape validation, (c) AdjustmentType only accepts 'DEBIT' or 'CREDIT'",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access must go through repository interfaces (GP-001) \u2014 this phase defines those interfaces",
+    "TypeScript strict mode: no implicit any, strict null checks \u2014 all interface fields must have explicit types",
+    "No `any` type \u2014 use `unknown` with type guards where needed (HARNESS constraint no-any)",
+    "remainingDays is derived (totalEntitlement - usedDays), never stored independently (BR-002)",
+    "Module files follow naming convention: src/modules/balance/balance.{model,repository}.ts"
+  ],
+  "outOfScope": [
+    "Database migrations (Phase 2)",
+    "Knex repository implementations (Phase 3, Phase 5)",
+    "Balance service interface and implementation (Phase 4)",
+    "Balance controller, routes, barrel export, app registration (Phases 5-7)",
+    "Audit logging (GP-002) \u2014 not applicable to model/interface definitions with no state-changing operations",
+    "RBAC enforcement (GP-005) \u2014 not applicable at the model/repository-interface layer",
+    "Input validation at API boundaries (GP-003) \u2014 not applicable at this layer"
+  ],
+  "ambiguities": [
+    {
+      "description": "Field types for id, employeeId, policyId are not explicitly stated \u2014 intent says 'id' but does not specify string vs UUID. The ARCHITECTURE.md conceptual tables use uuid, and the Phase 2 migration plan uses uuid_generate_v4(). Inferred: string (UUID).",
+      "options": [
+        "Use string for all ID fields (consistent with UUID string representation)",
+        "Use branded UUID type",
+        "Use number for IDs"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "description": "totalEntitlement, usedDays, amountDays numeric precision not specified. Phase 2 migration uses decimal type. Inferred: number (TypeScript) mapping to decimal in PostgreSQL.",
+      "options": [
+        "Use number (float)",
+        "Use number with explicit rounding semantics",
+        "Use a Decimal/Money value object"
+      ],
+      "impactIfWrong": "low"
+    }
+  ]
+}
