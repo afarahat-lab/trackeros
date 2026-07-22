@@ -1,0 +1,277 @@
+{
+  "domainChanges": [
+    {
+      "entityName": "LeaveRequest",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string (UUID)",
+          "required": true
+        },
+        {
+          "name": "employeeId",
+          "type": "string (UUID)",
+          "required": true
+        },
+        {
+          "name": "leaveTypeId",
+          "type": "string (UUID)",
+          "required": true
+        },
+        {
+          "name": "startDate",
+          "type": "string (ISO 8601)",
+          "required": true
+        },
+        {
+          "name": "endDate",
+          "type": "string (ISO 8601)",
+          "required": true
+        },
+        {
+          "name": "daysRequested",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "reason",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "status",
+          "type": "LeaveRequestStatus",
+          "required": true
+        },
+        {
+          "name": "approvedBy",
+          "type": "string (UUID) | null",
+          "required": false
+        },
+        {
+          "name": "approvedAt",
+          "type": "string (ISO 8601) | null",
+          "required": false
+        },
+        {
+          "name": "rejectedBy",
+          "type": "string (UUID) | null",
+          "required": false
+        },
+        {
+          "name": "rejectedAt",
+          "type": "string (ISO 8601) | null",
+          "required": false
+        },
+        {
+          "name": "rejectionReason",
+          "type": "string | null",
+          "required": false
+        },
+        {
+          "name": "cancelledBy",
+          "type": "string (UUID) | null",
+          "required": false
+        },
+        {
+          "name": "cancelledAt",
+          "type": "string (ISO 8601) | null",
+          "required": false
+        },
+        {
+          "name": "createdAt",
+          "type": "string (ISO 8601)",
+          "required": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "string (ISO 8601)",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "Employee",
+          "type": "belongs-to (via employeeId)"
+        },
+        {
+          "entity": "LeavePolicy",
+          "type": "belongs-to (via leaveTypeId \u2192 leave_policy.id)"
+        }
+      ]
+    },
+    {
+      "entityName": "LeaveRequestStatus (enum)",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "DRAFT",
+          "type": "string literal",
+          "required": true
+        },
+        {
+          "name": "SUBMITTED",
+          "type": "string literal",
+          "required": true
+        },
+        {
+          "name": "APPROVED",
+          "type": "string literal",
+          "required": true
+        },
+        {
+          "name": "REJECTED",
+          "type": "string literal",
+          "required": true
+        },
+        {
+          "name": "CANCELLED",
+          "type": "string literal",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "LeaveType (enum)",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "ANNUAL",
+          "type": "string literal",
+          "required": true
+        },
+        {
+          "name": "SICK",
+          "type": "string literal",
+          "required": true
+        },
+        {
+          "name": "EMERGENCY",
+          "type": "string literal",
+          "required": true
+        },
+        {
+          "name": "UNPAID",
+          "type": "string literal",
+          "required": true
+        },
+        {
+          "name": "MATERNITY",
+          "type": "string literal",
+          "required": true
+        },
+        {
+          "name": "PATERNITY",
+          "type": "string literal",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "CreateLeaveRequestDto",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "employeeId",
+          "type": "string (UUID)",
+          "required": true
+        },
+        {
+          "name": "leaveTypeId",
+          "type": "string (UUID)",
+          "required": true
+        },
+        {
+          "name": "startDate",
+          "type": "string (ISO 8601)",
+          "required": true
+        },
+        {
+          "name": "endDate",
+          "type": "string (ISO 8601)",
+          "required": true
+        },
+        {
+          "name": "reason",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "UpdateLeaveRequestDto",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "startDate",
+          "type": "string (ISO 8601) | undefined",
+          "required": false
+        },
+        {
+          "name": "endDate",
+          "type": "string (ISO 8601) | undefined",
+          "required": false
+        },
+        {
+          "name": "reason",
+          "type": "string | undefined",
+          "required": false
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "LeaveRequestQueryParams",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "status",
+          "type": "LeaveRequestStatus | undefined",
+          "required": false
+        },
+        {
+          "name": "leaveTypeId",
+          "type": "string (UUID) | undefined",
+          "required": false
+        },
+        {
+          "name": "startDateFrom",
+          "type": "string (ISO 8601) | undefined",
+          "required": false
+        },
+        {
+          "name": "startDateTo",
+          "type": "string (ISO 8601) | undefined",
+          "required": false
+        },
+        {
+          "name": "endDateFrom",
+          "type": "string (ISO 8601) | undefined",
+          "required": false
+        },
+        {
+          "name": "endDateTo",
+          "type": "string (ISO 8601) | undefined",
+          "required": false
+        },
+        {
+          "name": "limit",
+          "type": "number | undefined",
+          "required": false
+        },
+        {
+          "name": "offset",
+          "type": "number | undefined",
+          "required": false
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}
