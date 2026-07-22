@@ -32,6 +32,7 @@ src/modules/AuditServiceInterface/    — AuditServiceInterface module
 src/shared/db connection.ts
 src/shared/base repository.ts
 src/shared/error types.ts
+src/shared/types/index.ts
 ```
 
 ## Key patterns
@@ -58,11 +59,11 @@ The Leave Management module enables employees to apply for annual, sick, and eme
 ### Domain Entities
 - **LeaveRequest** — Core aggregate representing a leave application. Lifecycle: DRAFT → SUBMITTED → APPROVED/REJECTED/CANCELLED. Carries full audit trail (who acted, when).
 - **LeavePolicy** — Defines rules per leave type (entitlement, accrual, notice, approval requirement). Lifecycle: ACTIVE ↔ INACTIVE.
-- **Employee** — The actor who applies for leave. Employment status (ACTIVE/INACTIVE/TERMINATED) gates eligibility.
+- **Employee** — The actor who applies for leave. Employment status (ACTIVE/INACTIVE/TERMINATED/ON_LEAVE) gates eligibility.
 - **LeaveBalance** — Tracks entitlement, used, and remaining days per employee per policy per fiscal year. Lifecycle: ACTIVE → EXHAUSTED/FROZEN and back.
 - **AuditLog** — Immutable record of every state change (GP-002).
 - **Notification** — Stores messages sent to employees (e.g., status changes).
-- **Enums**: LeaveType, LeaveRequestStatus, EmploymentStatus, BalanceStatus.
+- **Enums**: LeaveType (ANNUAL, SICK, EMERGENCY), LeaveRequestStatus (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED), EmploymentStatus (ACTIVE, INACTIVE, TERMINATED, ON_LEAVE), BalanceStatus.
 
 ### Business Rules
 - **BR-001** — Only ACTIVE employees may create/submit leave requests.
@@ -89,13 +90,14 @@ src/
 │   ├── notification/   # Notification model, INotificationRepository, NotificationService
 │   └── leave/          # LeaveRequest model, ILeaveRepository, LeaveService, LeaveController, routes
 └── shared/
+    ├── types/          # Canonical enums: LeaveType, LeaveRequestStatus, EmploymentStatus
     └── validation/     # validateLeaveRequest, validateDateRange
 ```
 
 ### Dependencies
-- **leave** depends on employee, policy, balance, audit, notification, shared/validation.
-- **balance** depends on employee, policy, audit.
-- **employee**, **policy**, **notification** each depend on audit.
+- **leave** depends on employee, policy, balance, audit, notification, shared/validation, shared/types.
+- **balance** depends on employee, policy, audit, shared/types.
+- **employee**, **policy**, **notification** each depend on audit, shared/types.
 - No circular dependencies; all flows inward.
 
 ### Golden Principles Compliance
@@ -105,9 +107,9 @@ src/
 - **Transaction semantics**: Balance deduction and restoration are performed atomically within the same database transaction as the leave status update.
 
 ### Implementation Phases
-1. **Foundation** — Audit + Shared Validation (no module dependencies).
-2. **Employee + Policy** — Leaf modules depending only on Audit.
-3. **Balance** — Depends on Employee, Policy, Audit.
+1. **Foundation** — Shared types + Audit + Shared Validation (no module dependencies).
+2. **Employee + Policy** — Leaf modules depending only on Audit and shared/types.
+3. **Balance** — Depends on Employee, Policy, Audit, shared/types.
 4. **Notification** — Depends on Audit; can run parallel to Phase 3.
 5. **Leave (core)** — Orchestrator; all dependencies ready.
 

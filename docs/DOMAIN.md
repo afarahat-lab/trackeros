@@ -10,11 +10,19 @@ Base entity providing common fields for domain models.
 | created_at | Date | true |
 | updated_at | Date | true |
 
-## leave
+## shared/types
 
-Represents a leave record managed by the `leave` module, including leave requests and related leave-tracking data.
+Canonical enums used across all domain modules. Defined in `src/shared/types/index.ts`.
 
-### LeaveStatus
+### LeaveType
+
+| Value | Description |
+|-------|-------------|
+| ANNUAL | Annual leave |
+| SICK | Sick leave |
+| EMERGENCY | Emergency leave |
+
+### LeaveRequestStatus
 
 | Value | Description |
 |-------|-------------|
@@ -23,6 +31,19 @@ Represents a leave record managed by the `leave` module, including leave request
 | APPROVED | Leave request has been approved |
 | REJECTED | Leave request has been rejected |
 | CANCELLED | Leave request has been cancelled |
+
+### EmploymentStatus
+
+| Value | Description |
+|-------|-------------|
+| ACTIVE | Employee is currently active |
+| INACTIVE | Employee is inactive |
+| TERMINATED | Employee has been terminated |
+| ON_LEAVE | Employee is currently on leave |
+
+## leave
+
+Represents a leave record managed by the `leave` module, including leave requests and related leave-tracking data.
 
 ### LeaveRequest
 
@@ -133,7 +154,7 @@ Represents employee data managed by the `employee` module, including employee re
 | department | string \| null | false |
 | hireDate | Date | true |
 | terminationDate | Date \| null | false |
-| employmentStatus | 'ACTIVE' \| 'INACTIVE' \| 'TERMINATED' | true |
+| employmentStatus | EmploymentStatus | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 | deletedAt | Date \| null | false |
@@ -148,7 +169,7 @@ Represents leave policy data managed by the `policy` module, including policy de
 |-------|------|----------|
 | id | string | true |
 | policyName | string | true |
-| leaveType | string | true |
+| leaveType | LeaveType | true |
 | entitlementDays | number | true |
 | accrualRate | number | false |
 | maxAccumulation | number | false |
@@ -158,24 +179,13 @@ Represents leave policy data managed by the `policy` module, including policy de
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
-### LeaveType
-
-| Value | Description |
-|-------|-------------|
-| annual | Annual leave |
-| sick | Sick leave |
-| emergency | Emergency leave |
-| unpaid | Unpaid leave |
-| maternity | Maternity leave |
-| paternity | Paternity leave |
-
 ### LeavePolicy
 
 | Field | Type | Required |
 |-------|------|----------|
 | id | string | true |
 | policyName | string | true |
-| leaveType | string | true |
+| leaveType | LeaveType | true |
 | entitlementDays | number | true |
 | accrualRate | number | false |
 | maxAccumulation | number | false |
