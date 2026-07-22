@@ -1,0 +1,50 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared/types"
+    ],
+    "affectedLayers": [
+      "domain"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "src/shared/types/index.ts exports LeaveType enum with exactly 3 string members: ANNUAL, SICK, EMERGENCY",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/shared/types/index.ts exports LeaveRequestStatus enum with exactly 5 string members: DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/shared/types/index.ts exports EmploymentStatus enum with exactly 4 string members: ACTIVE, INACTIVE, TERMINATED, ON_LEAVE",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "tests/unit/shared/types/types.test.ts contains Jest tests verifying each enum has the correct members and correct member count",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All Jest tests in tests/unit/shared/types/types.test.ts pass (npm test or npx jest)",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "TypeScript strict mode: no implicit any, strict null checks (from HARNESS.json stack config)",
+    "Enums must use string enum pattern (e.g., ANNUAL = 'ANNUAL') for serialization safety across the REST boundary",
+    "No `any` type \u2014 use `unknown` with type guards instead (HARNESS.json constraint rule no-any)"
+  ],
+  "outOfScope": [
+    "Base repository (Phase 2), Employee model/repository (Phase 2), LeavePolicy model/repository (Phase 3), LeaveRequest model/repository (Phase 4), LeaveBalance model/repository (Phase 5), Leave service (Phase 6), Leave controller/routes (Phase 7), Balance service (Phase 8), Balance controller/routes (Phase 9)",
+    "Knex migrations, database tables, or any infrastructure beyond the shared types file and its unit tests",
+    "Any business logic, validation, audit, RBAC, or service-layer concerns \u2014 those belong to later phases"
+  ],
+  "ambiguities": []
+}
