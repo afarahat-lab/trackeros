@@ -1,0 +1,97 @@
+{
+  "domainChanges": [
+    {
+      "entityName": "LeaveType",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "ANNUAL",
+          "type": "string enum member",
+          "required": true
+        },
+        {
+          "name": "SICK",
+          "type": "string enum member",
+          "required": true
+        },
+        {
+          "name": "EMERGENCY",
+          "type": "string enum member",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "LeaveRequestStatus",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "DRAFT",
+          "type": "string enum member",
+          "required": true
+        },
+        {
+          "name": "SUBMITTED",
+          "type": "string enum member",
+          "required": true
+        },
+        {
+          "name": "APPROVED",
+          "type": "string enum member",
+          "required": true
+        },
+        {
+          "name": "REJECTED",
+          "type": "string enum member",
+          "required": true
+        },
+        {
+          "name": "CANCELLED",
+          "type": "string enum member",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "EmploymentStatus",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "ACTIVE",
+          "type": "string enum member",
+          "required": true
+        },
+        {
+          "name": "INACTIVE",
+          "type": "string enum member",
+          "required": true
+        },
+        {
+          "name": "TERMINATED",
+          "type": "string enum member",
+          "required": true
+        },
+        {
+          "name": "ON_LEAVE",
+          "type": "string enum member",
+          "required": true
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [
+    {
+      "method": "GET",
+      "path": "N/A \u2014 Phase 1 has no API surface",
+      "description": "No API contracts in this phase. The shared types module (src/shared/types/index.ts) is consumed by downstream domain modules at the TypeScript level, not via REST. API endpoints for leave and balance are deferred to Phases 7 and 9.",
+      "requestBody": null,
+      "responseBody": null,
+      "authRequired": false,
+      "roles": []
+    }
+  ],
+  "componentSpecs": []
+}
