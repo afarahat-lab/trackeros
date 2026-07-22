@@ -14,7 +14,7 @@ Base entity providing common fields for domain models.
 
 Represents a leave record managed by the `leave` module, including leave requests and related leave-tracking data.
 
-### LeaveStatus
+### LeaveRequestStatus
 
 | Value | Description |
 |-------|-------------|
@@ -23,6 +23,17 @@ Represents a leave record managed by the `leave` module, including leave request
 | APPROVED | Leave request has been approved |
 | REJECTED | Leave request has been rejected |
 | CANCELLED | Leave request has been cancelled |
+
+### LeaveType
+
+| Value | Description |
+|-------|-------------|
+| annual | Annual leave |
+| sick | Sick leave |
+| emergency | Emergency leave |
+| unpaid | Unpaid leave |
+| maternity | Maternity leave |
+| paternity | Paternity leave |
 
 ### LeaveRequest
 
@@ -33,10 +44,16 @@ Represents a leave record managed by the `leave` module, including leave request
 | leaveTypeId | string | true |
 | startDate | Date | true |
 | endDate | Date | true |
+| daysRequested | number | true |
 | reason | string \| undefined | false |
 | status | LeaveRequestStatus | true |
 | approvedBy | string \| null | false |
 | approvedAt | Date \| null | false |
+| rejectedBy | string \| null | false |
+| rejectedAt | Date \| null | false |
+| rejectionReason | string \| null | false |
+| cancelledBy | string \| null | false |
+| cancelledAt | Date \| null | false |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
