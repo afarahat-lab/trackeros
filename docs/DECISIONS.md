@@ -20,7 +20,7 @@ Description: Trackeros — a corporate operations web and mobile platform for
   repository,service,controller,routes}.ts. Domain modules
   include leave, balance, employee, policy, notification.
   Shared utilities under src/shared/ (db connection, base
-  repository, error types).
+  repository, error types, types).
   
   Frontend: React + Vite SPA for the web client, React Native
   for the mobile client (shared @trackeros/contracts package
@@ -28,7 +28,7 @@ Description: Trackeros — a corporate operations web and mobile platform for
   backend's /auth endpoints; identity comes from corporate
   OIDC in production and from local users in development.
   
-  Tests: Vitest for unit + integration. CI on GitHub Actions
+  Tests: Jest for unit + integration. CI on GitHub Actions
   runs lint (ESLint) + typecheck (tsc --noEmit) + unit tests +
   a Semgrep security pass on every PR. Conventional Commits +
   squash-merge. Strict TypeScript (no implicit any, strict
