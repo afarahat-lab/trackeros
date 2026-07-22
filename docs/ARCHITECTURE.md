@@ -58,8 +58,8 @@ The existing DOMAIN.md already defines `Balance`/`LeaveBalance` with `totalEntit
 
 ### Domain Entities
 
-- **LeaveBalance** — Tracks an employee's leave balance for a specific leave policy within a fiscal year. Lifecycle: ACTIVE → EXHAUSTED (auto when remainingDays=0), FROZEN (manual), CLOSED (year-end), CANCELLED (void).
-- **BalanceAdjustment** — Records every debit/credit against a LeaveBalance. Lifecycle: PENDING → APPLIED (success), REVERSED (undo), FAILED (insufficient balance/frozen).
+- **LeaveBalance** — Tracks an employee's leave balance for a specific leave policy within a fiscal year. Lifecycle: ACTIVE → EXHAUSTED (auto when remainingDays=0), FROZEN (manual), CLOSED (year-end).
+- **BalanceAdjustment** — Records every debit/credit against a LeaveBalance. Lifecycle: PENDING → APPLIED (success), REVERSED (undo).
 
 ### Business Rules (Key)
 
@@ -70,8 +70,8 @@ The existing DOMAIN.md already defines `Balance`/`LeaveBalance` with `totalEntit
 - BR-005: Leave cancellation/rejection creates a CREDIT reversal.
 - BR-006: Auto-transition to EXHAUSTED when remainingDays=0; back to ACTIVE on credit.
 - BR-007: Frozen balances reject all adjustments.
-- BR-008: CLOSED/CANCELLED balances are immutable.
-- BR-009: APPLIED/REVERSED/FAILED adjustments are immutable.
+- BR-008: CLOSED balances are immutable.
+- BR-009: APPLIED/REVERSED adjustments are immutable.
 - BR-010: Every state change on LeaveBalance and every BalanceAdjustment application produces an AuditRecord (GP-002).
 - BR-011: Fiscal year scoping; cross-year carryover governed by LeavePolicy.
 - BR-012: amountDays must be positive.
@@ -99,9 +99,13 @@ No module depends on leave. Balance depends only on leaf modules. Leaf modules h
 
 ### Implementation Phases
 
-1. **Phase 1 — Foundation**: employee, policy, audit (leaf modules, no dependencies).
-2. **Phase 2 — Balance module**: depends on policy, employee, audit; implements the usedDays/remainingDays model.
-3. **Phase 3 — Leave module**: depends on all others; integrates balance deduction on approval.
+1. **Phase 1 — Foundation** ✅ COMPLETE: `balance.model.ts` (LeaveBalanceStatus, BalanceAdjustmentStatus, AdjustmentType, LeaveBalance, BalanceAdjustment, CreateLeaveBalanceDto, CreateBalanceAdjustmentDto), `balance.repository.ts` (ILeaveBalanceRepository, IBalanceAdjustmentRepository), unit tests.
+2. **Phase 2 — Database migrations**: Knex migrations for `leave_balances` and `balance_adjustments` tables.
+3. **Phase 3 — Knex repository implementations**: `KnexLeaveBalanceRepository`, `KnexBalanceAdjustmentRepository`, Knex instance wrapper.
+4. **Phase 4 — Balance service**: `IBalanceService` interface and `BalanceService` implementation with transaction support.
+5. **Phase 5 — Balance controller**: `BalanceController` with HTTP handlers.
+6. **Phase 6 — Balance routes**: Fastify route registration with full dependency wiring.
+7. **Phase 7 — Module barrel export and app registration**: `index.ts` public API and `app.ts` route registration.
 
 ### Stack Compliance
 
