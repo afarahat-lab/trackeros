@@ -1,0 +1,40 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared/types"
+    ],
+    "affectedLayers": [
+      "domain"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "src/shared/types/leave.enums.ts exists and exports three TypeScript string enums: LeaveType with members ANNUAL, SICK, EMERGENCY; LeaveRequestStatus with members DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED; BalanceStatus with members ACTIVE, EXHAUSTED, EXPIRED. Each enum uses string values matching its member names.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/shared/types/index.ts re-exports all three enums (LeaveType, LeaveRequestStatus, BalanceStatus) from ./leave.enums via named export.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests exist in tests/unit/shared/types/ that verify each enum: correct member count (3 for LeaveType, 5 for LeaveRequestStatus, 3 for BalanceStatus) and correct string value for every member.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "TypeScript strict mode \u2014 no implicit any, strict null checks enforced by tsconfig.",
+    "Enums must use string values (not numeric) matching their member names for readability and serialization safety.",
+    "Tests use Jest framework; test file location: tests/unit/shared/types/."
+  ],
+  "outOfScope": [
+    "NotificationType enum \u2014 deferred to Phase 7.",
+    "Any model interfaces, repositories, services, controllers, or routes \u2014 these are later phases.",
+    "Database access, audit logging, RBAC, input validation \u2014 not applicable to enum definitions."
+  ],
+  "ambiguities": []
+}
