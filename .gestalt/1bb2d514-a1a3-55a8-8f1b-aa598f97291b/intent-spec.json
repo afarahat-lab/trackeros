@@ -1,0 +1,51 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared/types"
+    ],
+    "affectedLayers": [
+      "domain"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "src/shared/types/leave.enums.ts exists with LeaveType enum (ANNUAL, SICK, EMERGENCY) using string values matching keys",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/shared/types/leave.enums.ts exists with LeaveRequestStatus enum (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED) using string values matching keys",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/shared/types/leave.enums.ts exists with BalanceStatus enum (ACTIVE, EXHAUSTED, EXPIRED) using string values matching keys",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/shared/types/index.ts re-exports LeaveType, LeaveRequestStatus, and BalanceStatus from ./leave.enums",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests in tests/unit/shared/types/ verify all enum member counts and string values for all three enums",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "TypeScript strict mode (no implicit any, strict null checks) per HARNESS.json",
+    "No `any` type \u2014 use `unknown` with type guards (HARNESS.json constraint id: no-any)",
+    "Jest is the test framework; tests go under tests/unit/shared/types/"
+  ],
+  "outOfScope": [
+    "NotificationType enum \u2014 deferred to Phase 7",
+    "Any model, repository, service, controller, or route files \u2014 deferred to Phases 2\u201310",
+    "Database migrations \u2014 deferred to Phase 9",
+    "RBAC middleware \u2014 deferred to Phase 10"
+  ],
+  "ambiguities": []
+}
