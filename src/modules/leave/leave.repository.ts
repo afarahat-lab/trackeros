@@ -1,8 +1,6 @@
-import knex, { Knex } from 'knex';
-import dotenv from 'dotenv';
+import { Knex } from 'knex';
+import { db as defaultDb } from '../../shared/db/connection';
 import { LeaveType } from './leave.model';
-
-dotenv.config();
 
 export interface ILeaveTypeRepository {
   findAll(): Promise<LeaveType[]>;
@@ -15,18 +13,13 @@ export class KnexLeaveTypeRepository implements ILeaveTypeRepository {
   private readonly db: Knex;
 
   constructor(db?: Knex) {
-    this.db =
-      db ??
-      knex({
-        client: 'pg',
-        connection: process.env.DATABASE_URL,
-      });
+    this.db = db ?? defaultDb;
   }
 
   async findAll(): Promise<LeaveType[]> {
     const rows = await this.db('leave_types')
-      .where('is_active', true)
-      .select('*');
+      .select('*')
+      .where('is_active', true);
     return rows.map(this.toLeaveType);
   }
 
