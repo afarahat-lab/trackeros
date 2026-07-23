@@ -10,11 +10,23 @@ Base entity providing common fields for domain models.
 | created_at | Date | true |
 | updated_at | Date | true |
 
-## leave
+## shared/types
 
-Represents a leave record managed by the `leave` module, including leave requests and related leave-tracking data.
+Shared TypeScript enums and types used across modules.
 
-### LeaveStatus
+### LeaveType
+
+Enum with exactly three members:
+
+| Value | Description |
+|-------|-------------|
+| ANNUAL | Annual leave |
+| SICK | Sick leave |
+| EMERGENCY | Emergency leave |
+
+### LeaveRequestStatus
+
+Enum with exactly five members:
 
 | Value | Description |
 |-------|-------------|
@@ -23,6 +35,20 @@ Represents a leave record managed by the `leave` module, including leave request
 | APPROVED | Leave request has been approved |
 | REJECTED | Leave request has been rejected |
 | CANCELLED | Leave request has been cancelled |
+
+### BalanceStatus
+
+Enum with exactly three members:
+
+| Value | Description |
+|-------|-------------|
+| ACTIVE | Balance is active and usable |
+| EXHAUSTED | Balance has been fully consumed |
+| EXPIRED | Balance has expired (e.g. fiscal year ended) |
+
+## leave
+
+Represents a leave record managed by the `leave` module, including leave requests and related leave-tracking data.
 
 ### LeaveRequest
 
@@ -157,17 +183,6 @@ Represents leave policy data managed by the `policy` module, including policy de
 | isActive | boolean | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
-
-### LeaveType
-
-| Value | Description |
-|-------|-------------|
-| annual | Annual leave |
-| sick | Sick leave |
-| emergency | Emergency leave |
-| unpaid | Unpaid leave |
-| maternity | Maternity leave |
-| paternity | Paternity leave |
 
 ### LeavePolicy
 
