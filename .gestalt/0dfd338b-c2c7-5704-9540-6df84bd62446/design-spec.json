@@ -1,0 +1,82 @@
+{
+  "domainChanges": [
+    {
+      "entityName": "LeaveType",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "ANNUAL",
+          "type": "enum_member",
+          "required": true
+        },
+        {
+          "name": "SICK",
+          "type": "enum_member",
+          "required": true
+        },
+        {
+          "name": "EMERGENCY",
+          "type": "enum_member",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "LeaveRequestStatus",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "DRAFT",
+          "type": "enum_member",
+          "required": true
+        },
+        {
+          "name": "SUBMITTED",
+          "type": "enum_member",
+          "required": true
+        },
+        {
+          "name": "APPROVED",
+          "type": "enum_member",
+          "required": true
+        },
+        {
+          "name": "REJECTED",
+          "type": "enum_member",
+          "required": true
+        },
+        {
+          "name": "CANCELLED",
+          "type": "enum_member",
+          "required": true
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "entityName": "BalanceStatus",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "ACTIVE",
+          "type": "enum_member",
+          "required": true
+        },
+        {
+          "name": "EXHAUSTED",
+          "type": "enum_member",
+          "required": true
+        },
+        {
+          "name": "EXPIRED",
+          "type": "enum_member",
+          "required": true
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}
