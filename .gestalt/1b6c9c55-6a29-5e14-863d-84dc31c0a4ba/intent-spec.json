@@ -1,0 +1,76 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave",
+      "shared/db"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository",
+      "migration",
+      "configuration",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "knexfile.ts exists at project root, reads DATABASE_URL from environment, and is configured for TypeScript migrations",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/modules/leave/leave.model.ts defines LeaveType interface with fields: id (string), code (string), label (string), description (string), isActive (boolean), createdAt (Date), updatedAt (Date)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/modules/leave/leave.repository.ts defines ILeaveTypeRepository interface with methods: findAll, findById, findByCode, create \u2014 and KnexLeaveTypeRepository class implementing it",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "migrations/001_create_leave_types.ts: up creates leave_types table with columns matching LeaveType fields (id PK, code unique, label, description, is_active, created_at, updated_at); down drops the table",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "tests/unit/modules/leave/leave-type.repository.test.ts: Jest unit tests mock Knex and verify findAll returns active types, findById, findByCode",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "GP-001: All database access must go through repository interfaces \u2014 KnexLeaveTypeRepository implements ILeaveTypeRepository",
+    "Knex dependency already in package.json (^3.1.0); no new packages to install",
+    "Strict TypeScript: no implicit any, strict null checks \u2014 all interface methods must have explicit return types",
+    "Migration must use Knex schema builder (knex.schema.createTable / dropTable), not raw SQL"
+  ],
+  "outOfScope": [
+    "LeaveRequest, LeaveBalance, LeavePolicy entities \u2014 deferred to Phases 2-3",
+    "LeaveService, LeaveController, leave routes \u2014 deferred to Phases 4-5",
+    "Seed data for leave_types \u2014 deferred to Phase 6",
+    "Audit logging for LeaveType CRUD \u2014 not in this phase's scope (catalog entity, no state-change lifecycle defined yet)",
+    "RBAC enforcement on LeaveType endpoints \u2014 no routes/controllers in this phase"
+  ],
+  "ambiguities": [
+    {
+      "description": "src/shared/db/connection.ts exports a pg.Pool, not a Knex instance. The intent says KnexLeaveTypeRepository should use \"the Knex instance from the existing src/shared/db/connection.ts\" but no Knex instance exists there. The code-agent must decide: (a) create a Knex instance inside the repository using the same DATABASE_URL, (b) modify connection.ts to also export a Knex instance, or (c) configure Knex with the existing pool.",
+      "options": [
+        "Create Knex instance inside KnexLeaveTypeRepository constructor using DATABASE_URL from env",
+        "Modify src/shared/db/connection.ts to also export a configured Knex instance",
+        "Configure Knex to use the existing pg.Pool as its connection"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "The test description says \"test findAll returns active types\" implying isActive filtering, but the interface method name findAll does not encode this filter. Should findAll return all LeaveTypes or only active ones? The ARCHITECTURE.md conceptual table shows is_active as a column but does not prescribe findAll behavior.",
+      "options": [
+        "findAll returns all LeaveTypes (no filter); active filtering is a separate concern",
+        "findAll returns only active LeaveTypes (isActive=true); a separate method handles inactive"
+      ],
+      "impactIfWrong": "low"
+    }
+  ]
+}
