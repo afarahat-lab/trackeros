@@ -1,0 +1,73 @@
+{
+  "domainChanges": [
+    {
+      "entityName": "LeaveType",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "code",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "label",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "isActive",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": true
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": [
+    {
+      "name": "KnexLeaveTypeRepository",
+      "type": "service",
+      "description": "Knex-based implementation of ILeaveTypeRepository. Uses a Knex instance (configured from DATABASE_URL) to perform CRUD operations on the leave_types table. Methods: findAll (returns all leave types, no isActive filter), findById, findByCode (lookup by unique code), create (inserts a new LeaveType row). Constructor accepts an optional Knex instance; if none provided, creates one from process.env.DATABASE_URL.",
+      "props": null
+    },
+    {
+      "name": "knexfile.ts",
+      "type": "service",
+      "description": "Knex configuration file at project root. Reads DATABASE_URL from environment (via dotenv). Exports a Knex.Config with: client 'pg', connection from DATABASE_URL, migrations directory './migrations' with TypeScript support, seeds directory './seeds'. Used by Knex CLI for migrate:latest, migrate:rollback, seed:run.",
+      "props": null
+    },
+    {
+      "name": "leave.model.ts (LeaveType)",
+      "type": "component",
+      "description": "Defines the LeaveType interface with fields: id (string), code (string), label (string), description (string), isActive (boolean), createdAt (Date), updatedAt (Date). This is the initial domain model file for the leave module; future phases will add LeaveRequest, LeaveBalance, and related DTOs to this same file.",
+      "props": null
+    },
+    {
+      "name": "001_create_leave_types migration",
+      "type": "component",
+      "description": "Knex migration file at migrations/001_create_leave_types.ts. Up: creates leave_types table with columns id (uuid PK, default uuid_generate_v4()), code (varchar, unique, not null), label (varchar, not null), description (text), is_active (boolean, default true), created_at (timestamptz, default now()), updated_at (timestamptz, default now()). Down: drops the leave_types table.",
+      "props": null
+    }
+  ]
+}
