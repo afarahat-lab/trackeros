@@ -1,0 +1,72 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave",
+      "shared/db"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository",
+      "infrastructure",
+      "tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "knexfile.ts exports a Knex.Config with client 'pg', connection from DATABASE_URL env var, and migrations directory configured for TypeScript (.ts extension)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "LeaveType interface in leave.model.ts has exactly: id (string), code (string), label (string), description (string), isActive (boolean), createdAt (Date), updatedAt (Date)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "ILeaveTypeRepository interface declares: findAll() \u2192 Promise&lt;LeaveType[]&gt;, findById(id: string) \u2192 Promise&lt;LeaveType | null&gt;, findByCode(code: string) \u2192 Promise&lt;LeaveType | null&gt;, create(data: Omit&lt;LeaveType, 'id' | 'createdAt' | 'updatedAt'&gt;) \u2192 Promise&lt;LeaveType&gt;",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "KnexLeaveTypeRepository implements ILeaveTypeRepository, accepts optional Knex instance in constructor, maps snake_case DB columns (is_active, created_at, updated_at) to camelCase model fields via private toLeaveType mapper",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Migration 001_create_leave_types.ts: up creates leave_types table with uuid id PK (default gen_random_uuid()), code varchar(50) unique not null, label varchar(100) not null, description text not null default '', is_active boolean not null default true, created_at/updated_at timestamps; down drops the table",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "Unit tests mock Knex and verify: findAll filters is_active=true and returns mapped LeaveType[], findById returns type or null, findByCode returns type or null, create inserts with snake_case mapping and returns new type via returning('*')",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "GP-001: All database access must go through repository interfaces \u2014 KnexLeaveTypeRepository is the sole access point for leave_types table",
+    "HARNESS no-any rule: Use `Record<string, unknown>` with type guards instead of `any` \u2014 the toLeaveType mapper uses `row.id as string` pattern",
+    "HARNESS no-direct-db-outside-repository: No inline SQL/ORM calls outside the repository layer"
+  ],
+  "outOfScope": [
+    "LeaveRequest entity, LeaveRequestStatus enum, CreateLeaveRequestDto \u2014 deferred to Phase 2",
+    "LeaveBalance entity, UpdateLeaveBalanceDto \u2014 deferred to Phase 3",
+    "LeavePolicy entity \u2014 deferred to later phases (not in PLAN.md leave module phases)",
+    "Service layer, controllers, routes, and barrel export \u2014 deferred to Phases 4-5, 7-9",
+    "Seed data for leave types \u2014 deferred to Phase 6",
+    "Audit logging (GP-002) for leave type mutations \u2014 not required for this catalog-entity phase; audit applies to state-changing operations on LeaveRequest/LeaveBalance in later phases"
+  ],
+  "ambiguities": [
+    {
+      "description": "Intent says \"using the Knex instance from the existing src/shared/db/connection.ts\" but connection.ts exports a pg.Pool, not a Knex instance. The implementation creates its own Knex instance (or accepts one via constructor). This is a resolved design decision in the existing code.",
+      "options": [
+        "Keep current implementation: repository creates its own Knex instance with DATABASE_URL",
+        "Refactor connection.ts to export a Knex instance and have repository use it",
+        "Wrap the pg.Pool from connection.ts in a Knex instance inside the repository"
+      ],
+      "impactIfWrong": "medium"
+    }
+  ]
+}
