@@ -1,0 +1,67 @@
+{
+  "domainChanges": [
+    {
+      "entityName": "LeaveType",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string (UUID)",
+          "required": true
+        },
+        {
+          "name": "code",
+          "type": "string (max 50, unique)",
+          "required": true
+        },
+        {
+          "name": "label",
+          "type": "string (max 100)",
+          "required": true
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "isActive",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": true
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": [
+    {
+      "name": "KnexLeaveTypeRepository",
+      "type": "service",
+      "description": "PostgreSQL-backed implementation of ILeaveTypeRepository using Knex query builder. Constructor accepts optional Knex instance (defaults to creating one from DATABASE_URL). Maps snake_case DB columns (is_active, created_at, updated_at) to camelCase LeaveType model fields via private toLeaveType mapper. Methods: findAll (filters is_active=true), findById, findByCode, create (inserts with snake_case mapping, returns via returning('*')).",
+      "props": null
+    },
+    {
+      "name": "knexfile.ts",
+      "type": "service",
+      "description": "Knex configuration file exporting Knex.Config with client 'pg', connection from DATABASE_URL env var, migrations directory './migrations' with TypeScript extension 'ts'. Used by Knex CLI for running migrations and by repositories for database access.",
+      "props": null
+    },
+    {
+      "name": "001_create_leave_types migration",
+      "type": "service",
+      "description": "Knex migration: up creates leave_types table with uuid id PK (default gen_random_uuid()), code varchar(50) unique not null, label varchar(100) not null, description text not null default '', is_active boolean not null default true, created_at/updated_at timestamps defaulting to now(). down drops the table.",
+      "props": null
+    }
+  ]
+}
