@@ -1,0 +1,81 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave",
+      "shared/db"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository",
+      "infrastructure"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "knexfile.ts exports a Knex config that reads DATABASE_URL from environment and supports TypeScript migrations (ts-node or tsx for migration files)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/modules/leave/leave.model.ts exports a LeaveType interface with fields: id (string), code (string), label (string), description (string), isActive (boolean), createdAt (Date), updatedAt (Date)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/modules/leave/leave.repository.ts exports ILeaveTypeRepository interface with methods: findAll() \u2192 Promise<LeaveType[]>, findById(id: string) \u2192 Promise<LeaveType | null>, findByCode(code: string) \u2192 Promise<LeaveType | null>, create(input: { code, label, description, isActive }) \u2192 Promise<LeaveType>",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "KnexLeaveTypeRepository class implements ILeaveTypeRepository, accepts a Knex instance via constructor, and maps snake_case DB columns (is_active, created_at, updated_at) to camelCase LeaveType fields",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "migrations/001_create_leave_types.ts: up creates leave_types table with columns id (uuid PK), code (varchar unique not null), label (varchar not null), description (text), is_active (boolean default true), created_at (timestamptz), updated_at (timestamptz); down drops the table",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "Existing unit test at tests/unit/modules/leave/leave-type.repository.test.ts passes: findAll returns only active types, findById returns type or null, findByCode returns type or null, create inserts and returns new type",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "GP-001: All database access for leave_types must go through KnexLeaveTypeRepository \u2014 no inline Knex calls in models, services, or controllers",
+    "HARNESS.json constraint 'no-any': Use unknown with type guards instead of any in all new code",
+    "HARNESS.json constraint 'no-direct-db-outside-repository': Knex instance only used inside KnexLeaveTypeRepository; other modules import the interface",
+    "HARNESS.json constraint 'no-hardcoded-secrets': DATABASE_URL read from environment only, never hardcoded in knexfile.ts",
+    "KnexLeaveTypeRepository constructor must accept a Knex instance (dependency injection), not import db directly \u2014 the test file already mocks Knex and expects constructor injection"
+  ],
+  "outOfScope": [
+    "LeaveRequest model, repository, and migration (Phase 2)",
+    "LeaveBalance model, repository, and migration (Phase 3)",
+    "LeaveService with business logic for submit/approve/reject/cancel (Phase 4)",
+    "Leave controller and Fastify routes (Phase 5)",
+    "Seed scripts for default leave types (Phase 6)",
+    "LeaveBalanceService, balance routes, barrel exports, and integration tests (Phases 7-9)",
+    "Audit logging (GP-002) \u2014 not required for this phase since LeaveType is a static catalog entity with no state-changing operations in scope"
+  ],
+  "ambiguities": [
+    {
+      "description": "Table name conflict: ARCHITECTURE.md specifies the table as `leave_type` (singular), but the intent text, migration filename (001_create_leave_types), and the existing test file all use `leave_types` (plural). The test asserts `knexFn).toHaveBeenCalledWith('leave_types')`. Which name should the migration and repository use?",
+      "options": [
+        "Use `leave_types` (plural) \u2014 matches intent, migration filename, and existing test",
+        "Use `leave_type` (singular) \u2014 matches ARCHITECTURE.md canonical table specification"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "The intent says knexfile.ts should have \"TypeScript support for migrations\" but does not specify the loader (ts-node vs tsx). Knex typically uses ts-node with the `--require ts-node/register` flag or the `tsx` package. The choice affects the knexfile migration configuration and devDependencies.",
+      "options": [
+        "Use ts-node with `ts-node/register` (traditional Knex approach)",
+        "Use tsx (lighter-weight, ESM-friendly)"
+      ],
+      "impactIfWrong": "low"
+    }
+  ]
+}
