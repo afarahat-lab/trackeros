@@ -12,7 +12,19 @@ Base entity providing common fields for domain models.
 
 ## leave
 
-Represents a leave record managed by the `leave` module, including leave requests and related leave-tracking data.
+Represents a leave record managed by the `leave` module, including leave requests, leave types, and related leave-tracking data.
+
+### LeaveType
+
+| Field | Type | Required |
+|-------|------|----------|
+| id | string | true |
+| code | string | true |
+| label | string | true |
+| description | string | true |
+| isActive | boolean | true |
+| createdAt | Date | true |
+| updatedAt | Date | true |
 
 ### LeaveStatus
 
@@ -42,6 +54,7 @@ Represents a leave record managed by the `leave` module, including leave request
 
 **Relationships**
 - `Employee` — many-to-one
+- `LeaveType` — many-to-one
 
 ### CreateLeaveRequestDto
 
