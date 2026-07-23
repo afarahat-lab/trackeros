@@ -21,17 +21,9 @@ src/modules/balance/balance.{model,repository,service,controller,routes}.ts
 src/modules/employee/employee.{model,repository,service,controller,routes}.ts
 src/modules/policy/policy.{model,repository,service,controller,routes}.ts
 src/modules/notification/notification.{model,repository,service,controller,routes}.ts
-src/modules/LeaveStatus/    — LeaveStatus module
-src/modules/BaseEntity/    — BaseEntity module
-src/modules/LeaveRequest/    — LeaveRequest module
-src/modules/LeaveType/    — LeaveType module
-src/modules/LeavePolicy/    — LeavePolicy module
-src/modules/AuditLog/    — AuditLog module
-src/modules/AuditRecord/    — AuditRecord module
-src/modules/AuditServiceInterface/    — AuditServiceInterface module
-src/shared/db connection.ts
-src/shared/base repository.ts
-src/shared/error types.ts
+src/shared/db/connection.ts
+src/shared/base/repository.ts
+src/shared/error/types.ts
 ```
 
 ## Key patterns
@@ -76,13 +68,13 @@ The leave management module enables employees to apply for annual, sick, and eme
 
 ### Repository Interfaces and Implementations
 
-Each entity has a repository interface defined alongside its model, with a PostgreSQL implementation using `pg` Pool (src/shared/db/connection.ts).
+Each entity has a repository interface defined alongside its model, with a PostgreSQL implementation using Knex query builder (configured from `DATABASE_URL`).
 
-- **ILeaveTypeRepository** / **PgLeaveTypeRepository** — `findAll`, `findById`, `findByCode`, `create`, `update`, `delete`
-- **ILeavePolicyRepository** / **PgLeavePolicyRepository** — `findAll`, `findById`, `findByLeaveTypeId`, `findActive`, `create`, `update`, `deactivate`
-- **ILeaveBalanceRepository** / **PgLeaveBalanceRepository** — `findByEmployeeAndTypeAndYear`, `findAllByEmployee`, `create`, `update`, `upsert`
-- **ILeaveRequestRepository** / **PgLeaveRequestRepository** — `findById`, `findByEmployeeId`, `findByApproverId`, `findByStatus`, `create`, `update`
-- **IAuditLogRepository** / **PgAuditLogRepository** — `create`, `findByEntity`, `findByActor`, `list`
+- **ILeaveTypeRepository** / **KnexLeaveTypeRepository** — `findAll`, `findById`, `findByCode`, `create`, `update`, `delete`
+- **ILeavePolicyRepository** / **KnexLeavePolicyRepository** — `findAll`, `findById`, `findByLeaveTypeId`, `findActive`, `create`, `update`, `deactivate`
+- **ILeaveBalanceRepository** / **KnexLeaveBalanceRepository** — `findByEmployeeAndTypeAndYear`, `findAllByEmployee`, `create`, `update`, `upsert`
+- **ILeaveRequestRepository** / **KnexLeaveRequestRepository** — `findById`, `findByEmployeeId`, `findByApproverId`, `findByStatus`, `create`, `update`
+- **IAuditLogRepository** / **KnexAuditLogRepository** — `create`, `findByEntity`, `findByActor`, `list`
 
 ### Module Boundaries
 
@@ -132,7 +124,7 @@ All edges point inward. No module depends on `leave`. `audit` and `notification`
 
 - Language: TypeScript (Node 20)
 - Framework: Fastify (controllers/routes)
-- Database: PostgreSQL (via `pg` Pool, repository pattern)
+- Database: PostgreSQL (via Knex query builder, repository pattern)
 - Frontend: React Native (consumes REST API)
 - Architecture: modular-monolith with strict layer separation (domain → application → infrastructure → presentation)
 - Cross-cutting: Audit (GP-002) on every state change; RBAC (GP-005) enforced in controllers; input validation (GP-003) at API boundary and service level; transaction semantics for balance mutations.
