@@ -1,0 +1,73 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "LeavePolicy interface is defined in src/modules/leave/leave-policy.model.ts with all 13 fields: id (string), policyName (string), leaveType (LeaveType from shared/types), entitlementDays (number), accrualRate (number), maxAccumulation (number), minimumNoticeDays (number), requiresManagerApproval (boolean), isActive (boolean), allowsNegativeBalance (boolean), maxConsecutiveDays (number), createdAt (Date), updatedAt (Date)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "ILeavePolicyRepository interface declares methods: findById(id: string): Promise<LeavePolicy | null>, findAll(): Promise<LeavePolicy[]>, findByLeaveType(leaveType: LeaveType): Promise<LeavePolicy[]>, create(...): Promise<LeavePolicy>, update(...): Promise<LeavePolicy>, softDelete(id: string): Promise<void>",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "LeavePolicyRepository class extends BaseRepository<LeavePolicy> from src/shared/base-repository.ts and implements ILeavePolicyRepository with all six methods",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests at tests/unit/modules/leave/leave-policy.repository.test.ts cover all repository methods (findById, findAll, findByLeaveType, create, update, softDelete) with mocked BaseRepository query",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All imports correctly reference existing Phase 1 artifact (LeaveType from src/shared/types/index.ts) and Phase 2 artifacts (BaseRepository from src/shared/base-repository.ts, pool from src/shared/db/connection.ts)",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "GP-001: All database access must go through the repository pattern \u2014 LeavePolicyRepository extends BaseRepository<T> and uses its protected query() method; no inline SQL outside the repository",
+    "HARNESS.json constraint 'no-any': Use unknown with type guards instead of any \u2014 repository method signatures must not use 'any'",
+    "HARNESS.json constraint 'no-direct-db-outside-repository': Database calls must go through repository pattern \u2014 LeavePolicyRepository is the sole database access point for leave_policy",
+    "Strict TypeScript (no implicit any, strict null checks) per AGENTS.md \u2014 all types must be explicit and null-safe"
+  ],
+  "outOfScope": [
+    "Database migration / table creation for leave_policy \u2014 this phase only defines the model interface and repository class, not the DDL",
+    "Audit logging (GP-002) \u2014 audit records are written at the service layer (Phase 6), not at the repository layer in this phase",
+    "RBAC enforcement (GP-005) \u2014 handled at the route/middleware layer (Phase 8), not in the model or repository",
+    "LeaveBalance model/repository (Phase 4), LeaveRequest model/repository (Phase 5), LeaveService (Phase 6), LeaveController (Phase 7), LeaveRoutes (Phase 8)"
+  ],
+  "ambiguities": [
+    {
+      "description": "The `create` and `update` method signatures on ILeavePolicyRepository are not fully specified \u2014 the intent lists method names but does not define parameter types. The code agent must infer: create likely takes Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>, and update likely takes (id: string, partial: Partial<LeavePolicy>).",
+      "options": [
+        "create takes Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'> and returns Promise<LeavePolicy>",
+        "create takes a DTO with all required fields and returns Promise<LeavePolicy>",
+        "update takes (id: string, data: Partial<LeavePolicy>) and returns Promise<LeavePolicy>",
+        "update takes (id: string, data: Partial<LeavePolicy>) and returns Promise<LeavePolicy | null>"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "The `softDelete` mechanism is not specified \u2014 the architecture shows `isActive` as a boolean field on LeavePolicy, suggesting softDelete sets isActive=false, but it could also use a deletedAt timestamp. The intent does not clarify.",
+      "options": [
+        "softDelete sets isActive = false on the row",
+        "softDelete sets a deletedAt timestamp",
+        "softDelete sets both isActive = false and a deletedAt timestamp"
+      ],
+      "impactIfWrong": "low"
+    }
+  ]
+}
