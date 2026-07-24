@@ -1,0 +1,56 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-balance"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "LeaveBalance interface defined in src/modules/leave/leave-balance.model.ts with all required attributes: id, employeeId, policyId, totalEntitlement, usedDays, remainingDays, pendingDays, fiscalYear, status (BalanceStatus enum imported from src/shared/types/index.ts), createdAt, updatedAt",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "ILeaveBalanceRepository interface defined with methods: findById(id: string): Promise<LeaveBalance | null>, findByEmployeeId(employeeId: string): Promise<LeaveBalance[]>, findByEmployeeAndPolicy(employeeId: string, policyId: string, fiscalYear: number): Promise<LeaveBalance | null>, create(balance: Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeaveBalance>, update(id: string, balance: Partial<Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt'>>): Promise<LeaveBalance | null>, upsert(balance: Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeaveBalance>",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "LeaveBalanceRepository class extends BaseRepository<LeaveBalance> and implements ILeaveBalanceRepository, with constructor accepting optional poolOverride: Pool",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "upsert uses ON CONFLICT (employee_id, leave_policy_id, fiscal_year) DO UPDATE to handle insert-or-update atomically",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests at tests/unit/modules/leave/leave-balance.repository.test.ts covering all repository methods (findById, findByEmployeeId, findByEmployeeAndPolicy, create, update, upsert) with both success and edge cases (null returns, empty arrays, no-op updates, conflict vs insert)",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access must go through the repository pattern (GP-001) \u2014 LeaveBalanceRepository extends BaseRepository and uses pool.query; no inline SQL in models or elsewhere"
+  ],
+  "outOfScope": [
+    "Leave balance business logic (balance arithmetic, state transitions, pending-days enforcement) \u2014 deferred to Phase 6 (Leave service)"
+  ],
+  "ambiguities": [
+    {
+      "description": "The reconciled architecture (ARCHITECTURE.md) defines BalanceStatus as ACTIVE | EXHAUSTED | FROZEN | ROLLED_OVER, but src/shared/types/index.ts (Phase 1) only exports Active | Exhausted | Frozen \u2014 no RolledOver. The LeaveBalance model and repository use the three-value enum from the source file. This is a pre-existing gap from Phase 1, not introduced by Phase 4, but may affect future phases that expect ROLLED_OVER.",
+      "options": [
+        "Accept the three-value enum as-is and add ROLLED_OVER in a later phase when needed",
+        "Add RolledOver to BalanceStatus in Phase 1's types file now"
+      ],
+      "impactIfWrong": "low"
+    }
+  ]
+}
