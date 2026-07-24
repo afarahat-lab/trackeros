@@ -19,6 +19,8 @@ The architecture is modular, with a clear separation of concerns between models,
 src/modules/leave/
   leave-policy.model.ts          — LeavePolicy interface
   leave-policy.repository.ts     — ILeavePolicyRepository + LeavePolicyRepository
+  leave-balance.model.ts         — LeaveBalance interface
+  leave-balance.repository.ts    — ILeaveBalanceRepository + LeaveBalanceRepository
 src/modules/status/
   index.ts
   status.model.ts
@@ -42,6 +44,7 @@ tests/unit/
   shared/error-types.test.ts
   shared/base-repository.test.ts
   modules/leave/leave-policy.repository.test.ts
+  modules/leave/leave-balance.repository.test.ts
 ```
 
 ## Key patterns

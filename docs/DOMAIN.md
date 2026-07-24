@@ -88,6 +88,7 @@ Represents leave balance data managed by the `balance` module, including tracked
 | totalEntitlement | number | true |
 | usedDays | number | true |
 | remainingDays | number | true |
+| pendingDays | number | true |
 | fiscalYear | number | true |
 | status | string | true |
 | createdAt | Date | true |
@@ -107,6 +108,7 @@ Represents leave balance data managed by the `balance` module, including tracked
 | totalEntitlement | number | true |
 | usedDays | number | true |
 | remainingDays | number | true |
+| pendingDays | number | true |
 | fiscalYear | number | true |
 | status | string | true |
 | createdAt | Date | true |
