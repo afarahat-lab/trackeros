@@ -1,0 +1,40 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared"
+    ],
+    "affectedLayers": [
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "mockPool.query is typed so that mockResolvedValueOnce and mockRejectedValueOnce calls in tests/unit/shared/base-repository.test.ts compile without TS2345 errors",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All existing test assertions in tests/unit/shared/base-repository.test.ts continue to pass after the typing fix",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "tsc --noEmit passes with zero errors related to tests/unit/shared/base-repository.test.ts",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Must not change the runtime behavior of any test \u2014 only fix TypeScript typing",
+    "Must not introduce the `any` type (HARNESS.json constraint no-any)",
+    "Must not modify src/shared/base-repository.ts or any other production source file"
+  ],
+  "outOfScope": [
+    "Changes to any test file other than tests/unit/shared/base-repository.test.ts",
+    "Changes to production code (src/)",
+    "Changes to the BaseRepository class or its constructor signature"
+  ],
+  "ambiguities": []
+}
