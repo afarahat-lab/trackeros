@@ -89,19 +89,19 @@ describe('LeaveBalanceRepository', () => {
       const balance = makeBalance();
       mockQuery.mockResolvedValueOnce({ rows: [balance], rowCount: 1 });
 
-      const result = await repo.findByEmployeeAndPolicy('emp-1', 'policy-1');
+      const result = await repo.findByEmployeeAndPolicy('emp-1', 'policy-1', 2024);
 
       expect(result).toEqual(balance);
       expect(mockQuery).toHaveBeenCalledWith(
-        'SELECT * FROM leave_balance WHERE employee_id = $1 AND policy_id = $2',
-        ['emp-1', 'policy-1'],
+        'SELECT * FROM leave_balance WHERE employee_id = $1 AND leave_policy_id = $2 AND fiscal_year = $3',
+        ['emp-1', 'policy-1', 2024],
       );
     });
 
     it('should return null when not found', async () => {
       mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 });
 
-      const result = await repo.findByEmployeeAndPolicy('emp-1', 'policy-none');
+      const result = await repo.findByEmployeeAndPolicy('emp-1', 'policy-none', 2024);
 
       expect(result).toBeNull();
     });
@@ -127,7 +127,7 @@ describe('LeaveBalanceRepository', () => {
       expect(result).toEqual(created);
       expect(mockQuery).toHaveBeenCalledWith(
         `INSERT INTO leave_balance (
-        employee_id, policy_id, total_entitlement, used_days,
+        employee_id, leave_policy_id, total_entitlement, used_days,
         remaining_days, pending_days, fiscal_year, status
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING *`,
@@ -204,10 +204,10 @@ describe('LeaveBalanceRepository', () => {
       expect(result).toEqual(created);
       expect(mockQuery).toHaveBeenCalledWith(
         `INSERT INTO leave_balance (
-        employee_id, policy_id, total_entitlement, used_days,
+        employee_id, leave_policy_id, total_entitlement, used_days,
         remaining_days, pending_days, fiscal_year, status
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-      ON CONFLICT (employee_id, policy_id, fiscal_year)
+      ON CONFLICT (employee_id, leave_policy_id, fiscal_year)
       DO UPDATE SET
         total_entitlement = EXCLUDED.total_entitlement,
         used_days = EXCLUDED.used_days,

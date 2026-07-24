@@ -5,7 +5,7 @@ import { LeaveBalance } from './leave-balance.model';
 export interface ILeaveBalanceRepository {
   findById(id: string): Promise<LeaveBalance | null>;
   findByEmployeeId(employeeId: string): Promise<LeaveBalance[]>;
-  findByEmployeeAndPolicy(employeeId: string, policyId: string): Promise<LeaveBalance | null>;
+  findByEmployeeAndPolicy(employeeId: string, policyId: string, fiscalYear: number): Promise<LeaveBalance | null>;
   create(balance: Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeaveBalance>;
   update(id: string, balance: Partial<Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt'>>): Promise<LeaveBalance | null>;
   upsert(balance: Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeaveBalance>;
@@ -32,10 +32,10 @@ export class LeaveBalanceRepository extends BaseRepository<LeaveBalance> impleme
     return result.rows;
   }
 
-  async findByEmployeeAndPolicy(employeeId: string, policyId: string): Promise<LeaveBalance | null> {
+  async findByEmployeeAndPolicy(employeeId: string, policyId: string, fiscalYear: number): Promise<LeaveBalance | null> {
     const result = await this.query(
-      'SELECT * FROM leave_balance WHERE employee_id = $1 AND policy_id = $2',
-      [employeeId, policyId],
+      'SELECT * FROM leave_balance WHERE employee_id = $1 AND leave_policy_id = $2 AND fiscal_year = $3',
+      [employeeId, policyId, fiscalYear],
     );
     return result.rows[0] ?? null;
   }
@@ -43,7 +43,7 @@ export class LeaveBalanceRepository extends BaseRepository<LeaveBalance> impleme
   async create(balance: Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeaveBalance> {
     const result = await this.query(
       `INSERT INTO leave_balance (
-        employee_id, policy_id, total_entitlement, used_days,
+        employee_id, leave_policy_id, total_entitlement, used_days,
         remaining_days, pending_days, fiscal_year, status
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING *`,
@@ -71,7 +71,7 @@ export class LeaveBalanceRepository extends BaseRepository<LeaveBalance> impleme
 
     const fieldMap: Array<[keyof typeof balance, string]> = [
       ['employeeId', 'employee_id'],
-      ['policyId', 'policy_id'],
+      ['policyId', 'leave_policy_id'],
       ['totalEntitlement', 'total_entitlement'],
       ['usedDays', 'used_days'],
       ['remainingDays', 'remaining_days'],
@@ -105,10 +105,10 @@ export class LeaveBalanceRepository extends BaseRepository<LeaveBalance> impleme
   async upsert(balance: Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeaveBalance> {
     const result = await this.query(
       `INSERT INTO leave_balance (
-        employee_id, policy_id, total_entitlement, used_days,
+        employee_id, leave_policy_id, total_entitlement, used_days,
         remaining_days, pending_days, fiscal_year, status
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-      ON CONFLICT (employee_id, policy_id, fiscal_year)
+      ON CONFLICT (employee_id, leave_policy_id, fiscal_year)
       DO UPDATE SET
         total_entitlement = EXCLUDED.total_entitlement,
         used_days = EXCLUDED.used_days,
