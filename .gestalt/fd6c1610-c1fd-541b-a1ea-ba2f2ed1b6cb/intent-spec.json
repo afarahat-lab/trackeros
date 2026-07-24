@@ -1,0 +1,51 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared/types"
+    ],
+    "affectedLayers": [
+      "types",
+      "tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "src/shared/types/leave.ts exports a LeaveType enum with exactly three string-valued members: ANNUAL, SICK, EMERGENCY",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/shared/types/leave.ts exports a LeaveRequestStatus enum with exactly five string-valued members: DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/shared/types/leave.ts exports a BalanceStatus enum with exactly three string-valued members: ACTIVE, EXHAUSTED, FROZEN",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/shared/types/index.ts barrel re-exports all three enums (LeaveType, LeaveRequestStatus, BalanceStatus) from ./leave",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests in tests/unit/shared/types/ verify each enum has the correct members and correct member count",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Enums must use string-valued members (e.g., ANNUAL = 'ANNUAL'), not numeric \u2014 consistent with TypeScript strict mode and serialization needs",
+    "All TypeScript files must pass tsc --noEmit under strict mode (no implicit any, strict null checks)",
+    "Barrel export pattern: src/shared/types/index.ts re-exports all public symbols from leave.ts; consumers import from the barrel, not from leave.ts directly"
+  ],
+  "outOfScope": [
+    "LeaveType members beyond ANNUAL, SICK, EMERGENCY (e.g., UNPAID, MATERNITY, PATERNITY) \u2014 deferred to later phases",
+    "Any model, repository, service, controller, route, or migration code \u2014 this phase is types-only foundation",
+    "State transition rules, business logic, or validation \u2014 enums are pure data definitions with no behaviour"
+  ],
+  "ambiguities": []
+}
