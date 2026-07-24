@@ -17,8 +17,8 @@ The architecture is modular, with a clear separation of concerns between models,
 
 ```
 src/modules/leave/
-  leave-policy.model.ts          — LeavePolicy interface (Phase 3)
-  leave-policy.repository.ts     — ILeavePolicyRepository + LeavePolicyRepository (Phase 3)
+  leave-policy.model.ts          — LeavePolicy interface
+  leave-policy.repository.ts     — ILeavePolicyRepository + LeavePolicyRepository
 src/modules/status/
   index.ts
   status.model.ts
@@ -41,7 +41,7 @@ tests/unit/
   shared/types.test.ts
   shared/error-types.test.ts
   shared/base-repository.test.ts
-  modules/leave/leave-policy.repository.test.ts  — Phase 3
+  modules/leave/leave-policy.repository.test.ts
 ```
 
 ## Key patterns
@@ -91,7 +91,7 @@ The leave management module enables employees to apply for annual, sick, and eme
 
 - **leave-request** (`src/modules/leave/`) — orchestrates the full lifecycle; depends on all other modules.
 - **leave-balance** (`src/modules/leave/`) — balance arithmetic and state transitions.
-- **leave-policy** (`src/modules/leave/`) — policy definitions and validation (model + repository in Phase 3).
+- **leave-policy** (`src/modules/leave/`) — policy definitions and validation (model + repository implemented).
 - **employee** (`src/modules/employee/`) — employee identity, manager chain, status checks.
 - **audit** (`src/modules/audit/`) — cross-cutting audit trail (GP-002).
 - **notification** (`src/modules/notification/`) — fire-and-forget status notifications.
