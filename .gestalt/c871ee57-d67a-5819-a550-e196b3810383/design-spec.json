@@ -1,0 +1,77 @@
+{
+  "domainChanges": [
+    {
+      "entityName": "LeaveBalance",
+      "operation": "update",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "employeeId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "policyId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "totalEntitlement",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "usedDays",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "remainingDays",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "pendingDays",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "fiscalYear",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "status",
+          "type": "BalanceStatus",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "LeavePolicy",
+          "type": "many-to-one (via policyId)"
+        },
+        {
+          "entity": "Employee",
+          "type": "many-to-one (via employeeId)"
+        }
+      ]
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}
