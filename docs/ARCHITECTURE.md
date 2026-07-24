@@ -16,23 +16,32 @@ The architecture is modular, with a clear separation of concerns between models,
 ## Module structure
 
 ```
-src/modules/leave/leave.{model,repository,service,controller,routes}.ts
-src/modules/balance/balance.{model,repository,service,controller,routes}.ts
-src/modules/employee/employee.{model,repository,service,controller,routes}.ts
-src/modules/policy/policy.{model,repository,service,controller,routes}.ts
-src/modules/notification/notification.{model,repository,service,controller,routes}.ts
-src/modules/LeaveStatus/    — LeaveStatus module
-src/modules/BaseEntity/    — BaseEntity module
-src/modules/LeaveRequest/    — LeaveRequest module
-src/modules/LeaveType/    — LeaveType module
-src/modules/LeavePolicy/    — LeavePolicy module
-src/modules/AuditLog/    — AuditLog module
-src/modules/AuditRecord/    — AuditRecord module
-src/modules/AuditServiceInterface/    — AuditServiceInterface module
-src/shared/db connection.ts
-src/shared/base repository.ts
-src/shared/error types.ts
-src/shared/types/index.ts
+src/modules/leave/
+  leave-policy.model.ts          — LeavePolicy interface (Phase 3)
+  leave-policy.repository.ts     — ILeavePolicyRepository + LeavePolicyRepository (Phase 3)
+src/modules/status/
+  index.ts
+  status.model.ts
+  status.service.interface.ts
+  status.service.ts
+src/modules/uptime/
+  index.ts
+  uptime.model.ts
+  uptime.routes.ts
+  uptime.service.interface.ts
+  uptime.service.ts
+src/shared/
+  db/connection.ts               — pg Pool singleton
+  types/index.ts                 — LeaveType, LeaveRequestStatus, BalanceStatus enums
+  base-repository.ts             — abstract BaseRepository<T>
+  error-types.ts                 — NotFoundError, ValidationError, ConflictError
+src/app.ts                       — Fastify app bootstrap
+src/index.ts                     — entry point
+tests/unit/
+  shared/types.test.ts
+  shared/error-types.test.ts
+  shared/base-repository.test.ts
+  modules/leave/leave-policy.repository.test.ts  — Phase 3
 ```
 
 ## Key patterns
@@ -80,9 +89,9 @@ The leave management module enables employees to apply for annual, sick, and eme
 
 ### Module Boundaries
 
-- **leave-request** (`src/modules/leave-request/`) — orchestrates the full lifecycle; depends on all other modules.
-- **leave-balance** (`src/modules/leave-balance/`) — balance arithmetic and state transitions.
-- **leave-policy** (`src/modules/leave-policy/`) — policy definitions and validation.
+- **leave-request** (`src/modules/leave/`) — orchestrates the full lifecycle; depends on all other modules.
+- **leave-balance** (`src/modules/leave/`) — balance arithmetic and state transitions.
+- **leave-policy** (`src/modules/leave/`) — policy definitions and validation (model + repository in Phase 3).
 - **employee** (`src/modules/employee/`) — employee identity, manager chain, status checks.
 - **audit** (`src/modules/audit/`) — cross-cutting audit trail (GP-002).
 - **notification** (`src/modules/notification/`) — fire-and-forget status notifications.
