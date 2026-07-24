@@ -1,0 +1,51 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared/types"
+    ],
+    "affectedLayers": [
+      "types",
+      "tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "src/shared/types/leave.ts exports LeaveType enum with exactly three string members: ANNUAL='ANNUAL', SICK='SICK', EMERGENCY='EMERGENCY'",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/shared/types/leave.ts exports LeaveRequestStatus enum with exactly five string members: DRAFT='DRAFT', SUBMITTED='SUBMITTED', APPROVED='APPROVED', REJECTED='REJECTED', CANCELLED='CANCELLED'",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/shared/types/leave.ts exports BalanceStatus enum with exactly three string members: ACTIVE='ACTIVE', EXHAUSTED='EXHAUSTED', FROZEN='FROZEN'",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/shared/types/index.ts barrel re-exports all three enums (LeaveType, LeaveRequestStatus, BalanceStatus) from ./leave",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests in tests/unit/shared/types/leave.test.ts verify each enum has the correct members and correct member count (3, 5, 3 respectively)",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Enums must use TypeScript string enum syntax (e.g., ANNUAL = 'ANNUAL') \u2014 not numeric enums, not const enums",
+    "Barrel export in index.ts must use named re-exports: `export { LeaveType, LeaveRequestStatus, BalanceStatus } from './leave'`",
+    "No dependencies on any other modules or phases \u2014 this is a leaf foundation module"
+  ],
+  "outOfScope": [
+    "Additional LeaveType members (UNPAID, MATERNITY, PATERNITY) mentioned in ARCHITECTURE.md \u2014 deferred to later phases; this phase only delivers ANNUAL, SICK, EMERGENCY",
+    "Database tables, repositories, services, controllers, routes \u2014 all deferred to Phases 2\u201310",
+    "State transition rules, business logic, validation \u2014 deferred to later phases"
+  ],
+  "ambiguities": []
+}
