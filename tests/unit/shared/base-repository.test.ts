@@ -15,12 +15,12 @@ class TestRepository extends BaseRepository<TestEntity> {
 }
 
 describe('BaseRepository', () => {
-  let mockPool: jest.Mocked<Pool>;
+  let mockPool: Pool;
 
   beforeEach(() => {
     mockPool = {
       query: jest.fn(),
-    } as unknown as jest.Mocked<Pool>;
+    } as unknown as Pool;
   });
 
   describe('constructor', () => {
