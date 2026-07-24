@@ -1,0 +1,34 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-policy"
+    ],
+    "affectedLayers": [
+      "repository"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "`LeavePolicyRepository.findAll()` calls `this.pool.query` directly with exactly one argument \u2014 the SQL string `'SELECT * FROM leave_policy WHERE deleted_at IS NULL ORDER BY policy_name ASC'` \u2014 and no trailing `undefined` second argument.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The existing unit test at `tests/unit/modules/leave/leave-policy.repository.test.ts:72` passes: `expect(mockQuery).toHaveBeenCalledWith('SELECT * FROM leave_policy WHERE deleted_at IS NULL ORDER BY policy_name ASC')` matches the single-argument call.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Do not change `BaseRepository.query` \u2014 its signature and forwarding behavior are correct for all other callers that pass explicit params arrays.",
+    "Do not change the test file `tests/unit/modules/leave/leave-policy.repository.test.ts`.",
+    "Do not change any other method in `LeavePolicyRepository` (`findById`, `findByLeaveType`, `create`, `update`, `softDelete`)."
+  ],
+  "outOfScope": [
+    "Changing `BaseRepository.query` to conditionally omit the `params` argument when `undefined`.",
+    "Modifying any other repository or test file."
+  ],
+  "ambiguities": []
+}
