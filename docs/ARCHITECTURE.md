@@ -32,6 +32,8 @@ src/modules/AuditServiceInterface/    — AuditServiceInterface module
 src/shared/db connection.ts
 src/shared/base repository.ts
 src/shared/error types.ts
+src/shared/types/leave.ts          — LeaveType, LeaveRequestStatus, BalanceStatus enums
+src/shared/types/index.ts          — barrel re-export of leave.ts
 ```
 
 ## Key patterns
