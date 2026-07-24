@@ -1,0 +1,51 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared-types",
+      "leave"
+    ],
+    "affectedLayers": [
+      "types",
+      "tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "src/shared/types/leave.ts exists and exports three TypeScript enums: LeaveType (ANNUAL, SICK, EMERGENCY), LeaveRequestStatus (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED), BalanceStatus (ACTIVE, EXHAUSTED, FROZEN)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/shared/types/index.ts barrel re-exports all three enums from ./leave.ts",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests in tests/unit/shared/types/ verify that LeaveType has exactly [ANNUAL, SICK, EMERGENCY], LeaveRequestStatus has exactly [DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED], and BalanceStatus has exactly [ACTIVE, EXHAUSTED, FROZEN]",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "TypeScript strict mode: no implicit any, strict null checks",
+    "No `any` type \u2014 use `unknown` with type guards instead (HARNESS.json constraint id=no-any)",
+    "Enums must be plain TypeScript string enums (no numeric values, no const enum)"
+  ],
+  "outOfScope": [
+    "Additional LeaveType members beyond ANNUAL, SICK, EMERGENCY (e.g. UNPAID, MATERNITY, PATERNITY) \u2014 deferred to later phases",
+    "Database tables, migrations, repositories, services, controllers, or routes \u2014 this phase is types-only foundation",
+    "State transition validation logic for LeaveRequestStatus \u2014 deferred to later phases"
+  ],
+  "ambiguities": [
+    {
+      "description": "ARCHITECTURE.md references the file as src/shared/types/leave.types.ts while the intent and PLAN.md specify src/shared/types/leave.ts. The intent (phase spec) is authoritative \u2014 use leave.ts.",
+      "options": [
+        "Use leave.ts as specified in the intent",
+        "Use leave.types.ts as referenced in ARCHITECTURE.md"
+      ],
+      "impactIfWrong": "low"
+    }
+  ]
+}
