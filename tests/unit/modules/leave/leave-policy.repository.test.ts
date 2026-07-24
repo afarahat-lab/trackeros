@@ -71,6 +71,7 @@ describe('LeavePolicyRepository', () => {
       expect(result).toEqual(policies);
       expect(mockQuery).toHaveBeenCalledWith(
         'SELECT * FROM leave_policy WHERE deleted_at IS NULL ORDER BY policy_name ASC',
+        undefined,
       );
     });
 
