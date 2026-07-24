@@ -1,0 +1,69 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository",
+      "tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "Create `src/modules/leave/leave-policy.model.ts` exporting a `LeavePolicy` interface with all specified fields: id (string), policyName (string), leaveType (LeaveType enum imported from `src/shared/types/index.ts`), entitlementDays (number), accrualRate (number), maxAccumulation (number), minimumNoticeDays (number), requiresManagerApproval (boolean), isActive (boolean), allowsNegativeBalance (boolean), maxConsecutiveDays (number), createdAt (Date), updatedAt (Date).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Create `src/modules/leave/leave-policy.repository.ts` exporting an `ILeavePolicyRepository` interface with methods: `findById(id: string): Promise<LeavePolicy | null>`, `findAll(): Promise<LeavePolicy[]>`, `findByLeaveType(leaveType: LeaveType): Promise<LeavePolicy[]>`, `create(policy: Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeavePolicy>`, `update(id: string, policy: Partial<LeavePolicy>): Promise<LeavePolicy>`, `softDelete(id: string): Promise<void>`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Implement `LeavePolicyRepository` class extending `BaseRepository<LeavePolicy>` (from `src/shared/base-repository.ts`) and implementing `ILeavePolicyRepository`. Constructor accepts optional `Pool` override. All methods delegate to `this.pool.query` via the protected `query` method. `findById` is the concrete implementation of the abstract method from `BaseRepository`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Create `tests/unit/modules/leave/leave-policy.repository.test.ts` with Jest unit tests that mock the pg Pool and verify all six repository methods (findById, findAll, findByLeaveType, create, update, softDelete) behave correctly \u2014 including success paths and edge cases like findById returning null for missing records.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Must import `LeaveType` from `src/shared/types/index.ts` (Phase 1 artifact) \u2014 do not redefine or duplicate the enum.",
+    "`LeavePolicyRepository` must extend `BaseRepository<LeavePolicy>` from `src/shared/base-repository.ts` (Phase 2 artifact) and implement the abstract `findById(id: string): Promise<LeavePolicy | null>` method.",
+    "All database access must go through the repository's protected `query` method inherited from `BaseRepository` \u2014 no direct `pool.query` calls (GP-001).",
+    "Strict TypeScript: no `any` types; use `unknown` with type guards where needed (HARNESS.json constraint `no-any`).",
+    "Constructor must accept an optional `Pool` override (matching the `BaseRepository` pattern) to support testability with mocked pools."
+  ],
+  "outOfScope": [
+    "No service layer, controller, or routes for leave policy \u2014 those belong to later phases (Phase 6\u20138).",
+    "No database migrations or table creation \u2014 this phase defines only the TypeScript model interface and repository class.",
+    "No audit logging (GP-002) or RBAC enforcement (GP-005) \u2014 those are service-layer and route-layer concerns respectively, not repository-layer.",
+    "No input validation beyond TypeScript type-checking \u2014 GP-003 validation at API boundaries is a controller concern (Phase 7)."
+  ],
+  "ambiguities": [
+    {
+      "description": "The `softDelete` method semantics are not explicitly specified \u2014 should it set `isActive = false`, set a `deletedAt` timestamp, or both? The architecture defines the lifecycle as ACTIVE \u2194 INACTIVE \u2192 ARCHIVED, suggesting `isActive = false` is the intended behavior.",
+      "options": [
+        "Set isActive = false only",
+        "Set isActive = false and record deletedAt timestamp",
+        "Set isActive = false and set status to ARCHIVED"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "description": "The `update` method accepts `Partial<LeavePolicy>` \u2014 should `id`, `createdAt`, and `updatedAt` be excluded from the partial update payload? The intent does not specify which fields are immutable.",
+      "options": [
+        "Allow updating all fields (caller responsible)",
+        "Exclude id, createdAt, updatedAt from the partial type",
+        "Only allow updating a specific subset of mutable fields"
+      ],
+      "impactIfWrong": "low"
+    }
+  ]
+}
