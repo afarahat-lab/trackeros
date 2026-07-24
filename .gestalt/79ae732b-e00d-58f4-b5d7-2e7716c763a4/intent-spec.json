@@ -1,0 +1,43 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared"
+    ],
+    "affectedLayers": [
+      "types",
+      "tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "src/shared/types/index.ts exists and exports three TypeScript enums: LeaveType ('annual' | 'sick' | 'emergency'), LeaveRequestStatus ('draft' | 'pending' | 'approved' | 'rejected' | 'cancelled'), BalanceStatus ('active' | 'exhausted' | 'frozen')",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "tests/unit/shared/types.test.ts exists and verifies all enum values are defined and distinct (no duplicate values, all expected members present)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/shared/types/index.ts has zero imports from other project files \u2014 it is a leaf module with no internal dependencies",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "src/shared/types/index.ts must have zero imports from other project files \u2014 it is a leaf module",
+    "Must use TypeScript enum keyword (not string literal unions, not const objects) for all three enums",
+    "Must comply with strict TypeScript settings: no implicit any, strict null checks",
+    "Jest unit test at tests/unit/shared/types.test.ts must pass and verify all enum values are defined and distinct"
+  ],
+  "outOfScope": [
+    "Additional LeaveType values (UNPAID, MATERNITY, PATERNITY) referenced in ARCHITECTURE.md \u2014 deferred to later phases",
+    "Additional LeaveRequestStatus value SUBMITTED (vs. 'pending' in this phase) referenced in ARCHITECTURE.md \u2014 deferred to later phases",
+    "Additional BalanceStatus value ROLLED_OVER referenced in ARCHITECTURE.md \u2014 deferred to later phases",
+    "Database tables, migrations, repositories, services, controllers, routes \u2014 all deferred to Phases 2\u20138"
+  ],
+  "ambiguities": []
+}
