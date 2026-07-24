@@ -1,0 +1,102 @@
+{
+  "domainChanges": [
+    {
+      "entityName": "LeaveBalance",
+      "operation": "create",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "employeeId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "policyId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "totalEntitlement",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "usedDays",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "remainingDays",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "pendingDays",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "fiscalYear",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "status",
+          "type": "BalanceStatus",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": true
+        }
+      ],
+      "relationships": [
+        {
+          "entity": "LeavePolicy",
+          "type": "many-to-one (via policyId)"
+        },
+        {
+          "entity": "Employee",
+          "type": "many-to-one (via employeeId)"
+        }
+      ]
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": [
+    {
+      "name": "LeaveBalance (model)",
+      "type": "component",
+      "description": "Domain model interface for leave balances. Fields: id, employeeId, policyId, totalEntitlement, usedDays, remainingDays, pendingDays, fiscalYear, status (BalanceStatus enum from shared/types), createdAt, updatedAt. Stored in src/modules/leave/leave-balance.model.ts.",
+      "props": null
+    },
+    {
+      "name": "ILeaveBalanceRepository",
+      "type": "service",
+      "description": "Repository interface for LeaveBalance persistence. Methods: findById(id: string): Promise<LeaveBalance | null>, findByEmployeeId(employeeId: string): Promise<LeaveBalance[]>, findByEmployeeAndPolicy(employeeId: string, policyId: string, fiscalYear: number): Promise<LeaveBalance | null>, create(data: Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeaveBalance>, update(id: string, data: Partial<Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt'>>): Promise<LeaveBalance | null>, upsert(data: Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeaveBalance>.",
+      "props": null
+    },
+    {
+      "name": "LeaveBalanceRepository",
+      "type": "service",
+      "description": "Concrete repository extending BaseRepository<LeaveBalance> and implementing ILeaveBalanceRepository. All SQL uses parameterized queries via this.query(). Maps camelCase model fields to snake_case DB columns. upsert uses INSERT ... ON CONFLICT (employee_id, leave_policy_id, fiscal_year) DO UPDATE SET all non-key fields. Stored in src/modules/leave/leave-balance.repository.ts.",
+      "props": null
+    },
+    {
+      "name": "leave-balance.repository.test",
+      "type": "component",
+      "description": "Jest unit tests at tests/unit/modules/leave/leave-balance.repository.test.ts. Covers all six repository methods (findById, findByEmployeeId, findByEmployeeAndPolicy, create, update, upsert) using a mock pg Pool. Verifies correct SQL parameterization, column mapping, and return types.",
+      "props": null
+    }
+  ]
+}
