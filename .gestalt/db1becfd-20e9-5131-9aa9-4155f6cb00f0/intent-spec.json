@@ -1,0 +1,52 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared-types",
+      "leave"
+    ],
+    "affectedLayers": [
+      "types",
+      "tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "src/shared/types/leave.ts exports LeaveType enum with exactly three members: ANNUAL, SICK, EMERGENCY (string-valued)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/shared/types/leave.ts exports LeaveRequestStatus enum with exactly five members: DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED (string-valued)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/shared/types/leave.ts exports BalanceStatus enum with exactly three members: ACTIVE, EXHAUSTED, FROZEN (string-valued)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/shared/types/index.ts barrel re-exports all three enums (LeaveType, LeaveRequestStatus, BalanceStatus) from ./leave",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests in tests/unit/shared/types/ verify each enum has the correct members and correct member count",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No dependencies on prior phases \u2014 this is the foundation phase; must not import from any module outside src/shared/types/",
+    "Enums must use string-valued members (e.g., ANNUAL = 'ANNUAL') for serialization safety across the REST boundary",
+    "Barrel index.ts must re-export from ./leave, not duplicate enum definitions"
+  ],
+  "outOfScope": [
+    "Additional LeaveType values (unpaid, maternity, paternity) mentioned in ARCHITECTURE.md \u2014 deferred to later phases",
+    "Database tables, migrations, repositories, services, controllers, routes \u2014 all deferred to Phases 2\u201310",
+    "State transition logic, validation, RBAC, audit \u2014 deferred to later phases"
+  ],
+  "ambiguities": []
+}
