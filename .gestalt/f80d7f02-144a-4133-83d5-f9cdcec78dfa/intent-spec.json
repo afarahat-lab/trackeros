@@ -1,0 +1,61 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-balance"
+    ],
+    "affectedLayers": [
+      "repository",
+      "tests"
+    ],
+    "isBreakingChange": true,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The SQL column reference in `findByEmployeeAndPolicy` is corrected from `policy_id` to `leave_policy_id` in the repository implementation.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `findByEmployeeAndPolicy` method signature in `ILeaveBalanceRepository` interface gains a third parameter `fiscalYear: number`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `findByEmployeeAndPolicy` implementation uses `fiscalYear` in the SQL WHERE clause: `WHERE employee_id = $1 AND leave_policy_id = $2 AND fiscal_year = $3`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All unit tests for `findByEmployeeAndPolicy` in `tests/unit/modules/leave/leave-balance.repository.test.ts` are updated to pass `fiscalYear` as a third argument and assert the corrected SQL with `leave_policy_id` and `fiscal_year`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "TypeScript compilation passes with `tsc --noEmit` and all existing tests continue to pass after the changes.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The database column name is `leave_policy_id` per ARCHITECTURE.md \u2014 the SQL in `findByEmployeeAndPolicy` must use `leave_policy_id`, not `policy_id`.",
+    "The `leave_balance` table has a unique constraint on `(employee_id, leave_policy_id, fiscal_year)` \u2014 `findByEmployeeAndPolicy` must include `fiscal_year` in the WHERE clause to guarantee a single row.",
+    "All database access must go through the repository pattern (GP-001).",
+    "The `LeaveBalance` model field `policyId` is unchanged \u2014 only the SQL column mapping in the repository changes."
+  ],
+  "outOfScope": [
+    "Correcting `policy_id` \u2192 `leave_policy_id` in other repository methods (`create`, `update`, `upsert`) \u2014 the intent scopes the column-name correction to `findByEmployeeAndPolicy` only.",
+    "Changes to the `LeaveBalance` model interface \u2014 `policyId` and `fiscalYear` fields already exist and are not modified.",
+    "Changes to any other repository (e.g., `leave-request.repository.ts`) that also references `leave_policy_id`."
+  ],
+  "ambiguities": [
+    {
+      "description": "The `create`, `update`, and `upsert` methods in `LeaveBalanceRepository` also use `policy_id` in their SQL (not `leave_policy_id`). The intent only corrects `findByEmployeeAndPolicy`. If the database column is truly `leave_policy_id`, those other methods will fail at runtime. This may be intentional deferral or an oversight.",
+      "options": [
+        "Also correct policy_id \u2192 leave_policy_id in create, update, and upsert SQL in this phase",
+        "Leave those methods as-is and address in a follow-up phase"
+      ],
+      "impactIfWrong": "medium"
+    }
+  ]
+}
