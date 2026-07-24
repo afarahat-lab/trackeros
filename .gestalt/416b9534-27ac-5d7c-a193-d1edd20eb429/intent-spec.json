@@ -1,0 +1,48 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared"
+    ],
+    "affectedLayers": [
+      "shared/error-types",
+      "shared/base-repository",
+      "tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "src/shared/error-types.ts exports NotFoundError, ValidationError, and ConflictError classes, each extending native Error, each with an optional `details` property of type `unknown`",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/shared/base-repository.ts exports a generic abstract class BaseRepository&lt;T&gt; that accepts a pg Pool via constructor injection, exposes a protected query(text: string, params: unknown[]) method delegating to pool.query, and declares an abstract findById(id: string): Promise&lt;T | null&gt;",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "tests/unit/shared/error-types.test.ts verifies: each error class can be instantiated with a message, each is an instance of Error, each carries details when provided, and each has the correct name property",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "tests/unit/shared/base-repository.test.ts verifies: BaseRepository cannot be instantiated directly (abstract), a concrete subclass can be instantiated with a mock pool, query delegates to pool.query with correct arguments, and findById must be implemented by subclass",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Must read src/shared/db/connection.ts before generating \u2014 the BaseRepository constructor must accept the pg Pool type exported from that file",
+    "The `details` property on error classes must use `unknown` type, not `any` (HARNESS constraint no-any)",
+    "Jest unit tests must follow the existing pattern from tests/unit/shared/types.test.ts (describe/it blocks, no external test dependencies beyond Jest)",
+    "BaseRepository must be abstract \u2014 cannot be instantiated directly; findById must be abstract forcing subclasses to implement it"
+  ],
+  "outOfScope": [
+    "Any repository implementations beyond the abstract BaseRepository \u2014 concrete repositories (LeavePolicyRepository, LeaveBalanceRepository, LeaveRequestRepository) are deferred to Phases 3\u20135",
+    "Database migrations, table creation, or schema definitions \u2014 this phase only provides shared utility classes",
+    "Audit logging, RBAC enforcement, or input validation \u2014 these are handled in later phases (service/controller layers)"
+  ],
+  "ambiguities": []
+}
