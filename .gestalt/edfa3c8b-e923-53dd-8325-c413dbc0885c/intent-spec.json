@@ -1,0 +1,83 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-balance",
+      "shared"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "Define the `LeaveBalance` interface in `src/modules/leave/leave-balance.model.ts` with all specified fields: id, employeeId, policyId, totalEntitlement, usedDays, remainingDays, pendingDays, fiscalYear, status (BalanceStatus), createdAt, updatedAt",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Define `ILeaveBalanceRepository` interface with methods: findById(id: string), findByEmployeeId(employeeId: string), findByEmployeeAndPolicy(employeeId: string, policyId: string, fiscalYear: number), create(data), update(id, data), upsert(data)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Implement `LeaveBalanceRepository` class extending `BaseRepository<LeaveBalance>` and implementing `ILeaveBalanceRepository`, with all six methods backed by parameterized SQL queries against the `leave_balance` table",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Include Jest unit tests at `tests/unit/modules/leave/leave-balance.repository.test.ts` covering all repository methods (findById, findByEmployeeId, findByEmployeeAndPolicy, create, update, upsert) with mock pg Pool",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`BalanceStatus` is imported from `src/shared/types/index.ts` (Phase 1 dependency) and `BaseRepository` from `src/shared/base-repository.ts` (Phase 2 dependency)",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access must go through the repository pattern (GP-001) \u2014 the `LeaveBalanceRepository` extends `BaseRepository<LeaveBalance>` and uses its `query()` method for all SQL",
+    "Follow the established pattern from `LeavePolicyRepository` (Phase 3): interface + implementation class, constructor accepting optional `Pool` override, parameterized SQL with snake_case column mapping",
+    "No `any` types \u2014 use `unknown` with type guards where needed (HARNESS constraint `no-any`)",
+    "`LeaveBalance` model must import `BalanceStatus` from `src/shared/types/index.ts` (Phase 1) and repository must import `BaseRepository` from `src/shared/base-repository.ts` (Phase 2)"
+  ],
+  "outOfScope": [
+    "Service-layer business logic (balance arithmetic, pending-days transitions, validation against policy) \u2014 deferred to Phase 6",
+    "Audit record creation \u2014 handled at the service layer per GP-002, not in the repository itself",
+    "Database migration for the `leave_balance` table \u2014 the table is assumed to exist per the architecture",
+    "RBAC enforcement \u2014 handled at the route/middleware layer per GP-005",
+    "The `ROLLED_OVER` BalanceStatus variant mentioned in ARCHITECTURE.md but absent from the Phase 1 enum \u2014 this is a pre-existing gap from Phase 1, not resolvable in this phase"
+  ],
+  "ambiguities": [
+    {
+      "description": "The `findByEmployeeAndPolicy` method signature is not fully specified. The architecture defines a unique constraint on (employee_id, leave_policy_id, fiscal_year), so the method likely needs a `fiscalYear` parameter, but the intent does not state this explicitly.",
+      "options": [
+        "Include fiscalYear as a third parameter: findByEmployeeAndPolicy(employeeId, policyId, fiscalYear)",
+        "Omit fiscalYear and return all fiscal years for the employee+policy pair",
+        "Make fiscalYear optional"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "description": "The `upsert` method's conflict-resolution strategy is not specified. The natural conflict target based on the architecture is (employee_id, leave_policy_id, fiscal_year), but the exact ON CONFLICT clause and which columns get updated on conflict are not stated.",
+      "options": [
+        "INSERT ... ON CONFLICT (employee_id, leave_policy_id, fiscal_year) DO UPDATE SET all non-key fields",
+        "INSERT ... ON CONFLICT (employee_id, leave_policy_id) DO UPDATE (ignoring fiscal_year in the conflict target)",
+        "Use a SELECT-then-INSERT-or-UPDATE pattern instead of ON CONFLICT"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "description": "The `findByEmployeeId` return type is not explicitly stated \u2014 it could return `Promise<LeaveBalance[]>` (all balances for an employee across policies/years) or `Promise<LeaveBalance | null>` (a single balance). Given the domain, an array is more natural, but the intent is silent.",
+      "options": [
+        "Return Promise<LeaveBalance[]> (all balances for the employee)",
+        "Return Promise<LeaveBalance | null> (single balance, ambiguous which one)"
+      ],
+      "impactIfWrong": "low"
+    }
+  ]
+}
