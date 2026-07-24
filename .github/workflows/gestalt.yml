@@ -83,7 +83,17 @@ jobs:
       - run: npm install -g npm@10.5.0
       - run: npm install --force --legacy-peer-deps
 
+      # ── Every check is NON-BLOCKING (continue-on-error) — the Gestalt CI-agent is the SOLE gate.
+      # No individual check's exit code decides "does this phase proceed"; each check RUNS and
+      # REPORTS its outcome (collected below into ci-results.json), and the CI-agent judges the
+      # collected outcomes + logs by DevOps severity. A real compile/test/security failure still
+      # blocks (via the CI-agent); an infra finding (e.g. mutable-action-tag on the workflow file)
+      # no longer fails the phase unrecoverably. Platform-provided pattern — see
+      # docs/guides/ci-cd/github-actions.md. Each check carries an `id:` so its `.outcome` is
+      # recorded even when it fails. (Setup steps above stay blocking — they are prerequisites.)
       - name: Compile
+        id: compile
+        continue-on-error: true
         run: |
           if [ -f package.json ]; then
             npm run build
@@ -98,6 +108,8 @@ jobs:
           fi
 
       - name: Test
+        id: test
+        continue-on-error: true
         run: |
           if [ -f package.json ] || [ -f requirements.txt ] || [ -f pyproject.toml ] || [ -f go.mod ] || [ -f Cargo.toml ]; then
             npm run test
@@ -106,6 +118,8 @@ jobs:
           fi
 
       - name: Lint
+        id: lint
+        continue-on-error: true
         # TR_056-unblock — eslint@10.x (npx default) requires flat
         # config (eslint.config.js). Projects on legacy .eslintrc.*
         # break with "ESLint couldn't find an eslint.config file".
@@ -125,16 +139,47 @@ jobs:
           fi
 
       - name: Security scan
-        # The dedicated Semgrep GitHub Action is deprecated (semgrep/semgrep-action is
-        # ARCHIVED; @v2 was never published — the source of the earlier "unable to resolve
-        # action" CI failure). Run Semgrep directly via pip instead — future-proof, no
-        # external action to drift. `--error` keeps the enforce-exit-code behavior.
+        id: semgrep
+        continue-on-error: true
+        # Run Semgrep directly via pip (the dedicated action is deprecated/archived). NO `--error`
+        # and NO `--exclude` — the CI-agent is the sole gate now, so semgrep just REPORTS (JSON to
+        # an artifact) and the agent classifies each finding (a real vuln on app code → blocking;
+        # a mutable-action-tag on this workflow file → infra-noise → surfaced, not blocking). This
+        # supersedes the earlier temporary `--exclude '.github/workflows'` narrowing.
         run: |
           python3 -m pip install --quiet semgrep
-          # Scope OUT .github/workflows/** — the CI workflow file is infra the code-agent does not
-          # own or fix; a finding there (e.g. mutable-action-tag on actions/checkout@v4) blocks CI
-          # unrecoverably (the self-heal loop can only edit app code) — confirmed root cause of the
-          # d6603324 block. This is a SCOPE narrowing only: --error still ENFORCES on all application
-          # code. TEMPORARY unblock; the durable fix (route semgrep findings through the Gestalt
-          # quality gate's evaluation instead of a raw blocking exit) is a separate scoped follow-up.
-          semgrep scan --config auto --disable-version-check --error --exclude '.github/workflows'
+          semgrep scan --config auto --disable-version-check --json --output semgrep.json || true
+
+      # ── Collect every check's REAL outcome (`.outcome`, not `.conclusion`) so the CI-agent sees a
+      # failed compile/test even though the job 'passes' (each check is continue-on-error). `always()`
+      # ensures this runs regardless of upstream outcomes.
+      - name: Collect CI check results (for the Gestalt CI-agent)
+        if: always()
+        run: |
+          cat > ci-results.json <<JSON
+          { "checks": [
+            { "name": "compile", "outcome": "${{ steps.compile.outcome }}" },
+            { "name": "test",    "outcome": "${{ steps.test.outcome }}" },
+            { "name": "lint",    "outcome": "${{ steps.lint.outcome }}" },
+            { "name": "semgrep", "outcome": "${{ steps.semgrep.outcome }}" }
+          ] }
+          JSON
+          echo "CI check outcomes:"; cat ci-results.json
+
+      # Two SEPARATE artifacts — the CI-agent reads each by name (they are parsed differently, so
+      # they must not be concatenated into a single artifact zip).
+      - name: Upload CI check-outcome summary for the CI-agent
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-results
+          path: ci-results.json
+          if-no-files-found: ignore
+
+      - name: Upload semgrep results for the CI-agent
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: semgrep-results
+          path: semgrep.json
+          if-no-files-found: ignore
