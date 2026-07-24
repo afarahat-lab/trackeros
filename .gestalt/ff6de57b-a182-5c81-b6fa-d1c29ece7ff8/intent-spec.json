@@ -1,0 +1,44 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared"
+    ],
+    "affectedLayers": [
+      "shared/error-types",
+      "shared/base-repository",
+      "tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "`src/shared/error-types.ts` exports `NotFoundError`, `ValidationError`, and `ConflictError` classes, each extending native `Error`, with `name` set to the class name, `message` from constructor, and an optional `details: unknown` property (undefined when not provided).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`src/shared/base-repository.ts` exports a generic abstract class `BaseRepository<T>` whose constructor accepts a `Pool` (from `pg`), stores it as a protected field, exposes a protected `query(text: string, params?: unknown[]): Promise<QueryResult>` method that delegates to `pool.query`, and declares an abstract `findById(id: string): Promise<T | null>` method.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`tests/unit/shared/error-types.test.ts` passes: verifies each error class is an instance of both `Error` and its own class, has correct `name` and `message`, supports optional `details`, and has `undefined` details when omitted.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`tests/unit/shared/base-repository.test.ts` passes: verifies constructor stores pool, `query` delegates to `pool.query` with correct arguments and returns its result, `query` propagates pool errors, and `findById` returns entity when found or null when not found.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The `details` property on all error classes must be typed as `unknown`, not `any` (per HARNESS.json `no-any` constraint)."
+  ],
+  "outOfScope": [
+    "Actual leave domain repositories (LeavePolicyRepository, LeaveBalanceRepository, LeaveRequestRepository) that will extend BaseRepository \u2014 these are Phases 3-5.",
+    "Any database migration or table creation \u2014 this phase only provides the abstract base class and error types."
+  ],
+  "ambiguities": []
+}
