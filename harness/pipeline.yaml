@@ -156,10 +156,20 @@ phases:
             action: poll_ci
             inputs: [pr_ref]
             output: { name: ci_result, channel: workflow_state }
+          # CI-agent — judges the COMPLETED run's output (read-only) and classifies each finding
+          # by DevOps severity. Its verdict — not the raw exit code — decides block (→ self-heal,
+          # same path as a gate finding) / re-run (flaky) / proceed (non-blocking findings
+          # recorded). MUST directly follow poll_ci (validator + run-time guard enforced), which
+          # now hands it a completed run (pass or fail) instead of raising on failure.
+          - id: judge-ci
+            type: action
+            action: judge_ci
+            inputs: [ci_result]
+            output: { name: ci_judgment, channel: workflow_state }
           - id: gate
             type: action
             action: gate
-            inputs: [phase_branch, intent_id, commit_sha, ci_result]
+            inputs: [phase_branch, intent_id, commit_sha, ci_judgment]
             output: { name: gate_verdict, channel: workflow_state }
           # gap-B — the merge MODE is a static param (not a workflow value): a phase
           # branch merges INTO the feature branch here.
