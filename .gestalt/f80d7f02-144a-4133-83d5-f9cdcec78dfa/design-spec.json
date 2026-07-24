@@ -1,0 +1,23 @@
+{
+  "domainChanges": [
+    {
+      "entityName": "LeaveBalance",
+      "operation": "update",
+      "fields": [
+        {
+          "name": "policyId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "fiscalYear",
+          "type": "number",
+          "required": true
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "apiContracts": [],
+  "componentSpecs": []
+}
