@@ -1,0 +1,64 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "LeaveBalance interface is defined in src/modules/leave/leave-balance.model.ts with all required fields: id (string), employeeId (string), policyId (string), totalEntitlement (number), usedDays (number), remainingDays (number), pendingDays (number), fiscalYear (number), status (BalanceStatus imported from src/shared/types/index.ts), createdAt (Date), updatedAt (Date).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "ILeaveBalanceRepository interface is defined with method signatures: findById(id: string): Promise<LeaveBalance | null>, findByEmployeeId(employeeId: string): Promise<LeaveBalance[]>, findByEmployeeAndPolicy(employeeId: string, policyId: string): Promise<LeaveBalance | null>, create(balance: Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeaveBalance>, update(id: string, balance: Partial<Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt'>>): Promise<LeaveBalance | null>, upsert(balance: Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeaveBalance>.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "LeaveBalanceRepository class extends BaseRepository<LeaveBalance> and implements ILeaveBalanceRepository. Constructor accepts optional Pool override (matching the pattern from LeavePolicyRepository). All six methods execute correct SQL against the leave_balance table using snake_case column mapping.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "upsert method uses INSERT ... ON CONFLICT (employee_id, leave_policy_id, fiscal_year) DO UPDATE to atomically create-or-update a balance row, returning the resulting row.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests at tests/unit/modules/leave/leave-balance.repository.test.ts cover all six repository methods with mocked pool.query, verifying correct SQL text, parameter binding, and return-value handling (including null cases for findById and findByEmployeeAndPolicy).",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "GP-001: All database access must go through the repository pattern \u2014 LeaveBalanceRepository extends BaseRepository and uses the protected query() method for all SQL.",
+    "Follow the established pattern from LeavePolicyRepository: snake_case SQL column mapping, dynamic field building in update(), optional Pool override in constructor, soft-delete not applicable (leave_balance has no deleted_at \u2014 use the status field for lifecycle).",
+    "TypeScript strict mode \u2014 no `any` type; use `unknown` for query parameters where needed.",
+    "The upsert method must use INSERT ... ON CONFLICT (employee_id, leave_policy_id, fiscal_year) DO UPDATE, matching the unique constraint declared in ARCHITECTURE.md."
+  ],
+  "outOfScope": [
+    "Business logic (balance sufficiency checks, pendingDays arithmetic, policy validation) \u2014 deferred to Phase 6 (Leave service).",
+    "Audit logging (GP-002) \u2014 the repository layer does not write audit records; that responsibility belongs to the service layer in Phase 6.",
+    "RBAC enforcement (GP-005) \u2014 enforced at the route/middleware layer, not in the repository.",
+    "Database migration for the leave_balance table \u2014 schema is assumed to exist per ARCHITECTURE.md."
+  ],
+  "ambiguities": [
+    {
+      "description": "The findByEmployeeAndPolicy(employeeId, policyId) method signature does not include fiscalYear, but the unique constraint on leave_balance is (employee_id, leave_policy_id, fiscal_year). Without fiscalYear, multiple rows could match. Should the method return the balance for the current fiscal year (derived server-side), accept an optional fiscalYear parameter, or return all matching rows as an array?",
+      "options": [
+        "Return the balance for the current fiscal year (derived from current date server-side in the SQL)",
+        "Accept an optional fiscalYear parameter; if omitted, return all matching rows",
+        "Accept a required fiscalYear parameter to match the unique constraint exactly",
+        "Return Promise<LeaveBalance[]> for all fiscal years"
+      ],
+      "impactIfWrong": "medium"
+    }
+  ]
+}
