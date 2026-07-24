@@ -148,13 +148,15 @@ Represents leave policy data managed by the `policy` module, including policy de
 |-------|------|----------|
 | id | string | true |
 | policyName | string | true |
-| leaveType | string | true |
+| leaveType | LeaveType | true |
 | entitlementDays | number | true |
 | accrualRate | number | false |
 | maxAccumulation | number | false |
 | minimumNoticeDays | number | false |
 | requiresManagerApproval | boolean | true |
 | isActive | boolean | true |
+| allowsNegativeBalance | boolean | true |
+| maxConsecutiveDays | number | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
@@ -175,13 +177,15 @@ Represents leave policy data managed by the `policy` module, including policy de
 |-------|------|----------|
 | id | string | true |
 | policyName | string | true |
-| leaveType | string | true |
+| leaveType | LeaveType | true |
 | entitlementDays | number | true |
 | accrualRate | number | false |
 | maxAccumulation | number | false |
 | minimumNoticeDays | number | false |
 | requiresManagerApproval | boolean | true |
 | isActive | boolean | true |
+| allowsNegativeBalance | boolean | true |
+| maxConsecutiveDays | number | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
