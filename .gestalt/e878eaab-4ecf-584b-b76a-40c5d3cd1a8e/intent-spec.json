@@ -1,0 +1,76 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-policy"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository",
+      "tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "Define the `LeavePolicy` interface in `src/modules/leave/leave-policy.model.ts` with all specified fields: id, policyName, leaveType (imported from `src/shared/types/index.ts`), entitlementDays, accrualRate, maxAccumulation, minimumNoticeDays, requiresManagerApproval, isActive, allowsNegativeBalance, maxConsecutiveDays, createdAt, updatedAt.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Define `ILeavePolicyRepository` interface in `src/modules/leave/leave-policy.repository.ts` with methods: `findById(id: string): Promise<LeavePolicy | null>`, `findAll(): Promise<LeavePolicy[]>`, `findByLeaveType(leaveType: LeaveType): Promise<LeavePolicy[]>`, `create(data): Promise<LeavePolicy>`, `update(id: string, data): Promise<LeavePolicy>`, `softDelete(id: string): Promise<void>`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Implement `LeavePolicyRepository` class extending `BaseRepository<LeavePolicy>` and implementing `ILeavePolicyRepository`, with all six methods delegating to `this.query()` for database access.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Include Jest unit tests at `tests/unit/modules/leave/leave-policy.repository.test.ts` covering all repository methods with mocked pool.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "GP-001: All database access must go through the repository pattern \u2014 `LeavePolicyRepository` extends `BaseRepository<LeavePolicy>` and uses `this.query()` for all DB calls.",
+    "no-any (HARNESS.json): Use `unknown` with type guards instead of `any` \u2014 repository method signatures and query params must avoid `any`.",
+    "no-direct-db-outside-repository (HARNESS.json): No inline SQL outside the repository layer \u2014 the repository is the sole DB access point for leave policies.",
+    "GP-006: No unhandled promise rejections \u2014 all async repository methods must propagate errors cleanly; tests must handle rejected promises.",
+    "Strict TypeScript (no implicit any, strict null checks) \u2014 all interface fields and method signatures must be fully typed."
+  ],
+  "outOfScope": [
+    "Database migrations / table creation for `leave_policy` \u2014 this phase only defines the model interface and repository; actual schema is deferred.",
+    "LeavePolicy service layer, controller, and routes \u2014 these are Phase 6\u20138 per PLAN.md.",
+    "LeaveBalance and LeaveRequest models/repositories \u2014 these are Phase 4 and Phase 5 respectively.",
+    "Audit logging (GP-002) \u2014 the repository alone does not trigger state-changing operations; audit integration happens at the service layer in Phase 6.",
+    "RBAC enforcement (GP-005) \u2014 enforced at middleware/route layer, not at the repository level."
+  ],
+  "ambiguities": [
+    {
+      "description": "The `create` method parameter type is not specified \u2014 should it accept `Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>` or a dedicated `CreateLeavePolicyDto`? The intent only says `create(data)`.",
+      "options": [
+        "Use Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>",
+        "Define a dedicated CreateLeavePolicyDto type"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "description": "The `update` method parameter type is not specified \u2014 should it accept `Partial<Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>>` or a dedicated `UpdateLeavePolicyDto`?",
+      "options": [
+        "Use Partial<Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>>",
+        "Define a dedicated UpdateLeavePolicyDto type"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "description": "ARCHITECTURE.md shows `src/modules/leave-policy/` as a separate module, but PLAN.md Phase 3 places files under `src/modules/leave/`. The intent follows PLAN.md. This discrepancy may cause confusion about the canonical module path.",
+      "options": [
+        "Follow PLAN.md: src/modules/leave/",
+        "Follow ARCHITECTURE.md: src/modules/leave-policy/"
+      ],
+      "impactIfWrong": "low"
+    }
+  ]
+}
