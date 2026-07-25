@@ -1,6 +1,7 @@
 export enum LeaveStatus {
   DRAFT = 'DRAFT',
   SUBMITTED = 'SUBMITTED',
+  UNDER_REVIEW = 'UNDER_REVIEW',
   APPROVED = 'APPROVED',
   REJECTED = 'REJECTED',
   CANCELLED = 'CANCELLED',
@@ -14,11 +15,12 @@ export enum LeaveTypeCode {
 
 export enum PolicyStatus {
   ACTIVE = 'ACTIVE',
-  INACTIVE = 'INACTIVE',
-  ARCHIVED = 'ARCHIVED',
+  SUPERSEDED = 'SUPERSEDED',
+  REVOKED = 'REVOKED',
 }
 
 export enum BalanceStatus {
   ACTIVE = 'ACTIVE',
-  EXPIRED = 'EXPIRED',
+  EXHAUSTED = 'EXHAUSTED',
+  FROZEN = 'FROZEN',
 }
