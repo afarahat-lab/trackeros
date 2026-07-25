@@ -121,18 +121,18 @@ The Leave Management module enables employees to apply for annual, sick, emergen
 - **Employee** — organizational actor with employment status (ACTIVE, INACTIVE, TERMINATED). The `managerId` field establishes the approval hierarchy.
 - **LeaveType** — catalog of leave categories (annual, sick, emergency, unpaid, maternity, paternity). Each type has a code and active flag.
 - **LeavePolicy** — rules and entitlements for a leave type: entitlement days, accrual rate, max accumulation, minimum notice, and whether manager approval is required.
-- **LeaveRequest** — an employee's leave application. Lifecycle: PENDING → APPROVED / REJECTED; can be CANCELLED. References the employee, the applicable policy, and the approving manager.
-- **LeaveBalance** — tracks used and remaining days for an employee-policy-fiscalYear combination. Statuses: ACTIVE, EXHAUSTED, CLOSED.
+- **LeaveRequest** — an employee's leave application. Lifecycle: PENDING → APPROVED / REJECTED; can be CANCELLED. References the employee, the leave type, and the approving manager.
+- **LeaveBalance** — tracks used, pending, accrued, and carried-forward days for an employee-leaveType-policy-year combination.
 - **AuditLog** — immutable record of all state-changing operations (who, what, when, before/after).
 
 ### Business Rules
 
 - **BR-001** — Only ACTIVE employees may submit leave requests.
 - **BR-002** — `startDate` ≥ today; `endDate` ≥ `startDate`; requested days > 0.
-- **BR-003** — Before approval, the employee's LeaveBalance for the policy and fiscal year must have `remainingDays` ≥ requested days (excluding weekends/holidays per policy).
+- **BR-003** — Before approval, the employee's LeaveBalance for the leave type and year must have sufficient available days (entitlementDays − usedDays − pendingDays ≥ requested days, excluding weekends/holidays per policy).
 - **BR-004** — Submitted requests are routed to the employee's manager (`employee.managerId`). Only that manager (or a role subsuming manager authority) may approve/reject. Self-approval is forbidden.
 - **BR-005** — Rejection requires a non-empty `rejectionReason`.
-- **BR-006** — On approval, `LeaveBalance.usedDays` is incremented and `remainingDays` recalculated atomically within the same transaction.
+- **BR-006** — On approval, `LeaveBalance.usedDays` is incremented and `pendingDays` decremented atomically within the same transaction.
 
 ### Planned Module Structure
 
@@ -168,11 +168,11 @@ Shared enums (`LeaveTypeCode`, `LeaveStatus`, `EmploymentStatus`) live in `src/s
 - **employees** — `id`, `employee_number`, `first_name`, `last_name`, `email`, `manager_id` (FK→employees), `department`, `hire_date`, `termination_date`, `employment_status`, `created_at`, `updated_at`, `deleted_at`
 - **leave_types** — `id`, `code`, `name`, `description`, `is_active`, `created_at`, `updated_at`
 - **leave_policies** — `id`, `policy_name`, `leave_type_id` (FK→leave_types), `entitlement_days`, `accrual_rate`, `max_accumulation`, `minimum_notice_days`, `requires_manager_approval`, `is_active`, `created_at`, `updated_at`
-- **leave_requests** — `id`, `employee_id` (FK→employees), `leave_policy_id` (FK→leave_policies), `start_date`, `end_date`, `reason`, `status`, `approved_by` (FK→employees), `approved_at`, `rejection_reason`, `created_at`, `updated_at`
-- **leave_balances** — `id`, `employee_id` (FK→employees), `leave_policy_id` (FK→leave_policies), `total_entitlement`, `used_days`, `remaining_days`, `fiscal_year`, `status`, `created_at`, `updated_at`
+- **leave_requests** — `id`, `employee_id` (FK→employees), `leave_type_id` (FK→leave_types), `start_date`, `end_date`, `total_days`, `reason`, `status`, `manager_id` (FK→employees), `approved_by` (FK→employees), `approved_at`, `rejection_reason`, `cancelled_at`, `created_at`, `updated_at`
+- **leave_balances** — `id`, `employee_id` (FK→employees), `leave_type_id` (FK→leave_types), `policy_id` (FK→leave_policies), `entitlement_days`, `used_days`, `pending_days`, `accrued_days`, `carried_forward_days`, `expires_at`, `year`, `created_at`, `updated_at`
 - **audit_logs** — `id`, `entity_type`, `entity_id`, `action`, `old_values`, `new_values`, `performed_by`, `performed_at`, `ip_address`, `user_agent`, `created_at`
 
-All tables use UUID primary keys. Indexes are defined for frequent query patterns: employee lookups, status filtering, date-range queries, and unique compound keys for balances.
+All tables use UUID primary keys. Indexes are defined for frequent query patterns: employee lookups, status filtering, date-range queries, and unique compound keys for balances (employee_id + leave_type_id + year).
 
 ### Repository Interfaces (with Concrete Implementations)
 
@@ -213,17 +213,17 @@ No circular dependencies exist.
 
 ### Implementation Phases
 
-1. **BaseEntity foundation** — shared base model.
-2. **Employee model + repository** — core organizational entity.
-3. **LeaveType model + repository, LeaveStatus enum** — catalog and status value object.
-4. **LeavePolicy model + repository** — rules per leave type.
-5. **LeaveRequest model + repository** — core leave application entity.
-6. **LeaveBalance model + repository** — entitlement tracking.
-7. **AuditLog model, repository, audit service interface** — cross-cutting audit.
-8. **Balance service** — balance orchestration.
-9. **Notification service** — event notifications.
-10. **Approval service** — manager workflow.
-11. **Leave service, controller, routes** — application layer and HTTP endpoints.
+Per `PLAN.md` (9 phases total):
+
+1. **Shared enums and base types** ✅ — `src/shared/types/index.ts`
+2. **Employee model and repository** ✅ — `src/modules/employee/`
+3. **LeaveType model and repository** ✅ — `src/modules/leave/`
+4. **LeavePolicy model and repository** ✅ — `src/modules/leave/`
+5. **LeaveBalance model and repository** ✅ — `src/modules/leave/`
+6. **LeaveRequest model and repository** — planned
+7. **AuditLog model and repository** — planned
+8. **Leave service with validation and audit** — planned
+9. **Leave controller and Fastify routes** — planned
 
 ### Stack Compliance
 
