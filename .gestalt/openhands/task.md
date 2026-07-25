@@ -1,12 +1,12 @@
-# Implement this phase: Phase 1: Shared enums and base types
+# Implement this phase: Phase 2: LeaveType model and repository
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/022f5981-2f89-498b-906d-0f2e5bf44abd/1`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/022f5981-2f89-498b-906d-0f2e5bf44abd/2`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create src/shared/types/leave.enums.ts with the canonical enums: LeaveStatus (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED), LeaveTypeCode (ANNUAL, SICK, EMERGENCY), PolicyStatus (ACTIVE, INACTIVE, ARCHIVED), and BalanceStatus (ACTIVE, EXPIRED). Create src/shared/types/index.ts to barrel-export all enums. Include Jest unit tests in tests/unit/shared/types/leave.enums.test.ts verifying each enum has the expected members. This phase has no dependencies on prior phases — only on the existing tsconfig.json and jest.config.js at the project root.
+Create src/modules/leaveType/leaveType.model.ts with the LeaveType interface (id: string, code: LeaveTypeCode, label: string, description: string, requiresDocumentation: boolean, maxConsecutiveDays: number | null, isPaid: boolean, status: LeaveTypeStatus, createdAt: Date, updatedAt: Date). Import LeaveTypeCode from src/shared/types/leave.enums.ts (Phase 1). Create src/modules/leaveType/leaveType.repository.ts with ILeaveTypeRepository interface and LeaveTypeRepository class using the pg Pool from src/shared/db/connection.ts. Methods: findAll, findById, findByCode. Create src/modules/leaveType/index.ts barrel export. Include Jest unit tests in tests/unit/modules/leaveType/leaveType.repository.test.ts mocking the pg pool. This phase depends on src/shared/types/leave.enums.ts from Phase 1 — read it before generating any code that references its types.
 
 ## Project stack
 Before writing code, read `HARNESS.json` in the working directory to learn the project's language, framework, and test runner, and follow the existing conventions in the repository. Read `docs/ARCHITECTURE.md` and `PLAN.md` if present.
