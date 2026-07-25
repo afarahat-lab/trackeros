@@ -27,6 +27,10 @@ src/
       employee.model.ts               — Employee interface + CreateEmployeeDto
       employee.repository.ts          — IEmployeeRepository + Pg impl
       index.ts                        — barrel export
+    leave/
+      leave-type.model.ts             — LeaveType interface + CreateLeaveTypeDto
+      leave-type.repository.ts        — ILeaveTypeRepository + Pg impl
+      index.ts                        — barrel export
     status/
       status.model.ts                 — SystemStatus interface
       status.service.interface.ts     — IStatusService
@@ -43,6 +47,8 @@ tests/
     shared/types/index.test.ts        — enum/value tests
     modules/employee/
       employee.repository.test.ts     — repository tests (mocked pool)
+    modules/leave/
+      leave-type.repository.test.ts   — repository tests (mocked pool)
 ```
 
 ### Shared types (`src/shared/types/index.ts`)
@@ -56,6 +62,13 @@ tests/
 - **Employee** interface: id, employeeNumber, firstName, lastName, email, managerId, department, hireDate, terminationDate, employmentStatus, createdAt, updatedAt, deletedAt
 - **IEmployeeRepository**: findById, findAll, findByManagerId, create, update, softDelete
 - **EmployeeRepository**: concrete PostgreSQL implementation using the shared pool
+
+### Leave module (`src/modules/leave/`)
+
+- **LeaveType** interface: id, code (LeaveTypeCode), name, description, isActive, createdAt, updatedAt
+- **CreateLeaveTypeDto**: code, name, description, isActive?
+- **ILeaveTypeRepository**: findByCode, findById, findAll, create, update, softDelete
+- **LeaveTypeRepository**: concrete PostgreSQL implementation using the shared pool
 
 ## Key patterns
 
@@ -77,7 +90,8 @@ The leave management system is being built incrementally per `PLAN.md`:
 
 - **Phase 1** ✅ — Shared enums and base types (`src/shared/types/index.ts`)
 - **Phase 2** ✅ — Employee model and repository (`src/modules/employee/`)
-- **Phases 3–9** — Planned (leave type, policy, balance, request, audit, service, controller/routes)
+- **Phase 3** ✅ — LeaveType model and repository (`src/modules/leave/`)
+- **Phases 4–9** — Planned (leave policy, balance, request, audit, service, controller/routes)
 
 <!-- gestalt:architecture feature=bfdb6110-c37d-4c1b-a01f-6fca50944d25 START -->
 ## Leave Management Module (design)
@@ -110,7 +124,7 @@ The Leave Management module enables employees to apply for annual, sick, emergen
 src/modules/
 ├── base-entity/          # BaseEntity model (id, createdAt, updatedAt)
 ├── employee/             # ✅ Employee model + repository (Phase 2)
-├── leave-type/           # LeaveType model + repository interface
+├── leave-type/           # ✅ LeaveType model + repository (Phase 3, implemented under src/modules/leave/)
 ├── leave-status/         # LeaveStatus enum (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED)
 ├── leave-policy/         # LeavePolicy model + repository interface
 ├── leave-request/        # LeaveRequest model + repository interface
