@@ -19,6 +19,7 @@ The architecture is modular, with a clear separation of concerns between models,
 src/modules/
   status/           — Status module (health-check)
   uptime/           — Uptime module (system info)
+  leaveType/        — LeaveType model, repository (Phase 2)
 src/shared/
   db/connection.ts  — pg Pool factory
   types/
@@ -26,11 +27,10 @@ src/shared/
     index.ts        — barrel export for shared types
 ```
 
-## Planned module structure (Phases 2–8)
+## Planned module structure (Phases 3–8)
 
 ```
 src/modules/
-  leaveType/        — LeaveType model, repository (Phase 2)
   leavePolicy/      — LeavePolicy model, repository (Phase 3)
   leaveBalance/     — LeaveBalance model, repository (Phase 4)
   leaveRequest/     — LeaveRequest model, repository, service, controller, routes (Phases 5-7)
@@ -65,7 +65,7 @@ The leave management module enables employees to apply for annual, sick, and eme
 
 ### Domain Entities
 
-- **LeaveType** — reference data for leave categories (ANNUAL, SICK, EMERGENCY). Each type defines documentation requirements and maximum consecutive days. Lifecycle: ACTIVE, DEPRECATED.
+- **LeaveType** — reference data for leave categories (ANNUAL, SICK, EMERGENCY). Each type defines documentation requirements and maximum consecutive days. Lifecycle: ACTIVE, DEPRECATED. **Implemented (Phase 2).**
 - **LeavePolicy** — versioned rules per leave type: entitlement, carry-forward limits, notice periods, approval requirements. Lifecycle: ACTIVE, INACTIVE, ARCHIVED.
 - **LeaveBalance** — per-employee, per-policy, per-fiscal-year tracking of entitled, used, pending, and carried-forward days. Lifecycle: ACTIVE, EXPIRED.
 - **LeaveRequest** — the core application entity. Tracks the full lifecycle from DRAFT → SUBMITTED → APPROVED/REJECTED/CANCELLED.

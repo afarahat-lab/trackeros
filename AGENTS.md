@@ -51,19 +51,20 @@ user projects use whatever stack matches their description.
 
 ## Current implementation state
 
-Phase 1 (shared enums) is complete. Phases 2–8 are planned but not yet
-implemented. See `PLAN.md` for the full phase breakdown.
+Phase 1 (shared enums) and Phase 2 (LeaveType model and repository) are
+complete. Phases 3–8 are planned but not yet implemented. See `PLAN.md`
+for the full phase breakdown.
 
 ### Existing modules (implemented)
 
 - `src/modules/status/` — health-check module (model, service interface, service)
 - `src/modules/uptime/` — system info module (model, service interface, service, routes)
+- `src/modules/leaveType/` — LeaveType model, repository (Phase 2)
 - `src/shared/types/` — canonical enums: `LeaveStatus`, `LeaveTypeCode`, `PolicyStatus`, `BalanceStatus`
 - `src/shared/db/connection.ts` — pg Pool factory
 
 ### Planned modules (not yet implemented)
 
-- `src/modules/leaveType/` — Phase 2
 - `src/modules/leavePolicy/` — Phase 3
 - `src/modules/leaveBalance/` — Phase 4
 - `src/modules/leaveRequest/` — Phases 5–7
