@@ -1,0 +1,145 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "repository",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "ILeaveBalanceRepository declares findById(id: string): Promise<LeaveBalance | null> and softDelete(id: string): Promise<boolean>, and LeaveBalanceRepository implements both methods.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findById returns the matching LeaveBalance row when one exists and is not soft-deleted, and returns null when no non-deleted row matches the given id.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "softDelete returns true when a non-deleted row was affected (rowCount > 0) and false when no row was affected (rowCount 0 or null), i.e. when the id does not exist or is already deleted.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The update method's empty-fields fallback delegates to this.findById(id) instead of inlining a raw pool.query; calling update(id, {}) produces the same observable result (returns the existing non-deleted balance or null) via the findById path.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The existing unit test \"should return existing balance when no fields are provided\" still passes unchanged after the refactor \u2014 mockQuery is called once with the same SELECT SQL and ['lb-1'] argument.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "New unit test blocks cover findById (found and not-found cases) and softDelete (rowCount 1 \u2192 true, rowCount 0 \u2192 false cases), mirroring the leave-type.repository.test.ts patterns.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The project compiles under strict TypeScript (tsc --noEmit / npm run build) with no type errors after the interface and implementation changes.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access must go through the repository pattern (GP-001 / HARNESS no-direct-db-outside-repository). The update empty-fields fallback must delegate to this.findById rather than inlining a raw pool.query \u2014 no direct pool access outside repository methods.",
+    "No use of `any` (HARNESS no-any rule, severity high). Use unknown with type guards or proper generics instead; the new methods must be fully typed.",
+    "The new findById and softDelete methods must follow the established pattern in leave-type.repository.ts \u2014 same return-type contracts (Promise<LeaveBalance | null> and Promise<boolean>), same deleted_at IS NULL filtering, and softDelete must set both deleted_at and updated_at to NOW().",
+    "Strict TypeScript must remain satisfied (no implicit any, strict null checks). The rowCount ?? 0 nullish-coalescing pattern must be preserved in softDelete to handle undefined rowCount safely.",
+    "The barrel export src/modules/leave/index.ts already re-exports ILeaveBalanceRepository and LeaveBalanceRepository; no new exports are needed since findById and softDelete are additions to the existing interface/class, not new symbols."
+  ],
+  "outOfScope": [
+    "Adding a deletedAt field to the LeaveBalance interface in leave-balance.model.ts \u2014 the table has a deleted_at column but the model does not declare it; this task does not change the model.",
+    "Resolving the divergence between the conceptual architecture (totalEntitlement/remainingDays/fiscalYear/status fields, separate leave-balance/ module path) and the implemented code (entitlementDays/usedDays/pendingDays/accruedDays/carriedForwardDays/expiresAt/year, single leave/ module). This is pre-existing and not introduced or resolved by this task.",
+    "Adding audit records (GP-002) for the softDelete operation \u2014 audit infrastructure (Phase 7) does not yet exist; this phase only extends the repository interface and implementation.",
+    "Any service-layer, controller, or route changes that consume the new findById/softDelete methods \u2014 those belong to later phases (8\u20139)."
+  ],
+  "ambiguities": [
+    {
+      "description": "The LeaveBalance interface does not declare a deletedAt field, yet the leave_balances table has a deleted_at column (all existing queries filter deleted_at IS NULL). softDelete sets deleted_at = NOW() but the returned row from findById would not expose deletedAt in the typed LeaveBalance. It is unclear whether the model should be extended to include deletedAt to match the Employee pattern (which does declare deletedAt).",
+      "options": [
+        "Leave the LeaveBalance interface unchanged (no deletedAt field) \u2014 softDelete only returns boolean and findById returns LeaveBalance without deletedAt, matching the current model",
+        "Add deletedAt: Date | null to the LeaveBalance interface to align with the Employee model pattern and the actual table column"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "description": "The existing \"should return existing balance when no fields are provided\" test asserts mockQuery is called exactly once. After refactoring update to delegate to this.findById, findById issues the identical SQL via pool.query, so the mock is still called once. However, if the implementation chose to call findById through a different internal path (e.g. a wrapper), the call count assertion could break. The test is expected to pass unchanged, but this depends on findById using the same pool.query call.",
+      "options": [
+        "The existing test passes unchanged because findById issues the same pool.query with identical SQL and args (confirmed by leave-type pattern)",
+        "The existing test must be updated if the delegation path changes the mock call signature or count"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "A soft-deleted LeaveBalance (deleted_at IS NOT NULL) is never returned by any read method \u2014 findById, findByEmployeeId, findByEmployeeIdAndLeaveTypeId, findByEmployeeIdAndYear, and the update empty-fields fallback all filter deleted_at IS NULL. softDelete is idempotent: calling it on an already-deleted or non-existent row returns false without error."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "softDelete performs a logical deletion only \u2014 it sets deleted_at and updated_at to NOW() but never physically removes the row. The operation is irreversible through repository methods (no restore/undelete exists)."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "ILeaveBalanceRepository.findById(id: string): Promise<LeaveBalance | null>",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns the non-deleted LeaveBalance matching the id, or null if no non-deleted row exists. Read-only \u2014 no state change. Propagates pool errors (unhandled rejection is a GP-006 concern but this repository layer does not catch/rethrow; it lets errors bubble to the caller)."
+    },
+    {
+      "operation": "ILeaveBalanceRepository.softDelete(id: string): Promise<boolean>",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns true when a non-deleted row was affected (rowCount > 0), false when no row was affected (id not found or already deleted). State-changing (sets deleted_at + updated_at). Does not throw on not-found \u2014 returns false. Propagates pool errors to the caller."
+    },
+    {
+      "operation": "ILeaveBalanceRepository.update(id: string, dto: Partial<CreateLeaveBalanceDto>): Promise<LeaveBalance | null>",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "When dto has no fields, delegates to findById(id) and returns the existing non-deleted balance or null. When dto has fields, performs an UPDATE ... WHERE id = $N AND deleted_at IS NULL RETURNING * and returns the updated row or null if no non-deleted row matched. Propagates pool errors to the caller."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The new findById and softDelete methods on LeaveBalanceRepository must match the contract and behavior pattern of the corresponding methods on LeaveTypeRepository: findById returns rows[0] ?? null from a SELECT filtered by deleted_at IS NULL; softDelete returns (result.rowCount ?? 0) > 0 from an UPDATE setting deleted_at = NOW(), updated_at = NOW() filtered by deleted_at IS NULL. Only the table name (leave_balances) and generic type param (LeaveBalance) differ.",
+      "referencePath": "src/modules/leave/leave-type.repository.ts"
+    },
+    {
+      "requirement": "The update method's empty-fields fallback must delegate to this.findById(id) exactly as LeaveTypeRepository.update does (const existing = await this.findById(id); return existing;), replacing the current inlined pool.query SELECT.",
+      "referencePath": "src/modules/leave/leave-type.repository.ts"
+    },
+    {
+      "requirement": "The new findById and softDelete unit test blocks in leave-balance.repository.test.ts must mirror the structure and assertions of the corresponding describe blocks in leave-type.repository.test.ts: findById tests found/not-found with SQL assertion; softDelete tests rowCount 1 \u2192 true with SQL assertion and rowCount 0 \u2192 false.",
+      "referencePath": "tests/unit/modules/leave/leave-type.repository.test.ts"
+    },
+    {
+      "requirement": "All existing read methods (findByEmployeeId, findByEmployeeIdAndLeaveTypeId, findByEmployeeIdAndYear) and the update method already filter deleted_at IS NULL. The new findById must use the same deleted_at IS NULL filter to remain consistent with the soft-delete convention already established in this file.",
+      "referencePath": "src/modules/leave/leave-balance.repository.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/db/connection.ts (shared pg Pool)",
+      "why": "The new findById and softDelete methods, like all existing repository methods, execute SQL through the shared pool.query \u2014 this is the single database access point per GP-001."
+    },
+    {
+      "target": "src/modules/leave/index.ts (barrel export)",
+      "why": "The interface ILeaveBalanceRepository and class LeaveBalanceRepository are already re-exported here; consumers (future service/controller phases) will gain access to findById and softDelete through this public entry point without any export changes."
+    },
+    {
+      "target": "src/modules/leave/leave-balance.repository.ts upsert method",
+      "why": "The upsert method already delegates to this.update for the existing-balance path. After the refactor, upsert's call to update with a full dto will still hit the UPDATE branch (fields are non-empty), so upsert behavior is unaffected. However, upsert's internal reliance on update means the refactor must not change update's observable contract for the non-empty-fields case."
+    }
+  ]
+}
