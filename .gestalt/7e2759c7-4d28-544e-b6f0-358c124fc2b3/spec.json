@@ -1,0 +1,176 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The LeavePolicy model file exports a LeavePolicy interface and a CreateLeavePolicyDto type that compile under strict TypeScript; the DTO omits id/createdAt/updatedAt and makes isActive optional.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository file exports an ILeavePolicyRepository interface declaring findByLeaveTypeId, findById, findAll, create, update, and softDelete, and a concrete class implementing it using the shared pg pool.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findByLeaveTypeId returns an array of active LeavePolicy rows (filtered by is_active = true) for the given leave type id; findById and findAll exclude inactive rows via is_active = true.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "create persists a new leave_policies row from the DTO and returns the inserted row; update dynamically applies only provided fields and returns the updated row or null when absent; softDelete deactivates via is_active = false and returns a boolean indicating whether a row was affected.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The leave module barrel (index.ts) re-exports LeavePolicy, CreateLeavePolicyDto, ILeavePolicyRepository, and LeavePolicyRepository in addition to the existing LeaveType exports, so consumers import only from the module entry point.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests in tests/unit/modules/leave/leave-policy.repository.test.ts mock the pg pool and assert each repository method's return value and the exact SQL/params passed to pool.query, covering success and edge cases (not-found returns null/empty, softDelete rowCount 0 returns false, update with no fields falls back to a lookup).",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access must go through the repository pattern (GP-001 / no-direct-db-outside-repository); the LeavePolicyRepository must use the shared pool from src/shared/db/connection.ts and no other module may issue SQL against leave_policies directly.",
+    "No use of `any` \u2014 use `unknown` with type guards where needed (HARNESS no-any rule); strict TypeScript null checks must pass, so accrualRate, maxAccumulation, and minimumNoticeDays must be typed as `number | null`.",
+    "The leave_policies table has no deleted_at column; softDelete and all active-row filters must use is_active (set to false on deactivation, filter WHERE is_active = true) rather than the deleted_at pattern used by leave_types/employees.",
+    "Modules import from each other only through their declared public entry point (index.ts); the LeavePolicy model must import LeaveType from src/modules/leave/leave-type.model.ts (Phase 3 dependency), and external consumers must import LeavePolicy artifacts via src/modules/leave/index.ts."
+  ],
+  "outOfScope": [
+    "No service, controller, routes, or HTTP layer for LeavePolicy \u2014 Phase 8 (service) and Phase 9 (controller/routes) handle application and transport concerns.",
+    "No database migrations or schema creation for the leave_policies table \u2014 the table schema is assumed to already exist; this phase only writes model/repository/test code.",
+    "No audit logging (GP-002) within the repository itself \u2014 audit recording is a service-layer concern introduced in Phase 7 (AuditLog) and wired in Phase 8; the repository is a pure persistence adapter.",
+    "No input validation (GP-003) or RBAC (GP-005) in this phase \u2014 validation at API boundaries and role enforcement are controller/route concerns added in Phase 9."
+  ],
+  "ambiguities": [
+    {
+      "description": "The findAll ordering for leave_policies is unspecified. The sibling leave_types repository orders by name; leave_policies has policy_name as the natural ordering candidate, but it is not confirmed whether ordering should be by policy_name, created_at, or left unordered.",
+      "options": [
+        "Order by policy_name (mirroring leave_types ORDER BY name)",
+        "Order by created_at",
+        "Leave unordered (rely on DB default)"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "description": "Whether findByLeaveTypeId should filter only active policies (is_active = true) or return all policies for a leave type including inactive ones. The investigation summary assumes active-only, but a caller managing policies may need to see deactivated ones.",
+      "options": [
+        "Return only active policies (is_active = true)",
+        "Return all policies for the leave type regardless of is_active"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "Whether CreateLeavePolicyDto should make accrualRate, maxAccumulation, and minimumNoticeDays optional (using `?`) or required-but-nullable (using `| null`). The sibling CreateLeaveTypeDto uses `?` for its optional isActive, but these three fields are domain-optional policy rules whose absence is semantically distinct from explicit null.",
+      "options": [
+        "Make them optional with `?` (absent means not set)",
+        "Make them required with `| null` (caller must explicitly pass null)"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "A LeavePolicy is uniquely associated with a single LeaveType via leaveTypeId; multiple active policies may exist for the same leave type, so leaveTypeId is not unique per row."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "Deactivation is irreversible within this phase's repository surface: softDelete sets is_active to false, and all read methods (findById, findAll, findByLeaveTypeId) exclude inactive rows \u2014 a deactivated policy is not retrievable through the standard read paths."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "The optional policy-rule fields (accrualRate, maxAccumulation, minimumNoticeDays) are nullable; a null value means the rule does not apply for that policy, distinct from a zero value."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "ILeavePolicyRepository.findByLeaveTypeId(leaveTypeId)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns LeavePolicy[] (possibly empty); never throws on no-match. Filters to active policies."
+    },
+    {
+      "operation": "ILeavePolicyRepository.findById(id)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns LeavePolicy | null; returns null when the row is absent or inactive (is_active = false). Never throws on no-match."
+    },
+    {
+      "operation": "ILeavePolicyRepository.findAll()",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns LeavePolicy[] (possibly empty); excludes inactive rows. Never throws on empty table."
+    },
+    {
+      "operation": "ILeavePolicyRepository.create(dto)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the persisted LeavePolicy; relies on RETURNING * so the full row (including generated id/timestamps) is returned. Propagates underlying pool errors (e.g., FK violation on leave_type_id) to the caller."
+    },
+    {
+      "operation": "ILeavePolicyRepository.update(id, dto)",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns LeavePolicy | null; returns null when no matching active row exists. When dto has no updatable fields, falls back to a findById lookup rather than issuing an empty UPDATE. Appends updated_at = NOW() to any real update."
+    },
+    {
+      "operation": "ILeavePolicyRepository.softDelete(id)",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns boolean; true when an active row was deactivated (rowCount > 0), false when the row was absent or already inactive. Idempotent in the sense that re-calling on an already-inactive row returns false without error."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The LeavePolicyRepository must mirror the structural pattern of LeaveTypeRepository: an interface + concrete class in a single .repository.ts file, pool.query<T> calls with snake_case columns and RETURNING *, a dynamic addField builder for update with $N param indexing, and softDelete returning (result.rowCount ?? 0) > 0.",
+      "referencePath": "src/modules/leave/leave-type.repository.ts"
+    },
+    {
+      "requirement": "The LeavePolicy model file must follow the same shape as leave-type.model.ts: a domain interface and a CreateDto in one .model.ts file, with the DTO omitting id/createdAt/updatedAt and making the active flag optional with a default of true. The LeaveType import must come from this file (Phase 3 dependency).",
+      "referencePath": "src/modules/leave/leave-type.model.ts"
+    },
+    {
+      "requirement": "The barrel export must be extended (not replaced) \u2014 the existing LeaveType/CreateLeaveTypeDto/ILeaveTypeRepository/LeaveTypeRepository re-exports must remain, with the four LeavePolicy exports added alongside them.",
+      "referencePath": "src/modules/leave/index.ts"
+    },
+    {
+      "requirement": "The leave-policy.repository.test.ts must follow the same test conventions: jest.mock on the shared db connection path, mockQuery = pool.query as jest.Mock, makeLeavePolicy/makeCreateDto factory helpers with overrides, beforeEach reset, per-method describe blocks asserting both return value and exact mockQuery call args (SQL string + params), and softDelete tests covering rowCount 1 and 0.",
+      "referencePath": "tests/unit/modules/leave/leave-type.repository.test.ts"
+    },
+    {
+      "requirement": "The leave_policies column set and the is_active deactivation semantics must match the conceptual table definition in ARCHITECTURE.md (no deleted_at column; fields id, policy_name, leave_type_id, entitlement_days, accrual_rate, max_accumulation, minimum_notice_days, requires_manager_approval, is_active, created_at, updated_at).",
+      "referencePath": "docs/ARCHITECTURE.md"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/leave/leave-type.model.ts (Phase 3)",
+      "why": "LeavePolicy references LeaveType via the leaveTypeId field; the model imports the LeaveType type to establish the domain relationship. This is the declared Phase 3 dependency."
+    },
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "The repository concrete class uses the exported pg Pool instance for all leave_policies queries, satisfying GP-001 and the no-direct-db-outside-repository constraint."
+    },
+    {
+      "target": "src/modules/leave/index.ts",
+      "why": "The barrel is the sole public entry point for the leave module; Phase 5 (LeaveBalance) and Phase 8 (LeaveService) will import LeavePolicy artifacts through this barrel, so it must re-export all four new symbols."
+    }
+  ]
+}
