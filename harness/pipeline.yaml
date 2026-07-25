@@ -93,23 +93,18 @@ phases:
             action: prepare_phase
             inputs: [feature_id, current_phase]
             output: { name: intent_id, channel: workflow_state }
-          - id: intent
+          # Merged intent+design (consolidation Brief 2) — one agent specifying the phase's
+          # "what" AND the constraint/consistency invariants; keeps architecture as reference so
+          # chief-architect stays a consult predecessor. Task scope is strictly current_phase.
+          - id: intent-design
             type: agent
-            agent: intent-agent
-            # `architecture` is REFERENCE context (ADR-069) — for cross-checking + consulting
-            # chief-architect on cross-phase concerns; intent-agent's task scope is strictly
-            # current_phase. It also makes chief-architect a real data-flow consult predecessor.
+            agent: intent-design-agent
             inputs: [current_phase, intent_id, architecture]
-            output: { name: intent_spec, channel: workflow_state }
-          - id: design
-            type: agent
-            agent: design-agent
-            inputs: [intent_spec]
-            output: { name: design_spec, channel: workflow_state }
+            output: { name: spec, channel: workflow_state }
           - id: context
             type: agent
             agent: context-agent
-            inputs: [intent_spec]
+            inputs: [spec]
             output: { name: context_files, channel: files }
           # Code-generation composite (ADR-067 Phase 3 amendment A1/A2) — a `work_dir`
           # composite: every step shares ONE persistent work dir derived from
@@ -123,13 +118,13 @@ phases:
           - id: code-generation
             type: composite
             work_dir: phase_branch
-            inputs: [intent_spec, design_spec, current_phase, phase_branch]
+            inputs: [spec, current_phase, phase_branch]
             output: { name: commit_sha, channel: workflow_state }
             steps:
               - id: generate
                 type: action
                 action: openhands_code_agent
-                inputs: [intent_spec, design_spec, current_phase]
+                inputs: [spec, current_phase]
                 output: { name: generation_result, channel: workflow_state }
               - id: discover
                 type: action
