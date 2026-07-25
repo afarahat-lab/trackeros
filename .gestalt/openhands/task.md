@@ -1,18 +1,18 @@
-# Implement this phase: Phase 1: Shared enums and base types
+# Implement this phase: Phase 2: Employee model and repository
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/bfdb6110-c37d-4c1b-a01f-6fca50944d25/1`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/bfdb6110-c37d-4c1b-a01f-6fca50944d25/2`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create src/shared/types/index.ts with the canonical enums and types used across all leave modules:
+Create src/modules/employee/employee.model.ts with the Employee interface (id, employeeNumber, firstName, lastName, email, managerId, department, hireDate, terminationDate, employmentStatus, createdAt, updatedAt, deletedAt) and CreateEmployeeDto. Import EmploymentStatus from src/shared/types/index.ts (created in Phase 1).
 
-- `LeaveTypeCode` enum: 'annual' | 'sick' | 'emergency' | 'unpaid' | 'maternity' | 'paternity'
-- `LeaveStatus` enum: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED'
-- `EmploymentStatus` type: 'ACTIVE' | 'INACTIVE' | 'TERMINATED'
+Create src/modules/employee/employee.repository.ts with IEmployeeRepository interface and EmployeeRepository class using the pg pool from src/shared/db/connection.ts. Implement findByManagerId, findById, findAll, create, update, softDelete methods.
 
-Also create src/shared/types/index.ts as the single export barrel. Include Jest unit tests in tests/unit/shared/types/ verifying enum values. This phase has no dependencies on prior phases — only on the existing tsconfig.json and jest.config.js at the project root.
+Create src/modules/employee/index.ts barrel export.
+
+Include Jest unit tests in tests/unit/modules/employee/ for the repository methods (mock the pg pool). This phase depends on src/shared/types/index.ts from Phase 1 and src/shared/db/connection.ts (already exists).
 
 ## Project stack
 Before writing code, read `HARNESS.json` in the working directory to learn the project's language, framework, and test runner, and follow the existing conventions in the repository. Read `docs/ARCHITECTURE.md` and `PLAN.md` if present.
