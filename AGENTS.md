@@ -49,6 +49,39 @@ Note: the Gestalt platform itself runs on Node 20 + pnpm 9.x as a
 self-imposed constraint. That has no bearing on this project —
 user projects use whatever stack matches their description.
 
+## Current implementation state
+
+Phase 1 (shared enums) is complete. Phases 2–8 are planned but not yet
+implemented. See `PLAN.md` for the full phase breakdown.
+
+### Existing modules (implemented)
+
+- `src/modules/status/` — health-check module (model, service interface, service)
+- `src/modules/uptime/` — system info module (model, service interface, service, routes)
+- `src/shared/types/` — canonical enums: `LeaveStatus`, `LeaveTypeCode`, `PolicyStatus`, `BalanceStatus`
+- `src/shared/db/connection.ts` — pg Pool factory
+
+### Planned modules (not yet implemented)
+
+- `src/modules/leaveType/` — Phase 2
+- `src/modules/leavePolicy/` — Phase 3
+- `src/modules/leaveBalance/` — Phase 4
+- `src/modules/leaveRequest/` — Phases 5–7
+- `src/modules/audit/` — cross-cutting
+- `src/modules/notification/` — cross-cutting
+- `src/modules/employee/` — cross-cutting
+
+### Module file conventions
+
+Existing scaffold modules (status, uptime) use a flat structure:
+`<name>.model.ts`, `<name>.service.interface.ts`, `<name>.service.ts`,
+`<name>.routes.ts`, `index.ts`.
+
+New domain modules (leaveType, leavePolicy, leaveBalance, leaveRequest,
+audit, notification, employee) follow the target pattern:
+`<name>.model.ts`, `<name>.repository.ts`, `<name>.service.ts`,
+`<name>.controller.ts`, `<name>.routes.ts`, `index.ts`.
+
 ## Architecture rules
 
 1. Modules never import from each other's internals — only from index.ts

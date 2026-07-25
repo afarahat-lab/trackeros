@@ -10,9 +10,9 @@ Base entity providing common fields for domain models.
 | created_at | Date | true |
 | updated_at | Date | true |
 
-## leave
+## shared enums
 
-Represents a leave record managed by the `leave` module, including leave requests and related leave-tracking data.
+Canonical enums defined in `src/shared/types/leave.enums.ts` (Phase 1).
 
 ### LeaveStatus
 
@@ -24,6 +24,33 @@ Represents a leave record managed by the `leave` module, including leave request
 | REJECTED | Leave request has been rejected |
 | CANCELLED | Leave request has been cancelled |
 
+### LeaveTypeCode
+
+| Value | Description |
+|-------|-------------|
+| ANNUAL | Annual leave |
+| SICK | Sick leave |
+| EMERGENCY | Emergency leave |
+
+### PolicyStatus
+
+| Value | Description |
+|-------|-------------|
+| ACTIVE | Policy is currently in effect |
+| INACTIVE | Policy is not in effect |
+| ARCHIVED | Policy has been archived |
+
+### BalanceStatus
+
+| Value | Description |
+|-------|-------------|
+| ACTIVE | Balance is active for the current fiscal year |
+| EXPIRED | Balance has expired |
+
+## leave
+
+Represents a leave record managed by the `leave` module, including leave requests and related leave-tracking data.
+
 ### LeaveRequest
 
 | Field | Type | Required |
@@ -34,7 +61,7 @@ Represents a leave record managed by the `leave` module, including leave request
 | startDate | Date | true |
 | endDate | Date | true |
 | reason | string \| undefined | false |
-| status | LeaveRequestStatus | true |
+| status | LeaveStatus | true |
 | approvedBy | string \| null | false |
 | approvedAt | Date \| null | false |
 | createdAt | Date | true |
@@ -65,7 +92,7 @@ Represents a leave record managed by the `leave` module, including leave request
 
 | Field | Type | Required |
 |-------|------|----------|
-| status | LeaveRequestStatus | false |
+| status | LeaveStatus | false |
 | leaveTypeId | string | false |
 | startDateFrom | Date | false |
 | startDateTo | Date | false |
@@ -74,28 +101,50 @@ Represents a leave record managed by the `leave` module, including leave request
 | limit | number | false |
 | offset | number | false |
 
-## balance
+## leaveType
 
-Represents leave balance data managed by the `balance` module, including tracked entitlement, accrual, and remaining leave amounts.
+Reference data for leave categories (Phase 2).
 
-### Balance
+### LeaveType
 
 | Field | Type | Required |
 |-------|------|----------|
 | id | string | true |
-| employeeId | string | true |
-| policyId | string | true |
-| totalEntitlement | number | true |
-| usedDays | number | true |
-| remainingDays | number | true |
-| fiscalYear | number | true |
-| status | string | true |
+| code | LeaveTypeCode | true |
+| label | string | true |
+| description | string | true |
+| requiresDocumentation | boolean | true |
+| maxConsecutiveDays | number \| null | true |
+| isPaid | boolean | true |
+| status | LeaveTypeStatus | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
-**Relationships**
-- `Employee` — many-to-one
-- `LeavePolicy` — many-to-one
+## policy
+
+Represents leave policy data (Phase 3).
+
+### LeavePolicy
+
+| Field | Type | Required |
+|-------|------|----------|
+| id | string | true |
+| leaveTypeId | string | true |
+| name | string | true |
+| entitlementDaysPerYear | number | true |
+| maxCarryForwardDays | number | true |
+| minNoticeDays | number | true |
+| maxConsecutiveDays | number \| null | true |
+| requiresApproval | boolean | true |
+| effectiveFrom | Date | true |
+| effectiveTo | Date \| null | true |
+| status | PolicyStatus | true |
+| createdAt | Date | true |
+| updatedAt | Date | true |
+
+## balance
+
+Represents leave balance data (Phase 4).
 
 ### LeaveBalance
 
@@ -104,11 +153,13 @@ Represents leave balance data managed by the `balance` module, including tracked
 | id | string | true |
 | employeeId | string | true |
 | policyId | string | true |
-| totalEntitlement | number | true |
-| usedDays | number | true |
-| remainingDays | number | true |
 | fiscalYear | number | true |
-| status | string | true |
+| entitledDays | number | true |
+| usedDays | number | true |
+| pendingDays | number | true |
+| carriedForwardDays | number | true |
+| remainingDays | number | true |
+| status | BalanceStatus | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
@@ -138,53 +189,6 @@ Represents employee data managed by the `employee` module, including employee re
 | updatedAt | Date | true |
 | deletedAt | Date \| null | false |
 
-## policy
-
-Represents leave policy data managed by the `policy` module, including policy definitions, rules, and leave entitlement configurations.
-
-### Policy
-
-| Field | Type | Required |
-|-------|------|----------|
-| id | string | true |
-| policyName | string | true |
-| leaveType | string | true |
-| entitlementDays | number | true |
-| accrualRate | number | false |
-| maxAccumulation | number | false |
-| minimumNoticeDays | number | false |
-| requiresManagerApproval | boolean | true |
-| isActive | boolean | true |
-| createdAt | Date | true |
-| updatedAt | Date | true |
-
-### LeaveType
-
-| Value | Description |
-|-------|-------------|
-| annual | Annual leave |
-| sick | Sick leave |
-| emergency | Emergency leave |
-| unpaid | Unpaid leave |
-| maternity | Maternity leave |
-| paternity | Paternity leave |
-
-### LeavePolicy
-
-| Field | Type | Required |
-|-------|------|----------|
-| id | string | true |
-| policyName | string | true |
-| leaveType | string | true |
-| entitlementDays | number | true |
-| accrualRate | number | false |
-| maxAccumulation | number | false |
-| minimumNoticeDays | number | false |
-| requiresManagerApproval | boolean | true |
-| isActive | boolean | true |
-| createdAt | Date | true |
-| updatedAt | Date | true |
-
 ## notification
 
 Represents notification data managed by the `notification` module, including notification records, delivery status, and related messaging information.
@@ -207,21 +211,6 @@ Represents notification data managed by the `notification` module, including not
 ## audit
 
 Represents audit data managed by the `audit` module, including audit records, change history, and activity tracking information.
-
-### Audit
-
-| Field | Type | Required |
-|-------|------|----------|
-| id | string | true |
-| entityType | string | true |
-| entityId | string | true |
-| action | 'CREATE' \| 'UPDATE' \| 'DELETE' \| 'APPROVE' \| 'REJECT' | true |
-| oldValues | Record<string, any> \| null | false |
-| newValues | Record<string, any> \| null | false |
-| performedBy | string \| null | false |
-| performedAt | Date | true |
-| createdAt | Date | true |
-| updatedAt | Date | true |
 
 ### AuditLog
 

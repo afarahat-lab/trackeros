@@ -13,12 +13,23 @@ The architecture is modular, with a clear separation of concerns between models,
 - Frontend: React Native
 - Database: PostgreSQL
 
-## Module structure
+## Current module structure (implemented)
 
 ```
 src/modules/
   status/           — Status module (health-check)
   uptime/           — Uptime module (system info)
+src/shared/
+  db/connection.ts  — pg Pool factory
+  types/
+    leave.enums.ts  — canonical enums: LeaveStatus, LeaveTypeCode, PolicyStatus, BalanceStatus
+    index.ts        — barrel export for shared types
+```
+
+## Planned module structure (Phases 2–8)
+
+```
+src/modules/
   leaveType/        — LeaveType model, repository (Phase 2)
   leavePolicy/      — LeavePolicy model, repository (Phase 3)
   leaveBalance/     — LeaveBalance model, repository (Phase 4)
@@ -27,10 +38,8 @@ src/modules/
   notification/     — Notification model, repository, service
   employee/         — Employee model, repository, service
 src/shared/
-  db/connection.ts
-  db/base repository.ts
-  types/error types.ts
-  types/leave.enums.ts
+  db/base-repository.ts  — abstract base repository (planned)
+  types/error-types.ts   — typed domain errors (planned)
 ```
 
 ## Key patterns
