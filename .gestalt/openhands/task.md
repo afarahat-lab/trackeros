@@ -1,18 +1,18 @@
-# Implement this phase: Phase 4: LeavePolicy model and repository
+# Implement this phase: Phase 5: LeaveBalance model and repository
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/bfdb6110-c37d-4c1b-a01f-6fca50944d25/4`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/bfdb6110-c37d-4c1b-a01f-6fca50944d25/5`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create src/modules/leave/leave-policy.model.ts with the LeavePolicy interface (id, policyName, leaveTypeId, entitlementDays, accrualRate, maxAccumulation, minimumNoticeDays, requiresManagerApproval, isActive, createdAt, updatedAt) and CreateLeavePolicyDto. Import LeaveType from src/modules/leave/leave-type.model.ts (Phase 3).
+Create src/modules/leave/leave-balance.model.ts with the LeaveBalance interface (id, employeeId, leaveTypeId, policyId, entitlementDays, usedDays, pendingDays, accruedDays, carriedForwardDays, expiresAt, year, createdAt, updatedAt) and CreateLeaveBalanceDto.
 
-Create src/modules/leave/leave-policy.repository.ts with ILeavePolicyRepository interface and LeavePolicyRepository class using the pg pool from src/shared/db/connection.ts. Implement findByLeaveTypeId, findById, findAll, create, update, softDelete methods.
+Create src/modules/leave/leave-balance.repository.ts with ILeaveBalanceRepository interface and LeaveBalanceRepository class using the pg pool from src/shared/db/connection.ts. Implement findByEmployeeId, findByEmployeeIdAndLeaveTypeId, findByEmployeeIdAndYear, create, update, upsert methods.
 
-Update src/modules/leave/index.ts to also re-export LeavePolicy, CreateLeavePolicyDto, ILeavePolicyRepository, LeavePolicyRepository.
+Update src/modules/leave/index.ts to also re-export LeaveBalance, CreateLeaveBalanceDto, ILeaveBalanceRepository, LeaveBalanceRepository.
 
-Include Jest unit tests in tests/unit/modules/leave/leave-policy.repository.test.ts mocking the pg pool. This phase depends on src/modules/leave/leave-type.model.ts from Phase 3 and src/shared/db/connection.ts (already exists).
+Include Jest unit tests in tests/unit/modules/leave/leave-balance.repository.test.ts mocking the pg pool. This phase depends on src/modules/leave/leave-type.model.ts (Phase 3), src/modules/leave/leave-policy.model.ts (Phase 4), and src/shared/db/connection.ts (already exists).
 
 ## Project stack
 Before writing code, read `HARNESS.json` in the working directory to learn the project's language, framework, and test runner, and follow the existing conventions in the repository. Read `docs/ARCHITECTURE.md` and `PLAN.md` if present.
