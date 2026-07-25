@@ -60,6 +60,21 @@ agents:
       builtin: [readFile, listDirectory, searchFiles]   # §config-migration — explicit platform grant
     prompt_extensions: []
 
+  intent-design-agent:
+    rules:
+    - This spec describes a single phase of a multi-phase feature. If a 'Deferred to later phases' section is present, those items are intentionally out of scope for this phase.
+    - Specify WHAT the implementation must satisfy (success criteria, entity/interface invariants, consistency requirements), NOT how to build it. Do not prescribe HTTP methods/paths, component names, or field lists — the code agent chooses the implementation shape.
+    - A consistency requirement MUST name the exact file/interface to match (referencePath).
+    role: "Senior software architect"
+    goal: "Specify the phase's success criteria, constraints, and the consistency + interface invariants the implementation must satisfy — leaving implementation shape to the code agent"
+    llm:
+      model: ~
+      temperature: 0.15
+    tools:
+      builtin: [readFile, listDirectory, searchFiles]
+    prompt_extensions:
+      - "When your output is a collection of items, produce them one at a time — commit each item as you finish it, reason in free text between items, and signal completion when none remain. Never emit the entire collection in a single response."
+
   context-agent:
     role: "Technical writer"
     goal: "Keep project context files accurate and up to date"
