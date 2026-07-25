@@ -66,15 +66,15 @@ The leave management module enables employees to apply for annual, sick, and eme
 ### Domain Entities
 
 - **LeaveType** — reference data for leave categories (ANNUAL, SICK, EMERGENCY). Each type defines documentation requirements and maximum consecutive days. Lifecycle: ACTIVE, DEPRECATED.
-- **LeavePolicy** — versioned rules per leave type: entitlement, carry-forward limits, notice periods, approval requirements. Lifecycle: ACTIVE, SUPERSEDED, REVOKED.
-- **LeaveBalance** — per-employee, per-policy, per-fiscal-year tracking of entitled, used, pending, and carried-forward days. Lifecycle: ACTIVE, EXHAUSTED, FROZEN.
-- **LeaveRequest** — the core application entity. Tracks the full lifecycle from DRAFT → SUBMITTED → UNDER_REVIEW → APPROVED/REJECTED/CANCELLED.
+- **LeavePolicy** — versioned rules per leave type: entitlement, carry-forward limits, notice periods, approval requirements. Lifecycle: ACTIVE, INACTIVE, ARCHIVED.
+- **LeaveBalance** — per-employee, per-policy, per-fiscal-year tracking of entitled, used, pending, and carried-forward days. Lifecycle: ACTIVE, EXPIRED.
+- **LeaveRequest** — the core application entity. Tracks the full lifecycle from DRAFT → SUBMITTED → APPROVED/REJECTED/CANCELLED.
 - **LeaveStatus** — value object enumerating the states of a LeaveRequest.
 
 ### Business Rules
 
 - **BR-001** — Balance Sufficiency: A request may only be submitted if `entitledDays - usedDays - pendingDays >= totalDays`.
-- **BR-002** — No Overlapping Leaves: An employee cannot have two requests in SUBMITTED, UNDER_REVIEW, or APPROVED status with overlapping date ranges.
+- **BR-002** — No Overlapping Leaves: An employee cannot have two requests in SUBMITTED or APPROVED status with overlapping date ranges.
 - **BR-003** — Minimum Notice: A request must be submitted at least `minNoticeDays` before the start date (emergency leave exempt).
 
 ### Conceptual Tables
