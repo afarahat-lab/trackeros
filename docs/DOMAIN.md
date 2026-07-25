@@ -1,6 +1,6 @@
 ## base
 
-Base entity providing common fields for domain models.
+Base entity providing common fields for domain models. *(Planned — not yet implemented in code.)*
 
 ### BaseEntity
 
@@ -196,3 +196,13 @@ Represents system-level status information, including health-check and version d
 |-------|------|----------|
 | up | boolean | true |
 | version | string | true |
+
+## uptime
+
+Represents server uptime information.
+
+### UptimeStatus
+
+| Field | Type | Required |
+|-------|------|----------|
+| uptimeSeconds | number | true |
