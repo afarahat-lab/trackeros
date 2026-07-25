@@ -131,7 +131,40 @@ Represents leave-related entities managed under `src/modules/leave/`.
 | requiresManagerApproval | boolean | false |
 | isActive | boolean | false |
 
-## Planned entities (Phases 5–9)
+### LeaveBalance
+
+| Field | Type | Required |
+|-------|------|----------|
+| id | string | true |
+| employeeId | string | true |
+| leaveTypeId | string | true |
+| policyId | string | true |
+| entitlementDays | number | true |
+| usedDays | number | true |
+| pendingDays | number | true |
+| accruedDays | number | true |
+| carriedForwardDays | number | true |
+| expiresAt | Date \| null | false |
+| year | number | true |
+| createdAt | Date | true |
+| updatedAt | Date | true |
+
+### CreateLeaveBalanceDto
+
+| Field | Type | Required |
+|-------|------|----------|
+| employeeId | string | true |
+| leaveTypeId | string | true |
+| policyId | string | true |
+| entitlementDays | number | true |
+| usedDays | number | false |
+| pendingDays | number | false |
+| accruedDays | number | false |
+| carriedForwardDays | number | false |
+| expiresAt | Date \| null | false |
+| year | number | true |
+
+## Planned entities (Phases 6–9)
 
 The following entities are designed but not yet implemented. See `PLAN.md` for phase details.
 
@@ -152,24 +185,6 @@ The following entities are designed but not yet implemented. See `PLAN.md` for p
 | approvedAt | Date \| null | false |
 | rejectionReason | string \| null | false |
 | cancelledAt | Date \| null | false |
-| createdAt | Date | true |
-| updatedAt | Date | true |
-
-### LeaveBalance (Phase 5)
-
-| Field | Type | Required |
-|-------|------|----------|
-| id | string | true |
-| employeeId | string | true |
-| leaveTypeId | string | true |
-| policyId | string | true |
-| entitlementDays | number | true |
-| usedDays | number | true |
-| pendingDays | number | true |
-| accruedDays | number | true |
-| carriedForwardDays | number | true |
-| expiresAt | Date \| null | false |
-| year | number | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
