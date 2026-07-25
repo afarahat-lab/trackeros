@@ -1,0 +1,138 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leavePolicy"
+    ],
+    "affectedLayers": [
+      "domain-model",
+      "data-access"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The LeavePolicy model interface is exported from src/modules/leavePolicy/leavePolicy.model.ts and its status field is typed as the PolicyStatus enum imported from src/shared/types/leave.enums.ts (Phase 1), not a redeclared or string-typed copy.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository exposes all four read methods \u2014 findAll, findById, findByLeaveTypeId, findActiveByLeaveTypeId \u2014 on both the ILeavePolicyRepository interface and the LeavePolicyRepository class that implements it.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findActiveByLeaveTypeId returns only rows whose status is PolicyStatus.ACTIVE for the given leave type id, exercising the composite (leave_type_id, status) access pattern; the other lookup methods return the matching rows or null/empty as appropriate.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The barrel export src/modules/leavePolicy/index.ts re-exports the LeavePolicy interface, the ILeavePolicyRepository interface, and the LeavePolicyRepository class so consumers can import them from the module root.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests in tests/unit/modules/leavePolicy/leavePolicy.repository.test.ts mock the pg Pool and assert each repository method issues the expected query and returns the mocked rows (found case) or null/empty array (not-found case); the suite passes under the existing ts-jest config.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "PolicyStatus must be imported from src/shared/types/leave.enums.ts (Phase 1); the enum must not be redeclared or duplicated in the leavePolicy module.",
+    "The repository must receive its pg Pool via constructor injection (matching the LeaveTypeRepository pattern), not by importing the pool singleton from src/shared/db/connection.ts directly.",
+    "The module directory and file names must use camelCase (src/modules/leavePolicy/...), matching the existing leaveType module convention rather than the kebab-case used in architecture docs.",
+    "This phase is read-only: the repository must expose only the four query methods (findAll, findById, findByLeaveTypeId, findActiveByLeaveTypeId). No create/update/delete/persistence-mutation methods belong in this phase."
+  ],
+  "outOfScope": [
+    "LeaveBalance model and repository (Phase 4), LeaveRequest model/repository/service/controller/routes (Phases 5-8), and Fastify app wiring (Phase 8) are out of scope for this phase.",
+    "Write/mutation operations on leave policies (create, update, archive, supersede) are out of scope; only read/query methods are specified for this phase.",
+    "Database migrations, schema creation, and the leave_policies table DDL are out of scope; the repository assumes the table and its indexes already exist (or is tested against a mocked pool).",
+    "HTTP routes, controllers, request validation (Zod), and RBAC/audit enforcement for leave policies are out of scope for this phase \u2014 the repository is a data-access layer only."
+  ],
+  "ambiguities": [
+    {
+      "description": "findActiveByLeaveTypeId return cardinality is ambiguous: the composite (leave_type_id, status) index and the Phase 6 service's \"validate an active policy exists\" usage suggest at most one active policy per leave type, but the schema does not enforce uniqueness on (leave_type_id, status=ACTIVE), so multiple ACTIVE rows could exist. Should the method return a single row (null if none) or an array (empty if none)?",
+      "options": [
+        "Return a single LeavePolicy | null (assume at most one active policy per leave type)",
+        "Return an array LeavePolicy[] (allow multiple active policies, caller picks)",
+        "Return a single row but order by effective_from DESC and take the first to deterministically pick the latest active policy"
+      ],
+      "impactIfWrong": "medium"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "A LeavePolicy's status is constrained to the PolicyStatus enum values (ACTIVE, INACTIVE, ARCHIVED) imported from the shared enums; the model must not permit any other status value."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "effectiveTo is nullable (open-ended policy) but effectiveFrom is always present; a policy with a null effectiveTo is considered currently effective until its status transitions away from ACTIVE."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "maxConsecutiveDays is nullable, indicating no upper cap on consecutive leave days for that policy; a non-null value caps the maximum consecutive days allowed."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "findAll",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns all leave policy rows as an array (empty array when none exist); propagates underlying pool query errors without swallowing them."
+    },
+    {
+      "operation": "findById",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the single LeavePolicy matching the given id, or null when no row matches; propagates underlying pool query errors."
+    },
+    {
+      "operation": "findByLeaveTypeId",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns all LeavePolicy rows associated with the given leave type id as an array (empty array when none match); propagates underlying pool query errors."
+    },
+    {
+      "operation": "findActiveByLeaveTypeId",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the active LeavePolicy row(s) for the given leave type id filtered by status = PolicyStatus.ACTIVE, or null/empty when none match; propagates underlying pool query errors."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The LeavePolicy model must import and use the PolicyStatus enum exactly as defined in the shared enums file (ACTIVE/INACTIVE/ARCHIVED); it must not redefine the enum or use a divergent lifecycle vocabulary.",
+      "referencePath": "src/shared/types/leave.enums.ts"
+    },
+    {
+      "requirement": "The LeavePolicyRepository must follow the same structural pattern as LeaveTypeRepository: a constructor-injected pg Pool, an interface (ILeavePolicyRepository) paired with an implementing class, single-row lookups returning result.rows[0] ?? null, and list lookups returning result.rows.",
+      "referencePath": "src/modules/leaveType/leaveType.repository.ts"
+    },
+    {
+      "requirement": "The leavePolicy barrel export must mirror the leaveType barrel: re-export the model interface and the repository interface/class from the module root.",
+      "referencePath": "src/modules/leaveType/index.ts"
+    },
+    {
+      "requirement": "The repository unit tests must follow the established test pattern: jest.mock('pg') with a mock Pool exposing a mock query function, mockResolvedValueOnce for rows, and toHaveBeenCalledWith assertions on the SQL and params, covering both found and not-found cases per method.",
+      "referencePath": "tests/unit/modules/leaveType/leaveType.repository.test.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/leave.enums.ts (Phase 1)",
+      "why": "The LeavePolicy model imports PolicyStatus from the shared enums; this is the hard dependency declared by the phase."
+    },
+    {
+      "target": "src/shared/db/connection.ts (pg Pool)",
+      "why": "The repository operates against the pg Pool type; in production the Pool instance is sourced from the shared db connection, though the repository itself receives it via constructor injection."
+    },
+    {
+      "target": "src/modules/leavePolicy/leavePolicy.model.ts (Phase 6 consumer)",
+      "why": "Phase 6 (LeaveRequest service) depends on ILeavePolicyRepository.findActiveByLeaveTypeId to validate that an active policy exists for a leave type before creating a leave request; this phase establishes that contract."
+    }
+  ]
+}
