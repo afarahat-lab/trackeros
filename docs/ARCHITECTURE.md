@@ -48,3 +48,127 @@ src/shared/error types.ts
 - All database access goes through a repository layer — no inline SQL
   / ORM calls in route handlers or business logic
 - No circular dependencies between modules
+
+<!-- gestalt:architecture feature=bfdb6110-c37d-4c1b-a01f-6fca50944d25 START -->
+## Leave Management Module
+
+### Overview
+
+The Leave Management module enables employees to apply for annual, sick, emergency, and other leave types. Managers approve or reject requests, and the system tracks leave balances per policy and fiscal year. The module is built as a modular monolith using TypeScript, Fastify, PostgreSQL, and React Native (frontend). It adheres to the golden principles: every state change is audited (GP-002), RBAC is enforced at the route level (GP-005), input validation occurs at controller boundaries (GP-003), and all persistence goes through repository interfaces (GP-001).
+
+### Domain Entities
+
+- **Employee** — organizational actor with employment status (ACTIVE, INACTIVE, TERMINATED). The `managerId` field establishes the approval hierarchy.
+- **LeaveType** — catalog of leave categories (annual, sick, emergency, unpaid, maternity, paternity). Each type has a code and active flag.
+- **LeavePolicy** — rules and entitlements for a leave type: entitlement days, accrual rate, max accumulation, minimum notice, and whether manager approval is required.
+- **LeaveRequest** — an employee's leave application. Lifecycle: DRAFT → SUBMITTED → APPROVED / REJECTED; can be CANCELLED. References the employee, the applicable policy, and the approving manager.
+- **LeaveBalance** — tracks used and remaining days for an employee-policy-fiscalYear combination. Statuses: ACTIVE, EXHAUSTED, CLOSED.
+- **AuditLog** — immutable record of all state-changing operations (who, what, when, before/after).
+
+### Business Rules
+
+- **BR-001** — Only ACTIVE employees may submit leave requests.
+- **BR-002** — `startDate` ≥ today; `endDate` ≥ `startDate`; requested days > 0.
+- **BR-003** — Before approval, the employee's LeaveBalance for the policy and fiscal year must have `remainingDays` ≥ requested days (excluding weekends/holidays per policy).
+- **BR-004** — Submitted requests are routed to the employee's manager (`employee.managerId`). Only that manager (or a role subsuming manager authority) may approve/reject. Self-approval is forbidden.
+- **BR-005** — Rejection requires a non-empty `rejectionReason`.
+- **BR-006** — On approval, `LeaveBalance.usedDays` is incremented and `remainingDays` recalculated atomically within the same transaction.
+
+### Module Structure
+
+```
+src/modules/
+├── base-entity/          # BaseEntity model (id, createdAt, updatedAt)
+├── employee/             # Employee model + repository interface
+├── leave-type/           # LeaveType model + repository interface
+├── leave-status/         # LeaveStatus enum (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED)
+├── leave-policy/         # LeavePolicy model + repository interface
+├── leave-request/        # LeaveRequest model + repository interface
+├── leave-balance/        # LeaveBalance model + repository interface
+├── audit-log/            # AuditRecord model, repository interface, audit service interface
+├── balance/              # BalanceService (domain service)
+├── notification/         # NotificationService (domain service)
+├── approval/             # ApprovalService (domain service)
+└── leave/                # LeaveService (application service), controller, routes
+```
+
+### Persistence (Conceptual Tables)
+
+- **employees** — `id`, `employee_number`, `first_name`, `last_name`, `email`, `manager_id` (FK→employees), `department`, `hire_date`, `termination_date`, `employment_status`, `created_at`, `updated_at`, `deleted_at`
+- **leave_types** — `id`, `code`, `name`, `description`, `is_active`, `created_at`, `updated_at`
+- **leave_policies** — `id`, `policy_name`, `leave_type_id` (FK→leave_types), `entitlement_days`, `accrual_rate`, `max_accumulation`, `minimum_notice_days`, `requires_manager_approval`, `is_active`, `created_at`, `updated_at`
+- **leave_requests** — `id`, `employee_id` (FK→employees), `leave_policy_id` (FK→leave_policies), `start_date`, `end_date`, `reason`, `status`, `approved_by` (FK→employees), `approved_at`, `rejection_reason`, `created_at`, `updated_at`
+- **leave_balances** — `id`, `employee_id` (FK→employees), `leave_policy_id` (FK→leave_policies), `total_entitlement`, `used_days`, `remaining_days`, `fiscal_year`, `status`, `created_at`, `updated_at`
+- **audit_logs** — `id`, `entity_type`, `entity_id`, `action`, `old_values`, `new_values`, `performed_by`, `performed_at`, `ip_address`, `user_agent`, `created_at`
+
+All tables use UUID primary keys. Indexes are defined for frequent query patterns: employee lookups, status filtering, date-range queries, and unique compound keys for balances.
+
+### Repository Interfaces (with Concrete Implementations)
+
+| Interface | Concrete Implementation |
+|-----------|-------------------------|
+| `IEmployeeRepository` | `PgEmployeeRepository` |
+| `ILeaveTypeRepository` | `PgLeaveTypeRepository` |
+| `ILeavePolicyRepository` | `PgLeavePolicyRepository` |
+| `ILeaveRequestRepository` | `PgLeaveRequestRepository` |
+| `ILeaveBalanceRepository` | `PgLeaveBalanceRepository` |
+| `IAuditLogRepository` | `PgAuditLogRepository` |
+
+All implementations use the shared PostgreSQL connection pool (`src/shared/db/connection.ts`).
+
+### Services
+
+- **ILeaveService** — employee-facing operations: apply, view, cancel leave requests.
+- **IApprovalService** — manager operations: approve, reject, list pending approvals.
+- **IBalanceService** — balance queries, deduction, accrual, fiscal-year management.
+- **INotificationService** — sends notifications on leave events (applied, approved, rejected, balance updated).
+- **IAuditService** — records all state changes; used by every service.
+
+### Dependency Flow
+
+Dependencies flow strictly inward:
+
+```
+Leave (app) → Approval / Balance / Notification (domain services) → domain entities → value objects
+```
+
+- `Leave` depends on `LeaveRequest`, `Employee`, `Balance`, `Approval`, `Notification`.
+- `Approval` depends on `LeaveRequest`, `Employee`, `Balance`, `Notification`, `AuditLog`.
+- `Balance` depends on `LeaveBalance`, `LeavePolicy`, `AuditLog`.
+- `Notification` depends on `AuditLog`.
+- Domain entities depend on `BaseEntity` and, where appropriate, on each other (e.g., `LeaveRequest` → `Employee`, `LeavePolicy`).
+
+No circular dependencies exist.
+
+### Implementation Phases
+
+1. **BaseEntity foundation** — shared base model.
+2. **Employee model + repository** — core organizational entity.
+3. **LeaveType model + repository, LeaveStatus enum** — catalog and status value object.
+4. **LeavePolicy model + repository** — rules per leave type.
+5. **LeaveRequest model + repository** — core leave application entity.
+6. **LeaveBalance model + repository** — entitlement tracking.
+7. **AuditLog model, repository, audit service interface** — cross-cutting audit.
+8. **Balance service** — balance orchestration.
+9. **Notification service** — event notifications.
+10. **Approval service** — manager workflow.
+11. **Leave service, controller, routes** — application layer and HTTP endpoints.
+
+### Stack Compliance
+
+- Language: TypeScript (strict mode)
+- Runtime: Node.js 20
+- Framework: Fastify (routes, validation, serialization)
+- Frontend: React Native (consumes REST API)
+- Database: PostgreSQL (via `pg` Pool)
+- Architecture: modular monolith with clear layer boundaries
+- Testing: Jest (unit + integration)
+
+### Golden Principles Adherence
+
+- **GP-001 (Repository Pattern)**: All data access goes through repository interfaces; concrete implementations are injected.
+- **GP-002 (Audit Trail)**: Every state-changing operation is recorded in `audit_logs` via `IAuditService`.
+- **GP-003 (Input Validation)**: Fastify schema validation at route level; additional business rule validation in services.
+- **GP-005 (RBAC)**: Role-based access control enforced in `leave.routes.ts`; only managers (or admin role) can access approval endpoints.
+- **GP-006 (Transaction Semantics)**: Balance deduction on approval runs in a database transaction to ensure atomicity.
+<!-- gestalt:architecture feature=bfdb6110-c37d-4c1b-a01f-6fca50944d25 END -->
