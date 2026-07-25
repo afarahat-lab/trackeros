@@ -1,0 +1,129 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared-types",
+      "leave-management"
+    ],
+    "affectedLayers": [
+      "domain",
+      "shared"
+    ],
+    "isBreakingChange": true,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The LeaveStatus enum exposes exactly the six members DRAFT, SUBMITTED, UNDER_REVIEW, APPROVED, REJECTED, CANCELLED, with UNDER_REVIEW positioned between SUBMITTED and APPROVED; each member's string value equals its name.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The PolicyStatus enum exposes exactly the three members ACTIVE, SUPERSEDED, REVOKED \u2014 INACTIVE and ARCHIVED are no longer present; each member's string value equals its name.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The BalanceStatus enum exposes exactly the three members ACTIVE, EXHAUSTED, FROZEN \u2014 EXPIRED is no longer present and FROZEN has been added; each member's string value equals its name.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The LeaveTypeCode enum remains unchanged with exactly the three members ANNUAL, SICK, EMERGENCY; each member's string value equals its name.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The unit test suite for the enums asserts the corrected member set and exact member count for every enum: LeaveStatus count 6, LeaveTypeCode count 3, PolicyStatus count 3, BalanceStatus count 3 \u2014 and the suite passes under Jest.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The project typechecks cleanly (tsc --noEmit) after the enum changes, with no references to removed members (INACTIVE, ARCHIVED, EXPIRED) remaining in source or tests.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "ARCHITECTURE.md is the source of truth for enum member names and lifecycles; the generated enums must match the canonical domain lifecycles exactly, not the original PLAN.md member lists which were incomplete.",
+    "Each enum member's string value must equal its member name (e.g. UNDER_REVIEW = 'UNDER_REVIEW'), preserving the existing self-naming convention in leave.enums.ts.",
+    "No enum member may be added, removed, or renamed beyond the four corrections specified (UNDER_REVIEW added to LeaveStatus; INACTIVE\u2192SUPERSEDED and ARCHIVED\u2192REVOKED in PolicyStatus; EXPIRED\u2192EXHAUSTED and FROZEN added in BalanceStatus); LeaveTypeCode must not be touched.",
+    "The barrel export in src/shared/types/index.ts must continue to re-export all four enums so downstream consumers see the corrected types."
+  ],
+  "outOfScope": [
+    "Adding a LeaveTypeStatus enum (ACTIVE, DEPRECATED) \u2014 ARCHITECTURE.md defines this lifecycle but no such enum exists in the current file and it is not part of this phase's scope.",
+    "Updating PLAN.md's Phase 1 description to reflect the corrected enum members \u2014 PLAN.md is a planning artifact, not a runtime file; correcting it is out of scope for this code phase.",
+    "Migrating database column values or seed data for the renamed/added enum members \u2014 no persistence layer or migrations exist yet (Phases 2-7 are unbuilt), so there is no stored data to reconcile."
+  ],
+  "ambiguities": [
+    {
+      "description": "The task requires UNDER_REVIEW to be positioned \"between SUBMITTED and APPROVED\" in the enum, but the existing tests only assert member presence and count, not declaration order. It is unclear whether the test should additionally assert the source-order position of UNDER_REVIEW or whether source-order placement alone (untested) is sufficient.",
+      "options": [
+        "Place UNDER_REVIEW between SUBMITTED and APPROVED in source only; keep tests as presence+count assertions (no order test)",
+        "Add an explicit order assertion in the test verifying UNDER_REVIEW appears after SUBMITTED and before APPROVED in Object.keys(LeaveStatus)"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeaveStatus",
+      "mustExistOrExtend": true,
+      "invariant": "The LeaveRequest lifecycle is the ordered sequence DRAFT \u2192 SUBMITTED \u2192 UNDER_REVIEW \u2192 APPROVED/REJECTED/CANCELLED; the enum must contain all six states with UNDER_REVIEW between SUBMITTED and APPROVED."
+    },
+    {
+      "entity": "PolicyStatus",
+      "mustExistOrExtend": true,
+      "invariant": "The LeavePolicy lifecycle is ACTIVE, SUPERSEDED, REVOKED; the enum must contain exactly these three states and must not contain INACTIVE or ARCHIVED."
+    },
+    {
+      "entity": "BalanceStatus",
+      "mustExistOrExtend": true,
+      "invariant": "The LeaveBalance lifecycle is ACTIVE, EXHAUSTED, FROZEN; the enum must contain exactly these three states and must not contain EXPIRED."
+    },
+    {
+      "entity": "LeaveTypeCode",
+      "mustExistOrExtend": true,
+      "invariant": "The leave category reference codes are ANNUAL, SICK, EMERGENCY; the enum must remain exactly these three members, unchanged by this phase."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "Enum type surface consumed by downstream modules (leaveType, leavePolicy, leaveBalance, leaveRequest models/repositories/services in Phases 2-7)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "The four enums must remain importable from src/shared/types/leave.enums.ts (and via the barrel) with no removed-member references causing TypeScript compile errors; any downstream code referencing INACTIVE, ARCHIVED, or EXPIRED would fail typecheck \u2014 but no such downstream code exists yet."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The corrected LeaveStatus members (DRAFT, SUBMITTED, UNDER_REVIEW, APPROVED, REJECTED, CANCELLED) must match the LeaveRequest lifecycle declared in the Leave Management Module section.",
+      "referencePath": "docs/ARCHITECTURE.md"
+    },
+    {
+      "requirement": "The corrected PolicyStatus members (ACTIVE, SUPERSEDED, REVOKED) must match the LeavePolicy lifecycle declared in the Domain Entities section.",
+      "referencePath": "docs/ARCHITECTURE.md"
+    },
+    {
+      "requirement": "The corrected BalanceStatus members (ACTIVE, EXHAUSTED, FROZEN) must match the LeaveBalance lifecycle declared in the Domain Entities section.",
+      "referencePath": "docs/ARCHITECTURE.md"
+    },
+    {
+      "requirement": "The test assertions and member-count expectations must stay in sync with the enum definitions in the same file pair \u2014 every member asserted in the test must exist in the enum and vice versa, and the count assertions must equal the actual member count.",
+      "referencePath": "src/shared/types/leave.enums.ts"
+    },
+    {
+      "requirement": "The barrel export must continue to re-export all four enum types (LeaveStatus, LeaveTypeCode, PolicyStatus, BalanceStatus) so the public type surface is unchanged in shape.",
+      "referencePath": "src/shared/types/index.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts barrel export",
+      "why": "The corrected enums flow through this barrel to all downstream module consumers; the export list must remain complete and accurate."
+    },
+    {
+      "target": "tests/unit/shared/types/leave.enums.test.ts",
+      "why": "The test file is the verification harness for this phase; its assertions and counts must be updated in lockstep with the enum corrections or the phase cannot be considered done."
+    }
+  ]
+}
