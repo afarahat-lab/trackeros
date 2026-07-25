@@ -113,7 +113,7 @@ The Leave Management module enables employees to apply for annual, sick, emergen
 - **Employee** — organizational actor with employment status (ACTIVE, INACTIVE, TERMINATED). The `managerId` field establishes the approval hierarchy.
 - **LeaveType** — catalog of leave categories (annual, sick, emergency, unpaid, maternity, paternity). Each type has a code and active flag.
 - **LeavePolicy** — rules and entitlements for a leave type: entitlement days, accrual rate, max accumulation, minimum notice, and whether manager approval is required.
-- **LeaveRequest** — an employee's leave application. Lifecycle: DRAFT → SUBMITTED → APPROVED / REJECTED; can be CANCELLED. References the employee, the applicable policy, and the approving manager.
+- **LeaveRequest** — an employee's leave application. Lifecycle: PENDING → APPROVED / REJECTED; can be CANCELLED. References the employee, the applicable policy, and the approving manager.
 - **LeaveBalance** — tracks used and remaining days for an employee-policy-fiscalYear combination. Statuses: ACTIVE, EXHAUSTED, CLOSED.
 - **AuditLog** — immutable record of all state-changing operations (who, what, when, before/after).
 
@@ -130,19 +130,30 @@ The Leave Management module enables employees to apply for annual, sick, emergen
 
 ```
 src/modules/
-├── base-entity/          # BaseEntity model (id, createdAt, updatedAt)
 ├── employee/             # ✅ Employee model + repository (Phase 2)
-├── leave-type/           # ✅ LeaveType model + repository (Phase 3, implemented under src/modules/leave/)
-├── leave-status/         # LeaveStatus enum (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED)
-├── leave-policy/         # ✅ LeavePolicy model + repository (Phase 4, implemented under src/modules/leave/)
-├── leave-request/        # LeaveRequest model + repository interface
-├── leave-balance/        # LeaveBalance model + repository interface
-├── audit-log/            # AuditRecord model, repository interface, audit service interface
-├── balance/              # BalanceService (domain service)
-├── notification/         # NotificationService (domain service)
-├── approval/             # ApprovalService (domain service)
-└── leave/                # LeaveService (application service), controller, routes
+├── leave/                # ✅ LeaveType + LeavePolicy models + repositories (Phases 3-4)
+│   ├── leave-type.model.ts
+│   ├── leave-type.repository.ts
+│   ├── leave-policy.model.ts
+│   ├── leave-policy.repository.ts
+│   ├── leave-balance.model.ts       # Phase 5
+│   ├── leave-balance.repository.ts  # Phase 5
+│   ├── leave-request.model.ts       # Phase 6
+│   ├── leave-request.repository.ts  # Phase 6
+│   ├── leave.service.interface.ts   # Phase 8
+│   ├── leave.service.ts             # Phase 8
+│   ├── leave.controller.ts          # Phase 9
+│   ├── leave.routes.ts              # Phase 9
+│   └── index.ts
+├── audit/                # Phase 7
+│   ├── audit-log.model.ts
+│   ├── audit-log.repository.ts
+│   └── index.ts
+├── status/               # ✅ SystemStatus (read-only health check)
+└── uptime/               # ✅ UptimeStatus (read-only uptime endpoint)
 ```
+
+Shared enums (`LeaveTypeCode`, `LeaveStatus`, `EmploymentStatus`) live in `src/shared/types/index.ts`.
 
 ### Persistence (Conceptual Tables)
 
