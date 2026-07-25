@@ -20,6 +20,7 @@ Canonical enums defined in `src/shared/types/leave.enums.ts` (Phase 1).
 |-------|-------------|
 | DRAFT | Leave request is in draft state |
 | SUBMITTED | Leave request has been submitted |
+| UNDER_REVIEW | Leave request is under manager review |
 | APPROVED | Leave request has been approved |
 | REJECTED | Leave request has been rejected |
 | CANCELLED | Leave request has been cancelled |
@@ -37,15 +38,16 @@ Canonical enums defined in `src/shared/types/leave.enums.ts` (Phase 1).
 | Value | Description |
 |-------|-------------|
 | ACTIVE | Policy is currently in effect |
-| INACTIVE | Policy is not in effect |
-| ARCHIVED | Policy has been archived |
+| SUPERSEDED | Policy has been replaced by a newer version |
+| REVOKED | Policy has been explicitly revoked |
 
 ### BalanceStatus
 
 | Value | Description |
 |-------|-------------|
 | ACTIVE | Balance is active for the current fiscal year |
-| EXPIRED | Balance has expired |
+| EXHAUSTED | Balance has been fully consumed |
+| FROZEN | Balance is frozen (e.g. employee on long-term leave) |
 
 ## leave
 
