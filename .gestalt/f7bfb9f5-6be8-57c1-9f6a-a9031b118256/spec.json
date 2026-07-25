@@ -1,0 +1,171 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository",
+      "unit-tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The LeavePolicy model file exports a LeavePolicy interface and a CreateLeavePolicyDto, and imports LeaveType from the Phase 3 leave-type model (establishing the cross-entity dependency without redefining LeaveType).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The leave module barrel (index.ts) re-exports LeavePolicy, CreateLeavePolicyDto, ILeavePolicyRepository, and LeavePolicyRepository alongside the existing Phase 3 LeaveType exports, so downstream phases can import all leave types from the single public entry point.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository exposes all six operations \u2014 findByLeaveTypeId, findById, findAll, create, update, softDelete \u2014 and each persists/queries against the leave_policies table through the shared pg pool (no direct DB access outside the repository, satisfying GP-001).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "create persists a new leave_policies row and returns the inserted LeavePolicy; when requiresManagerApproval or isActive are omitted from the DTO they default to true.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findById and findByLeaveTypeId return null / empty array respectively when no matching non-deleted row exists; findAll returns an empty array when the table has no non-deleted rows.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "update with an empty partial DTO returns the existing non-deleted row without issuing an UPDATE; update on a non-existent id returns null; update on a deleted row returns null (deleted_at IS NULL guard).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "softDelete sets deleted_at (and updated_at) and returns true when a row was affected, false when the id does not exist or is already soft-deleted; it does not physically remove the row.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests in tests/unit/modules/leave/leave-policy.repository.test.ts mock the shared pg pool and cover every repository method including happy-path, not-found/null, empty-array, optional-field-default, and no-fields-update cases; the suite passes under `npx jest`.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access must go through the repository pattern (GP-001 / no-direct-db-outside-repository); the LeavePolicyRepository is the only component that issues SQL against leave_policies.",
+    "Strict TypeScript with no implicit any and strict null checks; use unknown with type guards instead of any (HARNESS no-any rule).",
+    "Modules import from each other ONLY through their declared public entry point (index.ts); the leave-policy model may import LeaveType from the sibling leave-type model within the same module, but external consumers must use the barrel.",
+    "No circular dependencies between modules; the leave-policy model/repository may depend on the leave-type model and shared db connection, but nothing in those dependencies may import back from leave-policy.",
+    "Unit tests must mock the shared pg pool (src/shared/db/connection) rather than hitting a real database; no integration/DB connectivity is required for this phase's tests."
+  ],
+  "outOfScope": [
+    "LeaveBalance model and repository (Phase 5) \u2014 not created or referenced in this phase beyond the barrel not yet exporting it.",
+    "LeaveRequest model and repository (Phase 6) and the LeaveStatus-driven request lifecycle.",
+    "AuditLog model/repository and audit recording (Phase 7); this phase performs no audit writes even though create/update/softDelete are state-changing (audit is wired in the service phase).",
+    "Leave service, controller, and Fastify routes (Phases 8\u20139) \u2014 no HTTP surface, Zod validation, or RBAC enforcement belongs in this repository/model phase.",
+    "Database migrations / DDL for the leave_policies table; this phase assumes the table schema exists and only interacts via the pool."
+  ],
+  "ambiguities": [
+    {
+      "description": "The reconciled architecture (.gestalt/architecture/reconciled.json) models accrualRate, maxAccumulation, and minimumNoticeDays as `number | null` (nullable), but the PLAN.md phase spec and the existing implementation declare them as non-nullable `number`. It is unclear whether these fields must accept null in this phase.",
+      "options": [
+        "Keep non-nullable number as specified in PLAN.md and the existing model (treat the architecture's nullable variant as a design-time allowance not enforced now).",
+        "Align the model to number | null to match the reconciled architecture, requiring update of the interface, DTO, and tests."
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "A LeavePolicy is logically deleted, never physically removed: softDelete sets deleted_at and all read operations (findById, findByLeaveTypeId, findAll) exclude rows where deleted_at IS NOT NULL."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "A LeavePolicy is associated with exactly one LeaveType via leaveTypeId; the model imports the LeaveType type from the Phase 3 leave-type model to express this relationship, and findByLeaveTypeId returns all non-deleted policies for that leave type."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "On create, requiresManagerApproval and isActive default to true when omitted from the DTO; on update, only fields explicitly present in the partial DTO are modified and updated_at is refreshed."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "findByLeaveTypeId",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns LeavePolicy[] (empty array when none match); never throws on no-match. Delegates to the shared pg pool."
+    },
+    {
+      "operation": "findById",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns LeavePolicy | null (null when not found or soft-deleted); never throws on no-match."
+    },
+    {
+      "operation": "findAll",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns LeavePolicy[] of all non-deleted policies ordered by policy name (empty array when none); never throws on empty table."
+    },
+    {
+      "operation": "create",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Persists a new row and returns the created LeavePolicy; relies on the database to reject constraint violations (e.g., duplicate/invalid leave_type_id) which propagate as pg errors."
+    },
+    {
+      "operation": "update",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Accepts a partial DTO; with no fields provided returns the existing non-deleted row without an UPDATE; returns null when the id is absent or already deleted; otherwise returns the updated row."
+    },
+    {
+      "operation": "softDelete",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns boolean \u2014 true when a row was affected, false when the id does not exist or is already soft-deleted; never physically deletes."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The LeavePolicyRepository must follow the same structural pattern as the sibling LeaveTypeRepository: shared pg pool import, deleted_at IS NULL filtering on all reads, RETURNING * on create/update, dynamic field builder for update, softDelete via deleted_at = NOW() returning a boolean from rowCount, and ORDER BY the name column on findAll.",
+      "referencePath": "src/modules/leave/leave-type.repository.ts"
+    },
+    {
+      "requirement": "The LeavePolicy model must import the LeaveType interface from the Phase 3 leave-type model (not redefine it), establishing the leaveTypeId \u2192 LeaveType relationship consistently with how LeaveType itself imports LeaveTypeCode from shared types.",
+      "referencePath": "src/modules/leave/leave-type.model.ts"
+    },
+    {
+      "requirement": "All repository SQL must execute through the shared pg pool exported from src/shared/db/connection.ts; no separate Pool instantiation or direct pg client usage is permitted in the leave module.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "The leave-policy repository test must mirror the leave-type repository test's mocking strategy: jest.mock the shared db connection module to provide { pool: { query: jest.fn() } }, reset the mock in beforeEach, and assert both return values and the exact SQL/parameters passed to pool.query.",
+      "referencePath": "tests/unit/modules/leave/leave-type.repository.test.ts"
+    },
+    {
+      "requirement": "The leave barrel must re-export the LeavePolicy model and repository symbols alongside (not replacing) the existing Phase 3 LeaveType exports, preserving the single public entry point convention for the leave module.",
+      "referencePath": "src/modules/leave/index.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/leave/leave-type.model.ts (Phase 3)",
+      "why": "Provides the LeaveType interface imported by the LeavePolicy model to type the leaveTypeId relationship."
+    },
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "Provides the shared pg Pool used by LeavePolicyRepository for all leave_policies queries; the repository must not create its own pool."
+    },
+    {
+      "target": "src/modules/leave/index.ts",
+      "why": "The leave module barrel that downstream phases (LeaveBalance in Phase 5, LeaveService in Phase 8) import LeavePolicy and its repository from; this phase extends it with the new exports."
+    }
+  ]
+}
