@@ -13,26 +13,49 @@ The architecture is modular, with a clear separation of concerns between models,
 - Frontend: React Native
 - Database: PostgreSQL
 
-## Module structure
+## Module structure (current)
 
 ```
-src/modules/leave/leave.{model,repository,service,controller,routes}.ts
-src/modules/balance/balance.{model,repository,service,controller,routes}.ts
-src/modules/employee/employee.{model,repository,service,controller,routes}.ts
-src/modules/policy/policy.{model,repository,service,controller,routes}.ts
-src/modules/notification/notification.{model,repository,service,controller,routes}.ts
-src/modules/LeaveStatus/    — LeaveStatus module
-src/modules/BaseEntity/    — BaseEntity module
-src/modules/LeaveRequest/    — LeaveRequest module
-src/modules/LeaveType/    — LeaveType module
-src/modules/LeavePolicy/    — LeavePolicy module
-src/modules/AuditLog/    — AuditLog module
-src/modules/AuditRecord/    — AuditRecord module
-src/modules/AuditServiceInterface/    — AuditServiceInterface module
-src/shared/db connection.ts
-src/shared/base repository.ts
-src/shared/error types.ts
+src/
+  app.ts                              — Fastify app assembly
+  index.ts                            — server entry point
+  shared/
+    db/connection.ts                  — PostgreSQL pool (pg)
+    types/index.ts                    — shared enums & types
+  modules/
+    employee/
+      employee.model.ts               — Employee interface + CreateEmployeeDto
+      employee.repository.ts          — IEmployeeRepository + Pg impl
+      index.ts                        — barrel export
+    status/
+      status.model.ts                 — SystemStatus interface
+      status.service.interface.ts     — IStatusService
+      status.service.ts               — StatusService impl
+      index.ts                        — barrel export
+    uptime/
+      uptime.model.ts                 — UptimeStatus interface
+      uptime.service.interface.ts     — IUptimeService
+      uptime.service.ts               — UptimeService impl
+      uptime.routes.ts                — Fastify plugin (GET /uptime)
+      index.ts                        — barrel export
+tests/
+  unit/
+    shared/types/index.test.ts        — enum/value tests
+    modules/employee/
+      employee.repository.test.ts     — repository tests (mocked pool)
 ```
+
+### Shared types (`src/shared/types/index.ts`)
+
+- `LeaveTypeCode` enum: 'annual' | 'sick' | 'emergency' | 'unpaid' | 'maternity' | 'paternity'
+- `LeaveStatus` enum: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED'
+- `EmploymentStatus` type: 'ACTIVE' | 'INACTIVE' | 'TERMINATED'
+
+### Employee module (`src/modules/employee/`)
+
+- **Employee** interface: id, employeeNumber, firstName, lastName, email, managerId, department, hireDate, terminationDate, employmentStatus, createdAt, updatedAt, deletedAt
+- **IEmployeeRepository**: findById, findAll, findByManagerId, create, update, softDelete
+- **EmployeeRepository**: concrete PostgreSQL implementation using the shared pool
 
 ## Key patterns
 
@@ -43,14 +66,21 @@ src/shared/error types.ts
 ## Dependency rules
 
 - Modules import from each other ONLY through their declared public
-  entry point (`index.ts`, `__init__.py`, package root — whatever the
-  stack uses)
+  entry point (`index.ts`)
 - All database access goes through a repository layer — no inline SQL
   / ORM calls in route handlers or business logic
 - No circular dependencies between modules
 
+## Implementation progress
+
+The leave management system is being built incrementally per `PLAN.md`:
+
+- **Phase 1** ✅ — Shared enums and base types (`src/shared/types/index.ts`)
+- **Phase 2** ✅ — Employee model and repository (`src/modules/employee/`)
+- **Phases 3–9** — Planned (leave type, policy, balance, request, audit, service, controller/routes)
+
 <!-- gestalt:architecture feature=bfdb6110-c37d-4c1b-a01f-6fca50944d25 START -->
-## Leave Management Module
+## Leave Management Module (design)
 
 ### Overview
 
@@ -74,12 +104,12 @@ The Leave Management module enables employees to apply for annual, sick, emergen
 - **BR-005** — Rejection requires a non-empty `rejectionReason`.
 - **BR-006** — On approval, `LeaveBalance.usedDays` is incremented and `remainingDays` recalculated atomically within the same transaction.
 
-### Module Structure
+### Planned Module Structure
 
 ```
 src/modules/
 ├── base-entity/          # BaseEntity model (id, createdAt, updatedAt)
-├── employee/             # Employee model + repository interface
+├── employee/             # ✅ Employee model + repository (Phase 2)
 ├── leave-type/           # LeaveType model + repository interface
 ├── leave-status/         # LeaveStatus enum (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED)
 ├── leave-policy/         # LeavePolicy model + repository interface
