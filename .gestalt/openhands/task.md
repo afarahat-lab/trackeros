@@ -1,12 +1,12 @@
-# Implement this phase: Phase 2: LeaveType model and repository
+# Implement this phase: Phase 3: LeavePolicy model and repository
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/022f5981-2f89-498b-906d-0f2e5bf44abd/2`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/022f5981-2f89-498b-906d-0f2e5bf44abd/3`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create src/modules/leaveType/leaveType.model.ts with the LeaveType interface (id: string, code: LeaveTypeCode, label: string, description: string, requiresDocumentation: boolean, maxConsecutiveDays: number | null, isPaid: boolean, status: LeaveTypeStatus, createdAt: Date, updatedAt: Date). Import LeaveTypeCode from src/shared/types/leave.enums.ts (Phase 1). Create src/modules/leaveType/leaveType.repository.ts with ILeaveTypeRepository interface and LeaveTypeRepository class using the pg Pool from src/shared/db/connection.ts. Methods: findAll, findById, findByCode. Create src/modules/leaveType/index.ts barrel export. Include Jest unit tests in tests/unit/modules/leaveType/leaveType.repository.test.ts mocking the pg pool. This phase depends on src/shared/types/leave.enums.ts from Phase 1 — read it before generating any code that references its types.
+Create src/modules/leavePolicy/leavePolicy.model.ts with the LeavePolicy interface (id: string, leaveTypeId: string, name: string, entitlementDaysPerYear: number, maxCarryForwardDays: number, minNoticeDays: number, maxConsecutiveDays: number | null, requiresApproval: boolean, effectiveFrom: Date, effectiveTo: Date | null, status: PolicyStatus, createdAt: Date, updatedAt: Date). Import PolicyStatus from src/shared/types/leave.enums.ts (Phase 1). Create src/modules/leavePolicy/leavePolicy.repository.ts with ILeavePolicyRepository interface and LeavePolicyRepository class using the pg Pool from src/shared/db/connection.ts. Methods: findAll, findById, findByLeaveTypeId, findActiveByLeaveTypeId. Create src/modules/leavePolicy/index.ts barrel export. Include Jest unit tests in tests/unit/modules/leavePolicy/leavePolicy.repository.test.ts mocking the pg pool. This phase depends on src/shared/types/leave.enums.ts from Phase 1 — read it before generating any code that references PolicyStatus.
 
 ## Project stack
 Before writing code, read `HARNESS.json` in the working directory to learn the project's language, framework, and test runner, and follow the existing conventions in the repository. Read `docs/ARCHITECTURE.md` and `PLAN.md` if present.
