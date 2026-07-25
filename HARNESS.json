@@ -78,7 +78,7 @@
   },
   "_comment_verification": "MECHANICAL COMPILE GATE: run in the code-agent work dir before commit; a non-zero exit blocks the commit + routes to self-heal so a compile/type error never reaches CI. Installs deps (clones carry no node_modules), guards on source presence so an empty phase exits 0.",
   "verification": {
-    "command": "npm install --no-audit --no-fund --silent && if find src -name '*.ts' -not -name '*.spec.ts' -not -name '*.test.ts' -not -name '*.d.ts' -type f | grep -q .; then npm run build && npx jest --passWithNoTests; else echo 'no source files to verify'; fi",
+    "command": "npm install --include=dev --no-audit --no-fund && if find src -name '*.ts' -not -name '*.spec.ts' -not -name '*.test.ts' -not -name '*.d.ts' -type f | grep -q .; then npm run build && npx jest --passWithNoTests; else echo 'no source files to verify'; fi",
     "timeoutSeconds": 900
   },
   "pipeline": {
