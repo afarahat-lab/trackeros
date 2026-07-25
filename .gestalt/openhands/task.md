@@ -1,30 +1,40 @@
-# Implement this phase: Phase 5: LeaveBalance model and repository
+# Fix specific quality-gate violations: Phase 5: LeaveBalance model and repository
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/bfdb6110-c37d-4c1b-a01f-6fca50944d25/5`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/fix/bfdb6110-c37d-4c1b-a01f-6fca50944d25/5/1`. Do not clone anything; work only in this directory.
 
-## What to build
-(no phase architecture provided — infer from the success criteria below)
+You are fixing SPECIFIC violations the quality gate found in EXISTING, already-committed files. Make ONLY the targeted edits listed below — do NOT refactor, regenerate, or change anything else.
 
-## Success criteria
-Create src/modules/leave/leave-balance.model.ts with the LeaveBalance interface (id, employeeId, leaveTypeId, policyId, entitlementDays, usedDays, pendingDays, accruedDays, carriedForwardDays, expiresAt, year, createdAt, updatedAt) and CreateLeaveBalanceDto.
+The files ALREADY EXIST. You MUST edit them in place with the `str_replace_editor` tool. Reading or viewing a file is NOT sufficient — you have NOT finished until you have edited EVERY file listed below.
 
-Create src/modules/leave/leave-balance.repository.ts with ILeaveBalanceRepository interface and LeaveBalanceRepository class using the pg pool from src/shared/db/connection.ts. Implement findByEmployeeId, findByEmployeeIdAndLeaveTypeId, findByEmployeeIdAndYear, create, update, upsert methods.
+## Required edits
 
-Update src/modules/leave/index.ts to also re-export LeaveBalance, CreateLeaveBalanceDto, ILeaveBalanceRepository, LeaveBalanceRepository.
+### Coherent change 1 — apply as ONE atomic edit across ALL sites below
 
-Include Jest unit tests in tests/unit/modules/leave/leave-balance.repository.test.ts mocking the pg pool. This phase depends on src/modules/leave/leave-type.model.ts (Phase 3), src/modules/leave/leave-policy.model.ts (Phase 4), and src/shared/db/connection.ts (already exists).
+Unifying change (do this now): Add both `findById(id: string): Promise<LeaveBalance | null>` and `softDelete(id: string): Promise<boolean>` to `ILeaveBalanceRepository` and implement them in `LeaveBalanceRepository` following the established pattern in `leave-type.repository.ts`; refactor the `update` method's empty-fields fallback to delegate to `this.findById(id)` instead of inlining a raw `pool.query`.
 
-## Project stack
-Before writing code, read `HARNESS.json` in the working directory to learn the project's language, framework, and test runner, and follow the existing conventions in the repository. Read `docs/ARCHITECTURE.md` and `PLAN.md` if present.
+The sites below are the SAME underlying issue. Fixing some but not others leaves the code incoherent and the quality gate WILL re-flag it — apply the one change above consistently to EVERY site:
 
-## Verify before you finish (MANDATORY)
-The code you write MUST compile and its tests MUST pass — a compilation or type error must NEVER be left for CI to find. Before you declare this task done:
-- Read the project's build / type-check / test commands from `package.json` (scripts) and `HARNESS.json`.
-- Install dependencies if they are not already installed, then RUN the type-check / build (e.g. `npm run build` or `tsc --noEmit`) AND the tests (e.g. `npm test`) for the files this phase touches.
-- FIX every compilation error, type error, and failing test you introduced — including in test files — and re-run until they pass.
-- Only when the build and the tests pass may you consider the task complete. If a dependency install genuinely cannot be made to work, say so explicitly in your final message rather than declaring success on unverified code.
+- Site 1
+File: src/modules/leave/leave-balance.repository.ts
+Line: 4
+Offending code: `export interface ILeaveBalanceRepository {`
+Rule violated: review/architecture
+Action (do this now): Edit `src/modules/leave/leave-balance.repository.ts` at line 4 in place to fix the `review/architecture` violation.
+What the quality gate found — apply this: [review/architecture] Missing `softDelete` method. Every existing repository in the project (EmployeeRepository, LeaveTypeRepository, LeavePolicyRepository) declares and implements `softDelete(id: string): Promise<boolean>`. The new ILeaveBalanceRepository omits it, yet all its SQL queries filter on `deleted_at IS NULL`, implying the column exists and soft-delete semantics are expected.
+
+- Site 2
+File: src/modules/leave/leave-balance.repository.ts
+Line: 4
+Offending code: `export interface ILeaveBalanceRepository {`
+Rule violated: review/architecture
+Action (do this now): Edit `src/modules/leave/leave-balance.repository.ts` at line 4 in place to fix the `review/architecture` violation.
+What the quality gate found — apply this: [review/architecture] Missing `findById` method. Every existing repository in the project (EmployeeRepository, LeaveTypeRepository, LeavePolicyRepository) declares `findById(id: string): Promise<T | null>`. The new ILeaveBalanceRepository omits it, yet the `update` method's empty-fields fallback (line 82-85) inlines a raw `pool.query` for the same purpose instead of delegating to a `findById` method, breaking the established pattern.
+
+Then check the rest of these files (and the surrounding module) for ANY OTHER occurrence of the same pattern beyond the specific lines listed above, and apply the same change there too — do NOT limit the fix to only the enumerated sites.
 
 ## Constraints (mandatory)
-- Write and modify source files ONLY. Do NOT run `git commit`, `git push`, `git add`, or any other git command. The platform handles all git operations. (Running the build / type-check / tests above is expected and encouraged — that is NOT a git operation.)
-- Do not create a new repository or change the git remote.
-- Stay within the scope of this phase; do not implement deferred/later work.
+- Edit ONLY the files listed above; do not add, delete, or rename files.
+- Do not modify imports unless a required change above needs it.
+- Do NOT run `git commit`, `git push`, `git add`, or any git command. The platform handles all git operations.
+- Do not run tests or build commands.
+- When all the listed edits are made, stop.

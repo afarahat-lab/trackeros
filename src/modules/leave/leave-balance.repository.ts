@@ -5,9 +5,11 @@ export interface ILeaveBalanceRepository {
   findByEmployeeId(employeeId: string): Promise<LeaveBalance[]>;
   findByEmployeeIdAndLeaveTypeId(employeeId: string, leaveTypeId: string): Promise<LeaveBalance | null>;
   findByEmployeeIdAndYear(employeeId: string, year: number): Promise<LeaveBalance[]>;
+  findById(id: string): Promise<LeaveBalance | null>;
   create(dto: CreateLeaveBalanceDto): Promise<LeaveBalance>;
   update(id: string, dto: Partial<CreateLeaveBalanceDto>): Promise<LeaveBalance | null>;
   upsert(dto: CreateLeaveBalanceDto): Promise<LeaveBalance>;
+  softDelete(id: string): Promise<boolean>;
 }
 
 export class LeaveBalanceRepository implements ILeaveBalanceRepository {
@@ -33,6 +35,14 @@ export class LeaveBalanceRepository implements ILeaveBalanceRepository {
       [employeeId, year]
     );
     return result.rows;
+  }
+
+  async findById(id: string): Promise<LeaveBalance | null> {
+    const result = await pool.query<LeaveBalance>(
+      'SELECT * FROM leave_balances WHERE id = $1 AND deleted_at IS NULL',
+      [id]
+    );
+    return result.rows[0] ?? null;
   }
 
   async create(dto: CreateLeaveBalanceDto): Promise<LeaveBalance> {
@@ -78,11 +88,7 @@ export class LeaveBalanceRepository implements ILeaveBalanceRepository {
     if (dto.year !== undefined) addField('year', dto.year);
 
     if (fields.length === 0) {
-      const result = await pool.query<LeaveBalance>(
-        'SELECT * FROM leave_balances WHERE id = $1 AND deleted_at IS NULL',
-        [id]
-      );
-      return result.rows[0] ?? null;
+      return this.findById(id);
     }
 
     fields.push('updated_at = NOW()');
@@ -93,6 +99,14 @@ export class LeaveBalanceRepository implements ILeaveBalanceRepository {
       values
     );
     return result.rows[0] ?? null;
+  }
+
+  async softDelete(id: string): Promise<boolean> {
+    const result = await pool.query(
+      'UPDATE leave_balances SET deleted_at = NOW(), updated_at = NOW() WHERE id = $1 AND deleted_at IS NULL',
+      [id]
+    );
+    return (result.rowCount ?? 0) > 0;
   }
 
   async upsert(dto: CreateLeaveBalanceDto): Promise<LeaveBalance> {
