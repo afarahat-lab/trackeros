@@ -139,7 +139,7 @@ phases:
           - id: context
             type: agent
             agent: context-agent
-            inputs: [spec, commit_sha]
+            inputs: [spec, commit_sha, feature_branch]
             output: { name: context_files, channel: files }
           # Deploy + gate — open PR → poll CI → GATE (after CI, ADR-041) → merge.
           # create_pr / poll_ci / gate are VERDICT nodes: a non-ok result RAISES a
