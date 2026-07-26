@@ -59,10 +59,10 @@ The leave management module enables employees to apply for annual, sick, and eme
 ### Domain Entities
 
 - **LeaveRequest** — central aggregate representing an employee's leave application. Lifecycle: DRAFT → SUBMITTED → APPROVED/REJECTED/CANCELLED. Tracks approver, rejector, canceller, and timestamps.
-- **LeaveType** — enum of leave categories (`annual`, `sick`, `emergency`, `unpaid`, `maternity`, `paternity`). Feature scope covers annual, sick, emergency; others reserved for future.
+- **LeaveType** — enum of leave categories (`annual`, `sick`, `emergency`, `unpaid`, `maternity`, `paternity`). Stored as a check-constrained varchar on `leave_policies.leave_type` (no separate `leave_types` table).
 - **LeaveRequestStatus** — enum of lifecycle states (`DRAFT`, `SUBMITTED`, `APPROVED`, `REJECTED`, `CANCELLED`).
 - **LeavePolicy** — defines entitlement rules (days, accrual, notice period, approval requirement) per leave type. Lifecycle: ACTIVE, INACTIVE.
-- **LeaveBalance** — tracks an employee's entitlement, used, and remaining days per leave type per fiscal year. Lifecycle: ACTIVE, EXHAUSTED, FROZEN.
+- **LeaveBalance** — tracks an employee's entitlement, used, and accrued days per leave type per year. Lifecycle: ACTIVE, EXHAUSTED, FROZEN.
 - **Employee** — organizational actor with manager relationship and employment status (ACTIVE, INACTIVE, TERMINATED).
 
 ### Module Boundaries
@@ -87,17 +87,61 @@ The leave management module enables employees to apply for annual, sick, and eme
 - `employee` depends on `audit`
 - `notification` depends on `employee`
 
-### Conceptual Data Model
+### Database Schema (as built — migrations 001–003)
 
-All tables are conceptual; the code agent generates migrations.
+Migrations are managed via Knex (`knexfile.ts` at project root, using `DATABASE_URL` from env). All tables use UUID primary keys with `knex.fn.uuid()` defaults and timestamptz for temporal columns.
 
-- **leave_types** (id, name, description, is_active, created_at, updated_at) — PK id; unique index on name; index on is_active.
-- **leave_policies** (id, policy_name, leave_type_id, entitlement_days, accrual_rate, max_accumulation, minimum_notice_days, requires_manager_approval, is_active, created_at, updated_at) — PK id; FK leave_type_id → leave_types.id; indexes on leave_type_id, is_active.
-- **leave_requests** (id, employee_id, leave_type_id, start_date, end_date, reason, status, approved_by, approved_at, rejected_by, rejected_at, rejection_reason, cancelled_by, cancelled_at, created_at, updated_at) — PK id; FKs employee_id → employees.id, leave_type_id → leave_types.id, approved_by → employees.id, rejected_by → employees.id, cancelled_by → employees.id; indexes on employee_id, status, leave_type_id, (start_date, end_date), approved_by.
-- **leave_balances** (id, employee_id, leave_type_id, policy_id, fiscal_year, total_entitlement, used_days, remaining_days, status, created_at, updated_at) — PK id; FKs employee_id → employees.id, leave_type_id → leave_types.id, policy_id → leave_policies.id; indexes on employee_id, (employee_id, fiscal_year), leave_type_id, policy_id.
-- **employees** (id, employee_number, first_name, last_name, email, manager_id, department, hire_date, termination_date, employment_status, created_at, updated_at, deleted_at) — PK id; FK manager_id → employees.id; unique indexes on employee_number, email; indexes on manager_id, employment_status, department.
-- **audit_logs** (id, entity_type, entity_id, action, old_values, new_values, performed_by, performed_at, ip_address, user_agent, created_at) — PK id; FK performed_by → employees.id; indexes on (entity_type, entity_id), performed_by, action, performed_at.
-- **notifications** (id, recipient_id, type, title, message, related_entity_type, related_entity_id, status, created_at, read_at) — PK id; FK recipient_id → employees.id; indexes on recipient_id, status, (related_entity_type, related_entity_id).
+**`leave_policies`** (migration 001)
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | uuid | PK, default uuid |
+| policy_name | varchar | NOT NULL |
+| leave_type | varchar | NOT NULL, CHECK IN ('annual','sick','emergency','unpaid','maternity','paternity') |
+| entitlement_days | integer | NOT NULL |
+| accrual_rate | decimal | nullable |
+| max_accumulation | decimal | nullable |
+| minimum_notice_days | integer | nullable |
+| requires_manager_approval | boolean | NOT NULL, DEFAULT true |
+| is_active | boolean | NOT NULL, DEFAULT true |
+| created_at | timestamptz | NOT NULL |
+| updated_at | timestamptz | NOT NULL |
+
+Note: `leave_type` is an inline check-constrained varchar — there is no separate `leave_types` table. The FK from `leave_requests` and `leave_balances` references `leave_policies.id`.
+
+**`leave_requests`** (migration 002)
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | uuid | PK, default uuid |
+| employee_id | uuid | NOT NULL |
+| leave_type_id | uuid | NOT NULL, FK → leave_policies.id |
+| start_date | date | NOT NULL |
+| end_date | date | NOT NULL |
+| reason | text | nullable |
+| status | varchar | NOT NULL, DEFAULT 'DRAFT', CHECK IN ('DRAFT','SUBMITTED','APPROVED','REJECTED','CANCELLED') |
+| approved_by | uuid | nullable |
+| approved_at | timestamptz | nullable |
+| rejected_by | uuid | nullable |
+| rejected_at | timestamptz | nullable |
+| rejection_reason | text | nullable |
+| cancelled_by | uuid | nullable |
+| cancelled_at | timestamptz | nullable |
+| created_at | timestamptz | NOT NULL |
+| updated_at | timestamptz | NOT NULL |
+
+**`leave_balances`** (migration 003)
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | uuid | PK, default uuid |
+| employee_id | uuid | NOT NULL |
+| leave_type_id | uuid | NOT NULL, FK → leave_policies.id |
+| entitlement_days | decimal | NOT NULL |
+| used_days | decimal | NOT NULL, DEFAULT 0 |
+| accrued_days | decimal | NOT NULL, DEFAULT 0 |
+| year | integer | NOT NULL |
+| created_at | timestamptz | NOT NULL |
+| updated_at | timestamptz | NOT NULL |
+
+Unique constraint on `(employee_id, leave_type_id, year)`.
 
 ### REST API Surface
 
@@ -137,12 +181,17 @@ All tables are conceptual; the code agent generates migrations.
 4. **Validation & Notification** — `leave-validation`, `notification` (depends on Phases 1–3; can be parallel).
 5. **Orchestration** — `leave-request` (depends on all prior phases; exposes public API).
 
+### Implementation Progress
+
+- ✅ **Phase 1 (Migrations)** — `knexfile.ts` + migrations 001–003 created. Tables `leave_policies`, `leave_requests`, `leave_balances` defined with UUID PKs, check constraints, foreign keys, and unique constraints. All migrations include `up` and `down` functions.
+
 ### Stack Compliance
 
 - Language: TypeScript (Node 20)
 - Framework: Fastify (REST API)
 - Frontend: React Native (mobile client)
 - Database: PostgreSQL (via `pg` Pool at `src/shared/db/connection.ts`)
+- Migrations: Knex (`knexfile.ts` at project root, TypeScript migrations in `migrations/`)
 - Architecture: modular-monolith with clear layer separation (domain, application, infrastructure, presentation)
 - Cross-cutting: audit (GP-002), RBAC (GP-005), input validation (GP-003)
 <!-- gestalt:architecture feature=6f64b552-c5b8-42bc-86fa-01fa08ab4abe END -->
