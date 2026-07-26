@@ -11,8 +11,8 @@ export async function up(knex: Knex): Promise<void> {
     table.integer('minimum_notice_days').nullable();
     table.boolean('requires_manager_approval').notNullable().defaultTo(true);
     table.boolean('is_active').notNullable().defaultTo(true);
-    table.timestamp('created_at', { useTz: true }).notNullable();
-    table.timestamp('updated_at', { useTz: true }).notNullable();
+    table.timestamp('created_at', { useTz: true }).notNullable().defaultTo(knex.fn.now());
+    table.timestamp('updated_at', { useTz: true }).notNullable().defaultTo(knex.fn.now());
   });
 
   await knex.raw(`

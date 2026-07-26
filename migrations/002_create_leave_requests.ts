@@ -16,8 +16,8 @@ export async function up(knex: Knex): Promise<void> {
     table.text('rejection_reason').nullable();
     table.uuid('cancelled_by').nullable();
     table.timestamp('cancelled_at', { useTz: true }).nullable();
-    table.timestamp('created_at', { useTz: true }).notNullable();
-    table.timestamp('updated_at', { useTz: true }).notNullable();
+    table.timestamp('created_at', { useTz: true }).notNullable().defaultTo(knex.fn.now());
+    table.timestamp('updated_at', { useTz: true }).notNullable().defaultTo(knex.fn.now());
 
     table.foreign('leave_type_id').references('id').inTable('leave_policies');
   });
