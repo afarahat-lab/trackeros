@@ -20,6 +20,7 @@ src/modules/uptime/uptime.{model,service.interface,service,routes}.ts
 src/modules/status/status.{model,service.interface,service}.ts
 src/modules/leave/index.ts
 src/modules/leave/leave.model.ts
+src/modules/leave/leave.repository.ts
 src/shared/db/connection.ts
 ```
 
@@ -174,6 +175,7 @@ Unique constraint on `(employee_id, leave_type_id, year)`.
 
 - ✅ **Phase 1 (Migrations)** — `knexfile.ts` + migrations 001–003 created. Tables `leave_policies`, `leave_requests`, `leave_balances` defined with UUID PKs, check constraints, foreign keys, and unique constraints. All migrations include `up` and `down` functions.
 - ✅ **Phase 2 (Domain Model Types)** — `src/modules/leave/leave.model.ts` defines all domain types: `LeaveType` (6-value literal union), `LeaveRequestStatus` (5-value literal union), `LeavePolicy`, `LeaveRequest`, `LeaveBalance`, `CreateLeaveRequestDto`, and `UpdateLeaveRequestStatusDto` interfaces. Barrel export via `src/modules/leave/index.ts`. Unit tests in `tests/unit/modules/leave/leave.model.test.ts` verify type correctness and optional/nullable field handling.
+- ✅ **Phase 3 (Leave Repository)** — `src/modules/leave/leave.repository.ts` implements `ILeaveRepository` interface and `LeaveRepository` class using the pg Pool from `src/shared/db/connection.ts`. Eight methods: `findById`, `findByEmployeeId`, `findByStatus`, `create` (INSERT with DRAFT status), `updateStatus` (switch on APPROVED/REJECTED/CANCELLED/fallback, each setting the appropriate reviewer fields and timestamps), `getBalance`, `upsertBalance` (INSERT ON CONFLICT UPDATE), and `decrementBalance` (increments used_days). Constructor accepts an optional pg Pool (defaults to shared pool). Barrel export updated in `src/modules/leave/index.ts`. Unit tests in `tests/unit/modules/leave/leave.repository.test.ts` with 16 test cases covering all methods, null/empty results, and status-specific update behavior.
 
 ### Stack Compliance
 
