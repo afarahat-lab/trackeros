@@ -81,7 +81,7 @@ tests/
 - **LeavePolicyRepository**: concrete PostgreSQL implementation using the shared pool
 - **LeaveBalance** interface: id, employeeId, leaveTypeId, policyId, entitlementDays, usedDays, pendingDays, accruedDays, carriedForwardDays, expiresAt, year, createdAt, updatedAt
 - **CreateLeaveBalanceDto**: employeeId, leaveTypeId, policyId, entitlementDays, usedDays?, pendingDays?, accruedDays?, carriedForwardDays?, expiresAt?, year
-- **ILeaveBalanceRepository**: findByEmployeeId, findByEmployeeIdAndLeaveTypeId, findByEmployeeIdAndYear, create, update, upsert
+- **ILeaveBalanceRepository**: findByEmployeeId, findByEmployeeIdAndLeaveTypeId, findByEmployeeIdAndYear, findById, create, update, upsert, softDelete
 - **LeaveBalanceRepository**: concrete PostgreSQL implementation using the shared pool
 
 ## Key patterns
