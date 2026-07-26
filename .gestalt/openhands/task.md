@@ -1,23 +1,20 @@
-# Implement this phase: Phase 4: Shared error types
+# Implement this phase: Phase 5: Auth middleware and JWT utilities
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/6f64b552-c5b8-42bc-86fa-01fa08ab4abe/4`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/6f64b552-c5b8-42bc-86fa-01fa08ab4abe/5`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create shared error type classes used across modules. No dependencies on prior phases.
+Create shared authentication middleware and JWT utilities. No dependencies on prior leave phases.
 
 Files to create:
-- `src/shared/errorTypes.ts` — define typed error classes:
-  - `NotFoundError` extending Error with a `resourceName: string` and `resourceId: string` properties
-  - `ValidationError` extending Error with a `details: string[]` property for validation messages
-  - `ConflictError` extending Error with a `resourceName: string` property (for duplicate/state conflict scenarios)
-  - `UnauthorizedError` extending Error (for auth failures)
-  - `ForbiddenError` extending Error (for RBAC failures)
-  Each class should set `this.name` to the class name and capture the stack trace properly.
+- `src/shared/auth/jwt.ts` — JWT utility functions: `verifyToken(token: string): Promise<{ userId: string; role: string }>` using jsonwebtoken, `extractTokenFromHeader(authHeader: string | undefined): string | null` to parse Bearer token. Read JWT_SECRET from process.env.
+- `src/shared/auth/middleware.ts` — Fastify preHandler middleware: `authenticate` that extracts and verifies JWT, attaches `request.user = { userId, role }` to the request. Export a Fastify `preHandler` hook. Also export `requireRole(...roles: string[])` that returns a preHandler checking the user's role.
+- `src/shared/auth/types.ts` — augment Fastify's request type: declare module 'fastify' to add `user?: { userId: string; role: string }` to FastifyRequest.
+- `src/shared/auth/index.ts` — barrel export of jwt.ts, middleware.ts, and types.ts.
 
-Include Jest unit tests in `tests/unit/shared/errorTypes.test.ts` verifying each error class instantiates correctly and preserves its message and custom properties.
+Include Jest unit tests in `tests/unit/shared/auth/jwt.test.ts` and `tests/unit/shared/auth/middleware.test.ts`.
 
 ## Project stack
 Before writing code, read `HARNESS.json` in the working directory to learn the project's language, framework, and test runner, and follow the existing conventions in the repository. Read `docs/ARCHITECTURE.md` and `PLAN.md` if present.
