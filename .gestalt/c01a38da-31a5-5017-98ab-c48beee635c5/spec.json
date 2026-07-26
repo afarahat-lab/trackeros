@@ -1,0 +1,111 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared-error-types"
+    ],
+    "affectedLayers": [
+      "shared"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "All five error classes (NotFoundError, ValidationError, ConflictError, UnauthorizedError, ForbiddenError) extend Error and are exported from src/shared/errorTypes.ts, each setting this.name to its own class name.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "NotFoundError exposes readonly resourceName and resourceId string properties; ConflictError exposes readonly resourceName; ValidationError exposes readonly details as a string array \u2014 all preserved after instantiation with the values passed to the constructor.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Each error instance carries a defined stack trace that contains the class name, demonstrating Error.captureStackTrace was invoked (guarded so it does not throw on runtimes lacking the API).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The Jest unit test suite in tests/unit/shared/errorTypes.test.ts verifies every error class instantiates correctly, preserves its message and custom properties, and captures a stack trace \u2014 and the suite passes under the ts-jest node environment.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No use of `any` \u2014 typed error classes must use concrete types (string, string[]) for their custom properties, consistent with the no-any rule in HARNESS.json.",
+    "Error.captureStackTrace must be guarded (e.g. `if (Error.captureStackTrace)`) so the module does not throw on runtimes where the API is absent.",
+    "The module must compile under strict TypeScript (strict null checks, no implicit any) targeting ES2022/commonjs as configured in tsconfig.json.",
+    "This phase has zero dependencies on prior phases \u2014 errorTypes.ts must not import from any leave module or other domain code; it is a shared utility consumed by later phases."
+  ],
+  "outOfScope": [
+    "HTTP status mapping logic (404/400/409/401/403) \u2014 the error classes only define the types; controllers in Phase 7 perform the status mapping.",
+    "Consumption of these error classes by the leave service (Phase 6) or controller (Phase 7) \u2014 this phase only defines and tests the shared types.",
+    "Auth middleware and JWT utilities (Phase 5) \u2014 UnauthorizedError and ForbiddenError are defined here as types only; their enforcement via middleware is a later phase."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "NotFoundError",
+      "mustExistOrExtend": true,
+      "invariant": "Every instance is an Error subclass whose name is exactly 'NotFoundError' and whose resourceName and resourceId are immutable after construction."
+    },
+    {
+      "entity": "ValidationError",
+      "mustExistOrExtend": true,
+      "invariant": "Every instance is an Error subclass whose name is exactly 'ValidationError' and whose details array is immutable after construction."
+    },
+    {
+      "entity": "ConflictError",
+      "mustExistOrExtend": true,
+      "invariant": "Every instance is an Error subclass whose name is exactly 'ConflictError' and whose resourceName is immutable after construction."
+    },
+    {
+      "entity": "UnauthorizedError",
+      "mustExistOrExtend": true,
+      "invariant": "Every instance is an Error subclass whose name is exactly 'UnauthorizedError' with no custom properties beyond the Error message."
+    },
+    {
+      "entity": "ForbiddenError",
+      "mustExistOrExtend": true,
+      "invariant": "Every instance is an Error subclass whose name is exactly 'ForbiddenError' with no custom properties beyond the Error message."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "Constructing any of the five error classes with a message string (and class-specific payload) produces a throwable Error whose name and custom properties are set; construction never throws for valid string inputs.",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Construction itself does not raise; the resulting object is intended to be thrown by callers and caught at API boundaries."
+    },
+    {
+      "operation": "Error.captureStackTrace invocation during construction \u2014 must be guarded so that runtimes without the API do not throw; when available it captures the stack excluding the constructor frame.",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "If Error.captureStackTrace is undefined, construction proceeds normally without a stack-capture failure."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The five error classes and their custom properties must match the shared error-types table in docs/ARCHITECTURE.md: NotFoundError (resourceName, resourceId \u2192 404), ValidationError (details \u2192 400), ConflictError (resourceName \u2192 409), UnauthorizedError (\u2192 401), ForbiddenError (\u2192 403).",
+      "referencePath": "docs/ARCHITECTURE.md"
+    },
+    {
+      "requirement": "The test file must import all five error classes from the canonical module location src/shared/errorTypes.ts and verify instantiation, property preservation, and stack-trace capture for each \u2014 matching the existing test coverage.",
+      "referencePath": "src/shared/errorTypes.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "Leave service (Phase 6) \u2014 will throw NotFoundError, ConflictError, ForbiddenError, and ValidationError to signal domain rule violations.",
+      "why": "These typed errors are the canonical failure vocabulary the service layer uses for state-machine guards and ownership checks."
+    },
+    {
+      "target": "Leave controller (Phase 7) \u2014 will catch these typed errors and map them to HTTP status codes (404/400/409/401/403).",
+      "why": "The controller's try/catch error-mapping logic depends on instanceof checks against these exact class names."
+    },
+    {
+      "target": "Auth middleware (Phase 5) \u2014 will throw UnauthorizedError and ForbiddenError for authentication and RBAC failures.",
+      "why": "GP-005 (RBAC enforcement) and auth failures surface through these shared error types at API boundaries."
+    }
+  ]
+}
