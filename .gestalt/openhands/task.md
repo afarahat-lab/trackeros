@@ -1,20 +1,25 @@
-# Implement this phase: Phase 1: Database migrations for leave tables
+# Implement this phase: Phase 2: Leave domain model types
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/6f64b552-c5b8-42bc-86fa-01fa08ab4abe/1`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/6f64b552-c5b8-42bc-86fa-01fa08ab4abe/2`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the Knex configuration and database migrations for the leave management domain.
+Create the leave module domain model types. This phase has no dependencies on prior phases — it defines pure TypeScript types.
 
 Files to create:
-- `knexfile.ts` at project root — configure Knex to use the existing DATABASE_URL from `src/shared/db/connection.ts`. Use the pg client, TypeScript migrations, and point at a `migrations/` directory.
-- `migrations/001_create_leave_policies.ts` — create the `leave_policies` table with columns: id (uuid PK), policy_name (varchar, not null), leave_type (varchar, not null, check constraint for 'annual','sick','emergency','unpaid','maternity','paternity'), entitlement_days (integer, not null), accrual_rate (decimal, nullable), max_accumulation (decimal, nullable), minimum_notice_days (integer, nullable), requires_manager_approval (boolean, not null, default true), is_active (boolean, not null, default true), created_at (timestamptz, not null), updated_at (timestamptz, not null).
-- `migrations/002_create_leave_requests.ts` — create the `leave_requests` table with columns: id (uuid PK), employee_id (uuid, not null), leave_type_id (uuid, not null, FK to leave_policies), start_date (date, not null), end_date (date, not null), reason (text, nullable), status (varchar, not null, default 'DRAFT', check constraint for 'DRAFT','SUBMITTED','APPROVED','REJECTED','CANCELLED'), approved_by (uuid, nullable), approved_at (timestamptz, nullable), rejected_by (uuid, nullable), rejected_at (timestamptz, nullable), rejection_reason (text, nullable), cancelled_by (uuid, nullable), cancelled_at (timestamptz, nullable), created_at (timestamptz, not null), updated_at (timestamptz, not null).
-- `migrations/003_create_leave_balances.ts` — create the `leave_balances` table with columns: id (uuid PK), employee_id (uuid, not null), leave_type_id (uuid, not null, FK to leave_policies), entitlement_days (decimal, not null), used_days (decimal, not null, default 0), accrued_days (decimal, not null, default 0), year (integer, not null), created_at (timestamptz, not null), updated_at (timestamptz, not null). Add unique constraint on (employee_id, leave_type_id, year).
+- `src/modules/leave/leave.model.ts` — define all domain types:
+  - `LeaveType` as a string literal union: `'annual' | 'sick' | 'emergency' | 'unpaid' | 'maternity' | 'paternity'`
+  - `LeaveRequestStatus` as a string literal union: `'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED'`
+  - `LeavePolicy` interface with fields: id (string), policyName (string), leaveType (LeaveType), entitlementDays (number), accrualRate (number | null), maxAccumulation (number | null), minimumNoticeDays (number | null), requiresManagerApproval (boolean), isActive (boolean), createdAt (Date), updatedAt (Date)
+  - `LeaveRequest` interface with fields: id (string), employeeId (string), leaveTypeId (string), startDate (Date), endDate (Date), reason (string | undefined), status (LeaveRequestStatus), approvedBy (string | null), approvedAt (Date | null), rejectedBy (string | null), rejectedAt (Date | null), rejectionReason (string | null), cancelledBy (string | null), cancelledAt (Date | null), createdAt (Date), updatedAt (Date)
+  - `LeaveBalance` interface with fields: id (string), employeeId (string), leaveTypeId (string), entitlementDays (number), usedDays (number), accruedDays (number), year (number), createdAt (Date), updatedAt (Date)
+  - `CreateLeaveRequestDto` interface with fields: employeeId (string), leaveTypeId (string), startDate (Date), endDate (Date), reason (string | undefined)
+  - `UpdateLeaveRequestStatusDto` interface with fields: status (LeaveRequestStatus), reviewerId (string), rejectionReason (string | undefined)
+- `src/modules/leave/index.ts` — barrel export of all types from leave.model.ts
 
-All migrations must have both `up` and `down` functions. Use `knex.schema.createTable` / `dropTableIfExists`. Use `knex.fn.uuid()` for UUID PK defaults.
+Include Jest unit tests in `tests/unit/modules/leave/leave.model.test.ts` that verify the type definitions compile and that the literal union values are correct.
 
 ## Project stack
 Before writing code, read `HARNESS.json` in the working directory to learn the project's language, framework, and test runner, and follow the existing conventions in the repository. Read `docs/ARCHITECTURE.md` and `PLAN.md` if present.
