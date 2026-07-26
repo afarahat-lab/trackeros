@@ -4,3 +4,5 @@ export { LeavePolicy, CreateLeavePolicyDto } from './leave-policy.model';
 export { ILeavePolicyRepository, LeavePolicyRepository } from './leave-policy.repository';
 export { LeaveBalance, CreateLeaveBalanceDto } from './leave-balance.model';
 export { ILeaveBalanceRepository, LeaveBalanceRepository } from './leave-balance.repository';
+export { LeaveRequest, CreateLeaveRequestDto } from './leave-request.model';
+export { ILeaveRequestRepository, LeaveRequestRepository } from './leave-request.repository';

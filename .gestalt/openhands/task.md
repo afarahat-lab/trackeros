@@ -1,18 +1,18 @@
-# Implement this phase: Phase 5: LeaveBalance model and repository
+# Implement this phase: Phase 6: LeaveRequest model and repository
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/bfdb6110-c37d-4c1b-a01f-6fca50944d25/5`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/bfdb6110-c37d-4c1b-a01f-6fca50944d25/6`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create src/modules/leave/leave-balance.model.ts with the LeaveBalance interface (id, employeeId, leaveTypeId, policyId, entitlementDays, usedDays, pendingDays, accruedDays, carriedForwardDays, expiresAt, year, createdAt, updatedAt) and CreateLeaveBalanceDto.
+Create src/modules/leave/leave-request.model.ts with the LeaveRequest interface (id, employeeId, leaveTypeId, startDate, endDate, totalDays, reason, status, managerId, approvedBy, approvedAt, rejectionReason, cancelledAt, createdAt, updatedAt) and CreateLeaveRequestDto. Import LeaveStatus from src/shared/types/index.ts (Phase 1).
 
-Create src/modules/leave/leave-balance.repository.ts with ILeaveBalanceRepository interface and LeaveBalanceRepository class using the pg pool from src/shared/db/connection.ts. Implement findByEmployeeId, findByEmployeeIdAndLeaveTypeId, findByEmployeeIdAndYear, create, update, upsert methods.
+Create src/modules/leave/leave-request.repository.ts with ILeaveRequestRepository interface and LeaveRequestRepository class using the pg pool from src/shared/db/connection.ts. Implement findByEmployeeId, findById, findByManagerId, findByStatus, create, updateStatus, findAll methods.
 
-Update src/modules/leave/index.ts to also re-export LeaveBalance, CreateLeaveBalanceDto, ILeaveBalanceRepository, LeaveBalanceRepository.
+Update src/modules/leave/index.ts to also re-export LeaveRequest, CreateLeaveRequestDto, ILeaveRequestRepository, LeaveRequestRepository.
 
-Include Jest unit tests in tests/unit/modules/leave/leave-balance.repository.test.ts mocking the pg pool. This phase depends on src/modules/leave/leave-type.model.ts (Phase 3), src/modules/leave/leave-policy.model.ts (Phase 4), and src/shared/db/connection.ts (already exists).
+Include Jest unit tests in tests/unit/modules/leave/leave-request.repository.test.ts mocking the pg pool. This phase depends on src/shared/types/index.ts (Phase 1), src/modules/leave/leave-type.model.ts (Phase 3), and src/shared/db/connection.ts (already exists).
 
 ## Project stack
 Before writing code, read `HARNESS.json` in the working directory to learn the project's language, framework, and test runner, and follow the existing conventions in the repository. Read `docs/ARCHITECTURE.md` and `PLAN.md` if present.
