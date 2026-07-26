@@ -1,26 +1,23 @@
-# Implement this phase: Phase 3: Leave repository
+# Implement this phase: Phase 4: Shared error types
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/6f64b552-c5b8-42bc-86fa-01fa08ab4abe/3`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/6f64b552-c5b8-42bc-86fa-01fa08ab4abe/4`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the leave repository implementing data access for leave requests and balances. This phase depends on `src/modules/leave/leave.model.ts` from Phase 2 — read it before generating any code that references its types.
+Create shared error type classes used across modules. No dependencies on prior phases.
 
 Files to create:
-- `src/modules/leave/leave.repository.ts` — implement `ILeaveRepository` interface and `LeaveRepository` class using the pg Pool from `src/shared/db/connection.ts`. Methods:
-  - `findById(id: string): Promise<LeaveRequest | null>` — SELECT by id
-  - `findByEmployeeId(employeeId: string): Promise<LeaveRequest[]>` — SELECT all requests for an employee, ordered by created_at DESC
-  - `findByStatus(status: LeaveRequestStatus): Promise<LeaveRequest[]>` — SELECT by status
-  - `create(dto: CreateLeaveRequestDto): Promise<LeaveRequest>` — INSERT a new leave request with status 'DRAFT', return the created row
-  - `updateStatus(id: string, dto: UpdateLeaveRequestStatusDto): Promise<LeaveRequest | null>` — UPDATE status and reviewer fields based on the new status (APPROVED sets approved_by/approved_at, REJECTED sets rejected_by/rejected_at/rejection_reason, CANCELLED sets cancelled_by/cancelled_at), return updated row or null
-  - `getBalance(employeeId: string, leaveTypeId: string, year: number): Promise<LeaveBalance | null>` — SELECT balance row
-  - `upsertBalance(balance: Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeaveBalance>` — INSERT ON CONFLICT UPDATE balance
-  - `decrementBalance(employeeId: string, leaveTypeId: string, year: number, days: number): Promise<LeaveBalance | null>` — decrement used_days by the given amount
-- Update `src/modules/leave/index.ts` — add exports for `ILeaveRepository` and `LeaveRepository`
+- `src/shared/errorTypes.ts` — define typed error classes:
+  - `NotFoundError` extending Error with a `resourceName: string` and `resourceId: string` properties
+  - `ValidationError` extending Error with a `details: string[]` property for validation messages
+  - `ConflictError` extending Error with a `resourceName: string` property (for duplicate/state conflict scenarios)
+  - `UnauthorizedError` extending Error (for auth failures)
+  - `ForbiddenError` extending Error (for RBAC failures)
+  Each class should set `this.name` to the class name and capture the stack trace properly.
 
-Include Jest unit tests in `tests/unit/modules/leave/leave.repository.test.ts` that mock the pg Pool and test each repository method.
+Include Jest unit tests in `tests/unit/shared/errorTypes.test.ts` verifying each error class instantiates correctly and preserves its message and custom properties.
 
 ## Project stack
 Before writing code, read `HARNESS.json` in the working directory to learn the project's language, framework, and test runner, and follow the existing conventions in the repository. Read `docs/ARCHITECTURE.md` and `PLAN.md` if present.
