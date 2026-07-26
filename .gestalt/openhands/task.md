@@ -1,25 +1,26 @@
-# Implement this phase: Phase 2: Leave domain model types
+# Implement this phase: Phase 3: Leave repository
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/6f64b552-c5b8-42bc-86fa-01fa08ab4abe/2`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/6f64b552-c5b8-42bc-86fa-01fa08ab4abe/3`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the leave module domain model types. This phase has no dependencies on prior phases — it defines pure TypeScript types.
+Create the leave repository implementing data access for leave requests and balances. This phase depends on `src/modules/leave/leave.model.ts` from Phase 2 — read it before generating any code that references its types.
 
 Files to create:
-- `src/modules/leave/leave.model.ts` — define all domain types:
-  - `LeaveType` as a string literal union: `'annual' | 'sick' | 'emergency' | 'unpaid' | 'maternity' | 'paternity'`
-  - `LeaveRequestStatus` as a string literal union: `'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED'`
-  - `LeavePolicy` interface with fields: id (string), policyName (string), leaveType (LeaveType), entitlementDays (number), accrualRate (number | null), maxAccumulation (number | null), minimumNoticeDays (number | null), requiresManagerApproval (boolean), isActive (boolean), createdAt (Date), updatedAt (Date)
-  - `LeaveRequest` interface with fields: id (string), employeeId (string), leaveTypeId (string), startDate (Date), endDate (Date), reason (string | undefined), status (LeaveRequestStatus), approvedBy (string | null), approvedAt (Date | null), rejectedBy (string | null), rejectedAt (Date | null), rejectionReason (string | null), cancelledBy (string | null), cancelledAt (Date | null), createdAt (Date), updatedAt (Date)
-  - `LeaveBalance` interface with fields: id (string), employeeId (string), leaveTypeId (string), entitlementDays (number), usedDays (number), accruedDays (number), year (number), createdAt (Date), updatedAt (Date)
-  - `CreateLeaveRequestDto` interface with fields: employeeId (string), leaveTypeId (string), startDate (Date), endDate (Date), reason (string | undefined)
-  - `UpdateLeaveRequestStatusDto` interface with fields: status (LeaveRequestStatus), reviewerId (string), rejectionReason (string | undefined)
-- `src/modules/leave/index.ts` — barrel export of all types from leave.model.ts
+- `src/modules/leave/leave.repository.ts` — implement `ILeaveRepository` interface and `LeaveRepository` class using the pg Pool from `src/shared/db/connection.ts`. Methods:
+  - `findById(id: string): Promise<LeaveRequest | null>` — SELECT by id
+  - `findByEmployeeId(employeeId: string): Promise<LeaveRequest[]>` — SELECT all requests for an employee, ordered by created_at DESC
+  - `findByStatus(status: LeaveRequestStatus): Promise<LeaveRequest[]>` — SELECT by status
+  - `create(dto: CreateLeaveRequestDto): Promise<LeaveRequest>` — INSERT a new leave request with status 'DRAFT', return the created row
+  - `updateStatus(id: string, dto: UpdateLeaveRequestStatusDto): Promise<LeaveRequest | null>` — UPDATE status and reviewer fields based on the new status (APPROVED sets approved_by/approved_at, REJECTED sets rejected_by/rejected_at/rejection_reason, CANCELLED sets cancelled_by/cancelled_at), return updated row or null
+  - `getBalance(employeeId: string, leaveTypeId: string, year: number): Promise<LeaveBalance | null>` — SELECT balance row
+  - `upsertBalance(balance: Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeaveBalance>` — INSERT ON CONFLICT UPDATE balance
+  - `decrementBalance(employeeId: string, leaveTypeId: string, year: number, days: number): Promise<LeaveBalance | null>` — decrement used_days by the given amount
+- Update `src/modules/leave/index.ts` — add exports for `ILeaveRepository` and `LeaveRepository`
 
-Include Jest unit tests in `tests/unit/modules/leave/leave.model.test.ts` that verify the type definitions compile and that the literal union values are correct.
+Include Jest unit tests in `tests/unit/modules/leave/leave.repository.test.ts` that mock the pg Pool and test each repository method.
 
 ## Project stack
 Before writing code, read `HARNESS.json` in the working directory to learn the project's language, framework, and test runner, and follow the existing conventions in the repository. Read `docs/ARCHITECTURE.md` and `PLAN.md` if present.
