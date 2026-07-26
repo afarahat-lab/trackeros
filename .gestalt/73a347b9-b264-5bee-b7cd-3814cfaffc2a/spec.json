@@ -1,0 +1,140 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared-auth",
+      "identity"
+    ],
+    "affectedLayers": [
+      "shared",
+      "middleware"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "extractTokenFromHeader parses a valid \"Bearer <token>\" Authorization header and returns the token string; it returns null for undefined, empty, non-Bearer scheme, or malformed (not exactly two space-separated parts) headers.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "verifyToken reads JWT_SECRET from process.env and throws when the secret is missing, when the token fails verification, or when the decoded payload lacks the required userId/role fields; on success it resolves the decoded payload containing userId and role.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "authenticate extracts the token from the request Authorization header, verifies it, and attaches request.user = { userId, role } on success; it throws UnauthorizedError when no token is present, re-throws UnauthorizedError/ForbiddenError as-is, and wraps any other error in UnauthorizedError.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "requireRole(...roles) returns a preHandler that throws UnauthorizedError when no user is attached to the request, throws ForbiddenError when the user's role is not in the allowed set, and resolves without error when the role matches one of the allowed roles (single or multi-role).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The FastifyRequest type is augmented (via declare module 'fastify') with an optional user property of shape { userId: string; role: string }, so route handlers can read request.user under strict TypeScript without implicit any.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The auth module's barrel export re-exports the public API (verifyToken, extractTokenFromHeader, TokenPayload type, authenticate, requireRole) so downstream modules import only from the shared auth entry point, per the module dependency rule.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests exist for jwt utilities (covering header extraction edge cases and verifyToken secret-missing/invalid-payload/success paths) and for middleware (covering authenticate missing-token/verify-failure/re-throw/success and requireRole no-user/wrong-role/match paths), and the full suite passes under the ts-jest node config.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "JWT_SECRET must be read from process.env at verification time; no hardcoded secrets (HARNESS no-hardcoded-secrets, critical).",
+    "Role-based access checks must be performed at the middleware layer via requireRole, never inlined in route handlers or business logic (GP-005).",
+    "No unhandled promise rejections: authenticate and requireRole must surface all failures as thrown typed errors rather than letting rejections propagate uncaught (GP-006).",
+    "No use of any; the decoded JWT payload must be narrowed/validated (unknown with type guards or explicit field checks) under strict TypeScript (HARNESS no-any, high).",
+    "The auth module must import UnauthorizedError and ForbiddenError from the existing src/shared/errorTypes.ts rather than defining its own error classes, so error-to-HTTP mapping stays consistent across modules.",
+    "Downstream modules may import the auth module only through its barrel entry point (index.ts), not from internal files, per the module dependency rule in AGENTS.md/ARCHITECTURE.md."
+  ],
+  "outOfScope": [
+    "JWT token issuance/signing and the /auth login endpoints \u2014 this phase only verifies and consumes tokens; token creation belongs to the auth/identity module.",
+    "Registering the authenticate/requireRole hooks on any concrete leave route \u2014 route wiring is Phase 8; this phase only provides the reusable middleware.",
+    "OIDC/corporate identity provider integration and local-user session management \u2014 production identity wiring is outside this shared utility phase.",
+    "Token refresh, rotation, blacklisting, or revocation logic \u2014 not part of the stateless JWT verification contract defined here."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "TokenPayload (decoded JWT)",
+      "mustExistOrExtend": true,
+      "invariant": "A verified TokenPayload always carries both a non-empty userId and a role; verification rejects (throws) any payload missing either field, so downstream consumers can rely on both being present."
+    },
+    {
+      "entity": "request.user (authenticated Fastify request)",
+      "mustExistOrExtend": true,
+      "invariant": "After a successful authenticate preHandler, request.user is defined and contains { userId, role } matching the verified token; before authenticate runs (or on failure) request.user is undefined, and requireRole treats an undefined request.user as unauthenticated rather than authorized."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "extractTokenFromHeader",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Never throws \u2014 returns null for any missing, empty, non-Bearer, or malformed (not exactly \"Bearer <token>\") header; returns the token string only for a well-formed Bearer header."
+    },
+    {
+      "operation": "verifyToken",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws Error when JWT_SECRET env var is missing; throws when the token is invalid/expired (underlying jwt.verify failure); throws when the decoded payload lacks userId or role. Resolves the TokenPayload on success."
+    },
+    {
+      "operation": "authenticate (Fastify preHandler)",
+      "authRule": "Requires a valid Bearer JWT in the Authorization header; on success attaches request.user.",
+      "idempotent": false,
+      "errorSemantics": "Throws UnauthorizedError when no extractable token is present; re-throws UnauthorizedError and ForbiddenError unchanged; wraps all other errors in UnauthorizedError. Never resolves successfully without attaching request.user."
+    },
+    {
+      "operation": "requireRole(...roles) (returns Fastify preHandler)",
+      "authRule": "Checks request.user.role membership in the provided role set; must run after authenticate so request.user is populated.",
+      "idempotent": false,
+      "errorSemantics": "Throws UnauthorizedError when request.user is absent; throws ForbiddenError when the user's role is not in the allowed set; resolves without error on a match."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Auth error throwing must reuse UnauthorizedError and ForbiddenError exactly as defined in src/shared/errorTypes.ts (same class identity, name property, and stack-capture behavior) so controllers can map them to 401/403 consistently \u2014 do not shadow or re-declare these classes.",
+      "referencePath": "src/shared/errorTypes.ts"
+    },
+    {
+      "requirement": "The request.user shape attached by authenticate must match the augmented FastifyRequest.user type declared in src/shared/auth/types.ts ({ userId: string; role: string }), so the runtime attachment and the compile-time augmentation stay in sync.",
+      "referencePath": "src/shared/auth/types.ts"
+    },
+    {
+      "requirement": "The set of symbols re-exported from the barrel must cover the full public API consumed by downstream phases (verifyToken, extractTokenFromHeader, TokenPayload, authenticate, requireRole) so modules import only from the entry point per the dependency rule.",
+      "referencePath": "src/shared/auth/index.ts"
+    },
+    {
+      "requirement": "requireRole must implement GP-005 (RBAC at middleware, never inline) \u2014 role enforcement lives in the returned preHandler, not in route handlers or services, matching the principle as stated in GOLDEN_PRINCIPLES.md.",
+      "referencePath": "docs/GOLDEN_PRINCIPLES.md"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/errorTypes.ts",
+      "why": "Auth middleware imports UnauthorizedError and ForbiddenError from the shared error types module so auth failures map to the same 401/403 semantics used by all controllers."
+    },
+    {
+      "target": "jsonwebtoken (npm)",
+      "why": "verifyToken delegates token verification to the jsonwebtoken library, reading JWT_SECRET from process.env; the module depends on this package being present (confirmed in package.json)."
+    },
+    {
+      "target": "Fastify request lifecycle (preHandler hooks)",
+      "why": "authenticate and the requireRole guard are Fastify preHandler hooks consumed by route registration in later phases (Phase 8 leave routes) to enforce authentication and RBAC before handlers run."
+    },
+    {
+      "target": "process.env.JWT_SECRET",
+      "why": "verifyToken reads the signing secret from the JWT_SECRET environment variable at verification time; the module's correctness depends on this env var being configured in the runtime environment."
+    }
+  ]
+}
