@@ -1,0 +1,141 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-management (database schema/migrations)",
+      "shared-infrastructure (db connection config)"
+    ],
+    "affectedLayers": [
+      "infrastructure (knexfile.ts SSL config)",
+      "data (migration timestamp defaults)"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "knexfile.ts connection applies SSL conditionally matching src/shared/db/connection.ts: when NODE_ENV === 'production' SSL is enabled with rejectUnauthorized: true and ca sourced from process.env.DB_SSL_CA; otherwise SSL is false. The connection still derives from process.env.DATABASE_URL.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "All six created_at and updated_at timestamp declarations across migrations 001_create_leave_policies.ts, 002_create_leave_requests.ts, and 003_create_leave_balances.ts carry a default of knex.fn.now() while remaining timestamptz (useTz: true) NOT NULL.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "An INSERT into any of the three leave tables that omits created_at and updated_at succeeds (the NOT NULL columns are populated by the database default) rather than failing with a not-null violation.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "Existing knexfile config is preserved: pg client, migrations directory pointing at ./migrations, ts extension, and dotenv.config() loading env vars at migration time.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The mechanical compile gate passes: npm run build (tsc --noEmit) and npx jest --passWithNoTests both exit zero, and the knexfile + migration files remain syntactically valid TypeScript loadable by ts-node (Knex's loader).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The change is additive only: down functions, check constraints, foreign keys, unique constraints, and every non-timestamp column in all three migrations are unchanged.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "knexfile.ts SSL handling must mirror the canonical pattern in src/shared/db/connection.ts exactly \u2014 production enables SSL with rejectUnauthorized: true and ca from process.env.DB_SSL_CA; non-production disables SSL (false). Do not invent a different SSL strategy.",
+    "The timestamp default must use knex.fn.now() (the Knex idiom already established in these migrations via knex.fn.uuid() for PKs). Do not use a raw SQL string or a JS-side Date.now() value.",
+    "The created_at and updated_at columns must remain NOT NULL and timestamptz (useTz: true). The default is additive; the notNullable() constraint must not be removed or weakened.",
+    "No hardcoded secrets: DB_SSL_CA and DATABASE_URL must continue to be read from process.env at runtime. No certificate material or connection strings may be embedded in knexfile.ts or the migrations.",
+    "Strict TypeScript compliance (no implicit any, strict null checks) must hold for the edited files. The Knex.Config connection object shape must typecheck against the knex type definitions.",
+    "Only the four files in scope may be modified: knexfile.ts and the three migration files. No other source, config, or doc file may be changed in this phase."
+  ],
+  "outOfScope": [
+    "Adding an updated_at auto-refresh trigger or ON UPDATE mechanism. This phase only adds a static default for inserts; automatic update-time refresh is not part of the requested fix.",
+    "Adding a new migration (e.g., 004) to alter existing timestamp columns. The fix is applied in-place to migrations 001\u2013003 since the schema is not yet deployed in production.",
+    "Refactoring src/shared/db/connection.ts or unifying the knexfile and the pg Pool into a shared config module. Only knexfile.ts is changed to mirror the existing connection.ts pattern.",
+    "Adding knex migration scripts to package.json (e.g., migrate:latest) or wiring migrations into app startup. This phase fixes config correctness only; migration execution tooling is out of scope.",
+    "Updating ARCHITECTURE.md, DECISIONS.md, or reconciled.json to document the SSL/default changes. The docs already describe the columns as timestamptz NOT NULL without specifying a default, so the additions are non-contradictory and no doc edit is required.",
+    "Phases 2\u201310 of PLAN.md (domain models, repositories, services, controllers, routes, policy integration). This phase is scoped to the Phase 1 migration/config fix only."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "leave_policies table (migration 001)",
+      "mustExistOrExtend": true,
+      "invariant": "created_at and updated_at are timestamptz NOT NULL with a server-side default of now(); an insert that omits both columns still produces a row with non-null timestamps."
+    },
+    {
+      "entity": "leave_requests table (migration 002)",
+      "mustExistOrExtend": true,
+      "invariant": "created_at and updated_at are timestamptz NOT NULL with a server-side default of now(); an insert that omits both columns still produces a row with non-null timestamps. All other lifecycle columns (approved_at, rejected_at, cancelled_at) remain nullable with no default."
+    },
+    {
+      "entity": "leave_balances table (migration 003)",
+      "mustExistOrExtend": true,
+      "invariant": "created_at and updated_at are timestamptz NOT NULL with a server-side default of now(); an insert that omits both columns still produces a row with non-null timestamps. The unique constraint on (employee_id, leave_type_id, year) is preserved."
+    },
+    {
+      "entity": "knexfile.ts Knex configuration",
+      "mustExistOrExtend": true,
+      "invariant": "The migration runner's connection SSL behavior is identical to the runtime pg Pool: SSL enabled in production with rejectUnauthorized and a CA from DB_SSL_CA, disabled otherwise. The migration runner and the application never disagree on whether SSL is used for the same DATABASE_URL."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "Knex migration runner establishing a connection via knexfile.ts",
+      "authRule": "No auth; uses DATABASE_URL from env. SSL must be applied identically to src/shared/db/connection.ts so the runner can reach a production-grade pool that mandates TLS.",
+      "idempotent": false,
+      "errorSemantics": "A missing DATABASE_URL or an unreachable production DB must surface as a Knex connection error (not a silent no-op). SSL misconfiguration must not be masked."
+    },
+    {
+      "operation": "Migration up function for each of 001/002/003 (createTable)",
+      "authRule": "No auth; runs under the migration connection.",
+      "idempotent": false,
+      "errorSemantics": "Re-running up against an existing table fails with a standard \"already exists\" error (unchanged behavior); the timestamp default addition must not alter this \u2014 defaults apply only on new row inserts, not on table creation."
+    },
+    {
+      "operation": "Migration down function for each of 001/002/003 (dropTableIfExists)",
+      "authRule": "No auth; runs under the migration connection.",
+      "idempotent": true,
+      "errorSemantics": "Dropping a non-existent table is a no-op (unchanged). The timestamp default change must not affect down behavior."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "knexfile.ts connection SSL configuration must match the canonical pattern in src/shared/db/connection.ts: production enables ssl with rejectUnauthorized: true and ca from process.env.DB_SSL_CA; non-production sets ssl to false. Both must read DATABASE_URL from process.env so the migration runner and the runtime Pool use the same connection semantics.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "The created_at and updated_at timestamp declarations in migration 001 must use the same default idiom (knex.fn.*) already established in this file for the id PK (knex.fn.uuid()) \u2014 i.e., append .defaultTo(knex.fn.now()) \u2014 and must keep useTz: true and notNullable() so the column remains timestamptz NOT NULL with a server default.",
+      "referencePath": "migrations/001_create_leave_policies.ts"
+    },
+    {
+      "requirement": "The created_at and updated_at timestamp declarations in migration 002 must receive .defaultTo(knex.fn.now()) consistent with the default idiom used for the id PK (knex.fn.uuid()) and the status default ('DRAFT') already in this file, while preserving useTz: true and notNullable(). The nullable lifecycle timestamps (approved_at, rejected_at, cancelled_at) must remain unchanged with no default.",
+      "referencePath": "migrations/002_create_leave_requests.ts"
+    },
+    {
+      "requirement": "The created_at and updated_at timestamp declarations in migration 003 must receive .defaultTo(knex.fn.now()) consistent with the default idiom already used in this file for id (knex.fn.uuid()), used_days (0), and accrued_days (0), while preserving useTz: true and notNullable().",
+      "referencePath": "migrations/003_create_leave_balances.ts"
+    },
+    {
+      "requirement": "The edited migrations must remain consistent with the ARCHITECTURE.md schema description: created_at and updated_at are timestamptz NOT NULL on all three tables. Adding a now() default is additive and must not change the documented type or nullability; no doc edit is required because the docs do not specify a default for these columns.",
+      "referencePath": "docs/ARCHITECTURE.md"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/db/connection.ts (canonical pg Pool SSL pattern)",
+      "why": "knexfile.ts must mirror this file's SSL decision (NODE_ENV === 'production' ? { rejectUnauthorized: true, ca: process.env.DB_SSL_CA } : false) so the migration runner and the application agree on TLS for the same DATABASE_URL. This is the source of truth being replicated, not a runtime dependency."
+    },
+    {
+      "target": "Knex migration runner (knex CLI / ts-node loader) consuming knexfile.ts and migrations/*.ts",
+      "why": "knexfile.ts is the entry point the Knex CLI loads to run migrations against the database; the three migration files are the units it executes. The SSL fix makes the runner able to reach a production pool, and the timestamp defaults make migration-created tables accept inserts that omit created_at/updated_at."
+    },
+    {
+      "target": "Repository layer insert paths (future Phases 3/9 \u2014 leave.repository.create, upsertBalance, policy.repository.create)",
+      "why": "These future repository inserts target the three tables and rely on the NOT NULL created_at/updated_at columns being populated. The now() default is what allows those inserts to omit the timestamps without a not-null violation; this phase unblocks those downstream phases."
+    }
+  ]
+}
