@@ -21,6 +21,7 @@ src/modules/status/status.{model,service.interface,service}.ts
 src/modules/leave/index.ts
 src/modules/leave/leave.model.ts
 src/modules/leave/leave.repository.ts
+src/shared/auth/{index,jwt,middleware,types}.ts
 src/shared/db/connection.ts
 src/shared/errorTypes.ts
 ```
@@ -44,6 +45,43 @@ src/shared/errorTypes.ts
 | `ForbiddenError` | (none beyond message) | 403 |
 
 All classes extend `Error`, set `this.name` to the class name, and capture stack traces via `Error.captureStackTrace`. Controllers catch these errors and map them to the appropriate HTTP status codes.
+
+## Auth middleware
+
+`src/shared/auth/` provides JWT-based authentication and role-based authorization as Fastify `preHandler` hooks. It depends on `src/shared/errorTypes.ts` for `UnauthorizedError` and `ForbiddenError`.
+
+### JWT utilities (`jwt.ts`)
+
+| Export | Signature | Description |
+|--------|-----------|-------------|
+| `TokenPayload` | `{ userId: string; role: string }` | Shape of the decoded JWT payload |
+| `extractTokenFromHeader` | `(authHeader: string \| undefined) => string \| null` | Parses `Bearer <token>` from the Authorization header; returns `null` for missing, non-Bearer, or malformed headers |
+| `verifyToken` | `(token: string) => Promise<TokenPayload>` | Verifies the JWT using `jsonwebtoken` and `JWT_SECRET` from `process.env`; throws if the secret is missing, the token is invalid, or the payload lacks `userId`/`role` |
+
+### Middleware (`middleware.ts`)
+
+| Export | Signature | Description |
+|--------|-----------|-------------|
+| `authenticate` | `(request: FastifyRequest, _reply: FastifyReply) => Promise<void>` | Extracts and verifies the JWT, then attaches `request.user = { userId, role }`. Throws `UnauthorizedError` on any failure. |
+| `requireRole` | `(...roles: string[]) => (request: FastifyRequest, _reply: FastifyReply) => Promise<void>` | Returns a `preHandler` that checks `request.user.role` is in the allowed set. Throws `UnauthorizedError` if no user is attached, `ForbiddenError` if the role is insufficient. |
+
+### Type augmentation (`types.ts`)
+
+Augments `FastifyRequest` via `declare module 'fastify'` to add the optional `user` property:
+
+```ts
+request.user?: { userId: string; role: string }
+```
+
+### Usage pattern
+
+Routes register `authenticate` as a `preHandler` for endpoints requiring a logged-in user, and chain `requireRole('manager', 'admin')` for endpoints restricted to specific roles:
+
+```ts
+fastify.post('/api/example', {
+  preHandler: [authenticate, requireRole('admin')],
+}, handler);
+```
 
 ## Dependency rules
 
@@ -192,6 +230,7 @@ Unique constraint on `(employee_id, leave_type_id, year)`.
 - ✅ **Phase 2 (Domain Model Types)** — `src/modules/leave/leave.model.ts` defines all domain types: `LeaveType` (6-value literal union), `LeaveRequestStatus` (5-value literal union), `LeavePolicy`, `LeaveRequest`, `LeaveBalance`, `CreateLeaveRequestDto`, and `UpdateLeaveRequestStatusDto` interfaces. Barrel export via `src/modules/leave/index.ts`. Unit tests in `tests/unit/modules/leave/leave.model.test.ts` verify type correctness and optional/nullable field handling.
 - ✅ **Phase 3 (Leave Repository)** — `src/modules/leave/leave.repository.ts` implements `ILeaveRepository` interface and `LeaveRepository` class using the pg Pool from `src/shared/db/connection.ts`. Eight methods: `findById`, `findByEmployeeId`, `findByStatus`, `create` (INSERT with DRAFT status), `updateStatus` (switch on APPROVED/REJECTED/CANCELLED/fallback, each setting the appropriate reviewer fields and timestamps), `getBalance`, `upsertBalance` (INSERT ON CONFLICT UPDATE), and `decrementBalance` (increments used_days). Constructor accepts an optional pg Pool (defaults to shared pool). Barrel export updated in `src/modules/leave/index.ts`. Unit tests in `tests/unit/modules/leave/leave.repository.test.ts` with 16 test cases covering all methods, null/empty results, and status-specific update behavior.
 - ✅ **Phase 4 (Shared Error Types)** — `src/shared/errorTypes.ts` defines five typed error classes: `NotFoundError`, `ValidationError`, `ConflictError`, `UnauthorizedError`, `ForbiddenError`. All extend `Error`, set `this.name`, and capture stack traces. Unit tests in `tests/unit/shared/errorTypes.test.ts` verify instantiation, property preservation, and stack trace capture for each class.
+- ✅ **Phase 5 (Auth Middleware & JWT)** — `src/shared/auth/` provides JWT verification (`verifyToken`, `extractTokenFromHeader`), Fastify `preHandler` middleware (`authenticate`, `requireRole`), and Fastify request type augmentation. Depends on `src/shared/errorTypes.ts` for `UnauthorizedError`/`ForbiddenError`. Unit tests in `tests/unit/shared/auth/jwt.test.ts` (7 tests) and `tests/unit/shared/auth/middleware.test.ts` (9 tests).
 
 ### Stack Compliance
 

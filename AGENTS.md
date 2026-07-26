@@ -19,7 +19,7 @@ Trackeros — a corporate operations web and mobile platform for
   repository,service,controller,routes}.ts. Domain modules
   include leave, balance, employee, policy, notification.
   Shared utilities under src/shared/ (db connection, base
-  repository, error types).
+  repository, error types, auth middleware).
   
   Frontend: React + Vite SPA for the web client, React Native
   for the mobile client (shared @trackeros/contracts package
@@ -55,6 +55,22 @@ user projects use whatever stack matches their description.
 2. All database access through the repository pattern (GP-001)
 3. Every state-changing operation produces an audit record (GP-002)
 4. RBAC enforced at middleware, never inline (GP-005)
+
+## Shared auth module
+
+`src/shared/auth/` provides JWT verification and Fastify `preHandler`
+middleware for authentication and role-based authorization:
+
+- `authenticate` — verifies the Bearer token from the Authorization
+  header, attaches `request.user = { userId, role }`. Throws
+  `UnauthorizedError` on failure.
+- `requireRole(...roles)` — returns a `preHandler` that checks
+  `request.user.role` is in the allowed set. Throws `ForbiddenError`
+  if the role is insufficient.
+
+Route handlers that need the authenticated user read from
+`request.user.userId` and `request.user.role`. The type augmentation
+is in `src/shared/auth/types.ts`.
 
 ## What agents must never do
 
