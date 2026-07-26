@@ -1,0 +1,179 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "auth",
+      "shared-infrastructure"
+    ],
+    "affectedLayers": [
+      "shared",
+      "middleware",
+      "types"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "A token-verification utility resolves with an object carrying userId and role (both strings) when given a JWT signed with the process.env JWT_SECRET; it rejects (does not resolve) for invalid, tampered, or expired tokens.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A header-parsing utility returns the raw token string when given a well-formed \"Bearer <token>\" Authorization header value, and returns null when the header is absent, empty, or not in Bearer scheme.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "An authentication preHandler, on a request with a valid Bearer token, attaches the verified user identity (userId + role) to the request so downstream handlers can read it type-safely.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The authentication preHandler, on a missing, malformed, or invalid/expired token, sends a 401 response directly via the reply object and does not proceed to the route handler (no unhandled rejection reaches the runtime).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A role-gating preHandler factory, given one or more allowed role strings, returns a preHandler that permits the request when the authenticated user's role is among the allowed set and sends a 403 response directly when the role does not match.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The role-gating preHandler sends a 401 response (not 403) when no authenticated user is present on the request, so \"not authenticated\" is distinguishable from \"authenticated but insufficient role\".",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Fastify's request type is augmented so that an optional user identity (userId + role) is visible to TypeScript under strict mode, allowing downstream code to read request.user.userId without type errors.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A barrel entry point re-exports the JWT utilities, the preHandler middleware, and the type augmentation so that consumers import only through that single module surface.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Unit tests cover the token-verification utility (valid token, invalid token, expired token) and the header-parsing utility (valid Bearer, missing header, non-Bearer scheme) using plain Jest with relative imports and no setup files.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Unit tests cover the authentication preHandler (attaches user on success, sends 401 on missing/invalid token) and the role-gating preHandler (permits matching role, sends 403 on mismatch, sends 401 when unauthenticated), with the JWT verification mocked.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No hardcoded secrets \u2014 JWT_SECRET must be read from process.env at runtime, never embedded as a literal in source (HARNESS.json no-hardcoded-secrets, critical).",
+    "No use of `any` \u2014 use `unknown` with type guards instead (HARNESS.json no-any, high severity); the JwtPayload index signature must not leak `any` into the public return type.",
+    "RBAC is enforced at middleware (preHandler), never inline in route handlers or business logic (GP-005, AGENTS.md architecture rule 4).",
+    "No sensitive data in logs \u2014 tokens must never be logged (GP-004); error responses must not echo the raw token value.",
+    "No unhandled promise rejections \u2014 the synchronous jsonwebtoken verify that throws must be wrapped so failures are caught and surfaced as controlled error replies, never as unhandled rejections (GP-006).",
+    "Modules import only through their declared public entry point (index.ts barrel); the auth module's internals (jwt.ts, middleware.ts, types.ts) are consumed via the barrel, not via deep imports (AGENTS.md architecture rule 1).",
+    "Error replies are sent directly via the reply object (reply.code/status + send), not by throwing, because no global Fastify error handler is registered in src/app.ts.",
+    "Shared utilities live under src/shared/; the auth module resides at src/shared/auth/ consistent with the existing src/shared/db and src/shared/errorTypes layout.",
+    "TypeScript strict mode applies \u2014 no implicit any, strict null checks; the augmented request.user must be optional to reflect that unauthenticated requests have no user.",
+    "Tests use plain Jest (describe/it/expect) with relative imports from the tests directory and no extra setup files, matching the established test style in tests/unit/shared/errorTypes.test.ts and jest.config.js testMatch."
+  ],
+  "outOfScope": [
+    "Registering the authenticate/requireRole preHandlers on any route or in src/app.ts \u2014 that is Phase 8 (leave routes and app registration).",
+    "Implementing the /auth login or token-issuance endpoints (jwt.sign for production token creation) \u2014 this phase only verifies tokens; issuing tokens is out of scope.",
+    "Leave controller, leave service, leave routes, and any leave-domain business logic \u2014 those are Phases 6\u20138.",
+    "OIDC / corporate identity provider integration \u2014 production identity comes from corporate OIDC per ARCHITECTURE.md; this phase handles local JWT verification only.",
+    "A global Fastify error handler or setErrorHandler \u2014 the settled decision is direct reply-based error responses; no global handler is added this phase.",
+    "Refresh-token logic, token blacklisting/revocation, or session management \u2014 only stateless JWT verification is in scope."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "VerifiedUserIdentity",
+      "mustExistOrExtend": true,
+      "invariant": "A successfully verified identity always carries a non-empty userId and a role string; it can only be produced by verifying a token signed with the process.env JWT_SECRET, and it is immutable once attached to a request."
+    },
+    {
+      "entity": "AuthenticatedRequest",
+      "mustExistOrExtend": true,
+      "invariant": "After the authentication preHandler runs successfully, the request carries exactly one verified user identity; before it runs (or after it fails with a 401), the request has no user identity. The presence of request.user is the sole signal that authentication succeeded."
+    },
+    {
+      "entity": "RoleGate",
+      "mustExistOrExtend": true,
+      "invariant": "A role gate is a preHandler factory parameterized by an allowed-roles set; it admits a request only when an authenticated user's role is a member of that set, and it never mutates the user identity \u2014 it only permits or denies."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "Verify a JWT and return the embedded user identity",
+      "authRule": "Uses process.env JWT_SECRET as the verification key; no caller-supplied secret.",
+      "idempotent": true,
+      "errorSemantics": "Rejects the returned Promise (does not resolve) for any jsonwebtoken failure (JsonWebTokenError, TokenExpiredError, NotBeforeError) or when required claims are absent; never throws synchronously to the caller."
+    },
+    {
+      "operation": "Extract a bearer token from an Authorization header value",
+      "authRule": "Pure function with no side effects; does not verify the token, only parses the Bearer scheme.",
+      "idempotent": true,
+      "errorSemantics": "Returns null (never throws) when the header is undefined, empty, or not in \"Bearer <token>\" form."
+    },
+    {
+      "operation": "Authenticate an incoming request (preHandler)",
+      "authRule": "Reads the Authorization header from the request, extracts and verifies the bearer token, and attaches the verified identity to the request on success.",
+      "idempotent": false,
+      "errorSemantics": "On missing/malformed/invalid/expired token, sends a 401 response directly via the reply object and short-circuits (does not call the route handler); no exception escapes the hook."
+    },
+    {
+      "operation": "Gate a request by allowed roles (preHandler factory)",
+      "authRule": "Checks the authenticated user's role against the supplied allowed-roles set; requires that authentication has already run (user identity present on the request).",
+      "idempotent": false,
+      "errorSemantics": "Sends 401 directly when no authenticated user is present; sends 403 directly when the user's role is not in the allowed set; permits the request otherwise. No exception escapes the hook."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Auth-failure semantics must align with the existing UnauthorizedError (401) and ForbiddenError (403) classes: 401 for missing/invalid/expired tokens (unauthenticated) and 403 for insufficient role (authenticated but forbidden), matching the HTTP-mapping table already documented for these error types.",
+      "referencePath": "src/shared/errorTypes.ts"
+    },
+    {
+      "requirement": "Environment-variable loading must follow the established precedent: read JWT_SECRET from process.env at runtime (dotenv.config() is already invoked at import time in connection.ts, establishing the env-loading pattern for src/shared/).",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "The auth module's barrel export must follow the same re-export pattern used by existing module barrels (src/modules/leave/index.ts, src/modules/uptime/index.ts): a single index.ts re-exporting all public symbols so consumers import only through the barrel.",
+      "referencePath": "src/modules/leave/index.ts"
+    },
+    {
+      "requirement": "Error responses must be sent directly via reply.status(n).send(...) / reply.code(n).send(...), matching the existing route-handler pattern in uptime.routes.ts where replies are sent directly and no global error handler is relied upon.",
+      "referencePath": "src/modules/uptime/uptime.routes.ts"
+    },
+    {
+      "requirement": "Unit tests must follow the established test style: plain describe/it/expect with relative imports from the tests directory and no setup files, matching tests/unit/shared/errorTypes.test.ts and the jest.config.js testMatch glob.",
+      "referencePath": "tests/unit/shared/errorTypes.test.ts"
+    },
+    {
+      "requirement": "The verified identity shape (userId + role) and the role-gating contract (requireRole accepting 'manager' and 'admin') must match what downstream Phase 7\u20138 consumers expect: controllers read request.user.userId and routes apply requireRole('manager','admin') for approve/reject/pending endpoints.",
+      "referencePath": "PLAN.md"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "jsonwebtoken (v8.5.1) + @types/jsonwebtoken",
+      "why": "The verification utility wraps the synchronous, throwing jwt.verify in a Promise to present an async interface; jwt.sign is available for test helpers to mint tokens."
+    },
+    {
+      "target": "Fastify v4.29.1 preHandler hook system",
+      "why": "authenticate and requireRole are Fastify preHandler hooks that read request.headers.authorization, attach request.user, and send error replies via the reply object; they integrate with the route lifecycle so downstream handlers only run on success."
+    },
+    {
+      "target": "Downstream Phase 7 (leave controller) \u2014 request.user.userId consumer",
+      "why": "Controllers will read the authenticated user's userId from the augmented request to attribute submit/approve/reject/cancel actions; the type augmentation must make this type-safe."
+    },
+    {
+      "target": "Downstream Phase 8 (leave routes) \u2014 requireRole('manager','admin') consumer",
+      "why": "Route registration will apply the authenticate preHandler and the role-gating preHandler to protected endpoints; the role-gating contract must accept the 'manager' and 'admin' role strings used downstream."
+    },
+    {
+      "target": "process.env.JWT_SECRET (environment configuration)",
+      "why": "The verification key is read from the environment at runtime, consistent with the dotenv precedent; tests must set/restore this variable rather than hardcoding a secret."
+    }
+  ]
+}
