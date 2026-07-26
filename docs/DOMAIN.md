@@ -37,6 +37,11 @@ Represents a leave record managed by the `leave` module, including leave request
 | status | LeaveRequestStatus | true |
 | approvedBy | string \| null | false |
 | approvedAt | Date \| null | false |
+| rejectedBy | string \| null | false |
+| rejectedAt | Date \| null | false |
+| rejectionReason | string \| null | false |
+| cancelledBy | string \| null | false |
+| cancelledAt | Date \| null | false |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
@@ -78,43 +83,23 @@ Represents a leave record managed by the `leave` module, including leave request
 
 Represents leave balance data managed by the `balance` module, including tracked entitlement, accrual, and remaining leave amounts.
 
-### Balance
-
-| Field | Type | Required |
-|-------|------|----------|
-| id | string | true |
-| employeeId | string | true |
-| policyId | string | true |
-| totalEntitlement | number | true |
-| usedDays | number | true |
-| remainingDays | number | true |
-| fiscalYear | number | true |
-| status | string | true |
-| createdAt | Date | true |
-| updatedAt | Date | true |
-
-**Relationships**
-- `Employee` — many-to-one
-- `LeavePolicy` — many-to-one
-
 ### LeaveBalance
 
 | Field | Type | Required |
 |-------|------|----------|
 | id | string | true |
 | employeeId | string | true |
-| policyId | string | true |
-| totalEntitlement | number | true |
+| leaveTypeId | string | true |
+| entitlementDays | number | true |
 | usedDays | number | true |
-| remainingDays | number | true |
-| fiscalYear | number | true |
-| status | string | true |
+| accruedDays | number | true |
+| year | number | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
 **Relationships**
 - `Employee` — many-to-one
-- `LeavePolicy` — many-to-one
+- `LeavePolicy` — many-to-one (via `leaveTypeId` FK → `leave_policies.id`)
 
 ## employee
 
