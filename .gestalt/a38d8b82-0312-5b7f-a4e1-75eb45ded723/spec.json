@@ -1,0 +1,186 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "repository",
+      "shared-db"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The leave repository implements all 8 methods (findById, findByEmployeeId, findByStatus, create, updateStatus, getBalance, upsertBalance, decrementBalance) against the pg pool from src/shared/db/connection.ts, each returning the typed model object (LeaveRequest | LeaveBalance) or null/empty array per its contract.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "create inserts a new leave request with status 'DRAFT' and returns the persisted row mapped to the LeaveRequest model; updateStatus sets the correct reviewer/timestamp fields per status (APPROVED\u2192approved_by/approved_at, REJECTED\u2192rejected_by/rejected_at/rejection_reason, CANCELLED\u2192cancelled_by/cancelled_at) and returns the updated row or null when no row matched.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "upsertBalance performs an INSERT ON CONFLICT against the (employee_id, leave_type_id, year) unique constraint and returns the resulting LeaveBalance row; decrementBalance reduces used_days by the given amount for the matching (employee_id, leave_type_id, year) row and returns the updated row or null when no row matched.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Every returned row is mapped from snake_case DB columns to the camelCase model fields defined in src/modules/leave/leave.model.ts (e.g. employee_id\u2192employeeId, leave_type_id\u2192leaveTypeId, used_days\u2192usedDays), with temporal columns converted to Date instances.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/modules/leave/index.ts re-exports ILeaveRepository and LeaveRepository alongside the existing type exports, so both are reachable through the module barrel.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "tests/unit/modules/leave/leave.repository.test.ts mocks pool.query and exercises all 8 repository methods, asserting correct SQL parameterization, row-to-model mapping, and null/empty-array returns when no rows match.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access must go through the repository pattern using the pg pool imported from src/shared/db/connection.ts; no inline SQL or direct pool usage outside the repository (GP-001, HARNESS no-direct-db-outside-repository).",
+    "All SQL must use parameterized queries (pool.query with a values array) \u2014 no string interpolation or concatenation of user-supplied values into SQL text.",
+    "TypeScript strict mode applies: no implicit any, strict null checks; repository code must be fully typed with no `any` (HARNESS no-any rule \u2014 use unknown with type guards instead).",
+    "The authoritative model types are those in src/modules/leave/leave.model.ts; the repository must import and return those exact types (LeaveRequest, LeaveBalance, LeaveRequestStatus, CreateLeaveRequestDto, UpdateLeaveRequestStatusDto) \u2014 not redefine them.",
+    "Modules import only through their declared public entry point (index.ts); the repository and its interface must be exported via src/modules/leave/index.ts (AGENTS.md architecture rule 1).",
+    "No unhandled promise rejections: all async repository methods must propagate errors as rejected promises that callers can catch (GP-006); the repository must not swallow or silently drop database errors."
+  ],
+  "outOfScope": [
+    "Business logic and state-machine guards (DRAFT\u2192SUBMITTED, SUBMITTED\u2192APPROVED/REJECTED, balance decrement on approval) \u2014 these belong to the leave service in Phase 6, not the repository.",
+    "Audit record writing (GP-002) \u2014 the repository performs persistence only; audit logging is a cross-cutting concern handled by the service/orchestration layer in later phases.",
+    "Input validation (GP-003) and RBAC enforcement (GP-005) \u2014 these are API-boundary concerns handled by the controller/middleware in Phases 5 and 7, not the repository.",
+    "HTTP routes, controllers, and Fastify registration \u2014 Phase 7/8; the repository exposes only programmatic methods.",
+    "LeavePolicy repository and seed data \u2014 Phase 9; this phase covers only leave requests and leave balances data access."
+  ],
+  "ambiguities": [
+    {
+      "description": "The LeaveRequest.reason field is typed `string | undefined` in the model, while the DB column is nullable `text` (returns null for absent values). The row mapper must decide whether a DB null maps to undefined (matching the model) or whether the model's undefined should be persisted as null. This affects round-trip fidelity of the reason field.",
+      "options": [
+        "Map DB null \u2192 undefined for reason to match the model's `string | undefined` type",
+        "Map DB null \u2192 null and tolerate the model allowing null (would require model change, out of scope)"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "A newly created LeaveRequest always starts in the 'DRAFT' status with all reviewer/timestamp fields (approvedBy, approvedAt, rejectedBy, rejectedAt, rejectionReason, cancelledBy, cancelledAt) null \u2014 the repository's create method must never insert a request in any other initial status."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "updateStatus sets reviewer fields exclusively per the target status: APPROVED populates only approved_by/approved_at (from dto.reviewerId and now), REJECTED populates only rejected_by/rejected_at/rejection_reason, CANCELLED populates only cancelled_by/cancelled_at; SUBMITTED and DRAFT set status only with no reviewer fields. The repository must not cross-populate reviewer fields for unrelated statuses."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "A LeaveBalance row is unique per (employeeId, leaveTypeId, year); upsertBalance must never create duplicate rows for that triple \u2014 it either inserts or updates the existing row via the unique constraint conflict target."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "decrementBalance only reduces used_days for an existing matching (employeeId, leaveTypeId, year) row; it must not insert a new row and must return null when no row matches, leaving the database unchanged."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "findById(id) \u2014 read a single LeaveRequest by primary key",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the LeaveRequest mapped from the row, or null when no row matches; database errors propagate as rejected promises."
+    },
+    {
+      "operation": "findByEmployeeId(employeeId) \u2014 list all LeaveRequests for an employee ordered by created_at DESC",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an array (empty when no rows match, never null); database errors propagate as rejected promises."
+    },
+    {
+      "operation": "findByStatus(status) \u2014 list LeaveRequests filtered by status",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an array (empty when no rows match, never null); database errors propagate as rejected promises."
+    },
+    {
+      "operation": "create(dto) \u2014 insert a new LeaveRequest with status DRAFT and return the persisted row",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the created LeaveRequest; database constraint violations (e.g. FK to leave_policies) propagate as rejected promises."
+    },
+    {
+      "operation": "updateStatus(id, dto) \u2014 update a LeaveRequest's status and reviewer fields per the status-specific rules",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the updated LeaveRequest or null when no row matched the id; database errors propagate as rejected promises."
+    },
+    {
+      "operation": "getBalance(employeeId, leaveTypeId, year) \u2014 read a single LeaveBalance by the natural key",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the LeaveBalance or null when no row matches; database errors propagate as rejected promises."
+    },
+    {
+      "operation": "upsertBalance(balance) \u2014 insert or update a LeaveBalance on conflict of (employee_id, leave_type_id, year)",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns the resulting LeaveBalance row in both insert and update paths; repeated calls with the same natural key converge to one row (idempotent on the conflict target)."
+    },
+    {
+      "operation": "decrementBalance(employeeId, leaveTypeId, year, days) \u2014 reduce used_days on the matching LeaveBalance row",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the updated LeaveBalance or null when no row matched; database errors propagate as rejected promises."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The repository's return types and DTO parameter types must match the interfaces defined in src/modules/leave/leave.model.ts exactly \u2014 LeaveRequest, LeaveBalance, LeaveRequestStatus, CreateLeaveRequestDto, UpdateLeaveRequestStatusDto \u2014 including nullable/optional field handling (reason: string | undefined; reviewer/timestamp fields: ... | null).",
+      "referencePath": "src/modules/leave/leave.model.ts"
+    },
+    {
+      "requirement": "The repository must obtain its database connection by importing the `pool` (pg.Pool) from src/shared/db/connection.ts and executing SQL via pool.query(text, params) \u2014 it must not instantiate its own Pool or read DATABASE_URL directly.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "SQL against leave_requests must target the snake_case columns defined in migration 002 (employee_id, leave_type_id, start_date, end_date, reason, status, approved_by, approved_at, rejected_by, rejected_at, rejection_reason, cancelled_by, cancelled_at, created_at, updated_at) with status values restricted to the CHECK constraint set (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED).",
+      "referencePath": "migrations/002_create_leave_requests.ts"
+    },
+    {
+      "requirement": "SQL against leave_balances must target the snake_case columns defined in migration 003 (employee_id, leave_type_id, entitlement_days, used_days, accrued_days, year) and use the unique constraint on (employee_id, leave_type_id, year) as the ON CONFLICT target for upsertBalance.",
+      "referencePath": "migrations/003_create_leave_balances.ts"
+    },
+    {
+      "requirement": "The barrel export in src/modules/leave/index.ts must be extended (not replaced) to add ILeaveRepository and LeaveRepository while preserving the existing type re-exports from leave.model.ts.",
+      "referencePath": "src/modules/leave/index.ts"
+    },
+    {
+      "requirement": "The repository test must follow the existing test conventions established in tests/unit/modules/leave/leave.model.test.ts: ts-jest preset, describe/it/expect, relative import path ../../../../src/modules/leave/..., and testMatch under tests/**/*.test.ts.",
+      "referencePath": "tests/unit/modules/leave/leave.model.test.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/db/connection.ts (pg Pool)",
+      "why": "The repository depends on the shared database connection pool as its sole data-access entry point; it imports `pool` and runs all SQL through it."
+    },
+    {
+      "target": "src/modules/leave/leave.model.ts (Phase 2 domain types)",
+      "why": "The repository imports and returns the authoritative model types (LeaveRequest, LeaveBalance, LeaveRequestStatus, CreateLeaveRequestDto, UpdateLeaveRequestStatusDto) defined in Phase 2; it must not redefine them."
+    },
+    {
+      "target": "src/modules/leave/index.ts (module barrel)",
+      "why": "The repository interface and class must be exported through the module's public entry point so downstream phases (Phase 6 service, Phase 8 routes) can import them without reaching into module internals."
+    },
+    {
+      "target": "Phase 6 leave service (ILeaveRepository consumer)",
+      "why": "The ILeaveRepository interface established here is the contract the Phase 6 LeaveService will depend on and mock in its unit tests; the method signatures and return semantics must remain stable."
+    }
+  ]
+}
