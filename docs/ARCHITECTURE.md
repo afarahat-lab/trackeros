@@ -18,6 +18,8 @@ The architecture is modular, with a clear separation of concerns between models,
 ```
 src/modules/uptime/uptime.{model,service.interface,service,routes}.ts
 src/modules/status/status.{model,service.interface,service}.ts
+src/modules/leave/index.ts
+src/modules/leave/leave.model.ts
 src/shared/db/connection.ts
 ```
 
@@ -171,6 +173,7 @@ Unique constraint on `(employee_id, leave_type_id, year)`.
 ### Implementation Progress
 
 - ✅ **Phase 1 (Migrations)** — `knexfile.ts` + migrations 001–003 created. Tables `leave_policies`, `leave_requests`, `leave_balances` defined with UUID PKs, check constraints, foreign keys, and unique constraints. All migrations include `up` and `down` functions.
+- ✅ **Phase 2 (Domain Model Types)** — `src/modules/leave/leave.model.ts` defines all domain types: `LeaveType` (6-value literal union), `LeaveRequestStatus` (5-value literal union), `LeavePolicy`, `LeaveRequest`, `LeaveBalance`, `CreateLeaveRequestDto`, and `UpdateLeaveRequestStatusDto` interfaces. Barrel export via `src/modules/leave/index.ts`. Unit tests in `tests/unit/modules/leave/leave.model.test.ts` verify type correctness and optional/nullable field handling.
 
 ### Stack Compliance
 
