@@ -1,0 +1,159 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave",
+      "policy",
+      "balance"
+    ],
+    "affectedLayers": [
+      "infrastructure"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "knexfile.ts exports a Knex config using the pg client, reading DATABASE_URL from environment (via dotenv), with migrations directed at a ./migrations directory using the ts extension \u2014 and its connection/SSL semantics mirror src/shared/db/connection.ts (production SSL with rejectUnauthorized + DB_SSL_CA, non-production false).",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "Migration 001 creates the leave_policies table with a UUID primary key defaulted via knex.fn.uuid(), a database-level CHECK constraint restricting leave_type to exactly the six valid values (annual, sick, emergency, unpaid, maternity, paternity), NOT NULL entitlement_days, default-true boolean flags for requires_manager_approval and is_active, and NOT NULL timestamptz created_at/updated_at.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "Migration 002 creates the leave_requests table with a UUID PK defaulted via knex.fn.uuid(), a NOT NULL leave_type_id foreign key referencing leave_policies.id, a status column defaulting to 'DRAFT' with a database-level CHECK constraint restricting status to exactly DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED, nullable approver/rejector/canceller uuid + timestamptz pairs, and NOT NULL timestamptz created_at/updated_at.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "Migration 003 creates the leave_balances table with a UUID PK defaulted via knex.fn.uuid(), a NOT NULL leave_type_id foreign key referencing leave_policies.id, decimal entitlement_days/used_days/accrued_days (used_days and accrued_days defaulting to 0), a NOT NULL integer year, and a unique constraint on (employee_id, leave_type_id, year) enforcing one balance row per employee per leave type per year.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "Every migration file exports both an async up(knex) and an async down(knex) function; up uses knex.schema.createTable and down uses knex.schema.dropTableIfExists so each migration is fully reversible.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The migration files typecheck under the project's strict tsconfig (no implicit any, strict null checks) \u2014 each imports Knex as a type and the up/down signatures are (knex: Knex) => Promise<void>.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The schema must use the inline check-constrained varchar approach for leave_type on leave_policies \u2014 no separate leave_types table. leave_requests and leave_balances reference leave_policies.id via leave_type_id, not a leave_types table.",
+    "All UUID primary keys must default via knex.fn.uuid(); all temporal columns must be timestamptz (timestamp with useTz: true).",
+    "knexfile.ts and the migrations/ directory are intentionally outside tsconfig.json's rootDir/include scope (rootDir is ./src, include is [\"src\"]) \u2014 this is the expected Knex pattern (migrations run via ts-node through the Knex CLI, not compiled by tsc) and must not be treated as a defect.",
+    "The required runtime dependencies (knex, pg) and dev dependency (ts-node) must be present in package.json; no new dependencies are introduced by this phase.",
+    "No hardcoded secrets \u2014 DATABASE_URL and DB_SSL_CA are read from process.env (loaded via dotenv), never literal values in knexfile.ts.",
+    "leave_balances uses an integer year column (not fiscal_year); the unique constraint is on (employee_id, leave_type_id, year). There is no policy_id FK on leave_balances \u2014 leave_type_id referencing leave_policies.id is sufficient."
+  ],
+  "outOfScope": [
+    "Domain model TypeScript types (LeaveType, LeaveRequestStatus, LeavePolicy, LeaveRequest, LeaveBalance interfaces and DTOs) \u2014 these are Phase 2 (src/modules/leave/leave.model.ts).",
+    "Repository, service, controller, and routes layers for the leave module \u2014 Phases 3, 6, 7, 8.",
+    "Seed migration for default leave policies (migrations/004_seed_default_policies.ts) \u2014 Phase 9.",
+    "Shared error types, auth middleware, and JWT utilities \u2014 Phases 4 and 5.",
+    "Defining a Knex CLI migration script in package.json scripts (e.g. knex migrate:latest) \u2014 no such script exists and adding one is outside this phase's file scope.",
+    "Employee, audit, and notification module tables/migrations \u2014 those belong to their respective modules and later phases, not the leave schema migrations."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "leave_policies",
+      "mustExistOrExtend": true,
+      "invariant": "A leave policy row's leave_type is constrained at the database level to one of the six valid categories; the row's active/inactive state is governed by the is_active flag (default true). A policy cannot be deleted while leave_requests or leave_balances still reference its id (the FKs have no ON DELETE clause, so the default RESTRICT applies)."
+    },
+    {
+      "entity": "leave_requests",
+      "mustExistOrExtend": true,
+      "invariant": "A leave request row is always tied to an existing leave_policies row via the leave_type_id FK; its status is constrained at the database level to the five lifecycle states and defaults to DRAFT on creation. The approver/rejector/canceller identity and timestamp columns are nullable and populated only as the corresponding lifecycle transition occurs."
+    },
+    {
+      "entity": "leave_balances",
+      "mustExistOrExtend": true,
+      "invariant": "At most one leave_balances row exists per (employee_id, leave_type_id, year) combination, enforced by the unique constraint; each balance row references an existing leave_policies row via leave_type_id. used_days and accrued_days start at 0 and are mutated by later-phase business logic (approval decrements, cancellation restores)."
+    },
+    {
+      "entity": "knex_migrations (Knex tracking table)",
+      "mustExistOrExtend": false,
+      "invariant": "Migration ordering is enforced by Knex's own migrations tracking table \u2014 migration 001 (leave_policies) must run before 002 and 003 because both define FKs referencing leave_policies.id; the down direction must drop dependent tables (leave_requests, leave_balances) before leave_policies to avoid FK violation, which the per-file dropTableIfExists satisfies when run in reverse order."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "knexfile default export \u2014 Knex configuration consumed by the Knex CLI",
+      "authRule": "No auth; the config reads DATABASE_URL and DB_SSL_CA from process.env (loaded via dotenv) \u2014 credentials come from environment, never hardcoded.",
+      "idempotent": false,
+      "errorSemantics": "If DATABASE_URL is unset, Knex connection attempts fail at runtime with a pg connection error; the config itself does not throw at import time."
+    },
+    {
+      "operation": "Migration up(knex) \u2014 forward schema creation for each of the three leave tables",
+      "authRule": "No auth; executed by the Knex CLI against the configured PostgreSQL connection.",
+      "idempotent": false,
+      "errorSemantics": "createTable fails if the table already exists (Knex throws); the CHECK constraint ALTER TABLE fails if a constraint of the same name already exists. Errors propagate as rejected promises from the async up function."
+    },
+    {
+      "operation": "Migration down(knex) \u2014 reverse schema teardown for each of the three leave tables",
+      "authRule": "No auth; executed by the Knex CLI against the configured PostgreSQL connection.",
+      "idempotent": true,
+      "errorSemantics": "dropTableIfExists is a no-op if the table is absent (does not throw); however, dropping leave_policies while leave_requests/leave_balances still exist fails with an FK violation unless those tables are dropped first \u2014 satisfied when Knex runs down migrations in reverse order (003, 002, then 001)."
+    },
+    {
+      "operation": "Database-level CHECK and FK constraints enforced by PostgreSQL on leave_policies.leave_type, leave_requests.status, and the leave_type_id foreign keys",
+      "authRule": "No auth; database-level enforcement independent of application code.",
+      "idempotent": false,
+      "errorSemantics": "An INSERT/UPDATE that violates the CHECK constraint is rejected by PostgreSQL with a constraint violation error; an INSERT/UPDATE that violates the FK is rejected with a foreign-key violation error; a duplicate (employee_id, leave_type_id, year) is rejected with a unique-violation error. These surface to the repository layer in later phases."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "knexfile.ts connection configuration (connectionString from DATABASE_URL, SSL logic: production uses { rejectUnauthorized: true, ca: process.env.DB_SSL_CA }, non-production uses false) must mirror the existing pg Pool configuration in src/shared/db/connection.ts so the Knex CLI and the application's runtime pool connect to the same database with the same SSL behavior.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "The three table definitions (leave_policies, leave_requests, leave_balances) \u2014 column names, types, nullability, defaults, CHECK constraints, FKs, and the unique constraint \u2014 must match the \"Database Schema (as built \u2014 migrations 001\u2013003)\" section of docs/ARCHITECTURE.md exactly, including the documented note that leave_type is an inline check-constrained varchar with no separate leave_types table and that FKs reference leave_policies.id.",
+      "referencePath": "docs/ARCHITECTURE.md"
+    },
+    {
+      "requirement": "The schema must remain consistent with the design decisions recorded in docs/DECISIONS.md (ADR-002): no separate leave_types table, leave_balances uses integer year not fiscal_year, no policy_id FK on leave_balances, accrued_days tracked separately from entitlement_days, and all migrations include down functions using dropTableIfExists.",
+      "referencePath": "docs/DECISIONS.md"
+    },
+    {
+      "requirement": "The leave_type enumeration values enforced by the leave_policies CHECK constraint and the LeaveRequestStatus values enforced by the leave_requests CHECK constraint must match the enum value sets documented in docs/DOMAIN.md (LeaveType: annual, sick, emergency, unpaid, maternity, paternity; LeaveStatus: DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED) so later-phase TypeScript literal unions align with the database constraints.",
+      "referencePath": "docs/DOMAIN.md"
+    },
+    {
+      "requirement": "The Knex config must use the pg client and the DATABASE_URL config key declared in HARNESS.json's adapters.database (type: postgres, configKey: DATABASE_URL), and must not introduce any database technology outside the declared stack.",
+      "referencePath": "HARNESS.json"
+    },
+    {
+      "requirement": "Migration files must remain valid TypeScript under the project's strict compiler settings (strict: true, no implicit any, strict null checks) even though they are excluded from tsc's include/rootDir scope \u2014 they are compiled on-demand by ts-node via the Knex CLI, so they must not rely on permissive defaults the project's tsconfig disables.",
+      "referencePath": "tsconfig.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/db/connection.ts (existing pg Pool)",
+      "why": "knexfile.ts must connect to the same PostgreSQL instance the application runtime uses \u2014 both read DATABASE_URL and apply identical SSL semantics \u2014 so migrations apply to the database the leave repositories (later phases) will query."
+    },
+    {
+      "target": "Knex CLI (knex migrate:latest / migrate:rollback)",
+      "why": "The knexfile.ts default export and the migrations/ directory are consumed by the Knex CLI (run via ts-node) to apply and roll back schema changes; no application code imports these files at runtime."
+    },
+    {
+      "target": "Later-phase leave repositories (Phase 3: src/modules/leave/leave.repository.ts, Phase 9: src/modules/leave/policy.repository.ts)",
+      "why": "The three tables created by these migrations are the persistence targets the repository layer will query/insert/update; the column names, types, and constraints defined here are the contract the repositories must conform to."
+    },
+    {
+      "target": "Phase 9 seed migration (migrations/004_seed_default_policies.ts)",
+      "why": "The seed migration depends on the leave_policies table created by migration 001 existing first; it inserts default policies using INSERT ON CONFLICT DO NOTHING, relying on the table and its CHECK constraint being in place."
+    },
+    {
+      "target": "docs/ARCHITECTURE.md and docs/DECISIONS.md (project documentation)",
+      "why": "The schema as built is documented in ARCHITECTURE.md's \"Database Schema (as built \u2014 migrations 001\u2013003)\" section and ADR-002 in DECISIONS.md; the migrations must remain consistent with these records, and any schema change would require updating both."
+    }
+  ]
+}
