@@ -25,14 +25,20 @@ export async function verifyToken(token: string): Promise<TokenPayload> {
     throw new Error('JWT_SECRET is not configured');
   }
 
-  const decoded = jwt.verify(token, secret) as jwt.JwtPayload;
+  const decoded = jwt.verify(token, secret) as unknown;
 
-  if (!decoded.userId || !decoded.role) {
+  if (typeof decoded !== 'object' || decoded === null) {
+    throw new Error('Token payload is not an object');
+  }
+
+  const payload = decoded as Record<string, unknown>;
+
+  if (typeof payload.userId !== 'string' || typeof payload.role !== 'string') {
     throw new Error('Token payload missing required fields: userId or role');
   }
 
   return {
-    userId: decoded.userId,
-    role: decoded.role,
+    userId: payload.userId,
+    role: payload.role,
   };
 }

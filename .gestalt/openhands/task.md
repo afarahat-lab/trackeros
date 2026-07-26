@@ -1,32 +1,24 @@
-# Implement this phase: Phase 5: Auth middleware and JWT utilities
+# Fix specific quality-gate violations: Phase 5: Auth middleware and JWT utilities
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/6f64b552-c5b8-42bc-86fa-01fa08ab4abe/5`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/fix/6f64b552-c5b8-42bc-86fa-01fa08ab4abe/5/1`. Do not clone anything; work only in this directory.
 
-## What to build
-(no phase architecture provided — infer from the success criteria below)
+You are fixing SPECIFIC violations the quality gate found in EXISTING, already-committed files. Make ONLY the targeted edits listed below — do NOT refactor, regenerate, or change anything else.
 
-## Success criteria
-Create shared authentication middleware and JWT utilities. No dependencies on prior leave phases.
+The files ALREADY EXIST. You MUST edit them in place with the `str_replace_editor` tool. Reading or viewing a file is NOT sufficient — you have NOT finished until you have edited EVERY file listed below.
 
-Files to create:
-- `src/shared/auth/jwt.ts` — JWT utility functions: `verifyToken(token: string): Promise<{ userId: string; role: string }>` using jsonwebtoken, `extractTokenFromHeader(authHeader: string | undefined): string | null` to parse Bearer token. Read JWT_SECRET from process.env.
-- `src/shared/auth/middleware.ts` — Fastify preHandler middleware: `authenticate` that extracts and verifies JWT, attaches `request.user = { userId, role }` to the request. Export a Fastify `preHandler` hook. Also export `requireRole(...roles: string[])` that returns a preHandler checking the user's role.
-- `src/shared/auth/types.ts` — augment Fastify's request type: declare module 'fastify' to add `user?: { userId: string; role: string }` to FastifyRequest.
-- `src/shared/auth/index.ts` — barrel export of jwt.ts, middleware.ts, and types.ts.
+## Required edits
 
-Include Jest unit tests in `tests/unit/shared/auth/jwt.test.ts` and `tests/unit/shared/auth/middleware.test.ts`.
-
-## Project stack
-Before writing code, read `HARNESS.json` in the working directory to learn the project's language, framework, and test runner, and follow the existing conventions in the repository. Read `docs/ARCHITECTURE.md` and `PLAN.md` if present.
-
-## Verify before you finish (MANDATORY)
-The code you write MUST compile and its tests MUST pass — a compilation or type error must NEVER be left for CI to find. Before you declare this task done:
-- Read the project's build / type-check / test commands from `package.json` (scripts) and `HARNESS.json`.
-- Install dependencies if they are not already installed, then RUN the type-check / build (e.g. `npm run build` or `tsc --noEmit`) AND the tests (e.g. `npm test`) for the files this phase touches.
-- FIX every compilation error, type error, and failing test you introduced — including in test files — and re-run until they pass.
-- Only when the build and the tests pass may you consider the task complete. If a dependency install genuinely cannot be made to work, say so explicitly in your final message rather than declaring success on unverified code.
+### Edit 1
+File: src/shared/auth/jwt.ts
+Line: 25
+Offending code: `const decoded = jwt.verify(token, secret) as jwt.JwtPayload;`
+Rule violated: no-any
+Action (do this now): Edit `src/shared/auth/jwt.ts` at line 25 in place to fix the `no-any` violation.
+What the quality gate found — apply this: [no-any] The cast to `jwt.JwtPayload` introduces `any` into the code because `JwtPayload` has an index signature `[key: string]: any`. This means `decoded.userId` and `decoded.role` are typed as `any` internally. The HARNESS.json `no-any` constraint (high severity) requires using `unknown` with type guards instead. The proper approach is to cast to `unknown` first, then validate the shape with type guards (e.g., `typeof payload.userId === 'string'`), avoiding the `any` index signature entirely.
 
 ## Constraints (mandatory)
-- Write and modify source files ONLY. Do NOT run `git commit`, `git push`, `git add`, or any other git command. The platform handles all git operations. (Running the build / type-check / tests above is expected and encouraged — that is NOT a git operation.)
-- Do not create a new repository or change the git remote.
-- Stay within the scope of this phase; do not implement deferred/later work.
+- Edit ONLY the files listed above; do not add, delete, or rename files.
+- Do not modify imports unless a required change above needs it.
+- Do NOT run `git commit`, `git push`, `git add`, or any git command. The platform handles all git operations.
+- Do not run tests or build commands.
+- When all the listed edits are made, stop.
