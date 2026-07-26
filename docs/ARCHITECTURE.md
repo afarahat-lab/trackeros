@@ -22,6 +22,7 @@ src/modules/leave/index.ts
 src/modules/leave/leave.model.ts
 src/modules/leave/leave.repository.ts
 src/shared/db/connection.ts
+src/shared/errorTypes.ts
 ```
 
 ## Key patterns
@@ -29,6 +30,20 @@ src/shared/db/connection.ts
 - See `AGENTS.md` for stack-specific coding conventions
 - See `docs/GOLDEN_PRINCIPLES.md` for the non-negotiable rules every
   cycle is checked against
+
+## Shared error types
+
+`src/shared/errorTypes.ts` provides typed error classes used across all modules for consistent error handling at API boundaries:
+
+| Class | Properties | HTTP mapping |
+|-------|-----------|--------------|
+| `NotFoundError` | `resourceName: string`, `resourceId: string` | 404 |
+| `ValidationError` | `details: string[]` | 400 |
+| `ConflictError` | `resourceName: string` | 409 |
+| `UnauthorizedError` | (none beyond message) | 401 |
+| `ForbiddenError` | (none beyond message) | 403 |
+
+All classes extend `Error`, set `this.name` to the class name, and capture stack traces via `Error.captureStackTrace`. Controllers catch these errors and map them to the appropriate HTTP status codes.
 
 ## Dependency rules
 
@@ -176,6 +191,7 @@ Unique constraint on `(employee_id, leave_type_id, year)`.
 - ✅ **Phase 1 (Migrations)** — `knexfile.ts` + migrations 001–003 created. Tables `leave_policies`, `leave_requests`, `leave_balances` defined with UUID PKs, check constraints, foreign keys, and unique constraints. All migrations include `up` and `down` functions.
 - ✅ **Phase 2 (Domain Model Types)** — `src/modules/leave/leave.model.ts` defines all domain types: `LeaveType` (6-value literal union), `LeaveRequestStatus` (5-value literal union), `LeavePolicy`, `LeaveRequest`, `LeaveBalance`, `CreateLeaveRequestDto`, and `UpdateLeaveRequestStatusDto` interfaces. Barrel export via `src/modules/leave/index.ts`. Unit tests in `tests/unit/modules/leave/leave.model.test.ts` verify type correctness and optional/nullable field handling.
 - ✅ **Phase 3 (Leave Repository)** — `src/modules/leave/leave.repository.ts` implements `ILeaveRepository` interface and `LeaveRepository` class using the pg Pool from `src/shared/db/connection.ts`. Eight methods: `findById`, `findByEmployeeId`, `findByStatus`, `create` (INSERT with DRAFT status), `updateStatus` (switch on APPROVED/REJECTED/CANCELLED/fallback, each setting the appropriate reviewer fields and timestamps), `getBalance`, `upsertBalance` (INSERT ON CONFLICT UPDATE), and `decrementBalance` (increments used_days). Constructor accepts an optional pg Pool (defaults to shared pool). Barrel export updated in `src/modules/leave/index.ts`. Unit tests in `tests/unit/modules/leave/leave.repository.test.ts` with 16 test cases covering all methods, null/empty results, and status-specific update behavior.
+- ✅ **Phase 4 (Shared Error Types)** — `src/shared/errorTypes.ts` defines five typed error classes: `NotFoundError`, `ValidationError`, `ConflictError`, `UnauthorizedError`, `ForbiddenError`. All extend `Error`, set `this.name`, and capture stack traces. Unit tests in `tests/unit/shared/errorTypes.test.ts` verify instantiation, property preservation, and stack trace capture for each class.
 
 ### Stack Compliance
 
