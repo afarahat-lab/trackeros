@@ -1,0 +1,143 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "domain"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The LeaveType string literal union exposes exactly the 6 values 'annual', 'sick', 'emergency', 'unpaid', 'maternity', 'paternity' \u2014 no more, no fewer \u2014 and a value outside this set is rejected by the TypeScript compiler.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The LeaveRequestStatus string literal union exposes exactly the 5 values 'DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED', 'CANCELLED' \u2014 no more, no fewer \u2014 and a value outside this set is rejected by the TypeScript compiler.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The LeavePolicy, LeaveRequest, and LeaveBalance interfaces are constructible as full objects; nullable fields accept null and optional fields accept undefined, and the compiler rejects objects missing required fields or assigning wrong types to constrained fields (e.g. leaveType must be a LeaveType, status must be a LeaveRequestStatus).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The CreateLeaveRequestDto and UpdateLeaveRequestStatusDto interfaces are constructible; their optional fields (reason, rejectionReason) accept undefined, and the status field on UpdateLeaveRequestStatusDto is constrained to LeaveRequestStatus.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The module barrel export re-exports all 7 public types (LeaveType, LeaveRequestStatus, LeavePolicy, LeaveRequest, LeaveBalance, CreateLeaveRequestDto, UpdateLeaveRequestStatusDto) so every type is importable from the module entry point.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests pass under the ts-jest preset, verifying the literal union value sets, object construction for each interface, and null/undefined handling for nullable and optional fields.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All type definitions compile cleanly under strict TypeScript (tsc --noEmit) with no implicit any and strict null checks enabled.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No use of `any` \u2014 use `unknown` with type guards instead (HARNESS.json constraint rule no-any, severity high).",
+    "Strict TypeScript must be satisfied: no implicit any and strict null checks enabled (tsconfig.json strict: true).",
+    "Cross-module imports must go through the module's barrel index.ts only, never from internal files (AGENTS.md architecture rule 1).",
+    "This phase defines pure TypeScript types only \u2014 no database access, no runtime logic, no HTTP surface, no repository/service/controller code.",
+    "Tests must use the Jest + ts-jest preset and match the configured testMatch glob (**/tests/**/*.test.(ts|js))."
+  ],
+  "outOfScope": [
+    "Repository, service, controller, and routes layers for the leave module (Phases 3, 6, 7, 8).",
+    "Leave state-machine transition logic and business rules (Phase 6/10) \u2014 this phase only defines the status union values, not the guards.",
+    "Policy enforcement logic (minimum notice days, auto-approval, manager-approval requirement) \u2014 Phase 10.",
+    "Shared error type classes (NotFoundError, ValidationError, etc.) \u2014 Phase 4.",
+    "Auth middleware and JWT utilities \u2014 Phase 5.",
+    "Database migrations and seed data \u2014 Phase 1 (already complete) and Phase 9.",
+    "Runtime validation (e.g. zod schemas) of DTO payloads at API boundaries \u2014 this phase defines static types only."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveType",
+      "mustExistOrExtend": true,
+      "invariant": "The set of allowed leave categories is closed and finite: exactly annual, sick, emergency, unpaid, maternity, paternity. No other string is assignable to the type."
+    },
+    {
+      "entity": "LeaveRequestStatus",
+      "mustExistOrExtend": true,
+      "invariant": "The set of allowed lifecycle states is closed and finite: exactly DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED. No other string is assignable to the type."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "A policy's leaveType is constrained to the LeaveType union, ensuring a policy can only govern a recognized leave category."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "A request's status is constrained to the LeaveRequestStatus union, and its reviewer/actor fields (approvedBy, rejectedBy, cancelledBy) and their timestamps are independently nullable, encoding that a request may be in a state where no reviewer has acted yet."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "A balance is scoped to a single employee, leave type, and year, tracking entitlement, used, and accrued days as numeric values."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "Barrel export of all leave domain types from the module entry point",
+      "authRule": "N/A \u2014 pure type module, no runtime auth",
+      "idempotent": true,
+      "errorSemantics": "Importing a non-exported name must fail at compile time; all 7 public types must be resolvable from the entry point."
+    },
+    {
+      "operation": "Construction of each domain interface (LeavePolicy, LeaveRequest, LeaveBalance, CreateLeaveRequestDto, UpdateLeaveRequestStatusDto) as a typed object literal",
+      "authRule": "N/A \u2014 pure type module",
+      "idempotent": true,
+      "errorSemantics": "The TypeScript compiler must reject object literals that omit required fields, assign a non-LeaveType to leaveType, assign a non-LeaveRequestStatus to status, or assign a non-null/non-undefined value to a nullable/optional field of incompatible type."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The LeaveType union values must exactly match the CHECK constraint on leave_policies.leave_type in migration 001: ('annual','sick','emergency','unpaid','maternity','paternity').",
+      "referencePath": "migrations/001_create_leave_policies.ts"
+    },
+    {
+      "requirement": "The LeaveRequestStatus union values must exactly match the CHECK constraint on leave_requests.status in migration 002: ('DRAFT','SUBMITTED','APPROVED','REJECTED','CANCELLED').",
+      "referencePath": "migrations/002_create_leave_requests.ts"
+    },
+    {
+      "requirement": "The LeaveBalance interface fields (entitlementDays, usedDays, accruedDays, year) must correspond to the leave_balances table columns (entitlement_days, used_days, accrued_days, year) defined in migration 003, preserving the unique scope of (employee_id, leave_type_id, year).",
+      "referencePath": "migrations/003_create_leave_balances.ts"
+    },
+    {
+      "requirement": "The barrel export pattern (re-export all public types from index.ts) must match the existing module convention used by src/modules/leave/index.ts and the module-structure rule in AGENTS.md.",
+      "referencePath": "src/modules/leave/index.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "Phase 3 \u2014 Leave repository (src/modules/leave/leave.repository.ts)",
+      "why": "Repository methods return LeaveRequest/LeaveBalance and accept CreateLeaveRequestDto/UpdateLeaveRequestStatusDto; the types defined here are the contract for all data-access signatures."
+    },
+    {
+      "target": "Phase 6 \u2014 Leave service (src/modules/leave/leave.service.ts)",
+      "why": "The service orchestrates the LeaveRequest lifecycle using LeaveRequestStatus for state-machine guards and consumes the DTOs for apply/approve/reject/cancel operations."
+    },
+    {
+      "target": "Phase 9 \u2014 Policy repository (src/modules/leave/policy.repository.ts)",
+      "why": "The policy repository returns LeavePolicy objects and uses the LeaveType union for findByLeaveType lookups."
+    },
+    {
+      "target": "Phase 1 \u2014 Database migrations (migrations/001\u2013003)",
+      "why": "The type unions must stay in lockstep with the database CHECK constraints so that values valid in TypeScript are also valid at the persistence layer."
+    }
+  ]
+}
