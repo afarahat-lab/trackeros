@@ -24,7 +24,7 @@
 # test_action_dispatch, so a validated action can never again die at dispatch.
 
 name: corporate-ops-web-mobile
-version: "3.0.0"
+version: "3.2.0"
 
 phases:
   # ── Planning: architecture crew → planner → persist (runs once) ──
@@ -101,11 +101,6 @@ phases:
             agent: intent-design-agent
             inputs: [current_phase, intent_id, architecture]
             output: { name: spec, channel: workflow_state }
-          - id: context
-            type: agent
-            agent: context-agent
-            inputs: [spec]
-            output: { name: context_files, channel: files }
           # Code-generation composite (ADR-067 Phase 3 amendment A1/A2) — a `work_dir`
           # composite: every step shares ONE persistent work dir derived from
           # `phase_branch` (no ephemeral per-step re-clone). The provider action
@@ -135,6 +130,17 @@ phases:
                 action: git_commit_push
                 inputs: [source_writes]
                 output: { name: commit_sha, channel: workflow_state }
+          # Context — runs AFTER code-generation (was before it): documentation must describe what
+          # was ACTUALLY BUILT, not the plan. `commit_sha` gives it the committed code so its gitDiff
+          # grant sees the real diff (previously vestigial — it ran before any diff existed); `spec`
+          # stays as the invariants to check the diff AGAINST (the review-agent reframe, applied here
+          # too). Docs commit into the phase branch before the PR, so they ship atomically with the
+          # code through CI + gate ("docs cannot lag", the already-decided doc-emission principle).
+          - id: context
+            type: agent
+            agent: context-agent
+            inputs: [spec, commit_sha]
+            output: { name: context_files, channel: files }
           # Deploy + gate — open PR → poll CI → GATE (after CI, ADR-041) → merge.
           # create_pr / poll_ci / gate are VERDICT nodes: a non-ok result RAISES a
           # typed signal into the loop's self-heal envelope. The gate is a single
