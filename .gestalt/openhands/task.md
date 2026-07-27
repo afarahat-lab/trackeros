@@ -1,12 +1,12 @@
-# Implement this phase: Phase 3: Employee model + repository
+# Implement this phase: Phase 4: LeaveBalance model + repository
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/e52e7dc9-5a2d-453b-b5a3-9d187c6021f7/3`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/e52e7dc9-5a2d-453b-b5a3-9d187c6021f7/4`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create src/modules/employee/employee.model.ts with the Employee interface (id, userId, firstName, lastName, email, role, managerId, department, designation, dateOfJoining, status, createdAt, updatedAt) using EmployeeStatus from src/shared/types/leave.types.ts. Create src/modules/employee/employee.repository.ts with IEmployeeRepository interface and KnexEmployeeRepository class. This phase depends on src/shared/types/leave.types.ts and src/shared/base-repository.ts from Phase 1 — read those before generating. Include Jest unit tests in tests/unit/modules/employee/.
+Create src/modules/balance/balance.model.ts with the LeaveBalance interface (id, employeeId, leaveType, leavePolicyId, entitled, used, pending, carriedOver, remaining as computed, year, status, createdAt, updatedAt) using LeaveType and LeaveBalanceStatus from src/shared/types/leave.types.ts. Create src/modules/balance/balance.repository.ts with ILeaveBalanceRepository interface and KnexLeaveBalanceRepository class. This phase depends on src/shared/types/leave.types.ts and src/shared/base-repository.ts from Phase 1 — read those before generating. Include Jest unit tests in tests/unit/modules/balance/.
 
 ## Project stack
 Before writing code, read `HARNESS.json` in the working directory to learn the project's language, framework, and test runner, and follow the existing conventions in the repository. Read `docs/ARCHITECTURE.md` and `PLAN.md` if present.
