@@ -1,4 +1,4 @@
-import { ILeaveRepository, KnexLeaveRepository } from '../../../../src/modules/leave/leave.repository';
+import { ILeaveRepository, KnexLeaveRepository, RepositoryError } from '../../../../src/modules/leave/leave.repository';
 import { LeaveRequest } from '../../../../src/modules/leave/leave.model';
 import { LeaveType, LeaveRequestStatus } from '../../../../src/shared/types/leave.types';
 import { Knex } from 'knex';
@@ -143,6 +143,13 @@ describe('KnexLeaveRepository', () => {
       const result = await repo.findById('nonexistent');
 
       expect(result).toBeNull();
+    });
+
+    it('should throw RepositoryError when the query rejects', async () => {
+      const dbError = new Error('connection refused');
+      mockQb.first = jest.fn().mockRejectedValue(dbError);
+
+      await expect(repo.findById('lr-001')).rejects.toThrow(RepositoryError);
     });
   });
 
