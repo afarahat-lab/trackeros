@@ -7,8 +7,9 @@ Base entity providing common fields for domain models.
 | Field | Type | Required |
 |-------|------|----------|
 | id | string | true |
-| created_at | Date | true |
-| updated_at | Date | true |
+| createdAt | Date | true |
+| updatedAt | Date | true |
+| deletedAt | Date \| null | false |
 
 ## leave
 
@@ -18,8 +19,7 @@ Represents a leave record managed by the `leave` module, including leave request
 
 | Value | Description |
 |-------|-------------|
-| DRAFT | Leave request is in draft state |
-| SUBMITTED | Leave request has been submitted |
+| PENDING | Leave request is pending review |
 | APPROVED | Leave request has been approved |
 | REJECTED | Leave request has been rejected |
 | CANCELLED | Leave request has been cancelled |
@@ -133,7 +133,7 @@ Represents employee data managed by the `employee` module, including employee re
 | department | string \| null | false |
 | hireDate | Date | true |
 | terminationDate | Date \| null | false |
-| employmentStatus | 'ACTIVE' \| 'INACTIVE' \| 'TERMINATED' | true |
+| employmentStatus | 'ACTIVE' \| 'INACTIVE' \| 'TERMINATED' \| 'ON_LEAVE' | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 | deletedAt | Date \| null | false |

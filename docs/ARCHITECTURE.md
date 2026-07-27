@@ -21,8 +21,6 @@ src/modules/balance/balance.{model,repository,service,controller,routes}.ts
 src/modules/employee/employee.{model,repository,service,controller,routes}.ts
 src/modules/policy/policy.{model,repository,service,controller,routes}.ts
 src/modules/notification/notification.{model,repository,service,controller,routes}.ts
-src/modules/LeaveStatus/    — LeaveStatus module
-src/modules/BaseEntity/    — BaseEntity module
 src/modules/LeaveRequest/    — LeaveRequest module
 src/modules/LeaveType/    — LeaveType module
 src/modules/LeavePolicy/    — LeavePolicy module
@@ -32,6 +30,7 @@ src/modules/AuditServiceInterface/    — AuditServiceInterface module
 src/shared/db connection.ts
 src/shared/base repository.ts
 src/shared/error types.ts
+src/shared/types/    — Shared enums and base types (LeaveStatus, EmploymentStatus, BaseEntity)
 ```
 
 ## Key patterns
@@ -74,7 +73,7 @@ The leave management module enables employees to apply for annual, sick, and eme
 
 #### LeaveRequest
 - **Attributes**: id, employeeId, leaveTypeId, startDate, endDate, reason, status (LeaveStatus), approvedBy, approvedAt, createdAt, updatedAt
-- **Lifecycle**: DRAFT → SUBMITTED → (APPROVED | REJECTED) → CANCELLED (terminal). CANCELLED can also be reached from DRAFT or APPROVED.
+- **Lifecycle**: PENDING → (APPROVED | REJECTED) → CANCELLED (terminal). CANCELLED can also be reached from PENDING or APPROVED.
 - **Purpose**: Core transactional entity for leave applications.
 
 #### LeaveBalance
@@ -88,7 +87,7 @@ The leave management module enables employees to apply for annual, sick, and eme
 - **Purpose**: Compliance audit trail for all state-changing operations (GP-002).
 
 ### Business Rules
-- **BR-001** No overlapping leave: An employee cannot have two LeaveRequests with overlapping date ranges where both statuses are in {DRAFT, SUBMITTED, APPROVED}.
+- **BR-001** No overlapping leave: An employee cannot have two LeaveRequests with overlapping date ranges where both statuses are in {PENDING, APPROVED}.
 - **BR-002** Sufficient balance check: Before approval, remainingDays must be >= requested calendar days.
 - **BR-003** Balance deduction on approval: Atomically increment usedDays and decrement remainingDays.
 - **BR-004** Balance restoration on cancellation from approved: Atomically reverse the deduction.
@@ -101,7 +100,7 @@ The leave management module enables employees to apply for annual, sick, and eme
 | Module | Path | Owns |
 |--------|------|------|
 | LeaveType | src/modules/leave-type/ | LeaveType enum + model |
-| LeaveStatus | src/modules/leave-status/ | LeaveStatus enum (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED) |
+| LeaveStatus | src/shared/types/ | LeaveStatus enum (PENDING, APPROVED, REJECTED, CANCELLED) |
 | Employee | src/modules/employee/ | Employee model, IEmployeeRepository, IEmployeeService |
 | AuditLog | src/modules/audit-log/ | AuditLog model, IAuditLogRepository, IAuditLogService |
 | LeavePolicy | src/modules/leave-policy/ | LeavePolicy model, ILeavePolicyRepository, ILeavePolicyService |
@@ -161,7 +160,7 @@ The leave management module enables employees to apply for annual, sick, and eme
 - **ILeaveRequestService**: apply, approve, reject, cancel, getById, listByEmployee, listByManager, listAll
 
 ### Implementation Phases
-1. **Leaf domain types** (LeaveType, LeaveStatus) — zero dependencies.
+1. **Leaf domain types** (LeaveType, LeaveStatus) — zero dependencies. ✅ Phase 1 complete: `src/shared/types/index.ts` with LeaveStatus (PENDING, APPROVED, REJECTED, CANCELLED), EmploymentStatus (ACTIVE, INACTIVE, TERMINATED, ON_LEAVE), BaseEntity.
 2. **AuditLog infrastructure** — cross-cutting, depends only on shared/db.
 3. **Employee module** — depends on AuditLog.
 4. **LeavePolicy module** — depends on LeaveType.
