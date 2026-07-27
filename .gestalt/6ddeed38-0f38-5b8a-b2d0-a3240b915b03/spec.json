@@ -1,0 +1,177 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "domain-model",
+      "data-access"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The LeaveRequest interface is exported and is assignable to a fully-populated object carrying all 15 documented attributes (id, employeeId, leaveType, leavePolicyId, startDate, endDate, totalDays, reason, status, managerId, managerComment, submittedAt, reviewedAt, createdAt, updatedAt) with the documented types \u2014 leaveType and status use the shared enums, dates are Date, and managerId/managerComment/submittedAt/reviewedAt are nullable.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "CreateLeaveRequestDto is exported and omits id, status, and all timestamps (submittedAt, reviewedAt, createdAt, updatedAt); a DTO instance does not have those keys present, while retaining employeeId, leaveType, leavePolicyId, startDate, endDate, totalDays, reason, managerId, managerComment.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "ILeaveRepository extends IBaseRepository<LeaveRequest> and adds findByEmployeeId(employeeId) and findByStatus(status); a class implementing ILeaveRepository must provide all five base methods plus the two custom methods, verified structurally by a stub implementation in tests.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "KnexLeaveRepository implements ILeaveRepository and persists against the 'leave_requests' table: findById returns the mapped entity or null when absent, findAll returns an array of mapped entities, create inserts and returns the persisted entity, update returns the updated entity or null when absent, and delete returns true when a row was removed and false otherwise.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findByEmployeeId filters rows by employeeId and returns mapped entities; findByStatus filters rows by status and returns mapped entities \u2014 both are exercised against a mocked Knex query builder in tests.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The row-to-entity mapper converts raw database rows into LeaveRequest objects, parsing date-string columns into Date instances and preserving null for the nullable managerId, managerComment, submittedAt, and reviewedAt fields.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Every repository method wraps its database interaction so that a thrown underlying error is caught and re-thrown as a typed RepositoryError that carries the original error, rather than propagating the raw Knex/pg error.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository constructor accepts an optional Knex instance for testability and, when none is supplied, defaults to a Knex instance wired to the shared pg pool from src/shared/db/connection.ts \u2014 enabling unit tests to inject a mock Knex without touching the real database.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No use of `any` \u2014 use `unknown` with type guards instead (HARNESS.json no-any rule, high severity).",
+    "All database access must go through the repository layer \u2014 no inline SQL or ORM calls outside repositories (GP-001 / HARNESS.json no-direct-db-outside-repository, critical severity).",
+    "No unhandled promise rejections \u2014 all async errors must be caught and handled (GP-006); repository methods must not leak raw rejected promises.",
+    "Use relative imports (e.g. ../../shared/types/leave.types), not the src baseUrl alias, consistent with all existing module files despite the baseUrl './src' tsconfig setting.",
+    "TypeScript strict mode with strict null checks must pass \u2014 nullable fields (managerId, managerComment, submittedAt, reviewedAt) must be typed to allow null, and the mapper must handle absent/null values without runtime errors.",
+    "The LeaveRequestStatus enum must use exactly 5 members (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED) \u2014 no UNDER_REVIEW \u2014 matching the implemented Phase 1 enum; the model and repository must not introduce or reference a sixth status."
+  ],
+  "outOfScope": [
+    "LeaveService business logic (apply/approve/reject/cancel, status-transition enforcement, balance checks, overlap prevention) \u2014 Phase 5.",
+    "LeaveController, Fastify routes, Zod request validation, and HTTP status-code handling \u2014 Phase 6.",
+    "Leave module index.ts barrel export and public API surface \u2014 Phase 7.",
+    "Knex database migrations and the knexfile (leave_requests table DDL, foreign keys, indexes) \u2014 Phase 9.",
+    "Audit-log writing for leave request state changes (GP-002) \u2014 not part of the model/repository phase; audit integration belongs to the service/orchestration layer."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "A LeaveRequest's status is always one of the five LeaveRequestStatus members (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED); the model and repository never produce or persist a status outside this set."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "A LeaveRequest's leaveType is always one of the three LeaveType members (ANNUAL, SICK, EMERGENCY); the model and repository never produce or persist a leave type outside this set."
+    },
+    {
+      "entity": "CreateLeaveRequestDto",
+      "mustExistOrExtend": true,
+      "invariant": "A CreateLeaveRequestDto never carries an identity (id), a status, or any timestamp (submittedAt, reviewedAt, createdAt, updatedAt) \u2014 these are server-assigned and excluded from the creation input shape."
+    },
+    {
+      "entity": "KnexLeaveRepository",
+      "mustExistOrExtend": true,
+      "invariant": "Every entity returned by the repository is a fully-populated LeaveRequest (no undefined fields) \u2014 the row mapper guarantees all 15 attributes are present, with nullable fields normalized to null rather than undefined."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "findById(id)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the mapped LeaveRequest when a row matches the id, null when no row exists; any underlying database error is caught and re-thrown as a typed RepositoryError carrying the original error."
+    },
+    {
+      "operation": "findAll()",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an array of mapped LeaveRequest entities (empty array when no rows); any underlying database error is caught and re-thrown as a typed RepositoryError carrying the original error."
+    },
+    {
+      "operation": "findByEmployeeId(employeeId)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an array of mapped LeaveRequest entities filtered by employeeId (empty array when none match); any underlying database error is caught and re-thrown as a typed RepositoryError carrying the original error."
+    },
+    {
+      "operation": "findByStatus(status)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an array of mapped LeaveRequest entities filtered by status (empty array when none match); any underlying database error is caught and re-thrown as a typed RepositoryError carrying the original error."
+    },
+    {
+      "operation": "create(entity)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Inserts the entity and returns the persisted mapped LeaveRequest; any underlying database error (e.g. constraint violation) is caught and re-thrown as a typed RepositoryError carrying the original error."
+    },
+    {
+      "operation": "update(id, entity)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the updated mapped LeaveRequest when a row matches the id, null when no row exists; any underlying database error is caught and re-thrown as a typed RepositoryError carrying the original error."
+    },
+    {
+      "operation": "delete(id)",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns true when at least one row was removed, false when no row matched the id; any underlying database error is caught and re-thrown as a typed RepositoryError carrying the original error."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The LeaveRequest interface's leaveType and status fields must use the LeaveType and LeaveRequestStatus enums exported from src/shared/types/leave.types.ts \u2014 not re-declared local enums or string literals.",
+      "referencePath": "src/shared/types/leave.types.ts"
+    },
+    {
+      "requirement": "ILeaveRepository must extend IBaseRepository<LeaveRequest> as declared in src/shared/base-repository.ts, inheriting the findById/findAll/create/update/delete signatures exactly (including the Omit<T,'id'> create input and Partial<T> update input) so the leave repository is substitutable for the base contract.",
+      "referencePath": "src/shared/base-repository.ts"
+    },
+    {
+      "requirement": "The repository's default Knex instance (when no Knex is injected) must be wired to the shared pg pool exported from src/shared/db/connection.ts \u2014 not a separately constructed Pool \u2014 so all database connections share the single configured pool.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "The RepositoryError type used by the repository must be a distinct, named error class carrying the original underlying error, consistent with the project's GP-006 error-handling principle and the base-repository's expectation that repository methods surface typed errors rather than raw driver exceptions.",
+      "referencePath": "src/shared/base-repository.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/leave.types.ts (Phase 1)",
+      "why": "The leave model imports LeaveType and LeaveRequestStatus enums for typed leaveType and status fields; the repository maps raw status/leaveType column values back to these enum types."
+    },
+    {
+      "target": "src/shared/base-repository.ts (Phase 1)",
+      "why": "ILeaveRepository extends IBaseRepository<LeaveRequest>, inheriting the generic CRUD contract so the leave repository is structurally compatible with the base repository abstraction."
+    },
+    {
+      "target": "src/shared/db/connection.ts (Phase 1)",
+      "why": "KnexLeaveRepository's default Knex instance is wired to the shared pg pool, ensuring all repository database traffic flows through the single configured connection pool."
+    },
+    {
+      "target": "Phase 5 \u2014 LeaveService",
+      "why": "The ILeaveRepository interface and KnexLeaveRepository implementation produced in this phase are the persistence dependency that the LeaveService (Phase 5) will depend on for apply/approve/reject/cancel/getById/getByEmployee operations."
+    },
+    {
+      "target": "Phase 9 \u2014 Knex migrations",
+      "why": "The repository persists against the 'leave_requests' table; the Phase 9 migration must create that table with columns matching the LeaveRequest model attributes so the repository's row mapping aligns with the actual schema."
+    }
+  ]
+}
