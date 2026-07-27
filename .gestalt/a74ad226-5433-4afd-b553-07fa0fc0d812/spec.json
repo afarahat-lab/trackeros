@@ -1,0 +1,180 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave",
+      "shared-error-handling"
+    ],
+    "affectedLayers": [
+      "repository",
+      "shared"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "Every one of the seven KnexLeaveRepository methods (findById, findAll, findByEmployeeId, findByStatus, create, update, delete) catches errors thrown by the Knex query builder / pg driver and never lets a raw Knex or pg error propagate to the caller.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "When a Knex/pg error is caught, the repository throws a typed domain error (a distinct error type/class, not a raw Error or Knex error) so callers can identify repository failures by type.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The ILeaveRepository interface contract is unchanged \u2014 method names, parameter lists, and return types remain identical to the current declaration, and the existing leave.repository.test.ts suite still passes without modification.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A unit test exists that mocks the Knex instance to reject/throw on each repository method and asserts the repository surfaces the typed domain error (not the raw Knex/pg error) for every method.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Happy-path behavior of all seven methods is preserved \u2014 successful queries still return mapped LeaveRequest objects, null, arrays, or booleans exactly as before, verified by the existing passing tests.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "GP-006 (no unhandled promise rejections): all async errors in repository methods must be caught and handled \u2014 no repository method may reject with an uncaught Knex/pg error.",
+    "HARNESS no-any rule (severity high): catch variables must be typed as `unknown` with type guards rather than `any`; no `any` introduced by the error-handling code.",
+    "GP-001 (repository pattern): database access stays inside the repository; the error translation must not move query logic out of KnexLeaveRepository or bypass the repository layer.",
+    "Strict TypeScript (strict null checks, no implicit any) must remain satisfied \u2014 the error-handling additions must compile cleanly under the existing tsconfig.",
+    "The ILeaveRepository interface and IBaseRepository<LeaveRequest> contract must not be altered \u2014 no new methods, no signature changes, no removed methods.",
+    "No new runtime dependencies may be added to package.json; error types must be implemented in-project (the project has no existing error-type library)."
+  ],
+  "outOfScope": [
+    "Error handling/wrapping in other repositories (employee, balance, policy, notification) \u2014 only KnexLeaveRepository is in scope for this phase.",
+    "Adding retry logic, circuit breakers, or connection-recovery behavior to the repository \u2014 this phase only translates errors, it does not retry or recover.",
+    "Changing the LeaveService, LeaveController, or route layers to consume the new error type \u2014 downstream consumers are a later phase.",
+    "Logging, metrics, or audit recording of repository errors (GP-004 concerns) \u2014 out of scope; the repository only translates and rethrows.",
+    "Altering the toLeaveRequest row mapper or the Knex query construction itself \u2014 only error wrapping is added; query behavior is unchanged."
+  ],
+  "ambiguities": [
+    {
+      "description": "No error types currently exist in the codebase (src/shared/error types.ts is referenced in ARCHITECTURE.md but is absent; no RepositoryError/DomainError class exists). The intent says \"e.g., a RepositoryError or rethrow a typed domain error\" but does not fix which. The implementer must decide whether to create a new RepositoryError class (and where it lives) versus reusing/creating a broader domain error hierarchy.",
+      "options": [
+        "Introduce a single new RepositoryError class under src/shared (matching the ARCHITECTURE.md reference to shared error types)",
+        "Introduce a broader domain-error base class plus a RepositoryError subclass",
+        "Reuse an existing error type if one is discovered/added by a concurrent change"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "The intent allows either translating into a RepositoryError OR rethrowing a typed domain error. It is unclear whether all caught Knex/pg errors should map to one generic RepositoryError, or whether specific pg error codes (e.g., unique-violation, foreign-key violation, connection errors) should map to distinct typed errors.",
+      "options": [
+        "Map every caught Knex/pg error to a single generic RepositoryError",
+        "Inspect pg error codes and map at least unique-violation / foreign-key / connection failures to distinct typed errors"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "It is unspecified whether the original Knex/pg error should be preserved as a `cause` on the translated error (for debugging) or discarded entirely. Preserving it aids diagnostics but could leak driver internals; GP-004 forbids logging sensitive data but does not directly govern error causes.",
+      "options": [
+        "Preserve the original error as the `cause` of the translated error",
+        "Discard the original error and surface only the typed domain error"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "The LeaveRequest domain entity shape and its mapping from raw database rows (via toLeaveRequest) must remain unchanged by the error-handling additions \u2014 successful reads still produce valid LeaveRequest objects with correct date parsing and null handling."
+    },
+    {
+      "entity": "KnexLeaveRepository",
+      "mustExistOrExtend": true,
+      "invariant": "Every public method of KnexLeaveRepository is total with respect to database failures: it either returns its declared result type (on success) or throws a typed domain error (on Knex/pg failure) \u2014 it never rejects with a raw Knex or pg error."
+    },
+    {
+      "entity": "ILeaveRepository",
+      "mustExistOrExtend": true,
+      "invariant": "The ILeaveRepository interface (extending IBaseRepository<LeaveRequest> with findByEmployeeId and findByStatus) must remain the unchanged public contract; KnexLeaveRepository must continue to implement it exactly."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "KnexLeaveRepository.findById",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "On Knex/pg failure, throws a typed domain error (not a raw Knex/pg error); on success returns LeaveRequest or null as before."
+    },
+    {
+      "operation": "KnexLeaveRepository.findAll",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "On Knex/pg failure, throws a typed domain error; on success returns LeaveRequest[] (possibly empty) as before."
+    },
+    {
+      "operation": "KnexLeaveRepository.findByEmployeeId",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "On Knex/pg failure, throws a typed domain error; on success returns LeaveRequest[] as before."
+    },
+    {
+      "operation": "KnexLeaveRepository.findByStatus",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "On Knex/pg failure, throws a typed domain error; on success returns LeaveRequest[] as before."
+    },
+    {
+      "operation": "KnexLeaveRepository.create",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "On Knex/pg failure (e.g., constraint violation), throws a typed domain error; on success returns the created LeaveRequest as before."
+    },
+    {
+      "operation": "KnexLeaveRepository.update",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "On Knex/pg failure, throws a typed domain error; on success returns the updated LeaveRequest or null (when no row matched) as before."
+    },
+    {
+      "operation": "KnexLeaveRepository.delete",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "On Knex/pg failure, throws a typed domain error; on success returns boolean (true if a row was deleted, false otherwise) as before."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The error-wrapping changes must preserve the existing KnexLeaveRepository method signatures, the TABLE_NAME constant, the constructor's optional-Knex-injection pattern (for testability), and the toLeaveRequest mapper behavior \u2014 only try/catch translation is added.",
+      "referencePath": "src/modules/leave/leave.repository.ts"
+    },
+    {
+      "requirement": "The IBaseRepository<T> interface (findById, findAll, create, update, delete) must remain unchanged; KnexLeaveRepository must still structurally satisfy it after error wrapping is added.",
+      "referencePath": "src/shared/base-repository.ts"
+    },
+    {
+      "requirement": "The existing repository test suite (happy-path coverage for all seven methods plus toLeaveRequest null/date handling) must continue to pass unmodified \u2014 the error wrapping must not alter observable success behavior.",
+      "referencePath": "tests/unit/modules/leave/leave.repository.test.ts"
+    },
+    {
+      "requirement": "No changes to the shared enums; the error type introduced must not duplicate or alter LeaveType/LeaveRequestStatus/LeaveBalanceStatus/EmployeeStatus.",
+      "referencePath": "src/shared/types/leave.types.ts"
+    },
+    {
+      "requirement": "The introduced error type should align with the ARCHITECTURE.md reference to shared error types (src/shared/error types.ts) \u2014 placing domain/repository error types under src/shared is consistent with the documented module layout.",
+      "referencePath": "docs/ARCHITECTURE.md"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/db/connection.ts (pg Pool / Knex client)",
+      "why": "The repository's Knex instance is backed by the shared pg pool; error translation must handle errors originating from this connection layer without modifying it."
+    },
+    {
+      "target": "src/modules/leave/leave.service.ts (Phase 5, not yet built)",
+      "why": "The typed domain error thrown by the repository is the contract future service-layer consumers will catch; the error type chosen now becomes the integration surface for the leave service."
+    },
+    {
+      "target": "src/shared error types (referenced in ARCHITECTURE.md, not yet present)",
+      "why": "If a RepositoryError/domain error class is introduced, it should live in the shared error-types location the architecture documents, so other repositories can reuse the same translation pattern later."
+    }
+  ]
+}
