@@ -1,0 +1,115 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared-types",
+      "leave",
+      "employee"
+    ],
+    "affectedLayers": [
+      "domain-types",
+      "unit-tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "src/shared/types/index.ts exports a LeaveStatus string enum whose member set is exactly {DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED} \u2014 PENDING is absent.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/shared/types/index.ts exports an EmploymentStatus string enum whose member set is exactly {ACTIVE, INACTIVE, TERMINATED} \u2014 ON_LEAVE is absent.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/shared/types/index.ts exports a BaseEntity interface with id: string, createdAt: Date, updatedAt: Date, deletedAt: Date | null (deletedAt is nullable; the other three are required).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "tsc --noEmit exits zero under the existing strict tsconfig.json (strict: true, no implicit any, strict null checks) with no type errors in src.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests under tests/unit/shared/types/ (matching testMatch '**/tests/**/*.test.(ts|js)') pass and assert each LeaveStatus and EmploymentStatus member's string value and that BaseEntity-typed objects satisfy the four field types.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "No occurrence of the `any` keyword in src/shared/types/index.ts or its tests (HARNESS no-any rule, high severity); unknown + type guards used if runtime narrowing is needed.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "LeaveStatus and EmploymentStatus must be TypeScript string enums (not numeric enums, not union types, not const objects) so their values map cleanly to PostgreSQL column values per DOMAIN.md.",
+    "Enum string values must equal their member names (e.g. LeaveStatus.DRAFT === 'DRAFT') to match the database string values documented in DOMAIN.md and the reconciled ARCHITECTURE.md.",
+    "The canonical enum values are the chief-architect's reconciled set, not the PLAN.md task text: LeaveStatus = DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED; EmploymentStatus = ACTIVE, INACTIVE, TERMINATED. PENDING and ON_LEAVE must not appear.",
+    "No @gestalt/* packages may be added as dependencies (HARNESS no-gestalt-internal-deps, critical). This types-only file must not introduce any new runtime dependency.",
+    "Phase 1 has zero dependencies on other phases; src/shared/types/index.ts must not import from any src/modules/* path or any other phase artifact.",
+    "Tests must live under tests/unit/shared/types/ and end in .test.ts to match jest.config.js testMatch '**/tests/**/*.test.(ts|js)'; tsconfig.json excludes tests from tsc, so tests are compiled only by ts-jest."
+  ],
+  "outOfScope": [
+    "LeaveType enum/model, LeavePolicy, Employee, LeaveRequest, LeaveBalance, AuditLog, and any other domain entity \u2014 only LeaveStatus, EmploymentStatus, and BaseEntity belong to this phase.",
+    "Any repository, service, controller, route, or database migration \u2014 this phase is pure types with no runtime behavior or persistence.",
+    "A BalanceStatus enum, NotificationType, AuditAction, or EntityType enum \u2014 not part of this phase's three exports even though ARCHITECTURE.md mentions them elsewhere.",
+    "Re-exporting or aliasing these types from any module index.ts (src/modules/*/index.ts) \u2014 module wiring is deferred to Phase 10."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveStatus",
+      "mustExistOrExtend": true,
+      "invariant": "The enum's member set is closed and load-bearing for the LeaveRequest lifecycle: DRAFT \u2192 SUBMITTED \u2192 (APPROVED | REJECTED) \u2192 CANCELLED, with CANCELLED also reachable from DRAFT and APPROVED. SUBMITTED is the trigger for the manager-approval workflow (BR-005, BR-006). No PENDING member exists."
+    },
+    {
+      "entity": "EmploymentStatus",
+      "mustExistOrExtend": true,
+      "invariant": "The enum's member set is closed at {ACTIVE, INACTIVE, TERMINATED} following the Employee lifecycle ACTIVE \u2192 INACTIVE \u2192 TERMINATED. ON_LEAVE is not a member; leave state is modeled on LeaveRequest via LeaveStatus, not on employment status."
+    },
+    {
+      "entity": "BaseEntity",
+      "mustExistOrExtend": true,
+      "invariant": "BaseEntity is the shared base for all persisted domain models: id is a non-empty string identity, createdAt and updatedAt are required Dates, and deletedAt is Date | null (null means not soft-deleted). It must be an interface (a structural contract to be extended), not a class with runtime logic."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "Import shared types from src/shared/types/index.ts (the public entry point) \u2014 downstream modules must import LeaveStatus, EmploymentStatus, and BaseEntity only through this index.ts, never from an internal file, per the architecture rule that modules import only through declared public entry points.",
+      "authRule": "N/A \u2014 pure type exports, no runtime operation or authentication.",
+      "idempotent": true,
+      "errorSemantics": "N/A \u2014 type-only imports produce compile-time errors only; no runtime error path."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "LeaveStatus member values must match the database string values documented for leave request status: DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED.",
+      "referencePath": "docs/DOMAIN.md#LeaveStatus"
+    },
+    {
+      "requirement": "EmploymentStatus member values must match the Employee.employmentStatus column values: ACTIVE, INACTIVE, TERMINATED (the union 'ACTIVE' | 'INACTIVE' | 'TERMINATED').",
+      "referencePath": "docs/DOMAIN.md#Employee"
+    },
+    {
+      "requirement": "BaseEntity field set and types must match the Employee entity's shared fields (id: string, createdAt: Date, updatedAt: Date, deletedAt: Date | null) as reconciled in the architecture.",
+      "referencePath": "docs/ARCHITECTURE.md#Employee"
+    },
+    {
+      "requirement": "The LeaveStatus enum must be the single canonical source that the LeaveRequest lifecycle (DRAFT \u2192 SUBMITTED \u2192 APPROVED|REJECTED \u2192 CANCELLED, plus DRAFT \u2192 CANCELLED) references; downstream LeaveRequest phases must import it from here rather than redefining it.",
+      "referencePath": "docs/ARCHITECTURE.md#LeaveRequest"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts as the public entry point consumed by all downstream leave modules (LeaveType, LeavePolicy, Employee, LeaveRequest, Balance, Audit) which import LeaveStatus, EmploymentStatus, and/or BaseEntity from this file per PLAN.md Phases 2\u201310.",
+      "why": "This file is the foundational types contract; every subsequent phase's model extends BaseEntity or imports an enum from here, so its export surface is the integration boundary."
+    },
+    {
+      "target": "jest.config.js testMatch and moduleDirectories \u2014 tests must be discoverable under tests/unit/shared/types/*.test.ts and resolve the 'src' baseUrl via moduleDirectories.",
+      "why": "The test runner configuration determines whether tests run and whether imports resolve; conformance is required for the verification gate (npx jest) to pass."
+    }
+  ]
+}
