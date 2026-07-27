@@ -10,6 +10,57 @@ Base entity providing common fields for domain models.
 | created_at | Date | true |
 | updated_at | Date | true |
 
+## shared types
+
+Shared TypeScript enums and interfaces used across modules.
+
+### LeaveType
+
+| Value | Description |
+|-------|-------------|
+| ANNUAL | Annual leave |
+| SICK | Sick leave |
+| EMERGENCY | Emergency leave |
+
+### LeaveRequestStatus
+
+| Value | Description |
+|-------|-------------|
+| DRAFT | Leave request is in draft state |
+| SUBMITTED | Leave request has been submitted |
+| APPROVED | Leave request has been approved |
+| REJECTED | Leave request has been rejected |
+| CANCELLED | Leave request has been cancelled |
+
+### LeaveBalanceStatus
+
+| Value | Description |
+|-------|-------------|
+| ACTIVE | Balance is active and usable |
+| EXHAUSTED | Balance has been fully consumed |
+| EXPIRED | Balance has expired (e.g. year-end) |
+
+### EmployeeStatus
+
+| Value | Description |
+|-------|-------------|
+| ACTIVE | Employee is active |
+| ON_LEAVE | Employee is currently on leave |
+| INACTIVE | Employee is inactive |
+| PROBATION | Employee is in probation period |
+
+### IBaseRepository\<T\>
+
+Generic repository interface at `src/shared/base-repository.ts`.
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| findById | `(id: string) => Promise<T \| null>` | Find entity by primary key |
+| findAll | `() => Promise<T[]>` | Return all entities |
+| create | `(entity: Omit<T, 'id'>) => Promise<T>` | Create and return entity with generated id |
+| update | `(id: string, entity: Partial<T>) => Promise<T \| null>` | Partial update; returns null if not found |
+| delete | `(id: string) => Promise<boolean>` | Delete by id; returns true if deleted |
+
 ## leave
 
 Represents a leave record managed by the `leave` module, including leave requests and related leave-tracking data.

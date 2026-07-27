@@ -29,8 +29,9 @@ src/modules/LeavePolicy/    — LeavePolicy module
 src/modules/AuditLog/    — AuditLog module
 src/modules/AuditRecord/    — AuditRecord module
 src/modules/AuditServiceInterface/    — AuditServiceInterface module
-src/shared/db connection.ts
-src/shared/base repository.ts
+src/shared/db/connection.ts
+src/shared/types/leave.types.ts
+src/shared/base-repository.ts
 src/shared/error types.ts
 ```
 
@@ -134,4 +135,11 @@ leave-request ──→ leave-balance ──→ leave-policy ──→ leave-typ
 4. **Core**: `leave-request` (orchestrator)
 
 All modules use Fastify for HTTP, Jest for testing, and follow the modular-monolith structure with clear service boundaries.
+
+### Phase 1 — Built
+
+- `src/shared/types/leave.types.ts` — TypeScript enums: `LeaveType` (ANNUAL, SICK, EMERGENCY), `LeaveRequestStatus` (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED), `LeaveBalanceStatus` (ACTIVE, EXHAUSTED, EXPIRED), `EmployeeStatus` (ACTIVE, ON_LEAVE, INACTIVE, PROBATION)
+- `src/shared/base-repository.ts` — Generic `IBaseRepository<T>` interface with `findById`, `findAll`, `create`, `update`, `delete`
+- Tests: `tests/unit/shared/leave.types.test.ts`, `tests/unit/shared/base-repository.test.ts`
+
 <!-- gestalt:architecture feature=e52e7dc9-5a2d-453b-b5a3-9d187c6021f7 END -->
