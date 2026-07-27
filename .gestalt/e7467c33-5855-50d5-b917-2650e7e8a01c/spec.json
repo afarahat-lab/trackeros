@@ -1,0 +1,217 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "balance"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository",
+      "unit-tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The LeaveBalance model interface is exported from the balance module and is constructible with all domain attributes (id, employeeId, leaveType, leavePolicyId, entitled, used, pending, carriedOver, remaining, year, status, createdAt, updatedAt); leaveType is typed as LeaveType and status as LeaveBalanceStatus, both imported from src/shared/types/leave.types.ts.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A CreateLeaveBalanceDto is exported that omits id, createdAt, and updatedAt but includes status (so callers can set the initial balance status), matching the established CreateDto pattern from the leave and employee modules.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The LeaveBalanceStatus values used by the model are ACTIVE, EXHAUSTED, EXPIRED \u2014 exactly the values defined in src/shared/types/leave.types.ts (not the FROZEN value mentioned in the architecture doc prose).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository interface extends IBaseRepository<LeaveBalance> and adds four finder operations: findByEmployeeId, findByEmployeeAndType, findByEmployeeAndYear, and findByStatus \u2014 each returning a Promise of LeaveBalance array(s).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The concrete Knex repository persists a row on create (using .returning('*')) and returns the mapped LeaveBalance entity; update returns the updated entity or null when no row matches; delete returns a boolean indicating whether a row was removed.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository's row-to-entity mapper parses date strings (createdAt, updatedAt) into Date objects and casts leaveType and status to their respective enum types, consistent with the toLeaveRequest/toEmployee mappers in the leave and employee repositories.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Every repository operation wraps database errors in a RepositoryError (with the original error preserved), so no unhandled promise rejections escape the repository layer \u2014 satisfying GP-006.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository constructor accepts an optional Knex instance for testability and defaults to a Knex instance wired to the shared pg pool from src/shared/db/connection.ts when none is supplied.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests exist in tests/unit/modules/balance/ covering: (a) a structural stub-class test proving the repository interface is implementable with all required methods, and (b) mocked-Knex tests covering findById, findAll, the four finders, create, update, delete, date parsing, and RepositoryError propagation.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The phase passes the mechanical compile gate: npm run build (tsc) succeeds with strict TypeScript (no implicit any, strict null checks) and npx jest runs the new balance tests with zero failures.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No use of `any` \u2014 use `unknown` with type guards instead (HARNESS.json no-any rule, severity high). The row mapper must type its input as Record<string, unknown> and cast via type guards/assertions, matching the existing toLeaveRequest/toEmployee pattern.",
+    "All database access must go through the repository pattern (GP-001 / HARNESS.json no-direct-db-outside-repository, severity critical). The balance module must not expose raw Knex or SQL outside its repository class.",
+    "No unhandled promise rejections (GP-006). Every async repository method must catch errors and rethrow as RepositoryError, matching the try/catch pattern in KnexLeaveRepository and KnexEmployeeRepository.",
+    "Strict TypeScript must pass: no implicit any, strict null checks enabled. The model and repository must compile cleanly under the project's tsconfig.",
+    "The balance module must import shared types (LeaveType, LeaveBalanceStatus) and the base repository interface only through their declared source paths (src/shared/types/leave.types.ts, src/shared/base-repository.ts, src/shared/db/connection.ts) \u2014 no circular module dependencies and no imports from other modules' internals.",
+    "The DB table name must be `leave_balance` (snake_case, matching the conceptual data model in docs/ARCHITECTURE.md and consistent with the leave_requests/employees table-name convention)."
+  ],
+  "outOfScope": [
+    "Balance computation logic (remaining = entitled + carriedOver - used - pending) \u2014 this belongs to the service layer in Phase 8, not this model/repository phase. The model declares remaining as a number and the repository reads it from the DB row; no computation is performed here.",
+    "Balance service layer (IBalanceService with getBalance, deductPending, restorePending, commitUsed) \u2014 deferred to Phase 8.",
+    "Balance controller, routes, and module index barrel export \u2014 deferred to Phase 10.",
+    "Knex database migration for the leave_balance table (including the unique composite index on employee_id + leave_type_id + year) \u2014 deferred to Phase 9. This phase targets the table name in the repository constant only.",
+    "Audit record writing (GP-002) for balance create/update \u2014 audit integration is cross-cutting and handled at the service/orchestration layer in later phases, not in the repository.",
+    "RBAC enforcement (GP-005) and input validation at API boundaries (GP-003) \u2014 these apply to HTTP endpoints, which are not created in this phase."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "A LeaveBalance is unique per (employee, leaveType, year) combination \u2014 the domain treats each employee-type-year triple as a distinct balance record; the repository's finders reflect this composite identity (findByEmployeeAndType, findByEmployeeAndYear)."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "The status field is constrained to the LeaveBalanceStatus enum values ACTIVE, EXHAUSTED, EXPIRED as defined in src/shared/types/leave.types.ts; the model must not introduce any status value outside this set."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "The leaveType field is constrained to the LeaveType enum values ANNUAL, SICK, EMERGENCY as defined in src/shared/types/leave.types.ts; the model must not introduce any leave-type value outside this set."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "The remaining field is a stored numeric value read directly from the database row by the repository mapper; the repository performs no derived computation of remaining \u2014 it is treated as a persisted column, with computation deferred to the service layer."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "findById(id) \u2014 returns a single LeaveBalance or null when no row matches the id.",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Database errors are caught and rethrown as RepositoryError wrapping the original error; a missing row returns null (not an error)."
+    },
+    {
+      "operation": "findAll() \u2014 returns all LeaveBalance rows as an array (empty array when none exist).",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Database errors are caught and rethrown as RepositoryError."
+    },
+    {
+      "operation": "findByEmployeeId(employeeId) \u2014 returns all LeaveBalance rows for a given employee as an array.",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Database errors are caught and rethrown as RepositoryError; no matching rows returns an empty array."
+    },
+    {
+      "operation": "findByEmployeeAndType(employeeId, leaveType) \u2014 returns all LeaveBalance rows matching the employee and leave-type combination as an array.",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Database errors are caught and rethrown as RepositoryError; no matching rows returns an empty array."
+    },
+    {
+      "operation": "findByEmployeeAndYear(employeeId, year) \u2014 returns all LeaveBalance rows matching the employee and year as an array.",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Database errors are caught and rethrown as RepositoryError; no matching rows returns an empty array."
+    },
+    {
+      "operation": "findByStatus(status) \u2014 returns all LeaveBalance rows with the given status as an array.",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Database errors are caught and rethrown as RepositoryError; no matching rows returns an empty array."
+    },
+    {
+      "operation": "create(entity) \u2014 persists a new LeaveBalance row and returns the created entity.",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Database errors are caught and rethrown as RepositoryError; the inserted row is returned via .returning('*') and mapped to a LeaveBalance entity."
+    },
+    {
+      "operation": "update(id, partialEntity) \u2014 updates the matching LeaveBalance row and returns the updated entity, or null when no row matches.",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Database errors are caught and rethrown as RepositoryError; a missing row returns null (not an error). The update must refresh the updatedAt timestamp, consistent with the leave and employee repository update pattern."
+    },
+    {
+      "operation": "delete(id) \u2014 removes the matching LeaveBalance row and returns true if a row was deleted, false otherwise.",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Database errors are caught and rethrown as RepositoryError."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The LeaveType and LeaveBalanceStatus enums must be imported and reused from src/shared/types/leave.types.ts \u2014 the model must not redefine or duplicate these enum values. The status values used must be ACTIVE, EXHAUSTED, EXPIRED (the code-defined values), not the FROZEN value in the architecture doc prose.",
+      "referencePath": "src/shared/types/leave.types.ts"
+    },
+    {
+      "requirement": "The repository interface must extend IBaseRepository<LeaveBalance> from src/shared/base-repository.ts, inheriting the findById, findAll, create, update, and delete operation signatures exactly as declared there (including the Omit<T,'id'> create input and Partial<T> update input).",
+      "referencePath": "src/shared/base-repository.ts"
+    },
+    {
+      "requirement": "The repository's default Knex instance must be wired to the shared `pool` exported from src/shared/db/connection.ts, matching how KnexLeaveRepository and KnexEmployeeRepository obtain their default connection.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "The balance repository must follow the same structural pattern as src/modules/leave/leave.repository.ts: optional Knex constructor arg defaulting to knex({ client: 'pg', pool }), a RepositoryError class wrapping the original error, try/catch on every method, .returning('*') on create/update, and a private to<Entity> mapper converting Record<string, unknown> rows to the entity with date parsing and enum casting.",
+      "referencePath": "src/modules/leave/leave.repository.ts"
+    },
+    {
+      "requirement": "The balance repository must follow the same structural pattern as src/modules/employee/employee.repository.ts for the RepositoryError class shape (message + public readonly originalError + name set to 'RepositoryError') and the update method's updatedAt refresh behavior.",
+      "referencePath": "src/modules/employee/employee.repository.ts"
+    },
+    {
+      "requirement": "The LeaveBalance model and CreateLeaveBalanceDto must follow the same interface + CreateDto pattern as src/modules/leave/leave.model.ts: a plain exported interface for the entity and a CreateDto that omits id and timestamps. The CreateDto includes status (matching the employee module's decision to let callers set initial status), consistent with CreateEmployeeDto.",
+      "referencePath": "src/modules/leave/leave.model.ts"
+    },
+    {
+      "requirement": "The balance repository tests must follow the same test structure as tests/unit/modules/leave/leave.repository.test.ts: a structural stub-class test proving the interface is implementable, plus mocked-Knex tests (mockKnex + mockQb with where/first/select/insert/update/delete/returning chain) covering all operations, date parsing, and RepositoryError propagation.",
+      "referencePath": "tests/unit/modules/leave/leave.repository.test.ts"
+    },
+    {
+      "requirement": "The balance model tests must follow the same structure as tests/unit/modules/employee/employee.model.test.ts: validate the entity interface is constructible with all fields, validate the CreateDto omits id and timestamps, and validate all LeaveBalanceStatus enum values are usable.",
+      "referencePath": "tests/unit/modules/employee/employee.model.test.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/leave.types.ts",
+      "why": "Provides the LeaveType and LeaveBalanceStatus enums that the LeaveBalance model imports for its leaveType and status fields."
+    },
+    {
+      "target": "src/shared/base-repository.ts",
+      "why": "Provides the IBaseRepository<T> interface that the balance repository interface extends, supplying the findById/findAll/create/update/delete contract."
+    },
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "Provides the shared pg pool that the Knex balance repository uses as its default database connection when no Knex instance is injected."
+    },
+    {
+      "target": "Phase 5 (LeaveService) and Phase 8 (BalanceService)",
+      "why": "Downstream consumers: the LeaveService (Phase 5) will use ILeaveBalanceRepository to check sufficient remaining days, and the BalanceService (Phase 8) will use it for getBalance/deductPending/restorePending/commitUsed. The repository interface and finders defined here are the contract those phases depend on."
+    },
+    {
+      "target": "Phase 9 (Knex migrations)",
+      "why": "The migration for the leave_balance table (Phase 9) must produce columns matching the LeaveBalance model fields defined here, including the unique composite index on (employee_id, leave_type_id, year) that the repository's finders implicitly rely on."
+    }
+  ]
+}
