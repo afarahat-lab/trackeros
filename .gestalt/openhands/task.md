@@ -1,24 +1,24 @@
-# Fix specific quality-gate violations: Phase 2: LeaveRequest model + repository
+# Implement this phase: Phase 2: LeaveRequest model + repository
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/fix/e52e7dc9-5a2d-453b-b5a3-9d187c6021f7/2/1`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/e52e7dc9-5a2d-453b-b5a3-9d187c6021f7/2`. Do not clone anything; work only in this directory.
 
-You are fixing SPECIFIC violations the quality gate found in EXISTING, already-committed files. Make ONLY the targeted edits listed below — do NOT refactor, regenerate, or change anything else.
+## What to build
+(no phase architecture provided — infer from the success criteria below)
 
-The files ALREADY EXIST. You MUST edit them in place with the `str_replace_editor` tool. Reading or viewing a file is NOT sufficient — you have NOT finished until you have edited EVERY file listed below.
+## Success criteria
+Create src/modules/leave/leave.model.ts with the LeaveRequest interface (all attributes: id, employeeId, leaveType, leavePolicyId, startDate, endDate, totalDays, reason, status, managerId, managerComment, submittedAt, reviewedAt, createdAt, updatedAt) and CreateLeaveRequestDto (omit id, status, timestamps). Create src/modules/leave/leave.repository.ts with ILeaveRepository interface (extending IBaseRepository<LeaveRequest>) and KnexLeaveRepository class using the db pool from src/shared/db/connection.ts. This phase depends on src/shared/types/leave.types.ts and src/shared/base-repository.ts from Phase 1 — read those before generating. Include Jest unit tests in tests/unit/modules/leave/.
 
-## Required edits
+## Project stack
+Before writing code, read `HARNESS.json` in the working directory to learn the project's language, framework, and test runner, and follow the existing conventions in the repository. Read `docs/ARCHITECTURE.md` and `PLAN.md` if present.
 
-### Edit 1
-File: src/modules/leave/leave.repository.ts
-Line: 41
-Offending code: `const [row] = await this.db(TABLE_NAME).insert(entity).returning('*');`
-Rule violated: error-handling-explicit
-Action (do this now): Edit `src/modules/leave/leave.repository.ts` at line 41 in place to fix the `error-handling-explicit` violation.
-What the quality gate found — apply this: [error-handling-explicit] The KnexLeaveRepository class contains zero error handling across all its methods (findById, findAll, findByEmployeeId, findByStatus, create, update, delete). Every database operation — including this insert — can throw Knex/pg errors (connection failures, constraint violations, etc.) that propagate unhandled to callers. The architectural rule requires explicit error handling so that callers are not exposed to raw failures from dependencies. The repository must wrap database calls in try/catch and translate low-level errors into domain-appropriate error types.
+## Verify before you finish (MANDATORY)
+The code you write MUST compile and its tests MUST pass — a compilation or type error must NEVER be left for CI to find. Before you declare this task done:
+- Read the project's build / type-check / test commands from `package.json` (scripts) and `HARNESS.json`.
+- Install dependencies if they are not already installed, then RUN the type-check / build (e.g. `npm run build` or `tsc --noEmit`) AND the tests (e.g. `npm test`) for the files this phase touches.
+- FIX every compilation error, type error, and failing test you introduced — including in test files — and re-run until they pass.
+- Only when the build and the tests pass may you consider the task complete. If a dependency install genuinely cannot be made to work, say so explicitly in your final message rather than declaring success on unverified code.
 
 ## Constraints (mandatory)
-- Edit ONLY the files listed above; do not add, delete, or rename files.
-- Do not modify imports unless a required change above needs it.
-- Do NOT run `git commit`, `git push`, `git add`, or any git command. The platform handles all git operations.
-- Do not run tests or build commands.
-- When all the listed edits are made, stop.
+- Write and modify source files ONLY. Do NOT run `git commit`, `git push`, `git add`, or any other git command. The platform handles all git operations. (Running the build / type-check / tests above is expected and encouraged — that is NOT a git operation.)
+- Do not create a new repository or change the git remote.
+- Stay within the scope of this phase; do not implement deferred/later work.
