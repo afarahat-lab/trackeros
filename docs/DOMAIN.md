@@ -63,67 +63,60 @@ Generic repository interface at `src/shared/base-repository.ts`.
 
 ## leave
 
-Represents a leave record managed by the `leave` module, including leave requests and related leave-tracking data.
-
-### LeaveStatus
-
-| Value | Description |
-|-------|-------------|
-| DRAFT | Leave request is in draft state |
-| SUBMITTED | Leave request has been submitted |
-| APPROVED | Leave request has been approved |
-| REJECTED | Leave request has been rejected |
-| CANCELLED | Leave request has been cancelled |
+Represents a leave request managed by the `leave` module. Source: `src/modules/leave/leave.model.ts` and `src/modules/leave/leave.repository.ts`.
 
 ### LeaveRequest
 
-| Field | Type | Required |
-|-------|------|----------|
-| id | string | true |
-| employeeId | string | true |
-| leaveTypeId | string | true |
-| startDate | Date | true |
-| endDate | Date | true |
-| reason | string \| undefined | false |
-| status | LeaveRequestStatus | true |
-| approvedBy | string \| null | false |
-| approvedAt | Date \| null | false |
-| createdAt | Date | true |
-| updatedAt | Date | true |
-
-**Relationships**
-- `Employee` — many-to-one
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| id | string | true | Primary key |
+| employeeId | string | true | FK to employee |
+| leaveType | LeaveType | true | Enum from shared types |
+| leavePolicyId | string | true | FK to leave policy |
+| startDate | Date | true | First day of leave |
+| endDate | Date | true | Last day of leave |
+| totalDays | number | true | Computed duration |
+| reason | string | true | Employee-provided reason |
+| status | LeaveRequestStatus | true | Lifecycle state |
+| managerId | string \| null | false | Assigned manager; null until submitted |
+| managerComment | string \| null | false | Manager feedback on review |
+| submittedAt | Date \| null | false | Timestamp when submitted |
+| reviewedAt | Date \| null | false | Timestamp when approved/rejected |
+| createdAt | Date | true | Record creation timestamp |
+| updatedAt | Date | true | Last modification timestamp |
 
 ### CreateLeaveRequestDto
 
+Input DTO for creating a leave request. Omits `id`, `status`, and all timestamps.
+
 | Field | Type | Required |
 |-------|------|----------|
 | employeeId | string | true |
-| leaveTypeId | string | true |
+| leaveType | LeaveType | true |
+| leavePolicyId | string | true |
 | startDate | Date | true |
 | endDate | Date | true |
-| reason | string \| undefined | false |
+| totalDays | number | true |
+| reason | string | true |
+| managerId | string \| null | false |
+| managerComment | string \| null | false |
 
-### UpdateLeaveRequestDto
+### ILeaveRepository
 
-| Field | Type | Required |
-|-------|------|----------|
-| startDate | Date | false |
-| endDate | Date | false |
-| reason | string \| undefined | false |
+Extends `IBaseRepository<LeaveRequest>` with leave-specific queries.
 
-### LeaveRequestQueryParams
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| findByEmployeeId | `(employeeId: string) => Promise<LeaveRequest[]>` | All requests for an employee |
+| findByStatus | `(status: string) => Promise<LeaveRequest[]>` | All requests with a given status |
 
-| Field | Type | Required |
-|-------|------|----------|
-| status | LeaveRequestStatus | false |
-| leaveTypeId | string | false |
-| startDateFrom | Date | false |
-| startDateTo | Date | false |
-| endDateFrom | Date | false |
-| endDateTo | Date | false |
-| limit | number | false |
-| offset | number | false |
+### KnexLeaveRepository
+
+Concrete implementation of `ILeaveRepository` using Knex query builder backed by the shared `pg` Pool. Table: `leave_requests`. Constructor accepts an optional `Knex` instance for testability; defaults to a Knex instance wired to the shared pool. Includes a private `toLeaveRequest` mapper that converts raw rows to `LeaveRequest` objects, handling nullability of `managerId`, `managerComment`, `submittedAt`, `reviewedAt` and parsing date strings. All public methods wrap errors in `RepositoryError`.
+
+### RepositoryError
+
+Custom error class exported from `leave.repository.ts`. Wraps the original error for upstream handling.
 
 ## balance
 
