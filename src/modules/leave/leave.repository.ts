@@ -10,6 +10,16 @@ export interface ILeaveRepository extends IBaseRepository<LeaveRequest> {
 
 const TABLE_NAME = 'leave_requests';
 
+export class RepositoryError extends Error {
+  constructor(
+    message: string,
+    public readonly originalError?: unknown,
+  ) {
+    super(message);
+    this.name = 'RepositoryError';
+  }
+}
+
 export class KnexLeaveRepository implements ILeaveRepository {
   private readonly db: Knex;
 
@@ -18,41 +28,84 @@ export class KnexLeaveRepository implements ILeaveRepository {
   }
 
   async findById(id: string): Promise<LeaveRequest | null> {
-    const row = await this.db(TABLE_NAME).where({ id }).first();
-    return row ? this.toLeaveRequest(row) : null;
+    try {
+      const row = await this.db(TABLE_NAME).where({ id }).first();
+      return row ? this.toLeaveRequest(row) : null;
+    } catch (error) {
+      throw new RepositoryError(
+        `Failed to find leave request by id: ${id}`,
+        error,
+      );
+    }
   }
 
   async findAll(): Promise<LeaveRequest[]> {
-    const rows = await this.db(TABLE_NAME).select('*');
-    return rows.map((row) => this.toLeaveRequest(row));
+    try {
+      const rows = await this.db(TABLE_NAME).select('*');
+      return rows.map((row) => this.toLeaveRequest(row));
+    } catch (error) {
+      throw new RepositoryError('Failed to find all leave requests', error);
+    }
   }
 
   async findByEmployeeId(employeeId: string): Promise<LeaveRequest[]> {
-    const rows = await this.db(TABLE_NAME).where({ employeeId }).select('*');
-    return rows.map((row) => this.toLeaveRequest(row));
+    try {
+      const rows = await this.db(TABLE_NAME).where({ employeeId }).select('*');
+      return rows.map((row) => this.toLeaveRequest(row));
+    } catch (error) {
+      throw new RepositoryError(
+        `Failed to find leave requests by employee id: ${employeeId}`,
+        error,
+      );
+    }
   }
 
   async findByStatus(status: string): Promise<LeaveRequest[]> {
-    const rows = await this.db(TABLE_NAME).where({ status }).select('*');
-    return rows.map((row) => this.toLeaveRequest(row));
+    try {
+      const rows = await this.db(TABLE_NAME).where({ status }).select('*');
+      return rows.map((row) => this.toLeaveRequest(row));
+    } catch (error) {
+      throw new RepositoryError(
+        `Failed to find leave requests by status: ${status}`,
+        error,
+      );
+    }
   }
 
   async create(entity: Omit<LeaveRequest, 'id'>): Promise<LeaveRequest> {
-    const [row] = await this.db(TABLE_NAME).insert(entity).returning('*');
-    return this.toLeaveRequest(row);
+    try {
+      const [row] = await this.db(TABLE_NAME).insert(entity).returning('*');
+      return this.toLeaveRequest(row);
+    } catch (error) {
+      throw new RepositoryError('Failed to create leave request', error);
+    }
   }
 
   async update(id: string, entity: Partial<LeaveRequest>): Promise<LeaveRequest | null> {
-    const [row] = await this.db(TABLE_NAME)
-      .where({ id })
-      .update({ ...entity, updatedAt: new Date() })
-      .returning('*');
-    return row ? this.toLeaveRequest(row) : null;
+    try {
+      const [row] = await this.db(TABLE_NAME)
+        .where({ id })
+        .update({ ...entity, updatedAt: new Date() })
+        .returning('*');
+      return row ? this.toLeaveRequest(row) : null;
+    } catch (error) {
+      throw new RepositoryError(
+        `Failed to update leave request: ${id}`,
+        error,
+      );
+    }
   }
 
   async delete(id: string): Promise<boolean> {
-    const count = await this.db(TABLE_NAME).where({ id }).delete();
-    return count > 0;
+    try {
+      const count = await this.db(TABLE_NAME).where({ id }).delete();
+      return count > 0;
+    } catch (error) {
+      throw new RepositoryError(
+        `Failed to delete leave request: ${id}`,
+        error,
+      );
+    }
   }
 
   private toLeaveRequest(row: Record<string, unknown>): LeaveRequest {
