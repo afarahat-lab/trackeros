@@ -1,0 +1,81 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The findById describe block in tests/unit/modules/leave/leave.repository.test.ts contains a new test case that mocks the underlying query-builder first() method to reject with a generic Error and asserts that repo.findById() rejects with a RepositoryError.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "RepositoryError is imported into the test file from the same module as KnexLeaveRepository (src/modules/leave/leave.repository) so the new test can assert against the class.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The new error test follows the existing per-test mock override pattern used in the findById block (overriding mockQb.first within the test body) rather than altering the shared beforeEach mock setup, so existing 'found' and 'not found' tests remain unaffected.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The full leave.repository.test.ts suite passes under Jest (npx jest) with the new test included, and the file remains typecheck-clean under strict TypeScript (npm run build / tsc --noEmit).",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The new test must not modify production source (src/modules/leave/leave.repository.ts); it only adds a test case and an import to the existing test file. The RepositoryError class and findById error-wrapping behavior already exist and must be asserted against, not changed.",
+    "RepositoryError must be added to the existing import statement from '../../../../src/modules/leave/leave.repository' rather than introduced via a separate import line or a dynamic require, matching the file's current import style.",
+    "The test must use the shared mockQb/mockKnex setup established in the KnexLeaveRepository beforeEach; it must not introduce a new mock Knex instance or a different query-builder mock, so it stays consistent with the 'found'/'not found' tests in the same describe block.",
+    "No use of any (HARNESS no-any rule); the rejecting mock must throw a typed Error (e.g. new Error('boom')) and the assertion must check against the RepositoryError class, not an untyped string match alone."
+  ],
+  "outOfScope": [
+    "Adding error-path tests for the other repository methods (findAll, findByEmployeeId, findByStatus, create, update, delete) \u2014 only the findById error path is in scope for this phase.",
+    "Modifying the RepositoryError class, the findById implementation, or any production source file \u2014 this phase is test-only.",
+    "Adding integration/e2e tests that exercise a real database connection \u2014 this is a unit test using the mocked Knex query builder."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "RepositoryError",
+      "mustExistOrExtend": true,
+      "invariant": "A RepositoryError is thrown by KnexLeaveRepository.findById whenever the underlying query (this.db(TABLE_NAME).where({ id }).first()) rejects or throws; its message is 'Failed to find leave request by id: <id>' and it carries the original error on its originalError property. The new test must assert that a generic Error thrown from the mocked first() surfaces as this RepositoryError type, not the raw Error."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "KnexLeaveRepository.findById(id)",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "When the underlying Knex query rejects, findById must reject with a RepositoryError (not propagate the raw Error). The new unit test mocks the query-builder first() to reject with a generic Error and asserts the rejection is an instance of RepositoryError. This validates GP-006 (no unhandled promise rejections / all async errors caught and handled) at the repository boundary."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The new error test must reuse the existing mockQb query-builder mock and the per-test override pattern already used by the 'should return a LeaveRequest when found' and 'should return null when not found' tests in the findById describe block (i.e. assign mockQb.first = jest.fn().mockRejectedValue(...) inside the test body), so the mock setup style is consistent across all findById cases.",
+      "referencePath": "tests/unit/modules/leave/leave.repository.test.ts"
+    },
+    {
+      "requirement": "The assertion in the new test must match the actual findById error contract: a rejecting first() yields new RepositoryError('Failed to find leave request by id: <id>', error). The test must assert the rejected error is an instance of RepositoryError (and may optionally verify the message contains the passed id and that originalError is the thrown Error), consistent with the production wrapping logic in this file.",
+      "referencePath": "src/modules/leave/leave.repository.ts"
+    },
+    {
+      "requirement": "RepositoryError must be added to the existing named import from '../../../../src/modules/leave/leave.repository' (the same source path already importing ILeaveRepository and KnexLeaveRepository), keeping a single consolidated import line consistent with the file's current import block.",
+      "referencePath": "tests/unit/modules/leave/leave.repository.test.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/leave/leave.repository.ts (RepositoryError export)",
+      "why": "The new test imports RepositoryError from this module to assert the rejection type; the export already exists and must remain available. No new export is created \u2014 the test consumes the existing public symbol."
+    }
+  ]
+}
