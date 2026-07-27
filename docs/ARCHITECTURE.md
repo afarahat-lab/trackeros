@@ -142,4 +142,10 @@ All modules use Fastify for HTTP, Jest for testing, and follow the modular-monol
 - `src/shared/base-repository.ts` — Generic `IBaseRepository<T>` interface with `findById`, `findAll`, `create`, `update`, `delete`
 - Tests: `tests/unit/shared/leave.types.test.ts`, `tests/unit/shared/base-repository.test.ts`
 
+### Phase 2 — Built
+
+- `src/modules/leave/leave.model.ts` — `LeaveRequest` interface (id, employeeId, leaveType, leavePolicyId, startDate, endDate, totalDays, reason, status, managerId, managerComment, submittedAt, reviewedAt, createdAt, updatedAt) and `CreateLeaveRequestDto` (omits id, status, and timestamps). Imports `LeaveType` and `LeaveRequestStatus` from shared types.
+- `src/modules/leave/leave.repository.ts` — `ILeaveRepository` interface extending `IBaseRepository<LeaveRequest>` with `findByEmployeeId(employeeId)` and `findByStatus(status)`. `KnexLeaveRepository` class implements it using Knex query builder backed by the `pg` Pool from `src/shared/db/connection.ts`. Constructor accepts an optional `Knex` instance for testability; defaults to a Knex instance wired to the shared pool. Table name: `leave_requests`. Private `toLeaveRequest` mapper converts raw rows to `LeaveRequest` objects, handling nullability of `managerId`, `managerComment`, `submittedAt`, `reviewedAt` and parsing date strings.
+- Tests: `tests/unit/modules/leave/leave.model.test.ts` (validates LeaveRequest and CreateLeaveRequestDto shapes, nullable fields, DTO omission of id/status/timestamps), `tests/unit/modules/leave/leave.repository.test.ts` (structural interface test via a stub class, and full KnexLeaveRepository tests using a mocked Knex instance covering findById, findAll, findByEmployeeId, findByStatus, create, update, delete, and date/null handling in toLeaveRequest)
+
 <!-- gestalt:architecture feature=e52e7dc9-5a2d-453b-b5a3-9d187c6021f7 END -->
