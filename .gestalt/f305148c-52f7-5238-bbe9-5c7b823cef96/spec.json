@@ -1,0 +1,182 @@
+{
+  "scope": {
+    "affectedDomains": [],
+    "affectedLayers": [],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The LeaveRequest interface is exported from src/modules/leave/leave.model.ts and includes every attribute named in the phase scope: id, employeeId, leaveType, leavePolicyId, startDate, endDate, totalDays, reason, status, managerId, managerComment, submittedAt, reviewedAt, createdAt, updatedAt.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The CreateLeaveRequestDto is exported from src/modules/leave/leave.model.ts and excludes id, status, and all timestamp fields (submittedAt, reviewedAt, createdAt, updatedAt) \u2014 it contains only the employee-supplied inputs (employeeId, leaveType, leavePolicyId, startDate, endDate, totalDays, reason, managerId, managerComment).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The LeaveRequest.status field is typed as the existing LeaveRequestStatus enum from src/shared/types/leave.types.ts (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED) and leaveType is typed as the existing LeaveType enum (ANNUAL, SICK, EMERGENCY) \u2014 the model reuses the Phase 1 enums rather than redefining them.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The ILeaveRepository interface is exported from src/modules/leave/leave.repository.ts and extends IBaseRepository<LeaveRequest> from src/shared/base-repository.ts, so it inherits findById, findAll, create, update, and delete with the exact signatures defined there.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A concrete repository class implementing ILeaveRepository is exported from src/modules/leave/leave.repository.ts and is backed by the database pool imported from src/shared/db/connection.ts \u2014 it performs all data access through that pool (no inline SQL or direct datastore calls outside the repository).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository's create operation persists a leave request row and returns a fully-populated LeaveRequest (including the generated id and server-set timestamps), and findById returns null when no row matches the given id.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests exist under tests/unit/modules/leave/ and pass under the project's ts-jest configuration; they cover the model's exported types (LeaveRequest, CreateLeaveRequestDto) and the repository's create/find/update/delete behavior, exercising the repository against a test double of the database pool rather than a live database.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The phase compiles cleanly under `npm run build` (tsc --noEmit) with strict TypeScript \u2014 no implicit any, no unresolved imports, and no type mismatch between CreateLeaveRequestDto and the IBaseRepository.create(Omit<LeaveRequest,'id'>) signature.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access must go through the repository layer (GP-001 / HARNESS no-direct-db-outside-repository, severity critical). The leave repository is the only place that may touch the database pool; no service or route code in this phase may import the pool directly.",
+    "Strict TypeScript must be satisfied (tsconfig strict: true, no implicit any, strict null checks). No use of `any`; use `unknown` with type guards where dynamic typing is unavoidable (HARNESS no-any rule, severity high).",
+    "The repository must reuse the existing database pool exported from src/shared/db/connection.ts and the existing IBaseRepository<T> interface from src/shared/base-repository.ts \u2014 it must not create a second connection pool or redefine the base repository contract.",
+    "The model must reuse the LeaveType and LeaveRequestStatus enums already defined in src/shared/types/leave.types.ts rather than redeclaring them, to avoid divergent enum definitions across the codebase.",
+    "No hardcoded secrets, passwords, or tokens may appear in the model, repository, or tests (HARNESS no-hardcoded-secrets, severity critical). Tests must not require a live DATABASE_URL or real database connection.",
+    "This phase must not introduce circular dependencies. The leave module may import only from src/shared (types, base-repository, db/connection); it must not import from other domain modules (employee, balance, policy) which do not yet exist."
+  ],
+  "outOfScope": [
+    "LeaveService, ILeaveService, and all business logic (apply/approve/reject/cancel, status-transition enforcement, balance checks, overlap prevention) \u2014 deferred to Phase 5.",
+    "LeaveController, Fastify routes, Zod validation schemas, and registration in src/app.ts \u2014 deferred to Phase 6.",
+    "The leave module public index.ts barrel export \u2014 deferred to Phase 7.",
+    "Knex migration files for the leave_requests table, the knexfile, and any DDL/schema definitions \u2014 deferred to Phase 9. This phase defines the TypeScript model and repository only, not the database schema.",
+    "Audit logging of leave request create/update/delete operations (GP-002) \u2014 the audit-log module does not exist yet; audit integration is deferred to later phases that introduce state-changing services.",
+    "RBAC enforcement and input validation at API boundaries (GP-003, GP-005) \u2014 there is no controller/route layer in this phase, so these principles are not applicable yet."
+  ],
+  "ambiguities": [
+    {
+      "description": "The intent names the concrete class \"KnexLeaveRepository\" and says it uses \"the db pool from src/shared/db/connection.ts\", but that file exports a raw `pg.Pool`, not a Knex client. Knex is a declared dependency but no Knex instance is constructed anywhere in the codebase, and ARCHITECTURE.md's GP-001 compliance note says concrete implementations are \"backed by PostgreSQL via pg Pool.\" The code agent must decide whether to (a) build the repository on the existing pg.Pool (consistent with the existing connection and ARCHITECTURE.md's \"pg Pool\" wording), or (b) construct a Knex client from DATABASE_URL and build on Knex (consistent with the class name and the \"Knex migrations\" stack description). Either is acceptable as long as all data access goes through the repository and the existing pool is not bypassed.",
+      "options": [
+        "Use the existing pg.Pool from src/shared/db/connection.ts (matches ARCHITECTURE.md 'pg Pool' wording and avoids a second connection)",
+        "Construct a Knex client from DATABASE_URL and build the repository on Knex (matches the 'KnexLeaveRepository' class name and the Knex-migrations stack)"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "IBaseRepository<T>.create is declared as `create(entity: Omit<T, 'id'>): Promise<T>`, which for LeaveRequest would require every field except `id` (including status and all timestamps) to be supplied by the caller. But CreateLeaveRequestDto intentionally omits id, status, and timestamps. The code agent must reconcile this: either the repository's create accepts CreateLeaveRequestDto and internally supplies defaults for status/timestamps before persisting (narrowing the input at the ILeaveRepository level), or it keeps the base signature and relies on the caller/service (Phase 5) to fill status+timestamps. Since Phase 5 is out of scope, the repository must be usable for creation in this phase's tests without a service layer.",
+      "options": [
+        "Narrow ILeaveRepository.create to accept CreateLeaveRequestDto and have the repository assign default status (DRAFT) and timestamps",
+        "Keep the base Omit<LeaveRequest,'id'> signature and have tests supply status+timestamps explicitly"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "The phase scope lists LeaveRequest attributes including `managerComment` and `managerId`, but ARCHITECTURE.md's conceptual data model for leave_request uses `reviewed_by` and `reviewed_at` rather than `managerComment`, and the LeaveRequestStatus enum from Phase 1 has no UNDER_REVIEW value even though ARCHITECTURE.md's lifecycle lists UNDER_REVIEW. The phase scope (PLAN.md Phase 2) is the authoritative field list for this phase; the code agent should follow the phase scope's attribute names and the Phase 1 enum values, not the higher-level ARCHITECTURE.md lifecycle notes that belong to later phases.",
+      "options": [
+        "Follow the Phase 2 scope field list (managerId, managerComment, submittedAt, reviewedAt) and the Phase 1 LeaveRequestStatus enum (5 values, no UNDER_REVIEW)",
+        "Add UNDER_REVIEW to the enum and align field names to ARCHITECTURE.md's reviewed_by"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "A LeaveRequest's status is always one of the existing LeaveRequestStatus enum values (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED); the model must not permit status values outside that enum. (Note: this phase only defines the model and persistence; transition rules are enforced in Phase 5.)"
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "A persisted LeaveRequest always carries a non-null id and populated createdAt/updatedAt timestamps; these are assigned by the persistence layer on create, never supplied by the caller via CreateLeaveRequestDto."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "A newly created LeaveRequest defaults to status DRAFT unless the persistence caller explicitly supplies another valid status; the repository must not leave status unset when persisting a row."
+    },
+    {
+      "entity": "CreateLeaveRequestDto",
+      "mustExistOrExtend": true,
+      "invariant": "CreateLeaveRequestDto is a strict subset of LeaveRequest that excludes id, status, submittedAt, reviewedAt, createdAt, and updatedAt \u2014 it must be assignable to the employee-supplied input fields only and must not be usable to forge an id or a server-controlled timestamp."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "ILeaveRepository.findById(id)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the matching LeaveRequest or null when no row exists; must not throw for a missing id. Database/connection errors propagate as rejected promises and must be caught by the caller (GP-006)."
+    },
+    {
+      "operation": "ILeaveRepository.findAll()",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an array (possibly empty) of all LeaveRequest rows; never returns null. Connection errors propagate as rejected promises."
+    },
+    {
+      "operation": "ILeaveRepository.create(input)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Persists a new leave request row and returns the fully-populated LeaveRequest with generated id and timestamps. Must reject (not silently succeed) when the underlying insert fails. The input shape must be compatible with CreateLeaveRequestDto (server-controlled fields are assigned by the repository, not the caller)."
+    },
+    {
+      "operation": "ILeaveRepository.update(id, partial)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Applies a partial update to the matching row and returns the updated LeaveRequest, or null when no row matches the id. Must not create a row if the id does not exist."
+    },
+    {
+      "operation": "ILeaveRepository.delete(id)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Deletes the matching row and returns true; returns false when no row matches the id. Must not throw for a missing id."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "ILeaveRepository must extend IBaseRepository<LeaveRequest> exactly as declared in src/shared/base-repository.ts \u2014 matching the findById/findAll/create/update/delete signatures and the `create(entity: Omit<T, 'id'>): Promise<T>` contract. The leave repository must not redefine or alter these base method signatures.",
+      "referencePath": "src/shared/base-repository.ts"
+    },
+    {
+      "requirement": "The LeaveRequest.status and LeaveRequest.leaveType fields must be typed using the LeaveRequestStatus and LeaveType enums exported from src/shared/types/leave.types.ts (LeaveRequestStatus: DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED; LeaveType: ANNUAL, SICK, EMERGENCY). The model must import these enums rather than redeclaring equivalent string-literal types.",
+      "referencePath": "src/shared/types/leave.types.ts"
+    },
+    {
+      "requirement": "The concrete leave repository must obtain its database access through the pool exported from src/shared/db/connection.ts (or a Knex client built from the same DATABASE_URL) \u2014 it must not instantiate a separate, parallel database connection. This keeps a single connection-management source consistent with the existing shared infrastructure.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "The leave repository unit tests must follow the same Jest + ts-jest conventions demonstrated in tests/unit/shared/base-repository.test.ts \u2014 importing from the source via relative paths, using describe/it blocks, and exercising repository behavior against a test double rather than a live database. Test file placement must be under tests/unit/modules/leave/ to match the project's test layout.",
+      "referencePath": "tests/unit/shared/base-repository.test.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/base-repository.ts (IBaseRepository<T>)",
+      "why": "ILeaveRepository extends this generic interface to inherit the standard CRUD contract; the leave repository is the first concrete consumer of the Phase 1 base repository."
+    },
+    {
+      "target": "src/shared/types/leave.types.ts (LeaveType, LeaveRequestStatus)",
+      "why": "The LeaveRequest model types its status and leaveType fields against these Phase 1 enums, establishing the shared enum as the canonical leave-type/status vocabulary across modules."
+    },
+    {
+      "target": "src/shared/db/connection.ts (pool)",
+      "why": "The concrete leave repository depends on the shared database pool for all data access, per GP-001 and the no-direct-db-outside-repository constraint."
+    },
+    {
+      "target": "Phase 5 \u2014 LeaveService (src/modules/leave/leave.service.ts, not yet built)",
+      "why": "The LeaveRequest model and ILeaveRepository created in this phase are the contracts that the Phase 5 service will depend on for apply/approve/reject/cancel operations; their shapes must remain stable so the service can consume them without rework."
+    }
+  ]
+}
