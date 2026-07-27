@@ -29,13 +29,17 @@ src/modules/LeavePolicy/    — LeavePolicy module
 src/modules/AuditLog/    — AuditLog module
 src/modules/AuditRecord/    — AuditRecord module
 src/modules/AuditServiceInterface/    — AuditServiceInterface module
-src/shared/db connection.ts
-src/shared/base repository.ts
+src/shared/db/connection.ts
+src/shared/base.repository.ts
 src/shared/error types.ts
 ```
 
 ## Key patterns
 
+- **BaseRepository** (`src/shared/base.repository.ts`) — abstract generic class
+  wrapping the `pg` Pool. Subclasses declare `tableName` and inherit
+  `findById`, `findAll`, `insert`, `update`, and `delete`. All domain
+  repositories extend this base (GP-001 compliance).
 - See `AGENTS.md` for stack-specific coding conventions
 - See `docs/GOLDEN_PRINCIPLES.md` for the non-negotiable rules every
   cycle is checked against
