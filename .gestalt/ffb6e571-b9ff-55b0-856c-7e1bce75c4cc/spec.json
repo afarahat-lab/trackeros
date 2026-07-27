@@ -1,0 +1,134 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared-types",
+      "shared-repository-contract",
+      "leave",
+      "employee",
+      "balance"
+    ],
+    "affectedLayers": [
+      "shared",
+      "types",
+      "persistence-contract",
+      "unit-tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The leave types module exports four string-valued enums with the exact member sets: LeaveType = {ANNUAL, SICK, EMERGENCY} (3 members), LeaveRequestStatus = {DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED} (5 members), LeaveBalanceStatus = {ACTIVE, EXHAUSTED, EXPIRED} (3 members), EmployeeStatus = {ACTIVE, ON_LEAVE, INACTIVE, PROBATION} (4 members). Each member's value equals its key (e.g. LeaveType.ANNUAL === 'ANNUAL').",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A generic IBaseRepository<T> interface is exported and declares exactly five async operations: findById(id) returning T|null, findAll() returning T[], create(entity: Omit<T,'id'>) returning T, update(id, entity: Partial<T>) returning T|null, and delete(id) returning boolean. A concrete class implementing the interface against an in-memory store must compile under strict TypeScript and satisfy all five operation contracts (create returns an entity with an id, findById returns null on miss, update returns null on miss, delete returns false on miss).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests exist under tests/unit/shared/ that (a) assert each enum's exact member values and exact member count, and (b) exercise a concrete IBaseRepository implementation through all five operations including the not-found paths (findById/update return null, delete returns false). The full suite passes via `npm test` (jest --passWithNoTests) with ts-jest under the node environment, and `npm run build` (tsc --noEmit) exits 0 with no type errors in src.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The base repository module obtains its database pool type from the existing src/shared/db/connection.ts (which exports a pg Pool built from process.env.DATABASE_URL) and exposes a DbPool type alias derived from that pool, so downstream repository implementations can reference the shared pool type without re-importing pg directly.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No use of `any` anywhere in the produced source or tests \u2014 use `unknown` with type guards where needed (HARNESS constraint no-any, severity high). Strict TypeScript is enabled (strict null checks, no implicit any); `npm run build` (tsc --noEmit) must pass with zero errors.",
+    "All database access must go through the repository pattern (GP-001 / HARNESS no-direct-db-outside-repository, severity critical). The generic IBaseRepository<T> interface is the shared contract that concrete repositories extend; no inline SQL or direct pg Pool queries belong in this phase's shared layer beyond the connection module.",
+    "No hardcoded passwords, API keys, tokens, or connection strings (HARNESS no-hardcoded-secrets, severity critical). The db pool must be constructed solely from process.env.DATABASE_URL; the shared types and base repository must not embed any credentials.",
+    "Tests must run under Jest 29 with the ts-jest preset in the node environment, matching jest.config.js (testMatch '**/tests/**/*.test.(ts|js)', moduleDirectories ['node_modules','src']). Source must compile under TypeScript 5 strict mode with baseUrl './src' (src-rooted module resolution). Tests are excluded from tsc's include set and are type-checked only by ts-jest.",
+    "Do not add @gestalt/* packages as project dependencies \u2014 these are Gestalt platform internals unavailable on npm (HARNESS no-gestalt-internal-deps, severity critical). Only declared runtime deps (pg, dotenv, etc.) may be imported."
+  ],
+  "outOfScope": [
+    "Concrete repository implementations (e.g. KnexLeaveRepository, KnexEmployeeRepository, KnexLeaveBalanceRepository) and any Knex query construction. This phase defines only the generic IBaseRepository<T> interface contract; concrete classes belong to Phases 2\u20134.",
+    "Domain entity interfaces and DTOs (LeaveRequest, Employee, LeaveBalance, CreateLeaveRequestDto, etc.) and their field definitions. This phase ships only the shared enums and the base repository interface; models are introduced in Phases 2\u20134.",
+    "Service layers, controllers, Fastify route plugins, Zod validation schemas, app.ts registration, and HTTP/integration tests. This phase is a pure shared-types + interface foundation with unit tests only; no HTTP surface or business logic.",
+    "Knex migration files, the knexfile configuration, and any table schema definitions. The db connection module already exists and is referenced only for its Pool type; schema migrations are Phase 9.",
+    "Audit record emission (GP-002). This phase introduces no state-changing operations against persisted entities \u2014 only enums and an interface contract \u2014 so no audit_log writes are required. Audit wiring begins when concrete repositories perform creates/updates in later phases."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveType",
+      "mustExistOrExtend": true,
+      "invariant": "The enum is a closed set of exactly three members {ANNUAL, SICK, EMERGENCY}, each string-valued with value equal to its key. This set is the authoritative leave-category vocabulary consumed by leave_policy, leave_balance, and leave_request in later phases; adding or renaming a member is a breaking change requiring coordination with all downstream modules."
+    },
+    {
+      "entity": "LeaveRequestStatus",
+      "mustExistOrExtend": true,
+      "invariant": "The enum is a closed set of exactly five members {DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED}, each string-valued with value equal to its key. These are the only legal lifecycle states for a leave request; the transition rules enforced in Phase 5 (DRAFT\u2192SUBMITTED\u2192APPROVED/REJECTED, DRAFT/SUBMITTED\u2192CANCELLED) reference exactly these members. Note: the architecture narrative mentions UNDER_REVIEW and FROZEN, but the spec and code agree on this 5-member set \u2014 those narrative-only states are not part of this phase's contract."
+    },
+    {
+      "entity": "LeaveBalanceStatus",
+      "mustExistOrExtend": true,
+      "invariant": "The enum is a closed set of exactly three members {ACTIVE, EXHAUSTED, EXPIRED}, each string-valued with value equal to its key. These are the only legal balance lifecycle states; the architecture narrative's FROZEN is out-of-sync with the spec/code and is not a member of this phase's contract."
+    },
+    {
+      "entity": "EmployeeStatus",
+      "mustExistOrExtend": true,
+      "invariant": "The enum is a closed set of exactly four members {ACTIVE, ON_LEAVE, INACTIVE, PROBATION}, each string-valued with value equal to its key. ACTIVE is the only status that permits leave submission (BR-001/BR-008 in later phases); PROBATION restricts eligibility to probationEligible leave types. This set is the authoritative employee-state vocabulary."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IBaseRepository<T>.findById(id: string) \u2192 Promise<T | null>",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns the matching entity or null when no entity with the given id exists; must not throw on a not-found id. Read-only \u2014 no persistence side effects."
+    },
+    {
+      "operation": "IBaseRepository<T>.findAll() \u2192 Promise<T[]>",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns an array of all persisted entities (empty array when none exist); never null. Read-only \u2014 no persistence side effects."
+    },
+    {
+      "operation": "IBaseRepository<T>.create(entity: Omit<T, 'id'>) \u2192 Promise<T>",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Persists a new entity from a payload excluding the id (Omit<T,'id'>), assigns/generates the id, and returns the fully-formed persisted entity including its id. Must not be retried blindly by callers for the same logical input unless the implementation guarantees idempotency \u2014 the interface contract itself is not idempotent."
+    },
+    {
+      "operation": "IBaseRepository<T>.update(id: string, entity: Partial<T>) \u2192 Promise<T | null>",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Applies a partial update (Partial<T>) to the entity with the given id and returns the updated entity, or returns null when no entity with that id exists. Must not throw on a not-found id."
+    },
+    {
+      "operation": "IBaseRepository<T>.delete(id: string) \u2192 Promise<boolean>",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Removes the entity with the given id and returns true on success, or returns false when no entity with that id exists. Must not throw on a not-found id."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The DbPool type exposed by the base repository module must be derived from the pg Pool exported by src/shared/db/connection.ts (which constructs the Pool from process.env.DATABASE_URL). The base repository must import from that connection module rather than constructing an independent Pool, so there is a single shared pool instance and type source.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "The four enum member sets must match the Phase 1 specification in PLAN.md exactly: LeaveType {ANNUAL,SICK,EMERGENCY}, LeaveRequestStatus {DRAFT,SUBMITTED,APPROVED,REJECTED,CANCELLED}, LeaveBalanceStatus {ACTIVE,EXHAUSTED,EXPIRED}, EmployeeStatus {ACTIVE,ON_LEAVE,INACTIVE,PROBATION}. Where docs/ARCHITECTURE.md diverges (UNDER_REVIEW, FROZEN), PLAN.md and the implemented code are authoritative and the narrative-only states are excluded.",
+      "referencePath": "PLAN.md"
+    },
+    {
+      "requirement": "Unit tests must be discoverable by the existing jest.config.js (testMatch '**/tests/**/*.test.(ts|js)', ts-jest preset, node environment, moduleDirectories ['node_modules','src']) and must import source via paths consistent with tsconfig.json's baseUrl './src'. No changes to jest.config.js or tsconfig.json are required for this phase.",
+      "referencePath": "jest.config.js"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/base-repository.ts (IBaseRepository<T> + DbPool)",
+      "why": "Phase 2 (leave.repository), Phase 3 (employee.repository), and Phase 4 (balance.repository) each define a module-specific repository interface that extends IBaseRepository<T> and a Knex implementation backed by the shared DbPool. This phase is the foundation contract they depend on."
+    },
+    {
+      "target": "src/shared/types/leave.types.ts (LeaveType, LeaveRequestStatus, LeaveBalanceStatus, EmployeeStatus)",
+      "why": "Phase 2's LeaveRequest model types status as LeaveRequestStatus and leaveType as LeaveType; Phase 3's Employee model types status as EmployeeStatus; Phase 4's LeaveBalance model types status as LeaveBalanceStatus and leaveType as LeaveType; Phase 5's service enforces transitions over LeaveRequestStatus. All downstream phases import these enums as the shared domain vocabulary."
+    }
+  ]
+}
