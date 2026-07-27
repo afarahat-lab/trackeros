@@ -1,0 +1,162 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared-types",
+      "shared-infrastructure",
+      "leave-management-foundation"
+    ],
+    "affectedLayers": [
+      "shared",
+      "types",
+      "data-access-interface",
+      "unit-tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "src/shared/types/leave.types.ts exports four TypeScript enums \u2014 LeaveType, LeaveRequestStatus, LeaveBalanceStatus, EmployeeStatus \u2014 with exactly the reconciled-architecture values: LeaveType = ANNUAL, SICK, EMERGENCY; LeaveRequestStatus = DRAFT, SUBMITTED, UNDER_REVIEW, APPROVED, REJECTED, CANCELLED (6 members); LeaveBalanceStatus = ACTIVE, EXHAUSTED, FROZEN; EmployeeStatus = ACTIVE, ON_LEAVE, INACTIVE, PROBATION. No enum contains EXPIRED, PENDING, MATERNITY, PATERNITY, UNPAID, or OTHER (the stale root-ARCHITECTURE.md values).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/shared/base-repository.ts exports a generic interface IBaseRepository<T> declaring exactly five methods \u2014 findById, findAll, create, update, delete \u2014 each with a Promise-returning signature appropriate to its semantics (single-entity lookup returns T | null, collection lookup returns T[], create/update return T, delete returns void or boolean). The interface is generic over T so that downstream phases can write ILeaveRepository extends IBaseRepository<LeaveRequest> without renaming methods.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The IBaseRepository<T> interface references the pg Pool type (imported from 'pg' or re-exported via src/shared/db/connection.ts) so that concrete repository implementations in later phases can inject the shared database pool. The interface compiles under strict TypeScript (strict:true, ES2022, commonjs, baseUrl ./src) with no implicit-any or type errors.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests exist under tests/unit/shared/ as .test.ts files (matching jest.config.js testMatch '**/tests/**/*.test.(ts|js)') and pass via ts-jest. The tests assert each enum's exact member set and string values, and verify that IBaseRepository<T> is structurally sound \u2014 i.e., a minimal object implementing all five methods satisfies the interface type at compile time (structural typing check) and the enum values match the reconciled architecture.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The full project type-checks and tests pass: `npm run build` (tsc --noEmit) exits 0 and `npx jest` runs the new tests with zero failures. No new TypeScript compilation errors are introduced in src/ or tests/.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Enum values must follow the reconciled architecture (.gestalt/architecture/reconciled.json + docs/ARCHITECTURE.md), NOT the stale root-level ARCHITECTURE.md. Specifically: LeaveRequestStatus must include UNDER_REVIEW (required by BR-007 sick-leave documentation workflow) and must NOT include PENDING; LeaveBalanceStatus must use FROZEN and must NOT include EXPIRED; LeaveType must be exactly ANNUAL/SICK/EMERGENCY (no MATERNITY/PATERNITY/UNPAID/OTHER).",
+    "TypeScript strict mode (strict:true, target ES2022, module commonjs, baseUrl ./src, rootDir ./src) must be satisfied with no implicit-any, no strict-null-check violations, and no unused declarations. The no-any HARNESS constraint (severity high) requires using unknown with type guards instead of any in any generic or helper code.",
+    "The IBaseRepository<T> method names \u2014 findById, findAll, create, update, delete \u2014 are fixed contracts: PLAN.md Phases 2\u20134 declare ILeaveRepository extends IBaseRepository<LeaveRequest>, IEmployeeRepository extends IBaseRepository<Employee>, and ILeaveBalanceRepository extends IBaseRepository<LeaveBalance>. Renaming any method or the generic parameter T would break downstream phases.",
+    "Follow the established module convention visible in src/modules/status/ and src/modules/uptime/: plain `export interface` for models in *.model.ts, `export interface I{Name}...` for service interfaces in *.interface.ts, and barrel index.ts re-exports. The new src/shared/types/ directory and src/shared/base-repository.ts must use the same export style (named exports, no default exports) for consistency.",
+    "This phase must not add @gestalt/* packages as dependencies (HARNESS no-gestalt-internal-deps, severity critical) and must not hardcode secrets (no-hardcoded-secrets, severity critical). The only external dependency reference allowed is the existing pg package (already in package.json) for the Pool type."
+  ],
+  "outOfScope": [
+    "Concrete repository implementations (e.g., KnexLeaveRepository, KnexEmployeeRepository, KnexLeaveBalanceRepository) \u2014 these are Phase 2\u20134. This phase only defines the IBaseRepository<T> interface contract, not any class that implements it or performs actual database queries.",
+    "Domain model interfaces (LeaveRequest, Employee, LeaveBalance, LeavePolicy) and their DTOs \u2014 these belong to Phase 2\u20134 module model files. This phase only defines the four shared enums and the base repository interface.",
+    "LeavePolicyStatus enum (ACTIVE, SUPERSEDED, DEPRECATED) and any NotificationType / AuditAction / EntityType enums \u2014 these are not part of the four enums specified for this phase (LeaveType, LeaveRequestStatus, LeaveBalanceStatus, EmployeeStatus). They may be introduced in later phases or modules.",
+    "Status transition rules, business-rule validation logic (BR-001 through BR-008), balance computation, and audit-log recording \u2014 these are service-layer concerns in Phases 5\u20138. The enums in this phase are pure value definitions with no transition or validation logic attached.",
+    "Database migrations, Knex configuration (knexfile), and table schema definitions \u2014 these are Phase 9. This phase references the pg Pool type only for the interface signature, not for schema or migration work."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveType",
+      "mustExistOrExtend": true,
+      "invariant": "The enum is a closed, static enumeration of exactly three leave categories (ANNUAL, SICK, EMERGENCY) with no lifecycle transitions. It is treated as a domain enum even though the reconciled architecture notes it may be stored as a reference table for extensibility; the enum values are the canonical codes."
+    },
+    {
+      "entity": "LeaveRequestStatus",
+      "mustExistOrExtend": true,
+      "invariant": "The enum captures the full LeaveRequest lifecycle with six states: DRAFT, SUBMITTED, UNDER_REVIEW, APPROVED, REJECTED, CANCELLED. APPROVED, REJECTED, and CANCELLED are terminal states. UNDER_REVIEW is a required intermediate state (per BR-007) reachable from SUBMITTED when sick-leave documentation is pending; CANCELLED is reachable from SUBMITTED, UNDER_REVIEW, or APPROVED. The enum must not include PENDING (a stale value) \u2014 SUBMITTED is the non-terminal active-review entry point."
+    },
+    {
+      "entity": "LeaveBalanceStatus",
+      "mustExistOrExtend": true,
+      "invariant": "The enum has exactly three states: ACTIVE (balance has remaining days available), EXHAUSTED (remaining is zero or below threshold), and FROZEN (balance locked, e.g., year-end or policy change). The enum must not include EXPIRED \u2014 FROZEN is the canonical locked state per the reconciled architecture."
+    },
+    {
+      "entity": "EmployeeStatus",
+      "mustExistOrExtend": true,
+      "invariant": "The enum has exactly four employment states: ACTIVE (eligible for leave per BR-001), ON_LEAVE (currently on approved leave), INACTIVE (no longer active employee), and PROBATION (restricted eligibility \u2014 only leave types with probationEligible=true per BR-008). These states gate leave eligibility in downstream service logic."
+    },
+    {
+      "entity": "IBaseRepository<T>",
+      "mustExistOrExtend": true,
+      "invariant": "The interface is a generic contract parameterized by entity type T, declaring exactly five data-access operations (findById, findAll, create, update, delete). It is the foundational abstraction that enforces GP-001 (all database access through repository interfaces) \u2014 no concrete database logic lives in this interface. It must be structurally extensible so that module-specific repository interfaces (ILeaveRepository, IEmployeeRepository, ILeaveBalanceRepository) can extend it with their entity type without renaming or redefining the five base methods."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IBaseRepository<T>.findById \u2014 retrieve a single entity by its unique identifier",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns the entity of type T when found, or null/undefined when no record matches the identifier. Must not throw for a missing record (absence is a normal result, not an error). Errors from the underlying data source (connection failure, query error) propagate as rejected Promises."
+    },
+    {
+      "operation": "IBaseRepository<T>.findAll \u2014 retrieve a collection of entities",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns an array of T (empty array when no records exist, never null). Data-source errors propagate as rejected Promises. The operation is a pure read with no side effects."
+    },
+    {
+      "operation": "IBaseRepository<T>.create \u2014 persist a new entity and return the persisted record",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Accepts the data needed to create a new T, persists it, and returns the created entity (including any server-generated fields like id and timestamps). Constraint violations (duplicate key, FK failure) and data-source errors propagate as rejected Promises. This is a state-changing operation \u2014 downstream implementations must pair it with an audit record per GP-002."
+    },
+    {
+      "operation": "IBaseRepository<T>.update \u2014 modify an existing entity and return the updated record",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Accepts an identifier and the partial or full update data, applies the change, and returns the updated T. If the target record does not exist, the result is null/undefined or a rejected Promise (the interface contract must document which, but absence is not a silent success). Data-source errors propagate as rejected Promises. This is a state-changing operation \u2014 downstream implementations must pair it with an audit record per GP-002."
+    },
+    {
+      "operation": "IBaseRepository<T>.delete \u2014 remove an entity by its unique identifier",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Accepts an identifier and removes the corresponding record. Returns void or a boolean/affected-rows indicator. Deleting a non-existent record is not an error (idempotent removal). Data-source errors propagate as rejected Promises. This is a state-changing operation \u2014 downstream implementations must pair it with an audit record per GP-002."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The four enum member sets must exactly match the reconciled architecture artifact. LeaveType: ANNUAL, SICK, EMERGENCY. LeaveRequestStatus: DRAFT, SUBMITTED, UNDER_REVIEW, APPROVED, REJECTED, CANCELLED. LeaveBalanceStatus: ACTIVE, EXHAUSTED, FROZEN. EmployeeStatus: ACTIVE, ON_LEAVE, INACTIVE, PROBATION. The reconciled.json domain_entities and architecture_md_update sections are the single source of truth; the stale root-level ARCHITECTURE.md (which lists MATERNITY/PATERNITY/UNPAID/OTHER and PENDING) must NOT be matched.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "The enum values must be consistent with the \"Lifecycle States\" section of docs/ARCHITECTURE.md (the gestalt-managed architecture block), which lists: LeaveRequest = DRAFT, SUBMITTED, UNDER_REVIEW, APPROVED, REJECTED, CANCELLED; Employee = ACTIVE, ON_LEAVE, INACTIVE, PROBATION; LeaveBalance = ACTIVE, EXHAUSTED, FROZEN; LeaveType = (static, ANNUAL/SICK/EMERGENCY). This is the human-readable mirror of reconciled.json and must agree with it.",
+      "referencePath": "docs/ARCHITECTURE.md"
+    },
+    {
+      "requirement": "The IBaseRepository<T> interface (or its concrete implementations in later phases) must reference the same pg Pool type that src/shared/db/connection.ts exports via `new Pool(...)`. The connection module is the single source of the database pool; the base repository interface must be compatible with injecting this pool so that downstream KnexLeaveRepository/KnexEmployeeRepository/KnexLeaveBalanceRepository classes can use it without a second pool instantiation.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "The export style of the new shared types and base repository must match the established barrel-export convention: named exports only (no default exports), with index.ts re-exporting public symbols. src/modules/status/index.ts demonstrates the pattern (`export { X } from './x'`). The new src/shared/types/leave.types.ts and src/shared/base-repository.ts must follow the same named-export style for cross-module consistency.",
+      "referencePath": "src/modules/status/index.ts"
+    },
+    {
+      "requirement": "All new source files must compile under the existing tsconfig.json settings: strict:true, target ES2022, module commonjs, baseUrl ./src, rootDir ./src. Source files live under src/ (included); test files live under tests/ (excluded from tsc compilation but compiled by ts-jest at test time). The enum and interface code must not rely on compiler options absent from this config (e.g., no experimental decorators, no enum string-value assumptions beyond standard TS enum semantics).",
+      "referencePath": "tsconfig.json"
+    },
+    {
+      "requirement": "Test files must match the jest.config.js testMatch pattern '**/tests/**/*.test.(ts|js)' and be compiled by the ts-jest preset in the node test environment. Tests must be placed under tests/unit/shared/ with a .test.ts extension. The moduleDirectories ['node_modules', 'src'] setting means imports can resolve from src/ without relative path prefixes \u2014 test imports of the shared types and base repository must be consistent with this resolution.",
+      "referencePath": "jest.config.js"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/db/connection.ts (pg Pool export)",
+      "why": "The IBaseRepository<T> interface must be type-compatible with the shared database pool exported from connection.ts. This is the only existing dependency for this phase \u2014 the interface references the Pool type so that concrete repository implementations in Phases 2\u20134 can inject the pool. No new database connection is created."
+    },
+    {
+      "target": "PLAN.md Phase 2 \u2014 src/modules/leave/leave.repository.ts (ILeaveRepository extends IBaseRepository<LeaveRequest>)",
+      "why": "The IBaseRepository<T> interface and its five method names (findById, findAll, create, update, delete) are the contract that Phase 2's ILeaveRepository will extend. The generic parameter T and method signatures established here must remain stable so that the leave repository interface can extend it without modification."
+    },
+    {
+      "target": "PLAN.md Phase 3 \u2014 src/modules/employee/employee.repository.ts (IEmployeeRepository extends IBaseRepository<Employee>) and Phase 4 \u2014 src/modules/balance/balance.repository.ts (ILeaveBalanceRepository extends IBaseRepository<LeaveBalance>)",
+      "why": "The EmployeeStatus enum (from leave.types.ts) is consumed by the Employee model in Phase 3, and the LeaveType + LeaveBalanceStatus enums are consumed by the LeaveBalance model in Phase 4. Both repository interfaces extend IBaseRepository<T>. The enum values and interface contract defined in this phase are the foundation for all downstream module repositories."
+    },
+    {
+      "target": "HARNESS.json constraints.rules (no-any, no-direct-db-outside-repository)",
+      "why": "The IBaseRepository<T> interface is the structural enforcement point for the no-direct-db-outside-repository constraint (severity critical) and GP-001. By defining the repository interface here, all downstream database access is channeled through it. The interface itself must use typed generics (T) rather than any to satisfy the no-any constraint (severity high)."
+    }
+  ]
+}
