@@ -50,22 +50,22 @@ Decision: Built the shared type system, error classes, abstract base repository,
    - `LeaveRequestStatus`: `DRAFT`, `SUBMITTED`, `APPROVED`, `REJECTED`, `CANCELLED`
    - `EmploymentStatus`: `ACTIVE`, `ON_LEAVE`, `TERMINATED`, `SUSPENDED`
 
-2. **`src/shared/errors.ts`** — Four error classes, each extending `Error` with a `statusCode`:
+2. **`src/shared/errors.ts`** — Four error classes, each extending `Error` with a `readonly statusCode`:
    - `NotFoundError` (404), `ValidationError` (400), `UnauthorizedError` (401), `ConflictError` (409)
-   - All use `Object.setPrototypeOf` for correct `instanceof` behaviour.
+   - Each sets `this.name` to the class name after `super()` for correct error discrimination.
 
-3. **`src/shared/base.repository.ts`** — Abstract generic `BaseRepository<T>` with a `db` getter returning the shared `pool` and five abstract methods: `findById`, `findAll`, `create`, `update`, `delete`.
+3. **`src/shared/base.repository.ts`** — Abstract generic `BaseRepository<T>` with a `protected` `db` getter returning the shared `pool`. The five CRUD methods (`findById`, `findAll`, `create`, `update`, `delete`) have **concrete** default implementations that build parameterised SQL against a table name supplied by the subclass via the abstract `getTableName()` method. Concrete repositories can override any method for domain-specific queries while reusing the base implementations for standard CRUD.
 
 4. **`src/modules/leave/leave.routes.ts`** — Placeholder Fastify plugin (no endpoints yet) registered in `app.ts` alongside `uptimeRoutes`.
 
-5. **Tests** — `tests/unit/shared/errors.test.ts` (5 tests covering status codes, default messages, `instanceof`) and `tests/unit/shared/base.repository.test.ts` (3 tests covering abstract instantiation guard, `db` property, concrete subclass implementation).
+5. **Tests** — `tests/unit/shared/errors.test.ts` (5 tests covering status codes, default messages, `instanceof`) and `tests/unit/shared/base.repository.test.ts` (tests for all five CRUD methods via a concrete `TestRepository` subclass, plus error-path coverage).
 
 ### Design decisions
 
 - **Enums use string values** (`ANNUAL` not `0`) for readability in logs and API responses.
-- **`BaseRepository` methods are abstract** (not concrete with default SQL) — each concrete repository writes its own queries, keeping the base class as a contract rather than a coupled implementation.
-- **`db` is a getter** returning the shared `pool` so subclasses access it via `this.db` without needing constructor injection.
-- **Error classes use `Object.setPrototypeOf`** to fix prototype chain after `super()` call, ensuring `instanceof` works correctly in TypeScript's ES5+ target.
+- **`BaseRepository` methods are concrete** with default SQL implementations parameterised by `getTableName()`. Only `getTableName()` is abstract. This gives concrete repositories working CRUD out of the box while still allowing overrides for domain-specific queries. The base class is not a pure contract — it provides real database access that subclasses inherit.
+- **`db` is a protected getter** returning the shared `pool` so subclasses access it via `this.db` without needing constructor injection.
+- **Error classes set `this.name`** to the class name after `super()` for error-type discrimination (e.g. `error instanceof NotFoundError` or `error.name === 'NotFoundError'`). No `Object.setPrototypeOf` is needed because the ES2022 target preserves the prototype chain correctly with this pattern.
 - **Phase 8 (route wiring) was built alongside Phase 1** to establish the end-to-end registration pattern early, even though the leave routes are a no-op placeholder.
 
 ### Divergence from PLAN.md
@@ -74,3 +74,4 @@ Decision: Built the shared type system, error classes, abstract base repository,
 - PLAN.md prescribed `LeaveType` values as `ANNUAL`, `SICK`, `EMERGENCY` — built as specified (the DOMAIN.md lists additional types `unpaid`, `maternity`, `paternity` which are not yet in the enum; these may be added in later phases).
 - PLAN.md prescribed `UnauthorizedError` with status code 403 — built with 401, which is the correct HTTP status for authentication failures (403 is for forbidden/authorization failures). This is a deliberate correction.
 - PLAN.md prescribed Phase 8 as a separate phase — it was built together with Phase 1 in this cycle.
+- PLAN.md described `BaseRepository` methods as abstract — built with concrete default implementations so subclasses get working CRUD without boilerplate. Only `getTableName()` is abstract.
