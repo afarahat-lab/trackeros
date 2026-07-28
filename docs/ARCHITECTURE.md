@@ -13,7 +13,20 @@ The architecture is modular, with a clear separation of concerns between models,
 - Frontend: React Native
 - Database: PostgreSQL
 
-## Module structure
+## Module structure (as built)
+
+```
+src/modules/uptime/       — UptimeStatus model, service, routes (health-check endpoint)
+src/modules/status/       — SystemStatus model, service (version info)
+src/modules/leave/        — leaveRoutes placeholder (no endpoints yet; registered in app.ts)
+src/shared/db/connection.ts — pg Pool (DATABASE_URL)
+src/app.ts                — Fastify app bootstrap; registers uptimeRoutes + leaveRoutes
+src/index.ts              — server entry point (port 3000)
+```
+
+### Planned module structure (not yet built)
+
+The PLAN.md defines 8 phases to build the leave management feature. When complete, the module structure will include:
 
 ```
 src/modules/leave/leave.{model,repository,service,controller,routes}.ts
@@ -21,18 +34,12 @@ src/modules/balance/balance.{model,repository,service,controller,routes}.ts
 src/modules/employee/employee.{model,repository,service,controller,routes}.ts
 src/modules/policy/policy.{model,repository,service,controller,routes}.ts
 src/modules/notification/notification.{model,repository,service,controller,routes}.ts
-src/modules/LeaveStatus/    — LeaveStatus module
-src/modules/BaseEntity/    — BaseEntity module
-src/modules/LeaveRequest/    — LeaveRequest module
-src/modules/LeaveType/    — LeaveType module
-src/modules/LeavePolicy/    — LeavePolicy module
-src/modules/AuditLog/    — AuditLog module
-src/modules/AuditRecord/    — AuditRecord module
-src/modules/AuditServiceInterface/    — AuditServiceInterface module
-src/shared/db connection.ts
-src/shared/base repository.ts
-src/shared/error types.ts
+src/shared/types/index.ts        — LeaveType, LeaveRequestStatus, EmploymentStatus enums
+src/shared/errors.ts             — NotFoundError, ValidationError, UnauthorizedError, ConflictError
+src/shared/base.repository.ts    — abstract BaseRepository<T>
 ```
+
+See `docs/DOMAIN.md` for the full domain model and `PLAN.md` for the phase-by-phase build plan.
 
 ## Key patterns
 
