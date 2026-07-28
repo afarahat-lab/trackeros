@@ -1,0 +1,5 @@
+npm install --include=dev --no-audit --no-fund &&
+if find src -name '*.ts' -not -name '*.spec.ts' -not -name '*.test.ts' -not -name '*.d.ts' -type f | grep -q .;
+then npm run build && npx jest --passWithNoTests;
+else echo 'no source files to verify';
+fi
