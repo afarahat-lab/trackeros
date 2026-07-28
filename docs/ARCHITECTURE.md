@@ -20,23 +20,24 @@ src/modules/uptime/       — UptimeStatus model, service, routes (health-check 
 src/modules/status/       — SystemStatus model, service (version info)
 src/modules/leave/        — leaveRoutes placeholder (no endpoints yet; registered in app.ts)
 src/shared/db/connection.ts — pg Pool (DATABASE_URL)
+src/shared/types/index.ts   — LeaveType, LeaveRequestStatus, EmploymentStatus enums
+src/shared/errors.ts        — NotFoundError, ValidationError, UnauthorizedError, ConflictError
+src/shared/base.repository.ts — abstract BaseRepository<T> with findById, findAll, create, update, delete
 src/app.ts                — Fastify app bootstrap; registers uptimeRoutes + leaveRoutes
 src/index.ts              — server entry point (port 3000)
+tests/unit/shared/        — errors.test.ts, base.repository.test.ts
 ```
 
 ### Planned module structure (not yet built)
 
-The PLAN.md defines 8 phases to build the leave management feature. When complete, the module structure will include:
+The PLAN.md defines 8 phases to build the leave management feature. Phases 1 and 8 are complete (shared foundation + route wiring). Remaining phases will add:
 
 ```
-src/modules/leave/leave.{model,repository,service,controller,routes}.ts
+src/modules/leave/leave.{model,repository,service,controller}.ts
 src/modules/balance/balance.{model,repository,service,controller,routes}.ts
 src/modules/employee/employee.{model,repository,service,controller,routes}.ts
 src/modules/policy/policy.{model,repository,service,controller,routes}.ts
 src/modules/notification/notification.{model,repository,service,controller,routes}.ts
-src/shared/types/index.ts        — LeaveType, LeaveRequestStatus, EmploymentStatus enums
-src/shared/errors.ts             — NotFoundError, ValidationError, UnauthorizedError, ConflictError
-src/shared/base.repository.ts    — abstract BaseRepository<T>
 ```
 
 See `docs/DOMAIN.md` for the full domain model and `PLAN.md` for the phase-by-phase build plan.
@@ -127,4 +128,10 @@ leave (orchestrator)
   - GP-006: Async error handling with try/catch in services and controllers.
 - **Phases**: Build in 7 phases — domain primitives first, then employee, policy, request, balance, cross-cutting services, and finally the leave orchestrator.
 - **Transactions**: Balance deduction (BR-006) and restoration (BR-007) must run within a database transaction to ensure atomicity.
+
+### Built So Far
+
+- **Phase 1 (complete)**: Shared foundation — `LeaveType`, `LeaveRequestStatus`, `EmploymentStatus` enums; `NotFoundError`, `ValidationError`, `UnauthorizedError`, `ConflictError` error classes; abstract `BaseRepository<T>`.
+- **Phase 8 (complete)**: Route wiring — `leaveRoutes` placeholder plugin registered in `app.ts` alongside `uptimeRoutes`.
+- **Remaining**: Phases 2–7 (employee, policy, balance, leave request models/repos, leave service, leave endpoints).
 <!-- gestalt:architecture feature=f06aa3d0-1181-4b12-bb08-810a726baf0a END -->
