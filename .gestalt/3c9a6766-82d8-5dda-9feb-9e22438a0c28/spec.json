@@ -1,0 +1,168 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared-infrastructure",
+      "leave"
+    ],
+    "affectedLayers": [
+      "shared-types",
+      "shared-errors",
+      "shared-repository",
+      "unit-tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The LeaveType enum is exported from src/shared/types/index.ts and exposes exactly the six members ANNUAL, SICK, EMERGENCY, UNPAID, MATERNITY, PATERNITY (matching the reconciled architecture), each usable as a typed value.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The LeaveRequestStatus enum is exported from src/shared/types/index.ts and exposes exactly the five members DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The EmploymentStatus enum is exported from src/shared/types/index.ts and exposes exactly the three members ACTIVE, INACTIVE, TERMINATED (no ON_LEAVE or SUSPENDED), matching the architecture's Employee lifecycle.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Each of NotFoundError, ValidationError, UnauthorizedError, ConflictError is exported from src/shared/errors.ts, extends Error, is constructible with a message, and exposes a readonly statusCode property with the correct value (404, 400, 401, 409 respectively); instances satisfy `instanceof Error`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "BaseRepository<T> is exported from src/shared/base.repository.ts as an abstract generic class whose public surface includes findById, findAll(filters?), create, update, and delete with the exact return types (Promise<T|null>, Promise<T[]>, Promise<T>, Promise<T>, Promise<void>); the class cannot be instantiated directly (abstract) but a concrete subclass can be constructed.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "BaseRepository obtains its database access by importing the existing `pool` from src/shared/db/connection.ts and exposing it as a protected property typed as pg.Pool, so concrete subclasses can issue queries through it without re-importing the pool.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Unit tests exist under tests/unit/shared/ (files ending in .test.ts) covering the error classes (assert correct statusCode, message propagation, instanceof Error) and BaseRepository (using a concrete test subclass with the pg pool mocked, verifying create/update/findById/findAll/delete delegate to the pool and return the expected shapes).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The phase compiles cleanly under `npm run build` (tsc --noEmit) and `npm test` passes with no type errors, satisfying the strict-mode TypeScript configuration and the no-any constraint.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No use of `any` anywhere in the new files or tests; the `findAll(filters?: Record<string, unknown>)` parameter must remain `unknown`-typed, and any narrowing must use type guards (HARNESS no-any, high severity).",
+    "All database access in BaseRepository must go through the repository pattern using the imported `pool`; no inline SQL or direct pg calls outside the repository abstraction (HARNESS no-direct-db-outside-repository, critical severity; GP-001).",
+    "New code must compile under the existing strict TypeScript config (strict: true, strictNullChecks, no implicit any, ES2022 target, commonjs module, baseUrl ./src) without modifying tsconfig.json.",
+    "Test files must live under tests/ and end in .test.ts to match the Jest testMatch glob (**/tests/**/*.test.(ts|js)); ts-jest compiles them at test time even though tsconfig excludes tests from the build.",
+    "Enum values must follow the reconciled architecture, superseding the PLAN.md task description: LeaveType has 6 members (adds UNPAID, MATERNITY, PATERNITY) and EmploymentStatus has 3 members (ACTIVE, INACTIVE, TERMINATED \u2014 no ON_LEAVE/SUSPENDED). LeaveRequestStatus has 5 members as stated.",
+    "No hardcoded secrets, passwords, API keys, or tokens in the new files or tests (HARNESS no-hardcoded-secrets, critical severity)."
+  ],
+  "outOfScope": [
+    "Concrete domain repositories (EmployeeRepository, PolicyRepository, BalanceRepository, LeaveRepository) and their table-specific query methods \u2014 these are Phases 2-5.",
+    "Domain model interfaces (Employee, LeavePolicy, LeaveBalance, LeaveRequest) and their DTOs \u2014 Phases 2-5.",
+    "LeaveService business logic, Fastify routes, route-to-statusCode error mapping, RBAC middleware, and audit logging \u2014 Phases 6-8.",
+    "Database migrations/schema creation and any actual PostgreSQL connection at test time \u2014 BaseRepository tests must mock the pool, not hit a real database."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveType enum",
+      "mustExistOrExtend": true,
+      "invariant": "The enum's member set is closed and immutable at exactly ANNUAL, SICK, EMERGENCY, UNPAID, MATERNITY, PATERNITY; no other leave-type values may exist in the codebase, and every later-phase domain model that references a leave type must use this enum rather than a raw string."
+    },
+    {
+      "entity": "LeaveRequestStatus enum",
+      "mustExistOrExtend": true,
+      "invariant": "The enum's member set is closed at exactly DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED and encodes the full LeaveRequest lifecycle (DRAFT\u2192SUBMITTED\u2192(APPROVED|REJECTED); APPROVED\u2192CANCELLED); no additional status values may be introduced."
+    },
+    {
+      "entity": "EmploymentStatus enum",
+      "mustExistOrExtend": true,
+      "invariant": "The enum's member set is closed at exactly ACTIVE, INACTIVE, TERMINATED, matching the architecture's Employee lifecycle; ON_LEAVE and SUSPENDED must not be present."
+    },
+    {
+      "entity": "Shared error classes (NotFoundError, ValidationError, UnauthorizedError, ConflictError)",
+      "mustExistOrExtend": true,
+      "invariant": "Each error class extends Error, carries a stable readonly statusCode (404/400/401/409 respectively) that does not change between instances, and preserves the constructor-provided message on the Error.message property so callers can discriminate by type (instanceof) and read statusCode for HTTP mapping."
+    },
+    {
+      "entity": "BaseRepository<T>",
+      "mustExistOrExtend": true,
+      "invariant": "BaseRepository is abstract and generic: it cannot be instantiated directly and must be subclassed to provide a concrete T and table binding; its five CRUD methods (findById, findAll, create, update, delete) constitute the complete data-access contract that every later-phase concrete repository inherits, and all database interaction flows through the protected pool-backed db property rather than external imports."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "BaseRepository.findById(id) \u2014 retrieve a single entity by its identifier",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns the entity when found or null when no row matches; must not throw on a missing row (null is the not-found signal). Database/query errors propagate as thrown errors."
+    },
+    {
+      "operation": "BaseRepository.findAll(filters?) \u2014 retrieve a collection of entities, optionally narrowed by opaque filter criteria",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns an array (empty when no matches) rather than null; filter values are typed as unknown and must be narrowed/handled safely without any-casts. Database errors propagate as thrown errors."
+    },
+    {
+      "operation": "BaseRepository.create(entity) \u2014 persist a new entity from a partial representation and return the persisted record",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the fully-formed persisted entity; constraint/conflict failures from the database propagate as thrown errors (later phases may wrap these into ConflictError, but the base layer surfaces the underlying error)."
+    },
+    {
+      "operation": "BaseRepository.update(id, updates) \u2014 apply a partial update to an existing entity and return the updated record",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the updated entity; behavior when the target id does not exist must be defined by the implementation (return null or throw) but must be consistent and documented \u2014 later phases rely on this contract for NotFoundError mapping."
+    },
+    {
+      "operation": "BaseRepository.delete(id) \u2014 remove an entity by identifier",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Resolves with void on success; behavior when the target id does not exist must be defined by the implementation (silent success or throw) and remain consistent for later-phase callers. Database errors propagate as thrown errors."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "BaseRepository must import and reuse the already-exported `pool` (a pg.Pool instance) from src/shared/db/connection.ts as its protected db property, rather than constructing a new Pool or duplicating connection logic; the import must resolve under the baseUrl ./src module resolution.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "The enum member sets must match the reconciled architecture in docs/ARCHITECTURE.md: LeaveType = annual/sick/emergency/unpaid/maternity/paternity (6), LeaveRequestStatus = DRAFT/SUBMITTED/APPROVED/REJECTED/CANCELLED (5), Employee/EmploymentStatus lifecycle = ACTIVE/INACTIVE/TERMINATED (3). This supersedes the PLAN.md Phase 1 task description where it differs.",
+      "referencePath": "docs/ARCHITECTURE.md"
+    },
+    {
+      "requirement": "BaseRepository must embody GP-001 (repository pattern): it is the sole channel through which database access occurs, and later-phase services/controllers will depend on repository interfaces rather than touching the pool directly; the base class must not expose raw pool mutation methods that bypass the CRUD contract.",
+      "referencePath": "docs/GOLDEN_PRINCIPLES.md"
+    },
+    {
+      "requirement": "All new source files must typecheck under the existing tsconfig.json strict settings (strict: true, strictNullChecks, noImplicitAny, ES2022/commonjs, baseUrl ./src) without requiring tsconfig changes; test files are excluded from the build compile but must still be valid under ts-jest's strict compilation at test time.",
+      "referencePath": "tsconfig.json"
+    },
+    {
+      "requirement": "Test files must be discoverable by the existing jest.config.js (preset ts-jest, testMatch **/tests/**/*.test.(ts|js), moduleDirectories node_modules+src) \u2014 placing them under tests/unit/shared/ with .test.ts extension satisfies the glob without config changes.",
+      "referencePath": "jest.config.js"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/db/connection.ts (existing pg.Pool export)",
+      "why": "BaseRepository imports `pool` from this module as its protected db property; this is the single existing database integration point the new code depends on."
+    },
+    {
+      "target": "Later-phase concrete repositories (EmployeeRepository, PolicyRepository, BalanceRepository, LeaveRepository \u2014 Phases 2-5)",
+      "why": "BaseRepository<T> is the base class every concrete repository extends, and the shared enums/errors are imported by every domain model and service in Phases 2-7; this phase establishes the contract those phases depend on."
+    },
+    {
+      "target": "Phase 6 LeaveService and Phase 7 route error mapping",
+      "why": "The four error classes and their statusCode values are consumed by LeaveService (Phase 6) for typed error throwing and by the Fastify route layer (Phase 7) for HTTP status mapping; the class statusCode values (404/400/401/409) are the canonical source, with Phase 7's 403 route mapping being a route-layer detail for UnauthorizedError, not a change to the class."
+    }
+  ]
+}
