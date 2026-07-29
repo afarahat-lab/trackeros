@@ -1,0 +1,177 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "employee"
+    ],
+    "affectedLayers": [
+      "data",
+      "domain"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The Employee domain interface is exported from the employee module and exposes the entity shape with id, firstName, lastName, email, employmentStatus, managerId (nullable), createdAt, and updatedAt; employmentStatus is typed as the EmploymentStatus enum imported from the shared types barrel.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The employee repository interface declares five operations \u2014 findById, findByEmail, findAll, create (accepting input omitting id/createdAt/updatedAt), and update (accepting a partial entity) \u2014 each returning the correct Promise<Employee | null> / Promise<Employee[]> / Promise<Employee> type so that downstream modules can depend on the interface rather than the concrete implementation.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The concrete PostgreSQL repository implementation satisfies the repository interface (it is assignable to IEmployeeRepository) and all database access goes through the shared pg pool from src/shared/db/connection.ts \u2014 no inline SQL or direct DB calls bypass the repository layer (GP-001).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Every repository query uses parameterized SQL (placeholder-bound values, never string-interpolated user input) so that findById, findByEmail, create, and update cannot be vulnerable to SQL injection.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "create persists a new employee row and returns the fully-hydrated Employee (with generated id, createdAt, updatedAt) populated from the database RETURNING result; findById and findByEmail return null when no row matches; findAll returns an empty array when the table has no rows.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "update with a partial entity updates only the supplied fields and returns the updated Employee (or null when the id does not exist); update with an empty partial performs no destructive write and returns the current row.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests at tests/unit/modules/employee/employee.repository.test.ts exercise each repository method against a mocked pg pool \u2014 covering the found, not-found/empty, and database-error paths \u2014 and the suite passes under the configured ts-jest runner.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The phase compiles cleanly under strict TypeScript (tsc --noEmit) with no implicit any and strict null checks, and introduces no `any` types (use unknown with type guards where runtime row shapes must be narrowed).",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access must go through the repository pattern \u2014 the concrete repository is the only component that touches the pg pool; services and controllers never query the database directly (GP-001 / HARNESS no-direct-db-outside-repository, severity critical).",
+    "No use of `any`; use `unknown` with type guards when narrowing raw database row shapes into the Employee interface (HARNESS no-any, severity high).",
+    "The Employee model must import EmploymentStatus from the shared types barrel (src/shared/types/index.ts) rather than redefining the enum, so the employee module depends only on shared-types per the architecture dependency rules.",
+    "No circular dependencies: the employee module may import only from shared-types and shared/db; it must not import from leave, balance, policy, audit, or notification modules (architecture dependency flow is inward).",
+    "All async repository methods must catch and handle errors rather than surfacing unhandled promise rejections (GP-006); database failures must be wrapped in a typed/thrown Error with a descriptive message.",
+    "No hardcoded secrets, credentials, or connection strings in the employee module; the repository must obtain the pool from the shared connection module which reads DATABASE_URL from environment (HARNESS no-hardcoded-secrets, severity critical)."
+  ],
+  "outOfScope": [
+    "Employee service layer (business logic, manager-relationship resolution, employment-status validation) \u2014 not part of this phase; only model, repository interface, and repository implementation are in scope.",
+    "Employee controller and HTTP routes \u2014 the API surface for employees is not created in this phase.",
+    "Database migrations / schema definition for the employees table \u2014 this phase assumes the employees table exists; Knex migrations are handled separately.",
+    "Audit logging for employee create/update operations (GP-002) \u2014 audit integration is deferred to Phase 8/9; the repository itself does not write audit records.",
+    "RBAC enforcement on employee operations (GP-005) \u2014 no auth middleware or role checks in this phase; the repository is a pure data-access layer with no request context."
+  ],
+  "ambiguities": [
+    {
+      "description": "The phase intent says to \"use the pg pool from src/shared/db/connection.ts,\" but the existing connection.ts exports a singleton `pool` instance. It is unclear whether the repository should import the singleton pool directly (tight coupling, untestable without module mocking) or accept a pool/Pool-like dependency via constructor injection for testability. The existing implementation imports the singleton and the test mocks the module.",
+      "options": [
+        "Import the singleton pool directly (matches existing implementation and test mocking pattern)",
+        "Accept a Pool-like dependency via constructor injection for testability (better DI, but diverges from existing code and PLAN wording)"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "The Employee model specifies id as a string, but the employees table primary-key generation strategy (UUID default, auto-increment, or application-supplied) is not defined in this phase or in any existing migration. The create method omits id from input and relies on the database RETURNING clause to populate it, but whether the column has a default is unspecified.",
+      "options": [
+        "Database column has a default (e.g., gen_random_uuid()) and create relies on RETURNING",
+        "Application must generate the id before insert"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "The update method accepts Partial<Employee> which technically includes id, createdAt, and updatedAt as updatable fields, but these are immutable/managed columns. The phase does not state whether update must explicitly reject or ignore attempts to modify id/createdAt/updatedAt.",
+      "options": [
+        "update silently ignores id/createdAt/updatedAt if present in the partial (current behavior)",
+        "update explicitly rejects or filters out immutable fields"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "An Employee's employmentStatus must always be a member of the EmploymentStatus enum (ACTIVE, INACTIVE, TERMINATED); the repository must never persist or return a row whose status cannot be narrowed to a valid EmploymentStatus value."
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "managerId is nullable \u2014 an employee may have no manager (managerId === null); the repository must preserve null rather than coercing it to an empty string or undefined when reading and writing rows."
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "id, createdAt, and updatedAt are system-managed and never supplied by the caller on create (the create input omits them); they are populated exclusively from the database result, ensuring the persisted identity and timestamps are authoritative."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IEmployeeRepository.findById(id)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns null when no row matches the id; wraps any database error in a thrown Error with a descriptive message (no unhandled rejection)."
+    },
+    {
+      "operation": "IEmployeeRepository.findByEmail(email)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns null when no row matches the email; wraps any database error in a thrown Error with a descriptive message."
+    },
+    {
+      "operation": "IEmployeeRepository.findAll()",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an empty array (never null) when no rows exist; wraps any database error in a thrown Error with a descriptive message."
+    },
+    {
+      "operation": "IEmployeeRepository.create(employee)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Persists a row and returns the fully-hydrated Employee from the database RETURNING result; wraps any database error (e.g., unique-constraint violation on email) in a thrown Error with a descriptive message."
+    },
+    {
+      "operation": "IEmployeeRepository.update(id, data)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Updates only supplied fields and returns the updated Employee, or null when the id does not exist; an empty partial performs no destructive write and returns the current row; wraps any database error in a thrown Error with a descriptive message."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The Employee model's employmentStatus type must be the EmploymentStatus enum exported from the shared types barrel (src/shared/types/index.ts) \u2014 the same enum already verified by Phase 1 tests (ACTIVE/INACTIVE/TERMINATED). The employee module must import this enum rather than redeclaring it, so a single source of truth governs employment-status values across all modules.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The concrete repository must obtain its database connection from the shared pg pool exported by src/shared/db/connection.ts (the Pool configured from DATABASE_URL). It must not instantiate its own Pool or hardcode a connection string, matching the existing connection module that all repositories are expected to reuse.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "The concrete PostgreSQL repository class must be structurally assignable to (implements) the IEmployeeRepository interface declared in employee.repository.interface.ts, so downstream consumers (e.g., the future LeaveService in Phase 6) can depend on the interface for dependency injection rather than the concrete class.",
+      "referencePath": "src/modules/employee/employee.repository.interface.ts"
+    },
+    {
+      "requirement": "The unit test file must be discovered by the existing Jest configuration (testMatch '**/tests/**/*.test.(ts|js)', ts-jest preset, moduleDirectories including 'src'), so it runs as part of the standard `npm test` / verification command without additional configuration.",
+      "referencePath": "jest.config.js"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts (EmploymentStatus enum)",
+      "why": "The Employee model imports EmploymentStatus from the shared types barrel to type the employmentStatus field; this is the cross-module dependency that ties the employee entity to the Phase 1 shared-types foundation."
+    },
+    {
+      "target": "src/shared/db/connection.ts (pg Pool)",
+      "why": "The concrete repository executes SQL through the shared pg pool, establishing the data-access integration point that all repositories reuse per GP-001."
+    },
+    {
+      "target": "Future LeaveService (Phase 6) / LeaveBalance / LeavePolicy modules",
+      "why": "The IEmployeeRepository interface is the contract that downstream modules (LeaveService for manager-relationship resolution and employment-status validation per BR-002, and balance/leave for employee references) will depend on; this phase establishes that public contract."
+    }
+  ]
+}
