@@ -2,13 +2,24 @@ import { pool } from '../../shared/db/connection';
 import { Employee } from './employee.model';
 import { IEmployeeRepository } from './employee.repository.interface';
 
-function rowToEmployee(row: any): Employee {
+interface EmployeeRow {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  employment_status: string;
+  manager_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+function rowToEmployee(row: EmployeeRow): Employee {
   return {
     id: row.id,
     firstName: row.first_name,
     lastName: row.last_name,
     email: row.email,
-    employmentStatus: row.employment_status,
+    employmentStatus: row.employment_status as Employee['employmentStatus'],
     managerId: row.manager_id,
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
@@ -70,7 +81,7 @@ export class PgEmployeeRepository implements IEmployeeRepository {
   async update(id: string, data: Partial<Employee>): Promise<Employee | null> {
     try {
       const fields: string[] = [];
-      const values: any[] = [];
+      const values: unknown[] = [];
       let paramIndex = 1;
 
       if (data.firstName !== undefined) {
