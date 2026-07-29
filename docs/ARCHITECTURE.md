@@ -51,8 +51,16 @@ The leave management module enables employees to apply for annual, sick, and eme
 - `src/shared/types/index.ts` — Barrel export re-exporting both enums
 - Tests: `tests/unit/shared/types/leave-type.enum.test.ts`, `tests/unit/shared/types/leave-status.enum.test.ts`
 
-**Phases 2–10 — Pending (not yet implemented)**
-- Phase 2–3: LeavePolicy model, repositories, service, routes
+**Phase 2 — LeavePolicy model and repositories: COMPLETE**
+- `src/modules/leave-policy/leave-policy.model.ts` — `LeavePolicy` interface (id, policyName, leaveType, entitlementDays, accrualRate, maxAccumulation, minimumNoticeDays, requiresManagerApproval, isActive, createdAt, updatedAt)
+- `src/modules/leave-policy/leave-policy.repository.interface.ts` — `ILeavePolicyRepository` interface (findAll, findById, findByLeaveType, create, update, delete)
+- `src/modules/leave-policy/leave-policy.repository.ts` — `PgLeavePolicyRepository` implementation using `pg` Pool from `src/shared/db/connection.ts`; parameterized queries; snake_case column mapping; UUID generation via `crypto.randomUUID()`; dynamic UPDATE with column-map whitelist
+- `src/modules/leave-policy/leave-type.repository.interface.ts` — `ILeaveTypeRepository` interface (findAll, findByValue)
+- `src/modules/leave-policy/leave-type.repository.ts` — `PgLeaveTypeRepository` implementation querying a `leave_types` table
+- Tests: `tests/unit/modules/leave-policy/leave-policy.repository.test.ts`, `tests/unit/modules/leave-policy/leave-type.repository.test.ts` — Jest unit tests with mocked `pool.query`, covering all CRUD paths, null/empty results, and error propagation
+
+**Phases 3–10 — Pending (not yet implemented)**
+- Phase 3: LeavePolicy service and routes
 - Phase 4–5: LeaveBalance model, repository, service, routes
 - Phase 6–7: Audit model, repository, service, routes
 - Phase 8–9: LeaveRequest model, repository, service, routes
@@ -79,7 +87,7 @@ src/
 │   └── types/          # ✅ LeaveType, LeaveStatus enums (Phase 1 — DONE)
 ├── modules/
 │   ├── audit/          # ⏳ AuditRecord, IAuditService, AuditService, IAuditLogRepository, PgAuditLogRepository, routes
-│   ├── leave-policy/   # ⏳ LeavePolicy, ILeavePolicyRepository, PgLeavePolicyRepository, ILeaveTypeRepository, PgLeaveTypeRepository, ILeavePolicyService, LeavePolicyService, routes
+│   ├── leave-policy/   # ✅ LeavePolicy model + repos (Phase 2 — DONE) / ⏳ service + routes (Phase 3)
 │   ├── leave-balance/  # ⏳ LeaveBalance, ILeaveBalanceRepository, PgLeaveBalanceRepository, ILeaveBalanceService, LeaveBalanceService, routes
 │   └── leave-request/  # ⏳ LeaveRequest, ILeaveRequestRepository, PgLeaveRequestRepository, ILeaveRequestService, LeaveRequestService, routes
 ```
