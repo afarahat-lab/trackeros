@@ -18,6 +18,7 @@ The architecture is modular, with a clear separation of concerns between models,
 ```
 src/modules/status/       — Status module (health-check)
 src/modules/uptime/       — Uptime module (system status)
+src/modules/leave-policy/ — Leave policy module (model + repositories)
 src/shared/db/            — Database connection (pg Pool)
 src/shared/types/         — Shared type definitions (LeaveType, LeaveStatus enums)
 ```
