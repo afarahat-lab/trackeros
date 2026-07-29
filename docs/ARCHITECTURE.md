@@ -32,6 +32,7 @@ src/modules/AuditServiceInterface/    — AuditServiceInterface module
 src/shared/db connection.ts
 src/shared/base repository.ts
 src/shared/error types.ts
+src/shared/types/index.ts   — shared enums & DTOs (LeaveType, LeaveRequestStatus, BalanceStatus, LeavePolicyStatus, EmploymentStatus, CreateLeaveRequestDto, UpdateLeaveRequestDto)
 ```
 
 ## Key patterns
