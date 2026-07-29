@@ -430,6 +430,7 @@ agents:
     - Dependencies flow inward only — outer layers depend on inner layers, never the reverse
     - Every public service method must be defined in an interface before the implementation
     - No circular dependencies between modules — verify your dependencyMap before returning
+    - 'Shared value-type placement — apply this MECHANICALLY to every type; it is a rule, not a per-case judgment. A pure data shape with NO owned business logic (an enum, a simple DTO, a shared value type, or a methodless interface) that is used by MORE THAN ONE module MUST be placed under the shared-types location src/shared/types/ — declare ONE module whose path is src/shared/types/ that owns those types; do not scatter them. A type WITH owned behavior (an entity with lifecycle or state rules, a service, or a repository/interface that declares methods) OR a pure value type used by ONLY ONE module MUST get its own module directory at src/modules/<name>/. Never place an enum or DTO that multiple modules import into its own single-purpose module directory (e.g. never src/modules/LeaveType/ for a cross-module LeaveType enum — that belongs in src/shared/types/).'
     role: "Application architect"
     goal: "Define the application layer: module boundaries, service interfaces, dependency direction, and recommended phase decomposition"
     llm:
