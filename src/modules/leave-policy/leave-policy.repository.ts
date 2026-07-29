@@ -5,10 +5,26 @@ import { LeaveType } from '../../shared/types/leave-type.enum';
 import crypto from 'crypto';
 
 export class PgLeavePolicyRepository implements ILeavePolicyRepository {
+  private mapRowToLeavePolicy(row: any): LeavePolicy {
+    return {
+      id: row.id,
+      policyName: row.policy_name ?? row.policyName,
+      leaveType: (row.leave_type ?? row.leaveType) as LeaveType,
+      entitlementDays: row.entitlement_days ?? row.entitlementDays,
+      accrualRate: row.accrual_rate ?? row.accrualRate,
+      maxAccumulation: row.max_accumulation ?? row.maxAccumulation,
+      minimumNoticeDays: row.minimum_notice_days ?? row.minimumNoticeDays,
+      requiresManagerApproval: row.requires_manager_approval ?? row.requiresManagerApproval,
+      isActive: row.is_active ?? row.isActive,
+      createdAt: row.created_at ?? row.createdAt,
+      updatedAt: row.updated_at ?? row.updatedAt,
+    };
+  }
+
   async findAll(): Promise<LeavePolicy[]> {
     try {
       const { rows } = await pool.query('SELECT * FROM leave_policies ORDER BY created_at DESC;');
-      return rows;
+      return rows.map(row => this.mapRowToLeavePolicy(row));
     } catch (error) {
       console.error('Error in findAll:', error);
       throw error;
@@ -18,7 +34,7 @@ export class PgLeavePolicyRepository implements ILeavePolicyRepository {
   async findById(id: string): Promise<LeavePolicy | null> {
     try {
       const { rows } = await pool.query('SELECT * FROM leave_policies WHERE id = $1;', [id]);
-      return rows[0] || null;
+      return rows[0] ? this.mapRowToLeavePolicy(rows[0]) : null;
     } catch (error) {
       console.error('Error in findById:', error);
       throw error;
@@ -28,7 +44,7 @@ export class PgLeavePolicyRepository implements ILeavePolicyRepository {
   async findByLeaveType(leaveType: LeaveType): Promise<LeavePolicy[]> {
     try {
       const { rows } = await pool.query('SELECT * FROM leave_policies WHERE leave_type = $1;', [leaveType]);
-      return rows;
+      return rows.map(row => this.mapRowToLeavePolicy(row));
     } catch (error) {
       console.error('Error in findByLeaveType:', error);
       throw error;
@@ -57,7 +73,7 @@ export class PgLeavePolicyRepository implements ILeavePolicyRepository {
           now,
         ]
       );
-      return rows[0];
+      return this.mapRowToLeavePolicy(rows[0]);
     } catch (error) {
       console.error('Error in create:', error);
       throw error;
@@ -103,7 +119,7 @@ export class PgLeavePolicyRepository implements ILeavePolicyRepository {
       values.push(id);
 
       const { rows } = await pool.query(query, values);
-      return rows[0] || null;
+      return rows[0] ? this.mapRowToLeavePolicy(rows[0]) : null;
     } catch (error) {
       console.error('Error in update:', error);
       throw error;
