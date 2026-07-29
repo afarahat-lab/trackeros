@@ -1,0 +1,138 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared-types"
+    ],
+    "affectedLayers": [
+      "unit"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The `LeaveType` enum exposes exactly six members (annual, sick, emergency, unpaid, maternity, paternity) whose string values are lowercase ('annual', 'sick', 'emergency', 'unpaid', 'maternity', 'paternity'), and the other four enums (`LeaveRequestStatus`, `BalanceStatus`, `LeavePolicyStatus`, `EmploymentStatus`) expose uppercase string values matching their keys (e.g. DRAFT='DRAFT', ACTIVE='ACTIVE', TERMINATED='TERMINATED') with no extra or missing members.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `CreateLeaveRequestDto` interface accepts employeeId (string), leavePolicyId (string), startDate (string), endDate (string), and reason (string | undefined), and the `UpdateLeaveRequestDto` interface accepts status (LeaveRequestStatus | undefined), approvedBy (string | undefined), and reason (string | undefined) with all fields optional for partial updates \u2014 verified by compile-time type assertions and/or runtime object-shape checks in the unit test.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All five enums and both DTO interfaces are re-exported from a single barrel entry point (`src/shared/types/index.ts`), so that downstream modules can import every symbol from `shared/types` (or `shared/types/index`) in one import statement without reaching into internal files.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The Jest unit test at `tests/unit/shared/types/index.test.ts` runs under the ts-jest preset and passes, asserting each enum's member count and exact value mapping, and confirming a DTO-shaped object satisfies (or is rejected by) the interface via type-level checks \u2014 establishing the repo's first passing test suite.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`npm run build` (tsc --noEmit) succeeds with zero type errors under strict mode, confirming the new `src/shared/types/index.ts` compiles cleanly and introduces no `any` usage (HARNESS no-any rule) \u2014 the shared-types module remains a zero-runtime-dependency foundation.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "TypeScript strict mode must hold: no implicit any, strict null checks enabled (tsconfig.json `\"strict\": true`). The `no-any` HARNESS constraint requires using `unknown` with type guards instead of `any` wherever runtime type narrowing is needed.",
+    "The shared-types module must be a zero-runtime-dependency foundation: it imports only TypeScript built-ins and its own symbols \u2014 no `pg`, `fastify`, `knex`, `class-validator`, `zod`, or any other package import \u2014 so that every downstream module (leave, balance, policy, employee, audit, notification) can depend on it without pulling in infrastructure.",
+    "Enum casing convention is fixed: `LeaveType` uses uppercase keys mapping to lowercase string values (Annual='annual', etc.); the other four enums (`LeaveRequestStatus`, `BalanceStatus`, `LeavePolicyStatus`, `EmploymentStatus`) use uppercase keys whose values equal their keys (DRAFT='DRAFT', etc.). This must not be deviated from, as downstream modules and the persisted entity layer depend on these exact string values.",
+    "DTO date fields use `string` (ISO date input at the API boundary), not `Date`. This is the boundary representation; the persisted `LeaveRequest` entity (Phase 5) uses `Date` for start/end. The DTO-to-entity conversion is a later-phase concern and must not be introduced in this phase.",
+    "All symbols must be exported through the barrel `index.ts` only; downstream modules must import from `shared/types` (the public entry point) and never reach into internal files \u2014 per ARCHITECTURE dependency rule #1 (\"Modules import from each other ONLY through their declared public entry point\")."
+  ],
+  "outOfScope": [
+    "The `LeaveRequest` persisted entity interface (with `Date` fields, `approvedBy: string | null`, `approvedAt: Date | null`, `status`, `createdAt`, `updatedAt`) \u2014 belongs to Phase 5 (`src/modules/leave/leave.model.ts`), not the shared-types DTO layer.",
+    "Entity model interfaces for `Employee`, `LeavePolicy`, `LeaveBalance`, and `AuditLog` \u2014 these are defined in their respective module phases (Phases 2, 3, 4, 8), not in shared-types. Only the enums and the two DTOs named in the intent belong here.",
+    "Input validation logic (GP-003), RBAC enforcement (GP-005), audit recording (GP-002), and repository implementations (GP-001) \u2014 these are runtime concerns of later phases (services, controllers, repositories). This phase defines only the type contracts; no validation, no DB access, no auth.",
+    "DTO-to-entity conversion helpers, date parsing/validation, and any runtime transformation logic \u2014 the DTOs are pure type declarations; conversion to persisted `Date` fields is a service-layer concern in Phase 6."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveType enum",
+      "mustExistOrExtend": true,
+      "invariant": "The set of members is closed and immutable: exactly {annual, sick, emergency, unpaid, maternity, paternity}. Every member's runtime string value is lowercase and matches the domain vocabulary used by `LeavePolicy.leaveType` and the `leave_policies.leave_type` column. No numeric-only enum members are permitted \u2014 all members carry explicit string values."
+    },
+    {
+      "entity": "LeaveRequestStatus enum",
+      "mustExistOrExtend": true,
+      "invariant": "The set of members is closed: exactly {DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED}. The values mirror the LeaveRequest lifecycle (DRAFT \u2192 SUBMITTED \u2192 APPROVED/REJECTED; CANCELLED from DRAFT, SUBMITTED, or APPROVED) defined in ARCHITECTURE. Each value equals its key (uppercase), so persisted `status` column values are unambiguous and round-trip without transformation."
+    },
+    {
+      "entity": "BalanceStatus enum",
+      "mustExistOrExtend": true,
+      "invariant": "The set of members is closed: exactly {ACTIVE, EXHAUSTED, FROZEN, CLOSED}, matching the LeaveBalance lifecycle in ARCHITECTURE. Values equal keys (uppercase). The enum is the sole source of truth for balance state \u2014 downstream balance logic (Phase 4/6) must not introduce ad-hoc status strings."
+    },
+    {
+      "entity": "LeavePolicyStatus enum",
+      "mustExistOrExtend": true,
+      "invariant": "The set of members is closed: exactly {ACTIVE, INACTIVE}, matching the LeavePolicy lifecycle. Values equal keys (uppercase). This is distinct from `BalanceStatus.ACTIVE` and `EmploymentStatus.ACTIVE` despite sharing a value \u2014 they are independent enums consumed by different modules."
+    },
+    {
+      "entity": "EmploymentStatus enum",
+      "mustExistOrExtend": true,
+      "invariant": "The set of members is closed: exactly {ACTIVE, INACTIVE, TERMINATED}, matching the Employee entity's employment state. Values equal keys (uppercase). Downstream employee/leave logic (Phase 2/6) uses this to gate whether an employee may submit leave (e.g. TERMINATED employees cannot)."
+    },
+    {
+      "entity": "CreateLeaveRequestDto interface",
+      "mustExistOrExtend": true,
+      "invariant": "The DTO is the API-boundary input shape for creating a leave request: it carries only the caller-supplied fields (employeeId, leavePolicyId, startDate, endDate, reason) and excludes system-managed fields (id, status, approvedBy, approvedAt, createdAt, updatedAt). Date fields are `string` (ISO input), not `Date`. `reason` is optional (`string | undefined`), not nullable `string | null`."
+    },
+    {
+      "entity": "UpdateLeaveRequestDto interface",
+      "mustExistOrExtend": true,
+      "invariant": "The DTO is the partial-update input shape: every field (status, approvedBy, reason) is optional (`| undefined`) to support partial PATCH semantics. It references `LeaveRequestStatus` (not a raw string) for the status field, coupling update input to the enum's closed value set. It must not require any field, so an empty object is a valid (no-op) update input at the type level."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "Barrel export of all shared-types symbols from `src/shared/types/index.ts`",
+      "authRule": "N/A \u2014 this is a compile-time type module with no runtime auth surface; no API endpoint, no RBAC applies at this layer.",
+      "idempotent": true,
+      "errorSemantics": "Importing a non-existent symbol must produce a TypeScript compile error (strict mode), not a runtime failure. The barrel must export exactly the five enums and two DTO interfaces \u2014 no more, no less \u2014 so that downstream imports are deterministic and tree-shakeable. A missing or misspelled export fails the build (tsc --noEmit) before runtime."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The barrel export pattern must match the existing module convention: `index.ts` both defines and re-exports all public symbols via `export { ... }` statements (as seen in `src/modules/uptime/index.ts` and `src/modules/status/index.ts`), so downstream imports use `shared/types` as the single public entry point per ARCHITECTURE dependency rule #1.",
+      "referencePath": "src/modules/uptime/index.ts"
+    },
+    {
+      "requirement": "The new source file must compile under the existing `tsconfig.json` settings: `\"strict\": true`, `\"target\": \"ES2022\"`, `\"module\": \"commonjs\"`, `\"baseUrl\": \"./src\"`, `\"rootDir\": \"./src\"`, `\"include\": [\"src\"]`, `\"exclude\": [\"tests\"]`. The test file lives under `tests/` (excluded from tsc but matched by jest's `testMatch: ['**/tests/**/*.test.(ts|js)']` and resolved via `moduleDirectories: ['node_modules', 'src']`).",
+      "referencePath": "tsconfig.json"
+    },
+    {
+      "requirement": "The test file path `tests/unit/shared/types/index.test.ts` must match the jest `testMatch` glob `**/tests/**/*.test.(ts|js)` and use the `ts-jest` preset with `testEnvironment: 'node'`. Imports in the test resolve via `moduleDirectories: ['node_modules', 'src']`, so the test can import from `shared/types` (not a relative path) \u2014 consistent with how `src/app.ts` imports `./modules/uptime/uptime.routes` under baseUrl `./src`.",
+      "referencePath": "jest.config.js"
+    },
+    {
+      "requirement": "The implementation must satisfy the HARNESS `no-any` constraint (severity high): use `unknown` with type guards instead of `any` wherever runtime narrowing is needed in the test. It must also satisfy `no-gestalt-internal-deps` (no `@gestalt/*` imports) and `no-hardcoded-secrets` (trivially satisfied by a pure-types module). The verification command (`npm run build && npx jest --passWithNoTests`) must exit zero.",
+      "referencePath": "HARNESS.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "Employee module (Phase 2) \u2014 `src/modules/employee/employee.model.ts`",
+      "why": "Imports `EmploymentStatus` from `shared/types` to type the `employmentStatus` field on the `Employee` entity. This phase must export `EmploymentStatus` before Phase 2 can compile."
+    },
+    {
+      "target": "LeavePolicy module (Phase 3) \u2014 `src/modules/policy/policy.model.ts`",
+      "why": "Imports `LeaveType` and `LeavePolicyStatus` from `shared/types` to type `leaveType` and `isActive` on the `LeavePolicy` entity. This phase is the sole owner of those enums."
+    },
+    {
+      "target": "LeaveBalance module (Phase 4) \u2014 `src/modules/balance/balance.model.ts`",
+      "why": "Imports `BalanceStatus` from `shared/types` to type the `status` field on the `LeaveBalance` entity. This phase is the sole owner of that enum."
+    },
+    {
+      "target": "LeaveRequest module (Phase 5/6) \u2014 `src/modules/leave/leave.model.ts` and `leave.service.ts`",
+      "why": "Imports `LeaveRequestStatus` from `shared/types` for the entity `status` field, and `CreateLeaveRequestDto` / `UpdateLeaveRequestDto` for the service's create/update method signatures. This phase defines the DTO-to-entity boundary (string dates in DTO vs Date in entity)."
+    },
+    {
+      "target": "Audit and Notification modules (Phases 8\u201310)",
+      "why": "These modules depend only on `shared-types` per ARCHITECTURE's dependency graph. While they primarily consume their own models, they transitively rely on the shared-types foundation existing as the zero-dependency base that all modules import from."
+    }
+  ]
+}
