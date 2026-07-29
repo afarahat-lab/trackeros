@@ -16,22 +16,10 @@ The architecture is modular, with a clear separation of concerns between models,
 ## Module structure
 
 ```
-src/modules/leave/leave.{model,repository,service,controller,routes}.ts
-src/modules/balance/balance.{model,repository,service,controller,routes}.ts
-src/modules/employee/employee.{model,repository,service,controller,routes}.ts
-src/modules/policy/policy.{model,repository,service,controller,routes}.ts
-src/modules/notification/notification.{model,repository,service,controller,routes}.ts
-src/modules/LeaveStatus/    — LeaveStatus module
-src/modules/BaseEntity/    — BaseEntity module
-src/modules/LeaveRequest/    — LeaveRequest module
-src/modules/LeaveType/    — LeaveType module
-src/modules/LeavePolicy/    — LeavePolicy module
-src/modules/AuditLog/    — AuditLog module
-src/modules/AuditRecord/    — AuditRecord module
-src/modules/AuditServiceInterface/    — AuditServiceInterface module
-src/shared/db connection.ts
-src/shared/base repository.ts
-src/shared/error types.ts
+src/modules/status/       — Status module (health-check)
+src/modules/uptime/       — Uptime module (system status)
+src/shared/db/            — Database connection (pg Pool)
+src/shared/types/         — Shared type definitions (LeaveType, LeaveStatus enums)
 ```
 
 ## Key patterns
@@ -55,13 +43,28 @@ src/shared/error types.ts
 ### Overview
 The leave management module enables employees to apply for annual, sick, and emergency leave, managers to approve or reject requests, and the system to track leave balances. It is built as a modular monolith using TypeScript, Fastify, React Native, and PostgreSQL, following the existing architecture and golden principles.
 
-### Domain Model
+### Implementation Status
+
+**Phase 1 — Shared types: COMPLETE**
+- `src/shared/types/leave-type.enum.ts` — `LeaveType` enum (ANNUAL, SICK, EMERGENCY, UNPAID, MATERNITY, PATERNITY)
+- `src/shared/types/leave-status.enum.ts` — `LeaveStatus` enum (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED)
+- `src/shared/types/index.ts` — Barrel export re-exporting both enums
+- Tests: `tests/unit/shared/types/leave-type.enum.test.ts`, `tests/unit/shared/types/leave-status.enum.test.ts`
+
+**Phases 2–10 — Pending (not yet implemented)**
+- Phase 2–3: LeavePolicy model, repositories, service, routes
+- Phase 4–5: LeaveBalance model, repository, service, routes
+- Phase 6–7: Audit model, repository, service, routes
+- Phase 8–9: LeaveRequest model, repository, service, routes
+- Phase 10: Wire all modules into app.ts
+
+### Domain Model (planned)
 - **LeaveRequest** — Core aggregate representing a leave application. Lifecycle: DRAFT → SUBMITTED → APPROVED/REJECTED; can be CANCELLED from any non-terminal state. Tracks approver, rejector, and canceller separately for full audit.
 - **LeaveType** — Enumeration of leave categories (annual, sick, emergency, plus extensible types).
 - **LeavePolicy** — Configuration per leave type: entitlement days, accrual rules, minimum notice, manager approval requirement. Lifecycle: ACTIVE/INACTIVE.
 - **LeaveBalance** — Per-employee, per-leave-type, per-fiscal-year balance. Lifecycle: ACTIVE → EXHAUSTED (when remaining=0) → CLOSED (fiscal year end).
 
-Business rules enforced:
+Business rules enforced (planned):
 - Date validity (start < end)
 - No overlapping approved leaves
 - Sufficient balance at approval time
@@ -69,35 +72,19 @@ Business rules enforced:
 - Manager approval required (self-approval prohibited)
 - Minimum notice period check at submission
 
-### Data Model (Conceptual Tables)
-All tables are PostgreSQL, managed via pg Pool (`src/shared/db/connection.ts`). Migrations are generated from these specifications.
-
-- **employees** — Existing shared table; referenced by all leave entities.
-- **leave_types** — Lookup table for leave type names (annual, sick, emergency, etc.).
-- **leave_requests** — Stores leave applications with full lifecycle fields (approved_by, rejected_by, cancelled_by, etc.).
-- **leave_balances** — Tracks entitlement, used, and remaining days per employee/type/year.
-- **leave_policies** — Defines rules per leave type (entitlement, notice, approval flag).
-- **audit_logs** — Immutable audit trail for all state-changing operations (GP-002).
-
-### Module Structure
+### Planned Module Structure
 ```
 src/
 ├── shared/
-│   └── types/          # LeaveType, LeaveStatus enums
+│   └── types/          # ✅ LeaveType, LeaveStatus enums (Phase 1 — DONE)
 ├── modules/
-│   ├── audit/          # AuditRecord, IAuditService, AuditService, IAuditLogRepository, PgAuditLogRepository, routes
-│   ├── leave-policy/   # LeavePolicy, ILeavePolicyRepository, PgLeavePolicyRepository, ILeaveTypeRepository, PgLeaveTypeRepository, ILeavePolicyService, LeavePolicyService, routes
-│   ├── leave-balance/  # LeaveBalance, ILeaveBalanceRepository, PgLeaveBalanceRepository, ILeaveBalanceService, LeaveBalanceService, routes
-│   └── leave-request/  # LeaveRequest, ILeaveRequestRepository, PgLeaveRequestRepository, ILeaveRequestService, LeaveRequestService, routes
+│   ├── audit/          # ⏳ AuditRecord, IAuditService, AuditService, IAuditLogRepository, PgAuditLogRepository, routes
+│   ├── leave-policy/   # ⏳ LeavePolicy, ILeavePolicyRepository, PgLeavePolicyRepository, ILeaveTypeRepository, PgLeaveTypeRepository, ILeavePolicyService, LeavePolicyService, routes
+│   ├── leave-balance/  # ⏳ LeaveBalance, ILeaveBalanceRepository, PgLeaveBalanceRepository, ILeaveBalanceService, LeaveBalanceService, routes
+│   └── leave-request/  # ⏳ LeaveRequest, ILeaveRequestRepository, PgLeaveRequestRepository, ILeaveRequestService, LeaveRequestService, routes
 ```
 
 Dependencies flow inward: routes → services → repositories → db. No circular dependencies. The leave-request module orchestrates the workflow and depends on leave-balance, leave-policy, audit, shared-types, and an external employee module (for IEmployeeRepository).
-
-### Implementation Phases
-1. **Shared types + Audit** — Foundation enums and audit infrastructure.
-2. **Leave Policy** — Policy configuration and leave type lookup.
-3. **Leave Balance** — Balance management with deduction/credit.
-4. **Leave Request** — Full leave workflow orchestration.
 
 ### Compliance with Golden Principles
 - **GP-001 (Repository Pattern)**: All data access through repository interfaces with PostgreSQL implementations.
