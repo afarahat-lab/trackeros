@@ -1,4 +1,4 @@
-import { EmploymentStatus } from '../../shared/types';
+import { EmploymentStatus } from '../../shared/types/index';
 
 export interface Employee {
   id: string;

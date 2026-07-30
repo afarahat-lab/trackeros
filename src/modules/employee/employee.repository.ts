@@ -1,123 +1,128 @@
-import { pool } from '../../shared/db/connection';
+import { Pool } from 'pg';
 import { Employee } from './employee.model';
 import { IEmployeeRepository } from './employee.repository.interface';
-
-interface EmployeeRow {
-  id: string;
-  first_name: string;
-  last_name: string;
-  email: string;
-  employment_status: string;
-  manager_id: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-function rowToEmployee(row: EmployeeRow): Employee {
-  return {
-    id: row.id,
-    firstName: row.first_name,
-    lastName: row.last_name,
-    email: row.email,
-    employmentStatus: row.employment_status as Employee['employmentStatus'],
-    managerId: row.manager_id,
-    createdAt: new Date(row.created_at),
-    updatedAt: new Date(row.updated_at),
-  };
-}
+import { EmploymentStatus } from '../../shared/types/index';
 
 export class PgEmployeeRepository implements IEmployeeRepository {
+  constructor(private readonly pool: Pool) {}
+
   async findById(id: string): Promise<Employee | null> {
     try {
-      const result = await pool.query('SELECT * FROM employees WHERE id = $1', [id]);
-      if (result.rows.length === 0) return null;
-      return rowToEmployee(result.rows[0]);
-    } catch (error) {
-      throw new Error(
-        `Failed to find employee by id: ${error instanceof Error ? error.message : 'Unknown error'}`
+      const result = await this.pool.query(
+        'SELECT id, first_name, last_name, email, employment_status, manager_id, created_at, updated_at FROM employees WHERE id = $1',
+        [id]
       );
+      if (result.rows.length === 0) return null;
+      return this.mapRowToEmployee(result.rows[0]);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to find employee by id: ${message}`);
     }
   }
 
   async findByEmail(email: string): Promise<Employee | null> {
     try {
-      const result = await pool.query('SELECT * FROM employees WHERE email = $1', [email]);
-      if (result.rows.length === 0) return null;
-      return rowToEmployee(result.rows[0]);
-    } catch (error) {
-      throw new Error(
-        `Failed to find employee by email: ${error instanceof Error ? error.message : 'Unknown error'}`
+      const result = await this.pool.query(
+        'SELECT id, first_name, last_name, email, employment_status, manager_id, created_at, updated_at FROM employees WHERE email = $1',
+        [email]
       );
+      if (result.rows.length === 0) return null;
+      return this.mapRowToEmployee(result.rows[0]);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to find employee by email: ${message}`);
     }
   }
 
   async findAll(): Promise<Employee[]> {
     try {
-      const result = await pool.query('SELECT * FROM employees');
-      return result.rows.map(rowToEmployee);
-    } catch (error) {
-      throw new Error(
-        `Failed to find all employees: ${error instanceof Error ? error.message : 'Unknown error'}`
+      const result = await this.pool.query(
+        'SELECT id, first_name, last_name, email, employment_status, manager_id, created_at, updated_at FROM employees ORDER BY last_name, first_name'
       );
+      return result.rows.map(row => this.mapRowToEmployee(row));
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to find all employees: ${message}`);
     }
   }
 
   async create(employee: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'>): Promise<Employee> {
     try {
-      const result = await pool.query(
+      const result = await this.pool.query(
         `INSERT INTO employees (first_name, last_name, email, employment_status, manager_id)
          VALUES ($1, $2, $3, $4, $5)
-         RETURNING *`,
+         RETURNING id, first_name, last_name, email, employment_status, manager_id, created_at, updated_at`,
         [employee.firstName, employee.lastName, employee.email, employee.employmentStatus, employee.managerId]
       );
-      return rowToEmployee(result.rows[0]);
-    } catch (error) {
-      throw new Error(
-        `Failed to create employee: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
+      return this.mapRowToEmployee(result.rows[0]);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to create employee: ${message}`);
     }
   }
 
   async update(id: string, data: Partial<Employee>): Promise<Employee | null> {
     try {
-      const fields: string[] = [];
+      const setClauses: string[] = [];
       const values: unknown[] = [];
       let paramIndex = 1;
 
       if (data.firstName !== undefined) {
-        fields.push(`first_name = $${paramIndex++}`);
+        setClauses.push(`first_name = $${paramIndex++}`);
         values.push(data.firstName);
       }
       if (data.lastName !== undefined) {
-        fields.push(`last_name = $${paramIndex++}`);
+        setClauses.push(`last_name = $${paramIndex++}`);
         values.push(data.lastName);
       }
       if (data.email !== undefined) {
-        fields.push(`email = $${paramIndex++}`);
+        setClauses.push(`email = $${paramIndex++}`);
         values.push(data.email);
       }
       if (data.employmentStatus !== undefined) {
-        fields.push(`employment_status = $${paramIndex++}`);
+        setClauses.push(`employment_status = $${paramIndex++}`);
         values.push(data.employmentStatus);
       }
       if (data.managerId !== undefined) {
-        fields.push(`manager_id = $${paramIndex++}`);
+        setClauses.push(`manager_id = $${paramIndex++}`);
         values.push(data.managerId);
       }
 
-      if (fields.length === 0) {
+      if (setClauses.length === 0) {
         return this.findById(id);
       }
 
+      setClauses.push(`updated_at = NOW()`);
       values.push(id);
-      const query = `UPDATE employees SET ${fields.join(', ')} WHERE id = $${paramIndex} RETURNING *`;
-      const result = await pool.query(query, values);
-      if (result.rows.length === 0) return null;
-      return rowToEmployee(result.rows[0]);
-    } catch (error) {
-      throw new Error(
-        `Failed to update employee: ${error instanceof Error ? error.message : 'Unknown error'}`
+
+      const result = await this.pool.query(
+        `UPDATE employees SET ${setClauses.join(', ')} WHERE id = $${paramIndex}
+         RETURNING id, first_name, last_name, email, employment_status, manager_id, created_at, updated_at`,
+        values
       );
+
+      if (result.rows.length === 0) return null;
+      return this.mapRowToEmployee(result.rows[0]);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to update employee: ${message}`);
     }
+  }
+
+  private mapRowToEmployee(row: Record<string, unknown>): Employee {
+    const status = row.employment_status as string;
+    if (!Object.values(EmploymentStatus).includes(status as EmploymentStatus)) {
+      throw new Error(`Invalid employment status from database: ${status}`);
+    }
+    return {
+      id: row.id as string,
+      firstName: row.first_name as string,
+      lastName: row.last_name as string,
+      email: row.email as string,
+      employmentStatus: status as EmploymentStatus,
+      managerId: row.manager_id as string | null,
+      createdAt: new Date(row.created_at as string),
+      updatedAt: new Date(row.updated_at as string),
+    };
   }
 }
