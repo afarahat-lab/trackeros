@@ -1,0 +1,134 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "policy"
+    ],
+    "affectedLayers": [
+      "data",
+      "domain"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The LeavePolicy domain interface is exported from the policy module and references the LeaveType enum from the shared types module, so downstream modules (balance, leave) can depend on it without importing repository internals.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The policy repository interface declares all five operations (findById, findByLeaveType, findAllActive, create, update) with return types that distinguish found/not-found (null) from successful results, and the concrete repository class implements that interface.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository's create operation persists a new leave_policies row and returns the persisted entity with server-generated id, createdAt, and updatedAt populated; undefined optional numeric fields are stored as NULL rather than coerced to a sentinel value.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository's update operation applies only the fields present in the partial input (dynamic SET clause), sets updated_at to the current timestamp, and returns null when no row matches the given id; an empty partial returns the current row without issuing an UPDATE.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All repository SQL uses parameterized queries ($N placeholders) \u2014 no string interpolation of user-supplied values into the query text \u2014 satisfying the no-direct-db and security constraints.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Every repository method catches async errors and re-throws a typed Error with a descriptive message (no unhandled promise rejections), satisfying GP-006.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests cover all five repository methods including the found, not-found (null), and database-error paths, plus the empty-partial update edge case, and the full suite passes under the project's verification command.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access must go through the repository pattern (GP-001 / HARNESS no-direct-db-outside-repository) \u2014 the policy module exposes no inline SQL outside its repository implementation.",
+    "No use of `any` \u2014 use `unknown` with type guards (HARNESS no-any); the row mapper must cast from `Record<string, unknown>` rather than `any`.",
+    "Strict TypeScript must pass (no implicit any, strict null checks) under `npm run build` \u2014 the optional numeric fields (accrualRate, maxAccumulation, minimumNoticeDays) must be typed as `number | undefined` and handled accordingly.",
+    "The policy module may depend only on shared-types and the shared db connection \u2014 no imports from sibling domain modules (employee, balance, leave, audit, notification), per the architecture dependency rules."
+  ],
+  "outOfScope": [
+    "LeavePolicyService, ILeavePolicyService interface, controller, and routes \u2014 this phase covers only the model, repository interface, and repository implementation; the service and HTTP surface are deferred to later phases.",
+    "Database migrations or DDL for the leave_policies table \u2014 the table schema is assumed to already exist (reconciled architecture defines it); this phase does not create or alter migrations.",
+    "Reconciling the pool-injection pattern (direct-import singleton vs. constructor injection) and import-path style (relative vs. baseUrl) with the sibling employee module \u2014 both styles are functionally correct and test-green; this is a stylistic choice, not a phase deliverable."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "A LeavePolicy's leaveType must be one of the LeaveType enum values (annual, sick, emergency, unpaid, maternity, paternity); the entity cannot exist with an undefined or out-of-enum leaveType."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "Lifecycle is binary: isActive=true (ACTIVE) or isActive=false (INACTIVE); there is no deleted state \u2014 deactivation is the soft-delete mechanism."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "findById(id) \u2014 retrieves a single LeavePolicy by its primary key",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns null when no row matches; throws a typed Error wrapping the underlying database error on connection/query failure (no unhandled rejection)."
+    },
+    {
+      "operation": "findByLeaveType(leaveType) \u2014 retrieves the LeavePolicy governing a specific leave category",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns null when no policy exists for the given leave type; throws a typed Error on database failure."
+    },
+    {
+      "operation": "findAllActive() \u2014 retrieves all policies where isActive is true",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an empty array when no active policies exist (never null); throws a typed Error on database failure."
+    },
+    {
+      "operation": "create(policy) \u2014 inserts a new LeavePolicy row",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Accepts input without id/createdAt/updatedAt (server-generated); returns the fully populated persisted entity; throws a typed Error on constraint violations (e.g., duplicate leave_type) or connection failure."
+    },
+    {
+      "operation": "update(id, data) \u2014 partially updates an existing LeavePolicy",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Applies only supplied fields, auto-updates updated_at; returns null when the id does not match any row; returns the current row unchanged when the partial is empty (no UPDATE issued); throws a typed Error on database failure."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The LeaveType enum values referenced by the policy model and repository must match the enum defined in the shared types module \u2014 the repository's leave_type column values and the findByLeaveType parameter must use the same string values (annual, sick, emergency, unpaid, maternity, paternity).",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The repository's SQL column names and the row mapper's field-to-column mapping must match the reconciled leave_policies table schema (id, policy_name, leave_type, entitlement_days, accrual_rate, max_accumulation, minimum_notice_days, requires_manager_approval, is_active, created_at, updated_at).",
+      "referencePath": "docs/.gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "The repository must obtain its database connection through the shared db connection module's exported pool, not by instantiating its own Pool \u2014 ensuring a single connection source across all modules.",
+      "referencePath": "src/shared/db/connection.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "shared-types module (LeaveType enum)",
+      "why": "The policy model and repository interface import LeaveType to type the leaveType field and the findByLeaveType parameter; this is the policy module's only cross-module dependency per the architecture dependency map."
+    },
+    {
+      "target": "shared db connection module (pg pool)",
+      "why": "The concrete repository implementation executes parameterized SQL against the leave_policies table via the shared pool; this is the single authorized database access point (GP-001)."
+    },
+    {
+      "target": "balance module (future phase) and leave module (future phase)",
+      "why": "Downstream modules will consume ILeavePolicyRepository to resolve applicable policies for balance calculations and leave request validation; the interface contract established here is the integration seam."
+    }
+  ]
+}
