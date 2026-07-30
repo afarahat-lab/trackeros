@@ -18,7 +18,9 @@ The architecture is modular, with a clear separation of concerns between models,
 ```
 src/modules/leave/leave.{model,repository,service,controller,routes}.ts
 src/modules/balance/balance.{model,repository,service,controller,routes}.ts
-src/modules/employee/employee.{model,repository,service,controller,routes}.ts
+src/modules/employee/employee.model.ts
+src/modules/employee/employee.repository.interface.ts
+src/modules/employee/employee.repository.ts
 src/modules/policy/policy.{model,repository,service,controller,routes}.ts
 src/modules/notification/notification.{model,repository,service,controller,routes}.ts
 src/modules/LeaveStatus/    — LeaveStatus module
@@ -73,7 +75,7 @@ The leave management module enables employees to apply for annual, sick, and eme
 src/
   shared/types/          # LeaveType, LeaveRequestStatus, BalanceStatus, DTOs
   modules/
-    employee/            # Employee model, repository, service
+    employee/            # Employee model, repository interface, repository
     policy/              # LeavePolicy model, repository, service
     balance/             # LeaveBalance model, repository, service
     leave/               # LeaveRequest model, repository, service, controller, routes
