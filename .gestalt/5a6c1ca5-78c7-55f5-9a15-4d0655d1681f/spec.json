@@ -1,0 +1,101 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared-types"
+    ],
+    "affectedLayers": [
+      "shared"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The LeaveType enum exposes exactly six string-valued members \u2014 ANNUAL, SICK, EMERGENCY, UNPAID, MATERNITY, PATERNITY \u2014 and each member's runtime value equals its key name (e.g. LeaveType.ANNUAL === 'ANNUAL'). A reviewer can assert this by importing LeaveType and checking both the member set and individual values.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The LeaveRequestStatus enum exposes exactly five string-valued members \u2014 DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED \u2014 and each member's runtime value equals its key name (e.g. LeaveRequestStatus.DRAFT === 'DRAFT'). A reviewer can assert this by importing LeaveRequestStatus and checking both the member set and individual values.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The BaseEntity interface is exported and, when an object is constructed with id (string), createdAt (Date), and updatedAt (Date), it satisfies the BaseEntity type without a TypeScript compile error. A reviewer can assert this by constructing such an object and confirming it is assignable to BaseEntity.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The Jest test file at tests/unit/shared/types/types.test.ts runs under the project's ts-jest configuration (testMatch **/tests/**/*.test.(ts|js)) and passes with zero failures, verifying the enum member values and the BaseEntity interface shape. The verification command `npm run build && npx jest --passWithNoTests` exits zero.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The new source file compiles cleanly under the project's strict TypeScript configuration (tsc --noEmit, target ES2022, strict, baseUrl ./src) with no type errors, and the test file transforms cleanly under ts-jest at runtime.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The no-any rule from HARNESS.json constraints applies: use unknown with type guards instead of any. The type definitions and tests must not introduce any-typed values.",
+    "Follow the existing model style (uptime.model.ts, status.model.ts): plain exported interface and enum declarations directly in the module's public entry point. No classes, no decorators, no class-transformer/class-validator annotations, no extra runtime imports.",
+    "LeaveType and LeaveRequestStatus must be TypeScript string enums where each member's value equals its key name (e.g. ANNUAL = 'ANNUAL'). Numeric enums are not acceptable because the values persist to DB columns (leave_type, status on leave_requests) as strings.",
+    "The type definitions must live under src/shared/types/ (the architecture-declared owning location for BaseEntity, LeaveType, and LeaveRequestStatus). The test must live under tests/unit/shared/types/ to match jest.config.js testMatch. Do not place these cross-module shared types in a single-purpose module directory under src/modules/.",
+    "The shared-types module has zero upstream dependencies \u2014 it must not import from any other src module or external package. It is the foundation that five downstream modules (employee, leave-policy, leave-balance, leave-request, audit-log) depend on."
+  ],
+  "outOfScope": [
+    "Employee, leave-policy, leave-balance, leave-request, and audit-log modules are out of scope for this phase. Only the shared type definitions and their unit tests are delivered here.",
+    "No database migrations, repository implementations, or persistence-layer code are created in this phase. The types are pure compile-time definitions.",
+    "No changes to src/app.ts, src/index.ts, or any existing module's barrel index.ts. No route registration or service wiring. This phase only adds the shared types module and its test."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "BaseEntity",
+      "mustExistOrExtend": true,
+      "invariant": "BaseEntity is a pure data shape (no owned business logic) used by more than one module, so it must be defined in the shared-types module (src/shared/types/) and exported from that module's public entry point. It must remain a methodless interface \u2014 no behavior, no lifecycle methods \u2014 so downstream entities extend it as a structural contract only."
+    },
+    {
+      "entity": "LeaveType",
+      "mustExistOrExtend": true,
+      "invariant": "LeaveType is a cross-module value type (used by leave-policy, leave-balance, and leave-request) with no owned behavior, so it must be defined in the shared-types module and exported from its public entry point. Its member set is closed and fixed at the six declared values; no additional leave types may be added without an architecture change, because downstream policy and balance logic depends on the exact set."
+    },
+    {
+      "entity": "LeaveRequestStatus",
+      "mustExistOrExtend": true,
+      "invariant": "LeaveRequestStatus is a cross-module value type (used by leave-request and audit-log) with no owned behavior, so it must be defined in the shared-types module and exported from its public entry point. Its member set is closed and fixed at the five declared lifecycle states (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED); the LeaveRequest lifecycle transitions defined in ARCHITECTURE.md depend on exactly these values, so no status may be added or removed without an architecture change."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "Importing BaseEntity, LeaveType, and LeaveRequestStatus from the shared-types module's public entry point (src/shared/types/index.ts)",
+      "authRule": "N/A \u2014 pure type definitions, no runtime auth boundary",
+      "idempotent": true,
+      "errorSemantics": "No runtime errors \u2014 these are compile-time type exports. A missing or misnamed export surfaces as a TypeScript compile error (tsc --noEmit fails), not a runtime exception."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The new type declarations must match the existing model style: plain `export interface` / `export enum` statements with no decorators, no classes, and no runtime imports. The existing uptime.model.ts and status.model.ts establish this convention.",
+      "referencePath": "src/modules/uptime/uptime.model.ts"
+    },
+    {
+      "requirement": "If the shared-types module exposes its symbols via a barrel index.ts, it must follow the existing convention where index.ts re-exports the public symbols from the model file. The existing uptime/index.ts and status/index.ts establish this pattern. Since src/shared/types/index.ts is itself the module's public entry point, defining the types directly in it is also consistent.",
+      "referencePath": "src/modules/uptime/index.ts"
+    },
+    {
+      "requirement": "The source file must compile under the project's tsconfig.json settings: strict mode (no implicit any, strict null checks), target ES2022, module commonjs, baseUrl ./src. The file is included by the \"include\": [\"src\"] glob and must not trigger any type errors under these settings.",
+      "referencePath": "tsconfig.json"
+    },
+    {
+      "requirement": "The test file must be discoverable by jest.config.js: it must match the testMatch glob **/tests/**/*.test.(ts|js) and be transformable by the ts-jest preset. The test may import the source types via a bare import (shared/types) since moduleDirectories includes 'src', or via a relative path \u2014 both resolve correctly.",
+      "referencePath": "jest.config.js"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "Five downstream modules (employee, leave-policy, leave-balance, leave-request, audit-log) will import BaseEntity, LeaveType, and/or LeaveRequestStatus from src/shared/types/index.ts in subsequent phases. The exported symbol names and their types are the contract these phases depend on.",
+      "why": "The shared-types module is the foundation with zero upstream dependencies; all five domain modules depend on it. The exact exported names (BaseEntity, LeaveType, LeaveRequestStatus) and their member sets must be stable so downstream phases can import them without modification."
+    }
+  ]
+}
