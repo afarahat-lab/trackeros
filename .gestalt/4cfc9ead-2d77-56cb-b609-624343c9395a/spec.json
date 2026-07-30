@@ -1,0 +1,164 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "balance"
+    ],
+    "affectedLayers": [
+      "data"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The LeaveBalance model interface is exported from the balance module and imports BalanceStatus from the shared types module; it exposes the balance identity (employee, policy, fiscal year), entitlement/used/remaining day counters, status, and timestamp fields.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The balance repository interface declares all five operations: lookup by employee+policy (returns null when absent), lookup all balances for an employee (returns empty array when none), create (accepts input omitting generated fields and returns the persisted entity), partial update (returns null when the id is absent), and deductDays (returns null when the id is absent).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The concrete repository implementation satisfies the interface and uses parameterized SQL for every operation; create persists a row and returns the mapped entity, findByEmployeeAndPolicy/findByEmployee return null/empty-array respectively when no rows match, and update returns null when no updatable fields are supplied or the id is absent.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "deductDays performs the remaining-days decrement and used-days increment in a single atomic UPDATE statement with a RETURNING clause, so the two counters cannot diverge under concurrent calls; it returns the updated balance or null when the id does not exist.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Every repository method wraps database errors and rethrows a typed Error whose message identifies the failing operation, satisfying GP-006 (no unhandled promise rejections); the unit tests verify this error-wrapping behavior for at least the read, create, and deduct paths.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests at the balance repository test path mock the shared db pool and assert: correct SQL is issued with parameterized values for each operation, null/empty-array returns on missing rows, the deductDays atomic single-statement behavior, and typed-error propagation on DB failure \u2014 and these tests pass under the project's Jest runner.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access must go through the repository layer (GP-001 / no-direct-db-outside-repository, severity critical); the balance repository is the sole component permitted to issue SQL against the leave_balances table.",
+    "Strict TypeScript with no implicit any and strict null checks (HARNESS.json no-any rule, severity high); use unknown with type guards instead of any when mapping raw database rows to the LeaveBalance interface.",
+    "All SQL must use parameterized queries ($N placeholders) \u2014 no string-interpolated user input \u2014 to prevent SQL injection; this is enforced by the existing sibling repositories and the Semgrep security pass in CI.",
+    "No unhandled promise rejections (GP-006); every async repository method must catch errors and rethrow as a typed Error rather than letting a raw pg error propagate.",
+    "The balance module may depend only on shared-types and (conceptually) policy per ARCHITECTURE.md dependency rules; it must not import from the leave, audit, or notification modules, and no circular dependencies may be introduced."
+  ],
+  "outOfScope": [
+    "Balance service layer (business logic for accrual, exhaustion status transitions, restore-on-cancellation) \u2014 not part of this phase; only model, repository interface, and repository implementation are in scope.",
+    "HTTP routes/controller for balance endpoints (e.g. GET /leave/balances) \u2014 deferred to the leave routes phase; this phase produces no Fastify route plugin.",
+    "Audit logging for balance mutations (GP-002) \u2014 the repository is a data-access primitive; audit wiring occurs in the service/orchestration phases, not here.",
+    "Database migrations / DDL for the leave_balances table \u2014 the repository assumes the table schema exists; migration creation is out of scope for this phase."
+  ],
+  "ambiguities": [
+    {
+      "description": "The existing balance repository imports the shared db pool as a module-level singleton (matching policy), whereas the employee repository accepts a Pool via constructor injection. The phase intent says \"use the pg pool from src/shared/db/connection.ts\" which both styles satisfy, but the two sibling modules are inconsistent. The code agent must pick one; the existing balance implementation already uses the singleton style.",
+      "options": [
+        "Module-level singleton import (matches existing policy + balance repos)",
+        "Constructor-injected Pool (matches existing employee repo, more testable)"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "description": "The existing update method returns null when no updatable fields are supplied (no findById fallback), whereas the employee repository's update delegates to findById in that case. The behavior on empty-partial update is therefore inconsistent across modules. The phase intent does not specify which is correct.",
+      "options": [
+        "Return null on empty partial (current balance behavior)",
+        "Delegate to a read by id on empty partial (employee behavior)"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "description": "deductDays does not guard against remainingDays going negative or against non-positive day counts; the phase intent specifies only the atomic decrement/increment. Whether to reject over-deduction (remainingDays would go below zero) or negative/zero day arguments is unspecified. BR-001 (balance sufficiency) is enforced in the leave service phase, not here, so the repository may currently allow negative remaining.",
+      "options": [
+        "Repository performs raw atomic math only; sufficiency/non-negative guards live in the service layer (BR-001)",
+        "Repository rejects deductions that would make remainingDays negative or accept non-positive day counts"
+      ],
+      "impactIfWrong": "medium"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "A LeaveBalance is uniquely scoped to one employee, one leave policy, and one fiscal year; the (employeeId, leavePolicyId, fiscalYear) triple identifies a single balance row, and findByEmployeeAndPolicy resolves at most one balance for a given employee+policy pair."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "The day counters are arithmetically coupled: remainingDays must equal totalEntitlement minus usedDays after any deductDays operation (the atomic UPDATE preserves this by decrementing remaining and incrementing used by the same amount in one statement)."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "The status field is constrained to the BalanceStatus enum values (ACTIVE, EXHAUSTED, FROZEN, CLOSED); the repository must not persist or return a status outside this set, and row mapping must treat an unexpected status value as an error rather than silently coercing it."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "findByEmployeeAndPolicy(employeeId, leavePolicyId)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns null when no balance row matches the employee+policy pair; wraps any database error in a typed Error identifying the operation (GP-006)."
+    },
+    {
+      "operation": "findByEmployee(employeeId)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an empty array (never null) when the employee has no balance rows; wraps database errors in a typed Error (GP-006)."
+    },
+    {
+      "operation": "create(balance without generated fields)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Persists a new balance row and returns the fully-populated entity including generated id/timestamps; wraps database errors (e.g. unique-constraint violation on the employee+policy+fiscalYear triple) in a typed Error (GP-006)."
+    },
+    {
+      "operation": "update(id, partial balance)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Applies only the supplied fields via a dynamic SET clause, sets updated_at, and returns the updated entity or null when the id is absent; wraps database errors in a typed Error (GP-006)."
+    },
+    {
+      "operation": "deductDays(id, days)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Atomically decrements remainingDays and increments usedDays by the same amount in a single UPDATE...RETURNING statement so the counters cannot diverge under concurrency; returns the updated entity or null when the id is absent; wraps database errors in a typed Error (GP-006)."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The BalanceStatus enum (ACTIVE, EXHAUSTED, FROZEN, CLOSED) must be imported from the shared types module rather than redefined locally; the model and repository must reference this single source of truth for status values.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The repository must obtain its PostgreSQL connection from the shared db pool exported here (the project's single declared database adapter), not instantiate its own Pool \u2014 matching the policy repository's usage and the no-direct-db-outside-repository constraint.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "Row-to-entity mapping and error-wrapping conventions must match the established sibling repository pattern: a private mapRow function converting snake_case columns to camelCase fields with Number()/Boolean()/new Date() coercion, and each method wrapping errors in `new Error(\\`Failed to <operation>: <message>\\`)` (GP-006).",
+      "referencePath": "src/modules/policy/policy.repository.ts"
+    },
+    {
+      "requirement": "The repository must validate enum-typed columns read from the database against the known enum values (as the employee repository validates employment_status via a ReadonlySet) so that a corrupted status value is rejected as an error rather than silently passed through.",
+      "referencePath": "src/modules/employee/employee.repository.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts (BalanceStatus enum)",
+      "why": "The balance model and repository depend on the shared BalanceStatus enum for the status field; this is the declared inward dependency per ARCHITECTURE.md (balance depends on shared-types)."
+    },
+    {
+      "target": "src/shared/db/connection.ts (pg pool)",
+      "why": "The repository executes SQL through the shared PostgreSQL pool; this is the sole permitted database access path (GP-001) and the project's declared postgres adapter."
+    },
+    {
+      "target": "src/modules/leave/leave.service.ts (Phase 6 \u2014 LeaveService.approveLeaveRequest)",
+      "why": "The deductDays operation is the downstream consumer invoked by the leave service on request approval (PLAN.md Phase 6); its atomic single-statement contract is what guarantees balance correctness under concurrent approvals."
+    }
+  ]
+}
