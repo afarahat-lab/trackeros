@@ -1,17 +1,18 @@
-# Implement this phase: Phase 1: Shared types — BaseEntity, LeaveType, LeaveRequestStatus
+# Implement this phase: Phase 2: Employee model + repository
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/9086d214-f416-4a0d-87b3-3d75d74d909d/1`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/9086d214-f416-4a0d-87b3-3d75d74d909d/2`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create `src/shared/types/index.ts` with:
-- `BaseEntity` interface: `id: string`, `createdAt: Date`, `updatedAt: Date`
-- `LeaveType` enum: `ANNUAL`, `SICK`, `EMERGENCY`, `UNPAID`, `MATERNITY`, `PATERNITY`
-- `LeaveRequestStatus` enum: `DRAFT`, `SUBMITTED`, `APPROVED`, `REJECTED`, `CANCELLED`
+Create the employee module at `src/modules/employee/`:
 
-Include Jest unit tests in `tests/unit/shared/types/types.test.ts` verifying enum values and interface shape. This phase has no dependencies on any prior phase files.
+- `src/modules/employee/employee.model.ts` — `Employee` entity extending `BaseEntity` from `src/shared/types/index.ts` (Phase 1). Fields: `id: string`, `employeeCode: string`, `firstName: string`, `lastName: string`, `email: string`, `managerId: string | null`, `role: 'EMPLOYEE' | 'MANAGER' | 'HR_ADMIN'`, `isActive: boolean`, `createdAt: Date`, `updatedAt: Date`.
+- `src/modules/employee/employee.repository.ts` — `IEmployeeRepository` interface with: `findById(id: string): Promise<Employee | null>`, `findByEmail(email: string): Promise<Employee | null>`, `findManagerId(employeeId: string): Promise<string | null>`, `findHrAdmins(): Promise<Employee[]>`. Also `EmployeeRepository` class implementing it using the pg pool from `src/shared/db/connection.ts`.
+- `src/modules/employee/index.ts` — barrel export.
+
+Include Jest unit tests in `tests/unit/modules/employee/employee.repository.test.ts`. This phase depends on `src/shared/types/index.ts` from Phase 1 — read it before generating any code that references `BaseEntity`.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -29,18 +30,26 @@ These are resolved, feature-wide decisions. Wherever this phase touches the conc
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- The new type declarations must match the existing model style: plain `export interface` / `export enum` statements with no decorators, no classes, and no runtime imports. The existing uptime.model.ts and status.model.ts establish this convention. (see `src/modules/uptime/uptime.model.ts`)
-- If the shared-types module exposes its symbols via a barrel index.ts, it must follow the existing convention where index.ts re-exports the public symbols from the model file. The existing uptime/index.ts and status/index.ts establish this pattern. Since src/shared/types/index.ts is itself the module's public entry point, defining the types directly in it is also consistent. (see `src/modules/uptime/index.ts`)
-- The source file must compile under the project's tsconfig.json settings: strict mode (no implicit any, strict null checks), target ES2022, module commonjs, baseUrl ./src. The file is included by the "include": ["src"] glob and must not trigger any type errors under these settings. (see `tsconfig.json`)
-- The test file must be discoverable by jest.config.js: it must match the testMatch glob **/tests/**/*.test.(ts|js) and be transformable by the ts-jest preset. The test may import the source types via a bare import (shared/types) since moduleDirectories includes 'src', or via a relative path — both resolve correctly. (see `jest.config.js`)
+- Employee must extend the BaseEntity interface exactly as exported here (id: string, createdAt: Date, updatedAt: Date) — no redeclaration or drift of the base fields. (see `src/shared/types/index.ts`)
+- The repository must obtain its pg.Pool from this module's exported `pool` (configured from process.env.DATABASE_URL); it must not instantiate its own Pool or read DATABASE_URL directly. (see `src/shared/db/connection.ts`)
+- The employees table column set the repository queries must match the conceptual data model here: id, email, full_name, role, manager_id, department, employment_status, created_at, updated_at — with snake_case→camelCase mapping to the entity. (see `docs/ARCHITECTURE.md`)
+- Unit tests must follow the established project test conventions shown here: bare imports via moduleDirectories ('shared/...'), plain describe/it/expect, ts-jest preset, node environment — matching the existing Phase 1 test style. (see `tests/unit/shared/types/types.test.ts`)
+- Test files must match testMatch '**/tests/**/*.test.(ts|js)' and resolve bare module imports via moduleDirectories ['node_modules','src']; the repository test path tests/unit/modules/employee/employee.repository.test.ts must conform to this. (see `jest.config.js`)
 ### Entity invariants — enforce these
-- Reuse or extend `BaseEntity`: BaseEntity is a pure data shape (no owned business logic) used by more than one module, so it must be defined in the shared-types module (src/shared/types/) and exported from that module's public entry point. It must remain a methodless interface — no behavior, no lifecycle methods — so downstream entities extend it as a structural contract only.
-- Reuse or extend `LeaveType`: LeaveType is a cross-module value type (used by leave-policy, leave-balance, and leave-request) with no owned behavior, so it must be defined in the shared-types module and exported from its public entry point. Its member set is closed and fixed at the six declared values; no additional leave types may be added without an architecture change, because downstream policy and balance logic depends on the exact set.
-- Reuse or extend `LeaveRequestStatus`: LeaveRequestStatus is a cross-module value type (used by leave-request and audit-log) with no owned behavior, so it must be defined in the shared-types module and exported from its public entry point. Its member set is closed and fixed at the five declared lifecycle states (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED); the LeaveRequest lifecycle transitions defined in ARCHITECTURE.md depend on exactly these values, so no status may be added or removed without an architecture change.
+- Reuse or extend `Employee`: employmentStatus is a three-valued lifecycle state ('ACTIVE'|'INACTIVE'|'TERMINATED'); INACTIVE and TERMINATED are distinct (Business Rule 10 blocks leave submission for either), so the entity must NOT collapse them into a single isActive boolean.
+- Reuse or extend `Employee`: managerId is nullable (string|null): an employee may have no manager, which is the trigger for the no-manager escalation path (Phase 9). The repository must preserve null rather than coercing to an empty string.
+- Reuse or extend `Employee`: role is a plain string (not a closed 'EMPLOYEE'|'MANAGER'|'HR_ADMIN' union) per the reconciled architecture, so that 'HR_ADMIN' is queryable by findHrAdmins without an enum constraint; the entity type must not narrow role to a fixed union.
+- Reuse or extend `Employee`: Employee extends BaseEntity from src/shared/types/index.ts, inheriting id, createdAt, updatedAt; it does not redeclare those base fields with conflicting types.
 ### Interface contract — expose these operations (their shape is yours)
-- Importing BaseEntity, LeaveType, and LeaveRequestStatus from the shared-types module's public entry point (src/shared/types/index.ts) — N/A — pure type definitions, no runtime auth boundary; idempotent; No runtime errors — these are compile-time type exports. A missing or misnamed export surfaces as a TypeScript compile error (tsc --noEmit fails), not a runtime exception.
+- findById(id: string): Promise<Employee | null> — idempotent; Returns null when no row matches the id; does not throw on missing data. Throws only on infrastructure/pool failure (unhandled rejection prohibited per GP-006 — errors propagate as rejected promises to the caller).
+- findByEmail(email: string): Promise<Employee | null> — idempotent; Returns null when no row matches the email; does not throw on missing data. Throws only on infrastructure/pool failure.
+- findManagerId(employeeId: string): Promise<string | null> — idempotent; Returns the manager_id of the employee, or null when the employee has no manager or does not exist; does not throw on missing data. Throws only on infrastructure/pool failure.
+- findHrAdmins(): Promise<Employee[]> — idempotent; Returns all employees whose role is 'HR_ADMIN'; returns an empty array when none exist (never null). Throws only on infrastructure/pool failure.
 ### Integration points — connect to these
-- Five downstream modules (employee, leave-policy, leave-balance, leave-request, audit-log) will import BaseEntity, LeaveType, and/or LeaveRequestStatus from src/shared/types/index.ts in subsequent phases. The exported symbol names and their types are the contract these phases depend on. — The shared-types module is the foundation with zero upstream dependencies; all five domain modules depend on it. The exact exported names (BaseEntity, LeaveType, LeaveRequestStatus) and their member sets must be stable so downstream phases can import them without modification.
+- src/shared/types/index.ts (BaseEntity) — Employee extends BaseEntity; this is the hard Phase 1 dependency — the entity cannot compile without it.
+- src/shared/db/connection.ts (pg.Pool) — EmployeeRepository executes queries through the shared pool; the repository is the sole DB-access boundary for the employee module (GP-001).
+- Phase 7 EmployeeService / Phase 9 LeaveRequestService (downstream consumers) — findManagerId and findHrAdmins feed the no-manager escalation flow; findById/findByEmail feed identity and ownership checks. The four-operation interface is the contract these later phases depend on, so signatures must remain stable.
+- employees table (PostgreSQL schema) — The repository queries the employees table whose columns (full_name, manager_id, department, employment_status) drive row-to-entity mapping; the implementation must align column names with the reconciled schema.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
