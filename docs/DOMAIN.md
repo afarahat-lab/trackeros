@@ -125,11 +125,15 @@ Represents employee data managed by the `employee` module, including employee re
 | Field | Type | Required |
 |-------|------|----------|
 | id | string | true |
+| employeeNumber | string | true |
 | firstName | string | true |
 | lastName | string | true |
 | email | string | true |
-| employmentStatus | 'ACTIVE' \| 'INACTIVE' \| 'TERMINATED' | true |
 | managerId | string \| null | false |
+| department | string | true |
+| hireDate | Date | true |
+| terminationDate | Date \| null | false |
+| employmentStatus | 'ACTIVE' \| 'INACTIVE' \| 'TERMINATED' | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 

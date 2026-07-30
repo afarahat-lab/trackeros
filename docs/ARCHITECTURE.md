@@ -16,24 +16,24 @@ The architecture is modular, with a clear separation of concerns between models,
 ## Module structure
 
 ```
-src/modules/leave/leave.{model,repository,service,controller,routes}.ts
-src/modules/balance/balance.{model,repository,service,controller,routes}.ts
 src/modules/employee/employee.model.ts
 src/modules/employee/employee.repository.interface.ts
 src/modules/employee/employee.repository.ts
-src/modules/policy/policy.{model,repository,service,controller,routes}.ts
-src/modules/notification/notification.{model,repository,service,controller,routes}.ts
-src/modules/LeaveStatus/    — LeaveStatus module
-src/modules/BaseEntity/    — BaseEntity module
-src/modules/LeaveRequest/    — LeaveRequest module
-src/modules/LeaveType/    — LeaveType module
-src/modules/LeavePolicy/    — LeavePolicy module
-src/modules/AuditLog/    — AuditLog module
-src/modules/AuditRecord/    — AuditRecord module
-src/modules/AuditServiceInterface/    — AuditServiceInterface module
-src/shared/db connection.ts
-src/shared/base repository.ts
-src/shared/error types.ts
+src/modules/employee/employee.service.interface.ts
+src/modules/employee/employee.service.ts
+src/modules/policy/policy.model.ts
+src/modules/policy/policy.repository.interface.ts
+src/modules/policy/policy.repository.ts
+src/modules/status/status.model.ts
+src/modules/status/status.service.interface.ts
+src/modules/status/status.service.ts
+src/modules/status/index.ts
+src/modules/uptime/uptime.model.ts
+src/modules/uptime/uptime.service.interface.ts
+src/modules/uptime/uptime.service.ts
+src/modules/uptime/uptime.routes.ts
+src/modules/uptime/index.ts
+src/shared/db/connection.ts
 src/shared/types/index.ts   — shared enums & DTOs (LeaveType, LeaveRequestStatus, BalanceStatus, LeavePolicyStatus, EmploymentStatus, CreateLeaveRequestDto, UpdateLeaveRequestDto)
 ```
 
@@ -75,8 +75,8 @@ The leave management module enables employees to apply for annual, sick, and eme
 src/
   shared/types/          # LeaveType, LeaveRequestStatus, BalanceStatus, DTOs
   modules/
-    employee/            # Employee model, repository interface, repository
-    policy/              # LeavePolicy model, repository, service
+    employee/            # Employee model, repository interface, repository, service
+    policy/              # LeavePolicy model, repository interface, repository
     balance/             # LeaveBalance model, repository, service
     leave/               # LeaveRequest model, repository, service, controller, routes
     audit/               # AuditLog model, repository, service
