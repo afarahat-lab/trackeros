@@ -12,10 +12,10 @@ export async function policyRoutes(app: FastifyInstance) {
   app.get('/policies', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const policies = await service.getAllActive();
-      return reply.send(policies);
+      return reply.type('application/json').send(policies);
     } catch (error) {
       request.log.error(error);
-      return reply.status(500).send({ error: 'Internal Server Error' });
+      return reply.status(500).type('application/json').send({ error: 'Oops! Something went wrong on our end.' });
     }
   });
 
@@ -27,12 +27,12 @@ export async function policyRoutes(app: FastifyInstance) {
         const { id } = request.params;
         const policy = await service.getById(id);
         if (!policy) {
-          return reply.status(404).send({ error: 'Policy not found' });
+          return reply.status(404).type('application/json').send({ error: 'Hmm, we couldn’t find that policy.' });
         }
-        return reply.send(policy);
+        return reply.type('application/json').send(policy);
       } catch (error) {
         request.log.error(error);
-        return reply.status(500).send({ error: 'Internal Server Error' });
+        return reply.status(500).type('application/json').send({ error: 'Oops! Something went wrong on our end.' });
       }
     }
   );
@@ -44,18 +44,19 @@ export async function policyRoutes(app: FastifyInstance) {
       try {
         const { leaveType } = request.params;
         if (!Object.values(LeaveType).includes(leaveType as LeaveType)) {
-          return reply.status(400).send({ error: 'Invalid leave type' });
+          return reply.status(400).type('application/json').send({ error: 'That leave type doesn’t look right.' });
         }
         const policy = await service.getByLeaveType(leaveType as LeaveType);
         if (!policy) {
           return reply
             .status(404)
-            .send({ error: 'Policy not found for this leave type' });
+            .type('application/json')
+            .send({ error: 'No policy found for that leave type, sorry.' });
         }
-        return reply.send(policy);
+        return reply.type('application/json').send(policy);
       } catch (error) {
         request.log.error(error);
-        return reply.status(500).send({ error: 'Internal Server Error' });
+        return reply.status(500).type('application/json').send({ error: 'Oops! Something went wrong on our end.' });
       }
     }
   );
@@ -69,16 +70,17 @@ export async function policyRoutes(app: FastifyInstance) {
       if (!data.policyName || !data.leaveType || data.entitlementDays == null) {
         return reply
           .status(400)
+          .type('application/json')
           .send({
             error:
-              'Missing required fields: policyName, leaveType, entitlementDays',
+              'Hey, you’re missing required fields: policyName, leaveType, entitlementDays',
           });
       }
       const created = await service.createPolicy(data);
-      return reply.status(201).send(created);
+      return reply.status(201).type('application/json').send(created);
     } catch (error) {
       request.log.error(error);
-      return reply.status(500).send({ error: 'Internal Server Error' });
+      return reply.status(500).type('application/json').send({ error: 'Oops! Something went wrong on our end.' });
     }
   });
 
@@ -92,12 +94,12 @@ export async function policyRoutes(app: FastifyInstance) {
       const data = request.body;
       const updated = await service.updatePolicy(id, data);
       if (!updated) {
-        return reply.status(404).send({ error: 'Policy not found' });
+        return reply.status(404).type('application/json').send({ error: 'Hmm, we couldn’t find that policy.' });
       }
-      return reply.send(updated);
+      return reply.type('application/json').send(updated);
     } catch (error) {
       request.log.error(error);
-      return reply.status(500).send({ error: 'Internal Server Error' });
+      return reply.status(500).type('application/json').send({ error: 'Oops! Something went wrong on our end.' });
     }
   });
 }
