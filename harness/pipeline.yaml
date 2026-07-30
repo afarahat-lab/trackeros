@@ -24,7 +24,7 @@
 # test_action_dispatch, so a validated action can never again die at dispatch.
 
 name: corporate-ops-web-mobile
-version: "3.2.0"
+version: "3.3.0"
 
 phases:
   # ── Planning: architecture crew → planner → persist (runs once) ──
@@ -49,10 +49,23 @@ phases:
             agent: app-architect-agent
             inputs: [feature_description]
             output: { name: app_spec, channel: workflow_state }
+      # The chief UNIONS the specialists' open_questions into its reconciled output (done in the
+      # chief agent so the planner's consult set is unchanged). Output is the pre-clarify reconciled
+      # architecture; the clarify gate below produces the final `architecture`.
       - id: reconcile
         type: agent
         agent: chief-architect-agent
         inputs: [domain_spec, data_spec, app_spec]
+        output: { name: architecture_reconciled, channel: workflow_state }
+      # Planning-layer clarification gate. Consumes ONLY the reconciled architecture (adds no new
+      # agent-producer path to the planner's consult walk). If a foundational open_question remains,
+      # PARKS ONCE (reusing the wait_condition/clarify mechanism) before phase 0; the operator's
+      # answer is folded into architecture.business_rules (a broad-scoped binding rule) — the same
+      # channel the planner + downstream consume. No open question ⇒ passes straight through.
+      - id: clarify-architecture
+        type: action
+        action: clarify_architecture
+        inputs: [architecture_reconciled]
         output: { name: architecture, channel: workflow_state }
       - id: plan
         type: agent

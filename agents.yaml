@@ -393,6 +393,7 @@ agents:
     - Every state transition must be named and documented in lifecycleStates
     - Do not define persistence or infrastructure concerns — focus on domain only. The data architect handles SQL schemas and repositories; the application architect handles modules and services.
     - Every lifecycle state you introduce must appear in domainNotes so the chief architect can fold it into architectureMdUpdate.
+    - 'Foundational semantics are BINDING or OPEN — never a silent narrow assertion. When a business rule involves a boundary, count, range, rounding, or unit (e.g. how a number of days is derived from a start and end date — inclusive vs exclusive, calendar vs business days), decide its reach: if it must hold everywhere that concept is used, record it as a businessRule with scope "broad" and appliesTo naming the concept; if the correct choice is genuinely undecided and needs a human, record it as an openQuestion (question, impact, candidate options). NEVER bury such a rule as a scope "narrow" assertion inside one check while leaving other call sites unspecified — this is the BR-001 anti-pattern: asserting days = endDate - startDate + 1 only for a sufficiency check while the deduction path that consumes the same count is left silent.'
     role: "Domain architect"
     goal: "Define the domain model: entities, relationships, lifecycle states, and business rules for this feature"
     llm:
@@ -411,6 +412,7 @@ agents:
     - Every repository interface must name its concrete backing implementation using the declared stack — do not leave the choice open
     - Use the declared database client — do not substitute alternatives
     - When the same table appears in multiple repositories, its schema must be defined exactly once and referenced by name elsewhere
+    - 'Foundational counting/rounding/range semantics are BINDING or OPEN — if how a quantity is computed, rounded, or bounded (e.g. an aggregated day count, a balance rounding direction) must hold across call sites but the correct choice is genuinely undecided, record it as an openQuestion (question, impact, candidate options) rather than silently asserting one value for a single query and leaving the rest implicit (the BR-001 anti-pattern).'
     role: "Data architect"
     goal: "Define the persistence layer: conceptual table specifications (no DDL), repository interfaces, and concrete implementations for this feature"
     llm:
@@ -431,6 +433,7 @@ agents:
     - Every public service method must be defined in an interface before the implementation
     - No circular dependencies between modules — verify your dependencyMap before returning
     - 'Shared value-type placement — apply this MECHANICALLY to every type; it is a rule, not a per-case judgment. A pure data shape with NO owned business logic (an enum, a simple DTO, a shared value type, or a methodless interface) that is used by MORE THAN ONE module MUST be placed under the shared-types location src/shared/types/ — declare ONE module whose path is src/shared/types/ that owns those types; do not scatter them. A type WITH owned behavior (an entity with lifecycle or state rules, a service, or a repository/interface that declares methods) OR a pure value type used by ONLY ONE module MUST get its own module directory at src/modules/<name>/. Never place an enum or DTO that multiple modules import into its own single-purpose module directory (e.g. never src/modules/LeaveType/ for a cross-module LeaveType enum — that belongs in src/shared/types/).'
+    - 'Foundational computation semantics are BINDING or OPEN — when a service derives a count, range, or rounded value whose rule must hold across sibling methods but the correct choice is genuinely undecided, record it as an openQuestion (question, impact, candidate options); never bake the rule silently into one service method and leave the methods that consume the same value unspecified (the BR-001 anti-pattern).'
     role: "Application architect"
     goal: "Define the application layer: module boundaries, service interfaces, dependency direction, and recommended phase decomposition"
     llm:
@@ -452,6 +455,7 @@ agents:
     - 'The final architecture must include: domain entities, conceptual table specifications (no SQL DDL), repository interfaces with concrete implementations, module boundaries, dependency map, and phase recommendations'
     - If a specialist slice is missing (errors block in the prompt), reconcile around it — supply the minimum content needed to keep the feature buildable, not a fresh design
     - Every lifecycle state introduced by the domain architect must be reflected in architectureMdUpdate
+    - 'Surface, do not swallow, open questions — if any specialist recorded an openQuestion, or you find a foundational semantics (counting, boundary, rounding, range, or unit) asserted narrowly in one place but relied on elsewhere, carry it into the reconciled openQuestions rather than silently picking a value (the BR-001 anti-pattern).'
     role: "Chief architect and design reviewer"
     goal: "Reconcile the domain, data, and application designs into a single coherent architecture. Resolve conflicts, enforce stack compliance, ensure completeness."
     llm:
