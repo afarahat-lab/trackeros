@@ -1,0 +1,146 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "employee"
+    ],
+    "affectedLayers": [
+      "data-access",
+      "domain-model"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The Employee entity extends BaseEntity from src/shared/types/index.ts and exposes the reconciled-architecture shape: email, fullName, role, managerId (nullable), department, and employmentStatus restricted to 'ACTIVE' | 'INACTIVE' | 'TERMINATED'. The BaseEntity fields (id, createdAt, updatedAt) are inherited, not redeclared.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository interface declares exactly four query operations \u2014 lookup by id, lookup by email, manager-id lookup by employee id, and HR-admin listing \u2014 each returning the documented result type (Employee | null, Employee | null, string | null, Employee[] respectively). A concrete implementation backed by the pg pool satisfies the interface.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findById and findByEmail return null when no row matches, return null when a returned row fails the type guard, and return a correctly mapped Employee when a valid row is present. findManagerId returns null when the employee is absent OR has no manager, and returns the manager id string otherwise. findHrAdmins returns only employees whose role is HR_ADMIN, returns an empty array when none exist, and filters out rows failing the type guard.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All repository query methods use parameterized SQL (bound parameters for user-supplied id/email values), never string-interpolate user input into the query text, so SQL injection is prevented at the data-access layer.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Database/pool errors from any repository method propagate as rejected promises (not swallowed or returned as null), satisfying GP-006 (no unhandled promise rejections) at the repository boundary so callers can handle them explicitly.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The module's barrel export (index.ts) re-exports the Employee type, the repository interface, and the repository implementation, so downstream modules import the employee module only through its public entry point.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests under tests/unit/modules/employee/ cover, for each of the four repository methods: the happy path (valid row mapped correctly), the empty/absent case (null or empty array), the type-guard-failure case (null or filtered out), and error propagation (rejected promise). The tests mock the pg Pool via constructor injection so no real database connection is required.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The Employee entity MUST follow the reconciled architecture's shape (email, fullName, role: string, managerId: string | null, department, employmentStatus: 'ACTIVE' | 'INACTIVE' | 'TERMINATED'), NOT the PLAN.md task-description field list (employeeCode, firstName, lastName, isActive, etc.). The reconciled architecture (.gestalt/architecture/reconciled.json) is authoritative; the binding business rules (Rule 10 referencing employmentStatus) and the SQL schema (full_name, department, employment_status) depend on this shape.",
+    "All database access goes through the repository pattern (GP-001 / HARNESS no-direct-db-outside-repository). The employee repository is the only component permitted to execute SQL against the employees table; no inline SQL or direct pool calls outside the repository implementation.",
+    "No use of `any` (HARNESS no-any rule). Database rows must be validated via a type guard against `unknown` before being mapped to the Employee domain type.",
+    "The employee module may depend only on shared-types (src/shared/types) and the shared db connection (src/shared/db/connection.ts). No dependency on leave, balance, policy, audit-log, or any other domain module \u2014 the dependency map declares employee \u2192 shared-types only, with no circular edges.",
+    "Modules import from each other ONLY through their declared public entry point (index.ts). The employee barrel export is the sole import surface for downstream consumers; internal files (employee.model.ts, employee.repository.ts) are not imported directly from outside the module.",
+    "The repository implementation must be testable without a real database: the pg Pool is injectable via the constructor (defaulting to the shared pool) so unit tests can substitute a mock Pool.",
+    "Strict TypeScript (tsconfig strict: true, strictNullChecks) must be satisfied. The nullable managerId is typed string | null, and employmentStatus is a string-literal union, not a loose string."
+  ],
+  "outOfScope": [
+    "EmployeeService and IEmployeeService (service layer) \u2014 deferred to Phase 7. This phase delivers only the model, repository interface + implementation, barrel export, and unit tests.",
+    "HTTP routes, controllers, and RBAC middleware for employee endpoints \u2014 not part of this phase; the employee module exposes only the repository data-access layer here.",
+    "Audit logging (GP-002) for employee reads \u2014 the four repository methods are read-only queries; no state-changing employee operations exist in this phase, so no audit records are required.",
+    "SQL migrations / DDL for the employees table \u2014 the conceptual schema is defined in the reconciled architecture; migration generation is out of scope for this repository-only phase.",
+    "Rewriting the existing employee module to match the PLAN.md task-description field list (employeeCode, firstName, lastName, isActive). The existing reconciled-architecture implementation is authoritative and must not be rewritten."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "An Employee's employmentStatus is always one of 'ACTIVE', 'INACTIVE', or 'TERMINATED' \u2014 the type-literal union is enforced at the model level, and the row mapper casts only after the type guard confirms the column is a string. This status is the field downstream Business Rule 10 consults to block leave submission for INACTIVE/TERMINATED employees."
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "An Employee's managerId is either a string referencing another employee's id or null (no manager). Nullability is preserved end-to-end: the database column is nullable, the type guard accepts null, and the mapped domain object carries string | null. This null case is what downstream no-manager escalation (Business Rule 13) detects via findManagerId returning null."
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "Employee extends BaseEntity and therefore always carries id (string), createdAt (Date), and updatedAt (Date) inherited from src/shared/types/index.ts; these three fields are never redeclared on the Employee interface itself."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "findById(id) \u2014 lookup a single employee by primary key",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns the Employee when a valid row exists, null when no row matches or when the row fails the type guard. Database errors propagate as rejected promises (GP-006)."
+    },
+    {
+      "operation": "findByEmail(email) \u2014 lookup a single employee by unique email",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns the Employee when a valid row exists, null when no row matches or when the row fails the type guard. Database errors propagate as rejected promises (GP-006)."
+    },
+    {
+      "operation": "findManagerId(employeeId) \u2014 resolve the manager id for a given employee",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns the manager id string when the employee exists and has a manager; returns null when the employee is absent OR has no manager (managerId null). Database errors propagate as rejected promises (GP-006). The null result is the signal downstream no-manager escalation (Rule 13) keys on."
+    },
+    {
+      "operation": "findHrAdmins() \u2014 list all employees with the HR_ADMIN role",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns an array of Employee objects whose role is HR_ADMIN; returns an empty array when none exist; rows failing the type guard are filtered out (never included). Database errors propagate as rejected promises (GP-006). The result feeds downstream no-manager escalation routing to HR approvers."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The Employee entity MUST extend the BaseEntity interface exactly as exported from src/shared/types/index.ts (id: string, createdAt: Date, updatedAt: Date). The model must not redefine or omit these inherited fields, and must import BaseEntity from the shared-types location.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The Employee entity's field set MUST match the reconciled architecture's Employee attributes (id, email, fullName, role: string, managerId: string | null, department, employmentStatus: 'ACTIVE' | 'INACTIVE' | 'TERMINATED', createdAt, updatedAt). The task-description field list (employeeCode, firstName, lastName, isActive) is superseded and must NOT be used.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "The repository implementation MUST obtain its database connection from the shared pg pool exported by src/shared/db/connection.ts, defaulting to that pool when no Pool is explicitly injected. The constructor injection pattern must be preserved so tests can substitute a mock Pool.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "The employees table column names referenced in repository SQL MUST match the conceptual data model in ARCHITECTURE.md / reconciled.json: id, email, full_name, role, manager_id, department, employment_status, created_at, updated_at. The row mapper must translate snake_case columns to the camelCase domain fields (full_name\u2192fullName, manager_id\u2192managerId, employment_status\u2192employmentStatus).",
+      "referencePath": "docs/ARCHITECTURE.md"
+    },
+    {
+      "requirement": "Unit tests MUST conform to the project Jest configuration: ts-jest preset, node environment, testMatch '**/tests/**/*.test.(ts|js)', and moduleDirectories including 'src' (enabling bare-path imports like 'modules/employee/...'). Tests must not require a live database connection.",
+      "referencePath": "jest.config.js"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts (shared-types module)",
+      "why": "Employee extends BaseEntity exported here; this is the employee module's only declared upstream dependency (employee \u2192 shared-types)."
+    },
+    {
+      "target": "src/shared/db/connection.ts (shared db pool)",
+      "why": "The repository implementation uses the pg Pool exported here as its default data-access connection, injectable via constructor for testing."
+    },
+    {
+      "target": "Downstream leave-request module (future phase) \u2014 EmployeeService consumer",
+      "why": "findManagerId (null \u2192 no-manager escalation, Rule 13) and findHrAdmins (HR approver routing) are consumed by the leave-request orchestration layer; employmentStatus is consulted by Business Rule 10. This phase establishes the data-access contract those downstream consumers will depend on via the employee service (Phase 7)."
+    }
+  ]
+}
