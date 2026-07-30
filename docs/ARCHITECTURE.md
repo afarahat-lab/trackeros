@@ -16,6 +16,9 @@ The architecture is modular, with a clear separation of concerns between models,
 ## Module structure
 
 ```
+src/modules/balance/balance.model.ts
+src/modules/balance/balance.repository.interface.ts
+src/modules/balance/balance.repository.ts
 src/modules/employee/employee.model.ts
 src/modules/employee/employee.repository.interface.ts
 src/modules/employee/employee.repository.ts
@@ -86,7 +89,7 @@ src/
   modules/
     employee/            # Employee model, repository interface, repository, service
     policy/              # LeavePolicy model, repository interface, repository, service, routes
-    balance/             # LeaveBalance model, repository, service
+    balance/             # LeaveBalance model, repository interface, repository
     leave/               # LeaveRequest model, repository, service, controller, routes
     audit/               # AuditLog model, repository, service
     notification/        # Notification service (email/in-app)

@@ -76,26 +76,7 @@ Represents a leave record managed by the `leave` module, including leave request
 
 ## balance
 
-Represents leave balance data managed by the `balance` module, including tracked entitlement, accrual, and remaining leave amounts.
-
-### Balance
-
-| Field | Type | Required |
-|-------|------|----------|
-| id | string | true |
-| employeeId | string | true |
-| policyId | string | true |
-| totalEntitlement | number | true |
-| usedDays | number | true |
-| remainingDays | number | true |
-| fiscalYear | number | true |
-| status | string | true |
-| createdAt | Date | true |
-| updatedAt | Date | true |
-
-**Relationships**
-- `Employee` — many-to-one
-- `LeavePolicy` — many-to-one
+Represents leave balance data managed by the `balance` module, including tracked entitlement, used, and remaining leave amounts per employee, policy, and fiscal year.
 
 ### LeaveBalance
 
@@ -103,18 +84,31 @@ Represents leave balance data managed by the `balance` module, including tracked
 |-------|------|----------|
 | id | string | true |
 | employeeId | string | true |
-| policyId | string | true |
+| leavePolicyId | string | true |
 | totalEntitlement | number | true |
 | usedDays | number | true |
 | remainingDays | number | true |
 | fiscalYear | number | true |
-| status | string | true |
+| status | BalanceStatus | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
 **Relationships**
-- `Employee` — many-to-one
-- `LeavePolicy` — many-to-one
+- `Employee` — many-to-one (via employeeId)
+- `LeavePolicy` — many-to-one (via leavePolicyId)
+
+**Status values** (BalanceStatus enum from `src/shared/types/index.ts`):
+- `ACTIVE` — balance is in use
+- `EXHAUSTED` — remainingDays is zero
+- `FROZEN` — balance is frozen (e.g. employee on long-term leave)
+- `CLOSED` — balance is closed (e.g. fiscal year ended)
+
+**Repository operations** (`ILeaveBalanceRepository`):
+- `findByEmployeeAndPolicy(employeeId, leavePolicyId)` → `LeaveBalance | null`
+- `findByEmployee(employeeId)` → `LeaveBalance[]`
+- `create(Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt'>)` → `LeaveBalance`
+- `update(id, Partial<LeaveBalance>)` → `LeaveBalance | null`
+- `deductDays(id, days)` → `LeaveBalance | null` — atomic UPDATE decrementing `remainingDays` and incrementing `usedDays` in a single statement with RETURNING
 
 ## employee
 
