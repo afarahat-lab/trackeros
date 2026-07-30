@@ -1,0 +1,135 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "policy"
+    ],
+    "affectedLayers": [
+      "routes"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "Re-running `semgrep scan --config auto` against src/modules/policy/policy.routes.ts yields zero CWE-79 (XSS) findings on the success-response send calls previously flagged at lines 32, 55, and 97.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The success response body for the GET-by-id, GET-by-leaveType, and PUT handlers is built as an explicitly-constructed object (not the raw service return value passed directly to reply.send), so no user-controlled path param or request body value reaches the response without an explicit construction step that breaks the taint flow.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The JSON response body returned by each of the three fixed handlers is field-equivalent to the prior LeavePolicy projection \u2014 no fields added, removed, or type-coerced relative to the object the handler returned before the fix.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "All five route paths registered by policyRoutes remain identical to the pre-fix set: /policies, /policies/:id, /policies/type/:leaveType, POST /policies, PUT /policies/:id.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "HTTP status codes are unchanged for every handler: 200 for successful GET and PUT, 201 for POST create, 404 for not-found, 400 for invalid leave type or missing required fields, 500 for caught internal errors.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "The error-handling structure is unchanged: every handler retains its try/catch, request.log.error on caught errors, and static-string error response bodies ({ error: '...' }) with no user-input reflection.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "npm run build (tsc --noEmit under strict mode) succeeds with no type errors and npx jest --passWithNoTests passes with no regressions in existing tests.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Only src/modules/policy/policy.routes.ts may be modified for this fix. The balance module (src/modules/balance/*), uptime routes (src/modules/uptime/uptime.routes.ts), policy.model.ts, policy.service.ts, policy.repository.ts, and policy.repository.interface.ts must remain untouched.",
+    "Do not change any route path or HTTP method registration. Do not change any status code (200/201/404/400/500) or the conditions under which each is returned.",
+    "Do not change the error-handling structure: keep the try/catch blocks, request.log.error calls, and static-string error response bodies unchanged. Static error responses are not flagged and must not be altered.",
+    "The fix must use Fastify's reply.send() (or reply.status().send()) to emit responses \u2014 this is a Fastify codebase, not Express. Do not introduce Express res.json/res.send calls.",
+    "Strict TypeScript must remain satisfied (no implicit any, strict null checks). No use of `any` (HARNESS.json no-any rule); use typed objects or `unknown` with type guards where needed.",
+    "The response body for the three fixed handlers must remain JSON-serializable and field-equivalent to the LeavePolicy projection the handler previously returned \u2014 the fix changes how the body is constructed, not its shape or content.",
+    "Do not introduce HTML rendering, template strings, or manual escaping. Fastify reply.send() already serializes objects to JSON with Content-Type application/json; the fix is to break the user-input-to-response taint flow via explicit object construction, not to add HTML escaping."
+  ],
+  "outOfScope": [
+    "Modifying the balance module (src/modules/balance/*) \u2014 it has no routes file and no reply.send calls; it is unaffected by the CWE-79 pattern.",
+    "Modifying the uptime routes (src/modules/uptime/uptime.routes.ts) \u2014 same reply.send pattern but not flagged by Semgrep because there is no user-input reflection path.",
+    "Adding RBAC/auth middleware to the policy routes (GP-005) \u2014 no auth middleware exists on these routes currently and adding it is outside this security-fix phase's scope.",
+    "Adding audit logging to the policy routes (GP-002) \u2014 the policy routes currently have no audit integration; this is a separate concern from the XSS fix.",
+    "Changing the LeavePolicy model, PolicyService, repository, or repository interface \u2014 the fix is confined to response construction in the routes file.",
+    "Adding new route-level integration tests for policyRoutes \u2014 no such tests exist currently and scaffolding them is outside this targeted fix phase. Existing repository unit tests must not regress."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeavePolicy (response projection)",
+      "mustExistOrExtend": true,
+      "invariant": "Every successful GET-by-id, GET-by-leaveType, and PUT response must project a LeavePolicy object whose fields match the LeavePolicy interface contract (id, policyName, leaveType, entitlementDays, accrualRate, maxAccumulation, minimumNoticeDays, requiresManagerApproval, isActive, createdAt, updatedAt) with no fields dropped, added, or type-coerced relative to the pre-fix response."
+    },
+    {
+      "entity": "policyRoutes module",
+      "mustExistOrExtend": true,
+      "invariant": "The policyRoutes registration function must continue to register exactly the same five route handlers on the FastifyInstance with the same paths and methods; the module's public export signature (async function accepting FastifyInstance) must not change."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "GET single policy by id \u2014 success response",
+      "authRule": "No auth middleware currently enforced on this route; this phase does not add or remove auth.",
+      "idempotent": true,
+      "errorSemantics": "Returns 404 with a static { error: 'Policy not found' } body when the service returns null; returns 500 with a static { error: 'Internal Server Error' } body on a caught exception. These error paths and their static bodies must remain unchanged."
+    },
+    {
+      "operation": "GET policy by leave type \u2014 success response",
+      "authRule": "No auth middleware currently enforced on this route; this phase does not add or remove auth.",
+      "idempotent": true,
+      "errorSemantics": "Returns 400 with a static { error: 'Invalid leave type' } body when the leaveType param is not a valid LeaveType enum value; returns 404 with a static { error: 'Policy not found for this leave type' } body when the service returns null; returns 500 with a static { error: 'Internal Server Error' } body on a caught exception. These error paths and their static bodies must remain unchanged."
+    },
+    {
+      "operation": "PUT update policy by id \u2014 success response",
+      "authRule": "No auth middleware currently enforced on this route; this phase does not add or remove auth.",
+      "idempotent": false,
+      "errorSemantics": "Returns 404 with a static { error: 'Policy not found' } body when the service returns null; returns 500 with a static { error: 'Internal Server Error' } body on a caught exception. These error paths and their static bodies must remain unchanged."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The explicitly-constructed success response object for the GET-by-id, GET-by-leaveType, and PUT handlers must match the LeavePolicy interface field set and types defined in src/modules/policy/policy.model.ts \u2014 no fields added, removed, or re-typed.",
+      "referencePath": "src/modules/policy/policy.model.ts"
+    },
+    {
+      "requirement": "The fix must not alter the PolicyService method signatures or return types (getById, getByLeaveType, updatePolicy) defined in src/modules/policy/policy.service.ts. The routes file consumes these methods unchanged; only the way their return value is mapped into the response body changes.",
+      "referencePath": "src/modules/policy/policy.service.ts"
+    },
+    {
+      "requirement": "The policyRoutes export consumed by src/app.ts (app.register(policyRoutes)) must remain a single async function accepting a FastifyInstance \u2014 the registration call in app.ts must not need to change.",
+      "referencePath": "src/app.ts"
+    },
+    {
+      "requirement": "The leaveType validation in the GET-by-leaveType handler must continue to validate against the LeaveType enum values defined in src/shared/types/index.ts (annual/sick/emergency/unpaid/maternity/paternity) using Object.values(LeaveType).includes(...), unchanged by this fix.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The fix must clear the Semgrep CWE-79 findings under the exact scan configuration used in CI: `semgrep scan --config auto` (no custom local ruleset, no --exclude narrowing) as declared in .github/workflows/gestalt.yml. The success criterion is verified against this same command.",
+      "referencePath": ".github/workflows/gestalt.yml"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/app.ts \u2014 Fastify route registration",
+      "why": "app.ts registers policyRoutes via app.register(policyRoutes); the routes module's export signature and registered paths must remain compatible so app.ts needs no change."
+    },
+    {
+      "target": "src/modules/policy/policy.service.ts \u2014 PolicyService",
+      "why": "The routes file calls service.getById, service.getByLeaveType, and service.updatePolicy; the fix consumes these method return values unchanged and only changes how the result is projected into the response body."
+    },
+    {
+      "target": "CI Semgrep security scan (.github/workflows/gestalt.yml)",
+      "why": "The Semgrep --config auto scan is the gate that produced the three CWE-79 findings; the fix must result in zero CWE-79 findings on this file under that same scan."
+    }
+  ]
+}
