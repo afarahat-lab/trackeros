@@ -30,7 +30,7 @@ Represents a leave record managed by the `leave` module, including leave request
 |-------|------|----------|
 | id | string | true |
 | employeeId | string | true |
-| leaveTypeId | string | true |
+| leavePolicyId | string | true |
 | startDate | Date | true |
 | endDate | Date | true |
 | reason | string \| undefined | false |
@@ -48,17 +48,17 @@ Represents a leave record managed by the `leave` module, including leave request
 | Field | Type | Required |
 |-------|------|----------|
 | employeeId | string | true |
-| leaveTypeId | string | true |
-| startDate | Date | true |
-| endDate | Date | true |
+| leavePolicyId | string | true |
+| startDate | string | true |
+| endDate | string | true |
 | reason | string \| undefined | false |
 
 ### UpdateLeaveRequestDto
 
 | Field | Type | Required |
 |-------|------|----------|
-| startDate | Date | false |
-| endDate | Date | false |
+| status | LeaveRequestStatus \| undefined | false |
+| approvedBy | string \| undefined | false |
 | reason | string \| undefined | false |
 
 ### LeaveRequestQueryParams
@@ -131,25 +131,23 @@ Represents employee data managed by the `employee` module, including employee re
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
+**Repository operations** (`IEmployeeRepository`):
+- `findById(id)` → `Employee | null`
+- `findByEmail(email)` → `Employee | null`
+- `findAll()` → `Employee[]`
+- `create(Omit<Employee, 'id' | 'createdAt' | 'updatedAt'>)` → `Employee`
+- `update(id, Partial<Employee>)` → `Employee | null`
+
+**Service operations** (`IEmployeeService`):
+- `getById(id)` → `Employee | null`
+- `getByEmail(email)` → `Employee | null`
+- `getAll()` → `Employee[]`
+- `createEmployee(data)` → `Employee`
+- `updateEmployee(id, data)` → `Employee | null`
+
 ## policy
 
 Represents leave policy data managed by the `policy` module, including policy definitions, rules, and leave entitlement configurations.
-
-### Policy
-
-| Field | Type | Required |
-|-------|------|----------|
-| id | string | true |
-| policyName | string | true |
-| leaveType | string | true |
-| entitlementDays | number | true |
-| accrualRate | number | false |
-| maxAccumulation | number | false |
-| minimumNoticeDays | number | false |
-| requiresManagerApproval | boolean | true |
-| isActive | boolean | true |
-| createdAt | Date | true |
-| updatedAt | Date | true |
 
 ### LeaveType
 
@@ -168,15 +166,29 @@ Represents leave policy data managed by the `policy` module, including policy de
 |-------|------|----------|
 | id | string | true |
 | policyName | string | true |
-| leaveType | string | true |
+| leaveType | LeaveType | true |
 | entitlementDays | number | true |
-| accrualRate | number | false |
-| maxAccumulation | number | false |
-| minimumNoticeDays | number | false |
+| accrualRate | number \| undefined | false |
+| maxAccumulation | number \| undefined | false |
+| minimumNoticeDays | number \| undefined | false |
 | requiresManagerApproval | boolean | true |
 | isActive | boolean | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
+
+**Repository operations** (`ILeavePolicyRepository`):
+- `findById(id)` → `LeavePolicy | null`
+- `findByLeaveType(leaveType)` → `LeavePolicy | null`
+- `findAllActive()` → `LeavePolicy[]`
+- `create(Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>)` → `LeavePolicy`
+- `update(id, Partial<LeavePolicy>)` → `LeavePolicy | null`
+
+**HTTP endpoints** (`policyRoutes` registered in `src/app.ts`):
+- `GET /policies` — list all active policies
+- `GET /policies/:id` — get a single policy by ID
+- `GET /policies/type/:leaveType` — get the policy for a specific leave type
+- `POST /policies` — create a new leave policy
+- `PUT /policies/:id` — update an existing leave policy
 
 ## notification
 
