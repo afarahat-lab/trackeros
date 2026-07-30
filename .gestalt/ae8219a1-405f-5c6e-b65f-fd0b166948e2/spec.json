@@ -1,0 +1,150 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "balance"
+    ],
+    "affectedLayers": [
+      "data",
+      "tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The LeaveBalance domain interface is exported from the balance module model file and exposes the attributes id, employeeId, leavePolicyId, totalEntitlement, usedDays, remainingDays, fiscalYear, status, createdAt, updatedAt; status is typed as BalanceStatus imported from src/shared/types/index.ts.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The balance repository interface declares all five operations: findByEmployeeAndPolicy(employeeId, leavePolicyId) returning Promise<LeaveBalance | null>, findByEmployee(employeeId) returning Promise<LeaveBalance[]>, create(Omit<LeaveBalance,'id'|'createdAt'|'updatedAt'>) returning Promise<LeaveBalance>, update(id, Partial<LeaveBalance>) returning Promise<LeaveBalance | null>, and deductDays(id, days) returning Promise<LeaveBalance | null>.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The concrete repository class implements the balance repository interface and is constructible with no arguments (direct pool import from src/shared/db/connection.ts, no constructor injection); it persists and returns LeaveBalance rows for create, findByEmployeeAndPolicy, and findByEmployee.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "deductDays performs a single atomic UPDATE that decrements remaining_days and increments used_days by the same day count in one statement with a RETURNING clause, returning the updated LeaveBalance or null when no row matches the id.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "update builds a dynamic SET clause from the provided partial (only supplied fields, parameterized indices) and appends updated_at = NOW(); when the partial is empty it returns the current row without relying on a findById method (which the balance interface does not define); it returns null when no row matches the id.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests at tests/unit/modules/balance/balance.repository.test.ts mock the shared db connection module, construct the repository with no args, and assert exact SQL strings and parameter arrays via toHaveBeenCalledWith for each operation including the atomic deductDays UPDATE...RETURNING; tests cover found, not-found (null), and database-failure (typed error) cases.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The new balance module files compile under strict TypeScript (tsc --noEmit) with no implicit any and no unused/missing imports, and the Jest suite passes.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Follow the policy repository pattern: direct import of pool from ../../shared/db/connection, no constructor injection, constructed with new PgLeaveBalanceRepository() (no args). Do NOT use the employee pattern (constructor-injected Pool, path-mapped imports).",
+    "All SQL must use parameterized placeholders ($1, $2, ...); no string-interpolated user input. This satisfies the no-direct-db-outside-repository and input-safety rules and matches the policy repository.",
+    "Strict TypeScript: no implicit any, strict null checks. Use unknown with type guards for caught errors (error instanceof Error ? error.message : String(error)) as the policy repository does; never use any.",
+    "Database access must go through the repository layer only (GP-001). The balance repository is the sole component that issues SQL against the leave_balances table; no inline SQL elsewhere.",
+    "Tests must mock the connection module (../../../../src/shared/db/connection) exporting __mockQuery, use relative imports, construct the repository with no args, and assert exact SQL via toHaveBeenCalledWith \u2014 mirroring the policy test pattern, not the employee test pattern.",
+    "Module dependency rule: the balance module may import only from shared-types and the shared db connection; it must not import internals of other modules (employee, policy, leave). Per ARCHITECTURE, balance depends on policy and shared-types only at the service layer, not in this data-layer phase."
+  ],
+  "outOfScope": [
+    "Balance service, controller, and routes \u2014 this phase is the data layer only (model, repository interface, repository). Service orchestration and HTTP surface are later phases.",
+    "Audit logging (GP-002) for balance mutations \u2014 deductDays/update/create are repository-level persistence, not state-changing business operations requiring audit records; audit wiring belongs to the service/orchestration phase.",
+    "RBAC enforcement (GP-005) and API input validation (GP-003) \u2014 these apply at API boundaries; the repository has no HTTP surface in this phase.",
+    "Balance accrual logic, status transitions (ACTIVE\u2192EXHAUSTED\u2192FROZEN\u2192CLOSED), and restore-on-cancellation \u2014 these are business rules for the service phase; the repository only persists and reads.",
+    "A findById method on the balance repository interface \u2014 explicitly omitted by the spec; update must handle the empty-partial case inline without delegating to findById."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "A LeaveBalance is uniquely scoped per (employeeId, leavePolicyId, fiscalYear); the findByEmployeeAndPolicy lookup resolves a single balance or none, and the entity's remainingDays must equal totalEntitlement minus usedDays after any deductDays mutation (the atomic UPDATE preserves this relationship in one statement)."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "status is constrained to the BalanceStatus enum values (ACTIVE, EXHAUSTED, FROZEN, CLOSED) defined in src/shared/types/index.ts; the model types it as BalanceStatus and the repository maps the database status column back to that enum."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "findByEmployeeAndPolicy(employeeId, leavePolicyId)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the matching LeaveBalance or null when no row matches; on database failure throws a typed Error whose message identifies the operation and the underlying cause."
+    },
+    {
+      "operation": "findByEmployee(employeeId)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an array (possibly empty) of LeaveBalance rows for the employee; on database failure throws a typed Error identifying the operation and cause."
+    },
+    {
+      "operation": "create(balance: Omit<LeaveBalance,'id'|'createdAt'|'updatedAt'>)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Inserts a new leave_balances row and returns the persisted LeaveBalance with generated id/createdAt/updatedAt; on constraint violation or database failure throws a typed Error identifying the operation and cause."
+    },
+    {
+      "operation": "update(id, data: Partial<LeaveBalance>)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Applies only supplied fields via a dynamic parameterized SET clause with updated_at = NOW(); returns the updated LeaveBalance or null when no row matches the id; on database failure throws a typed Error identifying the operation and cause. The empty-partial case must not rely on a findById method."
+    },
+    {
+      "operation": "deductDays(id, days)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Executes a single atomic UPDATE that decrements remaining_days and increments used_days by the same count with a RETURNING clause; returns the updated LeaveBalance or null when no row matches the id; on database failure throws a typed Error identifying the operation and cause. The decrement and increment must occur in one statement so the balance cannot be observed in an inconsistent intermediate state."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The balance repository must match the policy repository's structural conventions: direct `import { pool } from '../../shared/db/connection'`, no constructor injection, constructed with `new PgLeaveBalanceRepository()` (no args), try/catch with `error instanceof Error ? error.message : String(error)` rethrown as a typed Error, and a private row-to-entity mapper.",
+      "referencePath": "src/modules/policy/policy.repository.ts"
+    },
+    {
+      "requirement": "The update method's dynamic SET-clause construction (parameterized indices, appended updated_at = NOW(), id as the final positional parameter) must follow the policy repository's update implementation, except the empty-partial branch must be self-contained (no findById delegation) since the balance interface omits findById.",
+      "referencePath": "src/modules/policy/policy.repository.ts"
+    },
+    {
+      "requirement": "The LeaveBalance model's status field and the repository's status mapping must use the BalanceStatus enum exported from src/shared/types/index.ts (ACTIVE, EXHAUSTED, FROZEN, CLOSED) \u2014 do not redefine or duplicate the enum.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The repository must obtain its pg Pool via the exported `pool` from src/shared/db/connection.ts (the same shared connection the policy repository uses); it must not instantiate its own Pool.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "The balance repository test must mirror the policy test's mocking strategy: jest.mock on '../../../../src/shared/db/connection' exporting __mockQuery, relative imports of the repository and model, no-arg construction, and exact-SQL assertions via toHaveBeenCalledWith \u2014 not the employee test's pg-module mock or constructor-injection pattern.",
+      "referencePath": "tests/unit/modules/policy/policy.repository.test.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/db/connection.ts (pg pool)",
+      "why": "The repository executes all SQL through the shared pool export; this is the sole database integration for the balance data layer."
+    },
+    {
+      "target": "src/shared/types/index.ts (BalanceStatus enum)",
+      "why": "The LeaveBalance model and repository status mapping depend on the already-defined BalanceStatus enum; this phase consumes but does not modify it."
+    },
+    {
+      "target": "leave_balances table (PostgreSQL schema)",
+      "why": "The repository persists against the leave_balances table whose columns (id, employee_id, leave_policy_id, total_entitlement, used_days, remaining_days, fiscal_year, status, created_at, updated_at) and FKs to employees/leave_policies define the row mapping the repository must satisfy."
+    },
+    {
+      "target": "src/modules/leave/leave.service.ts (future LeaveService)",
+      "why": "Per PLAN.md Phase 6, the future LeaveService will call balanceRepository.deductDays() on approval; the deductDays atomic semantics established here are the contract that later orchestration relies on. This phase only defines the contract, not the wiring."
+    }
+  ]
+}
