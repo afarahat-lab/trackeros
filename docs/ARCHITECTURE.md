@@ -24,6 +24,8 @@ src/modules/employee/employee.service.ts
 src/modules/policy/policy.model.ts
 src/modules/policy/policy.repository.interface.ts
 src/modules/policy/policy.repository.ts
+src/modules/policy/policy.service.ts
+src/modules/policy/policy.routes.ts
 src/modules/status/status.model.ts
 src/modules/status/status.service.interface.ts
 src/modules/status/status.service.ts
@@ -52,6 +54,13 @@ src/shared/types/index.ts   — shared enums & DTOs (LeaveType, LeaveRequestStat
   / ORM calls in route handlers or business logic
 - No circular dependencies between modules
 
+## Registered routes
+
+`src/app.ts` registers the following Fastify route plugins:
+
+- `uptimeRoutes` — health-check endpoint (`/uptime`)
+- `policyRoutes` — leave policy CRUD endpoints (`/policies`, `/policies/:id`, `/policies/type/:leaveType`)
+
 <!-- gestalt:architecture feature=a0c317ce-afc7-4193-9ad3-7e886e228148 START -->
 ## Leave Management Module
 
@@ -76,7 +85,7 @@ src/
   shared/types/          # LeaveType, LeaveRequestStatus, BalanceStatus, DTOs
   modules/
     employee/            # Employee model, repository interface, repository, service
-    policy/              # LeavePolicy model, repository interface, repository
+    policy/              # LeavePolicy model, repository interface, repository, service, routes
     balance/             # LeaveBalance model, repository, service
     leave/               # LeaveRequest model, repository, service, controller, routes
     audit/               # AuditLog model, repository, service
@@ -98,6 +107,15 @@ src/
 
 ### API Endpoints (Fastify Routes)
 All endpoints enforce RBAC (GP-005) and validate inputs (GP-003).
+
+**Policy endpoints** (implemented — `src/modules/policy/policy.routes.ts`):
+- `GET /policies` — list all active policies.
+- `GET /policies/:id` — get a single policy by ID.
+- `GET /policies/type/:leaveType` — get the policy for a specific leave type.
+- `POST /policies` — create a new leave policy.
+- `PUT /policies/:id` — update an existing leave policy.
+
+**Leave request endpoints** (planned):
 - `POST /leave/requests` — submit a new leave request (employee).
 - `GET /leave/requests` — list own requests (employee) or pending for manager (manager).
 - `GET /leave/requests/:id` — get request details.
@@ -105,7 +123,6 @@ All endpoints enforce RBAC (GP-005) and validate inputs (GP-003).
 - `PATCH /leave/requests/:id/reject` — reject (manager).
 - `PATCH /leave/requests/:id/cancel` — cancel (employee).
 - `GET /leave/balances` — get own balances (employee).
-- `GET /leave/policies` — list active policies.
 
 ### Integration Points
 - **Audit (GP-002):** Every state change in LeaveService calls `IAuditService.record()`.
