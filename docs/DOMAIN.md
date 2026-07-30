@@ -125,12 +125,13 @@ Represents employee data managed by the `employee` module. Built in Phase 2.
 | Field | Type | Required |
 |-------|------|----------|
 | id | string | true |
+| employeeCode | string | true |
+| firstName | string | true |
+| lastName | string | true |
 | email | string | true |
-| fullName | string | true |
-| role | string | true |
 | managerId | string \| null | false |
-| department | string | true |
-| employmentStatus | 'ACTIVE' \| 'INACTIVE' \| 'TERMINATED' | true |
+| role | 'EMPLOYEE' \| 'MANAGER' \| 'HR_ADMIN' | true |
+| isActive | boolean | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
@@ -145,7 +146,7 @@ Extends `BaseEntity` from `src/shared/types/index.ts`.
 | findManagerId | `(employeeId: string) => Promise<string \| null>` |
 | findHrAdmins | `() => Promise<Employee[]>` |
 
-Implemented by `EmployeeRepository` using the pg pool from `src/shared/db/connection.ts`. Row mapping uses a type guard (`isEmployeeRow`) to validate database rows before mapping to the domain model.
+Implemented by `EmployeeRepository` using the pg pool from `src/shared/db/connection.ts`. Row mapping uses a type guard (`isEmployeeRow`) to validate database rows before mapping to the domain model. Role values are validated through `isValidRole` with fallback to `'EMPLOYEE'`.
 
 ## policy
 

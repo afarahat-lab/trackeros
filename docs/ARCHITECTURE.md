@@ -18,7 +18,7 @@ The architecture is modular, with a clear separation of concerns between models,
 ```
 src/modules/leave/leave.{model,repository,service,controller,routes}.ts
 src/modules/balance/balance.{model,repository,service,controller,routes}.ts
-src/modules/employee/employee.{model,repository,service,controller,routes}.ts
+src/modules/employee/employee.{model,repository}.ts
 src/modules/policy/policy.{model,repository,service,controller,routes}.ts
 src/modules/notification/notification.{model,repository,service,controller,routes}.ts
 src/modules/LeaveStatus/    — LeaveStatus module
@@ -61,7 +61,7 @@ The Leave Management module enables employees to apply for annual, sick, emergen
 - **LeavePolicy** — Rules for a leave type: entitlement days, accrual, max accumulation, minimum notice, approval requirement, etc. Lifecycle: `ACTIVE`, `INACTIVE`.
 - **LeaveBalance** — Tracks an employee's entitlement, used, pending, and remaining days for a leave type and fiscal year. Status: `ACTIVE`, `EXHAUSTED`, `FROZEN`.
 - **LeaveRequestStatus** — Enum: `DRAFT`, `SUBMITTED`, `APPROVED`, `REJECTED`, `CANCELLED`.
-- **Employee** — External entity referenced by leave; includes `employmentStatus` (`ACTIVE`, `INACTIVE`, `TERMINATED`) and `managerId`.
+- **Employee** — External entity referenced by leave; includes `role` (`'EMPLOYEE' | 'MANAGER' | 'HR_ADMIN'`), `isActive` (boolean), and `managerId` (string | null).
 
 ### Business Rules (Binding)
 1. `startDate ≤ endDate`; violation prevents submission.
@@ -73,7 +73,7 @@ The Leave Management module enables employees to apply for annual, sick, emergen
 7. If `minimumNoticeDays` set, `startDate` must be at least that many days after submission timestamp.
 8. Only owning employee may submit/cancel `DRAFT`/`SUBMITTED`; only manager may approve/reject/cancel `APPROVED`.
 9. `DRAFT` editable; `SUBMITTED` immutable except status.
-10. Cannot submit if employee `employmentStatus` is `INACTIVE` or `TERMINATED`.
+10. Cannot submit if employee `isActive` is `false`.
 11. Fiscal year = calendar year of `startDate`; balance matched on `(employeeId, leaveType, fiscalYear)`. If no balance exists, create from policy before approval.
 12. No overlapping `SUBMITTED`/`APPROVED` requests for same employee.
 13. Manager cannot approve/reject own request; if no manager and approval required, escalation rule TBD (see open questions).
@@ -103,7 +103,7 @@ All dependencies flow inward; no circular edges.
 - **leave_requests**: `id`, `employee_id`, `leave_type`, `start_date`, `end_date`, `status`, `reason`, `approved_by`, `approved_at`, `cancelled_at`, `rejection_reason`, `created_at`, `updated_at`
 - **leave_balances**: `id`, `employee_id`, `leave_type`, `year`, `total_allocated`, `used_days`, `pending_days`, `status`, `created_at`, `updated_at`
 - **leave_policies**: `id`, `leave_type`, `policy_name`, `entitlement_days`, `max_consecutive_days`, `max_accumulation`, `minimum_notice_days`, `requires_manager_approval`, `requires_attachment`, `allow_negative_balance`, `accrual_enabled`, `accrual_rate_per_month`, `is_active`, `created_at`, `updated_at`
-- **employees**: `id`, `email`, `full_name`, `role`, `manager_id`, `department`, `employment_status`, `created_at`, `updated_at`
+- **employees**: `id`, `employee_code`, `first_name`, `last_name`, `email`, `manager_id`, `role`, `is_active`, `created_at`, `updated_at`
 - **audit_logs**: `id`, `entity_type`, `entity_id`, `action`, `actor_id`, `changes`, `timestamp`
 
 ### Implementation Phases
