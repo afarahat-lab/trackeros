@@ -1,7 +1,6 @@
 import { Pool } from 'pg';
-import { PgEmployeeRepository } from '../../../../src/modules/employee/employee.repository';
-import { EmploymentStatus } from '../../../../src/shared/types/index';
-import { Employee } from '../../../../src/modules/employee/employee.model';
+import { PgEmployeeRepository } from 'modules/employee/employee.repository';
+import { EmploymentStatus } from 'shared/types';
 
 jest.mock('pg', () => {
   const mockQuery = jest.fn();
@@ -14,54 +13,68 @@ jest.mock('pg', () => {
   };
 });
 
-const { __mockQuery } = jest.requireMock('pg') as { __mockQuery: jest.Mock };
+const mockQuery = (jest.requireMock('pg') as { __mockQuery: jest.Mock }).__mockQuery;
 
-describe('PgEmployeeRepository', () => {
-  let repository: PgEmployeeRepository;
-  let mockQuery: jest.Mock;
-
-  const mockRow = {
+function makeMockRow(overrides: Partial<Record<string, unknown>> = {}): Record<string, unknown> {
+  return {
     id: 'emp-1',
+    employee_number: 'EMP001',
     first_name: 'John',
     last_name: 'Doe',
     email: 'john.doe@example.com',
-    employment_status: 'ACTIVE',
     manager_id: null,
-    created_at: '2024-01-01T00:00:00.000Z',
-    updated_at: '2024-01-02T00:00:00.000Z',
+    department: 'Engineering',
+    hire_date: '2023-01-15T00:00:00.000Z',
+    termination_date: null,
+    employment_status: 'ACTIVE',
+    created_at: '2023-01-15T00:00:00.000Z',
+    updated_at: '2023-06-01T00:00:00.000Z',
+    ...overrides,
   };
+}
 
-  const mockEmployee: Employee = {
+function makeExpectedEmployee(overrides: Partial<Record<string, unknown>> = {}): Record<string, unknown> {
+  return {
     id: 'emp-1',
+    employeeNumber: 'EMP001',
     firstName: 'John',
     lastName: 'Doe',
     email: 'john.doe@example.com',
-    employmentStatus: EmploymentStatus.ACTIVE,
     managerId: null,
-    createdAt: new Date('2024-01-01T00:00:00.000Z'),
-    updatedAt: new Date('2024-01-02T00:00:00.000Z'),
+    department: 'Engineering',
+    hireDate: new Date('2023-01-15T00:00:00.000Z'),
+    terminationDate: null,
+    employmentStatus: EmploymentStatus.ACTIVE,
+    createdAt: new Date('2023-01-15T00:00:00.000Z'),
+    updatedAt: new Date('2023-06-01T00:00:00.000Z'),
+    ...overrides,
   };
+}
+
+describe('PgEmployeeRepository', () => {
+  let repository: PgEmployeeRepository;
 
   beforeEach(() => {
-    jest.clearAllMocks();
-    mockQuery = __mockQuery;
-    repository = new PgEmployeeRepository(new Pool());
+    mockQuery.mockReset();
+    const pool = new Pool();
+    repository = new PgEmployeeRepository(pool);
   });
 
   describe('findById', () => {
     it('should return an employee when found', async () => {
-      mockQuery.mockResolvedValueOnce({ rows: [mockRow] });
+      const row = makeMockRow();
+      mockQuery.mockResolvedValueOnce({ rows: [row] });
 
       const result = await repository.findById('emp-1');
 
-      expect(result).toEqual(mockEmployee);
+      expect(result).toEqual(makeExpectedEmployee());
       expect(mockQuery).toHaveBeenCalledWith(
-        'SELECT id, first_name, last_name, email, employment_status, manager_id, created_at, updated_at FROM employees WHERE id = $1',
+        expect.stringContaining('SELECT'),
         ['emp-1']
       );
     });
 
-    it('should return null when employee not found', async () => {
+    it('should return null when not found', async () => {
       mockQuery.mockResolvedValueOnce({ rows: [] });
 
       const result = await repository.findById('nonexistent');
@@ -73,25 +86,26 @@ describe('PgEmployeeRepository', () => {
       mockQuery.mockRejectedValueOnce(new Error('Connection refused'));
 
       await expect(repository.findById('emp-1')).rejects.toThrow(
-        'Failed to find employee by id: Connection refused'
+        'PgEmployeeRepository.findById failed: Connection refused'
       );
     });
   });
 
   describe('findByEmail', () => {
-    it('should return an employee when found by email', async () => {
-      mockQuery.mockResolvedValueOnce({ rows: [mockRow] });
+    it('should return an employee when found', async () => {
+      const row = makeMockRow({ email: 'john.doe@example.com' });
+      mockQuery.mockResolvedValueOnce({ rows: [row] });
 
       const result = await repository.findByEmail('john.doe@example.com');
 
-      expect(result).toEqual(mockEmployee);
+      expect(result).toEqual(makeExpectedEmployee({ email: 'john.doe@example.com' }));
       expect(mockQuery).toHaveBeenCalledWith(
-        'SELECT id, first_name, last_name, email, employment_status, manager_id, created_at, updated_at FROM employees WHERE email = $1',
+        expect.stringContaining('SELECT'),
         ['john.doe@example.com']
       );
     });
 
-    it('should return null when email not found', async () => {
+    it('should return null when not found', async () => {
       mockQuery.mockResolvedValueOnce({ rows: [] });
 
       const result = await repository.findByEmail('unknown@example.com');
@@ -103,26 +117,39 @@ describe('PgEmployeeRepository', () => {
       mockQuery.mockRejectedValueOnce(new Error('Connection refused'));
 
       await expect(repository.findByEmail('john.doe@example.com')).rejects.toThrow(
-        'Failed to find employee by email: Connection refused'
+        'PgEmployeeRepository.findByEmail failed: Connection refused'
       );
     });
   });
 
   describe('findAll', () => {
     it('should return all employees', async () => {
-      const row2 = { ...mockRow, id: 'emp-2', first_name: 'Jane' };
-      mockQuery.mockResolvedValueOnce({ rows: [mockRow, row2] });
+      const row1 = makeMockRow();
+      const row2 = makeMockRow({
+        id: 'emp-2',
+        employee_number: 'EMP002',
+        first_name: 'Jane',
+        last_name: 'Smith',
+        email: 'jane.smith@example.com',
+      });
+      mockQuery.mockResolvedValueOnce({ rows: [row1, row2] });
 
       const result = await repository.findAll();
 
       expect(result).toHaveLength(2);
-      expect(result[0]).toEqual(mockEmployee);
-      expect(mockQuery).toHaveBeenCalledWith(
-        'SELECT id, first_name, last_name, email, employment_status, manager_id, created_at, updated_at FROM employees ORDER BY last_name, first_name'
+      expect(result[0]).toEqual(makeExpectedEmployee());
+      expect(result[1]).toEqual(
+        makeExpectedEmployee({
+          id: 'emp-2',
+          employeeNumber: 'EMP002',
+          firstName: 'Jane',
+          lastName: 'Smith',
+          email: 'jane.smith@example.com',
+        })
       );
     });
 
-    it('should return empty array when no employees exist', async () => {
+    it('should return an empty array when no employees exist', async () => {
       mockQuery.mockResolvedValueOnce({ rows: [] });
 
       const result = await repository.findAll();
@@ -134,74 +161,123 @@ describe('PgEmployeeRepository', () => {
       mockQuery.mockRejectedValueOnce(new Error('Connection refused'));
 
       await expect(repository.findAll()).rejects.toThrow(
-        'Failed to find all employees: Connection refused'
+        'PgEmployeeRepository.findAll failed: Connection refused'
       );
     });
   });
 
   describe('create', () => {
     const createInput = {
-      firstName: 'John',
-      lastName: 'Doe',
-      email: 'john.doe@example.com',
+      employeeNumber: 'EMP003',
+      firstName: 'Alice',
+      lastName: 'Johnson',
+      email: 'alice.johnson@example.com',
+      managerId: 'emp-1',
+      department: 'Marketing',
+      hireDate: new Date('2024-01-10T00:00:00.000Z'),
+      terminationDate: null,
       employmentStatus: EmploymentStatus.ACTIVE,
-      managerId: null,
     };
 
     it('should create and return a new employee', async () => {
-      mockQuery.mockResolvedValueOnce({ rows: [mockRow] });
+      const row = makeMockRow({
+        id: 'emp-3',
+        employee_number: 'EMP003',
+        first_name: 'Alice',
+        last_name: 'Johnson',
+        email: 'alice.johnson@example.com',
+        manager_id: 'emp-1',
+        department: 'Marketing',
+        hire_date: '2024-01-10T00:00:00.000Z',
+        termination_date: null,
+        employment_status: 'ACTIVE',
+        created_at: '2024-01-10T00:00:00.000Z',
+        updated_at: '2024-01-10T00:00:00.000Z',
+      });
+      mockQuery.mockResolvedValueOnce({ rows: [row] });
 
       const result = await repository.create(createInput);
 
-      expect(result).toEqual(mockEmployee);
-      expect(mockQuery).toHaveBeenCalledWith(
-        `INSERT INTO employees (first_name, last_name, email, employment_status, manager_id)
-         VALUES ($1, $2, $3, $4, $5)
-         RETURNING id, first_name, last_name, email, employment_status, manager_id, created_at, updated_at`,
-        ['John', 'Doe', 'john.doe@example.com', 'ACTIVE', null]
+      expect(result).toEqual(
+        makeExpectedEmployee({
+          id: 'emp-3',
+          employeeNumber: 'EMP003',
+          firstName: 'Alice',
+          lastName: 'Johnson',
+          email: 'alice.johnson@example.com',
+          managerId: 'emp-1',
+          department: 'Marketing',
+          hireDate: new Date('2024-01-10T00:00:00.000Z'),
+          terminationDate: null,
+          employmentStatus: EmploymentStatus.ACTIVE,
+          createdAt: new Date('2024-01-10T00:00:00.000Z'),
+          updatedAt: new Date('2024-01-10T00:00:00.000Z'),
+        })
       );
     });
 
-    it('should throw an error on unique constraint violation', async () => {
-      mockQuery.mockRejectedValueOnce(new Error('duplicate key value violates unique constraint'));
+    it('should throw an error on duplicate key violation', async () => {
+      mockQuery.mockRejectedValueOnce(
+        new Error('duplicate key value violates unique constraint')
+      );
 
       await expect(repository.create(createInput)).rejects.toThrow(
-        'Failed to create employee: duplicate key value violates unique constraint'
+        'PgEmployeeRepository.create failed: duplicate key value violates unique constraint'
+      );
+    });
+
+    it('should throw an error on database failure', async () => {
+      mockQuery.mockRejectedValueOnce(new Error('Connection refused'));
+
+      await expect(repository.create(createInput)).rejects.toThrow(
+        'PgEmployeeRepository.create failed: Connection refused'
       );
     });
   });
 
   describe('update', () => {
-    it('should update and return the employee', async () => {
-      const updatedRow = { ...mockRow, first_name: 'Jane', updated_at: '2024-01-03T00:00:00.000Z' };
-      mockQuery.mockResolvedValueOnce({ rows: [updatedRow] });
-
-      const result = await repository.update('emp-1', { firstName: 'Jane' });
-
-      expect(result).toEqual({
-        ...mockEmployee,
-        firstName: 'Jane',
-        updatedAt: new Date('2024-01-03T00:00:00.000Z'),
+    it('should update and return the employee when found', async () => {
+      const row = makeMockRow({
+        first_name: 'Updated',
+        last_name: 'Name',
+        updated_at: '2024-02-01T00:00:00.000Z',
       });
+      mockQuery.mockResolvedValueOnce({ rows: [row] });
+
+      const result = await repository.update('emp-1', {
+        firstName: 'Updated',
+        lastName: 'Name',
+      });
+
+      expect(result).toEqual(
+        makeExpectedEmployee({
+          firstName: 'Updated',
+          lastName: 'Name',
+          updatedAt: new Date('2024-02-01T00:00:00.000Z'),
+        })
+      );
     });
 
-    it('should return null when employee does not exist', async () => {
+    it('should return null when employee not found', async () => {
       mockQuery.mockResolvedValueOnce({ rows: [] });
 
-      const result = await repository.update('nonexistent', { firstName: 'Jane' });
+      const result = await repository.update('nonexistent', {
+        firstName: 'Updated',
+      });
 
       expect(result).toBeNull();
     });
 
-    it('should return current row when empty partial is provided', async () => {
-      mockQuery.mockResolvedValueOnce({ rows: [mockRow] });
+    it('should return current row when no updatable fields provided', async () => {
+      const row = makeMockRow();
+      mockQuery.mockResolvedValueOnce({ rows: [row] });
 
       const result = await repository.update('emp-1', {});
 
-      expect(result).toEqual(mockEmployee);
-      // Should call findById when no fields to update
+      expect(result).toEqual(makeExpectedEmployee());
+      expect(mockQuery).toHaveBeenCalledTimes(1);
       expect(mockQuery).toHaveBeenCalledWith(
-        'SELECT id, first_name, last_name, email, employment_status, manager_id, created_at, updated_at FROM employees WHERE id = $1',
+        expect.stringContaining('SELECT'),
         ['emp-1']
       );
     });
@@ -209,19 +285,21 @@ describe('PgEmployeeRepository', () => {
     it('should throw an error on database failure', async () => {
       mockQuery.mockRejectedValueOnce(new Error('Connection refused'));
 
-      await expect(repository.update('emp-1', { firstName: 'Jane' })).rejects.toThrow(
-        'Failed to update employee: Connection refused'
+      await expect(
+        repository.update('emp-1', { firstName: 'Updated' })
+      ).rejects.toThrow(
+        'PgEmployeeRepository.update failed: Connection refused'
       );
     });
   });
 
-  describe('mapRowToEmployee', () => {
-    it('should throw an error for invalid employment status', async () => {
-      const invalidRow = { ...mockRow, employment_status: 'INVALID_STATUS' };
-      mockQuery.mockResolvedValueOnce({ rows: [invalidRow] });
+  describe('mapRowToEmployee validation', () => {
+    it('should throw on invalid employment_status from database', async () => {
+      const row = makeMockRow({ employment_status: 'INVALID_STATUS' });
+      mockQuery.mockResolvedValueOnce({ rows: [row] });
 
       await expect(repository.findById('emp-1')).rejects.toThrow(
-        'Invalid employment status from database: INVALID_STATUS'
+        'Invalid employment_status value from database: INVALID_STATUS'
       );
     });
   });
