@@ -4,6 +4,8 @@ import { ILeaveBalanceRepository } from './balance.repository.interface';
 import { BalanceStatus } from '../../shared/types/index';
 
 export class PgLeaveBalanceRepository implements ILeaveBalanceRepository {
+  private static readonly VALID_STATUSES: ReadonlySet<string> = new Set(Object.values(BalanceStatus));
+
   async findByEmployeeAndPolicy(employeeId: string, leavePolicyId: string): Promise<LeaveBalance | null> {
     try {
       const result = await pool.query(
@@ -137,6 +139,10 @@ export class PgLeaveBalanceRepository implements ILeaveBalanceRepository {
   }
 
   private mapRowToBalance(row: Record<string, unknown>): LeaveBalance {
+    const rawStatus = row.status as string;
+    if (!PgLeaveBalanceRepository.VALID_STATUSES.has(rawStatus)) {
+      throw new Error(`Invalid balance status from database: ${rawStatus}`);
+    }
     return {
       id: row.id as string,
       employeeId: row.employee_id as string,
@@ -145,7 +151,7 @@ export class PgLeaveBalanceRepository implements ILeaveBalanceRepository {
       usedDays: Number(row.used_days),
       remainingDays: Number(row.remaining_days),
       fiscalYear: Number(row.fiscal_year),
-      status: row.status as BalanceStatus,
+      status: rawStatus as BalanceStatus,
       createdAt: new Date(row.created_at as string),
       updatedAt: new Date(row.updated_at as string),
     };

@@ -69,6 +69,14 @@ describe('PgLeaveBalanceRepository', () => {
         'Failed to find balance by employee and policy: DB error'
       );
     });
+
+    it('should throw an error when status is invalid', async () => {
+      const invalidRow = { ...sampleRow, status: 'INVALID' };
+      mockQuery.mockResolvedValueOnce({ rows: [invalidRow] });
+      await expect(repository.findByEmployeeAndPolicy('emp-1', 'pol-1')).rejects.toThrow(
+        'Invalid balance status from database: INVALID'
+      );
+    });
   });
 
   describe('findByEmployee', () => {
