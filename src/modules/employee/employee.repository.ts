@@ -1,15 +1,16 @@
 import { Pool } from 'pg';
-import { pool } from 'shared/db/connection';
+import { pool } from '../../shared/db/connection';
 import { Employee } from './employee.model';
 
 interface EmployeeRow {
   id: string;
+  employee_code: string;
+  first_name: string;
+  last_name: string;
   email: string;
-  full_name: string;
-  role: string;
   manager_id: string | null;
-  department: string;
-  employment_status: string;
+  role: string;
+  is_active: boolean;
   created_at: Date;
   updated_at: Date;
 }
@@ -19,26 +20,32 @@ function isEmployeeRow(row: unknown): row is EmployeeRow {
   const r = row as Record<string, unknown>;
   return (
     typeof r.id === 'string' &&
+    typeof r.employee_code === 'string' &&
+    typeof r.first_name === 'string' &&
+    typeof r.last_name === 'string' &&
     typeof r.email === 'string' &&
-    typeof r.full_name === 'string' &&
-    typeof r.role === 'string' &&
     (r.manager_id === null || typeof r.manager_id === 'string') &&
-    typeof r.department === 'string' &&
-    typeof r.employment_status === 'string' &&
+    typeof r.role === 'string' &&
+    typeof r.is_active === 'boolean' &&
     r.created_at instanceof Date &&
     r.updated_at instanceof Date
   );
 }
 
+function isValidRole(role: string): role is Employee['role'] {
+  return role === 'EMPLOYEE' || role === 'MANAGER' || role === 'HR_ADMIN';
+}
+
 function mapRowToEmployee(row: EmployeeRow): Employee {
   return {
     id: row.id,
+    employeeCode: row.employee_code,
+    firstName: row.first_name,
+    lastName: row.last_name,
     email: row.email,
-    fullName: row.full_name,
-    role: row.role,
     managerId: row.manager_id,
-    department: row.department,
-    employmentStatus: row.employment_status as Employee['employmentStatus'],
+    role: isValidRole(row.role) ? row.role : 'EMPLOYEE',
+    isActive: row.is_active,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -60,7 +67,7 @@ export class EmployeeRepository implements IEmployeeRepository {
 
   async findById(id: string): Promise<Employee | null> {
     const result = await this.db.query(
-      'SELECT id, email, full_name, role, manager_id, department, employment_status, created_at, updated_at FROM employees WHERE id = $1',
+      'SELECT id, employee_code, first_name, last_name, email, manager_id, role, is_active, created_at, updated_at FROM employees WHERE id = $1',
       [id]
     );
     if (result.rows.length === 0) return null;
@@ -71,7 +78,7 @@ export class EmployeeRepository implements IEmployeeRepository {
 
   async findByEmail(email: string): Promise<Employee | null> {
     const result = await this.db.query(
-      'SELECT id, email, full_name, role, manager_id, department, employment_status, created_at, updated_at FROM employees WHERE email = $1',
+      'SELECT id, employee_code, first_name, last_name, email, manager_id, role, is_active, created_at, updated_at FROM employees WHERE email = $1',
       [email]
     );
     if (result.rows.length === 0) return null;
@@ -92,7 +99,7 @@ export class EmployeeRepository implements IEmployeeRepository {
 
   async findHrAdmins(): Promise<Employee[]> {
     const result = await this.db.query(
-      "SELECT id, email, full_name, role, manager_id, department, employment_status, created_at, updated_at FROM employees WHERE role = 'HR_ADMIN'"
+      "SELECT id, employee_code, first_name, last_name, email, manager_id, role, is_active, created_at, updated_at FROM employees WHERE role = 'HR_ADMIN'"
     );
     return result.rows.filter(isEmployeeRow).map(mapRowToEmployee);
   }

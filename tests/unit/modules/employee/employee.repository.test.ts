@@ -4,12 +4,13 @@ import { Employee } from 'modules/employee/employee.model';
 function makeEmployeeRow(overrides: Partial<Record<string, unknown>> = {}) {
   return {
     id: overrides.id ?? 'emp-1',
+    employee_code: overrides.employee_code ?? 'EMP001',
+    first_name: overrides.first_name ?? 'Alice',
+    last_name: overrides.last_name ?? 'Smith',
     email: overrides.email ?? 'alice@example.com',
-    full_name: overrides.full_name ?? 'Alice Smith',
     role: overrides.role ?? 'EMPLOYEE',
     manager_id: overrides.manager_id !== undefined ? overrides.manager_id : 'mgr-1',
-    department: overrides.department ?? 'Engineering',
-    employment_status: overrides.employment_status ?? 'ACTIVE',
+    is_active: overrides.is_active !== undefined ? overrides.is_active : true,
     created_at: overrides.created_at ?? new Date('2026-01-01'),
     updated_at: overrides.updated_at ?? new Date('2026-06-15'),
   };
@@ -18,12 +19,13 @@ function makeEmployeeRow(overrides: Partial<Record<string, unknown>> = {}) {
 function expectedEmployee(overrides: Partial<Employee> = {}): Employee {
   return {
     id: 'emp-1',
+    employeeCode: 'EMP001',
+    firstName: 'Alice',
+    lastName: 'Smith',
     email: 'alice@example.com',
-    fullName: 'Alice Smith',
     role: 'EMPLOYEE',
     managerId: 'mgr-1',
-    department: 'Engineering',
-    employmentStatus: 'ACTIVE',
+    isActive: true,
     createdAt: new Date('2026-01-01'),
     updatedAt: new Date('2026-06-15'),
     ...overrides,
@@ -62,7 +64,7 @@ describe('EmployeeRepository', () => {
 
     it('should return null when the row fails the type guard', async () => {
       mockQuery.mockResolvedValueOnce({
-        rows: [{ id: 'x', email: null, full_name: null, role: null, manager_id: null, department: null, employment_status: null, created_at: null, updated_at: null }],
+        rows: [{ id: 'x', employee_code: null, first_name: null, last_name: null, email: null, role: null, manager_id: null, is_active: null, created_at: null, updated_at: null }],
       });
 
       const result = await repo.findById('bad-row');
@@ -146,15 +148,15 @@ describe('EmployeeRepository', () => {
 
   describe('findHrAdmins', () => {
     it('should return all employees with HR_ADMIN role', async () => {
-      const hrRow1 = makeEmployeeRow({ id: 'hr-1', role: 'HR_ADMIN', full_name: 'HR One' });
-      const hrRow2 = makeEmployeeRow({ id: 'hr-2', role: 'HR_ADMIN', full_name: 'HR Two' });
+      const hrRow1 = makeEmployeeRow({ id: 'hr-1', role: 'HR_ADMIN', first_name: 'HR', last_name: 'One' });
+      const hrRow2 = makeEmployeeRow({ id: 'hr-2', role: 'HR_ADMIN', first_name: 'HR', last_name: 'Two' });
       mockQuery.mockResolvedValueOnce({ rows: [hrRow1, hrRow2] });
 
       const result = await repo.findHrAdmins();
 
       expect(result).toHaveLength(2);
-      expect(result[0]).toEqual(expectedEmployee({ id: 'hr-1', fullName: 'HR One', role: 'HR_ADMIN' }));
-      expect(result[1]).toEqual(expectedEmployee({ id: 'hr-2', fullName: 'HR Two', role: 'HR_ADMIN' }));
+      expect(result[0]).toEqual(expectedEmployee({ id: 'hr-1', firstName: 'HR', lastName: 'One', role: 'HR_ADMIN' }));
+      expect(result[1]).toEqual(expectedEmployee({ id: 'hr-2', firstName: 'HR', lastName: 'Two', role: 'HR_ADMIN' }));
     });
 
     it('should return an empty array when no HR admins exist', async () => {
@@ -166,7 +168,7 @@ describe('EmployeeRepository', () => {
     });
 
     it('should filter out rows that fail the type guard', async () => {
-      const badRow = { id: 'bad', email: null, full_name: null, role: 'HR_ADMIN', manager_id: null, department: null, employment_status: null, created_at: null, updated_at: null };
+      const badRow = { id: 'bad', employee_code: null, first_name: null, last_name: null, email: null, role: 'HR_ADMIN', manager_id: null, is_active: null, created_at: null, updated_at: null };
       const goodRow = makeEmployeeRow({ id: 'hr-1', role: 'HR_ADMIN' });
       mockQuery.mockResolvedValueOnce({ rows: [badRow, goodRow] });
 
