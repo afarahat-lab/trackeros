@@ -90,10 +90,24 @@ src/
     employee/            # Employee model, repository interface, repository, service
     policy/              # LeavePolicy model, repository interface, repository, service, routes
     balance/             # LeaveBalance model, repository interface, repository
-    leave/               # LeaveRequest model, repository, service, controller, routes
-    audit/               # AuditLog model, repository, service
-    notification/        # Notification service (email/in-app)
+    leave/               # LeaveRequest model, repository interface, repository (built — Phase 5)
+    audit/               # AuditLog model, repository, service (planned)
+    notification/        # Notification service (planned)
 ```
+
+### Build Status (per phase)
+| Phase | What | Status |
+|-------|------|--------|
+| 1 | Shared types (`src/shared/types/index.ts`) | ✅ Built |
+| 2 | Employee module (model, repository interface, repository, service) | ✅ Built |
+| 3 | LeavePolicy module (model, repository interface, repository, service, routes) | ✅ Built |
+| 4 | LeaveBalance module (model, repository interface, repository) | ✅ Built |
+| 5 | LeaveRequest data layer (model, repository interface, repository) | ✅ Built |
+| 6 | LeaveService — business logic | Planned |
+| 7 | LeaveController + leaveRoutes — HTTP surface | Planned |
+| 8 | Audit module (model, repository interface, repository) | Planned |
+| 9 | AuditService + integration into LeaveService | Planned |
+| 10 | Notification module + final wiring | Planned |
 
 ### Dependencies
 - `leave` depends on all other modules (employee, policy, balance, audit, notification) and `shared-types`.
