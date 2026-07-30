@@ -1,0 +1,153 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "data"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The LeaveRequest model interface is exported from the leave module and imports LeaveRequestStatus from src/shared/types/index.ts; a consumer can import and reference the LeaveRequest type without compile errors.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The ILeaveRequestRepository interface declares five methods with the exact signatures: findById(id): Promise<LeaveRequest | null>, findByEmployee(employeeId): Promise<LeaveRequest[]>, findByStatus(status): Promise<LeaveRequest[]>, create(request: Omit<LeaveRequest, 'id'|'createdAt'|'updatedAt'>): Promise<LeaveRequest>, update(id, data: Partial<LeaveRequest>): Promise<LeaveRequest | null>.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The PgLeaveRequestRepository implementation persists a row on create (INSERT ... RETURNING) and returns the mapped LeaveRequest; findById returns the matching row or null when absent; findByEmployee and findByStatus return filtered arrays (empty array when none match); update applies only provided fields and returns the updated row or null when the id does not exist.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "When a database row contains a status value not in the LeaveRequestStatus enum, the row mapper throws an Error naming the invalid value (e.g. \"Invalid leave request status from database: <value>\"), preventing an invalid enum from propagating to callers.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Every repository method wraps its pool.query call in try/catch and rethrows a new Error with a \"Failed to <action>: <message>\" prefix, where message is error.message for Error instances or String(error) otherwise \u2014 no unhandled promise rejections escape the repository.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests at tests/unit/modules/leave/leave.repository.test.ts mock the db connection module and cover, per method: a success case returning the expected mapped model, a not-found/empty case (null or empty array), and an error case asserting the wrapped Error message; the test suite passes under npx jest.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No use of the `any` type anywhere in the leave module files; use `unknown` with type guards/casts (e.g. `error: unknown` in catch blocks, `Record<string, unknown>` for DB rows) per HARNESS.json constraint no-any.",
+    "All database access for leave requests goes through the repository class implementing ILeaveRequestRepository; no inline SQL or direct pool.query calls outside the repository implementation (GP-001, HARNESS.json no-direct-db-outside-repository).",
+    "All SQL queries must use parameterized placeholders ($1, $2, ...) with values passed as a separate array; no string interpolation or concatenation of user-supplied values into SQL text to prevent SQL injection.",
+    "Code must compile under strict TypeScript (noImplicitAny, strictNullChecks); nullable fields (reason, approvedBy, approvedAt) must be typed as `| undefined` / `| null` and handled explicitly, never assumed non-null.",
+    "The repository obtains the database connection via a direct module-level import of the singleton `pool` from src/shared/db/connection.ts (no constructor injection), matching the balance repository convention.",
+    "Every async repository method catches errors from pool.query and rethrows a wrapped Error; no async method can reject with a raw pg error or an unhandled rejection (GP-006)."
+  ],
+  "outOfScope": [
+    "LeaveService, state-machine transitions (DRAFT\u2192SUBMITTED\u2192APPROVED/REJECTED/CANCELLED), balance sufficiency checks (BR-001), and manager approval logic (BR-002) \u2014 these belong to Phase 6 and are not part of this data-layer phase.",
+    "LeaveController, leaveRoutes, Fastify route registration, and any HTTP endpoint surface \u2014 these belong to Phase 7 and are out of scope for this phase.",
+    "AuditLog recording for leave request state changes (GP-002) \u2014 the audit module and its integration into the leave workflow belong to Phases 8\u20139 and are not part of this repository-only phase.",
+    "Notification service and any email/in-app notification on submission, approval, rejection, or cancellation \u2014 belongs to Phase 10 and is out of scope.",
+    "Creating or altering the leave_requests table schema (Knex migrations) \u2014 the table is assumed to already exist with the reconciled snake_case columns; this phase only implements the data-access layer against it."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "The status field of any LeaveRequest returned by the repository must always be a member of the LeaveRequestStatus enum (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED); a row whose status is not in this set must never be returned to a caller \u2014 the mapper must throw instead."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "All date-typed fields (startDate, endDate, createdAt, updatedAt) on a returned LeaveRequest must be JavaScript Date instances constructed from the database column values; approvedAt must be a Date when present or null when the column is null \u2014 never a raw string."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "The create operation accepts only the caller-supplied fields (Omit<LeaveRequest, 'id'|'createdAt'|'updatedAt'>); id, createdAt, and updatedAt are always generated by the database (RETURNING clause) and never set from caller input."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "findById(id: string): Promise<LeaveRequest | null>",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns null when no row matches the id; throws a wrapped Error (\"Failed to find leave request by id: <message>\") on database failure."
+    },
+    {
+      "operation": "findByEmployee(employeeId: string): Promise<LeaveRequest[]>",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an empty array (not null) when no rows match the employeeId; throws a wrapped Error on database failure."
+    },
+    {
+      "operation": "findByStatus(status: LeaveRequestStatus): Promise<LeaveRequest[]>",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an empty array when no rows match the given status; throws a wrapped Error on database failure."
+    },
+    {
+      "operation": "create(request: Omit<LeaveRequest, 'id'|'createdAt'|'updatedAt'>): Promise<LeaveRequest>",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws a wrapped Error (\"Failed to create leave request: <message>\") on database failure (e.g. FK violation for unknown employee_id or leave_policy_id); never returns null on success."
+    },
+    {
+      "operation": "update(id: string, data: Partial<LeaveRequest>): Promise<LeaveRequest | null>",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns null without issuing a query when the partial data is empty (no fields to set); returns null when the id does not exist (zero rows returned); throws a wrapped Error on database failure."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The leave repository's try/catch error wrapping must match the balance repository pattern: `catch (error: unknown) { const message = error instanceof Error ? error.message : String(error); throw new Error(\\`Failed to <action>: ${message}\\`); }` \u2014 same structure, same message format.",
+      "referencePath": "src/modules/balance/balance.repository.ts"
+    },
+    {
+      "requirement": "The leave repository must validate the status column against a `ReadonlySet<string>` built from `Object.values(LeaveRequestStatus)`, throwing `Invalid leave request status from database: <value>` on mismatch \u2014 mirroring the balance repository's `VALID_STATUSES` set and `mapRowToBalance` validation.",
+      "referencePath": "src/modules/balance/balance.repository.ts"
+    },
+    {
+      "requirement": "The update method must return null without querying when the partial data has no settable fields (setClauses.length === 0), matching the balance repository's self-contained `return null` convention (not delegating to findById as the policy repository does).",
+      "referencePath": "src/modules/balance/balance.repository.ts"
+    },
+    {
+      "requirement": "All SELECT and RETURNING clauses must enumerate the explicit snake_case column list (id, employee_id, leave_policy_id, start_date, end_date, reason, status, approved_by, approved_at, created_at, updated_at) rather than using `SELECT *`, matching the balance and policy repository conventions.",
+      "referencePath": "src/modules/balance/balance.repository.ts"
+    },
+    {
+      "requirement": "The LeaveRequestStatus enum imported and validated against must be the one exported from src/shared/types/index.ts (DRAFT='DRAFT', SUBMITTED='SUBMITTED', APPROVED='APPROVED', REJECTED='REJECTED', CANCELLED='CANCELLED'); the model and repository must import from this exact path, not redefine the enum.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The leave repository test must follow the balance test structure: jest.mock on the connection module, a sampleRow fixture with snake_case columns, an expectedModel fixture with camelCase fields and Date instances, and per-method describe blocks covering success/not-found/error cases.",
+      "referencePath": "tests/unit/modules/balance/balance.repository.test.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts",
+      "why": "The leave model and repository import LeaveRequestStatus from the shared types module; this is the source of truth for the status enum values used in validation."
+    },
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "The repository imports the singleton `pool` from the shared DB connection module to execute all SQL queries; this is the only database access point."
+    },
+    {
+      "target": "leave_requests table (PostgreSQL)",
+      "why": "The repository reads from and writes to the leave_requests table with snake_case columns (id, employee_id, leave_policy_id, start_date, end_date, reason, status, approved_by, approved_at, created_at, updated_at); FKs reference employees.id and leave_policies.id."
+    },
+    {
+      "target": "src/modules/leave/leave.service.ts (Phase 6)",
+      "why": "The ILeaveRequestRepository interface and PgLeaveRequestRepository implementation produced in this phase are the data-access contract that the future LeaveService will depend on for all leave request persistence operations."
+    }
+  ]
+}
