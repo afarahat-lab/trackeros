@@ -118,25 +118,35 @@ Represents leave balance data managed by the `balance` module, including tracked
 
 ## employee
 
-Represents employee data managed by the `employee` module, including employee records and related personnel information.
+Represents employee data managed by the `employee` module. Built in Phase 2.
 
 ### Employee
 
 | Field | Type | Required |
 |-------|------|----------|
 | id | string | true |
-| employeeNumber | string | true |
+| employeeCode | string | true |
 | firstName | string | true |
 | lastName | string | true |
 | email | string | true |
 | managerId | string \| null | false |
-| department | string \| null | false |
-| hireDate | Date | true |
-| terminationDate | Date \| null | false |
-| employmentStatus | 'ACTIVE' \| 'INACTIVE' \| 'TERMINATED' | true |
+| role | 'EMPLOYEE' \| 'MANAGER' \| 'HR_ADMIN' | true |
+| isActive | boolean | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
-| deletedAt | Date \| null | false |
+
+Extends `BaseEntity` from `src/shared/types/index.ts`.
+
+### IEmployeeRepository
+
+| Method | Signature |
+|--------|-----------|
+| findById | `(id: string) => Promise<Employee \| null>` |
+| findByEmail | `(email: string) => Promise<Employee \| null>` |
+| findManagerId | `(employeeId: string) => Promise<string \| null>` |
+| findHrAdmins | `() => Promise<Employee[]>` |
+
+Implemented by `EmployeeRepository` using the pg pool from `src/shared/db/connection.ts`. Row mapping uses a type guard (`isEmployeeRow`) to validate database rows before mapping to the domain model. Role values are validated through `isValidRole` with fallback to `'EMPLOYEE'`.
 
 ## policy
 
