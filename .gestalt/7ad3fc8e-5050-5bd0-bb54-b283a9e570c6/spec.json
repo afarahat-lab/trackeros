@@ -1,0 +1,187 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "employee"
+    ],
+    "affectedLayers": [
+      "data",
+      "domain"
+    ],
+    "isBreakingChange": true,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The Employee interface exposes all 12 attributes from the reconciled architecture (id, employeeNumber, firstName, lastName, email, managerId, department, hireDate, terminationDate, employmentStatus, createdAt, updatedAt) with correct TypeScript types, and imports EmploymentStatus from the shared types module.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The IEmployeeRepository interface declares all five methods (findById, findByEmail, findAll, create, update) with signatures matching the existing interface contract: findById/findByEmail return Promise<Employee | null>, findAll returns Promise<Employee[]>, create accepts Omit<Employee,'id'|'createdAt'|'updatedAt'> and returns Promise<Employee>, update accepts (id: string, Partial<Employee>) and returns Promise<Employee | null>.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "PgEmployeeRepository implements IEmployeeRepository and every database query uses parameterized placeholders ($N) for all user-supplied values \u2014 no string interpolation or concatenation of input data into SQL text.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All SQL column lists (SELECT, INSERT, RETURNING) and the row-to-entity mapping cover all 12 columns of the employees table (id, employee_number, first_name, last_name, email, manager_id, department, hire_date, termination_date, employment_status, created_at, updated_at) \u2014 no column is silently dropped or omitted.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "create persists all nine user-provided fields (employeeNumber, firstName, lastName, email, managerId, department, hireDate, terminationDate, employmentStatus) and returns a fully-populated Employee including server-generated id, createdAt, and updatedAt.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "update applies only the fields present in the Partial<Employee> input (dynamic partial update), returns the updated Employee when the row exists, and returns null when no row matches the given id.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findById and findByEmail return null (not throw) when no matching row exists in the database.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All database errors are caught and re-thrown as Error instances with descriptive messages (satisfying GP-006 \u2014 no unhandled promise rejections escape any repository method).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The row-to-entity mapping validates the employment_status column value against the EmploymentStatus enum members (ACTIVE, INACTIVE, TERMINATED) and throws an Error when the database returns an unrecognized status value.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests cover success, not-found, error, and edge cases for every repository method, asserting exact SQL strings and parameter arrays against the mocked pg query calls, and the full test suite passes under ts-jest with strict TypeScript.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No `any` type \u2014 use `unknown` with type guards (HARNESS.json no-any rule, severity high). The existing repository already uses `Record<string, unknown>` for row typing and `error: unknown` in catch blocks; this must be preserved.",
+    "All database access must go through the repository pattern (GP-001 / HARNESS.json no-direct-db-outside-repository, severity critical). The repository is the only component that issues SQL against the employees table.",
+    "Preserve the existing constructor-injection design (constructor accepts a `Pool`); do NOT switch to importing the singleton `pool` from `src/shared/db/connection.ts` inside the repository. The existing Jest suite constructs `new PgEmployeeRepository(new Pool())` and mocks the `pg` module \u2014 switching to the singleton import would break those tests.",
+    "Strict TypeScript must pass (strict:true, no implicit any, strict null checks). The nullable fields (managerId: string | null, terminationDate: Date | null) must be typed as nullable and handled accordingly in SQL parameter binding and row mapping.",
+    "Do not introduce or rely on any BaseRepository abstraction \u2014 no such class exists in `src/` despite the stale ARCHITECTURE.md reference. PgEmployeeRepository must remain standalone.",
+    "No hardcoded secrets, passwords, or tokens (HARNESS.json no-hardcoded-secrets, severity critical). The repository must not embed connection strings or credentials.",
+    "No circular dependencies \u2014 the employee module may import only from `shared/types` (its sole declared dependency); it must not import from leave, policy, balance, audit, or notification modules.",
+    "Tests must mock the `pg` module via `jest.mock('pg', ...)` and expose the mock query function via `jest.requireMock('pg').__mockQuery`, importing the repository via relative paths (`../../../../src/...`) \u2014 matching the existing test conventions and jest.config.js (ts-jest preset, node environment, moduleDirectories ['node_modules','src'])."
+  ],
+  "outOfScope": [
+    "EmployeeService, IEmployeeService interface, and any service-layer business logic (the reconciled architecture lists these as owned by the employee module, but this phase covers only the model, repository interface, repository implementation, and unit tests).",
+    "HTTP controller, Fastify routes, and RBAC middleware for employee endpoints \u2014 no API surface is built in this phase.",
+    "Database migrations / Knex schema definitions for the employees table \u2014 the table schema is treated as pre-existing per the reconciled architecture; this phase only reads/writes it.",
+    "Audit logging (GP-002) within the repository \u2014 the repository is a data-access primitive; audit recording is a service-layer concern handled in later phases.",
+    "Integration tests against a real PostgreSQL instance \u2014 this phase includes only Jest unit tests with mocked pg.",
+    "Phases 3\u201310 of PLAN.md (policy, balance, leave, audit, notification modules and their wiring) \u2014 out of scope for this employee data-layer phase."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "An Employee's employmentStatus must always be one of the EmploymentStatus enum members (ACTIVE, INACTIVE, TERMINATED) \u2014 the repository must reject (throw on) any database row whose employment_status column is not a valid enum value, and create/update must only accept valid EmploymentStatus values."
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "managerId is either a valid employee id (self-referential FK to employees.id) or null \u2014 an employee may have no manager. The repository must preserve nullability through both persistence and row mapping rather than coercing null to an empty string or undefined."
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "terminationDate is nullable: a currently-employed employee has terminationDate === null, and only a TERMINATED employee is expected to carry a termination date. The repository must round-trip this nullability faithfully (Date when present, null when absent)."
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "id, createdAt, and updatedAt are server-generated and never supplied by the caller \u2014 create accepts Omit<Employee,'id'|'createdAt'|'updatedAt'> and the returned Employee always carries all three populated from the database RETURNING clause."
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "employeeNumber and email are unique per employee (unique indexes on the employees table) \u2014 the repository's create/update must surface duplicate-key violations as thrown Errors rather than silently succeeding or returning null."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IEmployeeRepository.findById(id)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns null when no row matches the id; throws an Error wrapping any underlying database error (GP-006 \u2014 no unhandled rejection)."
+    },
+    {
+      "operation": "IEmployeeRepository.findByEmail(email)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns null when no row matches the email; throws an Error wrapping any underlying database error."
+    },
+    {
+      "operation": "IEmployeeRepository.findAll()",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an empty array (not null) when the table has no rows; throws an Error wrapping any underlying database error."
+    },
+    {
+      "operation": "IEmployeeRepository.create(employee)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws an Error on unique-constraint violations (duplicate employee_number or email) and on any other database error; never returns null. The input excludes id/createdAt/updatedAt which are server-generated."
+    },
+    {
+      "operation": "IEmployeeRepository.update(id, data)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns null when no row matches the id; applies only the fields present in the partial input; throws an Error wrapping any underlying database error. When the partial input contains no updatable fields, the method returns the current row (or null if absent) without performing a write."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The Employee interface attribute set and types must match the Employee domain entity definition in the reconciled architecture exactly \u2014 12 attributes: id (string), employeeNumber (string), firstName (string), lastName (string), email (string), managerId (string | null), department (string), hireDate (Date), terminationDate (Date | null), employmentStatus (EmploymentStatus), createdAt (Date), updatedAt (Date). The current 8-attribute model must be expanded to this full set.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "All SQL issued by PgEmployeeRepository must reference only the columns documented in the employees table schema (id, employee_number, first_name, last_name, email, manager_id, department, hire_date, termination_date, employment_status, created_at, updated_at) with PK id and FK manager_id -> employees.id. No column outside this schema may appear in SELECT/INSERT/UPDATE/RETURNING clauses.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "EmploymentStatus must be imported from the shared types module (the enum with members ACTIVE='ACTIVE', INACTIVE='INACTIVE', TERMINATED='TERMINATED'). The repository's status validation and the model's employmentStatus type must reference this exact enum, not a re-declared or inline copy.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "PgEmployeeRepository must implement the IEmployeeRepository interface declared in employee.repository.interface.ts \u2014 the method names, parameter types, and return types of the implementation must be assignable to that interface (TypeScript structural compatibility under strict mode).",
+      "referencePath": "src/modules/employee/employee.repository.interface.ts"
+    },
+    {
+      "requirement": "The unit test's mock row objects and expected Employee objects must include all 12 fields/columns after the model expansion \u2014 mock rows must carry employee_number, department, hire_date, termination_date columns and expected Employee objects must carry employeeNumber, department, hireDate, terminationDate, matching the expanded model and SQL column lists.",
+      "referencePath": "tests/unit/modules/employee/employee.repository.test.ts"
+    },
+    {
+      "requirement": "The employee module's dependency direction must remain consistent with ARCHITECTURE.md: employee depends only on shared-types, with no inbound dependencies from this phase and no circular dependencies. The module must not import from leave, policy, balance, audit, or notification.",
+      "referencePath": "docs/ARCHITECTURE.md"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts (EmploymentStatus enum)",
+      "why": "The Employee model and repository import EmploymentStatus from the shared types module to type and validate the employmentStatus field; this is the employee module's sole declared external dependency."
+    },
+    {
+      "target": "pg (node-postgres Pool)",
+      "why": "PgEmployeeRepository executes parameterized SQL against PostgreSQL through a constructor-injected pg Pool; the unit tests mock this module via jest.mock('pg')."
+    },
+    {
+      "target": "employees table (PostgreSQL schema)",
+      "why": "The repository reads and writes the pre-existing employees table (12 columns, PK id, FK manager_id -> employees.id, unique indexes on employee_number and email); all SQL must conform to this schema."
+    },
+    {
+      "target": "Downstream leave module (future phases)",
+      "why": "Per the dependency map, the leave module will consume IEmployeeRepository to resolve manager relationships (BR-002) and validate employment status; the interface contract established here must remain stable for those later phases."
+    }
+  ]
+}
