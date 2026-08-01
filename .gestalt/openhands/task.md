@@ -1,25 +1,23 @@
-# Implement this phase: Phase 7: Audit module — model and repository
+# Implement this phase: Phase 8: Shared day-count utility
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/35df38af-c9d7-41ee-b412-79ee8d149189/7`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/35df38af-c9d7-41ee-b412-79ee8d149189/8`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the audit module at `src/modules/audit/`. This phase depends on `src/shared/types/index.ts` from Phase 1 — read it before generating any code that references AuditAction.
+Create a shared business-day calculation utility. This phase depends on `src/shared/types/index.ts` from Phase 1 and `src/shared/db/connection.ts` (existing).
 
 Files to create:
-- `src/modules/audit/audit.model.ts` — Define the **AuditLog** entity with EXACT fields: `id: string`, `entityType: string`, `entityId: string`, `action: AuditAction` (import from `src/shared/types`), `oldValues: Record<string, unknown> | null`, `newValues: Record<string, unknown> | null`, `performedBy: string`, `performedAt: Date`.
+- `src/shared/utils/day-count.ts` — Implement a single shared function `calculateBusinessDays(startDate: Date, endDate: Date, holidays: Date[]): number` that counts BUSINESS DAYS ONLY, excluding weekends (Saturday/Sunday) AND public holidays. Whole days only — no half-day support. This function is the single source of truth for all day-count calculations (balance sufficiency check, deduction, restoration).
 
-  Also define **IAuditRepository** interface with methods:
-  - `findByEntity(entityType: string, entityId: string): Promise<AuditLog[]>`
-  - `findByPerformer(performedBy: string): Promise<AuditLog[]>`
-  - `create(data: Omit<AuditLog, 'id'>): Promise<AuditLog>`
+  Also export `getHolidaysForYear(year: number): Promise<Date[]>` which queries a `holidays` table via the pg pool. The holidays table has columns: `date: Date`, `name: string`, `country: string` (default `'US'`).
 
-- `src/modules/audit/audit.repository.ts` — Implement **AuditRepository** class implementing IAuditRepository using the pg pool from `src/shared/db/connection.ts`.
-- `src/modules/audit/index.ts` — Barrel export.
+- `src/shared/utils/index.ts` — Barrel export.
 
-Include Jest unit tests in `tests/unit/modules/audit/`.
+Include Jest unit tests in `tests/unit/shared/utils/` covering: weekends excluded, holidays excluded, same-day = 1 day, multi-day spans, edge cases.
+
+**BINDING RULE**: This utility must be used by every call site that computes leave day counts — balance sufficiency check, deduction, and restoration — so all computations are identical.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -34,6 +32,24 @@ These are resolved, feature-wide decisions. Wherever this phase touches the conc
 4. leave_balances.used_days = DENORMALIZED COUNTER and the source of truth (balance reads are O(1)). Deduct-on-submission: increment used_days atomically, in the same transaction, when a LeaveRequest is SUBMITTED (reserving the balance so an employee cannot over-book). Restore-on-reject/cancel: decrement used_days when that request is REJECTED or CANCELLED. Approval does NOT change used_days again (it was already deducted at submission). A submission must fail if it would drive remaining below zero.
 
 6. remainingDays = COMPUTED/DERIVED, never stored: remainingDays = totalEntitlement - usedDays, calculated at query time. All consumers use this one formula; no code path writes remainingDays directly. This eliminates drift. [BINDING RULE — operator decision resolving: How is the fiscal year boundary defined — calendar year (Jan 1 – Dec 31) or a company-specific fiscal year (e.g., Apr 1 – Mar 31)?; Should the day-count calculation for leave consumption exclude weekends and/or public holidays (business days only), or count all calendar days?; When an employee has no manager (managerId is null), who approves their SUBMITTED LeaveRequest? Does it auto-approve, escalate to a department head, or require a different workflow?; How is `used_days` in `leave_balances` derived — is it a denormalized counter incremented atomically on leave approval, or is it computed on-the-fly by summing the day counts of all approved `leave_requests` for that employee/type/year?; Are leave day counts based on calendar days (inclusive start-to-end) or working/business days (excluding weekends and holidays)?; Should Balance.remainingDays be a stored column or a computed (derived) field?; apply everywhere these apply, not in one place only]
+
+## Constraints & consistency
+You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
+### Reuse & consistency — match these exactly
+- getHolidaysForYear must obtain the pg Pool from the same export used by all existing repositories — the `pool` named export — so connection configuration is shared and not duplicated. (see `src/shared/db/connection.ts`)
+- The barrel export at src/shared/utils/index.ts must follow the same simple re-export style used by existing module barrels (e.g., `export { X, Y } from './file'`). (see `src/modules/balance/index.ts`)
+- getHolidaysForYear must use parameterized SQL via pool.query(sql, params) with a mapRow-style conversion from the raw DB row to the return type, matching the established repository pattern for snake_case-to-camelCase mapping and Record<string, unknown> casting. (see `src/modules/balance/balance.repository.ts`)
+- Unit tests must mock the pool using the same pattern as existing repository tests: jest.mock('shared/db/connection', () => ({ pool: { query: jest.fn() } })) with mockReset() in beforeEach, resolving via the jest.config.js moduleDirectories and tsconfig baseUrl. (see `tests/unit/modules/balance/balance.repository.test.ts`)
+### Entity invariants — enforce these
+- Reuse or extend `calculateBusinessDays`: For any valid inclusive date range where startDate <= endDate, the returned count is always >= 0 and equals the number of days in the range that are Monday–Friday and not present in the holidays array (by calendar date). The function never throws for any Date inputs.
+- Reuse or extend `getHolidaysForYear`: The function always returns a Promise that resolves to a Date[] (possibly empty) and never returns undefined; if the query yields no rows, an empty array is returned.
+### Interface contract — expose these operations (their shape is yours)
+- calculateBusinessDays(startDate: Date, endDate: Date, holidays: Date[]): number — idempotent; Must not throw for any input, including inverted ranges (startDate > endDate returns 0) and dates with arbitrary time components.
+- getHolidaysForYear(year: number): Promise<Date[]> — idempotent; If the underlying pool.query rejects, the rejection propagates to the caller (no silent swallowing); an empty result set resolves to an empty array, not null or undefined.
+### Integration points — connect to these
+- src/shared/db/connection.ts (pool export) — getHolidaysForYear queries the holidays table through the shared pg Pool; this is the runtime dependency for holiday data retrieval.
+- Phase 9 leave service (src/modules/leave/leave.service.ts) — The leave service will be the primary consumer, calling getHolidaysForYear(fiscalYear) then calculateBusinessDays(startDate, endDate, holidays) for balance sufficiency checks, deduction on submit, and restoration on reject/cancel.
+- holidays table (PostgreSQL) — getHolidaysForYear reads from the holidays table (columns: date, name, country) to supply the holiday list consumed by calculateBusinessDays.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
