@@ -1,0 +1,165 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "policy"
+    ],
+    "affectedLayers": [
+      "domain-model",
+      "persistence-repository",
+      "unit-tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The policy module barrel (src/modules/policy/index.ts) re-exports LeavePolicy, IPolicyRepository, and PolicyRepository, and all three are importable from the module-alias path `modules/policy` \u2014 verifiable by a passing unit test or import.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The LeavePolicy entity's `leaveType` field is typed as the `LeaveType` enum imported from `shared/types` (not a raw string), and accrualRate, maxAccumulation, and minimumNoticeDays are typed `number | null`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "PolicyRepository structurally implements IPolicyRepository and the module compiles under strict TypeScript with no `any` (tsc --noEmit / npm run build passes).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findById returns a fully mapped LeavePolicy when a row exists and returns null when no row matches.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findByLeaveType filters by the supplied LeaveType value and returns the mapped policies (or an empty array when none match); findActive returns only policies where isActive is true (or an empty array when none).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "create persists a new LeavePolicy via INSERT ... RETURNING * (omitting id/createdAt/updatedAt from the insert columns) and returns the mapped entity including the DB-generated id and timestamps.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "update applies only the supplied fields (a partial update), appends updated_at = NOW(), returns the updated entity, returns null when no row matches the id, and falls back to findById when no updatable fields are provided.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All repository SQL uses parameterized placeholders ($1, $2, ...) \u2014 no string-interpolated user values \u2014 so the module satisfies the no-direct-db-outside-repository and SQL-injection-safe constraints.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The Jest unit test suite at tests/unit/modules/policy/ mocks the shared db pool, resets the mock per test, and asserts both the returned mapped entities AND the exact pool.query call (SQL text + params) for each method, covering found/not-found, results/empty, and null-nullable cases.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No `any` type anywhere in the policy module source or tests (HARNESS.json `no-any` rule, severity high; tsconfig strict + noImplicitAny). Use `unknown` with type guards/casts (e.g. `Record<string, unknown>` + `row.x as string`) as the employee module does.",
+    "All database access goes through the repository layer via the shared `pool` from `src/shared/db/connection.ts` \u2014 no inline SQL or direct pg calls outside PolicyRepository (GP-001 / `no-direct-db-outside-repository`, severity critical).",
+    "Every query must use parameterized placeholders ($1, $2, ...) for all user-supplied values; no string concatenation/interpolation of values into SQL.",
+    "The policy module imports `LeaveType` only from `shared/types` (Phase 1) and the `pool` only from `shared/db/connection`; it must not import from other modules' internals \u2014 only through declared public entry points (ARCHITECTURE.md dependency rules).",
+    "Source files import `LeaveType` via the relative path `../../shared/types`; test files import via the module-alias `shared/types` and the repository via `modules/policy/policy.repository`, matching jest.config.js `moduleDirectories: ['node_modules','src']` and tsconfig `baseUrl: './src'`.",
+    "The module must not introduce circular dependencies; policy depends only on shared-types and shared/db (reconciled.json dependency map: policy \u2192 shared-types)."
+  ],
+  "outOfScope": [
+    "PolicyService, IPolicyService, controller, and routes for the policy module \u2014 this phase creates only the model, repository, and barrel (PLAN.md Phase 3 file list; service/HTTP layers are later phases).",
+    "Database migrations / DDL for the `leave_policies` table \u2014 the table schema is assumed to exist (defined in reconciled.json); this phase only reads/writes it via the repository.",
+    "Audit-log writes (GP-002), RBAC enforcement (GP-005), and input validation (GP-003) \u2014 these are service/API-boundary concerns deferred to later phases; the repository layer (mirroring the employee module) writes no audit records and enforces no RBAC.",
+    "Business-rule validation of policy values (e.g. entitlementDays > 0, accrualRate sanity) \u2014 the repository is a persistence layer only; validation belongs to the future service layer."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "Each LeavePolicy is bound to exactly one LeaveType (the `leave_type` column has a unique index), and its lifecycle is the ACTIVE/INACTIVE toggle expressed by the `isActive` boolean \u2014 there is no separate status enum."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "The nullable numeric fields (accrualRate, maxAccumulation, minimumNoticeDays) round-trip as `null` through create/update/find \u2014 a null DB column maps to a null entity field and vice versa, never to undefined or 0."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "`createdAt` and `updatedAt` are always Date instances on read (the mapRow helper wraps the DB timestamp string with `new Date(...)`), and `updatedAt` is refreshed to NOW() on every successful update."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IPolicyRepository.findById(id)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the mapped LeavePolicy when a row matches, null when no row matches; does not throw on not-found."
+    },
+    {
+      "operation": "IPolicyRepository.findByLeaveType(leaveType)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an array (possibly empty) of mapped policies whose leave_type equals the supplied LeaveType value; never null."
+    },
+    {
+      "operation": "IPolicyRepository.findActive()",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an array (possibly empty) of mapped policies where is_active is true; never null."
+    },
+    {
+      "operation": "IPolicyRepository.create(policy)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Persists the policy (omitting id/createdAt/updatedAt) via INSERT ... RETURNING * and returns the mapped entity with DB-generated id and timestamps; a unique-constraint violation on leave_type propagates as a pg error (no swallowing)."
+    },
+    {
+      "operation": "IPolicyRepository.update(id, data)",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Applies only the supplied (defined) fields plus updated_at=NOW(); returns the updated entity, null when no row matches the id; when no updatable fields are supplied it falls back to findById (a read, not a write) and returns that result or null."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The PolicyRepository must mirror the EmployeeRepository structural pattern: a class implementing its interface via `pool.query` with parameterized SQL, a private `mapRow(row: Record<string, unknown>)` helper converting snake_case DB columns to camelCase entity fields (wrapping created_at/updated_at with `new Date(...)`), and a dynamic fieldMap-driven `update` that appends `updated_at = NOW()` and falls back to `findById` when no fields are supplied.",
+      "referencePath": "src/modules/employee/employee.repository.ts"
+    },
+    {
+      "requirement": "The policy model file must follow the same shape as the employee model: an entity interface with camelCase fields plus a repository interface declaring the five methods, with no class on the model side (the class lives in the repository file).",
+      "referencePath": "src/modules/employee/employee.model.ts"
+    },
+    {
+      "requirement": "The policy barrel must re-export the entity interface, the repository interface, and the repository class \u2014 matching the employee barrel's three-symbol export set.",
+      "referencePath": "src/modules/employee/index.ts"
+    },
+    {
+      "requirement": "The policy repository test must follow the employee test conventions: jest.mock('shared/db/connection', () => ({ pool: { query: jest.fn() } })), a makeRow(overrides) helper returning snake_case rows, mockQuery.mockReset() in beforeEach, mockResolvedValueOnce({ rows: [...] }), and assertions on both the returned mapped entity and the exact mockQuery call (SQL + params).",
+      "referencePath": "tests/unit/modules/employee/employee.repository.test.ts"
+    },
+    {
+      "requirement": "The LeavePolicy.leaveType field and the findByLeaveType parameter must use the LeaveType enum exported from shared/types (ANNUAL/SICK/EMERGENCY/UNPAID/MATERNITY/PATERNITY, lowercase string values) \u2014 not a locally redefined string type.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The repository's SQL must target the `leave_policies` table with the reconciled column set (id, leave_type, policy_name, entitlement_days, accrual_rate, max_accumulation, minimum_notice_days, requires_manager_approval, is_active, created_at, updated_at); findActive filters is_active = true and findByLeaveType filters leave_type = $1, matching the documented unique index on leave_type and index on is_active.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts (LeaveType)",
+      "why": "The policy module imports the LeaveType enum from shared/types for the LeavePolicy.leaveType field and the findByLeaveType parameter; this is the Phase 1 dependency declared in the reconciled dependency map (policy \u2192 shared-types)."
+    },
+    {
+      "target": "src/shared/db/connection.ts (pool)",
+      "why": "PolicyRepository obtains the pg Pool from the shared db connection to execute all queries against the leave_policies table, satisfying GP-001 (all DB access through the repository layer)."
+    },
+    {
+      "target": "src/modules/leave/ (future Phase 4/9) and src/modules/balance/ (future Phase 5)",
+      "why": "Downstream modules consume LeavePolicy and IPolicyRepository via the policy barrel to validate leave requests (policy must be ACTIVE, entitlement/notice rules) and to seed balance entitlements; the barrel's exported symbols are the contract those phases depend on."
+    }
+  ]
+}
