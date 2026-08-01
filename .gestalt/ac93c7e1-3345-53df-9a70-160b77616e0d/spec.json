@@ -1,0 +1,139 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared-types"
+    ],
+    "affectedLayers": [
+      "shared"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The LeaveType enum exposes exactly six members \u2014 annual, sick, emergency, unpaid, maternity, paternity \u2014 each with a lowercase string value matching the leave_types.code controlled vocabulary.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The LeaveStatus enum exposes exactly five members \u2014 DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED \u2014 each with an uppercase string value matching the leave_requests.status column.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The AuditAction enum exposes exactly seven members \u2014 CREATED, SUBMITTED, APPROVED, REJECTED, CANCELLED, BALANCE_DEDUCTED, BALANCE_RESTORED \u2014 each with an uppercase string value matching the audit_logs.action column.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "LeaveRequestDTO and LeaveBalanceDTO are exported as TypeScript interfaces that compile cleanly under strict mode with no use of the any type; LeaveRequestDTO.status is typed as LeaveStatus and LeaveBalanceDTO.status is the string-literal union 'ACTIVE' | 'EXHAUSTED' | 'FROZEN'.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The barrel index.ts re-exports every enum and DTO symbol so that downstream modules can import all shared types from the single public entry point src/shared/types/index.ts.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A Jest unit test located under the tests/ directory with the .test.ts extension asserts the exact member counts and casing of all three enums, and is discovered and executed by the configured test runner (testMatch **/tests/**/*.test.(ts|js)).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The phase introduces no external runtime dependencies and the source compiles without errors via tsc --noEmit under the project's strict tsconfig (rootDir ./src, tests excluded from build).",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No use of the any type anywhere in the shared-types module \u2014 use unknown with type guards or concrete types instead (HARNESS.json no-any, severity high).",
+    "The shared-types module must stand alone with no external runtime dependencies; only relative type/enum re-exports within src/shared/types/ are permitted.",
+    "All test files must use the .test.ts extension and live under the tests/ directory to match the Jest testMatch pattern **/tests/**/*.test.(ts|js); do not use .spec.ts naming or alter the Jest config.",
+    "TypeScript strict mode must pass (no implicit any, strict null checks); source under src/ must compile via tsc --noEmit with rootDir ./src and tests excluded from the build.",
+    "Modules import from each other only through their declared public entry point (index.ts); the shared-types barrel is the sole public surface for enums and DTOs."
+  ],
+  "outOfScope": [
+    "The LeaveType entity interface (id, code, label, description, isActive, createdAt, updatedAt) \u2014 owned by the leave-policy module in a later phase, not by shared-types which only owns the LeaveType enum.",
+    "The LeaveBalance entity interface and LeaveRequest entity interface with Date-typed fields \u2014 these are domain entities owned by their respective modules in later phases; shared-types only owns the DTOs with string-typed date fields.",
+    "Audit module (AuditRecord entity, IAuditRepository, IAuditService) \u2014 deferred to a later phase; this phase only provides the AuditAction enum that the audit module will consume.",
+    "Any repository, service, controller, or route implementation \u2014 this phase is purely type/enum definitions with no runtime logic or database access.",
+    "DTO validation logic (e.g., class-validator decorators, zod schemas) \u2014 the DTOs are plain transport interfaces; validation at API boundaries is a later-phase concern per GP-003."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveType enum",
+      "mustExistOrExtend": true,
+      "invariant": "The set of members is a fixed controlled vocabulary of exactly six leave categories (annual, sick, emergency, unpaid, maternity, paternity); each member's string value equals its lowercase key, matching the leave_types.code column. No additional members may be added without an architecture decision."
+    },
+    {
+      "entity": "LeaveStatus enum",
+      "mustExistOrExtend": true,
+      "invariant": "The enum defines the complete LeaveRequest lifecycle states \u2014 DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED \u2014 where APPROVED, REJECTED, and CANCELLED are terminal; the set is closed and every member's value is uppercase matching the leave_requests.status column."
+    },
+    {
+      "entity": "AuditAction enum",
+      "mustExistOrExtend": true,
+      "invariant": "The enum enumerates every state-changing and balance-mutating action that must produce an audit record per GP-002 \u2014 CREATED, SUBMITTED, APPROVED, REJECTED, CANCELLED, BALANCE_DEDUCTED, BALANCE_RESTORED; the set is closed so no auditable operation lacks a corresponding action value."
+    },
+    {
+      "entity": "LeaveRequestDTO",
+      "mustExistOrExtend": true,
+      "invariant": "The DTO is a serializable transport shape for a LeaveRequest; its status field is constrained to the LeaveStatus enum and its nullable lifecycle fields (approvedBy, approvedAt, cancelledAt) are typed as string | null to represent absent values over the wire rather than undefined."
+    },
+    {
+      "entity": "LeaveBalanceDTO",
+      "mustExistOrExtend": true,
+      "invariant": "The DTO is a serializable transport shape for a LeaveBalance; its status field is the closed string-literal union 'ACTIVE' | 'EXHAUSTED' | 'FROZEN' matching the LeaveBalance lifecycle, and remainingDays is carried as a derived transport field even though the entity computes it as totalEntitlement - usedDays at query time."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "Barrel re-export of all shared-types symbols from src/shared/types/index.ts \u2014 downstream modules import LeaveType, LeaveStatus, AuditAction, LeaveRequestDTO, and LeaveBalanceDTO exclusively through this public entry point.",
+      "authRule": "N/A \u2014 pure type/enum module with no runtime operations or authentication surface.",
+      "idempotent": true,
+      "errorSemantics": "Compile-time only: a missing or misnamed export produces a TypeScript compile error, not a runtime error. The barrel must export every symbol so that downstream imports never fail to resolve."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The LeaveType enum member values must exactly match the controlled vocabulary documented for the LeaveType entity codes (annual, sick, emergency, unpaid, maternity, paternity) so that DTOs and future leave_types seed data align.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "The LeaveStatus enum member values must exactly match the LeaveRequest lifecycle states documented in the architecture (DRAFT \u2192 SUBMITTED \u2192 APPROVED | REJECTED | CANCELLED) so that the leave-request module's status transitions reference the same closed set.",
+      "referencePath": "docs/ARCHITECTURE.md"
+    },
+    {
+      "requirement": "The AuditAction enum must cover every action that GP-002 requires an audit record for \u2014 including the balance-mutating actions BALANCE_DEDUCTED and BALANCE_RESTORED \u2014 so that the audit module's AuditRecord.action field uses a value from this enum.",
+      "referencePath": "docs/GOLDEN_PRINCIPLES.md"
+    },
+    {
+      "requirement": "The LeaveBalanceDTO.status string-literal union ('ACTIVE' | 'EXHAUSTED' | 'FROZEN') must exactly match the LeaveBalance entity lifecycle status documented in the reconciled architecture, ensuring the DTO transport shape and the domain entity stay aligned.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "The barrel index.ts must re-export only the symbols declared in enums.ts and dtos.ts \u2014 no additional types, no re-exports from outside the shared-types directory \u2014 so the module boundary declared in the architecture (shared-types owns enums and DTOs) is respected.",
+      "referencePath": "src/shared/types/index.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "leave-request module (src/modules/leave-request/)",
+      "why": "Will import LeaveStatus and LeaveRequestDTO from the shared-types barrel to type the LeaveRequest entity status field and the notification/transport surface."
+    },
+    {
+      "target": "leave-balance module (src/modules/leave-balance/)",
+      "why": "Will import LeaveBalanceDTO and the LeaveType enum from the shared-types barrel to type balance transport shapes and scope balances per leave type."
+    },
+    {
+      "target": "audit module (src/modules/audit/)",
+      "why": "Will import the AuditAction enum from the shared-types barrel to type the AuditRecord.action field, ensuring every auditable operation maps to a value from this closed set per GP-002."
+    },
+    {
+      "target": "leave-policy, employee, and notification modules",
+      "why": "All depend on shared-types per the reconciled dependency map; they import enums and DTOs through the barrel as their sole shared-type surface."
+    }
+  ]
+}
