@@ -125,4 +125,16 @@ Created the zero-dependency foundation module. Exports:
 - **ValidationResult**: `{ isValid: boolean; errors: string[] }`
 
 All symbols are importable from `shared/types`. The module has zero runtime side effects and no database access. Unit tests in `tests/unit/shared/types/index.test.ts` verify enum value sets, DTO shapes, and the LeaveStatus/LeaveRequestStatus identity invariant.
+
+### Phase 2 — Employee Module (src/modules/employee/)
+Created the employee domain module with model, repository, and barrel export. Depends on `src/shared/types` (Phase 1) for `EmploymentStatus`.
+
+**Files created:**
+- `src/modules/employee/employee.model.ts` — **Employee** entity with fields: `id`, `firstName`, `lastName`, `email`, `role`, `managerId: string | null`, `department`, `employmentStatus: EmploymentStatus`, `createdAt`, `updatedAt`. Also defines **IEmployeeRepository** interface with methods: `findById`, `findByDepartment`, `findAll`, `create`, `update`.
+- `src/modules/employee/employee.repository.ts` — **EmployeeRepository** class implementing `IEmployeeRepository` using the pg `Pool` from `src/shared/db/connection.ts`. All queries use parameterized SQL. Internal `mapRow` helper converts snake_case column names to camelCase entity fields. The `update` method uses a dynamic field map to build SET clauses only for provided fields, falling back to `findById` when no fields are supplied.
+- `src/modules/employee/index.ts` — Barrel export of `Employee`, `IEmployeeRepository`, `EmployeeRepository`.
+
+**Database mapping:** Repository maps between TypeScript camelCase (`firstName`, `managerId`, `employmentStatus`, `createdAt`, `updatedAt`) and PostgreSQL snake_case columns (`first_name`, `manager_id`, `employment_status`, `created_at`, `updated_at`).
+
+**Tests:** `tests/unit/modules/employee/employee.repository.test.ts` — 11 tests covering all repository methods: findById (found, not found, null manager_id), findByDepartment (results, empty), findAll (results, empty), create, update (partial fields, nonexistent, empty fields fallback, null managerId). All tests mock `pool.query` from `shared/db/connection`.
 <!-- gestalt:architecture feature=35df38af-c9d7-41ee-b412-79ee8d149189 END -->
