@@ -1,0 +1,196 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "domain-model",
+      "persistence",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The LeaveRequest entity is defined and exported from the leave module's model file, with its `status` field typed as `LeaveStatus` imported from `shared/types` \u2014 a reviewer can verify the import source and that the type is not a free string.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The ILeaveRepository interface is defined and exported with all six operations (findById, findByEmployeeId, findByStatus, create, update, updateStatus), each declaring the correct return type (LeaveRequest | null for single-row reads/updates, LeaveRequest[] for list reads, LeaveRequest for create).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The LeaveRepository class implements ILeaveRepository and compiles under strict TypeScript with zero `any` types \u2014 `tsc --noEmit` / `npm run build` passes for the new files.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findById returns null (not undefined, not a throw) when no row matches the given id; it returns a fully mapped LeaveRequest when a row exists.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "create persists a new leave_requests row via INSERT ... RETURNING * and returns the mapped LeaveRequest entity (including server-generated id, createdAt, updatedAt).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "updateStatus sets approved_at to NOW() when the target status is APPROVED; for non-APPROVED statuses it does not set approved_at to now. The method returns the updated LeaveRequest or null when the row does not exist.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findByEmployeeId builds a dynamic WHERE clause from LeaveRequestQueryParams (status, policyId, startDateFrom/To, endDateFrom/To) using parameterized placeholders, appends LIMIT/OFFSET only when provided, and returns the mapped LeaveRequest[] \u2014 an empty result yields an empty array, never null.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "update builds a dynamic SET clause only for provided fields and falls back to findById (returning the current row) when no updatable fields are supplied; it returns null when the target row does not exist.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The barrel index.ts re-exports LeaveRequest and ILeaveRepository from the model file and LeaveRepository from the repository file, so consumers can import all three from the module root.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests exist at tests/unit/modules/leave/ (ending in .test.ts), mock the pool from shared/db/connection, and assert both the returned mapped entity values and the exact SQL string + params array passed to pool.query for each repository method.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The full verification command (npm install + npm run build + npx jest --passWithNoTests) exits zero with the new leave module files and tests present.",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "All database access must go through the repository layer (GP-001 / no-direct-db-outside-repository, severity critical): the LeaveRepository is the only component that issues SQL against the leave_requests table; no inline SQL or direct pool usage outside the repository file.",
+    "No `any` type anywhere in the new files (HARNESS no-any, severity high): use `Record<string, unknown>` for row shapes and `unknown[]` for parameter arrays, with type assertions at mapping boundaries.",
+    "Strict TypeScript must pass (tsconfig strict: true, no implicit any, strict null checks) \u2014 the new files must compile cleanly under `npm run build` / `tsc --noEmit`.",
+    "All SQL must use parameterized placeholders ($1, $2, \u2026) \u2014 no string interpolation of user-supplied values into query text (SQL-injection prevention; matches employee/policy repo convention).",
+    "Modules import from sibling modules only through their declared public entry point (index.ts) \u2014 the leave module must not import employee/policy internals directly; Employee and LeavePolicy are type references only and are not imported into the model file per the task spec.",
+    "Test files must end in `.test.ts` and be placed under `tests/unit/modules/leave/` to match the jest testMatch glob (`**/tests/**/*.test.(ts|js)`); imports use path aliases resolvable via moduleDirectories (`modules/...`, `shared/db/connection`, `shared/types`).",
+    "The `leave_type` column exists in the leave_requests table but is NOT part of the LeaveRequest entity surface \u2014 the repository must not expose it as an entity field; it may be ignored on read and omitted on write unless required by the schema."
+  ],
+  "outOfScope": [
+    "Leave service, controller, and routes (Phases 9\u201310) \u2014 no ILeaveService, LeaveService, LeaveController, or leaveRoutes in this phase.",
+    "Business-rule validation (employee ACTIVE, policy ACTIVE, balance sufficiency, minimum notice, date-range checks) \u2014 that logic belongs to the service layer in Phase 9, not the repository.",
+    "Balance deduction/restoration, audit logging, and notification dispatch \u2014 these are cross-module orchestrations in Phase 9; the repository only persists/reads LeaveRequest rows.",
+    "HTTP layer, RBAC middleware, and input validation at API boundaries (GP-003/GP-005) \u2014 deferred to the controller/routes phase.",
+    "Database migrations or schema DDL for the leave_requests table \u2014 the schema is pre-declared in the reconciled architecture; this phase assumes the table exists."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "A LeaveRequest's status is always one of the LeaveStatus values (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED); the repository must never persist or return a status outside this set, and the entity's status field is typed as LeaveStatus (not a free string)."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "approvedAt is non-null only when the request has been approved (status APPROVED with approvedBy set); the updateStatus operation enforces this by setting approved_at = NOW() exclusively on the APPROVED transition. A request that is DRAFT/SUBMITTED/REJECTED/CANCELLED has approvedAt = null."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "rejectionReason is non-null only for REJECTED requests; approvedBy is non-null only for APPROVED requests. The repository preserves these nullability relationships when mapping rows and when updating status."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "Every persisted LeaveRequest has server-generated id, createdAt, and updatedAt (the create operation omits these from its input type via Omit and relies on INSERT ... RETURNING * to populate them); a caller cannot supply id/createdAt/updatedAt through the create signature."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "ILeaveRepository.findById(id)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns null when no row matches the id (not undefined, not a thrown error); returns a fully mapped LeaveRequest when found."
+    },
+    {
+      "operation": "ILeaveRepository.findByEmployeeId(employeeId, params?)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an empty array (never null) when no rows match; applies optional LeaveRequestQueryParams filters as a dynamic WHERE clause with LIMIT/OFFSET."
+    },
+    {
+      "operation": "ILeaveRepository.findByStatus(status)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an empty array (never null) when no rows match the given LeaveStatus."
+    },
+    {
+      "operation": "ILeaveRepository.create(data)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Persists via INSERT ... RETURNING * and returns the mapped LeaveRequest with server-generated id/createdAt/updatedAt; input type excludes id/createdAt/updatedAt via Omit."
+    },
+    {
+      "operation": "ILeaveRepository.update(id, data)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns null when the target row does not exist; falls back to findById (returning the current row) when no updatable fields are supplied; builds a dynamic SET clause only for provided fields."
+    },
+    {
+      "operation": "ILeaveRepository.updateStatus(id, status, approvedBy?, rejectionReason?)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns null when the target row does not exist; sets approved_at = NOW() when status is APPROVED (and persists approvedBy); does not set approved_at to now for non-APPROVED statuses."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The LeaveRepository must replicate the established repository pattern from EmployeeRepository: module-level `pool` import from `../../shared/db/connection`, parameterized SQL ($1, $2, \u2026), a private `mapRow` helper converting snake_case columns to camelCase entity fields, `findById` returning null on empty rows, `create` using INSERT ... RETURNING *, and `update` building a dynamic SET clause via a fieldMap with findById fallback when no fields are supplied.",
+      "referencePath": "src/modules/employee/employee.repository.ts"
+    },
+    {
+      "requirement": "The LeaveRepository's update method must follow the same dynamic-SET + fieldMap + `updated_at = NOW()` + findById-fallback structure used by PolicyRepository, so the three repositories are structurally consistent.",
+      "referencePath": "src/modules/policy/policy.repository.ts"
+    },
+    {
+      "requirement": "The LeaveRequest entity's `status` field and the ILeaveRepository method signatures must import and use LeaveStatus (and LeaveRequestQueryParams) from `shared/types` rather than redefining them, preserving the single source of truth for these types established in Phase 1.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The leave barrel index.ts must follow the same export shape as the employee/policy barrels: re-export the entity interface and the repository interface from the model file, and re-export the repository class from the repository file.",
+      "referencePath": "src/modules/employee/index.ts"
+    },
+    {
+      "requirement": "The leave repository tests must follow the established test conventions: jest.mock('shared/db/connection', () => ({ pool: { query: jest.fn() } })), a snake_case makeRow(overrides) fixture helper, mockQuery.mockReset() in beforeEach, and assertions on both mapped return values and the exact SQL string + params array passed to pool.query.",
+      "referencePath": "tests/unit/modules/employee/employee.repository.test.ts"
+    },
+    {
+      "requirement": "The repository's column mapping must match the reconciled leave_requests schema (id, employee_id, policy_id, leave_type, start_date, end_date, status, reason, rejection_reason, approved_by, approved_at, created_at, updated_at), mapping camelCase entity fields to these snake_case columns; the leave_type column is present in the schema but excluded from the LeaveRequest entity surface per the task spec.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts (Phase 1)",
+      "why": "Provides LeaveStatus, LeaveRequestQueryParams, CreateLeaveRequestDto, and UpdateLeaveRequestDto \u2014 the leave model imports LeaveStatus for the entity's status field and LeaveRequestQueryParams for the findByEmployeeId signature."
+    },
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "Provides the pg Pool instance the LeaveRepository imports at module level to execute parameterized queries against the leave_requests table."
+    },
+    {
+      "target": "src/modules/employee/employee.model.ts (Phase 2)",
+      "why": "Employee is a type reference for the leave_requests.employee_id and leave_requests.approved_by foreign keys; referenced as a type only (no runtime import in the model per task spec)."
+    },
+    {
+      "target": "src/modules/policy/policy.model.ts (Phase 3)",
+      "why": "LeavePolicy is a type reference for the leave_requests.policy_id foreign key; referenced as a type only (no runtime import in the model per task spec)."
+    },
+    {
+      "target": "Phase 9 \u2014 Leave service",
+      "why": "The ILeaveRepository interface and LeaveRepository implementation produced in this phase are the persistence contract the future LeaveService will depend on for submit/approve/reject/cancel orchestration; the interface signatures must remain stable for that consumer."
+    }
+  ]
+}
