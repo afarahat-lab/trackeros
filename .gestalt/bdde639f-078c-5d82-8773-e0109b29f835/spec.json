@@ -1,0 +1,55 @@
+{
+  "scope": {
+    "affectedDomains": [],
+    "affectedLayers": [],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The AuditLog entity's `action` field is typed as the `AuditAction` enum imported from `src/shared/types` (not a locally redefined copy), verifying the Phase 1 dependency is wired correctly.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The AuditLog entity does NOT include `createdAt` or `updatedAt` fields \u2014 it diverges from BaseEntity and carries only `performedAt: Date` as its temporal field.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository `create` method accepts `Omit<AuditLog, 'id'>` (caller supplies `performedAt`), persists the row via `INSERT ... RETURNING *`, and returns the fully-mapped AuditLog with the DB-generated `id`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository `findByEntity(entityType, entityId)` returns all matching audit rows as an empty array when none exist (never null), and `findByPerformer(performedBy)` likewise returns an empty array for no matches.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository's row-mapping converts snake_case DB columns (entity_type, entity_id, old_values, new_values, performed_by, performed_at) to the camelCase entity fields, and JSONB columns (old_values, new_values) are returned as `Record<string, unknown> | null` preserving null when the DB value is null.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The module's barrel export (`index.ts`) re-exports `AuditLog`, `IAuditRepository` from the model file and `AuditRepository` from the repository file, matching the established module barrel pattern.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests in `tests/unit/modules/audit/` mock `shared/db/connection` (bare path) providing `{ pool: { query: jest.fn() } }`, reset the mock in `beforeEach`, and assert both exact SQL strings and the mapped camelCase entity output for all three repository methods.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access must be encapsulated inside the audit repository class \u2014 no `pool.query` or SQL outside `audit.repository.ts` (GP-001 / no-direct-db-outside-repository).",
+    "No use of `any` anywhere in the audit module \u2014 the `mapRow` helper must type its row parameter as `Record<string, unknown>` and use type assertions/guards instead of `any` (no-any rule, severity high)."
+  ],
+  "outOfScope": [],
+  "ambiguities": [],
+  "entityInvariants": [],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [],
+  "integrationPoints": []
+}
