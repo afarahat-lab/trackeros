@@ -32,6 +32,7 @@ src/modules/AuditServiceInterface/    — AuditServiceInterface module
 src/shared/db connection.ts
 src/shared/base repository.ts
 src/shared/error types.ts
+src/shared/types/           — Shared enums (LeaveType, LeaveStatus, AuditAction) and DTOs (LeaveRequestDTO, LeaveBalanceDTO)
 ```
 
 ## Key patterns
@@ -134,7 +135,7 @@ The leave management module enables employees to apply for annual, sick, emergen
 - **employee** (`src/modules/employee/`): Employee entity, IEmployeeRepository, IEmployeeService, EmployeeService.
 - **leave-policy** (`src/modules/leave-policy/`): LeavePolicy entity, ILeavePolicyRepository, ILeavePolicyService, LeavePolicyService.
 - **leave-balance** (`src/modules/leave-balance/`): LeaveBalance entity, ILeaveBalanceRepository, ILeaveBalanceService, LeaveBalanceService.
-- **leave-request** (`src/modules/leave-request/`): LeaveRequest entity, ILeaveRequestRepository, ILeaveRequestService, LeaveRequestService, LeaveRequestController, routes.
+- **leave-request** (`src/modules/leave-request/`): LeaveRequest entity, ILeaveRequestRepository, ILeaveRequestService, LeaveRequestController, routes.
 - **notification** (`src/modules/notification/`): INotificationService, NotificationService.
 
 ## Dependency Map
