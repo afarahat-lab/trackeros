@@ -28,10 +28,29 @@ Description: Trackeros — a corporate operations web and mobile platform for
   backend's /auth endpoints; identity comes from corporate
   OIDC in production and from local users in development.
   
-  Tests: Vitest for unit + integration. CI on GitHub Actions
+  Tests: Jest for unit + integration. CI on GitHub Actions
   runs lint (ESLint) + typecheck (tsc --noEmit) + unit tests +
   a Semgrep security pass on every PR. Conventional Commits +
   squash-merge. Strict TypeScript (no implicit any, strict
   null checks).
 Stack: TypeScript / Node.js / React / PostgreSQL
 Architecture: Modular monolith (corporate-ops-web-mobile template, tier 1)
+
+## ADR-002 — Header-based auth for development
+
+Date: 2026-06-10
+Status: Accepted
+
+Decision: Use `x-user-id` and `x-user-role` headers for authentication
+during development. A `preHandler` hook in `leave.routes.ts` populates
+`request.user` from these headers. JWT/OIDC integration is deferred to
+a future phase.
+
+Rationale: Simple header-based auth is sufficient for internal/development
+use and avoids the complexity of JWT issuance and OIDC integration during
+early feature development. The `request.user` shape (`{ id, role }`) is
+designed to be compatible with a future JWT middleware replacement.
+
+RBAC enforcement: The leave controller checks `request.user.role` for
+approve/reject (must be `manager` or `hr_admin`) and `request.user.id`
+for cancel (must match the request's employeeId).

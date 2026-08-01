@@ -67,6 +67,25 @@ user projects use whatever stack matches their description.
 
 Emit a `CONTEXT_GAP` signal with the specific missing information identified.
 
+## Active modules
+
+The following modules are registered in `src/app.ts`:
+- **uptime** — health-check endpoint
+- **leave** — full leave management API (submit, approve, reject, cancel, query)
+
+The **status** module exists in the codebase but is NOT registered in `app.ts`.
+
+## Auth mechanism (current)
+
+Authentication uses header-based identity: `x-user-id` and `x-user-role` headers
+are read by a `preHandler` hook in `leave.routes.ts` and stored on
+`request.user` as `{ id, role }`. This is suitable for development/internal use.
+JWT/OIDC integration is planned for production but not yet implemented.
+
+RBAC checks in the leave controller enforce:
+- `approve` / `reject`: role must be `manager` or `hr_admin`
+- `cancel`: the authenticated user's id must match the request's employeeId
+
 ## Operator notes — Git credential scopes
 
 The personal access token registered with this project drives BOTH the

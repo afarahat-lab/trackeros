@@ -349,4 +349,65 @@ Created the leave service implementing all core business logic. Depends on all p
 - **getEmployeeLeaveRequests** (4 tests): returns array, returns empty array, passes query params to repository, no audit/notification side effects.
 
 All tests mock `calculateBusinessDays` and `getHolidaysForYear` from `shared/utils/day-count` via `jest.mock`, and all 6 repository interfaces are mocked with `jest.fn()` per test.
+
+### Phase 10 — Leave Controller, Routes, and App Registration (src/modules/leave/)
+Created the HTTP layer for the leave module and registered it in the Fastify app. Depends on all prior phases (1–9).
+
+**Files created/modified:**
+- `src/modules/leave/leave.controller.ts` — **LeaveController** class wrapping `ILeaveService`. Six methods:
+  - **submit**: Parses body, validates required fields (`employeeId`, `policyId`, `startDate`, `endDate`) at the API boundary (GP-003). Validates date strings parse correctly. Maps `InsufficientBalanceError` → 409, other service errors → 400, unknown errors → 500. Returns 201 on success.
+  - **approve**: Extracts `requestId` from params, `approverId` and `role` from `request.user` (populated by header hook). Enforces RBAC: only `manager` or `hr_admin` roles allowed (GP-005) — returns 403 otherwise. Returns 200 on success.
+  - **reject**: Same RBAC check as approve. Validates `reason` is non-empty in body. Returns 200 on success.
+  - **cancel**: Extracts `employeeId` from `request.user`. Service-level employee mismatch throws → controller maps to 403. Returns 200 on success.
+  - **getById**: Returns 200 with request or 404 if not found.
+  - **getByEmployee**: Parses query string params into `LeaveRequestQueryParams` (status, policyId, date ranges, limit, offset). Returns 200 with array.
+
+- `src/modules/leave/leave.routes.ts` — Fastify plugin exporting `leaveRoutes(fastify: FastifyInstance)`. Key details:
+  - Instantiates all 6 repository classes and wires them into `LeaveService` → `LeaveController`.
+  - Registers a `preHandler` hook that populates `request.user` from `x-user-id` and `x-user-role` headers (header-based auth for development/internal use).
+  - Augments Fastify's `FastifyRequest` interface with optional `user` property via `declare module 'fastify'`.
+  - Six routes:
+    - `POST /api/leave/requests` → `controller.submit`
+    - `GET /api/leave/requests/:requestId` → `controller.getById`
+    - `GET /api/leave/employees/:employeeId/requests` → `controller.getByEmployee`
+    - `POST /api/leave/requests/:requestId/approve` → `controller.approve`
+    - `POST /api/leave/requests/:requestId/reject` → `controller.reject`
+    - `POST /api/leave/requests/:requestId/cancel` → `controller.cancel`
+
+- `src/modules/leave/index.ts` — Updated barrel export to include `ILeaveService`, `LeaveService`, `LeaveController`, and `leaveRoutes`.
+
+- `src/app.ts` — Modified to import and register `leaveRoutes` alongside the existing `uptimeRoutes`:
+  ```ts
+  import { leaveRoutes } from './modules/leave/leave.routes';
+  app.register(leaveRoutes);
+  ```
+
+**Auth mechanism:** Header-based. `x-user-id` and `x-user-role` headers are read in a `preHandler` hook and stored on `request.user` as `{ id, role }`. The controller reads these for RBAC checks and identity. No JWT or OIDC integration is implemented — this is suitable for development/internal use.
+
+**RBAC enforcement (GP-005):** Enforced at the controller level (API boundary):
+- `approve` and `reject`: role must be `manager` or `hr_admin` (403 otherwise).
+- `cancel`: identity check in service (employeeId must match request's employeeId); controller maps mismatch errors to 403.
+
+**Input validation (GP-003):** `submit` validates all required fields at the controller before calling the service. `reject` validates `reason` is non-empty. `getByEmployee` safely parses optional query params.
+
+**Error mapping:**
+| Condition | HTTP Status |
+|-----------|-------------|
+| Missing/invalid required fields | 400 |
+| Service validation errors | 400 |
+| InsufficientBalanceError | 409 |
+| RBAC denial (wrong role) | 403 |
+| Employee mismatch on cancel | 403 |
+| Request not found | 404 |
+| Unknown errors | 500 |
+
+**Tests:** `tests/integration/modules/leave/leave.routes.test.ts` — 18 integration tests using Fastify's `inject` method with `LeaveService` fully mocked:
+- **POST /api/leave/requests** (7 tests): success (201), missing employeeId/policyId/startDate/endDate (400 each), invalid startDate (400), InsufficientBalanceError (409), service error (400).
+- **GET /api/leave/requests/:requestId** (2 tests): found (200), not found (404).
+- **GET /api/leave/employees/:employeeId/requests** (3 tests): returns array (200), empty array (200), passes query params to service.
+- **POST /api/leave/requests/:requestId/approve** (3 tests): success (200), wrong role (403), hr_admin role succeeds (200).
+- **POST /api/leave/requests/:requestId/reject** (3 tests): success (200), wrong role (403), missing reason (400).
+- **POST /api/leave/requests/:requestId/cancel** (2 tests): success (200), employee mismatch (403).
+
+All tests mock `LeaveService` via `jest.mock('modules/leave/leave.service')` and build a fresh Fastify instance per test.
 <!-- gestalt:architecture feature=35df38af-c9d7-41ee-b412-79ee8d149189 END -->
