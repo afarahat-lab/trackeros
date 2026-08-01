@@ -340,11 +340,11 @@ Created the leave service implementing all core business logic. Depends on all p
   - Multi-fiscal-year span check is NOT implemented.
   - These validations are deferred to the controller layer (Phase 10) or future phases.
 
-**Tests:** `tests/unit/modules/leave/leave.service.spec.ts` — 30 tests covering all service methods with all 6 repository dependencies mocked:
-- **submitLeaveRequest** (8 tests): employee not found, employee not ACTIVE, policy not found, policy not active, creates balance when none exists, throws `InsufficientBalanceError` when balance insufficient, notifies manager when employee has managerId, notifies HR admins when employee has no manager, creates audit log with action CREATE, returns created LeaveRequest with status SUBMITTED.
-- **approveLeaveRequest** (5 tests): request not found, wrong status, updates to APPROVED with approver fields, creates audit log with action APPROVE, notifies employee, does NOT modify usedDays.
-- **rejectLeaveRequest** (5 tests): request not found, wrong status, updates to REJECTED with rejectionReason, restores balance via decrementUsedDays, creates audit log with action REJECT, notifies employee.
-- **cancelLeaveRequest** (7 tests): request not found, wrong status (REJECTED), employeeId mismatch, cancels SUBMITTED request, cancels APPROVED request, restores balance via decrementUsedDays, creates audit log with action UPDATE, does NOT create notification.
+**Tests:** `tests/unit/modules/leave/leave.service.test.ts` — 37 tests covering all service methods with all 6 repository dependencies mocked:
+- **submitLeaveRequest** (10 tests): employee not found, employee not ACTIVE, policy not found, policy not active, creates balance when none exists, throws `InsufficientBalanceError` when balance insufficient, notifies manager when employee has managerId, notifies HR admins when employee has no manager, creates audit log with action CREATE, returns created LeaveRequest with status SUBMITTED.
+- **approveLeaveRequest** (6 tests): request not found, wrong status, updates to APPROVED with approver fields, creates audit log with action APPROVE, notifies employee, does NOT modify usedDays.
+- **rejectLeaveRequest** (6 tests): request not found, wrong status, updates to REJECTED with rejectionReason, restores balance via decrementUsedDays, creates audit log with action REJECT, notifies employee.
+- **cancelLeaveRequest** (8 tests): request not found, wrong status (REJECTED), employeeId mismatch, cancels SUBMITTED request, cancels APPROVED request, restores balance via decrementUsedDays, creates audit log with action UPDATE, does NOT create notification.
 - **getLeaveRequest** (3 tests): returns request when found, returns null when not found, no audit/notification side effects.
 - **getEmployeeLeaveRequests** (4 tests): returns array, returns empty array, passes query params to repository, no audit/notification side effects.
 
