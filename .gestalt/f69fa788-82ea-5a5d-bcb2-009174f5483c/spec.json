@@ -1,0 +1,155 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared-types"
+    ],
+    "affectedLayers": [
+      "shared",
+      "unit-tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The shared-types module exports a LeaveType type whose allowed values are exactly 'annual', 'sick', 'emergency', 'unpaid', 'maternity', 'paternity' \u2014 a unit test asserts each value is assignable and that an out-of-set string is rejected by the type system (compile-time) / not present at runtime.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The shared-types module exports a leave-status type (under both the canonical name LeaveRequestStatus and the alias LeaveStatus) whose allowed values are exactly 'DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED', 'CANCELLED' \u2014 a unit test asserts both export names resolve to the same type and that all five values are members.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The shared-types module exports an EmploymentStatus type whose allowed values are exactly 'ACTIVE', 'INACTIVE', 'TERMINATED', and an AuditAction type whose allowed values are exactly 'CREATE', 'UPDATE', 'DELETE', 'APPROVE', 'REJECT' \u2014 unit tests assert the full value set for each.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The shared-types module exports a BaseEntity interface (id: string, createdAt: Date, updatedAt: Date), a CreateLeaveRequestDto (employeeId, policyId, startDate, endDate required; reason optional), an UpdateLeaveRequestDto (startDate, endDate, reason all optional), a LeaveRequestQueryParams (status, policyId, four date-range bounds, limit, offset all optional), and a ValidationResult (isValid: boolean, errors: string[]) \u2014 unit tests assert each DTO accepts a validly-shaped object and rejects one missing a required field (via type-level checks or runtime shape assertions).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The project compiles cleanly under `tsc --noEmit` (strict mode, no implicit any) with the new shared-types source present, and the Jest unit tests under tests/unit/shared/types/ pass \u2014 satisfying the HARNESS verification command (npm run build && npx jest --passWithNoTests).",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No use of `any` anywhere in the shared-types module or its tests \u2014 use `unknown` with type guards where a broad type is needed (HARNESS constraint `no-any`, severity high).",
+    "All source must compile under strict TypeScript (strict: true, no implicit any, strict null checks) with baseUrl ./src and module commonjs \u2014 the shared-types file must be importable via the path `shared/types` (or `shared/types/index`) from other modules.",
+    "Unit tests must live under the `tests/` directory and match the Jest testMatch glob `**/tests/**/*.test.(ts|js)` \u2014 i.e. file names end in `.test.ts`, not `.spec.ts`, and reside under tests/unit/shared/types/.",
+    "The shared-types module owns ONLY the nine declared symbols (LeaveType, LeaveRequestStatus/LeaveStatus, EmploymentStatus, AuditAction, BaseEntity, CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveRequestQueryParams, ValidationResult) \u2014 no entity models, repositories, or business logic belong here; it is a pure type/value module with zero runtime side effects and no database access.",
+    "The enum value sets must match the reconciled architecture exactly: LeaveType lowercase string literals ('annual' etc.), and LeaveStatus/EmploymentStatus/AuditAction uppercase string literals \u2014 NOT the stale root ARCHITECTURE.md values (ANNUAL/PENDING/3-action AuditAction) which are superseded."
+  ],
+  "outOfScope": [
+    "Entity models, repository interfaces, and service implementations for employee, policy, leave, balance, notification, and audit modules (PLAN.md Phases 2\u201310) \u2014 this phase only creates the shared type definitions those modules will later import.",
+    "The BalanceStatus, NotificationStatus, and EntityType enums \u2014 these are defined in their owning modules in later phases (balance, notification, audit) per the reconciled architecture; only the four enums named in Phase 1 (LeaveType, LeaveStatus/LeaveRequestStatus, EmploymentStatus, AuditAction) are in scope here.",
+    "Input validation logic / runtime validators \u2014 ValidationResult is a type shape only; no validation functions, zod schemas, or class-validator decorators are produced in this phase (GP-003 validation is applied at API boundaries in Phase 10).",
+    "Database migrations, the holidays table, and the day-count utility (Phase 8) \u2014 the shared-types module has no database dependency."
+  ],
+  "ambiguities": [
+    {
+      "description": "The intent says LeaveStatus should be \"named LeaveRequestStatus for clarity in code but exported as both.\" The reconciled architecture's entity list names the enum `LeaveStatus` (attribute `status: LeaveRequestStatus`), while PLAN.md and the module-owns list say `LeaveStatus`. It is ambiguous which name is the canonical definition and which is the alias \u2014 i.e. is `LeaveRequestStatus` the primary type with `LeaveStatus = LeaveRequestStatus`, or vice-versa?",
+      "options": [
+        "LeaveRequestStatus is the canonical type; LeaveStatus is a type alias re-exported for compatibility",
+        "LeaveStatus is the canonical type; LeaveRequestStatus is a type alias re-exported for clarity",
+        "Both are separate but identical type definitions exported independently"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "description": "The intent specifies the enums as TypeScript union string-literal types (e.g. `'annual' | 'sick' | ...`), but the architecture and AGENTS.md refer to them as \"enums.\" It is ambiguous whether these should be implemented as TypeScript `enum` constructs, `type` aliases of string unions, or `const` objects with a derived union \u2014 each has different runtime behavior (enums emit JS objects; type aliases are erased).",
+      "options": [
+        "TypeScript string-literal union types (type LeaveType = 'annual' | ...)",
+        "TypeScript enum constructs (enum LeaveType { ANNUAL = 'annual', ... })",
+        "Const object + derived union (const LeaveTypeValues = {...} as const; type LeaveType = typeof LeaveTypeValues[keyof ...]"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "The intent lists LeaveRequestQueryParams.status as typed `LeaveStatus`, but the LeaveRequest entity in the reconciled architecture uses `LeaveRequestStatus` for its status field. Since both names are exported as the same type this is likely harmless, but it is ambiguous whether the query-params DTO should reference `LeaveStatus` or `LeaveRequestStatus` explicitly \u2014 and whether the two aliases are guaranteed structurally identical so downstream phases can use either interchangeably.",
+      "options": [
+        "Query params reference LeaveStatus (as the intent literally states); both aliases are structurally identical so it does not matter",
+        "Query params should reference LeaveRequestStatus to match the entity's field type exactly"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeaveType",
+      "mustExistOrExtend": true,
+      "invariant": "The set of allowed leave-category values is closed and fixed at exactly six members (annual, sick, emergency, unpaid, maternity, paternity); no consumer may introduce a seventh value without extending this shared definition, and every LeavePolicy in later phases binds to exactly one of these values."
+    },
+    {
+      "entity": "LeaveRequestStatus (a.k.a. LeaveStatus)",
+      "mustExistOrExtend": true,
+      "invariant": "The leave-request lifecycle state space is exactly five states (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED); both exported names (LeaveRequestStatus and LeaveStatus) MUST resolve to the identical type so that no downstream consumer can observe a structural difference between them."
+    },
+    {
+      "entity": "EmploymentStatus",
+      "mustExistOrExtend": true,
+      "invariant": "The employment-status value set is closed at exactly three members (ACTIVE, INACTIVE, TERMINATED); this is the sole source of truth for employee employment state referenced by the leave-submission business rule (employee must be ACTIVE to submit)."
+    },
+    {
+      "entity": "AuditAction",
+      "mustExistOrExtend": true,
+      "invariant": "The audit-action value set is closed at exactly five members (CREATE, UPDATE, DELETE, APPROVE, REJECT); every state-changing operation recorded by the audit module in a later phase must use one of these values \u2014 no ad-hoc action strings are permitted."
+    },
+    {
+      "entity": "BaseEntity",
+      "mustExistOrExtend": true,
+      "invariant": "BaseEntity is the structural contract every persisted domain entity extends \u2014 it carries identity (id: string) and temporal audit fields (createdAt, updatedAt); any entity that is persisted to PostgreSQL in later phases must be structurally compatible with this interface so repository create/update signatures can rely on it."
+    },
+    {
+      "entity": "ValidationResult",
+      "mustExistOrExtend": true,
+      "invariant": "ValidationResult is a pure result shape (isValid boolean + errors string array) with no validation logic owned here; when isValid is false the errors array must be non-empty, and when isValid is true the errors array must be empty \u2014 this invariant is a contract later validation functions must uphold."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "The shared-types module must export all nine declared symbols (LeaveType, LeaveRequestStatus, LeaveStatus, EmploymentStatus, AuditAction, BaseEntity, CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveRequestQueryParams, ValidationResult) from its public entry point so that every downstream module can import each symbol from the single declared module path `shared/types`.",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "A missing or misnamed export is a compile-time failure caught by tsc --noEmit; no runtime error semantics apply to a pure type module."
+    },
+    {
+      "operation": "Importing any shared type from a downstream module must go through the shared-types module's declared public entry point (its index/barrel), never from an internal file \u2014 per the architecture rule that modules import only through declared public entry points.",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Importing from an internal path rather than the barrel is an architectural violation (CONSTRAINT_VIOLATION), not a runtime error."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The enum value sets and DTO field shapes must match the reconciled architecture's domain_entities and modules declarations exactly \u2014 LeaveType values are lowercase string literals, LeaveStatus/EmploymentStatus/AuditAction are uppercase string literals, and the shared-types module path is src/shared/types/ owning exactly the nine named symbols. The reconciled architecture is authoritative over the stale root ARCHITECTURE.md.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "The DTO field shapes (CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveRequestQueryParams, BaseEntity, ValidationResult) must match the field-level definitions in PLAN.md Phase 1 so that later phases (2\u201310) which import these types compile against the exact shapes they were planned around \u2014 e.g. CreateLeaveRequestDto requires employeeId, policyId, startDate, endDate with optional reason; UpdateLeaveRequestDto makes all three optional.",
+      "referencePath": "PLAN.md"
+    },
+    {
+      "requirement": "The shared-types source must compile under the project's tsconfig (strict: true, baseUrl: ./src, module: commonjs, rootDir: ./src, include: [\"src\"]) \u2014 meaning the file lives under src/, uses no implicit any, and is importable via the baseUrl-relative path `shared/types`.",
+      "referencePath": "tsconfig.json"
+    },
+    {
+      "requirement": "Unit tests for the shared-types module must match the Jest config's testMatch glob (`**/tests/**/*.test.(ts|js)`) and use the ts-jest transform \u2014 test files must end in `.test.ts` and reside under tests/unit/shared/types/, not use the `.spec.ts` suffix.",
+      "referencePath": "jest.config.js"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "All downstream domain modules (employee, policy, leave, balance, notification, audit) \u2014 Phases 2\u201310",
+      "why": "The shared-types module is the zero-dependency foundation every other module imports from; EmploymentStatus is consumed by the employee module, LeaveType by policy, LeaveStatus/CreateLeaveRequestDto/UpdateLeaveRequestDto/LeaveRequestQueryParams by leave, AuditAction by audit. This phase must complete and export correctly before any of those phases can compile."
+    },
+    {
+      "target": "HARNESS.json verification pipeline (npm run build && npx jest --passWithNoTests)",
+      "why": "The shared-types source is the first non-trivial src/ TypeScript the mechanical compile gate will typecheck; it must pass tsc --noEmit under strict mode and its tests must be discovered and pass under the configured Jest testMatch."
+    }
+  ]
+}
