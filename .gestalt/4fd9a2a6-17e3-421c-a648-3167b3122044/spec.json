@@ -1,0 +1,168 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave",
+      "employee",
+      "policy",
+      "balance"
+    ],
+    "affectedLayers": [
+      "controller",
+      "routes",
+      "integration-tests"
+    ],
+    "isBreakingChange": true,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "All five cross-module repository imports in leave.routes.ts (BalanceRepository, EmployeeRepository, PolicyRepository, NotificationRepository, AuditRepository) resolve through barrel exports (index.ts) rather than internal file paths, and the module compiles without import errors.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The InsufficientBalanceError import in the leave routes integration test resolves through the balance module barrel export rather than the internal balance.model file path, and the test file compiles without import errors.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "The submit controller method rejects a request whose startDate is in the past with HTTP 400 and an error message indicating the start date cannot be in the past \u2014 the service is never invoked for such requests.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "The submit controller method rejects a request where startDate is after endDate with HTTP 400 and an error message indicating the start date must be on or before the end date \u2014 the service is never invoked for such requests.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "The submit controller method rejects a request that does not satisfy the policy's minimum notice period (when minimumNoticeDays is set) with HTTP 400 and an error message indicating insufficient notice \u2014 the service is never invoked for such requests. When minimumNoticeDays is null the check is skipped.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "The submit controller method rejects a request whose startDate and endDate span different fiscal years (compared via getUTCFullYear) with HTTP 400 and an error message indicating the request must not span multiple fiscal years \u2014 the service is never invoked for such requests.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "The submit controller method enforces RBAC: a request is accepted only when the authenticated user's id matches the body employeeId OR the user's role is hr_admin; otherwise it returns HTTP 403 without invoking the service.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "The getById controller method enforces RBAC: a request is returned only when the authenticated user is the request's own employee, the request employee's manager, or has the hr_admin role; otherwise it returns HTTP 403.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "The getByEmployee controller method enforces RBAC: leave requests are returned only when the authenticated user is the target employee themselves, that employee's manager, or has the hr_admin role; otherwise it returns HTTP 403.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "Existing integration tests that exercise submit, getById, and getByEmployee are updated to include auth headers so they pass under the new RBAC enforcement, and new tests cover the RBAC denial (403) and validation-failure (400) paths.",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "Modules never import from each other's internals \u2014 only from index.ts. All five cross-module repository imports in leave.routes.ts must use barrel paths (e.g. from '../balance', from '../employee', etc.), not internal file paths like '../balance/balance.repository'.",
+    "The InsufficientBalanceError import in the integration test must use the barrel path (from 'modules/balance'), not the internal balance.model path.",
+    "All database access must go through repository interfaces (GP-001). The controller's RBAC manager-relationship checks and minimum-notice policy lookups must use repository interfaces (IEmployeeRepository.findById, IPolicyRepository.findById), never inline SQL or direct pool access.",
+    "RBAC must be enforced at the controller layer (API boundary), consistent with the existing approve/reject/cancel pattern (GP-005). The submit, getById, and getByEmployee methods must each perform their authorization check before delegating to the service.",
+    "Input validation must occur at the API boundary before the service is called (GP-003). The four deferred validations (past-date, date-order, minimum-notice, multi-fiscal-year) must be performed in the submit controller method after date parseability is confirmed and before DTO construction / service invocation. All validation failures return HTTP 400.",
+    "Fiscal year equals calendar year; the multi-fiscal-year span check compares getUTCFullYear() of startDate and endDate. The minimum-notice check uses the policy's minimumNoticeDays field; when it is null the notice check is skipped.",
+    "The controller must not duplicate business logic already owned by the service. The four validations are controller-layer input checks only; the service's existing employee-status, policy-active, and balance-sufficiency checks remain unchanged.",
+    "Strict TypeScript must pass (no implicit any, strict null checks). The controller's new repository dependencies for RBAC and policy lookup must be typed via their interfaces (IEmployeeRepository, IPolicyRepository), not concrete classes or any."
+  ],
+  "outOfScope": [
+    "JWT/OIDC authentication integration \u2014 the header-based auth mechanism (x-user-id, x-user-role via preHandler) remains unchanged; no token validation or session management is added.",
+    "Changes to the LeaveService business logic \u2014 the service's existing employee-status, policy-active, balance-sufficiency, deduct-on-submission, restore-on-reject/cancel, audit, and notification logic is not modified.",
+    "RBAC enforcement on the approve, reject, and cancel methods \u2014 these already have RBAC checks and are not modified in this phase.",
+    "New database migrations, schema changes, or new tables \u2014 this phase modifies only controller, routes, and test files.",
+    "Frontend changes \u2014 this phase is backend-only (controller, routes, tests)."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "A submitted LeaveRequest must not have a startDate in the past, must have startDate <= endDate, must satisfy the governing policy's minimum notice period (when set), and must not span multiple fiscal years \u2014 these are enforced at the controller boundary before the service creates the request."
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "An Employee's managerId field (string | null) is the authoritative source for manager-relationship RBAC: a caller is the employee's manager if and only if the caller's id equals the employee's managerId. Employees with null managerId have no manager and escalate to hr_admin for approval-related access."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "A LeavePolicy's minimumNoticeDays field (number | null) governs the minimum-notice validation: when non-null, the number of days between the submission time and the request startDate must be >= minimumNoticeDays; when null, no notice-period constraint is applied."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "submit (leave request creation)",
+      "authRule": "Authenticated user's id must match the body employeeId OR user role must be hr_admin; otherwise 403. After auth passes, four input validations run (past-date, date-order, minimum-notice, multi-fiscal-year); any failure returns 400. Only then is the service invoked.",
+      "idempotent": false,
+      "errorSemantics": "400 for validation failures (missing fields, invalid dates, past date, date-order, insufficient notice, multi-fiscal-year); 403 for RBAC denial; 409 for InsufficientBalanceError from service; 400 for other service errors; 500 for unknown errors."
+    },
+    {
+      "operation": "getById (retrieve a single leave request)",
+      "authRule": "Authenticated user must be the request's employee (user.id === request.employeeId), the request employee's manager (user.id === employee.managerId), or have role hr_admin; otherwise 403. The auth check requires fetching the leave request and its employee to resolve the manager relationship.",
+      "idempotent": true,
+      "errorSemantics": "403 for RBAC denial; 404 if the leave request is not found; 400 for other service errors; 500 for unknown errors."
+    },
+    {
+      "operation": "getByEmployee (retrieve leave requests for an employee)",
+      "authRule": "Authenticated user must be the target employee (user.id === path employeeId), that employee's manager (user.id === employee.managerId), or have role hr_admin; otherwise 403. The auth check requires fetching the employee by path employeeId to resolve the manager relationship.",
+      "idempotent": true,
+      "errorSemantics": "403 for RBAC denial (including when the target employee does not exist, as the manager relationship cannot be established); 400 for other service errors; 500 for unknown errors."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The controller's new repository dependencies for RBAC and policy lookup must use the same interface types (IEmployeeRepository, IPolicyRepository) that the service already imports via barrel exports from '../employee' and '../policy'. The controller must not import these interfaces from internal model files.",
+      "referencePath": "src/modules/leave/leave.service.ts"
+    },
+    {
+      "requirement": "The existing error-mapping pattern in the submit method (InsufficientBalanceError \u2192 409 via error.name check, other Error \u2192 400, unknown \u2192 500) must be preserved. The new validation failures must return 400 with an errors array consistent with the existing field-validation 400 responses.",
+      "referencePath": "src/modules/leave/leave.controller.ts"
+    },
+    {
+      "requirement": "The existing RBAC pattern in approve/reject (extract authContext from request.user, read id and role, return 403 with a Forbidden message on denial) must be followed consistently for the new submit/getById/getByEmployee RBAC checks. The 403 response shape must match the existing { error: 'Forbidden: ...' } pattern.",
+      "referencePath": "src/modules/leave/leave.controller.ts"
+    },
+    {
+      "requirement": "The preHandler hook that populates request.user from x-user-id and x-user-role headers must remain the source of auth context. The new RBAC checks in the controller must read request.user the same way the existing approve/reject/cancel methods do (authContext?.id, authContext?.role).",
+      "referencePath": "src/modules/leave/leave.routes.ts"
+    },
+    {
+      "requirement": "The fiscalYear computation in the controller's multi-fiscal-year validation must use the same method as the service: getUTCFullYear() on the parsed startDate and endDate. This ensures the controller and service agree on fiscal-year boundaries (calendar year).",
+      "referencePath": "src/modules/leave/leave.service.ts"
+    },
+    {
+      "requirement": "The controller constructor currently takes only ILeaveService. To perform manager-relationship RBAC (getById, getByEmployee) and policy-based minimum-notice validation (submit), the controller must be given access to IEmployeeRepository and IPolicyRepository. The routes file must wire these repositories into the controller alongside the existing LeaveService, using the same barrel-exported repository instances already instantiated for the service.",
+      "referencePath": "src/modules/leave/leave.routes.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/employee (IEmployeeRepository.findById)",
+      "why": "The controller needs to resolve the manager relationship for getById and getByEmployee RBAC checks \u2014 it must look up the employee by id to read their managerId field and compare it against the caller's id."
+    },
+    {
+      "target": "src/modules/policy (IPolicyRepository.findById)",
+      "why": "The controller needs to read the policy's minimumNoticeDays field to perform the minimum-notice validation in submit before invoking the service."
+    },
+    {
+      "target": "src/modules/balance (InsufficientBalanceError barrel export)",
+      "why": "The integration test must import InsufficientBalanceError from the balance module barrel export (modules/balance) rather than the internal balance.model path, matching the barrel-export convention used by other tests."
+    },
+    {
+      "target": "tests/integration/modules/leave/leave.routes.test.ts",
+      "why": "Existing integration tests for submit, getById, and getByEmployee send no auth headers and will receive 403 under the new RBAC enforcement; they must be updated with appropriate x-user-id/x-user-role headers, and new test cases must cover the RBAC denial and validation-failure paths."
+    }
+  ]
+}
