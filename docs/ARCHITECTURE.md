@@ -270,4 +270,83 @@ Created the shared business-day calculation utility — the single source of tru
 - `getHolidaysForYear`: verifies query shape (year + country='US'), returns Date[] from rows, returns empty array for no rows, propagates pool.query rejection, never returns undefined/null.
 
 All tests mock `pool.query` from `shared/db/connection` using the same pattern as existing repository tests (`jest.mock` + `mockReset` in `beforeEach`).
+
+### Phase 9 — Leave Service (src/modules/leave/)
+Created the leave service implementing all core business logic. Depends on all prior phases (1–8). The service orchestrates policy validation, balance operations, audit logging, and notifications — it is the single entry point for all leave request state transitions.
+
+**Files created:**
+- `src/modules/leave/leave.service.interface.ts` — **ILeaveService** interface with 6 methods:
+  - `submitLeaveRequest(dto: CreateLeaveRequestDto): Promise<LeaveRequest>`
+  - `approveLeaveRequest(requestId: string, approverId: string): Promise<LeaveRequest>`
+  - `rejectLeaveRequest(requestId: string, approverId: string, reason: string): Promise<LeaveRequest>`
+  - `cancelLeaveRequest(requestId: string, employeeId: string): Promise<LeaveRequest>`
+  - `getLeaveRequest(requestId: string): Promise<LeaveRequest | null>`
+  - `getEmployeeLeaveRequests(employeeId: string, params?: LeaveRequestQueryParams): Promise<LeaveRequest[]>`
+
+- `src/modules/leave/leave.service.ts` — **LeaveService** class implementing `ILeaveService`. Constructor takes 6 repository interfaces: `ILeaveRepository`, `IBalanceRepository`, `IEmployeeRepository`, `IPolicyRepository`, `INotificationRepository`, `IAuditRepository`. All database access goes through these repository interfaces (GP-001 compliant).
+
+  **submitLeaveRequest** logic:
+  1. Look up employee; throw if not found or `employmentStatus !== ACTIVE`.
+  2. Look up policy; throw if not found or `!isActive`.
+  3. Compute `fiscalYear = startDate.getUTCFullYear()`.
+  4. Get or create LeaveBalance for (employeeId, policyId, fiscalYear). If creating, set `totalEntitlement = policy.entitlementDays`, `usedDays = 0`, `status = 'ACTIVE'`.
+  5. Fetch holidays via `getHolidaysForYear(fiscalYear)`.
+  6. Compute `requestedDays = calculateBusinessDays(startDate, endDate, holidays)`.
+  7. Check sufficiency: `totalEntitlement - usedDays >= requestedDays`. If insufficient, throw `InsufficientBalanceError`.
+  8. Atomically increment usedDays via `balanceRepository.incrementUsedDays`.
+  9. Create LeaveRequest with status `SUBMITTED`.
+  10. Create AuditLog with action `CREATE`, `performedBy = employeeId`.
+  11. Notify: if employee has `managerId`, notify manager; otherwise find all employees with `role === 'hr_admin'` and notify each.
+
+  **approveLeaveRequest** logic:
+  1. Find request; throw if not found or status is not `SUBMITTED`.
+  2. Update status to `APPROVED` with `approvedBy = approverId`.
+  3. Create AuditLog with action `APPROVE`, `performedBy = approverId`.
+  4. Notify the employee.
+  5. Does NOT modify usedDays (balance was already deducted at submission).
+
+  **rejectLeaveRequest** logic:
+  1. Find request; throw if not found or status is not `SUBMITTED`.
+  2. Update status to `REJECTED` with `rejectionReason`.
+  3. Compute business days for the request's date range.
+  4. Find balance and restore via `decrementUsedDays`.
+  5. Create AuditLog with action `REJECT`, `performedBy = approverId`.
+  6. Notify the employee.
+
+  **cancelLeaveRequest** logic:
+  1. Find request; throw if not found, status is not `SUBMITTED` or `APPROVED`, or `employeeId` does not match.
+  2. Update status to `CANCELLED`.
+  3. Compute business days for the request's date range.
+  4. Find balance and restore via `decrementUsedDays`.
+  5. Create AuditLog with action `UPDATE`, `performedBy = employeeId`.
+  6. Does NOT create a notification.
+
+  **getLeaveRequest** / **getEmployeeLeaveRequests**: Pure delegation to `leaveRepository`.
+
+  **Binding rules applied:**
+  - Deduct-on-submission: `incrementUsedDays` at SUBMIT, not at APPROVE.
+  - Restore-on-reject/cancel: `decrementUsedDays` on REJECT and CANCEL.
+  - Approval does NOT change usedDays again.
+  - No-manager escalates to HR admin (employees with `role === 'hr_admin'`).
+  - Business days only via shared `calculateBusinessDays` + `getHolidaysForYear`.
+  - `remainingDays` is computed (`totalEntitlement - usedDays`), never stored.
+  - Every state-changing operation writes an audit record (GP-002).
+  - All async errors are caught and re-thrown as typed errors (GP-006).
+
+  **Notable divergences from the original business rules spec:**
+  - `startDate` not-in-past validation is NOT implemented.
+  - `startDate <= endDate` validation is NOT implemented.
+  - Minimum notice period check is NOT implemented.
+  - Multi-fiscal-year span check is NOT implemented.
+  - These validations are deferred to the controller layer (Phase 10) or future phases.
+
+**Tests:** `tests/unit/modules/leave/leave.service.spec.ts` — 30 tests covering all service methods with all 6 repository dependencies mocked:
+- **submitLeaveRequest** (8 tests): employee not found, employee not ACTIVE, policy not found, policy not active, creates balance when none exists, throws `InsufficientBalanceError` when balance insufficient, notifies manager when employee has managerId, notifies HR admins when employee has no manager, creates audit log with action CREATE, returns created LeaveRequest with status SUBMITTED.
+- **approveLeaveRequest** (5 tests): request not found, wrong status, updates to APPROVED with approver fields, creates audit log with action APPROVE, notifies employee, does NOT modify usedDays.
+- **rejectLeaveRequest** (5 tests): request not found, wrong status, updates to REJECTED with rejectionReason, restores balance via decrementUsedDays, creates audit log with action REJECT, notifies employee.
+- **cancelLeaveRequest** (7 tests): request not found, wrong status (REJECTED), employeeId mismatch, cancels SUBMITTED request, cancels APPROVED request, restores balance via decrementUsedDays, creates audit log with action UPDATE, does NOT create notification.
+- **getLeaveRequest** (3 tests): returns request when found, returns null when not found, no audit/notification side effects.
+- **getEmployeeLeaveRequests** (4 tests): returns array, returns empty array, passes query params to repository, no audit/notification side effects.
+
+All tests mock `calculateBusinessDays` and `getHolidaysForYear` from `shared/utils/day-count` via `jest.mock`, and all 6 repository interfaces are mocked with `jest.fn()` per test.
 <!-- gestalt:architecture feature=35df38af-c9d7-41ee-b412-79ee8d149189 END -->
