@@ -1,0 +1,250 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "http-api",
+      "app-bootstrap",
+      "integration-tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The leave HTTP layer exposes one operation per ILeaveService method (submit, approve, reject, cancel, getById, getByEmployee); each delegates to ILeaveService without re-implementing business logic.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "Submit rejects requests missing required CreateLeaveRequestDto fields (employeeId, policyId, startDate, endDate) with a 4xx response before the service is invoked (GP-003); a valid submission returns 201 with the created LeaveRequest body.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "getById returns 200 with the LeaveRequest body when the service finds it, and 404 when the service returns null.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "getByEmployee returns 200 with a JSON array (possibly empty) and forwards query parameters to the service as LeaveRequestQueryParams.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "Cancel enforces that the authenticated user's id matches the request's employeeId (GP-005); a mismatch is rejected with 403 and the service is not invoked. A matching caller returns 200 with the cancelled request.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "Approve and reject enforce that the authenticated user holds the manager or hr_admin role (GP-005); callers without those roles are rejected with 403 and the service is not invoked. Authorized callers return 200.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "Service errors are mapped to HTTP statuses: InsufficientBalanceError \u2192 4xx (e.g. 409 or 422), not-found / wrong-status / employee-mismatch errors \u2192 4xx (404 or 409), and unexpected errors \u2192 500 \u2014 no unhandled promise rejections reach the client (GP-006).",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "The routes registration function instantiates all six repositories (leave, balance, employee, policy, notification, audit) and constructs the LeaveService with them, so every operation has its full dependency graph wired.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "src/app.ts registers the leave routes alongside the existing uptime routes (both remain functional); the exported app boots without error and the leave endpoints are reachable.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "Integration tests under tests/integration/modules/leave/ exercise the full request\u2192controller\u2192service path via Fastify's inject method, with the LeaveService (or its repositories) mocked, covering at least: successful submit (201), invalid submit (4xx), getById found (200) and not-found (404), getByEmployee (200), approve/reject authorized (200) and unauthorized (403), cancel owner-match (200) and mismatch (403).",
+      "testable": true,
+      "layer": "e2e"
+    },
+    {
+      "description": "The project builds (tsc --noEmit) and the full Jest suite passes with the new controller/routes/app changes and integration tests added.",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "The controller must not contain business logic or database access \u2014 it only parses/validates inputs, enforces RBAC, delegates to ILeaveService, and maps results/errors to HTTP responses (GP-001, GP-003).",
+    "All database access stays behind repository interfaces; the routes wiring instantiates the concrete repository classes but the controller and service only depend on the interfaces (GP-001).",
+    "RBAC must be enforced at the API boundary (GP-005): cancel requires the authenticated user id to equal the request's employeeId; approve and reject require the authenticated user's role to be 'manager' or 'hr_admin'. Since no auth middleware exists yet, the implementation must read the identity/role from a placeholder auth context (e.g. request.user) and still perform the checks.",
+    "No unhandled promise rejections (GP-006): every controller operation must catch service errors and convert them to HTTP responses rather than letting them propagate to Fastify's default handler.",
+    "Strict TypeScript (no implicit any, strict null checks) \u2014 the controller must type request params/query/body and the auth context rather than using any; use unknown with type guards where the request payload is untyped (HARNESS no-any rule).",
+    "The leave routes registration must follow the existing uptimeRoutes pattern: an async function taking FastifyInstance that registers handlers, invoked via app.register, and must not break the existing /uptime endpoint.",
+    "No sensitive data (passwords, tokens, PII) in logs (GP-004); error responses must not echo raw internal error stacks or PII to the client.",
+    "The deferred validations from Phase 9 (startDate not in past, startDate <= endDate, minimum notice period, multi-fiscal-year span) must be enforced at this API boundary before calling the service, since the service does not perform them (GP-003)."
+  ],
+  "outOfScope": [
+    "Implementing a real authentication/JWT middleware or a full RBAC middleware framework \u2014 this phase uses a placeholder auth context (request.user) and performs inline boundary checks only.",
+    "Frontend/React Native client or @trackeros/contracts REST surface changes.",
+    "New database migrations, schema changes, or new repository methods \u2014 all persistence is reused from Phases 2\u20139.",
+    "Balance, employee, policy, notification, or audit controllers/routes \u2014 only the leave module HTTP layer is in scope.",
+    "Pagination metadata envelopes, HATEOAS links, or response-shape standardization beyond returning the LeaveRequest entity / array as JSON.",
+    "Rate limiting, CORS configuration, or request-size limits."
+  ],
+  "ambiguities": [
+    {
+      "description": "The shape of the placeholder auth context (request.user) is undefined \u2014 there is no auth middleware or Fastify type declaration for it in the codebase. The controller must read user id and role from it, but the exact property names/typing are unspecified.",
+      "options": [
+        "Assume request.user = { id: string; role: string } and declare a local type/interface for it",
+        "Read id/role from request headers (e.g. x-user-id, x-user-role) as a testable placeholder",
+        "Decorate request.user via a minimal Fastify plugin/declare module in this phase"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "The HTTP status code for InsufficientBalanceError is unspecified \u2014 PLAN.md says submit returns 201 on success but does not prescribe the failure status for insufficient balance.",
+      "options": [
+        "409 Conflict",
+        "422 Unprocessable Entity",
+        "400 Bad Request"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "description": "The HTTP status for service-level not-found / wrong-status / employee-mismatch errors is unspecified. These are currently generic Error throws in LeaveService (not typed errors), so the controller cannot distinguish them by type alone.",
+      "options": [
+        "Map all generic service Errors to 500 and only InsufficientBalanceError to a 4xx",
+        "Inspect error message text to map not-found\u2192404 and wrong-status/mismatch\u2192409",
+        "Introduce typed error classes in the service (out of this phase's scope) \u2014 for now map generic errors to 400/409 heuristically"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "Whether the deferred validations (startDate not in past, startDate <= endDate, minimum notice, multi-fiscal-year span) should be enforced in this phase. Phase 9 explicitly deferred them to \"the controller layer (Phase 10)\", but PLAN.md's Phase 10 description only mentions GP-003 required-field validation and does not restate these date validations.",
+      "options": [
+        "Enforce all four deferred date validations at the controller boundary now (GP-003)",
+        "Enforce only startDate <= endDate (data integrity) and defer the rest",
+        "Defer all four to a later phase and only do required-field presence validation this phase"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "Whether getByEmployee should enforce that the authenticated user may only view their own requests (RBAC) or whether managers/hr_admin may view any employee's requests. PLAN.md only specifies RBAC for cancel and approve/reject, not for read operations.",
+      "options": [
+        "No RBAC on reads this phase \u2014 any authenticated user can query by employeeId",
+        "Restrict reads to self (request.user.id === employeeId) or manager/hr_admin role"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeaveController",
+      "mustExistOrExtend": true,
+      "invariant": "Every controller method is a thin adapter: it validates/extracts inputs, enforces RBAC, delegates exactly one ILeaveService method, and maps the result or thrown error to an HTTP response \u2014 it never performs repository calls, balance math, audit writes, or notification creation directly."
+    },
+    {
+      "entity": "LeaveService (consumed)",
+      "mustExistOrExtend": true,
+      "invariant": "The controller must not alter the LeaveService contract or behavior; it calls the existing six ILeaveService methods with the same argument shapes (CreateLeaveRequestDto, requestId+approverId, requestId+approverId+reason, requestId+employeeId, requestId, employeeId+params) and surfaces their results/errors unchanged in semantics."
+    },
+    {
+      "entity": "Fastify app (src/app.ts)",
+      "mustExistOrExtend": true,
+      "invariant": "The app must continue to register and serve the existing uptimeRoutes after the leave routes are added; both route plugins coexist without path or plugin-name collisions."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "Submit a leave request (delegates to service.submitLeaveRequest)",
+      "authRule": "Authenticated user required; the submitted employeeId need not match the caller in this phase (no explicit RBAC stated for submit), but the caller identity must be available for audit provenance.",
+      "idempotent": false,
+      "errorSemantics": "Missing/invalid required CreateLeaveRequestDto fields \u2192 4xx before service call. InsufficientBalanceError \u2192 4xx. Service not-found/inactive-employee/inactive-policy errors \u2192 4xx. Unexpected errors \u2192 500. Success \u2192 201 with the created LeaveRequest."
+    },
+    {
+      "operation": "Approve a leave request (delegates to service.approveLeaveRequest)",
+      "authRule": "Authenticated user must have role 'manager' or 'hr_admin'; otherwise 403 and the service is not invoked. The approverId passed to the service is the authenticated user's id.",
+      "idempotent": false,
+      "errorSemantics": "Unauthorized \u2192 403. Service not-found / wrong-status errors \u2192 4xx. Unexpected errors \u2192 500. Success \u2192 200 with the approved LeaveRequest."
+    },
+    {
+      "operation": "Reject a leave request (delegates to service.rejectLeaveRequest)",
+      "authRule": "Authenticated user must have role 'manager' or 'hr_admin'; otherwise 403 and the service is not invoked. The approverId passed to the service is the authenticated user's id. A rejection reason must be present (GP-003).",
+      "idempotent": false,
+      "errorSemantics": "Unauthorized \u2192 403. Missing reason \u2192 4xx. Service not-found / wrong-status errors \u2192 4xx. Unexpected errors \u2192 500. Success \u2192 200 with the rejected LeaveRequest."
+    },
+    {
+      "operation": "Cancel a leave request (delegates to service.cancelLeaveRequest)",
+      "authRule": "Authenticated user's id must equal the request's employeeId; otherwise 403 and the service is not invoked. The employeeId passed to the service is the authenticated user's id (not a body/param value).",
+      "idempotent": false,
+      "errorSemantics": "Owner mismatch \u2192 403. Service not-found / wrong-status errors \u2192 4xx. Unexpected errors \u2192 500. Success \u2192 200 with the cancelled LeaveRequest."
+    },
+    {
+      "operation": "Get a leave request by id (delegates to service.getLeaveRequest)",
+      "authRule": "Authenticated user required; no explicit role restriction stated for reads this phase (ambiguity flagged).",
+      "idempotent": true,
+      "errorSemantics": "Service returns null \u2192 404. Unexpected errors \u2192 500. Success \u2192 200 with the LeaveRequest body."
+    },
+    {
+      "operation": "Get leave requests by employee (delegates to service.getEmployeeLeaveRequests)",
+      "authRule": "Authenticated user required; no explicit role restriction stated for reads this phase (ambiguity flagged).",
+      "idempotent": true,
+      "errorSemantics": "Unexpected errors \u2192 500. Success \u2192 200 with a JSON array (possibly empty)."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The controller must call exactly the six ILeaveService methods with their declared signatures: submitLeaveRequest(CreateLeaveRequestDto), approveLeaveRequest(requestId, approverId), rejectLeaveRequest(requestId, approverId, reason), cancelLeaveRequest(requestId, employeeId), getLeaveRequest(requestId), getEmployeeLeaveRequests(employeeId, params?). No new service methods may be introduced.",
+      "referencePath": "src/modules/leave/leave.service.interface.ts"
+    },
+    {
+      "requirement": "The LeaveService constructor argument order is (leaveRepository, balanceRepository, employeeRepository, policyRepository, notificationRepository, auditRepository); the routes wiring must instantiate and pass the concrete repository classes in this exact order so dependency injection matches the service's expectations.",
+      "referencePath": "src/modules/leave/leave.service.ts"
+    },
+    {
+      "requirement": "Input validation at the API boundary must validate against the CreateLeaveRequestDto shape (employeeId, policyId, startDate, endDate, optional reason) and parse query parameters into LeaveRequestQueryParams \u2014 reusing these shared types rather than redefining them.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The controller must detect InsufficientBalanceError (exported from the balance module) by type and map it to a distinct 4xx response, preserving its balanceId/requestedDays/availableDays properties in the error body rather than treating it as a generic error.",
+      "referencePath": "src/modules/balance/balance.model.ts"
+    },
+    {
+      "requirement": "The modified app.ts must preserve the existing uptimeRoutes registration and Fastify({ logger: true }) configuration, adding the leave routes registration alongside it via the same app.register pattern; the default export must remain the configured Fastify instance.",
+      "referencePath": "src/app.ts"
+    },
+    {
+      "requirement": "The leave routes registration function must follow the same structural pattern as uptimeRoutes: an exported async function accepting FastifyInstance that registers route handlers, invoked via app.register \u2014 ensuring consistency with the existing route-plugin convention.",
+      "referencePath": "src/modules/uptime/uptime.routes.ts"
+    },
+    {
+      "requirement": "The routes wiring must construct repository classes that depend on the shared pg pool from src/shared/db/connection.ts; integration tests must mock this same pool export (as all existing unit tests do) so no real database connection is required.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "Module imports must go through barrel exports (index.ts) per the architecture dependency rule \u2014 the controller/routes import ILeaveService/LeaveService and repository interfaces from the leave, balance, employee, policy, notification, and audit barrel files, not from internal module files.",
+      "referencePath": "src/modules/leave/index.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "ILeaveService (src/modules/leave/leave.service.interface.ts)",
+      "why": "The controller delegates all six leave operations to this interface; it is the single business-logic entry point the HTTP layer consumes."
+    },
+    {
+      "target": "Fastify app (src/app.ts)",
+      "why": "The leave routes plugin must be registered here alongside uptimeRoutes to make the leave endpoints reachable on the running server."
+    },
+    {
+      "target": "Concrete repository classes (leave, balance, employee, policy, notification, audit)",
+      "why": "The routes wiring instantiates these and injects them into LeaveService; they are the only place database access occurs (GP-001)."
+    },
+    {
+      "target": "Shared types (src/shared/types/index.ts)",
+      "why": "The controller validates request bodies against CreateLeaveRequestDto and parses query strings into LeaveRequestQueryParams from this shared module."
+    },
+    {
+      "target": "InsufficientBalanceError (src/modules/balance/balance.model.ts)",
+      "why": "The controller must catch this typed error specifically to produce a distinct 4xx response with balance details."
+    },
+    {
+      "target": "Jest integration test harness (Fastify inject)",
+      "why": "Integration tests must exercise the registered routes via Fastify's inject method without binding a network port, mocking the service/repositories to verify controller behavior and RBAC enforcement."
+    }
+  ]
+}
