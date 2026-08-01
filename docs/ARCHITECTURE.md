@@ -137,4 +137,16 @@ Created the employee domain module with model, repository, and barrel export. De
 **Database mapping:** Repository maps between TypeScript camelCase (`firstName`, `managerId`, `employmentStatus`, `createdAt`, `updatedAt`) and PostgreSQL snake_case columns (`first_name`, `manager_id`, `employment_status`, `created_at`, `updated_at`).
 
 **Tests:** `tests/unit/modules/employee/employee.repository.test.ts` — 11 tests covering all repository methods: findById (found, not found, null manager_id), findByDepartment (results, empty), findAll (results, empty), create, update (partial fields, nonexistent, empty fields fallback, null managerId). All tests mock `pool.query` from `shared/db/connection`.
+
+### Phase 3 — Policy Module (src/modules/policy/)
+Created the policy domain module with model, repository, and barrel export. Depends on `src/shared/types` (Phase 1) for `LeaveType`.
+
+**Files created:**
+- `src/modules/policy/policy.model.ts` — **LeavePolicy** entity with fields: `id`, `policyName`, `leaveType: LeaveType`, `entitlementDays`, `accrualRate: number | null`, `maxAccumulation: number | null`, `minimumNoticeDays: number | null`, `requiresManagerApproval: boolean`, `isActive: boolean`, `createdAt`, `updatedAt`. Also defines **IPolicyRepository** interface with methods: `findById`, `findByLeaveType`, `findActive`, `create`, `update`.
+- `src/modules/policy/policy.repository.ts` — **PolicyRepository** class implementing `IPolicyRepository` using the pg `Pool` from `src/shared/db/connection.ts`. All queries use parameterized SQL. Internal `mapRow` helper converts snake_case column names to camelCase entity fields. The `update` method uses a dynamic field map to build SET clauses only for provided fields, falling back to `findById` when no fields are supplied.
+- `src/modules/policy/index.ts` — Barrel export of `LeavePolicy`, `IPolicyRepository`, `PolicyRepository`.
+
+**Database mapping:** Repository maps between TypeScript camelCase (`policyName`, `leaveType`, `entitlementDays`, `accrualRate`, `maxAccumulation`, `minimumNoticeDays`, `requiresManagerApproval`, `isActive`, `createdAt`, `updatedAt`) and PostgreSQL snake_case columns (`policy_name`, `leave_type`, `entitlement_days`, `accrual_rate`, `max_accumulation`, `minimum_notice_days`, `requires_manager_approval`, `is_active`, `created_at`, `updated_at`).
+
+**Tests:** `tests/unit/modules/policy/policy.repository.test.ts` — 11 tests covering all repository methods: findById (found, not found, null numeric fields), findByLeaveType (results, empty), findActive (results, empty), create, update (specified fields, nonexistent, empty fields fallback, nullable fields to null, isActive to false). All tests mock `pool.query` from `shared/db/connection`.
 <!-- gestalt:architecture feature=35df38af-c9d7-41ee-b412-79ee8d149189 END -->
