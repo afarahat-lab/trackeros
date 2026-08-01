@@ -208,6 +208,9 @@ Represents notification data managed by the `notification` module, including not
 
 Represents audit data managed by the `audit` module, including audit records, change history, and activity tracking information.
 
+The `AuditAction` enum is defined in `src/shared/types/enums.ts`:
+`CREATED | SUBMITTED | APPROVED | REJECTED | CANCELLED | BALANCE_DEDUCTED | BALANCE_RESTORED`
+
 ### Audit
 
 | Field | Type | Required |
@@ -215,7 +218,7 @@ Represents audit data managed by the `audit` module, including audit records, ch
 | id | string | true |
 | entityType | string | true |
 | entityId | string | true |
-| action | 'CREATE' \| 'UPDATE' \| 'DELETE' \| 'APPROVE' \| 'REJECT' | true |
+| action | AuditAction | true |
 | oldValues | Record<string, any> \| null | false |
 | newValues | Record<string, any> \| null | false |
 | performedBy | string \| null | false |
@@ -230,7 +233,7 @@ Represents audit data managed by the `audit` module, including audit records, ch
 | id | string | true |
 | entityType | string | true |
 | entityId | string | true |
-| action | 'CREATE' \| 'UPDATE' \| 'DELETE' \| 'APPROVE' \| 'REJECT' | true |
+| action | AuditAction | true |
 | oldValues | Record<string, any> \| null | false |
 | newValues | Record<string, any> \| null | false |
 | performedBy | string \| null | false |
