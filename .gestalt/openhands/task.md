@@ -1,23 +1,72 @@
-# Implement this phase: Phase 8: Shared day-count utility
+# Implement this phase: Phase 9: Leave service — core business logic
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/35df38af-c9d7-41ee-b412-79ee8d149189/8`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/35df38af-c9d7-41ee-b412-79ee8d149189/9`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create a shared business-day calculation utility. This phase depends on `src/shared/types/index.ts` from Phase 1 and `src/shared/db/connection.ts` (existing).
+Create the leave service implementing all core business logic. This phase depends on ALL prior phases — read these files before generating any code:
+- `src/shared/types/index.ts` (Phase 1)
+- `src/modules/employee/employee.model.ts` (Phase 2)
+- `src/modules/policy/policy.model.ts` (Phase 3)
+- `src/modules/leave/leave.model.ts` (Phase 4)
+- `src/modules/balance/balance.model.ts` (Phase 5)
+- `src/modules/notification/notification.model.ts` (Phase 6)
+- `src/modules/audit/audit.model.ts` (Phase 7)
+- `src/shared/utils/day-count.ts` (Phase 8)
 
 Files to create:
-- `src/shared/utils/day-count.ts` — Implement a single shared function `calculateBusinessDays(startDate: Date, endDate: Date, holidays: Date[]): number` that counts BUSINESS DAYS ONLY, excluding weekends (Saturday/Sunday) AND public holidays. Whole days only — no half-day support. This function is the single source of truth for all day-count calculations (balance sufficiency check, deduction, restoration).
+- `src/modules/leave/leave.service.interface.ts` — Define **ILeaveService** interface with methods:
+  - `submitLeaveRequest(dto: CreateLeaveRequestDto): Promise<LeaveRequest>` — validates, checks balance, deducts, creates request, audits, notifies
+  - `approveLeaveRequest(requestId: string, approverId: string): Promise<LeaveRequest>` — approves, audits, notifies employee
+  - `rejectLeaveRequest(requestId: string, approverId: string, reason: string): Promise<LeaveRequest>` — rejects, restores balance, audits, notifies employee
+  - `cancelLeaveRequest(requestId: string, employeeId: string): Promise<LeaveRequest>` — cancels, restores balance, audits
+  - `getLeaveRequest(requestId: string): Promise<LeaveRequest | null>`
+  - `getEmployeeLeaveRequests(employeeId: string, params?: LeaveRequestQueryParams): Promise<LeaveRequest[]>`
 
-  Also export `getHolidaysForYear(year: number): Promise<Date[]>` which queries a `holidays` table via the pg pool. The holidays table has columns: `date: Date`, `name: string`, `country: string` (default `'US'`).
+- `src/modules/leave/leave.service.ts` — Implement **LeaveService** class implementing ILeaveService. Constructor takes: ILeaveRepository, IBalanceRepository, IEmployeeRepository, IPolicyRepository, INotificationRepository, IAuditRepository.
 
-- `src/shared/utils/index.ts` — Barrel export.
+  **submitLeaveRequest** logic:
+  1. Look up employee; if employmentStatus is not ACTIVE, throw error.
+  2. Look up policy by policyId; if not active, throw error.
+  3. Compute fiscalYear = calendar year of startDate.
+  4. Get or create LeaveBalance for (employeeId, policyId, fiscalYear). If creating, set totalEntitlement = policy.entitlementDays, usedDays = 0.
+  5. Fetch holidays for the year via `getHolidaysForYear(fiscalYear)`.
+  6. Compute requestedDays = `calculateBusinessDays(startDate, endDate, holidays)`.
+  7. Check sufficiency: `balance.totalEntitlement - balance.usedDays >= requestedDays`. If not, throw error.
+  8. Atomically increment usedDays by requestedDays via `balanceRepository.incrementUsedDays`.
+  9. Create LeaveRequest with status SUBMITTED.
+  10. Create AuditLog with action CREATE.
+  11. Determine approver: if employee.managerId is not null, notify manager; if null, notify HR admin role (hardcoded role check for now — find employees with role 'hr_admin').
+  12. Create Notification for approver.
+  13. Return the created LeaveRequest.
 
-Include Jest unit tests in `tests/unit/shared/utils/` covering: weekends excluded, holidays excluded, same-day = 1 day, multi-day spans, edge cases.
+  **approveLeaveRequest** logic:
+  1. Find request; must be SUBMITTED.
+  2. Update status to APPROVED, set approvedBy=approverId, approvedAt=now.
+  3. Create AuditLog with action APPROVE.
+  4. Notify employee.
+  5. Return updated request.
 
-**BINDING RULE**: This utility must be used by every call site that computes leave day counts — balance sufficiency check, deduction, and restoration — so all computations are identical.
+  **rejectLeaveRequest** logic:
+  1. Find request; must be SUBMITTED.
+  2. Update status to REJECTED, set rejectionReason.
+  3. Restore balance: decrement usedDays by the business-day count of the request's date range.
+  4. Create AuditLog with action REJECT.
+  5. Notify employee.
+  6. Return updated request.
+
+  **cancelLeaveRequest** logic:
+  1. Find request; must be SUBMITTED or APPROVED; employeeId must match.
+  2. Update status to CANCELLED.
+  3. Restore balance: decrement usedDays by the business-day count.
+  4. Create AuditLog with action UPDATE.
+  5. Return updated request.
+
+  **BINDING RULES applied**: Deduct-on-submission (increment usedDays at SUBMIT), restore-on-reject/cancel (decrement usedDays). Approval does NOT change usedDays again. No-manager escalates to HR admin. Business days only via shared utility. remainingDays is computed, never stored.
+
+Include Jest unit tests in `tests/unit/modules/leave/leave.service.spec.ts` mocking all repository dependencies.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -36,20 +85,22 @@ These are resolved, feature-wide decisions. Wherever this phase touches the conc
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- getHolidaysForYear must obtain the pg Pool from the same export used by all existing repositories — the `pool` named export — so connection configuration is shared and not duplicated. (see `src/shared/db/connection.ts`)
-- The barrel export at src/shared/utils/index.ts must follow the same simple re-export style used by existing module barrels (e.g., `export { X, Y } from './file'`). (see `src/modules/balance/index.ts`)
-- getHolidaysForYear must use parameterized SQL via pool.query(sql, params) with a mapRow-style conversion from the raw DB row to the return type, matching the established repository pattern for snake_case-to-camelCase mapping and Record<string, unknown> casting. (see `src/modules/balance/balance.repository.ts`)
-- Unit tests must mock the pool using the same pattern as existing repository tests: jest.mock('shared/db/connection', () => ({ pool: { query: jest.fn() } })) with mockReset() in beforeEach, resolving via the jest.config.js moduleDirectories and tsconfig baseUrl. (see `tests/unit/modules/balance/balance.repository.test.ts`)
+- The ILeaveService interface and LeaveService implementation must use the LeaveRequest entity shape and ILeaveRepository contract exactly as defined — create accepts Omit<LeaveRequest, 'id' | 'createdAt' | 'updatedAt'>, updateStatus accepts (id, status, approvedBy?, rejectionReason?), findById returns LeaveRequest | null, findByEmployeeId accepts optional LeaveRequestQueryParams. (see `src/modules/leave/leave.model.ts`)
+- The service must use IBalanceRepository methods exactly as defined: findByEmployeeAndPolicy(employeeId, policyId, fiscalYear) for balance lookup, create(Omit<LeaveBalance, 'id' | 'remainingDays' | 'createdAt' | 'updatedAt'>) for auto-creation (must NOT pass remainingDays), incrementUsedDays(id, days) for deduction (throws InsufficientBalanceError on insufficient), decrementUsedDays(id, days) for restoration (returns null on missing/negative). (see `src/modules/balance/balance.model.ts`)
+- All day-count computations in the service must use calculateBusinessDays(startDate, endDate, holidays) with holidays from getHolidaysForYear(fiscalYear). No inline day-count logic. The same utility must be used for the sufficiency check, deduction amount, and restoration amount so all computations are identical. (see `src/shared/utils/day-count.ts`)
+- AuditLog creation must use IAuditRepository.create(Omit<AuditLog, 'id'>) with the exact AuditAction enum values from shared/types (CREATE, APPROVE, REJECT, UPDATE) — not string literals. The performedBy field must be the employeeId for submit/cancel and the approverId for approve/reject. (see `src/modules/audit/audit.model.ts`)
 ### Entity invariants — enforce these
-- Reuse or extend `calculateBusinessDays`: For any valid inclusive date range where startDate <= endDate, the returned count is always >= 0 and equals the number of days in the range that are Monday–Friday and not present in the holidays array (by calendar date). The function never throws for any Date inputs.
-- Reuse or extend `getHolidaysForYear`: The function always returns a Promise that resolves to a Date[] (possibly empty) and never returns undefined; if the query yields no rows, an empty array is returned.
+- Reuse or extend `LeaveRequest`: Lifecycle transitions are restricted: SUBMITTED is the only valid source state for APPROVED and REJECTED; SUBMITTED and APPROVED are the only valid source states for CANCELLED. DRAFT is never created by this service. REJECTED is terminal. The service must enforce these transitions and throw on any invalid source state.
+- Reuse or extend `LeaveBalance`: usedDays is a denormalized counter and the source of truth for consumption; it is incremented atomically at SUBMIT and decremented atomically at REJECT/CANCEL. It must never be decremented at APPROVE. remainingDays is always derived (totalEntitlement - usedDays) and never persisted. A balance is auto-created with totalEntitlement = policy.entitlementDays, usedDays = 0, status ACTIVE when none exists for (employeeId, policyId, fiscalYear).
+- Reuse or extend `AuditLog`: Every state-changing service operation writes exactly one AuditLog: submit → action CREATE (performedBy = employee), approve → action APPROVE (performedBy = approver), reject → action REJECT (performedBy = approver), cancel → action UPDATE (performedBy = employee). Read operations write none. The audit record's entityType and entityId must reference the LeaveRequest being acted upon.
+- Reuse or extend `Notification`: Submit creates a notification to the approver (manager if managerId !== null, else all HR admins) with status PENDING and relatedEntityType 'leave_request'. Approve and reject create a notification to the employee. Cancel does not create a notification per the task's explicit 5-step logic.
 ### Interface contract — expose these operations (their shape is yours)
-- calculateBusinessDays(startDate: Date, endDate: Date, holidays: Date[]): number — idempotent; Must not throw for any input, including inverted ranges (startDate > endDate returns 0) and dates with arbitrary time components.
-- getHolidaysForYear(year: number): Promise<Date[]> — idempotent; If the underlying pool.query rejects, the rejection propagates to the caller (no silent swallowing); an empty result set resolves to an empty array, not null or undefined.
-### Integration points — connect to these
-- src/shared/db/connection.ts (pool export) — getHolidaysForYear queries the holidays table through the shared pg Pool; this is the runtime dependency for holiday data retrieval.
-- Phase 9 leave service (src/modules/leave/leave.service.ts) — The leave service will be the primary consumer, calling getHolidaysForYear(fiscalYear) then calculateBusinessDays(startDate, endDate, holidays) for balance sufficiency checks, deduction on submit, and restoration on reject/cancel.
-- holidays table (PostgreSQL) — getHolidaysForYear reads from the holidays table (columns: date, name, country) to supply the holiday list consumed by calculateBusinessDays.
+- submitLeaveRequest — Throws when employee not found or not ACTIVE; throws when policy not found or not active; throws InsufficientBalanceError (or equivalent) when balance insufficient or atomic increment fails. On success, returns the created LeaveRequest with status SUBMITTED.
+- approveLeaveRequest — Throws when the request is not found or its status is not SUBMITTED. Does not modify usedDays. On success, returns the updated LeaveRequest with status APPROVED, approvedBy, and approvedAt set.
+- rejectLeaveRequest — Throws when the request is not found or its status is not SUBMITTED. Restores balance via decrementUsedDays before returning. On success, returns the updated LeaveRequest with status REJECTED and rejectionReason set.
+- cancelLeaveRequest — Throws when the request is not found, its status is not SUBMITTED or APPROVED, or the provided employeeId does not match the request's employeeId. Restores balance via decrementUsedDays. On success, returns the updated LeaveRequest with status CANCELLED.
+- getLeaveRequest — idempotent; Returns the LeaveRequest or null without side effects. No audit, no notification, no balance change.
+- getEmployeeLeaveRequests — idempotent; Returns an array (possibly empty) without side effects. Passes optional query params through to the repository.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
