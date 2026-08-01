@@ -149,4 +149,28 @@ Created the policy domain module with model, repository, and barrel export. Depe
 **Database mapping:** Repository maps between TypeScript camelCase (`policyName`, `leaveType`, `entitlementDays`, `accrualRate`, `maxAccumulation`, `minimumNoticeDays`, `requiresManagerApproval`, `isActive`, `createdAt`, `updatedAt`) and PostgreSQL snake_case columns (`policy_name`, `leave_type`, `entitlement_days`, `accrual_rate`, `max_accumulation`, `minimum_notice_days`, `requires_manager_approval`, `is_active`, `created_at`, `updated_at`).
 
 **Tests:** `tests/unit/modules/policy/policy.repository.test.ts` — 11 tests covering all repository methods: findById (found, not found, null numeric fields), findByLeaveType (results, empty), findActive (results, empty), create, update (specified fields, nonexistent, empty fields fallback, nullable fields to null, isActive to false). All tests mock `pool.query` from `shared/db/connection`.
+
+### Phase 4 — Leave Module (src/modules/leave/)
+Created the leave domain module with model, repository, and barrel export. Depends on `src/shared/types` (Phase 1) for `LeaveStatus` and `LeaveRequestQueryParams`.
+
+**Files created:**
+- `src/modules/leave/leave.model.ts` — **LeaveRequest** entity with fields: `id`, `employeeId`, `policyId`, `startDate`, `endDate`, `reason: string | undefined`, `status: LeaveStatus`, `approvedBy: string | null`, `approvedAt: Date | null`, `rejectionReason: string | null`, `createdAt`, `updatedAt`. Also defines **ILeaveRepository** interface with methods: `findById`, `findByEmployeeId(employeeId, params?: LeaveRequestQueryParams)`, `findByStatus`, `create`, `update`, `updateStatus(id, status, approvedBy?, rejectionReason?)`.
+- `src/modules/leave/leave.repository.ts` — **LeaveRepository** class implementing `ILeaveRepository` using the pg `Pool` from `src/shared/db/connection.ts`. All queries use parameterized SQL. Internal `mapRow` helper converts snake_case column names to camelCase entity fields. Key behaviors:
+  - `findByEmployeeId` builds dynamic WHERE clauses from optional `LeaveRequestQueryParams` filters (status, policyId, startDateFrom/To, endDateFrom/To, limit, offset), ordered by `start_date DESC`.
+  - `update` uses a dynamic field map to build SET clauses only for provided fields, falling back to `findById` when no fields are supplied. Always sets `updated_at = NOW()`.
+  - `updateStatus` implements status-specific logic: APPROVED sets `approved_at = NOW()`, `approved_by`, and clears `rejection_reason`; REJECTED sets `rejection_reason` and clears approval fields; all other statuses (DRAFT, SUBMITTED, CANCELLED) clear both approval and rejection fields. Always sets `updated_at = NOW()`.
+  - `create` maps `reason: undefined` to SQL NULL.
+- `src/modules/leave/index.ts` — Barrel export of `LeaveRequest`, `ILeaveRepository`, `LeaveRepository`.
+
+**Database mapping:** Repository maps between TypeScript camelCase (`employeeId`, `policyId`, `startDate`, `endDate`, `approvedBy`, `approvedAt`, `rejectionReason`, `createdAt`, `updatedAt`) and PostgreSQL snake_case columns (`employee_id`, `policy_id`, `start_date`, `end_date`, `approved_by`, `approved_at`, `rejection_reason`, `created_at`, `updated_at`). The `reason` field maps to the `reason` column (no rename). The denormalized `leave_type` column present in the database is not mapped to the entity — it exists for query convenience only.
+
+**Tests:** `tests/unit/modules/leave/leave.repository.test.ts` — 24 tests covering all repository methods:
+- `findById`: found, not found, approved request with approvedBy/approvedAt, rejected request with rejectionReason, undefined reason
+- `findByEmployeeId`: basic query, empty results, status filter, policyId filter, startDate range filters, endDate range filters, limit/offset, all filters combined
+- `findByStatus`: results, empty
+- `create`: normal insert, undefined reason → null
+- `update`: specified fields, nonexistent, empty fields fallback, setting approvedBy to null
+- `updateStatus`: APPROVED with approvedBy, REJECTED with rejectionReason, CANCELLED clears approval/rejection, DRAFT clears approval/rejection, nonexistent, APPROVED with null approvedBy
+
+All tests mock `pool.query` from `shared/db/connection`.
 <!-- gestalt:architecture feature=35df38af-c9d7-41ee-b412-79ee8d149189 END -->
