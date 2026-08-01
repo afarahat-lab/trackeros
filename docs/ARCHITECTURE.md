@@ -53,7 +53,7 @@ The leave management module enables employees to apply for annual, sick, and eme
 - **Employee**: Represents an employee with employment status (ACTIVE, INACTIVE, TERMINATED) and reporting line (managerId).
 - **LeaveRequest**: Core entity tracking a leave application through lifecycle states: DRAFT → SUBMITTED → APPROVED | REJECTED | CANCELLED. CANCELLED reachable from DRAFT, SUBMITTED, or APPROVED. REJECTED is terminal.
 - **LeavePolicy**: Defines rules per leave type: entitlement days, accrual rate, max accumulation, minimum notice days, requires manager approval, active/inactive.
-- **LeaveBalance**: Per-employee, per-policy, per-fiscal-year balance with total entitlement, used days, remaining days. Lifecycle: ACTIVE → EXHAUSTED → CLOSED.
+- **LeaveBalance**: Per-employee, per-policy, per-fiscal-year balance with total entitlement, used days, remaining days. Lifecycle: ACTIVE → EXHAUSTED → EXPIRED.
 - **Notification**: Messages triggered by leave events; lifecycle: PENDING → SENT → READ → ARCHIVED.
 - **AuditLog**: Immutable record of all state-changing operations for compliance.
 
@@ -94,7 +94,7 @@ Six tables: `employees`, `leave_policies`, `leave_balances`, `leave_requests`, `
 ## Lifecycle States Summary
 - LeaveRequest: DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED.
 - LeavePolicy: ACTIVE, INACTIVE.
-- LeaveBalance: ACTIVE, EXHAUSTED, CLOSED.
+- LeaveBalance: ACTIVE, EXHAUSTED, EXPIRED.
 - Notification: PENDING, SENT, READ, ARCHIVED.
 - Employee: ACTIVE, INACTIVE, TERMINATED.
 
@@ -171,6 +171,32 @@ Created the leave domain module with model, repository, and barrel export. Depen
 - `create`: normal insert, undefined reason → null
 - `update`: specified fields, nonexistent, empty fields fallback, setting approvedBy to null
 - `updateStatus`: APPROVED with approvedBy, REJECTED with rejectionReason, CANCELLED clears approval/rejection, DRAFT clears approval/rejection, nonexistent, APPROVED with null approvedBy
+
+All tests mock `pool.query` from `shared/db/connection`.
+
+### Phase 5 — Balance Module (src/modules/balance/)
+Created the balance domain module with model, repository, and barrel export. Depends on `src/shared/types` (Phase 1) for base types.
+
+**Files created:**
+- `src/modules/balance/balance.model.ts` — **LeaveBalance** entity with fields: `id`, `employeeId`, `policyId`, `totalEntitlement`, `usedDays`, `remainingDays` (computed, never stored), `fiscalYear`, `status: BalanceStatus`, `createdAt`, `updatedAt`. Defines **BalanceStatus** as `'ACTIVE' | 'EXHAUSTED' | 'EXPIRED'`. Also defines **InsufficientBalanceError** class (extends Error) with `balanceId`, `requestedDays`, and `availableDays` properties. Defines **IBalanceRepository** interface with methods: `findByEmployeeAndPolicy`, `findByEmployeeId`, `create`, `updateUsedDays`, `incrementUsedDays`, `decrementUsedDays`.
+- `src/modules/balance/balance.repository.ts` — **BalanceRepository** class implementing `IBalanceRepository` using the pg `Pool` from `src/shared/db/connection.ts`. All queries use parameterized SQL. Internal `mapRow` helper converts snake_case column names to camelCase entity fields and computes `remainingDays = totalEntitlement - usedDays` at query time (never stored in DB). Key behaviors:
+  - `findByEmployeeAndPolicy` queries by the composite key (employee_id, policy_id, fiscal_year).
+  - `findByEmployeeId` supports optional `fiscalYear` filter, ordered by `fiscal_year DESC, policy_id`.
+  - `create` accepts `Omit<LeaveBalance, 'id' | 'remainingDays' | 'createdAt' | 'updatedAt'>` — `remainingDays` is excluded from input since it is always computed.
+  - `updateUsedDays` sets `used_days` directly and sets `updated_at = NOW()`.
+  - `incrementUsedDays` uses an atomic SQL UPDATE with guard clause `total_entitlement - used_days - $1 >= 0`. If the guard fails (no rows updated), it checks whether the row exists: if not found, returns `null`; if found but balance insufficient, throws `InsufficientBalanceError`.
+  - `decrementUsedDays` uses an atomic SQL UPDATE with guard clause `used_days - $1 >= 0`. Returns `null` if the row doesn't exist or the decrement would make `usedDays` negative.
+- `src/modules/balance/index.ts` — Barrel export of `LeaveBalance`, `BalanceStatus`, `IBalanceRepository`, `InsufficientBalanceError`, `BalanceRepository`.
+
+**Database mapping:** Repository maps between TypeScript camelCase (`employeeId`, `policyId`, `totalEntitlement`, `usedDays`, `fiscalYear`, `createdAt`, `updatedAt`) and PostgreSQL snake_case columns (`employee_id`, `policy_id`, `total_entitlement`, `used_days`, `fiscal_year`, `created_at`, `updated_at`). `remainingDays` is NOT a database column — it is computed in `mapRow` as `totalEntitlement - usedDays`.
+
+**Tests:** `tests/unit/modules/balance/balance.repository.test.ts` — 11 tests covering all repository methods:
+- `findByEmployeeAndPolicy`: found (verifies all mapped fields including computed `remainingDays`), not found
+- `findByEmployeeId`: all balances for employee, filtered by fiscalYear, empty results
+- `create`: inserts and returns with computed `remainingDays`
+- `updateUsedDays`: sets used_days directly, nonexistent row
+- `incrementUsedDays`: successful atomic increment, nonexistent row, throws `InsufficientBalanceError` when balance would go negative (verifies error message, balanceId, requestedDays, availableDays)
+- `decrementUsedDays`: successful atomic decrement, nonexistent row, returns null when decrement would make usedDays negative
 
 All tests mock `pool.query` from `shared/db/connection`.
 <!-- gestalt:architecture feature=35df38af-c9d7-41ee-b412-79ee8d149189 END -->
