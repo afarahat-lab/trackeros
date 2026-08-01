@@ -1,0 +1,175 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "notification"
+    ],
+    "affectedLayers": [
+      "data-access",
+      "domain-model"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "NotificationStatus is defined locally in the notification model file as a type alias exposing exactly the values PENDING, SENT, READ, and ARCHIVED \u2014 not imported from shared types.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The Notification entity omits an updatedAt field entirely, distinguishing it from Employee/Policy/Leave/Balance which all carry updatedAt \u2014 matching the notifications table schema that has no updated_at column.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository interface declares all four operations: findByRecipientId, create, markAsRead, and updateStatus \u2014 each returning the correct Promise type (array, entity, nullable entity, nullable entity respectively).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findByRecipientId returns notifications for the given recipient ordered by creation time descending, and returns an empty array when no rows match.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "create persists a notification row and returns the mapped entity; the input type excludes id, createdAt, and readAt (auto-generated/null), and the insert lets the database generate id and created_at while read_at defaults to null.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "markAsRead atomically sets both read_at to the current timestamp and status to READ in a single UPDATE, returning the updated entity or null when no row matches the id.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "updateStatus performs a generic status transition to any NotificationStatus value, returning the updated entity or null when no row matches the id.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository's row mapper converts snake_case database columns to camelCase entity fields, constructs Date objects for created_at, and maps a null read_at to null (not undefined) on the entity.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The barrel export re-exports the Notification entity, NotificationStatus type, INotificationRepository interface, and NotificationRepository concrete class so the module is consumable via its public entry point.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Unit tests mock the shared db connection pool and assert exact SQL strings and exact parameter arrays for each repository method, covering found/not-found/empty cases and nullable read_at mapping.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The implementation compiles under strict TypeScript (no implicit any, strict null checks) with no use of the any type \u2014 the row mapper parameter is typed as Record<string, unknown> with explicit casts.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access goes through the repository pattern (GP-001 / no-direct-db-outside-repository) \u2014 the NotificationRepository is the only component that executes SQL against the notifications table.",
+    "No use of the any type (no-any harness rule, severity high) \u2014 use unknown with type guards or explicit casts instead; the row mapper must type its parameter as Record<string, unknown>.",
+    "All SQL queries must use parameterized placeholders ($1, $2, \u2026) \u2014 never interpolate values into the query string (SQL injection prevention).",
+    "The repository must import the pg pool from the shared db connection module via the established relative path, not instantiate its own Pool or manage connections directly.",
+    "Modules import from each other only through their declared public entry point (index.ts) \u2014 no cross-module imports of another module's internal files.",
+    "No unhandled promise rejections (GP-006) \u2014 async repository methods must not let errors from pool.query propagate unhandled beyond their own catch/return boundary."
+  ],
+  "outOfScope": [
+    "Notification service (INotificationService / NotificationService) \u2014 the reconciled architecture lists it as owned by the notification module, but this phase scope covers only the model, repository, and barrel export.",
+    "Notification controller and routes \u2014 no HTTP layer is created in this phase; the leave service (Phase 9) and routes (Phase 10) will consume the repository.",
+    "Database migrations / CREATE TABLE DDL for the notifications table \u2014 the code agent generates migrations separately; this phase defines the entity and repository against the conceptual schema.",
+    "Audit logging for notification state changes (GP-002) \u2014 the audit module does not yet exist (Phase 7); notification lifecycle auditing is deferred to the leave service orchestration phase.",
+    "RBAC enforcement on notification access (GP-005) \u2014 no API endpoints exist in this phase; access control is applied at the controller/middleware layer in a later phase.",
+    "Input validation at API boundaries (GP-003) \u2014 no API boundary exists in this phase; validation is deferred to the controller layer."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "The Notification lifecycle progresses PENDING \u2192 SENT \u2192 READ \u2192 ARCHIVED; markAsRead is the dedicated transition to READ that simultaneously sets readAt, while updateStatus handles all other status transitions generically."
+    },
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "readAt is null until the notification is marked as read; once set it holds a timestamp and is never reset to null by any operation in this phase."
+    },
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "A Notification is always associated with a recipient (recipientId is non-null) and may optionally reference a related entity via relatedEntityType/relatedEntityId, both of which are nullable together."
+    },
+    {
+      "entity": "NotificationStatus",
+      "mustExistOrExtend": true,
+      "invariant": "NotificationStatus is a closed type alias with exactly four values \u2014 PENDING, SENT, READ, ARCHIVED \u2014 defined locally in the notification model file and not imported from shared types."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "findByRecipientId(recipientId: string): Promise<Notification[]>",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an empty array when no notifications exist for the recipient; never returns null. Results are ordered by creation time descending."
+    },
+    {
+      "operation": "create(data: Omit<Notification, 'id' | 'createdAt' | 'readAt'>): Promise<Notification>",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Always returns the newly created entity; the caller-provided data excludes id, createdAt, and readAt which are database-generated or default to null. A database failure propagates as a rejected promise."
+    },
+    {
+      "operation": "markAsRead(id: string): Promise<Notification | null>",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Atomically sets read_at to NOW() and status to READ in a single UPDATE; returns the updated entity on success or null when no row matches the given id."
+    },
+    {
+      "operation": "updateStatus(id: string, status: NotificationStatus): Promise<Notification | null>",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Performs a generic status transition to any NotificationStatus value; returns the updated entity on success or null when no row matches the given id."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "NotificationStatus must be defined as a local type alias in the notification model file, mirroring how BalanceStatus is defined locally in balance.model.ts rather than imported from shared types.",
+      "referencePath": "src/modules/balance/balance.model.ts"
+    },
+    {
+      "requirement": "The NotificationRepository must follow the same repository implementation pattern as BalanceRepository: import pool from the shared db connection, use parameterized INSERT/UPDATE ... RETURNING * queries, and implement a private mapRow helper typed as Record<string, unknown> that converts snake_case columns to camelCase entity fields.",
+      "referencePath": "src/modules/balance/balance.repository.ts"
+    },
+    {
+      "requirement": "The notification barrel export must follow the same structure as the balance barrel: re-export the entity interface, the locally-defined status type, the repository interface, and the concrete repository class from their respective files.",
+      "referencePath": "src/modules/balance/index.ts"
+    },
+    {
+      "requirement": "Unit tests must follow the established test pattern: jest.mock the shared db connection module, assert exact SQL strings and exact parameter arrays via expect(mockQuery).toHaveBeenCalledWith(sql, params), and use a snake_case makeRow helper for mock row construction.",
+      "referencePath": "tests/unit/modules/balance/balance.repository.test.ts"
+    },
+    {
+      "requirement": "The repository must import the pool from the shared db connection module (which exports a pg.Pool instance named pool), matching how all existing repositories obtain their database connection.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "The Notification entity shape must match the reconciled architecture's Notification domain entity attributes exactly \u2014 notably omitting updatedAt (the notifications table has no updated_at column) and including readAt as a nullable Date, distinguishing it from Employee/Policy/Leave/Balance which all carry updatedAt.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "The NotificationRepository depends on the exported pg Pool instance for all database access, matching the established pattern across employee/policy/leave/balance repositories."
+    },
+    {
+      "target": "src/shared/types/index.ts",
+      "why": "The notification module depends on the shared types foundation from Phase 1; NotificationStatus is defined locally (not exported from shared types) following the BalanceStatus precedent, but the module's barrel must be consumable alongside other modules that import from shared types."
+    },
+    {
+      "target": "src/modules/leave/ (Phase 9 leave service)",
+      "why": "The leave service will depend on INotificationRepository to create notifications for managers and employees on leave lifecycle events (submission, approval, rejection, cancellation); this phase provides the repository interface and implementation that the leave service will consume."
+    }
+  ]
+}
