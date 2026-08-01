@@ -1,160 +1,146 @@
-# Fix specific quality-gate violations: Phase 9: Leave service — core business logic
+# Implement this phase: Phase 9: Leave service — core business logic
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/fix/35df38af-c9d7-41ee-b412-79ee8d149189/9/1`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/35df38af-c9d7-41ee-b412-79ee8d149189/9`. Do not clone anything; work only in this directory.
 
-You are fixing SPECIFIC violations the quality gate found in EXISTING, already-committed files. Make ONLY the targeted edits listed below — do NOT refactor, regenerate, or change anything else.
+## What to build
+(no phase architecture provided — infer from the success criteria below)
 
-The files ALREADY EXIST. You MUST edit them in place with the `str_replace_editor` tool. Reading or viewing a file is NOT sufficient — you have NOT finished until you have edited EVERY file listed below.
+## Success criteria
+Create the leave service implementing all core business logic. This phase depends on ALL prior phases — read these files before generating any code:
+- `src/shared/types/index.ts` (Phase 1)
+- `src/modules/employee/employee.model.ts` (Phase 2)
+- `src/modules/policy/policy.model.ts` (Phase 3)
+- `src/modules/leave/leave.model.ts` (Phase 4)
+- `src/modules/balance/balance.model.ts` (Phase 5)
+- `src/modules/notification/notification.model.ts` (Phase 6)
+- `src/modules/audit/audit.model.ts` (Phase 7)
+- `src/shared/utils/day-count.ts` (Phase 8)
 
-## Required edits
+Files to create:
+- `src/modules/leave/leave.service.interface.ts` — Define **ILeaveService** interface with methods:
+  - `submitLeaveRequest(dto: CreateLeaveRequestDto): Promise<LeaveRequest>` — validates, checks balance, deducts, creates request, audits, notifies
+  - `approveLeaveRequest(requestId: string, approverId: string): Promise<LeaveRequest>` — approves, audits, notifies employee
+  - `rejectLeaveRequest(requestId: string, approverId: string, reason: string): Promise<LeaveRequest>` — rejects, restores balance, audits, notifies employee
+  - `cancelLeaveRequest(requestId: string, employeeId: string): Promise<LeaveRequest>` — cancels, restores balance, audits
+  - `getLeaveRequest(requestId: string): Promise<LeaveRequest | null>`
+  - `getEmployeeLeaveRequests(employeeId: string, params?: LeaveRequestQueryParams): Promise<LeaveRequest[]>`
 
-### Coherent change 1 — apply as ONE atomic edit across ALL sites below
+- `src/modules/leave/leave.service.ts` — Implement **LeaveService** class implementing ILeaveService. Constructor takes: ILeaveRepository, IBalanceRepository, IEmployeeRepository, IPolicyRepository, INotificationRepository, IAuditRepository.
 
-Unifying change (do this now): In src/modules/leave/leave.service.ts, replace all six cross-module direct-file imports with barrel imports: change '../audit/audit.model' to '../audit', '../balance/balance.model' to '../balance', '../employee/employee.model' to '../employee', '../notification/notification.model' to '../notification', '../policy/policy.model' to '../policy', and '../../shared/utils/day-count' to '../../shared/utils'. Preserve all imported symbols.
+  **submitLeaveRequest** logic:
+  1. Look up employee; if employmentStatus is not ACTIVE, throw error.
+  2. Look up policy by policyId; if not active, throw error.
+  3. Compute fiscalYear = calendar year of startDate.
+  4. Get or create LeaveBalance for (employeeId, policyId, fiscalYear). If creating, set totalEntitlement = policy.entitlementDays, usedDays = 0.
+  5. Fetch holidays for the year via `getHolidaysForYear(fiscalYear)`.
+  6. Compute requestedDays = `calculateBusinessDays(startDate, endDate, holidays)`.
+  7. Check sufficiency: `balance.totalEntitlement - balance.usedDays >= requestedDays`. If not, throw error.
+  8. Atomically increment usedDays by requestedDays via `balanceRepository.incrementUsedDays`.
+  9. Create LeaveRequest with status SUBMITTED.
+  10. Create AuditLog with action CREATE.
+  11. Determine approver: if employee.managerId is not null, notify manager; if null, notify HR admin role (hardcoded role check for now — find employees with role 'hr_admin').
+  12. Create Notification for approver.
+  13. Return the created LeaveRequest.
 
-The sites below are the SAME underlying issue. Fixing some but not others leaves the code incoherent and the quality gate WILL re-flag it — apply the one change above consistently to EVERY site:
+  **approveLeaveRequest** logic:
+  1. Find request; must be SUBMITTED.
+  2. Update status to APPROVED, set approvedBy=approverId, approvedAt=now.
+  3. Create AuditLog with action APPROVE.
+  4. Notify employee.
+  5. Return updated request.
 
-- Site 1
-File: src/modules/leave/leave.service.ts
-Line: 9
-Offending code: `import { IAuditRepository } from '../audit/audit.model';`
-Rule violated: barrel-import-only
-Action (do this now): Edit `src/modules/leave/leave.service.ts` at line 9 in place to fix the `barrel-import-only` violation.
-What the quality gate found — apply this: [barrel-import-only] Imports from internal model file '../audit/audit.model' instead of the barrel export '../audit'. The barrel at src/modules/audit/index.ts exports IAuditRepository. Cross-module imports must go through the declared public entry point (index.ts).
+  **rejectLeaveRequest** logic:
+  1. Find request; must be SUBMITTED.
+  2. Update status to REJECTED, set rejectionReason.
+  3. Restore balance: decrement usedDays by the business-day count of the request's date range.
+  4. Create AuditLog with action REJECT.
+  5. Notify employee.
+  6. Return updated request.
 
-- Site 2
-File: src/modules/leave/leave.service.ts
-Line: 10
-Offending code: `import { IBalanceRepository, InsufficientBalanceError } from '../balance/balance.model';`
-Rule violated: barrel-import-only
-Action (do this now): Edit `src/modules/leave/leave.service.ts` at line 10 in place to fix the `barrel-import-only` violation.
-What the quality gate found — apply this: [barrel-import-only] Imports from internal model file '../balance/balance.model' instead of the barrel export '../balance'. The barrel at src/modules/balance/index.ts exports both IBalanceRepository and InsufficientBalanceError.
+  **cancelLeaveRequest** logic:
+  1. Find request; must be SUBMITTED or APPROVED; employeeId must match.
+  2. Update status to CANCELLED.
+  3. Restore balance: decrement usedDays by the business-day count.
+  4. Create AuditLog with action UPDATE.
+  5. Return updated request.
 
-- Site 3
-File: src/modules/leave/leave.service.ts
-Line: 11
-Offending code: `import { IEmployeeRepository } from '../employee/employee.model';`
-Rule violated: barrel-import-only
-Action (do this now): Edit `src/modules/leave/leave.service.ts` at line 11 in place to fix the `barrel-import-only` violation.
-What the quality gate found — apply this: [barrel-import-only] Imports from internal model file '../employee/employee.model' instead of the barrel export '../employee'. The barrel at src/modules/employee/index.ts exports IEmployeeRepository.
+  **BINDING RULES applied**: Deduct-on-submission (increment usedDays at SUBMIT), restore-on-reject/cancel (decrement usedDays). Approval does NOT change usedDays again. No-manager escalates to HR admin. Business days only via shared utility. remainingDays is computed, never stored.
 
-- Site 4
-File: src/modules/leave/leave.service.ts
-Line: 12
-Offending code: `import { INotificationRepository } from '../notification/notification.model';`
-Rule violated: barrel-import-only
-Action (do this now): Edit `src/modules/leave/leave.service.ts` at line 12 in place to fix the `barrel-import-only` violation.
-What the quality gate found — apply this: [barrel-import-only] Imports from internal model file '../notification/notification.model' instead of the barrel export '../notification'. The barrel at src/modules/notification/index.ts exports INotificationRepository.
+Include Jest unit tests in `tests/unit/modules/leave/leave.service.spec.ts` mocking all repository dependencies.
 
-- Site 5
-File: src/modules/leave/leave.service.ts
-Line: 8
-Offending code: `import { calculateBusinessDays, getHolidaysForYear } from '../../shared/utils/day-count';`
-Rule violated: barrel-import-only
-Action (do this now): Edit `src/modules/leave/leave.service.ts` at line 8 in place to fix the `barrel-import-only` violation.
-What the quality gate found — apply this: [barrel-import-only] Imports from internal file '../../shared/utils/day-count' instead of the barrel export '../../shared/utils'. The barrel at src/shared/utils/index.ts exports both calculateBusinessDays and getHolidaysForYear.
+## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
+These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
+- Consolidated decision (answers all 6 questions; apply consistently across annual, sick, and emergency leave):
 
-- Site 6
-File: src/modules/leave/leave.service.ts
-Line: 13
-Offending code: `import { IPolicyRepository } from '../policy/policy.model';`
-Rule violated: barrel-import-only
-Action (do this now): Edit `src/modules/leave/leave.service.ts` at line 13 in place to fix the `barrel-import-only` violation.
-What the quality gate found — apply this: [barrel-import-only] Imports from internal model file '../policy/policy.model' instead of the barrel export '../policy'. The barrel at src/modules/policy/index.ts exports IPolicyRepository.
+1. Fiscal/leave year = CALENDAR YEAR (Jan 1 – Dec 31). Derive fiscalYear = the calendar year of the request start_date. Not tenant-configurable for now.
 
-- Site 7
-File: src/modules/leave/leave.service.ts
-Line: 8
-Offending code: `import { IAuditRepository } from '../audit/audit.model';`
-Rule violated: review/architecture
-Action (do this now): Edit `src/modules/leave/leave.service.ts` at line 8 in place to fix the `review/architecture` violation.
-What the quality gate found — apply this: [review/architecture] Import bypasses the audit module's barrel export (index.ts). The constraint requires importing through the declared public entry point: `import { IAuditRepository } from '../audit';`
+2 & 5. Day counting = BUSINESS DAYS ONLY, excluding weekends AND public holidays, applied uniformly to ALL leave types. Introduce a `holidays` table (public-holiday calendar) used by a single shared day-count function so every call site (balance sufficiency check, deduction, restoration) computes identically. Whole days only — no half-day or partial-day leave.
 
-- Site 8
-File: src/modules/leave/leave.service.ts
-Line: 9
-Offending code: `import { IBalanceRepository, InsufficientBalanceError } from '../balance/balance.model';`
-Rule violated: review/architecture
-Action (do this now): Edit `src/modules/leave/leave.service.ts` at line 9 in place to fix the `review/architecture` violation.
-What the quality gate found — apply this: [review/architecture] Import bypasses the balance module's barrel export (index.ts). The constraint requires importing through the declared public entry point: `import { IBalanceRepository, InsufficientBalanceError } from '../balance';`
+3. Employee with no manager (managerId is null): ESCALATE to the HR admin role for approval. Do NOT auto-approve and do NOT block submission.
 
-- Site 9
-File: src/modules/leave/leave.service.ts
-Line: 10
-Offending code: `import { IEmployeeRepository } from '../employee/employee.model';`
-Rule violated: review/architecture
-Action (do this now): Edit `src/modules/leave/leave.service.ts` at line 10 in place to fix the `review/architecture` violation.
-What the quality gate found — apply this: [review/architecture] Import bypasses the employee module's barrel export (index.ts). The constraint requires importing through the declared public entry point: `import { IEmployeeRepository } from '../employee';`
+4. leave_balances.used_days = DENORMALIZED COUNTER and the source of truth (balance reads are O(1)). Deduct-on-submission: increment used_days atomically, in the same transaction, when a LeaveRequest is SUBMITTED (reserving the balance so an employee cannot over-book). Restore-on-reject/cancel: decrement used_days when that request is REJECTED or CANCELLED. Approval does NOT change used_days again (it was already deducted at submission). A submission must fail if it would drive remaining below zero.
 
-- Site 10
-File: src/modules/leave/leave.service.ts
-Line: 11
-Offending code: `import { INotificationRepository } from '../notification/notification.model';`
-Rule violated: review/architecture
-Action (do this now): Edit `src/modules/leave/leave.service.ts` at line 11 in place to fix the `review/architecture` violation.
-What the quality gate found — apply this: [review/architecture] Import bypasses the notification module's barrel export (index.ts). The constraint requires importing through the declared public entry point: `import { INotificationRepository } from '../notification';`
+6. remainingDays = COMPUTED/DERIVED, never stored: remainingDays = totalEntitlement - usedDays, calculated at query time. All consumers use this one formula; no code path writes remainingDays directly. This eliminates drift. [BINDING RULE — operator decision resolving: How is the fiscal year boundary defined — calendar year (Jan 1 – Dec 31) or a company-specific fiscal year (e.g., Apr 1 – Mar 31)?; Should the day-count calculation for leave consumption exclude weekends and/or public holidays (business days only), or count all calendar days?; When an employee has no manager (managerId is null), who approves their SUBMITTED LeaveRequest? Does it auto-approve, escalate to a department head, or require a different workflow?; How is `used_days` in `leave_balances` derived — is it a denormalized counter incremented atomically on leave approval, or is it computed on-the-fly by summing the day counts of all approved `leave_requests` for that employee/type/year?; Are leave day counts based on calendar days (inclusive start-to-end) or working/business days (excluding weekends and holidays)?; Should Balance.remainingDays be a stored column or a computed (derived) field?; apply everywhere these apply, not in one place only]
 
-- Site 11
-File: src/modules/leave/leave.service.ts
-Line: 12
-Offending code: `import { IPolicyRepository } from '../policy/policy.model';`
-Rule violated: review/architecture
-Action (do this now): Edit `src/modules/leave/leave.service.ts` at line 12 in place to fix the `review/architecture` violation.
-What the quality gate found — apply this: [review/architecture] Import bypasses the policy module's barrel export (index.ts). The constraint requires importing through the declared public entry point: `import { IPolicyRepository } from '../policy';`
+## Constraints & consistency
+You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
+### Reuse & consistency — match these exactly
+- The service must use calculateBusinessDays and getHolidaysForYear from src/shared/utils/day-count.ts (via the shared/utils barrel) for all day-count computations — the sufficiency check at submit, the restore at reject, and the restore at cancel. No inline date arithmetic or alternative day-count logic may exist in the service. (see `src/shared/utils/day-count.ts`)
+- The service must use InsufficientBalanceError from src/modules/balance/balance.model.ts for balance-sufficiency failures, and must call IBalanceRepository.incrementUsedDays / decrementUsedDays (not updateUsedDays) for atomic balance mutations, matching the repository interface signatures defined in balance.model.ts. (see `src/modules/balance/balance.model.ts`)
+- The service must use LeaveRequestStatus (SUBMITTED, APPROVED, REJECTED, CANCELLED), EmploymentStatus (ACTIVE), and AuditAction (CREATE, APPROVE, REJECT, UPDATE) enums from src/shared/types/index.ts for all status comparisons and audit actions — no hardcoded string literals for these values. (see `src/shared/types/index.ts`)
+- The service must use ILeaveRepository.updateStatus for all status transitions (not the generic update method), matching the signature updateStatus(id, status, approvedBy?, rejectionReason?) defined in leave.model.ts, so that repository-level status-specific side effects (setting approvedAt, clearing rejection fields) are applied consistently. (see `src/modules/leave/leave.model.ts`)
+- LeaveService must implement the ILeaveService interface defined in leave.service.interface.ts exactly — all six methods with matching signatures. The interface is the contract that Phase 10's controller will depend on. (see `src/modules/leave/leave.service.interface.ts`)
+### Entity invariants — enforce these
+- Reuse or extend `LeaveRequest`: State machine: SUBMITTED is the entry state created by submitLeaveRequest. APPROVED and REJECTED are reachable only from SUBMITTED. CANCELLED is reachable from SUBMITTED or APPROVED. REJECTED is terminal. The service must reject any transition that violates these allowed source states.
+- Reuse or extend `LeaveBalance`: usedDays is a denormalized counter and the source of truth for consumption. It is incremented atomically at submission and decremented atomically at rejection or cancellation. It must never go below zero (decrementUsedDays guard) and must never exceed totalEntitlement (incrementUsedDays guard). remainingDays is always derived as totalEntitlement - usedDays, never stored or written.
+- Reuse or extend `AuditLog`: Every state-changing leave operation produces exactly one immutable audit record with entityType 'leave_request'. The action must match the operation: CREATE for submit, APPROVE for approve, REJECT for reject, UPDATE for cancel. performedBy is the actor initiating the change (employeeId for submit/cancel, approverId for approve/reject).
+- Reuse or extend `Notification`: Notifications are created for submit (to manager or HR admins), approve (to employee), and reject (to employee). No notification is created for cancel. All notifications are created with status PENDING and relatedEntityType 'leave_request' linking to the request id.
+### Interface contract — expose these operations (their shape is yours)
+- submitLeaveRequest(dto) — Caller identity is dto.employeeId; the service verifies the employee exists and is ACTIVE but does not perform RBAC (deferred to controller).; Throws Error for employee-not-found, employee-not-ACTIVE, policy-not-found, policy-inactive. Throws InsufficientBalanceError when totalEntitlement - usedDays < requestedDays. All errors are typed and propagated (GP-006).
+- approveLeaveRequest(requestId, approverId) — approverId is the acting approver; RBAC verification that approverId is the employee's manager or an hr_admin is deferred to the controller/middleware layer.; Throws Error if request not found or status is not SUBMITTED. Throws Error if the repository updateStatus returns null (update failed). Does not modify balance.
+- rejectLeaveRequest(requestId, approverId, reason) — approverId is the acting approver; RBAC verification deferred to controller/middleware.; Throws Error if request not found or status is not SUBMITTED. Throws Error if updateStatus returns null. Restores balance via decrementUsedDays only if a balance record exists (no throw if balance is null).
+- cancelLeaveRequest(requestId, employeeId) — employeeId must match the request's employeeId; the service enforces this ownership check directly. RBAC role checks are deferred to controller/middleware.; Throws Error if request not found, status is not SUBMITTED or APPROVED, or employeeId does not match the request owner. Restores balance via decrementUsedDays only if a balance record exists. Does not create a notification.
+- getLeaveRequest(requestId) / getEmployeeLeaveRequests(employeeId, params?) — No auth check in the service; RBAC deferred to controller/middleware.; idempotent; Pure read-through delegation to the leave repository. Returns null (getLeaveRequest) or empty array (getEmployeeLeaveRequests) when no records match. Produces no audit records or notifications.
+### Integration points — connect to these
+- src/modules/balance/ (IBalanceRepository) — The leave service depends on the balance repository for get-or-create balance, atomic incrementUsedDays at submission, and decrementUsedDays at reject/cancel. This is the deduct-on-submission / restore-on-reject-cancel binding.
+- src/modules/employee/ (IEmployeeRepository) — The leave service depends on the employee repository for findById (employment status check, managerId resolution) and findAll (HR-admin escalation when managerId is null).
+- src/modules/policy/ (IPolicyRepository) — The leave service depends on the policy repository for findById to validate the policy is active and to read entitlementDays for balance creation.
+- src/modules/notification/ (INotificationRepository) — The leave service depends on the notification repository to create notifications for the approver on submit, and for the employee on approve and reject.
+- src/modules/audit/ (IAuditRepository) — The leave service depends on the audit repository to write one audit record per state-changing operation (GP-002), with entityType 'leave_request' and the appropriate AuditAction.
+- src/shared/utils/day-count.ts (calculateBusinessDays, getHolidaysForYear) — The leave service depends on the shared day-count utility as the single source of truth for business-day calculations across sufficiency checks and balance restoration.
+- src/modules/leave/leave.controller.ts (Phase 10 — not yet built) — The ILeaveService interface is the contract that the future Phase 10 controller will consume; the service is the single entry point for all leave request state transitions and must remain stable for that consumer.
 
-Then check the rest of these files (and the surrounding module) for ANY OTHER occurrence of the same pattern beyond the specific lines listed above, and apply the same change there too — do NOT limit the fix to only the enumerated sites.
+## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
+Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
+- Use unknown with type guards instead of any (rule: `no-any`)
+- Database calls must go through repository pattern (rule: `no-direct-db-outside-repository`)
+- No hardcoded passwords, API keys, or tokens (rule: `no-hardcoded-secrets`)
+- Do not add @gestalt/* packages as project dependencies — these are Gestalt platform internals not available on npm (rule: `no-gestalt-internal-deps`)
 
-### Coherent change 2 — apply as ONE atomic edit across ALL sites below
+## Architecture & constraint rules the quality gate enforces (satisfy these now)
+The quality gate judges your code against the rules below and BLOCKS the phase on any violation — a violation it rates critical escalates to a human with no automatic retry. These are the same rules the gate checks, so comply up front rather than leaving them for the gate:
+- Data access is only permitted in the designated data access layer of this project. Code in business logic, presentation, or routing layers must delegate all data operations to the data access layer.
+- The data access layer is the only layer permitted to contain connection management, query execution, and direct interaction with the data store.
+- Each architectural layer communicates only with its immediately adjacent layer. Layers must not bypass intermediate layers.
+- Dependencies flow in one direction only — from outer layers toward inner layers. Inner layers must not depend on outer layers.
+- Error handling must be explicit. Callers must not be exposed to unhandled failures from dependencies.
 
-Unifying change (do this now): In src/modules/leave/index.ts, add two export lines alongside the existing exports: `export { ILeaveService } from './leave.service.interface';` and `export { LeaveService } from './leave.service';`
+## Project stack & references
+Before writing code, read the referenced files below (those present in the working directory) to learn the project's language, framework, test runner, and conventions, and the cross-cutting rules your code must satisfy — then follow the existing repository conventions:
+- `HARNESS.json`
+- `docs/ARCHITECTURE.md`
+- `docs/GOLDEN_PRINCIPLES.md`
+- `AGENTS.md`
+- `PLAN.md`
 
-The sites below are the SAME underlying issue. Fixing some but not others leaves the code incoherent and the quality gate WILL re-flag it — apply the one change above consistently to EVERY site:
-
-- Site 1
-File: src/modules/leave/index.ts
-Offending code: `export { LeaveRequest, ILeaveRepository } from './leave.model';
-export { LeaveRepository } from './leave.repository';`
-Rule violated: missing-barrel-exports
-Action (do this now): Edit `src/modules/leave/index.ts` in place to fix the `missing-barrel-exports` violation.
-What the quality gate found — apply this: [missing-barrel-exports] The leave barrel (index.ts) does not export ILeaveService or LeaveService. The success criteria require: "The leave barrel (src/modules/leave/index.ts) additionally exports ILeaveService and LeaveService alongside the existing LeaveRequest, ILeaveRepository, and LeaveRepository exports."
-
-- Site 2
-File: src/modules/leave/index.ts
-Line: 1
-Offending code: `export { LeaveRequest, ILeaveRepository } from './leave.model';
-export { LeaveRepository } from './leave.repository';`
-Rule violated: review/architecture
-Action (do this now): Edit `src/modules/leave/index.ts` at line 1 in place to fix the `review/architecture` violation.
-What the quality gate found — apply this: [review/architecture] The leave barrel (index.ts) does not export ILeaveService and LeaveService as required by success criterion #10. Only LeaveRequest, ILeaveRepository, and LeaveRepository are exported.
-
-Then check the rest of these files (and the surrounding module) for ANY OTHER occurrence of the same pattern beyond the specific lines listed above, and apply the same change there too — do NOT limit the fix to only the enumerated sites.
-
-### Coherent change 3 — apply as ONE atomic edit across ALL sites below
-
-Unifying change (do this now): Rename tests/unit/modules/leave/leave.service.spec.ts to tests/unit/modules/leave/leave.service.test.ts so Jest discovers and runs it under the configured testMatch pattern.
-
-The sites below are the SAME underlying issue. Fixing some but not others leaves the code incoherent and the quality gate WILL re-flag it — apply the one change above consistently to EVERY site:
-
-- Site 1
-File: tests/unit/modules/leave/leave.service.spec.ts
-Offending code: `tests/unit/modules/leave/leave.service.spec.ts`
-Rule violated: test-file-naming
-Action (do this now): Edit `tests/unit/modules/leave/leave.service.spec.ts` in place to fix the `test-file-naming` violation.
-What the quality gate found — apply this: [test-file-naming] The test file uses the `.spec.ts` extension, but jest.config.js only matches `**/tests/**/*.test.(ts|js)`. Jest does not discover or run this file (confirmed by `npx jest --listTests` — the file is absent). The success criteria require: "Unit tests exist and run under the Jest testMatch config (file extension .test.ts, not .spec.ts)."
-
-- Site 2
-File: tests/unit/modules/leave/leave.service.spec.ts
-Line: 1
-Offending code: `tests/unit/modules/leave/leave.service.spec.ts`
-Rule violated: review/test-infrastructure
-Action (do this now): Edit `tests/unit/modules/leave/leave.service.spec.ts` at line 1 in place to fix the `review/test-infrastructure` violation.
-What the quality gate found — apply this: [review/test-infrastructure] Test file uses `.spec.ts` extension but Jest config only matches `**/tests/**/*.test.(ts|js)`. The 30 service tests are never executed. Verified: `npx jest --listTests` does not list this file, and `npx jest tests/unit/modules/leave/leave.service.spec.ts` reports "No tests found."
-
-Then check the rest of these files (and the surrounding module) for ANY OTHER occurrence of the same pattern beyond the specific lines listed above, and apply the same change there too — do NOT limit the fix to only the enumerated sites.
+## Verify before you finish (MANDATORY)
+The code you write MUST compile and its tests MUST pass — a compilation or type error must NEVER be left for CI to find. Before you declare this task done:
+- Read the project's build / type-check / test commands from `package.json` (scripts) and `HARNESS.json`.
+- Install dependencies if they are not already installed, then RUN the type-check / build (e.g. `npm run build` or `tsc --noEmit`) AND the tests (e.g. `npm test`) for the files this phase touches.
+- FIX every compilation error, type error, and failing test you introduced — including in test files — and re-run until they pass.
+- Only when the build and the tests pass may you consider the task complete. If a dependency install genuinely cannot be made to work, say so explicitly in your final message rather than declaring success on unverified code.
 
 ## Constraints (mandatory)
-- Edit ONLY the files listed above; do not add, delete, or rename files.
-- Do not modify imports unless a required change above needs it.
-- Do NOT run `git commit`, `git push`, `git add`, or any git command. The platform handles all git operations.
-- Do not run tests or build commands.
-- When all the listed edits are made, stop.
+- Write and modify source files ONLY. Do NOT run `git commit`, `git push`, `git add`, or any other git command. The platform handles all git operations. (Running the build / type-check / tests above is expected and encouraged — that is NOT a git operation.)
+- Do not create a new repository or change the git remote.
+- Stay within the scope of this phase; do not implement deferred/later work.
