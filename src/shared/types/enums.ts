@@ -1,10 +1,10 @@
 export enum LeaveType {
-  ANNUAL = 'annual',
-  SICK = 'sick',
-  EMERGENCY = 'emergency',
-  UNPAID = 'unpaid',
-  MATERNITY = 'maternity',
-  PATERNITY = 'paternity',
+  annual = 'annual',
+  sick = 'sick',
+  emergency = 'emergency',
+  unpaid = 'unpaid',
+  maternity = 'maternity',
+  paternity = 'paternity',
 }
 
 export enum LeaveStatus {
