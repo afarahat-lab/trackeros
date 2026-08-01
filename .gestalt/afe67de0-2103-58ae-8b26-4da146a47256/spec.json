@@ -1,0 +1,116 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "audit"
+    ],
+    "affectedLayers": [
+      "domain",
+      "persistence"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The AuditLog entity and IAuditRepository interface are defined in the audit model file, with the action field typed as the existing AuditAction enum imported from shared/types (not redefined locally).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The AuditRepository implements IAuditRepository and its create method persists a row into the audit_log table using parameterized SQL with RETURNING *, then returns the mapped AuditLog entity (including the database-generated id).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findByEntity returns all audit records matching a given (entityType, entityId) pair, and findByPerformer returns all records matching a given performedBy; both return an empty array (not null) when no rows match.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository's row mapping converts snake_case database columns (entity_type, entity_id, old_values, new_values, performed_by, performed_at) to the camelCase AuditLog fields, and preserves null oldValues/newValues as null rather than undefined.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The barrel export re-exports AuditLog, IAuditRepository, and AuditRepository so consumers import only through the module's public entry point (index.ts), matching the established module convention.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests in tests/unit/modules/audit/ cover all three repository methods (findByEntity, findByPerformer, create) including the empty-result and null oldValues/newValues cases, mocking pool.query from shared/db/connection.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access must go through the repository layer (GP-001 / no-direct-db-outside-repository); the audit module must not expose raw pool access or inline SQL outside AuditRepository.",
+    "No use of `any` \u2014 use `unknown` with type guards/casts instead (no-any rule, high severity); strict TypeScript with strict null checks must pass.",
+    "All SQL must use parameterized queries ($1, $2, \u2026) \u2014 no string-interpolated values \u2014 to prevent SQL injection.",
+    "Modules import from each other only through their declared public entry point (index.ts); the audit module must import AuditAction from shared/types, not from a sibling module's internals."
+  ],
+  "outOfScope": [
+    "AuditService, IAuditService, controller, and routes for the audit module \u2014 these are not part of this phase (only model, repository, barrel, and unit tests).",
+    "Wiring the AuditRepository into the LeaveService or any other consumer \u2014 integration of audit recording into leave workflows happens in Phase 9, not here.",
+    "Database migrations or schema creation for the audit_log table \u2014 the table schema is already defined in the reconciled architecture; this phase only implements the repository against it."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "An AuditLog record is immutable once created \u2014 there is no update or delete operation on the repository; it is an append-only compliance trail (GP-002). The entity does not extend BaseEntity and carries no createdAt/updatedAt; its sole timestamp is performedAt, supplied by the caller at creation time."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IAuditRepository.create(data: Omit<AuditLog, 'id'>) \u2014 persists a new audit record and returns it with the database-generated id.",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Must propagate database errors (e.g., FK violation on performed_by) rather than swallowing them; the caller supplies performedAt so the repository does not default it."
+    },
+    {
+      "operation": "IAuditRepository.findByEntity(entityType, entityId) \u2014 returns all audit records for a given entity, ordered to support chronological review.",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an empty array when no rows match; never returns null."
+    },
+    {
+      "operation": "IAuditRepository.findByPerformer(performedBy) \u2014 returns all audit records performed by a given actor.",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an empty array when no rows match; never returns null."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The action field must use the existing AuditAction enum (CREATE, UPDATE, DELETE, APPROVE, REJECT) imported from shared/types \u2014 it must not be redefined or duplicated in the audit module.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The repository must obtain its database connection by importing the existing `pool` export from shared/db/connection, the same source every other repository uses \u2014 no separate Pool instantiation.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "The repository must follow the established repository pattern: a class implementing the interface, parameterized SQL with RETURNING *, and a private mapRow helper converting snake_case columns to camelCase entity fields \u2014 matching the notification and employee repository conventions.",
+      "referencePath": "src/modules/notification/notification.repository.ts"
+    },
+    {
+      "requirement": "Unit tests must follow the established test convention: jest.mock('shared/db/connection', () => ({ pool: { query: jest.fn() } })), a makeRow helper producing snake_case rows, and assertions on both the SQL string and the mapped entity fields.",
+      "referencePath": "tests/unit/modules/notification/notification.repository.test.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts (AuditAction enum)",
+      "why": "The audit module depends on the Phase 1 AuditAction enum for the action field type; this is the sole cross-module dependency for this phase."
+    },
+    {
+      "target": "src/shared/db/connection.ts (pool)",
+      "why": "The AuditRepository obtains its pg Pool from the shared database connection, consistent with all other repositories."
+    },
+    {
+      "target": "src/modules/leave/ (LeaveService, Phase 9)",
+      "why": "The audit module's public IAuditRepository interface is the integration surface that the future LeaveService will consume to record audit entries for every state-changing operation (GP-002); this phase establishes that contract."
+    }
+  ]
+}
