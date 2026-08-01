@@ -5,12 +5,12 @@ import {
   LeaveRequestQueryParams,
   LeaveRequestStatus,
 } from '../../shared/types';
-import { calculateBusinessDays, getHolidaysForYear } from '../../shared/utils/day-count';
-import { IAuditRepository } from '../audit/audit.model';
-import { IBalanceRepository, InsufficientBalanceError } from '../balance/balance.model';
-import { IEmployeeRepository } from '../employee/employee.model';
-import { INotificationRepository } from '../notification/notification.model';
-import { IPolicyRepository } from '../policy/policy.model';
+import { calculateBusinessDays, getHolidaysForYear } from '../../shared/utils';
+import { IAuditRepository } from '../audit';
+import { IBalanceRepository, InsufficientBalanceError } from '../balance';
+import { IEmployeeRepository } from '../employee';
+import { INotificationRepository } from '../notification';
+import { IPolicyRepository } from '../policy';
 import { ILeaveRepository, LeaveRequest } from './leave.model';
 import { ILeaveService } from './leave.service.interface';
 
