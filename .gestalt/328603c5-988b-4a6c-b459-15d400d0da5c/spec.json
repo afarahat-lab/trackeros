@@ -1,0 +1,110 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared-types"
+    ],
+    "affectedLayers": [
+      "unit"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "Every LeaveType enum member in src/shared/types/enums.ts is declared with a lowercase identifier whose name equals its string value (annual='annual', sick='sick', emergency='emergency', unpaid='unpaid', maternity='maternity', paternity='paternity'); no uppercase LeaveType member identifiers remain.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The LeaveType enum still exposes exactly six members with the unchanged string values annual, sick, emergency, unpaid, maternity, paternity \u2014 Object.values(LeaveType) returns exactly those six strings and nothing else.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The LeaveStatus and AuditAction enums are unchanged from their pre-phase state (uppercase member identifiers and uppercase string values: DRAFT/SUBMITTED/APPROVED/REJECTED/CANCELLED for LeaveStatus; CREATED/SUBMITTED/APPROVED/REJECTED/CANCELLED/BALANCE_DEDUCTED/BALANCE_RESTORED for AuditAction).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The Jest unit test for the shared enums references the new lowercase LeaveType member names directly (e.g. LeaveType.annual) rather than only relying on Object.values and string literals, and all assertions pass under the project's Jest test runner.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The project typechecks (tsc --noEmit) and the full Jest suite passes after the rename \u2014 no compile error or test failure is introduced in any consumer of LeaveType.",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "Only the LeaveType enum members are renamed; the string values assigned to each member must not change (annual, sick, emergency, unpaid, maternity, paternity remain the literal values).",
+    "LeaveStatus and AuditAction enums must not be modified by this phase \u2014 their member identifiers and string values stay uppercase as currently declared.",
+    "The barrel export src/shared/types/index.ts must continue to re-export LeaveType by name; the rename must not alter the exported type name or the public import surface of the shared-types module.",
+    "Strict TypeScript (no implicit any, strict null checks) must remain satisfied; the renamed lowercase enum members must be valid TypeScript identifiers and compile cleanly."
+  ],
+  "outOfScope": [
+    "Fixing the stale LeaveType vocabulary in docs/ARCHITECTURE.md line 19 (ANNUAL, SICK, MATERNITY, PATERNITY, UNPAID, OTHER \u2014 missing EMERGENCY, has OTHER) \u2014 this is a pre-existing, pre-feature section outside this phase's scope.",
+    "Renaming or altering the LeaveStatus or AuditAction enums, their member identifiers, or their string values.",
+    "Changing the string values of LeaveType members, adding new leave types, or removing existing ones \u2014 only the member identifiers change from uppercase to lowercase.",
+    "Updating any downstream consumer (services, repositories, DTOs, controllers) of LeaveType \u2014 discovery confirmed no consumer accesses LeaveType.<MEMBER>, so none require changes."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveType enum (src/shared/types/enums.ts)",
+      "mustExistOrExtend": true,
+      "invariant": "The controlled vocabulary is exactly six members: annual, sick, emergency, unpaid, maternity, paternity. After this phase each member's identifier equals its string value (name === value), and the set of string values is unchanged from before the rename."
+    },
+    {
+      "entity": "LeaveType enum (src/shared/types/enums.ts)",
+      "mustExistOrExtend": true,
+      "invariant": "The enum remains a TypeScript string enum (not a union/const object) and remains the single source of truth for the leave-type controlled vocabulary consumed by the leave_types.code column and downstream modules."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "Programmatic access to each LeaveType member by its lowercase identifier (e.g. LeaveType.annual) must resolve to the corresponding lowercase string value, and Object.values(LeaveType) / Object.keys(LeaveType) must return only the six lowercase string values with no numeric reverse-mapping keys (string enums do not reverse-map).",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Accessing a non-existent member is a compile-time error under strict TypeScript; no runtime error semantics are introduced."
+    },
+    {
+      "operation": "The Jest unit test for the shared enums must verify that LeaveType exposes exactly the six required members with lowercase values, and must reference the renamed lowercase members directly so the test would fail if a member identifier were not lowercase or were missing.",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "A test failure (assertion mismatch) is the only failure mode; there is no thrown/typed error contract for this phase."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The LeaveType controlled vocabulary (annual, sick, emergency, unpaid, maternity, paternity) must match the authoritative module ownership declaration in the reconciled architecture, which lists \"LeaveType enum (annual, sick, emergency, unpaid, maternity, paternity)\" under the shared-types module. The rename must not alter this vocabulary, only the member identifiers.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "The barrel export must continue to re-export LeaveType by name exactly as declared (export { LeaveType, LeaveStatus, AuditAction } from './enums'); renaming enum members must not change the exported symbol name or require any edit to this barrel.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "LeaveStatus and AuditAction must remain byte-for-byte unchanged in their member identifiers and string values (uppercase) \u2014 the rename applies exclusively to LeaveType members. Any edit must preserve the existing LeaveStatus (DRAFT/SUBMITTED/APPROVED/REJECTED/CANCELLED) and AuditAction (CREATED/SUBMITTED/APPROVED/REJECTED/CANCELLED/BALANCE_DEDUCTED/BALANCE_RESTORED) declarations.",
+      "referencePath": "src/shared/types/enums.ts"
+    },
+    {
+      "requirement": "The enum test must remain consistent with the actual enum declaration in src/shared/types/enums.ts: it must assert the six LeaveType values (annual, sick, emergency, unpaid, maternity, paternity) and the unchanged LeaveStatus/AuditAction values, and must use the new lowercase LeaveType member names so the test and source stay in lockstep.",
+      "referencePath": "tests/unit/shared/types/enums.test.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts (shared-types barrel)",
+      "why": "The barrel re-exports LeaveType by name; the rename must leave this public import surface intact so all downstream modules importing LeaveType from shared-types continue to compile without change."
+    },
+    {
+      "target": "tests/unit/shared/types/enums.test.ts (Jest unit test)",
+      "why": "The test is the verification artifact for this phase and must be updated to reference the new lowercase LeaveType member names directly, keeping assertions in lockstep with the renamed enum."
+    },
+    {
+      "target": "Project typecheck + Jest suite (tsc --noEmit and npx jest)",
+      "why": "The rename must not break compilation or any test in the suite; the verification gate (npm run build && npx jest) must pass, confirming no consumer of LeaveType was affected."
+    }
+  ]
+}
