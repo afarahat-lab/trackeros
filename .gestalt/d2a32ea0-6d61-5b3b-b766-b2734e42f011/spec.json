@@ -1,0 +1,126 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared-utils",
+      "leave-management"
+    ],
+    "affectedLayers": [
+      "shared",
+      "utils"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "calculateBusinessDays returns the correct count of business days (Monday\u2013Friday) within an inclusive [startDate, endDate] range, excluding Saturdays, Sundays, and any date whose calendar date matches an entry in the holidays array.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "calculateBusinessDays returns 1 when startDate and endDate are the same calendar day that falls on a business day (not a weekend or holiday).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "calculateBusinessDays returns 0 when startDate is after endDate (inverted range), without throwing.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "getHolidaysForYear queries the holidays table via the pg pool, filtering by the given year and country = 'US', and returns an array of Date objects derived from the date column.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Both calculateBusinessDays and getHolidaysForYear are exported through the barrel at src/shared/utils/index.ts and are importable from that path.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Unit tests in tests/unit/shared/utils/ cover: weekends excluded, holidays excluded, same-day = 1, multi-day spans, and inverted-range edge cases, and all pass under npx jest.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "npm run build completes with no TypeScript compilation errors and npx jest --passWithNoTests exits zero.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "calculateBusinessDays must be a pure function with no database access and no side effects \u2014 it must not import or call the pool.",
+    "Date comparison in calculateBusinessDays must compare only the calendar date (year/month/day) of each day in the range against the holidays array; time components must be ignored to avoid false negatives.",
+    "No use of the `any` type anywhere in the utility or its tests \u2014 use `unknown` with type guards or `Record<string, unknown>` with explicit casts, consistent with the existing repository mapRow pattern.",
+    "getHolidaysForYear must use parameterized SQL (pool.query with $1/$2 placeholders) \u2014 no string-interpolated values in the query \u2014 matching the existing repository query style.",
+    "The holidays table query must filter by country = 'US' as the default; the function signature takes only a year parameter and does not expose a country parameter.",
+    "Whole days only \u2014 no half-day or partial-day counting logic is permitted in this utility.",
+    "This utility is the single source of truth for leave day-count calculations; no other code path may independently compute business-day counts for balance sufficiency, deduction, or restoration."
+  ],
+  "outOfScope": [
+    "The leave service (Phase 9) that consumes calculateBusinessDays and getHolidaysForYear for balance sufficiency checks, deduction, and restoration is out of scope for this phase.",
+    "Database migrations or schema creation for the holidays table are out of scope \u2014 the utility assumes the table already exists with columns date, name, and country.",
+    "Support for country parameters other than the default 'US' is out of scope \u2014 the function signature is fixed to year-only.",
+    "Half-day or partial-day leave counting is out of scope \u2014 whole days only.",
+    "Caching of holiday query results is out of scope for this phase."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "calculateBusinessDays",
+      "mustExistOrExtend": true,
+      "invariant": "For any valid inclusive date range where startDate <= endDate, the returned count is always >= 0 and equals the number of days in the range that are Monday\u2013Friday and not present in the holidays array (by calendar date). The function never throws for any Date inputs."
+    },
+    {
+      "entity": "getHolidaysForYear",
+      "mustExistOrExtend": true,
+      "invariant": "The function always returns a Promise that resolves to a Date[] (possibly empty) and never returns undefined; if the query yields no rows, an empty array is returned."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "calculateBusinessDays(startDate: Date, endDate: Date, holidays: Date[]): number",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Must not throw for any input, including inverted ranges (startDate > endDate returns 0) and dates with arbitrary time components."
+    },
+    {
+      "operation": "getHolidaysForYear(year: number): Promise<Date[]>",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "If the underlying pool.query rejects, the rejection propagates to the caller (no silent swallowing); an empty result set resolves to an empty array, not null or undefined."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "getHolidaysForYear must obtain the pg Pool from the same export used by all existing repositories \u2014 the `pool` named export \u2014 so connection configuration is shared and not duplicated.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "The barrel export at src/shared/utils/index.ts must follow the same simple re-export style used by existing module barrels (e.g., `export { X, Y } from './file'`).",
+      "referencePath": "src/modules/balance/index.ts"
+    },
+    {
+      "requirement": "getHolidaysForYear must use parameterized SQL via pool.query(sql, params) with a mapRow-style conversion from the raw DB row to the return type, matching the established repository pattern for snake_case-to-camelCase mapping and Record<string, unknown> casting.",
+      "referencePath": "src/modules/balance/balance.repository.ts"
+    },
+    {
+      "requirement": "Unit tests must mock the pool using the same pattern as existing repository tests: jest.mock('shared/db/connection', () => ({ pool: { query: jest.fn() } })) with mockReset() in beforeEach, resolving via the jest.config.js moduleDirectories and tsconfig baseUrl.",
+      "referencePath": "tests/unit/modules/balance/balance.repository.test.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/db/connection.ts (pool export)",
+      "why": "getHolidaysForYear queries the holidays table through the shared pg Pool; this is the runtime dependency for holiday data retrieval."
+    },
+    {
+      "target": "Phase 9 leave service (src/modules/leave/leave.service.ts)",
+      "why": "The leave service will be the primary consumer, calling getHolidaysForYear(fiscalYear) then calculateBusinessDays(startDate, endDate, holidays) for balance sufficiency checks, deduction on submit, and restoration on reject/cancel."
+    },
+    {
+      "target": "holidays table (PostgreSQL)",
+      "why": "getHolidaysForYear reads from the holidays table (columns: date, name, country) to supply the holiday list consumed by calculateBusinessDays."
+    }
+  ]
+}
