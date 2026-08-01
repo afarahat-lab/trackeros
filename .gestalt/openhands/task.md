@@ -1,24 +1,19 @@
-# Implement this phase: Phase 1: Shared types — enums, DTOs, and base interfaces
+# Implement this phase: Phase 2: Employee module — model and repository
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/35df38af-c9d7-41ee-b412-79ee8d149189/1`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/35df38af-c9d7-41ee-b412-79ee8d149189/2`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create `src/shared/types/index.ts` with ALL of the following, using the EXACT names from the architecture's shared-types module:
+Create the employee module at `src/modules/employee/`. This phase depends on `src/shared/types/index.ts` from Phase 1 — read it before generating any code that references EmploymentStatus.
 
-- **LeaveType enum**: `'annual' | 'sick' | 'emergency' | 'unpaid' | 'maternity' | 'paternity'`
-- **LeaveStatus enum** (named LeaveRequestStatus for clarity in code but exported as both): `'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED'`
-- **EmploymentStatus enum**: `'ACTIVE' | 'INACTIVE' | 'TERMINATED'`
-- **AuditAction enum**: `'CREATE' | 'UPDATE' | 'DELETE' | 'APPROVE' | 'REJECT'`
-- **BaseEntity interface**: `{ id: string; createdAt: Date; updatedAt: Date }`
-- **CreateLeaveRequestDto**: `{ employeeId: string; policyId: string; startDate: Date; endDate: Date; reason?: string }`
-- **UpdateLeaveRequestDto**: `{ startDate?: Date; endDate?: Date; reason?: string }`
-- **LeaveRequestQueryParams**: `{ status?: LeaveStatus; policyId?: string; startDateFrom?: Date; startDateTo?: Date; endDateFrom?: Date; endDateTo?: Date; limit?: number; offset?: number }`
-- **ValidationResult interface**: `{ isValid: boolean; errors: string[] }`
+Files to create:
+- `src/modules/employee/employee.model.ts` — Define the **Employee** entity with EXACT fields: `id: string`, `firstName: string`, `lastName: string`, `email: string`, `role: string`, `managerId: string | null`, `department: string`, `employmentStatus: EmploymentStatus` (import from `src/shared/types`), `createdAt: Date`, `updatedAt: Date`. Also define **IEmployeeRepository** interface with methods: `findById(id: string): Promise<Employee | null>`, `findByDepartment(department: string): Promise<Employee[]>`, `findAll(): Promise<Employee[]>`, `create(employee: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'>): Promise<Employee>`, `update(id: string, data: Partial<Employee>): Promise<Employee | null>`.
+- `src/modules/employee/employee.repository.ts` — Implement **EmployeeRepository** class implementing IEmployeeRepository using the pg pool from `src/shared/db/connection.ts`. Use parameterized queries. Follow the repository pattern from GP-001.
+- `src/modules/employee/index.ts` — Barrel export of Employee, IEmployeeRepository, EmployeeRepository.
 
-Also create `src/shared/types/` directory if it does not exist. Include Jest unit tests in `tests/unit/shared/types/` verifying enum values and DTO shapes.
+Include Jest unit tests in `tests/unit/modules/employee/` mocking the db pool.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -34,26 +29,19 @@ These are resolved, feature-wide decisions. Wherever this phase touches the conc
 
 6. remainingDays = COMPUTED/DERIVED, never stored: remainingDays = totalEntitlement - usedDays, calculated at query time. All consumers use this one formula; no code path writes remainingDays directly. This eliminates drift. [BINDING RULE — operator decision resolving: How is the fiscal year boundary defined — calendar year (Jan 1 – Dec 31) or a company-specific fiscal year (e.g., Apr 1 – Mar 31)?; Should the day-count calculation for leave consumption exclude weekends and/or public holidays (business days only), or count all calendar days?; When an employee has no manager (managerId is null), who approves their SUBMITTED LeaveRequest? Does it auto-approve, escalate to a department head, or require a different workflow?; How is `used_days` in `leave_balances` derived — is it a denormalized counter incremented atomically on leave approval, or is it computed on-the-fly by summing the day counts of all approved `leave_requests` for that employee/type/year?; Are leave day counts based on calendar days (inclusive start-to-end) or working/business days (excluding weekends and holidays)?; Should Balance.remainingDays be a stored column or a computed (derived) field?; apply everywhere these apply, not in one place only]
 
-## Constraints & consistency
-You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
-### Reuse & consistency — match these exactly
-- The enum value sets and DTO field shapes must match the reconciled architecture's domain_entities and modules declarations exactly — LeaveType values are lowercase string literals, LeaveStatus/EmploymentStatus/AuditAction are uppercase string literals, and the shared-types module path is src/shared/types/ owning exactly the nine named symbols. The reconciled architecture is authoritative over the stale root ARCHITECTURE.md. (see `.gestalt/architecture/reconciled.json`)
-- The DTO field shapes (CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveRequestQueryParams, BaseEntity, ValidationResult) must match the field-level definitions in PLAN.md Phase 1 so that later phases (2–10) which import these types compile against the exact shapes they were planned around — e.g. CreateLeaveRequestDto requires employeeId, policyId, startDate, endDate with optional reason; UpdateLeaveRequestDto makes all three optional. (see `PLAN.md`)
-- The shared-types source must compile under the project's tsconfig (strict: true, baseUrl: ./src, module: commonjs, rootDir: ./src, include: ["src"]) — meaning the file lives under src/, uses no implicit any, and is importable via the baseUrl-relative path `shared/types`. (see `tsconfig.json`)
-- Unit tests for the shared-types module must match the Jest config's testMatch glob (`**/tests/**/*.test.(ts|js)`) and use the ts-jest transform — test files must end in `.test.ts` and reside under tests/unit/shared/types/, not use the `.spec.ts` suffix. (see `jest.config.js`)
-### Entity invariants — enforce these
-- Reuse or extend `LeaveType`: The set of allowed leave-category values is closed and fixed at exactly six members (annual, sick, emergency, unpaid, maternity, paternity); no consumer may introduce a seventh value without extending this shared definition, and every LeavePolicy in later phases binds to exactly one of these values.
-- Reuse or extend `LeaveRequestStatus (a.k.a. LeaveStatus)`: The leave-request lifecycle state space is exactly five states (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED); both exported names (LeaveRequestStatus and LeaveStatus) MUST resolve to the identical type so that no downstream consumer can observe a structural difference between them.
-- Reuse or extend `EmploymentStatus`: The employment-status value set is closed at exactly three members (ACTIVE, INACTIVE, TERMINATED); this is the sole source of truth for employee employment state referenced by the leave-submission business rule (employee must be ACTIVE to submit).
-- Reuse or extend `AuditAction`: The audit-action value set is closed at exactly five members (CREATE, UPDATE, DELETE, APPROVE, REJECT); every state-changing operation recorded by the audit module in a later phase must use one of these values — no ad-hoc action strings are permitted.
-- Reuse or extend `BaseEntity`: BaseEntity is the structural contract every persisted domain entity extends — it carries identity (id: string) and temporal audit fields (createdAt, updatedAt); any entity that is persisted to PostgreSQL in later phases must be structurally compatible with this interface so repository create/update signatures can rely on it.
-- Reuse or extend `ValidationResult`: ValidationResult is a pure result shape (isValid boolean + errors string array) with no validation logic owned here; when isValid is false the errors array must be non-empty, and when isValid is true the errors array must be empty — this invariant is a contract later validation functions must uphold.
-### Interface contract — expose these operations (their shape is yours)
-- The shared-types module must export all nine declared symbols (LeaveType, LeaveRequestStatus, LeaveStatus, EmploymentStatus, AuditAction, BaseEntity, CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveRequestQueryParams, ValidationResult) from its public entry point so that every downstream module can import each symbol from the single declared module path `shared/types`. — A missing or misnamed export is a compile-time failure caught by tsc --noEmit; no runtime error semantics apply to a pure type module.
-- Importing any shared type from a downstream module must go through the shared-types module's declared public entry point (its index/barrel), never from an internal file — per the architecture rule that modules import only through declared public entry points. — Importing from an internal path rather than the barrel is an architectural violation (CONSTRAINT_VIOLATION), not a runtime error.
-### Integration points — connect to these
-- All downstream domain modules (employee, policy, leave, balance, notification, audit) — Phases 2–10 — The shared-types module is the zero-dependency foundation every other module imports from; EmploymentStatus is consumed by the employee module, LeaveType by policy, LeaveStatus/CreateLeaveRequestDto/UpdateLeaveRequestDto/LeaveRequestQueryParams by leave, AuditAction by audit. This phase must complete and export correctly before any of those phases can compile.
-- HARNESS.json verification pipeline (npm run build && npx jest --passWithNoTests) — The shared-types source is the first non-trivial src/ TypeScript the mechanical compile gate will typecheck; it must pass tsc --noEmit under strict mode and its tests must be discovered and pass under the configured Jest testMatch.
+## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
+The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
+- `Employee` — the entity MUST have exactly these fields:
+    - id: string
+    - firstName: string
+    - lastName: string
+    - email: string
+    - role: string
+    - managerId: string | null
+    - department: string
+    - employmentStatus: EmploymentStatus
+    - createdAt: Date
+    - updatedAt: Date
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
