@@ -1,35 +1,26 @@
-# Implement this phase: Phase 5: Balance module — model and repository
+# Implement this phase: Phase 6: Notification module — model and repository
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/35df38af-c9d7-41ee-b412-79ee8d149189/5`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/35df38af-c9d7-41ee-b412-79ee8d149189/6`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the balance module at `src/modules/balance/`. This phase depends on:
-- `src/shared/types/index.ts` from Phase 1
-- `src/modules/employee/employee.model.ts` from Phase 2
-- `src/modules/policy/policy.model.ts` from Phase 3
-
-Read all three before generating any code.
+Create the notification module at `src/modules/notification/`. This phase depends on `src/shared/types/index.ts` from Phase 1.
 
 Files to create:
-- `src/modules/balance/balance.model.ts` — Define the **LeaveBalance** entity with EXACT fields: `id: string`, `employeeId: string`, `policyId: string`, `totalEntitlement: number`, `usedDays: number`, `remainingDays: number` (COMPUTED — see binding rule below), `fiscalYear: number`, `status: BalanceStatus` (define BalanceStatus as `'ACTIVE' | 'EXHAUSTED' | 'EXPIRED'`), `createdAt: Date`, `updatedAt: Date`.
+- `src/modules/notification/notification.model.ts` — Define the **Notification** entity with EXACT fields: `id: string`, `recipientId: string`, `type: string`, `title: string`, `message: string`, `relatedEntityType: string | null`, `relatedEntityId: string | null`, `status: NotificationStatus` (define as `'PENDING' | 'SENT' | 'READ' | 'ARCHIVED'`), `createdAt: Date`, `readAt: Date | null`.
 
-  Also define **IBalanceRepository** interface with methods:
-  - `findByEmployeeAndPolicy(employeeId: string, policyId: string, fiscalYear: number): Promise<LeaveBalance | null>`
-  - `findByEmployeeId(employeeId: string, fiscalYear?: number): Promise<LeaveBalance[]>`
-  - `create(data: Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeaveBalance>`
-  - `updateUsedDays(id: string, usedDays: number): Promise<LeaveBalance | null>` — atomic update
-  - `incrementUsedDays(id: string, days: number): Promise<LeaveBalance | null>` — atomic increment, must fail if remainingDays (totalEntitlement - usedDays) would go below zero
-  - `decrementUsedDays(id: string, days: number): Promise<LeaveBalance | null>` — atomic decrement for restore-on-reject/cancel
+  Also define **INotificationRepository** interface with methods:
+  - `findByRecipientId(recipientId: string): Promise<Notification[]>`
+  - `create(data: Omit<Notification, 'id' | 'createdAt' | 'readAt'>): Promise<Notification>`
+  - `markAsRead(id: string): Promise<Notification | null>`
+  - `updateStatus(id: string, status: NotificationStatus): Promise<Notification | null>`
 
-  **BINDING RULE**: `remainingDays` is COMPUTED/DERIVED, never stored. All consumers compute it as `totalEntitlement - usedDays`. The repository must NOT write remainingDays; it is computed at query time.
+- `src/modules/notification/notification.repository.ts` — Implement **NotificationRepository** class implementing INotificationRepository using the pg pool from `src/shared/db/connection.ts`.
+- `src/modules/notification/index.ts` — Barrel export.
 
-- `src/modules/balance/balance.repository.ts` — Implement **BalanceRepository** class implementing IBalanceRepository using the pg pool. The `incrementUsedDays` method must use an atomic SQL UPDATE with a CHECK/WHERE clause ensuring `totalEntitlement - usedDays - :days >= 0`, throwing a specific error if the balance would go negative. The `decrementUsedDays` method must ensure usedDays never goes below 0.
-- `src/modules/balance/index.ts` — Barrel export.
-
-Include Jest unit tests in `tests/unit/modules/balance/`.
+Include Jest unit tests in `tests/unit/modules/notification/`.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -45,34 +36,43 @@ These are resolved, feature-wide decisions. Wherever this phase touches the conc
 
 6. remainingDays = COMPUTED/DERIVED, never stored: remainingDays = totalEntitlement - usedDays, calculated at query time. All consumers use this one formula; no code path writes remainingDays directly. This eliminates drift. [BINDING RULE — operator decision resolving: How is the fiscal year boundary defined — calendar year (Jan 1 – Dec 31) or a company-specific fiscal year (e.g., Apr 1 – Mar 31)?; Should the day-count calculation for leave consumption exclude weekends and/or public holidays (business days only), or count all calendar days?; When an employee has no manager (managerId is null), who approves their SUBMITTED LeaveRequest? Does it auto-approve, escalate to a department head, or require a different workflow?; How is `used_days` in `leave_balances` derived — is it a denormalized counter incremented atomically on leave approval, or is it computed on-the-fly by summing the day counts of all approved `leave_requests` for that employee/type/year?; Are leave day counts based on calendar days (inclusive start-to-end) or working/business days (excluding weekends and holidays)?; Should Balance.remainingDays be a stored column or a computed (derived) field?; apply everywhere these apply, not in one place only]
 
+## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
+The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
+- `Notification` — the entity MUST have exactly these fields:
+    - id: string
+    - recipientId: string
+    - type: string
+    - title: string
+    - message: string
+    - relatedEntityType: string | null
+    - relatedEntityId: string | null
+    - status: NotificationStatus
+    - createdAt: Date
+    - readAt: Date | null
+
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- The BalanceRepository must follow the same standalone-class repository conventions as EmployeeRepository: import pool from ../../shared/db/connection; parameterized SQL ($1, $2); a private mapRow helper converting snake_case columns to camelCase entity fields with new Date(...) for date columns; create uses INSERT INTO ... RETURNING * omitting id/createdAt/updatedAt. No base repository class exists to extend. (see `src/modules/employee/employee.repository.ts`)
-- Any dynamic-update path (e.g. updateUsedDays or a general update) must match the PolicyRepository/EmployeeRepository pattern: build SET clauses from a fieldMap with an incrementing paramIndex, append updated_at = NOW(), and fall back to findById when no fields are supplied. Nullable fields use data[key] ?? null. (see `src/modules/policy/policy.repository.ts`)
-- The balance barrel index.ts must match the sibling-module pattern: re-export the entity interface and repository interface from the model file, and the concrete repository class from the repository file (e.g. export { LeaveBalance, IBalanceRepository } from './balance.model'; export { BalanceRepository } from './balance.repository'). (see `src/modules/employee/index.ts`)
-- Unit tests must match the established pattern: jest.mock('shared/db/connection', () => ({ pool: { query: jest.fn() } })); path-alias imports (modules/balance/..., shared/db/connection); a makeRow(overrides) snake_case helper; beforeEach resets the mock and instantiates the repo; describe/it per method. Jest config moduleDirectories: ['node_modules', 'src'] enables the aliases. (see `tests/unit/modules/employee/employee.repository.test.ts`)
-- BalanceStatus must be defined locally in the balance module because src/shared/types/index.ts contains no BalanceStatus type (confirmed by reading the file — it exports LeaveType, LeaveRequestStatus, LeaveStatus, EmploymentStatus, AuditAction, BaseEntity, and DTOs only). Do not import BalanceStatus from shared types. (see `src/shared/types/index.ts`)
-- The reconciled.json LeaveBalance entity lists remainingDays as a stored column updated atomically, but the operator binding rule (business_rules item 6) and PLAN.md Phase 5 override this: remainingDays is computed at query time and never written. The implementation must follow the binding rule, not the schema doc, for remainingDays semantics. (see `.gestalt/architecture/reconciled.json`)
+- NotificationStatus must be defined as a local type alias in the notification model file, mirroring how BalanceStatus is defined locally in balance.model.ts rather than imported from shared types. (see `src/modules/balance/balance.model.ts`)
+- The NotificationRepository must follow the same repository implementation pattern as BalanceRepository: import pool from the shared db connection, use parameterized INSERT/UPDATE ... RETURNING * queries, and implement a private mapRow helper typed as Record<string, unknown> that converts snake_case columns to camelCase entity fields. (see `src/modules/balance/balance.repository.ts`)
+- The notification barrel export must follow the same structure as the balance barrel: re-export the entity interface, the locally-defined status type, the repository interface, and the concrete repository class from their respective files. (see `src/modules/balance/index.ts`)
+- Unit tests must follow the established test pattern: jest.mock the shared db connection module, assert exact SQL strings and exact parameter arrays via expect(mockQuery).toHaveBeenCalledWith(sql, params), and use a snake_case makeRow helper for mock row construction. (see `tests/unit/modules/balance/balance.repository.test.ts`)
+- The repository must import the pool from the shared db connection module (which exports a pg.Pool instance named pool), matching how all existing repositories obtain their database connection. (see `src/shared/db/connection.ts`)
+- The Notification entity shape must match the reconciled architecture's Notification domain entity attributes exactly — notably omitting updatedAt (the notifications table has no updated_at column) and including readAt as a nullable Date, distinguishing it from Employee/Policy/Leave/Balance which all carry updatedAt. (see `.gestalt/architecture/reconciled.json`)
 ### Entity invariants — enforce these
-- Reuse or extend `LeaveBalance`: remainingDays is a pure function of totalEntitlement and usedDays (remainingDays = totalEntitlement - usedDays) at every read; it is never an independently stored/mutable value. Any LeaveBalance returned by the repository must satisfy remainingDays === totalEntitlement - usedDays.
-- Reuse or extend `LeaveBalance`: usedDays must never be negative. decrementUsedDays is guarded so used_days - days >= 0; no operation may produce a LeaveBalance with usedDays < 0.
-- Reuse or extend `LeaveBalance`: usedDays must never exceed totalEntitlement (equivalently remainingDays >= 0). incrementUsedDays is guarded so totalEntitlement - usedDays - days >= 0; an attempt to over-deduct is rejected and leaves the row unchanged.
-- Reuse or extend `LeaveBalance`: A LeaveBalance is uniquely identified by the composite (employeeId, policyId, fiscalYear); findByEmployeeAndPolicy resolves at most one balance for that triple, consistent with the unique composite index on (employee_id, policy_id, fiscal_year).
-- Reuse or extend `LeaveBalance`: The status field is constrained to exactly the BalanceStatus union 'ACTIVE' | 'EXHAUSTED' | 'EXPIRED' (defined locally in the balance module); no other status value is representable on the entity.
+- Reuse or extend `Notification`: The Notification lifecycle progresses PENDING → SENT → READ → ARCHIVED; markAsRead is the dedicated transition to READ that simultaneously sets readAt, while updateStatus handles all other status transitions generically.
+- Reuse or extend `Notification`: readAt is null until the notification is marked as read; once set it holds a timestamp and is never reset to null by any operation in this phase.
+- Reuse or extend `Notification`: A Notification is always associated with a recipient (recipientId is non-null) and may optionally reference a related entity via relatedEntityType/relatedEntityId, both of which are nullable together.
+- Reuse or extend `NotificationStatus`: NotificationStatus is a closed type alias with exactly four values — PENDING, SENT, READ, ARCHIVED — defined locally in the notification model file and not imported from shared types.
 ### Interface contract — expose these operations (their shape is yours)
-- IBalanceRepository.incrementUsedDays(id, days) — Atomic guarded UPDATE: must fail (throw a specific local Error subclass, not a generic Error, and not return null) when totalEntitlement - usedDays - days < 0, leaving the row unchanged. Returns the updated LeaveBalance on success, or null when the row does not exist. Never writes remaining_days.
-- IBalanceRepository.decrementUsedDays(id, days) — Atomic guarded UPDATE: must not mutate the row when usedDays - days < 0 (guard failure) or the row is missing; returns null in both cases without throwing. Returns the updated LeaveBalance on success. Never writes remaining_days.
-- IBalanceRepository.updateUsedDays(id, usedDays) — idempotent; Atomic direct SET of used_days with updated_at = NOW(); returns the updated LeaveBalance or null when the row is missing. Never writes remaining_days.
-- IBalanceRepository.create(data) — INSERT ... RETURNING * omitting id/createdAt/updatedAt and omitting remaining_days; returns the persisted LeaveBalance with remainingDays computed. Relies on the unique composite index to reject duplicate (employeeId, policyId, fiscalYear) triples via a database constraint error.
-- IBalanceRepository.findByEmployeeAndPolicy(employeeId, policyId, fiscalYear) — idempotent; Returns the single matching LeaveBalance (remainingDays computed) or null when none exists; resolves at most one row per the unique composite index.
-- IBalanceRepository.findByEmployeeId(employeeId, fiscalYear?) — idempotent; Returns all LeaveBalance rows for the employee, optionally filtered by fiscalYear; each returned entity has remainingDays computed. Returns an empty array when none match.
+- findByRecipientId(recipientId: string): Promise<Notification[]> — Returns an empty array when no notifications exist for the recipient; never returns null. Results are ordered by creation time descending.
+- create(data: Omit<Notification, 'id' | 'createdAt' | 'readAt'>): Promise<Notification> — Always returns the newly created entity; the caller-provided data excludes id, createdAt, and readAt which are database-generated or default to null. A database failure propagates as a rejected promise.
+- markAsRead(id: string): Promise<Notification | null> — Atomically sets read_at to NOW() and status to READ in a single UPDATE; returns the updated entity on success or null when no row matches the given id.
+- updateStatus(id: string, status: NotificationStatus): Promise<Notification | null> — Performs a generic status transition to any NotificationStatus value; returns the updated entity on success or null when no row matches the given id.
 ### Integration points — connect to these
-- src/shared/db/connection.ts (pg Pool export) — BalanceRepository imports the shared pool for all database access, matching every sibling repository; this is the single database access point (GP-001).
-- src/shared/types/index.ts — The balance module depends on shared types (Phase 1) for cross-cutting enums/types; BalanceStatus itself is local because shared types has no such export.
-- src/modules/employee (Employee entity / IEmployeeRepository) — LeaveBalance references employeeId; the balance module imports the Employee type reference from the employee module per the dependency map (balance → employee is implicit via the FK, and the leave service in Phase 9 will join them).
-- src/modules/policy (LeavePolicy entity / IPolicyRepository) — LeaveBalance references policyId and totalEntitlement is derived from LeavePolicy.entitlementDays; the balance module imports the LeavePolicy type reference per the dependency map (balance → policy, shared-types).
-- src/modules/leave/leave.service.ts (Phase 9, not yet built) — The leave service will consume incrementUsedDays (deduct-on-submission) and decrementUsedDays (restore-on-reject/cancel) as atomic primitives; this phase defines the contract those operations must satisfy so Phase 9 can rely on the guards.
+- src/shared/db/connection.ts — The NotificationRepository depends on the exported pg Pool instance for all database access, matching the established pattern across employee/policy/leave/balance repositories.
+- src/shared/types/index.ts — The notification module depends on the shared types foundation from Phase 1; NotificationStatus is defined locally (not exported from shared types) following the BalanceStatus precedent, but the module's barrel must be consumable alongside other modules that import from shared types.
+- src/modules/leave/ (Phase 9 leave service) — The leave service will depend on INotificationRepository to create notifications for managers and employees on leave lifecycle events (submission, approval, rejection, cancellation); this phase provides the repository interface and implementation that the leave service will consume.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
