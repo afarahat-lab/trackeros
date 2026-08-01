@@ -21,15 +21,8 @@ src/modules/balance/balance.{model,repository,service,controller,routes}.ts
 src/modules/employee/employee.{model,repository,service,controller,routes}.ts
 src/modules/policy/policy.{model,repository,service,controller,routes}.ts
 src/modules/notification/notification.{model,repository,service,controller,routes}.ts
-src/modules/LeaveStatus/    — LeaveStatus module
-src/modules/BaseEntity/    — BaseEntity module
-src/modules/LeaveRequest/    — LeaveRequest module
-src/modules/LeaveType/    — LeaveType module
-src/modules/LeavePolicy/    — LeavePolicy module
-src/modules/AuditLog/    — AuditLog module
-src/modules/AuditRecord/    — AuditRecord module
-src/modules/AuditServiceInterface/    — AuditServiceInterface module
-src/shared/db connection.ts
+src/shared/types/          — Shared enums, DTOs, and base interfaces (Phase 1)
+src/shared/db/connection.ts
 src/shared/base repository.ts
 src/shared/error types.ts
 ```
@@ -115,4 +108,21 @@ Six tables: `employees`, `leave_policies`, `leave_balances`, `leave_requests`, `
 - Frontend: React Native (out of scope for this backend architecture).
 - Database: PostgreSQL accessed via pg Pool; repositories implemented as Pg* classes.
 - Testing: Jest.
+
+## Implemented Phases
+
+### Phase 1 — Shared Types (src/shared/types/)
+Created the zero-dependency foundation module. Exports:
+- **LeaveType** enum: `'annual' | 'sick' | 'emergency' | 'unpaid' | 'maternity' | 'paternity'` (string enum, lowercase values)
+- **LeaveRequestStatus** enum: `'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED'` (string enum, uppercase values)
+- **LeaveStatus** type alias: identical to LeaveRequestStatus, exported for compatibility
+- **EmploymentStatus** enum: `'ACTIVE' | 'INACTIVE' | 'TERMINATED'`
+- **AuditAction** enum: `'CREATE' | 'UPDATE' | 'DELETE' | 'APPROVE' | 'REJECT'`
+- **BaseEntity** interface: `{ id: string; createdAt: Date; updatedAt: Date }`
+- **CreateLeaveRequestDto**: `{ employeeId: string; policyId: string; startDate: Date; endDate: Date; reason?: string }`
+- **UpdateLeaveRequestDto**: `{ startDate?: Date; endDate?: Date; reason?: string }`
+- **LeaveRequestQueryParams**: `{ status?: LeaveStatus; policyId?: string; startDateFrom?: Date; startDateTo?: Date; endDateFrom?: Date; endDateTo?: Date; limit?: number; offset?: number }`
+- **ValidationResult**: `{ isValid: boolean; errors: string[] }`
+
+All symbols are importable from `shared/types`. The module has zero runtime side effects and no database access. Unit tests in `tests/unit/shared/types/index.test.ts` verify enum value sets, DTO shapes, and the LeaveStatus/LeaveRequestStatus identity invariant.
 <!-- gestalt:architecture feature=35df38af-c9d7-41ee-b412-79ee8d149189 END -->

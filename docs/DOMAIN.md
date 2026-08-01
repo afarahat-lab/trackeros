@@ -48,7 +48,7 @@ Represents a leave record managed by the `leave` module, including leave request
 | Field | Type | Required |
 |-------|------|----------|
 | employeeId | string | true |
-| leaveTypeId | string | true |
+| policyId | string | true |
 | startDate | Date | true |
 | endDate | Date | true |
 | reason | string \| undefined | false |
@@ -66,7 +66,7 @@ Represents a leave record managed by the `leave` module, including leave request
 | Field | Type | Required |
 |-------|------|----------|
 | status | LeaveRequestStatus | false |
-| leaveTypeId | string | false |
+| policyId | string | false |
 | startDateFrom | Date | false |
 | startDateTo | Date | false |
 | endDateFrom | Date | false |
