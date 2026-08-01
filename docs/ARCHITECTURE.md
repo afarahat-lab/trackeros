@@ -241,4 +241,33 @@ Created the audit domain module with model, repository, and barrel export. Depen
 - `create`: normal insert with null oldValues, insert with object oldValues/newValues, handles oldValues/newValues as raw JSON strings (pg text result), handles null oldValues and newValues
 
 All tests mock `pool.query` from `shared/db/connection`.
+
+### Phase 8 — Shared Day-Count Utility (src/shared/utils/)
+Created the shared business-day calculation utility — the single source of truth for all leave day-count computations. Depends on `src/shared/db/connection.ts` for the `pool` export (used only by `getHolidaysForYear`).
+
+**Files created:**
+- `src/shared/utils/day-count.ts` — Two exports:
+  - **`calculateBusinessDays(startDate: Date, endDate: Date, holidays: Date[]): number`** — A pure function with zero side effects and no database access. Counts business days (Monday–Friday) in the inclusive `[startDate, endDate]` range, excluding weekends and any date whose calendar date matches an entry in the `holidays` array. Key behaviors:
+    - Normalizes all dates to UTC date-only via internal `toDateOnly` helper — time components are ignored.
+    - Returns `1` when `startDate` and `endDate` are the same business day.
+    - Returns `0` when `startDate > endDate` (inverted range), without throwing.
+    - Returns `0` when all days in the range are weekends or holidays.
+    - Holidays falling on weekends do not double-count (already excluded by weekend check).
+    - Never throws for any `Date` inputs (including `new Date('invalid')`).
+    - Idempotent: same inputs always produce the same output.
+  - **`getHolidaysForYear(year: number): Promise<Date[]>`** — Queries the `holidays` table via the shared pg `Pool`. Uses parameterized SQL (`$1`, `$2` placeholders) filtering by `EXTRACT(YEAR FROM date) = $1` and `country = 'US'`. Returns a `Date[]` (possibly empty), never `null` or `undefined`. Propagates pool.query rejections to the caller (no silent swallowing). Assumes the `holidays` table already exists with columns `date`, `name`, `country`.
+- `src/shared/utils/index.ts` — Barrel export re-exporting `calculateBusinessDays` and `getHolidaysForYear` from `./day-count`.
+
+**Design constraints:**
+- `calculateBusinessDays` is a pure function — no database access, no side effects.
+- `getHolidaysForYear` uses the same `pool` named export from `src/shared/db/connection.ts` as all existing repositories.
+- Country is hardcoded to `'US'`; the function signature takes only `year`.
+- Whole days only — no half-day or partial-day counting.
+- This utility is the single source of truth for leave day-count calculations; all future consumers (leave service balance sufficiency checks, deduction, restoration) must use it.
+
+**Tests:** `tests/unit/shared/utils/day-count.test.ts` — 20 tests (16 for `calculateBusinessDays`, 4 for `getHolidaysForYear`):
+- `calculateBusinessDays`: same-day Monday (1), same-day Saturday (0), same-day Sunday (0), Mon–Fri span (5), Mon–Sun span (5), holiday exclusion (4), holiday on weekend no double-count (5), multi-week span (10), multi-week with holidays (8), inverted range (0), dates with time components (2), all-weekend span (0), all-holiday span (0), empty holidays array (5), invalid dates don't throw, idempotency.
+- `getHolidaysForYear`: verifies query shape (year + country='US'), returns Date[] from rows, returns empty array for no rows, propagates pool.query rejection, never returns undefined/null.
+
+All tests mock `pool.query` from `shared/db/connection` using the same pattern as existing repository tests (`jest.mock` + `mockReset` in `beforeEach`).
 <!-- gestalt:architecture feature=35df38af-c9d7-41ee-b412-79ee8d149189 END -->
