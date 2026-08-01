@@ -1,0 +1,137 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared-types"
+    ],
+    "affectedLayers": [
+      "types",
+      "unit-tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The LeaveType enum exports exactly six members \u2014 annual, sick, emergency, unpaid, maternity, paternity \u2014 each a string enum whose member name equals its value (lowercase).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The LeaveStatus enum exports exactly five members \u2014 DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED \u2014 each a string enum whose member name equals its value (uppercase).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The AuditAction enum exports exactly seven members \u2014 CREATED, SUBMITTED, APPROVED, REJECTED, CANCELLED, BALANCE_DEDUCTED, BALANCE_RESTORED \u2014 each a string enum whose member name equals its value (uppercase).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The LeaveRequestDTO type is exported and its status field is typed as LeaveStatus (not a string literal union), with all date fields typed as string and nullable fields (approvedBy, approvedAt, cancelledAt) typed as string | null.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The LeaveBalanceDTO type is exported with its status field typed as the string literal union 'ACTIVE' | 'EXHAUSTED' | 'FROZEN' (not the LeaveStatus enum), numeric fields (totalEntitlement, usedDays, pendingDays, remainingDays, fiscalYear) typed as number, and date fields typed as string.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The barrel index.ts re-exports every symbol from enums.ts and dtos.ts so that a single import from the module root yields LeaveType, LeaveStatus, AuditAction, LeaveRequestDTO, and LeaveBalanceDTO.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A Jest test file at tests/unit/shared/types/enums.test.ts (using the .test.ts extension, not .spec.ts) is discovered by the configured testMatch pattern and asserts that all enum members of LeaveType, LeaveStatus, and AuditAction are present with their expected values.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The verification gate passes: `npm run build` (tsc --noEmit over src/) exits zero with no type errors under strict mode, and `npx jest --passWithNoTests` exits zero with the enums test discovered and passing.",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "No use of `any` anywhere in the new module or test \u2014 use `unknown` with type guards if dynamic typing is needed (HARNESS no-any constraint, severity high).",
+    "The shared-types module must be a zero-dependency foundation: no imports from external packages and no imports from other project modules. The only cross-file dependency within the module is dtos.ts importing LeaveStatus from ./enums.",
+    "All source files must compile under strict mode (strict: true, target ES2022, module commonjs, rootDir ./src, baseUrl ./src, esModuleInterop true) with no implicit any and strict null checks enforced.",
+    "Imports within the shared-types module must use relative paths (e.g. ./enums, ./dtos) consistent with the existing codebase convention; the barrel index.ts must use relative re-exports.",
+    "Test files must be named with the .test.ts extension and placed under the tests/ directory (e.g. tests/unit/shared/types/enums.test.ts) to match jest.config.js testMatch of '**/tests/**/*.test.(ts|js)'; .spec.ts files are not discovered.",
+    "The module must not exceed the planner's maxFilesPerPhase limit of 5 files; this phase produces exactly 4 files (enums.ts, dtos.ts, index.ts, enums.test.ts)."
+  ],
+  "outOfScope": [
+    "Entity interfaces (LeaveRequest, LeaveBalance, Employee, LeavePolicy, LeaveType, AuditRecord) with Date-typed fields \u2014 these are defined in Phases 2\u20136, not in shared-types. The DTOs in this phase use string for dates and are distinct from entity interfaces.",
+    "The audit module (AuditRecord entity, IAuditRepository, IAuditService, AuditService) \u2014 deferred to Phase 6 per PLAN.md, even though the reconciled architecture groups it with shared-types in the first recommended phase.",
+    "Any repository, service, controller, or route implementation \u2014 this phase only produces type definitions and enums; all runtime logic is deferred to later phases.",
+    "Tests for the DTO types \u2014 only the enums test is in scope for this phase; DTO shape verification is covered implicitly by downstream phases that consume them."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveType enum",
+      "mustExistOrExtend": true,
+      "invariant": "The set of members is closed and exhaustive: exactly annual, sick, emergency, unpaid, maternity, paternity. No additional members may be added without updating the reconciled architecture and all downstream consumers. Member values must be lowercase strings matching the leave_types.code column values."
+    },
+    {
+      "entity": "LeaveStatus enum",
+      "mustExistOrExtend": true,
+      "invariant": "The set of members is closed: exactly DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED. These correspond to the LeaveRequest lifecycle states (DRAFT \u2192 SUBMITTED \u2192 APPROVED | REJECTED | CANCELLED). Member values must be uppercase strings matching the leave_requests.status column values."
+    },
+    {
+      "entity": "AuditAction enum",
+      "mustExistOrExtend": true,
+      "invariant": "The set of members is closed: exactly CREATED, SUBMITTED, APPROVED, REJECTED, CANCELLED, BALANCE_DEDUCTED, BALANCE_RESTORED. These are the only valid values for the audit_logs.action column. Member values must be uppercase strings."
+    },
+    {
+      "entity": "LeaveRequestDTO",
+      "mustExistOrExtend": true,
+      "invariant": "The status field must be typed as the LeaveStatus enum (not a bare string), ensuring compile-time exhaustiveness against the controlled vocabulary. Date fields (startDate, endDate, createdAt, updatedAt) are string (ISO-serialized), distinct from the LeaveRequest entity which uses Date. Nullable fields (approvedBy, approvedAt, cancelledAt) are string | null, not string | undefined."
+    },
+    {
+      "entity": "LeaveBalanceDTO",
+      "mustExistOrExtend": true,
+      "invariant": "The status field must be typed as the string literal union 'ACTIVE' | 'EXHAUSTED' | 'FROZEN' \u2014 NOT the LeaveStatus enum \u2014 because balance status is a distinct vocabulary from request status. Numeric fields (totalEntitlement, usedDays, pendingDays, remainingDays, fiscalYear) are number, not string. Date fields are string (ISO-serialized)."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "Barrel re-export from src/shared/types/index.ts \u2014 the module's public entry point per the architecture rule that modules import only through their declared index.ts",
+      "authRule": "N/A \u2014 this is a pure type/enum module with no runtime operations or auth surface",
+      "idempotent": true,
+      "errorSemantics": "No runtime errors; import failures surface as TypeScript compile errors only. A missing or misnamed export causes a compile-time error, not a runtime exception."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The LeaveType enum member values must match the controlled vocabulary listed in the reconciled architecture's LeaveType entity description and the leave_types.code column: annual, sick, emergency, unpaid, maternity, paternity.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "The LeaveStatus enum members must match the LeaveRequest lifecycle states documented in the architecture: DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED, corresponding to the leave_requests.status column values.",
+      "referencePath": "docs/ARCHITECTURE.md"
+    },
+    {
+      "requirement": "The LeaveBalanceDTO.status string literal union ('ACTIVE' | 'EXHAUSTED' | 'FROZEN') must match the LeaveBalance lifecycle states documented in the architecture, which are distinct from LeaveStatus values.",
+      "referencePath": "docs/ARCHITECTURE.md"
+    },
+    {
+      "requirement": "The DTO field shapes must match the reconciled architecture's domain entity attribute lists, with the type adaptation that DTOs use string for dates (ISO serialization) where entities use Date, and LeaveBalanceDTO.status uses a string literal union rather than an enum.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "The module path src/shared/types/ and its ownership of LeaveType, LeaveStatus, AuditAction enums and LeaveRequestDTO, LeaveBalanceDTO must match the shared-types module boundary declared in the reconciled architecture's modules list.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "All downstream domain modules (audit, employee, leave-policy, leave-balance, leave-request, notification) import LeaveType, LeaveStatus, AuditAction, LeaveRequestDTO, and LeaveBalanceDTO from src/shared/types/index.ts as their sole source of these controlled vocabularies and DTO shapes.",
+      "why": "The reconciled architecture's dependency map shows every domain module depends on shared-types. This phase establishes the canonical types that all later phases (2\u201310) import; any divergence here propagates errors downstream."
+    },
+    {
+      "target": "Jest test runner configuration (jest.config.js testMatch) \u2014 the enums test must be placed and named to be discovered.",
+      "why": "The verification gate runs npx jest --passWithNoTests; a .spec.ts file or a file outside tests/ would not be discovered by testMatch '**/tests/**/*.test.(ts|js)', causing the test to silently not run and potentially masking regressions."
+    }
+  ]
+}
