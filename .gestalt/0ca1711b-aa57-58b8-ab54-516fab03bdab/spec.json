@@ -1,0 +1,185 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-balance",
+      "notification",
+      "leave-policy",
+      "shared-types"
+    ],
+    "affectedLayers": [
+      "service",
+      "unit-test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "ILeaveBalanceService exposes exactly five operations: getBalance, getAllBalances, initializeBalance, deductDays, and restoreDays \u2014 each with the parameter arity (employeeId, leaveTypeId, fiscalYear[, days]) specified in PLAN.md Phase 9.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "initializeBalance derives totalEntitlement from the active leave policy's entitlementDays (looked up via ILeavePolicyService.getActivePolicy) and persists a balance with usedDays=0, pendingDays=0, status=ACTIVE, and the provided fiscalYear.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "initializeBalance throws a typed NoActivePolicyError when no active policy exists for the given leaveTypeId, and does not attempt to create a balance.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "deductDays throws a typed InsufficientBalanceError when totalEntitlement - usedDays - days < 0 and does not call the repository's increment operation.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "deductDays atomically increments usedDays via the repository when sufficient balance exists and returns the updated LeaveBalance with recomputed remainingDays.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "restoreDays atomically decrements usedDays via the repository and throws when the restore would drive usedDays below zero, without calling the decrement operation.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "remainingDays is computed as totalEntitlement - usedDays at read time on every returned LeaveBalance and is never written to storage by any service or repository code path.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "INotificationService exposes exactly four operations \u2014 notifyLeaveSubmitted, notifyLeaveApproved, notifyLeaveRejected, notifyLeaveCancelled \u2014 each accepting a LeaveRequestDTO and resolving to void.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Each notification method completes without throwing (resolves to void) and produces a console log line; notifyLeaveRejected uses rejectionReason ?? 'N/A' when the reason is absent.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The leave-balance barrel exports ILeaveBalanceService, LeaveBalanceService, and the three custom error classes; the notification barrel exports INotificationService and NotificationService.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit test files exist for both services with mocked repository/policy dependencies, covering the happy path, each typed-error branch, and the remainingDays invariant.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access in the leave-balance service must go through ILeaveBalanceRepository \u2014 no direct pool/SQL calls in service code (GP-001, HARNESS no-direct-db-outside-repository).",
+    "No use of the `any` type anywhere in the new service files or tests; use `unknown` with type guards or typed mocks (HARNESS no-any, strict tsconfig).",
+    "Cross-module imports must go through the module barrel (index.ts) only \u2014 the leave-balance service imports ILeavePolicyService from the leave-policy barrel, not from internal files (AGENTS.md architecture rule 1).",
+    "Notification log output must contain only request identifiers, employee IDs, dates, and reasons \u2014 never passwords, tokens, PII, or financial data (GP-004).",
+    "No unhandled promise rejections: every async service method either returns a value or throws a typed error that callers can catch (GP-006).",
+    "Test files use the `.spec.ts` extension as explicitly requested by the task and already established by prior phases; jest.config.js matches both `.test.ts` and `.spec.ts` patterns."
+  ],
+  "outOfScope": [
+    "Real email/SMS delivery \u2014 the notification service is a console-log stub; actual transport adapters are deferred to a later phase.",
+    "Leave-request orchestration (submit/approve/reject/cancel workflow), controller, and routes \u2014 Phase 10 scope; this phase only provides the balance and notification services it will consume.",
+    "Audit record creation for balance deduct/restore operations \u2014 the dependency map lists leave-balance \u2192 audit, but Phase 9 does not wire audit writes; that integration belongs to the orchestrating leave-request service in Phase 10.",
+    "Balance status transitions (ACTIVE \u2192 EXHAUSTED \u2192 FROZEN) and pendingDays manipulation \u2014 Phase 9 implements deduct/restore of usedDays only; status lifecycle and pending-day reservation are not part of this phase.",
+    "HTTP routes, controllers, RBAC middleware, and input validation at API boundaries \u2014 no API surface is introduced in this phase (GP-003/GP-005 apply at the controller layer, deferred to Phase 10)."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "remainingDays is a derived value equal to totalEntitlement - usedDays, computed at read time; it is never persisted or directly written by any code path."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "usedDays must never become negative: deductDays rejects when the deduction would drive remaining below zero, and restoreDays rejects when the restore would drive usedDays below zero."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "A newly initialized balance always has usedDays=0, pendingDays=0, status=ACTIVE, and totalEntitlement sourced from the active LeavePolicy.entitlementDays for that leaveTypeId."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "Each balance is uniquely scoped by (employeeId, leaveTypeId, fiscalYear); initializeBalance creates one balance per that triple, referencing the active policy's id as policyId."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "ILeaveBalanceService.initializeBalance",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws NoActivePolicyError (typed) when no active policy exists for the leaveTypeId; propagates repository create errors. Must not create a balance when the policy lookup fails."
+    },
+    {
+      "operation": "ILeaveBalanceService.deductDays",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws BalanceNotFoundError when no balance exists for the (employeeId, leaveTypeId, fiscalYear) triple or when the atomic increment returns null; throws InsufficientBalanceError (typed) when totalEntitlement - usedDays - days < 0, without invoking the increment operation."
+    },
+    {
+      "operation": "ILeaveBalanceService.restoreDays",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws BalanceNotFoundError when no balance exists or the atomic decrement returns null; throws an Error when usedDays - days < 0, without invoking the decrement operation."
+    },
+    {
+      "operation": "ILeaveBalanceService.getBalance",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the LeaveBalance or null when none exists; propagates repository errors."
+    },
+    {
+      "operation": "ILeaveBalanceService.getAllBalances",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an array (possibly empty) of balances for the employee/fiscalYear; propagates repository errors."
+    },
+    {
+      "operation": "INotificationService.notifyLeave* (all four)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Each method resolves to void and must not throw under normal operation; the stub logs to console and completes successfully."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The service's remainingDays computation (totalEntitlement - usedDays) must match the repository's rowToLeaveBalance derivation exactly \u2014 both use the same formula with no pendingDays subtraction, despite the reconciled architecture listing remainingDays = totalEntitlement - usedDays - pendingDays. The as-built formula (without pendingDays) is authoritative for this phase.",
+      "referencePath": "src/modules/leave-balance/leave-balance.repository.ts"
+    },
+    {
+      "requirement": "initializeBalance must obtain the active policy via ILeavePolicyService.getActivePolicy(leaveTypeId) and read totalEntitlement from LeavePolicy.entitlementDays \u2014 matching the field name declared in the leave-policy model and service interface.",
+      "referencePath": "src/modules/leave-policy/leave-policy.service.interface.ts"
+    },
+    {
+      "requirement": "The notification service must accept LeaveRequestDTO as defined in shared-types (including the optional rejectionReason field) \u2014 not a locally redeclared type \u2014 so the stub is wire-compatible with the DTO the leave-request orchestrator will pass in Phase 10.",
+      "referencePath": "src/shared/types/dtos.ts"
+    },
+    {
+      "requirement": "The repository's create input type omits remainingDays (Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt' | 'remainingDays'>); initializeBalance must not attempt to pass remainingDays to repository.create, consistent with the never-stored invariant.",
+      "referencePath": "src/modules/leave-balance/leave-balance.repository.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/leave-policy (ILeavePolicyService.getActivePolicy)",
+      "why": "initializeBalance depends on the leave-policy service to resolve the active policy and derive totalEntitlement from entitlementDays; this is the cross-module dependency declared in the architecture dependency map (leave-balance \u2192 leave-policy)."
+    },
+    {
+      "target": "src/modules/leave-balance (ILeaveBalanceRepository)",
+      "why": "The leave-balance service delegates all persistence (findByEmployeeAndType, findByEmployee, create, incrementUsedDays, decrementUsedDays) to the repository interface from Phase 4 \u2014 no direct DB access in the service."
+    },
+    {
+      "target": "src/shared/types (LeaveRequestDTO)",
+      "why": "The notification service consumes LeaveRequestDTO from shared-types so that the Phase 10 leave-request orchestrator can pass request data to the notification methods without adapter conversion."
+    },
+    {
+      "target": "src/modules/leave-request (future Phase 10 ILeaveRequestService)",
+      "why": "Phase 10's leave-request orchestrator will consume ILeaveBalanceService (initializeBalance, deductDays, restoreDays) and INotificationService (all four notify methods) as constructor-injected dependencies; this phase establishes the contracts Phase 10 depends on."
+    }
+  ]
+}
