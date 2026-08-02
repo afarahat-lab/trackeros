@@ -1,4 +1,3 @@
-export { LeaveType } from './leave-type.enum';
-export { LeaveRequestStatus } from './leave-request-status.enum';
+export { LeaveType, LeaveRequestStatus } from './enums';
 export type { BaseEntity } from './base-entity.interface';
 export type { CreateLeaveRequestDto, UpdateLeaveRequestDto } from './leave-request.dto';

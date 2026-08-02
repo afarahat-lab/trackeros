@@ -1,4 +1,4 @@
-import { LeaveRequestStatus } from './leave-request-status.enum';
+import { LeaveRequestStatus } from './enums';
 
 export interface CreateLeaveRequestDto {
   employeeId: string;

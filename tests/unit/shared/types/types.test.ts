@@ -1,5 +1,4 @@
-import { LeaveType } from '../../../../src/shared/types/leave-type.enum';
-import { LeaveRequestStatus } from '../../../../src/shared/types/leave-request-status.enum';
+import { LeaveType, LeaveRequestStatus } from '../../../../src/shared/types/enums';
 import type { BaseEntity } from '../../../../src/shared/types/base-entity.interface';
 import type {
   CreateLeaveRequestDto,
