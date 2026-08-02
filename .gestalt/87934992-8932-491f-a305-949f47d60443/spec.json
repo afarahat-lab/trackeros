@@ -1,0 +1,85 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared-types"
+    ],
+    "affectedLayers": [
+      "tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The file tests/unit/shared/types/enums.spec.ts no longer exists on disk after the change.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The file tests/unit/shared/types/enums.test.ts exists and is byte-for-byte unchanged \u2014 it still contains the three describe blocks covering LeaveType, LeaveStatus, and AuditAction with all six assertions intact.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Running the Jest suite discovers and executes the enums tests from the .test.ts file with every test passing, proving the deletion was lossless (no coverage lost).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "No .spec.ts file is created or remains anywhere under the tests/ directory as a result of this phase.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The .test.ts file must not be modified, renamed, or recreated \u2014 it already exists with the correct content and is an exact duplicate of the .spec.ts file; the change is deletion-only.",
+    "No new file may be created in this phase \u2014 the .test.ts duplicate already exists, so the operation is purely removing the .spec.ts file.",
+    "The source module src/shared/types/enums.ts must not be touched \u2014 this phase only concerns the duplicate test file, not the enum definitions it imports."
+  ],
+  "outOfScope": [
+    "Updating PLAN.md's later-phase references that still use .spec.ts (lines 35, 51, 67, 83, 99, 118, 139, 174, 221) \u2014 those belong to their respective future phases, not this enums-only housekeeping task.",
+    "Updating PLAN.md line 18 to reference enums.test.ts instead of enums.spec.ts \u2014 the intent targets the test file on disk, not the planning document; PLAN.md edits are a separate concern.",
+    "Modifying jest.config.js testMatch to drop the .spec.(ts|js) pattern \u2014 the config already accepts .test.ts, and tightening the matcher is out of scope for this single-file deletion.",
+    "Any change to src/shared/types/enums.ts, dtos.ts, or index.ts \u2014 this phase is test-file housekeeping only, not a shared-types content change."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveType / LeaveStatus / AuditAction enums (src/shared/types/enums.ts)",
+      "mustExistOrExtend": true,
+      "invariant": "The enum definitions must remain unchanged and importable \u2014 the surviving enums.test.ts imports LeaveType, LeaveStatus, and AuditAction from this module, so the deletion of the duplicate test file must not alter or break the source it depends on."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "Jest test discovery and execution of the enums unit tests",
+      "authRule": "N/A \u2014 local test runner, no auth boundary",
+      "idempotent": true,
+      "errorSemantics": "After the .spec.ts deletion, `npx jest --passWithNoTests` must still discover the enums tests via the `**/tests/**/*.test.(ts|js)` testMatch pattern and all six assertions across the three describe blocks must pass; a missing test file or failed assertion is a hard failure."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The surviving test file must continue to import LeaveType, LeaveStatus, and AuditAction from the same source path (src/shared/types/enums.ts) and assert the same six LeaveType members, five LeaveStatus members, and seven AuditAction members \u2014 the deletion must not change what the test verifies relative to the source.",
+      "referencePath": "src/shared/types/enums.ts"
+    },
+    {
+      "requirement": "The resulting on-disk state must conform to the project test-file convention: test files use the .test.ts extension and .spec.ts files must not exist \u2014 the deletion of enums.spec.ts aligns the enums test with this rule.",
+      "referencePath": "AGENTS.md"
+    },
+    {
+      "requirement": "The surviving enums.test.ts must remain byte-for-byte identical to its current content (three describe blocks, six assertions) \u2014 since it was confirmed an exact duplicate of the deleted .spec.ts, no content drift is permitted; the change is deletion-only.",
+      "referencePath": "tests/unit/shared/types/enums.test.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "Jest test runner (jest.config.js testMatch)",
+      "why": "The surviving enums.test.ts must remain discoverable by Jest's `**/tests/**/*.test.(ts|js)` pattern after the .spec.ts file is removed; test discovery continuity is the integration this phase preserves."
+    },
+    {
+      "target": "src/shared/types/enums.ts (source module under test)",
+      "why": "The surviving test imports LeaveType, LeaveStatus, and AuditAction from this module; the deletion must not disturb the import relationship or the source it depends on."
+    }
+  ]
+}
