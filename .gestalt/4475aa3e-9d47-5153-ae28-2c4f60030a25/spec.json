@@ -1,0 +1,172 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "audit"
+    ],
+    "affectedLayers": [
+      "domain-model",
+      "data-access",
+      "testing"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The AuditLog entity interface extends BaseEntity and is exported from the module's barrel entry point; importing it resolves to a type that includes id, createdAt, and updatedAt from the base interface.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository create() method persists a new audit log entry via an INSERT with RETURNING * and returns a fully-populated AuditLog with server-generated id, createdAt, and updatedAt \u2014 the test verifies the returned entity has all fields populated including the generated identity fields.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository findByTarget() method returns all audit entries matching a given targetId + targetType composite, with correct snake_case-to-camelCase field mapping and the correct query parameters passed to the pool.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository findByActor() method returns all audit entries for a given actorId, with correct field mapping and the correct query parameter passed to the pool.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Array-returning repository methods (findByTarget, findByActor) return an empty array (not null, not undefined) when the query yields zero rows.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository create() method rejects (propagates the error) when the pool query throws \u2014 covering connection refused, query timeout, and unique-constraint violation error paths.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository create() method correctly serializes the details field (Record<string, unknown> | null) to the database and the row mapper correctly deserializes it back \u2014 a null details value round-trips as null, and a populated details object round-trips with its keys intact.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository create() method correctly round-trips the timestamp field (Date) \u2014 the value passed in is persisted and the returned entity's timestamp is a Date matching the persisted value.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The module's barrel entry point exports AuditLog (as a type), IAuditLogRepository (as a type), and PgAuditLogRepository (as a concrete class) \u2014 all three symbols are importable from the module's public entry point.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The project compiles cleanly under strict TypeScript (tsc --noEmit) with no implicit-any or strict-null-check errors introduced by the audit module files.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No use of the `any` type anywhere in the audit module \u2014 the `details` field must be typed as `Record<string, unknown> | null` and any downstream consumption must use `unknown` with type guards (HARNESS.json constraint `no-any`, severity high).",
+    "All database access in the audit module must go through the repository class \u2014 no inline SQL or direct pool queries outside the repository implementation (HARNESS.json constraint `no-direct-db-outside-repository`, severity critical; GP-001).",
+    "The audit module must import BaseEntity from the deep path `../../shared/types/base-entity.interface` (not the shared barrel `../../shared/types`), matching the literal instruction in PLAN.md and the pattern established by all 5 prior modules.",
+    "The repository must use the shared `pool` instance imported at module level from `../../shared/db/connection` \u2014 no constructor injection, no custom Pool instantiation \u2014 matching the pattern established by all 5 prior repository implementations.",
+    "The repository create() method must generate the entity id via `randomUUID()` from the `crypto` module and set createdAt/updatedAt server-side \u2014 the caller never provides id, createdAt, or updatedAt (the create signature omits these via `Omit<AuditLog, 'id' | 'createdAt' | 'updatedAt'>`).",
+    "Test files must use the project's Jest convention \u2014 `*.test.ts` under `tests/` matching the configured testMatch glob \u2014 not `.spec.ts`, and the Jest config must not be modified (binding rule from reconciled architecture).",
+    "Modules must never import from each other's internals \u2014 only through the declared public entry point (`index.ts`). The audit module's barrel must be the sole import surface for any downstream consumer (AGENTS.md architecture rule 1).",
+    "No hardcoded secrets, passwords, API keys, or tokens in the audit module source or tests (HARNESS.json constraint `no-hardcoded-secrets`, severity critical).",
+    "No unhandled promise rejections \u2014 all async repository methods must propagate errors via rejection (not swallow them), and the test suite must verify error propagation (GP-006)."
+  ],
+  "outOfScope": [
+    "Audit service layer \u2014 no service interface or service implementation in this phase; the module exposes only the model, repository interface, and repository implementation (PLAN.md Phase 9 scope is model + repository only; the audit service is consumed directly by the leave service in Phase 10).",
+    "Audit controller and HTTP routes \u2014 the audit module is consumed programmatically by the leave service, not exposed as an HTTP API in this phase.",
+    "Database migrations for the audit_logs table \u2014 schema creation is deferred; the repository assumes the table exists with the expected snake_case columns.",
+    "Integration of audit record writing into the leave workflow \u2014 the leave service (Phase 10) will call the audit repository's create() method on state transitions; this phase only builds the infrastructure, not the call sites.",
+    "Audit report generation or query endpoints for HR admin surfaces \u2014 out of scope for this phase; only create, findByTarget, and findByActor repository methods are built.",
+    "IP address, user agent, old_values, and new_values fields from the conceptual audit_logs table schema in the reconciled architecture \u2014 the operative model fields are dictated by PLAN.md Phase 9 (actorId, action, targetId, targetType, details, timestamp) and supersede the conceptual table schema."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "An AuditLog entry is immutable once created \u2014 the repository exposes no update or delete method; audit records are append-only and never modified or removed after insertion."
+    },
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "Every AuditLog entry must have a non-null actorId, action, targetId, and targetType \u2014 these identify who performed the action, what action was performed, and what entity was acted upon; only the details field may be null."
+    },
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "AuditLog extends BaseEntity, so every persisted entry carries a server-generated id (UUID via randomUUID), createdAt, and updatedAt \u2014 the caller never supplies these fields; they are populated by the repository on insert."
+    },
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "The timestamp field records when the audited action occurred (distinct from the BaseEntity createdAt which records when the log entry itself was persisted) \u2014 both must be preserved through the create \u2192 persist \u2192 return round-trip."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IAuditLogRepository.create(entry: Omit<AuditLog, 'id' | 'createdAt' | 'updatedAt'>): Promise<AuditLog>",
+      "authRule": "No auth enforcement at the repository layer \u2014 RBAC is enforced at the API boundary (GP-005); the repository is a pure data-access interface called by the service layer.",
+      "idempotent": false,
+      "errorSemantics": "Rejects (propagates the underlying pg error) on connection failure, query timeout, or constraint violation \u2014 errors are never swallowed; the caller is responsible for handling."
+    },
+    {
+      "operation": "IAuditLogRepository.findByTarget(targetId: string, targetType: string): Promise<AuditLog[]>",
+      "authRule": "No auth enforcement at the repository layer \u2014 RBAC is enforced at the API boundary; the repository is a pure data-access interface.",
+      "idempotent": true,
+      "errorSemantics": "Rejects (propagates the underlying pg error) on connection failure or query timeout; returns an empty array (never null) when zero rows match the targetId + targetType composite."
+    },
+    {
+      "operation": "IAuditLogRepository.findByActor(actorId: string): Promise<AuditLog[]>",
+      "authRule": "No auth enforcement at the repository layer \u2014 RBAC is enforced at the API boundary; the repository is a pure data-access interface.",
+      "idempotent": true,
+      "errorSemantics": "Rejects (propagates the underlying pg error) on connection failure or query timeout; returns an empty array (never null) when zero rows match the actorId."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The AuditLog entity must extend the BaseEntity interface exactly as defined \u2014 inheriting id (string), createdAt (Date), updatedAt (Date) \u2014 using `import type { BaseEntity } from '../../shared/types/base-entity.interface'`, matching the import path used by all 5 prior modules (employee, policy, balance, leave, notification).",
+      "referencePath": "src/shared/types/base-entity.interface.ts"
+    },
+    {
+      "requirement": "The repository must import and use the shared `pool` (a pg.Pool instance) exported from this file at module level \u2014 `import { pool } from '../../shared/db/connection'` \u2014 with no constructor injection, matching the pattern in all 5 prior repository implementations (employee, policy, balance, leave, notification).",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "The audit repository must follow the same structural pattern as this reference repository: crypto randomUUID import, pool import, model type import, private snake_case *Row interface, private rowTo* mapper function, exported I*Repository interface, exported Pg*Repository class implementing it, create() with randomUUID() + INSERT ... RETURNING *, array lookups via result.rows.map(rowMapper), no constructor, module-level pool usage.",
+      "referencePath": "src/modules/notification/notification.repository.ts"
+    },
+    {
+      "requirement": "The audit module barrel must use the same export pattern: `export type { ... }` for interfaces and model types (AuditLog, IAuditLogRepository) and `export { ... }` for the concrete repository class (PgAuditLogRepository) \u2014 matching the barrel export convention across all prior modules.",
+      "referencePath": "src/modules/notification/index.ts"
+    },
+    {
+      "requirement": "The audit repository test must follow the same test structure as this reference: jest.mock the shared db connection module before importing pool, cast pool.query as jest.Mock, use makeRow()/makeEntity() helper factories, beforeEach instantiates the repo and clears mocks, mock results cast `as never`, cover success (field mapping + SQL/params verification), empty results (empty array for array methods), and error cases (connection refused, query timeout, unique constraint violation).",
+      "referencePath": "tests/unit/modules/leave/leave.repository.test.ts"
+    },
+    {
+      "requirement": "The audit repository's create() method must follow the same INSERT pattern: generate id via randomUUID(), set now = new Date() for createdAt/updatedAt, use parameterized INSERT with RETURNING *, and map the returned row through the row mapper \u2014 matching the established create() implementation across employee, policy, balance, leave, and notification repositories.",
+      "referencePath": "src/modules/employee/employee.repository.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/base-entity.interface.ts (BaseEntity interface)",
+      "why": "AuditLog extends BaseEntity \u2014 the model file imports the interface to inherit id, createdAt, updatedAt; this is the sole external type dependency of the audit module per the reconciled architecture dependency map (audit \u2192 shared-types only)."
+    },
+    {
+      "target": "src/shared/db/connection.ts (shared pg.Pool instance)",
+      "why": "The PgAuditLogRepository implementation imports the module-level `pool` to execute all SQL queries \u2014 this is the sole database access point, satisfying the no-direct-db-outside-repository constraint."
+    },
+    {
+      "target": "src/modules/leave/leave.service.ts (Phase 10 \u2014 future)",
+      "why": "The leave service will consume IAuditLogRepository.create() to write audit records on every state-changing operation (submit, approve, reject, cancel), satisfying GP-002; the audit module's barrel is the import surface the leave service will use."
+    },
+    {
+      "target": ".gestalt/architecture/reconciled.json (audit module ownership)",
+      "why": "The reconciled architecture declares the audit module at src/modules/audit/ owning IAuditLogRepository, PgAuditLogRepository, and AuditLog entity \u2014 the implementation must match this declared ownership boundary; the dependency map shows audit \u2192 shared-types only (no other module dependencies)."
+    }
+  ]
+}
