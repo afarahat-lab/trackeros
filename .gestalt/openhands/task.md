@@ -1,25 +1,25 @@
-# Implement this phase: Phase 1: Shared types and enums
+# Implement this phase: Phase 2: Employee model and repository
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/e207b7c2-5967-4897-aeeb-2fac2e370ce3/1`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/e207b7c2-5967-4897-aeeb-2fac2e370ce3/2`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the shared-types module at src/shared/types/. Produce three files:
+Create the employee module at `src/modules/employee/`. This phase depends on `src/shared/types/index.ts` from Phase 1 — read it before generating.
 
-1. `src/shared/types/enums.ts` — Define and export:
-   - `LeaveType` enum: `annual`, `sick`, `emergency`, `unpaid`, `maternity`, `paternity`
-   - `LeaveStatus` enum: `DRAFT`, `SUBMITTED`, `APPROVED`, `REJECTED`, `CANCELLED`
-   - `AuditAction` enum: `CREATED`, `SUBMITTED`, `APPROVED`, `REJECTED`, `CANCELLED`, `BALANCE_DEDUCTED`, `BALANCE_RESTORED`
+Files to create:
 
-2. `src/shared/types/dtos.ts` — Define and export:
-   - `LeaveRequestDTO`: `{ id: string; employeeId: string; leaveTypeId: string; startDate: string; endDate: string; reason?: string; rejectionReason?: string; status: LeaveStatus; approvedBy: string | null; approvedAt: string | null; cancelledAt: string | null; createdAt: string; updatedAt: string }`
-   - `LeaveBalanceDTO`: `{ id: string; employeeId: string; leaveTypeId: string; policyId: string; totalEntitlement: number; usedDays: number; pendingDays: number; remainingDays: number; fiscalYear: number; status: 'ACTIVE' | 'EXHAUSTED' | 'FROZEN'; createdAt: string; updatedAt: string }`
+1. `src/modules/employee/employee.model.ts` — Define and export the `Employee` entity interface with the canonical fields:
+   - `id: string`, `employeeNumber: string`, `firstName: string`, `lastName: string`, `email: string`, `managerId: string | null`, `department: string | null`, `hireDate: Date`, `terminationDate: Date | null`, `employmentStatus: 'ACTIVE' | 'INACTIVE' | 'TERMINATED'`, `createdAt: Date`, `updatedAt: Date`, `deletedAt: Date | null`
 
-3. `src/shared/types/index.ts` — barrel re-export of all symbols from enums.ts and dtos.ts.
+2. `src/modules/employee/employee.repository.ts` — Define and export:
+   - `IEmployeeRepository` interface with methods: `findById(id: string): Promise<Employee | null>`, `findByEmployeeNumber(employeeNumber: string): Promise<Employee | null>`, `findByManagerId(managerId: string): Promise<Employee[]>`, `findAll(): Promise<Employee[]>`, `create(employee: Omit<Employee, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt'>): Promise<Employee>`, `update(id: string, data: Partial<Employee>): Promise<Employee | null>`, `softDelete(id: string): Promise<void>`
+   - `EmployeeRepository` class implementing `IEmployeeRepository` using the pg pool from `src/shared/db/connection.ts`. Use parameterized SQL queries.
 
-Include a Jest unit test at `tests/unit/shared/types/enums.spec.ts` verifying all enum values are present. No external dependencies — this phase stands alone.
+3. `src/modules/employee/index.ts` — barrel re-export.
+
+Include Jest unit tests at `tests/unit/modules/employee/employee.repository.spec.ts` with mocked pg pool.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -37,29 +37,49 @@ These are resolved, feature-wide decisions. Wherever this phase touches the conc
 
 6. RBAC (GP-005): every endpoint enforces role-based access control — an employee may act only on their own requests; managers/HR admins on those they oversee. Validate all inputs at the API boundary (GP-003) before calling the service. [BINDING RULE — operator decision resolving: What is the fiscal year definition — calendar year (Jan 1 – Dec 31) or a custom fiscal year (e.g., Apr 1 – Mar 31)?; Should leave day counting use calendar days or business days (excluding weekends and/or public holidays)?; Should the system support half-day leave requests?; Should leave balances be pre-seeded at the start of each fiscal year, or lazily initialized on first request?; How are leave days counted — calendar days or business days (Mon–Fri excluding holidays)?; When does the fiscal year start, and should it be configurable per organization?; apply everywhere these apply, not in one place only]
 
+## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
+The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
+- `Employee` — the entity MUST have exactly these fields:
+    - id: string
+    - employeeNumber: string
+    - firstName: string
+    - lastName: string
+    - email: string
+    - managerId: string | null
+    - department: string | null
+    - hireDate: Date
+    - terminationDate: Date | null
+    - employmentStatus: 'ACTIVE' | 'INACTIVE' | 'TERMINATED'
+    - createdAt: Date
+    - updatedAt: Date
+    - deletedAt: Date | null
+
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- The LeaveType enum values must match the controlled vocabulary declared in the reconciled architecture (annual, sick, emergency, unpaid, maternity, paternity) and the leave_types.code column casing. (see `.gestalt/architecture/reconciled.json`)
-- The LeaveStatus enum must match the LeaveRequest lifecycle states declared in the reconciled architecture (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED) and the leave_requests.status column casing. (see `.gestalt/architecture/reconciled.json`)
-- The LeaveBalanceDTO.status union ('ACTIVE' | 'EXHAUSTED' | 'FROZEN') must match the LeaveBalance lifecycle declared in the reconciled architecture and the leave_balances.status column values. (see `.gestalt/architecture/reconciled.json`)
-- The module boundary for shared-types (src/shared/types/) and its ownership of the three enums and two DTOs must match the Module Boundaries section of ARCHITECTURE.md; do not relocate or duplicate these symbols in another module. (see `docs/ARCHITECTURE.md`)
-- The test file naming and location must follow the AGENTS.md convention (.test.ts under tests/ mirroring src/), not the .spec.ts path mentioned in PLAN.md's prose — the clarification and AGENTS.md override the plan's filename. (see `AGENTS.md`)
+- The repository must obtain its database connection by importing the singleton `pool` exported from src/shared/db/connection.ts and calling pool.query(...). It must not instantiate its own pg.Pool or read process.env.DATABASE_URL directly. (see `src/shared/db/connection.ts`)
+- The Employee entity interface field names and types must exactly match the canonical attributes declared in the reconciled architecture (id, employeeNumber, firstName, lastName, email, managerId, department, hireDate, terminationDate, employmentStatus, createdAt, updatedAt, deletedAt) with the specified nullability and the 'ACTIVE' | 'INACTIVE' | 'TERMINATED' union. (see `.gestalt/architecture/reconciled.json`)
+- The employees table column mapping must follow the snake_case schema documented in ARCHITECTURE.md (employee_number, first_name, last_name, manager_id, hire_date, termination_date, employment_status, created_at, updated_at, deleted_at), with the repository translating between snake_case columns and the camelCase TS interface. (see `docs/ARCHITECTURE.md`)
+- The Employee model must follow the existing module convention of a plain `export interface` declaration with no decorators or runtime metadata, matching the style of uptime.model.ts and status.model.ts. (see `src/modules/uptime/uptime.model.ts`)
+- The employee barrel index.ts must re-export all public symbols (Employee, IEmployeeRepository, EmployeeRepository) following the same pattern as the uptime and status module barrels. (see `src/modules/uptime/index.ts`)
+- The IEmployeeRepository method signatures must exactly match those specified in PLAN.md Phase 2, including the Omit<Employee, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt'> parameter type for create and the Promise<Employee | null> / Promise<Employee[]> / Promise<void> return types. (see `PLAN.md`)
 ### Entity invariants — enforce these
-- Reuse or extend `LeaveType enum`: The enum is a closed controlled vocabulary of exactly six leave categories; no member may be added or removed without an architecture change. Values are lowercase to match the leave_types.code database column.
-- Reuse or extend `LeaveStatus enum`: The enum enumerates the complete LeaveRequest lifecycle: DRAFT → SUBMITTED → (APPROVED | REJECTED | CANCELLED), with DRAFT → CANCELLED also permitted. APPROVED, REJECTED, and CANCELLED are terminal states. No intermediate status may exist outside this set.
-- Reuse or extend `AuditAction enum`: The enum covers every state-changing action that must produce an audit record per GP-002: request lifecycle transitions (CREATED, SUBMITTED, APPROVED, REJECTED, CANCELLED) plus balance mutations (BALANCE_DEDUCTED, BALANCE_RESTORED). No state-changing operation may use an action outside this set.
-- Reuse or extend `LeaveRequestDTO`: The status field is constrained to the LeaveStatus enum (not a free string), so every DTO instance can only carry a valid lifecycle state; the DTO is a transport shape with ISO-string dates, distinct from the Date-typed LeaveRequest domain entity.
-- Reuse or extend `LeaveBalanceDTO`: The status field is constrained to the literal union 'ACTIVE' | 'EXHAUSTED' | 'FROZEN', matching the LeaveBalance lifecycle; the DTO is a transport shape with ISO-string dates, distinct from the Date-typed LeaveBalance domain entity.
+- Reuse or extend `Employee`: Lifecycle is constrained to three states: ACTIVE, INACTIVE, TERMINATED. The repository does not enforce transitions between these states (that is a service-layer concern); it only persists and reads the value as the union type.
+- Reuse or extend `Employee`: Soft-delete is the only deletion mechanism: a deleted employee is identified by deleted_at being non-null. Read methods must never return a row whose deleted_at is set; the row itself is never physically removed.
+- Reuse or extend `Employee`: managerId is a self-referential foreign key to employees.id; it may be null (no manager / top of hierarchy) but when present must reference an existing employee. The repository does not validate referential integrity (the database FK enforces it), but the interface must preserve the null-or-string shape.
+- Reuse or extend `Employee`: Identity and audit timestamps (id, createdAt, updatedAt, deletedAt) are system-generated, not caller-supplied: create accepts an input omitting these four fields, and the database supplies id and timestamps.
 ### Interface contract — expose these operations (their shape is yours)
-- Import all shared-types symbols from the barrel entry point src/shared/types/index.ts — N/A — pure type module, no auth surface.; idempotent; A missing or misnamed export must surface as a TypeScript compile error at the import site, not a runtime failure.
-- Use LeaveStatus as the type of LeaveRequestDTO.status (DTO references the enum, not a duplicate string literal) — N/A; idempotent; Assigning a status outside the LeaveStatus set must be a compile-time type error.
-- Run the enums unit test via the configured Jest runner (npx jest) — N/A — no auth in unit tests.; idempotent; A missing enum member or wrong casing must fail the test with a clear assertion message; the test must not pass silently on an incomplete enum.
+- IEmployeeRepository.findById — Returns the Employee with matching id where deleted_at IS NULL, or null if no such non-deleted row exists. Database errors propagate as rejected promises (GP-006).
+- IEmployeeRepository.findByEmployeeNumber — Returns the single non-deleted Employee matching the employee_number, or null if not found. Relies on the unique index on employee_number. Database errors propagate as rejected promises.
+- IEmployeeRepository.findByManagerId — Returns an array of non-deleted Employees whose manager_id matches the given value; returns an empty array when no subordinates exist. Database errors propagate as rejected promises.
+- IEmployeeRepository.findAll — Returns an array of all non-deleted Employees (deleted_at IS NULL); returns an empty array when the table has no active rows. Database errors propagate as rejected promises.
+- IEmployeeRepository.create — Persists a new row from the caller-supplied fields (omitting id, createdAt, updatedAt, deletedAt) and returns the fully-populated Employee with database-generated id and timestamps. Unique-constraint violations (employee_number, email) propagate as rejected promises.
+- IEmployeeRepository.update — Applies only the fields present in the Partial<Employee> input, sets updated_at to NOW(), and returns the updated non-deleted Employee or null if no matching non-deleted row exists. Must not allow updating id, createdAt, or deletedAt via the partial input. Database errors propagate as rejected promises.
+- IEmployeeRepository.softDelete — idempotent; Sets deleted_at to NOW() for the row matching the given id and resolves void. Does not alter employmentStatus or terminationDate. If no row matches, it still resolves void (idempotent soft-delete). Database errors propagate as rejected promises.
 ### Integration points — connect to these
-- leave-request module (later phase) — Imports LeaveStatus and LeaveRequestDTO from src/shared/types/index.ts to type the request lifecycle and transport shape.
-- leave-balance module (later phase) — Imports LeaveType and LeaveBalanceDTO from src/shared/types/index.ts to type balance scoping and transport shape.
-- audit module (later phase) — Imports AuditAction from src/shared/types/index.ts to type audit record actions per GP-002.
-- employee, leave-policy, notification modules (later phases) — All depend on shared-types per the reconciled dependency map; they import enums/DTOs exclusively through the barrel index.ts.
+- src/shared/db/connection.ts — The EmployeeRepository imports the singleton pg `pool` from this module to execute all SQL queries; this is the sole database access point per the established pattern and GP-001.
+- src/modules/employee/index.ts — Downstream phases (Phase 4 leave-balance, Phase 5 leave-request, Phase 8 employee service, Phase 9 notification) depend on the Employee entity and repository and must import them only through this public barrel entry point per the module boundary rule.
+- src/shared/types/index.ts — Phase 1 dependency: the employee module's declared architecture edge is employee → shared-types. Although the Employee interface itself needs no shared-types symbols, the module must compile against the Phase 1 foundation that PLAN.md declares as a prerequisite.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
