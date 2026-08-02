@@ -129,9 +129,10 @@ src/shared/error types.ts
 2. **Employee module** — employee CRUD, manager hierarchy ✅ (Phase 2 complete)
 3. **Policy module** — leave policy CRUD, validation rules ✅ (Phase 3 complete)
 4. **Balance module** — balance tracking, deduction/restoration ✅ (Phase 4 complete)
-5. **Notification module** — notification dispatch
-6. **Audit module** — audit trail recording
-7. **Leave module** — full leave workflow orchestration
+5. **Leave module (model + repository)** — LeaveRequest entity, repository with overlap queries ✅ (Phase 5 complete)
+6. **Notification module** — notification dispatch
+7. **Audit module** — audit trail recording
+8. **Leave service** — full leave workflow orchestration
 
 ### Employee Module — Built (Phase 2)
 
@@ -187,6 +188,25 @@ src/shared/error types.ts
 - `findByEmployeeAndPolicy` looks up a balance by the composite key `(employee_id, leave_policy_id, fiscal_year)`.
 
 **Out of scope (deferred):** Balance service, controller, routes, status transition logic (ACTIVE→EXHAUSTED→CLOSED), database migrations.
+
+### Leave Module — Built (Phase 5)
+
+**Files delivered:**
+- `src/modules/leave/leave.model.ts` — `LeaveRequest` interface extending `BaseEntity` with fields: `employeeId` (string), `leavePolicyId` (string), `startDate` (Date), `endDate` (Date), `reason` (string | undefined), `status` (LeaveRequestStatus), `approvedBy` (string | null), `approvedAt` (Date | null), `rejectedBy` (string | null), `rejectedAt` (Date | null), `rejectionReason` (string | null), `cancelledBy` (string | null), `cancelledAt` (Date | null)
+- `src/modules/leave/leave.repository.ts` — `ILeaveRequestRepository` interface (6 methods: `findById`, `findByEmployeeId`, `findByStatus`, `findByEmployeeAndDateRange`, `create`, `update`) + `PgLeaveRequestRepository` implementation using the shared `pool` from `src/shared/db/connection.ts`. Includes a private `LeaveRequestRow` interface and `rowToLeaveRequest` mapper for snake_case → camelCase conversion.
+- `src/modules/leave/index.ts` — barrel export of `LeaveRequest`, `ILeaveRequestRepository`, `PgLeaveRequestRepository`
+- `tests/unit/modules/leave/leave.repository.test.ts` — Jest unit tests mocking the pg pool, covering all CRUD paths, `findByEmployeeAndDateRange` overlap logic, and error cases (connection refused, unique constraint violation, query timeout)
+
+**Design decisions:**
+- `reason` is typed as `string | undefined` (not `string | null`), matching the model's optional field semantics. The `rowToLeaveRequest` mapper converts `null` from the database to `undefined` via `row.reason ?? undefined`.
+- `LeaveRequestStatus` is imported from `../../shared/types/enums` (the consolidated enums file from Phase 1).
+- `BaseEntity` is imported from the deep path `../../shared/types/base-entity.interface` (same pattern as employee, policy, and balance modules).
+- `create` generates `id` via `randomUUID()` and populates `createdAt`/`updatedAt` server-side (same pattern as prior modules).
+- `update` does a read-then-write: fetches the existing row via `findById`, merges with partial data, then updates all columns (same pattern as prior modules).
+- `findByEmployeeAndDateRange` uses overlap logic: `start_date <= $3 AND end_date >= $2` — this finds any existing request whose date range intersects with the queried range, supporting the "no overlapping" business rule.
+- `LeaveRequestRow` is a private interface (not exported) used only for mapping database rows.
+
+**Out of scope (deferred):** Leave service (orchestration with business rules), controller, routes, RBAC enforcement, audit record writing, database migrations.
 
 ### Open Questions
 
