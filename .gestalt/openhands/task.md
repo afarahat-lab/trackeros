@@ -1,27 +1,29 @@
-# Implement this phase: Phase 7: LeavePolicy service
+# Implement this phase: Phase 8: Employee service
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/e207b7c2-5967-4897-aeeb-2fac2e370ce3/7`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/e207b7c2-5967-4897-aeeb-2fac2e370ce3/8`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the leave-policy service layer. This phase depends on `src/modules/leave-policy/leave-policy.model.ts` and `src/modules/leave-policy/leave-policy.repository.ts` from Phase 3 — read both before generating.
+Create the employee service layer. This phase depends on `src/modules/employee/employee.model.ts` and `src/modules/employee/employee.repository.ts` from Phase 2 — read both before generating.
 
 Files to create:
 
-1. `src/modules/leave-policy/leave-policy.service.interface.ts` — Define and export `ILeavePolicyService` interface:
-   - `getActivePolicy(leaveTypeId: string): Promise<LeavePolicy | null>`
-   - `getPolicyById(id: string): Promise<LeavePolicy | null>`
-   - `getAllPolicies(): Promise<LeavePolicy[]>`
-   - `createPolicy(data: Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeavePolicy>`
-   - `updatePolicy(id: string, data: Partial<LeavePolicy>): Promise<LeavePolicy | null>`
+1. `src/modules/employee/employee.service.interface.ts` — Define and export `IEmployeeService` interface:
+   - `getEmployeeById(id: string): Promise<Employee | null>`
+   - `getEmployeeByNumber(employeeNumber: string): Promise<Employee | null>`
+   - `getSubordinates(managerId: string): Promise<Employee[]>`
+   - `getAllEmployees(): Promise<Employee[]>`
+   - `createEmployee(data: Omit<Employee, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt'>): Promise<Employee>`
+   - `updateEmployee(id: string, data: Partial<Employee>): Promise<Employee | null>`
+   - `terminateEmployee(id: string): Promise<void>`
 
-2. `src/modules/leave-policy/leave-policy.service.ts` — Implement `LeavePolicyService` class implementing `ILeavePolicyService`. Inject `ILeavePolicyRepository` via constructor. Each method delegates to the repository. The `getActivePolicy` method filters for `isActive: true` and returns the first match.
+2. `src/modules/employee/employee.service.ts` — Implement `EmployeeService` class implementing `IEmployeeService`. Inject `IEmployeeRepository` via constructor. The `terminateEmployee` method sets `employmentStatus` to `'TERMINATED'`, sets `terminationDate` to now, and calls `softDelete`.
 
-3. Update `src/modules/leave-policy/index.ts` to also export the service interface and class.
+3. Update `src/modules/employee/index.ts` to also export the service interface and class.
 
-Include Jest unit tests at `tests/unit/modules/leave-policy/leave-policy.service.spec.ts` with mocked repository.
+Include Jest unit tests at `tests/unit/modules/employee/employee.service.spec.ts` with mocked repository.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -41,41 +43,46 @@ These are resolved, feature-wide decisions. Wherever this phase touches the conc
 
 ## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
 The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
-- `LeavePolicy` — the entity MUST have exactly these fields:
+- `Employee` — the entity MUST have exactly these fields:
     - id: string
-    - policyName: string
-    - leaveTypeId: string
-    - entitlementDays: number
-    - accrualRate: number | undefined
-    - maxAccumulation: number | undefined
-    - minimumNoticeDays: number | undefined
-    - requiresManagerApproval: boolean
-    - isActive: boolean
+    - employeeNumber: string
+    - firstName: string
+    - lastName: string
+    - email: string
+    - managerId: string | null
+    - department: string | null
+    - hireDate: Date
+    - terminationDate: Date | null
+    - employmentStatus: 'ACTIVE' | 'INACTIVE' | 'TERMINATED'
     - createdAt: Date
     - updatedAt: Date
+    - deletedAt: Date | null
 
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- The ILeavePolicyService method signatures must align one-to-one with ILeavePolicyRepository: getActivePolicy→findActiveByLeaveTypeId(leaveTypeId): Promise<LeavePolicy | null>, getPolicyById→findById(id): Promise<LeavePolicy | null>, getAllPolicies→findAll(): Promise<LeavePolicy[]>, createPolicy→create(policy: Omit<LeavePolicy,'id'|'createdAt'|'updatedAt'>): Promise<LeavePolicy>, updatePolicy→update(id, data: Partial<LeavePolicy>): Promise<LeavePolicy | null>. The createPolicy input type must be exactly Omit<LeavePolicy,'id'|'createdAt'|'updatedAt'> so it passes through to repo.create with no transformation. (see `src/modules/leave-policy/leave-policy.repository.ts`)
-- The service interface and implementation must import and use the canonical LeavePolicy interface from leave-policy.model.ts (id, policyName, leaveTypeId, entitlementDays, accrualRate, maxAccumulation, minimumNoticeDays, requiresManagerApproval, isActive, createdAt, updatedAt) — no redefinition or drift of the entity shape. (see `src/modules/leave-policy/leave-policy.model.ts`)
-- The barrel must continue to export the existing model and repository symbols (LeaveType, LeavePolicy, ILeavePolicyRepository, LeavePolicyRepository) and additionally export ILeavePolicyService and LeavePolicyService, matching the re-export pattern used by src/modules/status/index.ts and src/modules/uptime/index.ts (model, service interface, service class). (see `src/modules/leave-policy/index.ts`)
-- The service interface file must follow the established convention: the interface file imports the model type and exports an I<Name>Service interface, and the implementation file imports the interface plus the model and declares a class that implements it — mirroring status.service.interface.ts / status.service.ts and uptime.service.interface.ts / uptime.service.ts. (see `src/modules/status/status.service.interface.ts`)
-- The service spec must mirror the existing leave-policy.repository.spec.ts structure and location (tests/unit/modules/leave-policy/, .spec.ts extension, ts-jest preset) and use the same makeRow-style fixture pattern adapted for LeavePolicy objects, so the two leave-policy test files are stylistically consistent. (see `tests/unit/modules/leave-policy/leave-policy.repository.spec.ts`)
+- The service interface and class must import and operate on the exact Employee type defined in employee.model.ts — do not redefine or narrow the entity shape; the create input must omit precisely id, createdAt, updatedAt, and deletedAt. (see `src/modules/employee/employee.model.ts`)
+- The service must delegate to the existing IEmployeeRepository method set (findById, findByEmployeeNumber, findByManagerId, findAll, create, update, softDelete) without adding or assuming repository methods; terminateEmployee must compose update then softDelete from this exact set. (see `src/modules/employee/employee.repository.ts`)
+- The employee service interface file must follow the leave-policy service-interface pattern: import only the model type, export the service interface with async method signatures, no repository import. (see `src/modules/leave-policy/leave-policy.service.interface.ts`)
+- The employee service class must follow the leave-policy service class pattern: constructor takes a private readonly repository typed as the repository interface, implements the service interface, and each method delegates directly to the repository. (see `src/modules/leave-policy/leave-policy.service.ts`)
+- The employee barrel must add the service interface and class exports in the same ordering convention as the leave-policy barrel (model, repository, service interface, service class). (see `src/modules/leave-policy/index.ts`)
+- The employee service test must mirror the leave-policy service test structure: a jest.Mocked<IEmployeeRepository> built in beforeEach, a makeEmployee() factory helper, delegation assertions (correct args + returned value), and error-propagation assertions (mockRejectedValueOnce → rejects.toThrow). (see `tests/unit/modules/leave-policy/leave-policy.service.spec.ts`)
 ### Entity invariants — enforce these
-- Reuse or extend `LeavePolicy`: At most one active policy exists per leaveTypeId (ARCHITECTURE.md / reconciled.json key rule). The service's getActivePolicy must surface this constraint by returning a single active policy or null — it must never return an array or silently pick among multiple active rows; the repository's findActiveByLeaveTypeId (which filters WHERE is_active = true and returns the first row) is the authoritative source.
-- Reuse or extend `LeavePolicy`: id, createdAt, and updatedAt are system-managed and never supplied by callers: createPolicy's input is Omit<LeavePolicy,'id'|'createdAt'|'updatedAt'>, and updatePolicy must not allow callers to overwrite id or createdAt (the repository already strips read-only fields; the service must not re-introduce them).
-- Reuse or extend `ILeavePolicyService`: The service contract is a pure delegation layer over ILeavePolicyRepository: each method maps one-to-one to a repository method with no additional persistence, no cross-module calls, and no business-rule side effects — it must remain substitutable by any ILeavePolicyRepository-backed implementation.
+- Reuse or extend `Employee`: Termination is a terminal lifecycle transition: terminateEmployee must move employmentStatus to 'TERMINATED' and set terminationDate to a non-null current timestamp before the record is soft-deleted; an employee cannot be terminated without both fields being persisted.
+- Reuse or extend `Employee`: Soft-deletion (deletedAt set) must only occur after the termination status fields are written, because the repository's update path excludes rows where deleted_at IS NOT NULL — the ordering preserves the status/terminationDate write.
+- Reuse or extend `IEmployeeService`: The service is a pure delegation layer over IEmployeeRepository for all read/create/update operations — it must not mutate, filter, or synthesize Employee data beyond the terminateEmployee status/terminationDate assignment.
 ### Interface contract — expose these operations (their shape is yours)
-- getActivePolicy(leaveTypeId: string): Promise<LeavePolicy | null> — No auth enforcement at the service layer (RBAC is deferred to the controller/middleware phase); the service performs no role checks.; idempotent; Read-only and idempotent; returns null when no active policy exists for the leave type; propagates repository errors unchanged without catching or wrapping.
-- getPolicyById(id: string): Promise<LeavePolicy | null> — No auth enforcement at the service layer.; idempotent; Read-only and idempotent; returns null when no policy matches the id; propagates repository errors unchanged.
-- getAllPolicies(): Promise<LeavePolicy[]> — No auth enforcement at the service layer.; idempotent; Read-only and idempotent; returns an empty array (never null) when no policies exist; propagates repository errors unchanged.
-- createPolicy(data: Omit<LeavePolicy,'id'|'createdAt'|'updatedAt'>): Promise<LeavePolicy> — No auth enforcement at the service layer; GP-002 audit recording is deferred to orchestration phases, so this method does not itself write an audit record.; Not idempotent (each call persists a new row); propagates repository errors — including unique-constraint violations on (leave_type_id, is_active) — unchanged without catching or wrapping; returns the persisted LeavePolicy.
-- updatePolicy(id: string, data: Partial<LeavePolicy>): Promise<LeavePolicy | null> — No auth enforcement at the service layer; GP-002 audit recording is deferred to orchestration phases.; idempotent; Idempotent for no-op updates (returns the existing row when no mutable fields are supplied); returns null when no row matches the id (the null is propagated, not converted to a thrown error); propagates repository errors unchanged.
+- getEmployeeById(id) — Delegates to repository.findById; returns Employee | null; propagates repository errors unchanged.
+- getEmployeeByNumber(employeeNumber) — Delegates to repository.findByEmployeeNumber; returns Employee | null; propagates repository errors unchanged.
+- getSubordinates(managerId) — Delegates to repository.findByManagerId; returns Employee[] (empty when none); propagates repository errors unchanged.
+- getAllEmployees() — Delegates to repository.findAll; returns Employee[] (empty when none); propagates repository errors unchanged.
+- createEmployee(data) — Delegates to repository.create with the provided data (omitting id/createdAt/updatedAt/deletedAt); returns the persisted Employee; propagates unique-constraint and other repository errors unchanged.
+- updateEmployee(id, data) — Delegates to repository.update; returns the updated Employee or null when no non-deleted row matches; propagates repository errors unchanged.
+- terminateEmployee(id) — Calls repository.update with employmentStatus 'TERMINATED' and terminationDate = now, then calls repository.softDelete; resolves void on success; propagates repository errors unchanged (an update failure must not trigger softDelete).
 ### Integration points — connect to these
-- ILeavePolicyRepository (src/modules/leave-policy/leave-policy.repository.ts) — The service's sole dependency: constructor-injected and the only path to persistence. Every service method delegates to a repository method; the service has no other data source.
-- src/modules/leave-policy/index.ts (module public entry point) — Downstream phases (Phase 9 LeaveBalanceService.initializeBalance looks up the active policy via ILeavePolicyService, and Phase 10 LeaveRequestService uses ILeavePolicyService) must import the service through the barrel, per the module-boundary import rule.
-- Jest test runner (jest.config.js, ts-jest preset) — The new leave-policy.service.spec.ts must be discovered by the existing testMatch glob (**/tests/**/*.spec.(ts|js)) and compile under ts-jest with strict TypeScript.
+- src/modules/employee/employee.repository.ts (IEmployeeRepository) — The service consumes the repository interface as its sole dependency; all persistence operations flow through it.
+- src/modules/employee/index.ts (module barrel) — Downstream phases (Phase 10 leave-request orchestration) consume IEmployeeService and EmployeeService exclusively through the public barrel entry point per the module-boundary rule.
+- src/modules/leave-policy/leave-policy.service.ts (established service-layer pattern) — The employee service must structurally match the leave-policy service precedent so the codebase has one consistent service-layer shape.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
