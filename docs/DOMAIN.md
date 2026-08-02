@@ -74,6 +74,13 @@ Transport shape for a LeaveBalance. All date fields are ISO strings.
 | createdAt | string | true |
 | updatedAt | string | true |
 
+## Shared Utilities
+
+### business-day.ts (`src/shared/utils/business-day.ts`)
+
+- `countBusinessDays(startDate: Date, endDate: Date, holidays: Date[]): number` — counts weekdays (Mon–Fri) between two dates inclusive, excluding weekends and provided holidays. Returns 0 if startDate > endDate.
+- `DEFAULT_HOLIDAYS: Date[]` — empty array placeholder for future holidays table.
+
 ## Employee Module
 
 Source: `src/modules/employee/`
@@ -202,7 +209,58 @@ Source: `src/modules/leave-request/`
 - `findPendingByManager` joins `employees` to find submitted requests for subordinates.
 - `updateStatus` accepts optional `extra` with `rejectionReason`, `approvedBy`, `approvedAt`, `cancelledAt`.
 
-**Service, controller, routes**: Not yet built (planned Phase 10).
+### Service (`ILeaveRequestService` / `LeaveRequestService`)
+
+Constructor-injected dependencies: `ILeaveRequestRepository`, `ILeaveBalanceService`, `IEmployeeService`, `ILeavePolicyService`, `IAuditRepository`, `INotificationService`.
+
+**Custom error classes** (defined in `leave-request.service.ts`):
+- `InvalidStateTransitionError` — thrown when a transition is not allowed from the current status.
+- `UnauthorizedApproverError` — thrown when the approver is neither the employee's manager nor an HR admin.
+- `RequestOwnershipError` — thrown when an employee tries to act on a request they don't own.
+
+**Methods**:
+
+- `submitDraft(requestId, employeeId)`: Validates ownership (employeeId must match request.employeeId). Validates current status is DRAFT. Looks up active policy. Computes business days via `countBusinessDays`. Initializes balance if needed. Atomically deducts days. If employee has no manager (`managerId === null`), logs escalation to HR admin (does not block submission). Updates status to SUBMITTED. Creates audit record. Sends notification.
+
+- `approveRequest(requestId, approverId)`: Validates current status is SUBMITTED. Looks up the request's employee. Authorizes if `approverId === employee.managerId` OR (`employee.managerId === null` AND `approverId !== employeeId`). Sets `approvedBy` and `approvedAt`. Updates status to APPROVED. Creates audit. Sends notification.
+
+- `rejectRequest(requestId, approverId, rejectionReason)`: Requires non-empty rejectionReason. Validates current status is SUBMITTED. Same authorization check as approve. Restores balance days. Sets rejectionReason. Updates status to REJECTED. Creates audit. Sends notification.
+
+- `cancelRequest(requestId, employeeId)`: Validates ownership. Validates current status is SUBMITTED or APPROVED. Restores balance days (days were deducted on submit). Sets `cancelledAt`. Updates status to CANCELLED. Creates audit. Sends notification.
+
+- `getRequestById(id)`, `getEmployeeRequests(employeeId)`, `getPendingForManager(managerId)`: Read-through to repository.
+
+### Controller (`LeaveRequestController`)
+
+Reads authenticated user identity from `request.user` (Fastify request decoration with shape `{ id: string; role: string }`). If `request.user` is absent/undefined, returns 401.
+
+**RBAC approach (as-built divergence)**: RBAC is enforced at the **service layer** via custom error classes, not at the controller boundary. The controller maps error classes to HTTP status codes:
+- `RequestOwnershipError` → 403
+- `UnauthorizedApproverError` → 403
+- `InvalidStateTransitionError` → 409
+- Other `Error` → 400
+- Unknown → 500
+
+**HR-admin identification (as-built divergence)**: The implementation does NOT use `request.user.role` for HR-admin checks. Instead, it uses the heuristic `employee.managerId === null && approverId !== request.employeeId` — i.e., if the employee has no manager, any authenticated user who is not the employee themselves can act as approver. The `request.user.role` field is accepted by the controller type but never read or checked.
+
+**Handler methods**: `submit`, `approve`, `reject`, `cancel`, `getById`, `getMyRequests`, `getPendingForManager`.
+
+### Routes (`leaveRequestRoutes`)
+
+Fastify plugin function registered under prefix `/api/leave-requests`. Manually instantiates all dependencies (repositories, services) and wires them together — no DI container.
+
+**Endpoints**:
+- `POST /api/leave-requests/:requestId/submit`
+- `POST /api/leave-requests/:requestId/approve`
+- `POST /api/leave-requests/:requestId/reject`
+- `POST /api/leave-requests/:requestId/cancel`
+- `GET /api/leave-requests/:requestId`
+- `GET /api/leave-requests/my`
+- `GET /api/leave-requests/pending`
+
+### `index.ts` barrel (not updated in Phase 10)
+
+The barrel still only re-exports `LeaveRequest`, `ILeaveRequestRepository`, and `LeaveRequestRepository`. The service, controller, and routes are not exported from the barrel. This is a known gap.
 
 ## Audit Module
 

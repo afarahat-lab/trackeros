@@ -1,0 +1,233 @@
+{
+  "scope": {
+    "affectedDomains": [],
+    "affectedLayers": [],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "countBusinessDays counts weekdays (Mon\u2013Fri) between two dates inclusive, excluding weekends and provided holiday dates; returns 0 when start equals end on a weekend/holiday; DEFAULT_HOLIDAYS is an empty array.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "submitDraft transitions a DRAFT request to SUBMITTED only when the request belongs to the acting employee; it computes business days, ensures a balance exists (initializing lazily if absent), deducts days atomically, and rejects submission when totalEntitlement - usedDays - requestedDays < 0.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "submitDraft for an employee whose managerId is null does not block submission \u2014 it logs the escalation and routes the request to the hr_admin role for approval.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "approveRequest transitions SUBMITTED\u2192APPROVED, sets approvedBy and approvedAt, and rejects the transition when the approver is neither the employee's manager nor an hr_admin.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "rejectRequest transitions SUBMITTED\u2192REJECTED, requires a non-empty rejectionReason, validates approver authority, and restores the previously deducted balance days.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "cancelRequest transitions SUBMITTED or APPROVED\u2192CANCELLED, validates that the acting employee owns the request, sets cancelledAt, and restores balance days only if they were previously deducted.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Every state-transition method (submit, approve, reject, cancel) validates the request's current status before proceeding and throws a typed error on an illegal transition (e.g. approving an already-APPROVED request).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Every state-transition method writes an audit record (GP-002) and sends the corresponding notification via INotificationService before returning.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The controller returns 401 when request.user is absent/undefined, 403 when the authenticated user's role/id violates RBAC rules (employee acting on another's request, manager approving a non-subordinate's request), and validates all inputs at the boundary (GP-003) before calling the service.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The leave-request module barrel (index.ts) exports the service interface, service class, controller class, and routes plugin alongside the existing model and repository exports.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access goes through repository interfaces (GP-001) \u2014 the service must not issue SQL or import the pg pool directly; it uses ILeaveRequestRepository and IAuditRepository.",
+    "The service must not import from other modules' internals \u2014 only through their index.ts barrel exports (IEmployeeService, ILeaveBalanceService, ILeavePolicyService, INotificationService, IAuditRepository).",
+    "No `any` type \u2014 use `unknown` with type guards (HARNESS constraint no-any); strict TypeScript with no implicit any and strict null checks.",
+    "RBAC (GP-005) is enforced at the controller boundary before calling the service: employee may act only on their own requests (request.user.id === target employeeId); manager may approve/reject only for employees they manage; hr_admin may act on any. Return 403 on violation.",
+    "The controller must not build or modify auth middleware, JWT/session verification, or login \u2014 it only consumes request.user as an already-established platform contract with shape { id: string; role: string } where role \u2208 'employee' | 'manager' | 'hr_admin'.",
+    "No role field is added to the Employee entity in this phase \u2014 role comes from request.user.role (auth context), not the Employee record.",
+    "remainingDays is computed as totalEntitlement - usedDays at read time and is never written directly; the submit sufficiency check uses totalEntitlement - usedDays - requestedDays >= 0.",
+    "Fiscal year is the calendar year of the request's startDate (Jan 1 \u2013 Dec 31); it is not tenant-configurable in this phase.",
+    "All async errors are caught and handled (GP-006) \u2014 no unhandled promise rejections; the controller wraps service calls in try/catch and returns appropriate HTTP error responses.",
+    "No sensitive data (passwords, tokens, PII) is logged (GP-004); the notification service stub logs only request metadata (id, employeeId, leaveTypeId, dates), not credentials."
+  ],
+  "outOfScope": [
+    "Building or modifying auth middleware, JWT/session verification, or login endpoints \u2014 these are existing application infrastructure consumed but not built in this phase.",
+    "Actual HR-admin routing/notification delivery (email/SMS) \u2014 the notification service is a console-log stub; HR escalation is logged but real HR routing is deferred.",
+    "Leave request creation (DRAFT) \u2014 this phase handles submit/approve/reject/cancel transitions and reads; the DRAFT creation endpoint is not part of this phase's route surface.",
+    "Overlap detection between leave requests on SUBMITTED \u2014 the reconciled architecture lists it as a key rule but the phase scope does not include it; deferred to a later phase.",
+    "Auto-approval when policy.requiresManagerApproval === false \u2014 the phase scope does not mention this path; deferred to a later phase.",
+    "A real holidays table or public-holiday calendar \u2014 DEFAULT_HOLIDAYS is an empty array placeholder; the holidays table is deferred."
+  ],
+  "ambiguities": [
+    {
+      "description": "The phase says cancelRequest restores balance days \"if previously deducted\" but does not specify how the service determines whether days were deducted. A SUBMITTED request had days deducted on submit; an APPROVED request also had days deducted (on submit, not on approve per the business rules). A DRAFT\u2192CANCELLED path (mentioned in the reconciled architecture) would have no deduction.",
+      "options": [
+        "Restore days only when the prior status was SUBMITTED or APPROVED (i.e., days were deducted at submit time); skip restore for DRAFT\u2192CANCELLED.",
+        "Always attempt restore and rely on the balance service to no-op/throw if there is nothing to restore.",
+        "Track a 'deductedDays' field on the request to know exactly how many to restore."
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "The phase scope says cancelRequest transitions \"SUBMITTED/APPROVED\u2192CANCELLED\" but the reconciled architecture's LeaveRequest lifecycle also allows \"DRAFT \u2192 CANCELLED\". It is unclear whether the service should accept DRAFT\u2192CANCELLED in this phase.",
+      "options": [
+        "Allow DRAFT\u2192CANCELLED in addition to SUBMITTED/APPROVED\u2192CANCELLED, matching the reconciled lifecycle.",
+        "Restrict to SUBMITTED/APPROVED\u2192CANCELLED only, matching the phase scope verbatim."
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "description": "The controller extracts employeeId/approverId from request.user.id, but the service methods also take employeeId/approverId as parameters. It is unclear whether the controller should pass request.user.id as the employeeId/approverId argument, or whether the service should independently re-derive the actor. The clarification says RBAC is enforced at the controller boundary, so the service may trust the passed ID.",
+      "options": [
+        "Controller passes request.user.id as the employeeId/approverId argument; the service trusts it and uses it for audit performedBy.",
+        "Service independently looks up the employee and ignores the passed ID for ownership, using it only for audit."
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "description": "The phase says submitDraft \"validates the request belongs to the employee\" but the controller also enforces RBAC (employee may act only on their own requests). If the controller already guarantees ownership, the service's ownership check is redundant \u2014 but the service interface takes employeeId as a parameter, implying it validates independently.",
+      "options": [
+        "Service validates ownership independently (defense-in-depth) even though the controller also checks RBAC.",
+        "Service trusts the controller's RBAC check and skips redundant ownership validation."
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "Lifecycle transitions are restricted: DRAFT\u2192SUBMITTED (submit), SUBMITTED\u2192APPROVED (approve), SUBMITTED\u2192REJECTED (reject), SUBMITTED/APPROVED\u2192CANCELLED (cancel). Any transition from a terminal state (APPROVED, REJECTED, CANCELLED) or an invalid source state must be rejected with a typed error."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "rejectionReason must be non-empty when status transitions to REJECTED; it must not be set on other transitions."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "approvedBy and approvedAt are set together on APPROVED transitions and are null otherwise; cancelledAt is set on CANCELLED transitions and is null otherwise."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "usedDays is the denormalized source of truth: it is incremented atomically on SUBMITTED (deduct-on-submission) and decremented on REJECT/CANCEL (restore-on-reject/cancel); approval does NOT change usedDays. A submission must fail if it would drive remainingDays below zero."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "remainingDays = totalEntitlement - usedDays, computed at read time; no code path writes remainingDays directly to persistence."
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "Only employees with employmentStatus ACTIVE can submit leave requests; the service must reject submission for INACTIVE or TERMINATED employees."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "submitDraft(requestId, employeeId)",
+      "authRule": "The acting employeeId must own the request (request.employeeId === employeeId); the employee must be ACTIVE. RBAC is enforced at the controller boundary (employee may act only on own requests).",
+      "idempotent": false,
+      "errorSemantics": "Throws a typed error when: request not found, request does not belong to employee, current status is not DRAFT, no active policy exists for the leave type, employee is not ACTIVE, or insufficient balance (totalEntitlement - usedDays - requestedDays < 0)."
+    },
+    {
+      "operation": "approveRequest(requestId, approverId)",
+      "authRule": "The approver must be the employee's manager (employee.managerId === approverId) or an hr_admin; RBAC enforced at controller boundary (manager may approve only for subordinates, hr_admin may approve any).",
+      "idempotent": false,
+      "errorSemantics": "Throws a typed error when: request not found, current status is not SUBMITTED, or approver lacks authority (not the manager and not hr_admin)."
+    },
+    {
+      "operation": "rejectRequest(requestId, approverId, rejectionReason)",
+      "authRule": "The approver must be the employee's manager or an hr_admin; RBAC enforced at controller boundary. rejectionReason must be non-empty.",
+      "idempotent": false,
+      "errorSemantics": "Throws a typed error when: request not found, current status is not SUBMITTED, rejectionReason is empty/whitespace, approver lacks authority, or balance restore fails (usedDays would go below zero)."
+    },
+    {
+      "operation": "cancelRequest(requestId, employeeId)",
+      "authRule": "The acting employeeId must own the request (request.employeeId === employeeId); RBAC enforced at controller boundary (employee may cancel only own requests).",
+      "idempotent": false,
+      "errorSemantics": "Throws a typed error when: request not found, request does not belong to employee, current status is not SUBMITTED or APPROVED, or balance restore fails."
+    },
+    {
+      "operation": "getRequestById(id)",
+      "authRule": "RBAC enforced at controller boundary: employee may read only own requests; manager may read requests of subordinates; hr_admin may read any.",
+      "idempotent": true,
+      "errorSemantics": "Returns null when the request is not found; does not throw for missing records."
+    },
+    {
+      "operation": "getEmployeeRequests(employeeId)",
+      "authRule": "RBAC enforced at controller boundary: employee may list only their own requests; hr_admin may list any employee's requests.",
+      "idempotent": true,
+      "errorSemantics": "Returns an empty array when no requests exist; does not throw."
+    },
+    {
+      "operation": "getPendingForManager(managerId)",
+      "authRule": "RBAC enforced at controller boundary: the authenticated user must be a manager or hr_admin; managerId is derived from request.user.id for managers.",
+      "idempotent": true,
+      "errorSemantics": "Returns an empty array when no pending requests exist; does not throw."
+    },
+    {
+      "operation": "countBusinessDays(startDate, endDate, holidays)",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Counts weekdays (Mon\u2013Fri) inclusive of both endpoints, excluding weekends and dates matching the provided holidays array; returns 0 when no business days fall in the range. Behavior for startDate > endDate should be handled gracefully (return 0 or throw \u2014 implementation choice, but must be deterministic)."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The service must use the existing ILeaveRequestRepository interface signatures (findById, findByEmployee, findByStatus, findPendingByManager, updateStatus with the extra options bag) \u2014 do not add new repository methods or change existing ones.",
+      "referencePath": "src/modules/leave-request/leave-request.repository.ts"
+    },
+    {
+      "requirement": "Balance operations must call the existing ILeaveBalanceService methods with their exact signatures: initializeBalance(employeeId, leaveTypeId, fiscalYear), deductDays(employeeId, leaveTypeId, fiscalYear, days), restoreDays(employeeId, leaveTypeId, fiscalYear, days) \u2014 the service must not bypass these to touch the balance repository directly.",
+      "referencePath": "src/modules/leave-balance/leave-balance.service.interface.ts"
+    },
+    {
+      "requirement": "Audit records must be created via IAuditRepository.create with the as-built AuditRecord shape (entityType, entityId, action: AuditAction, performedBy, details: Record<string, unknown> | null) \u2014 not the reconciled audit_logs shape with old_values/new_values.",
+      "referencePath": "src/modules/audit/audit.repository.ts"
+    },
+    {
+      "requirement": "Notifications must be sent via the existing INotificationService methods (notifyLeaveSubmitted, notifyLeaveApproved, notifyLeaveRejected, notifyLeaveCancelled) which accept LeaveRequestDTO \u2014 the service must convert LeaveRequest entities to LeaveRequestDTO before calling.",
+      "referencePath": "src/modules/notification/notification.service.interface.ts"
+    },
+    {
+      "requirement": "Audit actions must use the existing AuditAction enum values (SUBMITTED, APPROVED, REJECTED, CANCELLED, BALANCE_DEDUCTED, BALANCE_RESTORED) \u2014 do not introduce new action values. LeaveStatus transitions must use the existing LeaveStatus enum (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED).",
+      "referencePath": "src/shared/types/enums.ts"
+    },
+    {
+      "requirement": "Active policy lookup must use ILeavePolicyService.getActivePolicy(leaveTypeId) \u2014 the same method used by LeaveBalanceService.initializeBalance \u2014 to ensure consistent policy resolution across balance initialization and submission.",
+      "referencePath": "src/modules/leave-policy/leave-policy.service.interface.ts"
+    },
+    {
+      "requirement": "Employee lookups (for manager validation, employment status check, and managerId null-check escalation) must use IEmployeeService.getEmployeeById \u2014 do not query the employee repository directly from the leave-request service.",
+      "referencePath": "src/modules/employee/employee.service.interface.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/leave-balance (ILeaveBalanceService)",
+      "why": "submitDraft calls initializeBalance (lazy) then deductDays; rejectRequest and cancelRequest call restoreDays to return deducted days."
+    }
+  ]
+}
