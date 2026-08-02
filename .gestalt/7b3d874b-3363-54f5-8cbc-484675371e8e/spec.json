@@ -1,0 +1,121 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared-holidays"
+    ],
+    "affectedLayers": [
+      "data",
+      "shared"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The Holiday interface is defined as a standalone data interface (not extending BaseEntity) with exactly four fields: id (string), date (Date), name (string), country (string). It compiles under strict TypeScript without importing BaseEntity.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The IHolidayRepository interface exposes exactly two read-only methods: findByDateRange(startDate: Date, endDate: Date) returning Promise<Holiday[]>, and findByYear(year: number) returning Promise<Holiday[]>. No create/update/delete methods exist on the interface.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "PgHolidayRepository implements IHolidayRepository and uses the shared pg pool from src/shared/db/connection.ts. findByDateRange queries the holidays table with an inclusive date range (date >= startDate AND date <= endDate) and returns matching Holiday entities. findByYear queries rows whose date falls within the requested calendar year and returns matching Holiday entities.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository's row mapper returns Date objects for the date field that are directly consumable by countBusinessDays(startDate, endDate, holidays: Date[]) \u2014 i.e., each returned Holiday's date is a JS Date whose local date components (year/month/day) match the stored holiday date, so isSameDay() comparison in day-count.ts works correctly.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The barrel file src/shared/holidays/index.ts re-exports the Holiday type, the IHolidayRepository type, and the PgHolidayRepository class, so consumers can import all three from the single module entry point.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests at tests/unit/shared/holidays/holiday.repository.test.ts mock the shared pg pool and cover: findByDateRange returning matching rows, findByDateRange returning an empty array when no rows match, findByDateRange rejecting on a pool error, findByYear returning matching rows, findByYear returning an empty array, and findByYear rejecting on a pool error. All tests pass under the project's Jest configuration.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No use of `any` \u2014 use `unknown` with type guards instead (HARNESS.json constraint no-any, severity high). The HolidayRow interface and row mapper must be fully typed.",
+    "All database access must go through the repository pattern (GP-001 / HARNESS.json no-direct-db-outside-repository, severity critical). PgHolidayRepository is the sole database access point for the holidays table; no inline SQL elsewhere.",
+    "The repository must let database errors propagate as rejected promises without try/catch wrapping \u2014 matching the established convention across employee, policy, balance, and leave repositories (GP-006: no unhandled promise rejections at the caller level, but the repository itself does not swallow errors).",
+    "Strict TypeScript must pass (no implicit any, strict null checks). The Holiday interface, IHolidayRepository interface, PgHolidayRepository class, and barrel must all compile cleanly under `npm run build` (tsc --noEmit).",
+    "Test files must use the project's Jest convention \u2014 `*.test.ts` under `tests/` matching the configured testMatch, NOT `.spec.ts`. The Jest config must not be modified."
+  ],
+  "outOfScope": [
+    "No create/update/delete operations on the holidays table \u2014 the repository is read-only (findByDateRange and findByYear only). Holiday data ingestion/management is deferred.",
+    "No country-based filtering at the repository layer \u2014 the country field is stored and returned but not used as a query parameter in this phase. Multi-country filtering logic is deferred to the Phase 10 leave service consumer.",
+    "No database migration for the holidays table \u2014 schema creation is out of scope for this phase. The repository assumes the holidays table exists with columns id, date, name, country.",
+    "No service, controller, or routes layer for holidays \u2014 this phase delivers only the model, repository interface, repository implementation, barrel, and unit tests. The leave service (Phase 10) will consume IHolidayRepository."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "Holiday",
+      "mustExistOrExtend": false,
+      "invariant": "Holiday is reference data, not a domain aggregate \u2014 it does not extend BaseEntity and carries no createdAt/updatedAt lifecycle timestamps. It is immutable from the application's perspective (read-only access only in this phase)."
+    },
+    {
+      "entity": "Holiday",
+      "mustExistOrExtend": true,
+      "invariant": "Every Holiday returned by the repository must have a non-null date that is a valid JS Date object whose local date components correspond to the actual public holiday date, ensuring compatibility with countBusinessDays' isSameDay() comparison."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IHolidayRepository.findByDateRange(startDate: Date, endDate: Date): Promise<Holiday[]>",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Read-only query with no side effects. Returns an empty array (not null) when no holidays fall within the inclusive range. Database errors propagate as rejected promises without swallowing."
+    },
+    {
+      "operation": "IHolidayRepository.findByYear(year: number): Promise<Holiday[]>",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Read-only query with no side effects. Returns an empty array (not null) when no holidays exist for the requested calendar year. Database errors propagate as rejected promises without swallowing."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "PgHolidayRepository must import the shared `pool` from src/shared/db/connection.ts \u2014 the same pool instance used by all other repositories (employee, policy, balance, leave). No separate database connection or Pool instantiation.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "The repository's returned Holiday.date values must be directly passable as the `holidays: Date[]` argument to countBusinessDays. The date objects must have local date components (getFullYear/getMonth/getDate) matching the stored holiday date, because countBusinessDays uses isSameDay() which compares local-time getters \u2014 not UTC.",
+      "referencePath": "src/shared/utils/day-count.ts"
+    },
+    {
+      "requirement": "The repository implementation must follow the established pattern: define a private *Row interface for DB columns, a private rowTo* mapper function, use pool.query<RowType>(sql, params) accessing result.rows, and have the class implement the interface (PgHolidayRepository implements IHolidayRepository). Errors propagate as rejected promises without try/catch.",
+      "referencePath": "src/modules/balance/balance.repository.ts"
+    },
+    {
+      "requirement": "The unit test must follow the established test pattern: jest.mock the shared db connection module, import pool after the mock, cast pool.query as jest.Mock, use makeRow()/makeEntity() helper factories with overrides, structure as describe('PgHolidayRepository') with nested describe blocks per method, call jest.clearAllMocks() in beforeEach, and cast mock resolved values with `as never`.",
+      "referencePath": "tests/unit/modules/balance/balance.repository.test.ts"
+    },
+    {
+      "requirement": "The Holiday interface must NOT extend BaseEntity. BaseEntity defines id/createdAt/updatedAt; Holiday is reference data with only id/date/name/country and no lifecycle timestamps. base-entity.interface.ts is read for awareness only \u2014 it is not imported by the holidays module.",
+      "referencePath": "src/shared/types/base-entity.interface.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/utils/day-count.ts (countBusinessDays)",
+      "why": "The repository's primary consumer contract: findByDateRange returns Holiday[] whose .date values are extracted and passed as the holidays: Date[] argument to countBusinessDays. The Phase 10 leave service will call findByDateRange, map results to Date[], and invoke countBusinessDays for business-day calculation."
+    },
+    {
+      "target": "src/shared/db/connection.ts (shared pg pool)",
+      "why": "PgHolidayRepository depends on the shared Pool instance for all database queries, consistent with every other repository in the codebase."
+    },
+    {
+      "target": "Phase 10 leave service (ILeaveRequestService)",
+      "why": "The leave service constructor will accept IHolidayRepository to fetch holidays for a leave request's date range, enabling accurate business-day counting that excludes public holidays per binding rule 2."
+    }
+  ]
+}
