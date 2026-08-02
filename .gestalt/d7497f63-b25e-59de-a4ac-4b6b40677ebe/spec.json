@@ -1,0 +1,155 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-balance",
+      "notification",
+      "leave-policy",
+      "shared-types"
+    ],
+    "affectedLayers": [
+      "service",
+      "unit-test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "LeaveBalanceService.initializeBalance resolves the active policy for the given leaveTypeId via ILeavePolicyService.getActivePolicy, and when a policy is found, persists a new LeaveBalance row with totalEntitlement sourced from the policy's entitlementDays, usedDays=0, pendingDays=0, status='ACTIVE', and the returned balance's remainingDays equals totalEntitlement (computed, never written).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "LeaveBalanceService.deductDays rejects (throws a typed error) when totalEntitlement - usedDays - days < 0, and otherwise atomically increments usedDays via the repository and returns the updated balance whose remainingDays reflects the new totalEntitlement - usedDays.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "LeaveBalanceService.restoreDays atomically decrements usedDays via the repository and returns the updated balance whose remainingDays reflects the recomputed totalEntitlement - usedDays.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "LeaveBalanceService.getBalance and getAllBalances delegate to the repository and return balances whose remainingDays is computed as totalEntitlement - usedDays at query time (matching the repository's rowToLeaveBalance computation), never read from a stored column.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "NotificationService exposes four notifyLeave<Event> methods (submitted, approved, rejected, cancelled) each accepting a LeaveRequestDTO and resolving to void without throwing; the stub logs to console and performs no external I/O.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The leave-balance barrel (index.ts) exports the new ILeaveBalanceService interface and LeaveBalanceService class in addition to the existing model and repository exports, and the notification barrel exports INotificationService and NotificationService, enabling cross-module consumption through index.ts only.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The two new test files (leave-balance.service.spec.ts and notification.service.spec.ts) pass under Jest with mocked repository/service dependencies, verifying the balance computation, deduct guard, restore, initialize-from-policy, and notification logging behavior.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No audit injection in Phase 9 \u2014 LeaveBalanceService constructor takes only ILeaveBalanceRepository and ILeavePolicyService; audit wiring is deferred to Phase 10. GP-002 audit records are not written by this phase's services.",
+    "remainingDays is read-only/computed: it must never be passed as a create/update input to the repository. The repository's create input type already omits remainingDays and lists it in READ_ONLY_FIELDS; the service must rely on rowToLeaveBalance to compute it at read time.",
+    "Cross-module imports go through barrel index.ts files only \u2014 LeaveBalanceService must import ILeavePolicyService from the leave-policy barrel (src/modules/leave-policy/index.ts), not from internal service files. Same-module imports (LeaveBalance model, ILeaveBalanceRepository) use internal files directly.",
+    "NotificationService is a console-logging stub with no constructor dependencies; it imports only LeaveRequestDTO from src/shared/types/index.ts. The dependency-map edge notification \u2192 employee is for the future real implementation, not this stub phase.",
+    "Strict TypeScript (no-any rule): use unknown with type guards instead of any. No direct database access outside the repository layer (GP-001) \u2014 the service must not import the pg pool or write SQL. All async errors must be caught/handled (GP-006).",
+    "The two new test files use the .spec.ts extension (task override of the .test.ts project convention); Jest config matches both patterns. Tests use jest.Mocked and factory helpers with relative imports resolving four levels up from tests/unit/modules/<module>/."
+  ],
+  "outOfScope": [
+    "Audit record creation for balance deduct/restore/initialize operations \u2014 deferred to Phase 10 (leave-request orchestration) which injects IAuditRepository.",
+    "Real email/SMS notification delivery \u2014 NotificationService is a console-logging stub only; actual transport, employee/manager recipient resolution, and the notification \u2192 employee dependency are deferred to a later phase.",
+    "LeaveRequest service, controller, routes, and business-day utility \u2014 Phase 10 scope. This phase does not build the leave-request orchestration layer that consumes these services.",
+    "Balance status transitions (ACTIVE \u2192 EXHAUSTED \u2192 FROZEN) and pendingDays manipulation \u2014 the service initializes with status='ACTIVE' and pendingDays=0; EXHAUSTED/FROZEN lifecycle transitions and pending-day reservation logic are not implemented in this phase."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "remainingDays is always derived as totalEntitlement - usedDays at read time and is never persisted or written through any create/update path; every balance returned by the service must satisfy remainingDays === totalEntitlement - usedDays."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "A newly initialized balance has usedDays=0, pendingDays=0, status='ACTIVE', and totalEntitlement equal to the active policy's entitlementDays for the given leaveTypeId; the policyId on the balance must reference the policy that was active at initialization time."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "usedDays must never become negative and must never exceed totalEntitlement as a result of service operations: deductDays is rejected before any mutation when totalEntitlement - usedDays - days < 0, and restoreDays must not drive usedDays below zero."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "LeaveBalanceService.initializeBalance(employeeId, leaveTypeId, fiscalYear)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Must throw a typed error when no active policy exists for the given leaveTypeId (getActivePolicy returns null); on success returns a persisted LeaveBalance with status ACTIVE and entitlement sourced from the policy."
+    },
+    {
+      "operation": "LeaveBalanceService.deductDays(employeeId, leaveTypeId, fiscalYear, days)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Must throw a typed error when the balance does not exist for the employee/type/year combination, or when totalEntitlement - usedDays - days < 0 (insufficient remaining); on success atomically increments usedDays and returns the updated balance."
+    },
+    {
+      "operation": "LeaveBalanceService.restoreDays(employeeId, leaveTypeId, fiscalYear, days)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Must throw a typed error when the balance does not exist for the employee/type/year combination; on success atomically decrements usedDays and returns the updated balance."
+    },
+    {
+      "operation": "NotificationService.notifyLeave<Event>(request: LeaveRequestDTO)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Must resolve to void without throwing for all four event variants (submitted, approved, rejected, cancelled); the stub logs to console and performs no external I/O, so no transient-failure retry semantics apply."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The service's remainingDays computation must match the repository's rowToLeaveBalance formula exactly: remainingDays = totalEntitlement - usedDays (not totalEntitlement - usedDays - pendingDays). The repository already computes this at read time; the service must not recompute or override it with a different formula.",
+      "referencePath": "src/modules/leave-balance/leave-balance.repository.ts"
+    },
+    {
+      "requirement": "The service must call the repository's atomic incrementUsedDays/decrementUsedDays methods for deduct/restore (which use UPDATE ... SET used_days = used_days +/- $n) rather than read-modify-write via update(); this preserves the atomic counter semantics established in Phase 4.",
+      "referencePath": "src/modules/leave-balance/leave-balance.repository.ts"
+    },
+    {
+      "requirement": "The service must never include remainingDays in the create input passed to the repository \u2014 the repository's create signature is Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt' | 'remainingDays'> and remainingDays is in READ_ONLY_FIELDS, so any attempt to write it would be silently dropped or cause a type error.",
+      "referencePath": "src/modules/leave-balance/leave-balance.repository.ts"
+    },
+    {
+      "requirement": "initializeBalance must source totalEntitlement and policyId from the LeavePolicy returned by ILeavePolicyService.getActivePolicy(leaveTypeId) \u2014 specifically policy.entitlementDays and policy.id \u2014 matching the field names established in the leave-policy model and service interface.",
+      "referencePath": "src/modules/leave-policy/leave-policy.service.interface.ts"
+    },
+    {
+      "requirement": "NotificationService methods must accept the LeaveRequestDTO shape as defined in shared-types (id, employeeId, leaveTypeId, startDate, endDate, reason?, rejectionReason?, status, approvedBy, approvedAt, cancelledAt, createdAt, updatedAt) \u2014 imported from the shared-types barrel, not redefined locally.",
+      "referencePath": "src/shared/types/dtos.ts"
+    },
+    {
+      "requirement": "The leave-balance barrel update must mirror the leave-policy barrel pattern: export both the service interface (ILeaveBalanceService) and the service class (LeaveBalanceService) alongside the existing model and repository exports, so cross-module consumers import through index.ts only.",
+      "referencePath": "src/modules/leave-policy/index.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/leave-policy (ILeavePolicyService.getActivePolicy)",
+      "why": "LeaveBalanceService.initializeBalance depends on the leave-policy service to resolve the active policy for a leaveTypeId, sourcing policyId and entitlementDays for the new balance. This is the leave-balance \u2192 leave-policy dependency edge."
+    },
+    {
+      "target": "src/modules/leave-balance (ILeaveBalanceRepository)",
+      "why": "LeaveBalanceService delegates all persistence (create, findByEmployeeAndType, findByEmployee, incrementUsedDays, decrementUsedDays) to the existing repository interface from Phase 4; no direct DB access."
+    },
+    {
+      "target": "src/shared/types (LeaveRequestDTO)",
+      "why": "NotificationService imports LeaveRequestDTO from the shared-types barrel as the parameter type for all four notify methods; this is the notification \u2192 shared-types dependency edge."
+    },
+    {
+      "target": "Phase 10 \u2014 leave-request orchestration (ILeaveBalanceService, INotificationService)",
+      "why": "Phase 10's LeaveRequestService will consume both new services: initializeBalance/deductDays on submit, restoreDays on reject/cancel, and the four notification methods on each lifecycle transition. The interfaces and barrel exports produced here are the contract Phase 10 depends on."
+    }
+  ]
+}
