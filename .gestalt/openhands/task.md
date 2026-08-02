@@ -1,24 +1,27 @@
-# Implement this phase: Phase 6: Audit model and repository
+# Implement this phase: Phase 7: LeavePolicy service
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/e207b7c2-5967-4897-aeeb-2fac2e370ce3/6`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/e207b7c2-5967-4897-aeeb-2fac2e370ce3/7`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the audit module at `src/modules/audit/`. This phase depends on `src/shared/types/index.ts` from Phase 1 — read it before generating.
+Create the leave-policy service layer. This phase depends on `src/modules/leave-policy/leave-policy.model.ts` and `src/modules/leave-policy/leave-policy.repository.ts` from Phase 3 — read both before generating.
 
 Files to create:
 
-1. `src/modules/audit/audit.model.ts` — Define and export the `AuditRecord` entity interface: `id: string`, `entityType: string`, `entityId: string`, `action: AuditAction`, `performedBy: string`, `details: Record<string, unknown> | null`, `createdAt: Date`. Import `AuditAction` from `src/shared/types/index.ts`.
+1. `src/modules/leave-policy/leave-policy.service.interface.ts` — Define and export `ILeavePolicyService` interface:
+   - `getActivePolicy(leaveTypeId: string): Promise<LeavePolicy | null>`
+   - `getPolicyById(id: string): Promise<LeavePolicy | null>`
+   - `getAllPolicies(): Promise<LeavePolicy[]>`
+   - `createPolicy(data: Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeavePolicy>`
+   - `updatePolicy(id: string, data: Partial<LeavePolicy>): Promise<LeavePolicy | null>`
 
-2. `src/modules/audit/audit.repository.ts` — Define and export:
-   - `IAuditRepository` interface: `create(record: Omit<AuditRecord, 'id' | 'createdAt'>): Promise<AuditRecord>`, `findByEntity(entityType: string, entityId: string): Promise<AuditRecord[]>`, `findByUser(performedBy: string): Promise<AuditRecord[]>`
-   - `AuditRepository` class implementing the interface using the pg pool from `src/shared/db/connection.ts`.
+2. `src/modules/leave-policy/leave-policy.service.ts` — Implement `LeavePolicyService` class implementing `ILeavePolicyService`. Inject `ILeavePolicyRepository` via constructor. Each method delegates to the repository. The `getActivePolicy` method filters for `isActive: true` and returns the first match.
 
-3. `src/modules/audit/index.ts` — barrel re-export.
+3. Update `src/modules/leave-policy/index.ts` to also export the service interface and class.
 
-Include Jest unit tests at `tests/unit/modules/audit/audit.repository.spec.ts`.
+Include Jest unit tests at `tests/unit/modules/leave-policy/leave-policy.service.spec.ts` with mocked repository.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -36,26 +39,43 @@ These are resolved, feature-wide decisions. Wherever this phase touches the conc
 
 6. RBAC (GP-005): every endpoint enforces role-based access control — an employee may act only on their own requests; managers/HR admins on those they oversee. Validate all inputs at the API boundary (GP-003) before calling the service. [BINDING RULE — operator decision resolving: What is the fiscal year definition — calendar year (Jan 1 – Dec 31) or a custom fiscal year (e.g., Apr 1 – Mar 31)?; Should leave day counting use calendar days or business days (excluding weekends and/or public holidays)?; Should the system support half-day leave requests?; Should leave balances be pre-seeded at the start of each fiscal year, or lazily initialized on first request?; How are leave days counted — calendar days or business days (Mon–Fri excluding holidays)?; When does the fiscal year start, and should it be configurable per organization?; apply everywhere these apply, not in one place only]
 
+## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
+The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
+- `LeavePolicy` — the entity MUST have exactly these fields:
+    - id: string
+    - policyName: string
+    - leaveTypeId: string
+    - entitlementDays: number
+    - accrualRate: number | undefined
+    - maxAccumulation: number | undefined
+    - minimumNoticeDays: number | undefined
+    - requiresManagerApproval: boolean
+    - isActive: boolean
+    - createdAt: Date
+    - updatedAt: Date
+
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- The AuditRecord model file must import AuditAction from the shared-types barrel using the same relative-path style as the existing module models (e.g. leave-request.model.ts imports LeaveStatus from '../../shared/types/index'). (see `src/modules/leave-request/leave-request.model.ts`)
-- The AuditRepository must follow the established repository structure: interface + implementing class co-located in one .repository.ts file, a private rowTo<Entity> mapper converting snake_case DB columns to camelCase entity fields with new Date(...) wrapping for date columns, parameterized SQL via pool.query, INSERT ... RETURNING * for create, and empty-array / null returns for not-found. (see `src/modules/leave-request/leave-request.repository.ts`)
-- The audit module barrel must re-export the model type plus the repository interface and class in the same shape as existing module barrels (e.g. export { AuditRecord } from './audit.model'; export { IAuditRepository, AuditRepository } from './audit.repository';). (see `src/modules/leave-request/index.ts`)
-- The audit repository must import the module-level `pool` singleton directly from '../../shared/db/connection' (no constructor injection), matching how employee.repository.ts and leave-request.repository.ts access the pool. (see `src/shared/db/connection.ts`)
-- The unit test must mirror the existing repository spec structure: jest.mock the connection module as { pool: { query: jest.fn() } }, a makeRow helper returning snake_case rows, beforeEach that resets mocks and reinstantiates the repo, and happy-path / not-found / error-propagation cases — matching leave-request.repository.spec.ts. (see `tests/unit/modules/leave-request/leave-request.repository.spec.ts`)
+- The ILeavePolicyService method signatures must align one-to-one with ILeavePolicyRepository: getActivePolicy→findActiveByLeaveTypeId(leaveTypeId): Promise<LeavePolicy | null>, getPolicyById→findById(id): Promise<LeavePolicy | null>, getAllPolicies→findAll(): Promise<LeavePolicy[]>, createPolicy→create(policy: Omit<LeavePolicy,'id'|'createdAt'|'updatedAt'>): Promise<LeavePolicy>, updatePolicy→update(id, data: Partial<LeavePolicy>): Promise<LeavePolicy | null>. The createPolicy input type must be exactly Omit<LeavePolicy,'id'|'createdAt'|'updatedAt'> so it passes through to repo.create with no transformation. (see `src/modules/leave-policy/leave-policy.repository.ts`)
+- The service interface and implementation must import and use the canonical LeavePolicy interface from leave-policy.model.ts (id, policyName, leaveTypeId, entitlementDays, accrualRate, maxAccumulation, minimumNoticeDays, requiresManagerApproval, isActive, createdAt, updatedAt) — no redefinition or drift of the entity shape. (see `src/modules/leave-policy/leave-policy.model.ts`)
+- The barrel must continue to export the existing model and repository symbols (LeaveType, LeavePolicy, ILeavePolicyRepository, LeavePolicyRepository) and additionally export ILeavePolicyService and LeavePolicyService, matching the re-export pattern used by src/modules/status/index.ts and src/modules/uptime/index.ts (model, service interface, service class). (see `src/modules/leave-policy/index.ts`)
+- The service interface file must follow the established convention: the interface file imports the model type and exports an I<Name>Service interface, and the implementation file imports the interface plus the model and declares a class that implements it — mirroring status.service.interface.ts / status.service.ts and uptime.service.interface.ts / uptime.service.ts. (see `src/modules/status/status.service.interface.ts`)
+- The service spec must mirror the existing leave-policy.repository.spec.ts structure and location (tests/unit/modules/leave-policy/, .spec.ts extension, ts-jest preset) and use the same makeRow-style fixture pattern adapted for LeavePolicy objects, so the two leave-policy test files are stylistically consistent. (see `tests/unit/modules/leave-policy/leave-policy.repository.spec.ts`)
 ### Entity invariants — enforce these
-- Reuse or extend `AuditRecord`: An AuditRecord is immutable once persisted — the repository exposes no update or delete operation; the only write path is create, which inserts a new row and never mutates an existing one.
-- Reuse or extend `AuditRecord`: The `action` value of every persisted AuditRecord must be a member of the AuditAction enum (CREATED, SUBMITTED, APPROVED, REJECTED, CANCELLED, BALANCE_DEDUCTED, BALANCE_RESTORED) imported from shared-types; the repository does not accept or persist arbitrary action strings.
-- Reuse or extend `AuditRecord`: `id` and `createdAt` are always DB-generated and never supplied by the caller — create accepts Omit&lt;AuditRecord, 'id' | 'createdAt'&gt; and the returned record always carries both populated (createdAt as a Date).
+- Reuse or extend `LeavePolicy`: At most one active policy exists per leaveTypeId (ARCHITECTURE.md / reconciled.json key rule). The service's getActivePolicy must surface this constraint by returning a single active policy or null — it must never return an array or silently pick among multiple active rows; the repository's findActiveByLeaveTypeId (which filters WHERE is_active = true and returns the first row) is the authoritative source.
+- Reuse or extend `LeavePolicy`: id, createdAt, and updatedAt are system-managed and never supplied by callers: createPolicy's input is Omit<LeavePolicy,'id'|'createdAt'|'updatedAt'>, and updatePolicy must not allow callers to overwrite id or createdAt (the repository already strips read-only fields; the service must not re-introduce them).
+- Reuse or extend `ILeavePolicyService`: The service contract is a pure delegation layer over ILeavePolicyRepository: each method maps one-to-one to a repository method with no additional persistence, no cross-module calls, and no business-rule side effects — it must remain substitutable by any ILeavePolicyRepository-backed implementation.
 ### Interface contract — expose these operations (their shape is yours)
-- IAuditRepository.create — Rejects the promise with the underlying pg error (e.g. unique-constraint violation, connection failure) without catching or transforming it; never returns null on the create path.
-- IAuditRepository.findByEntity — idempotent; Returns an empty array when no rows match; rejects with the underlying pg error on failure.
-- IAuditRepository.findByUser — idempotent; Returns an empty array when no rows match; rejects with the underlying pg error on failure.
+- getActivePolicy(leaveTypeId: string): Promise<LeavePolicy | null> — No auth enforcement at the service layer (RBAC is deferred to the controller/middleware phase); the service performs no role checks.; idempotent; Read-only and idempotent; returns null when no active policy exists for the leave type; propagates repository errors unchanged without catching or wrapping.
+- getPolicyById(id: string): Promise<LeavePolicy | null> — No auth enforcement at the service layer.; idempotent; Read-only and idempotent; returns null when no policy matches the id; propagates repository errors unchanged.
+- getAllPolicies(): Promise<LeavePolicy[]> — No auth enforcement at the service layer.; idempotent; Read-only and idempotent; returns an empty array (never null) when no policies exist; propagates repository errors unchanged.
+- createPolicy(data: Omit<LeavePolicy,'id'|'createdAt'|'updatedAt'>): Promise<LeavePolicy> — No auth enforcement at the service layer; GP-002 audit recording is deferred to orchestration phases, so this method does not itself write an audit record.; Not idempotent (each call persists a new row); propagates repository errors — including unique-constraint violations on (leave_type_id, is_active) — unchanged without catching or wrapping; returns the persisted LeavePolicy.
+- updatePolicy(id: string, data: Partial<LeavePolicy>): Promise<LeavePolicy | null> — No auth enforcement at the service layer; GP-002 audit recording is deferred to orchestration phases.; idempotent; Idempotent for no-op updates (returns the existing row when no mutable fields are supplied); returns null when no row matches the id (the null is propagated, not converted to a thrown error); propagates repository errors unchanged.
 ### Integration points — connect to these
-- src/shared/types/index.ts — AuditAction enum is imported from the shared-types barrel; the audit module's only cross-module dependency is shared-types (per the reconciled dependency map: audit → shared-types).
-- src/shared/db/connection.ts — The module-level pg.Pool singleton is imported by AuditRepository for all SQL execution; no other DB access path is permitted.
-- src/modules/leave-request/ (future Phase 10) — The LeaveRequestService will consume IAuditRepository.create to write audit records on every state-changing operation (GP-002); this phase establishes the repository contract that later phases depend on.
+- ILeavePolicyRepository (src/modules/leave-policy/leave-policy.repository.ts) — The service's sole dependency: constructor-injected and the only path to persistence. Every service method delegates to a repository method; the service has no other data source.
+- src/modules/leave-policy/index.ts (module public entry point) — Downstream phases (Phase 9 LeaveBalanceService.initializeBalance looks up the active policy via ILeavePolicyService, and Phase 10 LeaveRequestService uses ILeavePolicyService) must import the service through the barrel, per the module-boundary import rule.
+- Jest test runner (jest.config.js, ts-jest preset) — The new leave-policy.service.spec.ts must be discovered by the existing testMatch glob (**/tests/**/*.spec.(ts|js)) and compile under ts-jest with strict TypeScript.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
