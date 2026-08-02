@@ -127,7 +127,7 @@ src/shared/error types.ts
 
 1. **Shared types** — enums (consolidated `enums.ts`), base entity interface, DTOs, day-count utility ✅ (Phase 1 complete)
 2. **Employee module** — employee CRUD, manager hierarchy ✅ (Phase 2 complete)
-3. **Policy module** — leave policy CRUD, validation rules
+3. **Policy module** — leave policy CRUD, validation rules ✅ (Phase 3 complete)
 4. **Balance module** — balance tracking, deduction/restoration
 5. **Notification module** — notification dispatch
 6. **Audit module** — audit trail recording
@@ -150,6 +150,24 @@ src/shared/error types.ts
 - `update` does a read-then-write: fetches the existing row, merges, then updates all columns
 
 **Out of scope (deferred):** Employee service, controller, routes, RBAC enforcement, audit record writing, database migrations, soft-delete operations.
+
+### Policy Module — Built (Phase 3)
+
+**Files delivered:**
+- `src/modules/policy/policy.model.ts` — `LeavePolicy` interface extending `BaseEntity` with fields: `policyName` (string), `leaveType` (LeaveType), `entitlementDays` (number), `accrualRate` (number | null), `maxAccumulation` (number | null), `minimumNoticeDays` (number | null), `requiresManagerApproval` (boolean), `isActive` (boolean)
+- `src/modules/policy/policy.repository.ts` — `ILeavePolicyRepository` interface (5 methods: `findById`, `findByLeaveType`, `findActive`, `create`, `update`) + `PgLeavePolicyRepository` implementation using the shared `pool` from `src/shared/db/connection.ts`. Includes a private `rowToLeavePolicy` mapper for snake_case → camelCase conversion.
+- `src/modules/policy/index.ts` — barrel export of `LeavePolicy`, `ILeavePolicyRepository`, `PgLeavePolicyRepository`
+- `tests/unit/modules/policy/policy.repository.test.ts` — Jest unit tests mocking the pg pool, covering all CRUD paths, `findByLeaveType`, `findActive`, and error cases (connection refused, unique constraint violation, query timeout)
+
+**Design decisions:**
+- `LeaveType` is imported from `../../shared/types/enums` (the consolidated enums file from Phase 1)
+- `BaseEntity` is imported from the deep path `../../shared/types/base-entity.interface` (same pattern as employee module)
+- `create` generates `id` via `randomUUID()` and populates `createdAt`/`updatedAt` server-side (same pattern as employee module)
+- `update` does a read-then-write: fetches the existing row via `findById`, merges with partial data, then updates all columns (same pattern as employee module)
+- `findByLeaveType` returns the first matching row (or null) — assumes one active policy per leave type
+- `findActive` filters on `is_active = true`
+
+**Out of scope (deferred):** Policy service, controller, routes, validation rules enforcement, database migrations.
 
 ### Open Questions
 
