@@ -56,6 +56,13 @@ user projects use whatever stack matches their description.
 3. Every state-changing operation produces an audit record (GP-001)
 4. RBAC enforced at middleware, never inline (GP-002)
 
+## Test file conventions
+
+- All test files live under the `tests/` directory, mirroring the `src/` structure.
+- Test files use the `.test.ts` extension (e.g. `tests/unit/shared/types/enums.test.ts`).
+- The Jest configuration (`jest.config.js`) matches `**/tests/**/*.test.(ts|js)` and `**/tests/**/*.spec.(ts|js)`, but the project convention is `.test.ts` — do not create `.spec.ts` files.
+- Run tests with `npx jest --passWithNoTests`.
+
 ## What agents must never do
 
 - Violate principle GP-003 as defined in `GOLDEN_PRINCIPLES.md`.
