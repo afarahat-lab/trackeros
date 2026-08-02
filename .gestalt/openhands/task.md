@@ -1,22 +1,26 @@
-# Implement this phase: Phase 6: Holidays repository — model and data access for public holidays
+# Implement this phase: Phase 7: Notification module — model, repository, and service
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/c8e3d826-436d-4da1-aaf8-6a4bd895c61c/7`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/c8e3d826-436d-4da1-aaf8-6a4bd895c61c/8`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create a minimal holidays data layer for the public-holiday calendar required by the binding rules. Depends on src/shared/types/base-entity.interface.ts from Phase 1 — read it before generating.
+Build the notification module. Depends on src/shared/types/base-entity.interface.ts from Phase 1 — read it before generating.
 
-Files to create (3 source files):
+Files to create (5 source files):
 
-1. **src/shared/holidays/holiday.model.ts** — Define `Holiday` interface: id (string), date (Date), name (string), country (string). This is a simple data interface (not extending BaseEntity since holidays are reference data).
+1. **src/modules/notification/notification.model.ts** — Define `Notification` entity: id (string), recipientId (string), recipientEmail (string), subject (string), body (string), sentAt (Date | null), status ('PENDING' | 'SENT' | 'FAILED'), createdAt (Date), updatedAt (Date).
 
-2. **src/shared/holidays/holiday.repository.ts** — Define `IHolidayRepository` interface: findByDateRange(startDate: Date, endDate: Date): Promise<Holiday[]>, findByYear(year: number): Promise<Holiday[]>. Implement `PgHolidayRepository` using the shared pg pool from src/shared/db/connection.ts. The repository returns Date objects that can be passed directly to the `countBusinessDays` function from Phase 1.
+2. **src/modules/notification/notification.repository.ts** — Define `INotificationRepository` interface: create(notification: Omit<Notification, 'id' | 'createdAt' | 'updatedAt'>): Promise<Notification>, updateStatus(id: string, status: string): Promise<Notification | null>, findByRecipient(recipientId: string): Promise<Notification[]>. Implement `PgNotificationRepository` using the shared pg pool.
 
-3. **src/shared/holidays/index.ts** — Barrel export of Holiday, IHolidayRepository, PgHolidayRepository.
+3. **src/modules/notification/notification.service.interface.ts** — Define `INotificationService` interface: notifyLeaveSubmitted(employeeId: string, leaveRequestId: string): Promise<void>, notifyLeaveStatusChange(employeeId: string, leaveRequestId: string, oldStatus: string, newStatus: string): Promise<void>.
 
-Include Jest unit tests in **tests/unit/shared/holidays/holiday.repository.test.ts**.
+4. **src/modules/notification/notification.service.ts** — Implement `NotificationService` implementing INotificationService. Uses INotificationRepository to persist notifications. For now, actual email sending is stubbed (log + persist).
+
+5. **src/modules/notification/index.ts** — Barrel export.
+
+Include Jest unit tests in **tests/unit/modules/notification/notification.service.test.ts**.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -39,21 +43,24 @@ These are resolved, feature-wide decisions. Wherever this phase touches the conc
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- PgHolidayRepository must import the shared `pool` from src/shared/db/connection.ts — the same pool instance used by all other repositories (employee, policy, balance, leave). No separate database connection or Pool instantiation. (see `src/shared/db/connection.ts`)
-- The repository's returned Holiday.date values must be directly passable as the `holidays: Date[]` argument to countBusinessDays. The date objects must have local date components (getFullYear/getMonth/getDate) matching the stored holiday date, because countBusinessDays uses isSameDay() which compares local-time getters — not UTC. (see `src/shared/utils/day-count.ts`)
-- The repository implementation must follow the established pattern: define a private *Row interface for DB columns, a private rowTo* mapper function, use pool.query<RowType>(sql, params) accessing result.rows, and have the class implement the interface (PgHolidayRepository implements IHolidayRepository). Errors propagate as rejected promises without try/catch. (see `src/modules/balance/balance.repository.ts`)
-- The unit test must follow the established test pattern: jest.mock the shared db connection module, import pool after the mock, cast pool.query as jest.Mock, use makeRow()/makeEntity() helper factories with overrides, structure as describe('PgHolidayRepository') with nested describe blocks per method, call jest.clearAllMocks() in beforeEach, and cast mock resolved values with `as never`. (see `tests/unit/modules/balance/balance.repository.test.ts`)
-- The Holiday interface must NOT extend BaseEntity. BaseEntity defines id/createdAt/updatedAt; Holiday is reference data with only id/date/name/country and no lifecycle timestamps. base-entity.interface.ts is read for awareness only — it is not imported by the holidays module. (see `src/shared/types/base-entity.interface.ts`)
+- The Notification entity must extend BaseEntity from src/shared/types/base-entity.interface.ts, inheriting id (string), createdAt (Date), updatedAt (Date) — matching the pattern used by Employee, LeavePolicy, LeaveBalance, and LeaveRequest. Import BaseEntity with import type from the deep path ../../shared/types/base-entity.interface. (see `src/shared/types/base-entity.interface.ts`)
+- PgNotificationRepository must follow the established repository implementation pattern: private *Row interface for snake_case DB columns, a rowTo* mapper converting snake_case to camelCase, I*Repository interface, and Pg*Repository class importing the shared pool from ../../shared/db/connection. create() uses randomUUID() + INSERT ... RETURNING * with parameterized queries. (see `src/modules/balance/balance.repository.ts`)
+- The Notification status field must be typed as a string union type ('PENDING' | 'SENT' | 'FAILED') exported alongside the entity — matching the LeaveBalanceStatus pattern in balance.model.ts where the union type is defined and exported separately from the interface. (see `src/modules/balance/balance.model.ts`)
+- The notification barrel (index.ts) must use export type for interfaces (INotificationRepository, INotificationService, Notification, status union type) and export for classes (PgNotificationRepository, NotificationService) — matching the established barrel convention in balance/index.ts. (see `src/modules/balance/index.ts`)
+- The service unit test must follow the project's Jest convention: *.test.ts under tests/unit/modules/notification/, importing from the src path, using jest.mock and jest.fn for mocks. However, per the settled decision, the service test mocks INotificationRepository (a mock object implementing the interface) rather than mocking the shared pool — establishing the first service-test pattern in the project. (see `tests/unit/modules/balance/balance.repository.test.ts`)
 ### Entity invariants — enforce these
-- Introduce `Holiday`: Holiday is reference data, not a domain aggregate — it does not extend BaseEntity and carries no createdAt/updatedAt lifecycle timestamps. It is immutable from the application's perspective (read-only access only in this phase).
-- Reuse or extend `Holiday`: Every Holiday returned by the repository must have a non-null date that is a valid JS Date object whose local date components correspond to the actual public holiday date, ensuring compatibility with countBusinessDays' isSameDay() comparison.
+- Reuse or extend `Notification`: A newly created Notification always starts with status 'PENDING' and sentAt null; it transitions to 'SENT' (with sentAt set to the send timestamp) or 'FAILED' only via updateStatus. The status union is closed: 'PENDING' | 'SENT' | 'FAILED' — no other value is valid.
+- Reuse or extend `Notification`: Notification extends BaseEntity, so every persisted Notification has a non-null id (UUID), createdAt, and updatedAt. The repository's create() generates these server-side; callers never supply id/createdAt/updatedAt.
 ### Interface contract — expose these operations (their shape is yours)
-- IHolidayRepository.findByDateRange(startDate: Date, endDate: Date): Promise<Holiday[]> — idempotent; Read-only query with no side effects. Returns an empty array (not null) when no holidays fall within the inclusive range. Database errors propagate as rejected promises without swallowing.
-- IHolidayRepository.findByYear(year: number): Promise<Holiday[]> — idempotent; Read-only query with no side effects. Returns an empty array (not null) when no holidays exist for the requested calendar year. Database errors propagate as rejected promises without swallowing.
+- INotificationRepository.create — Rejects (throws) on database errors (connection failure, constraint violation). Generates id via randomUUID() and sets createdAt/updatedAt server-side via INSERT ... RETURNING *. Accepts Omit<Notification, 'id' | 'createdAt' | 'updatedAt'> and returns the fully-populated Notification.
+- INotificationRepository.updateStatus — Returns null when no row matches the given id; rejects (throws) on database errors. Updates the status column and updatedAt; when transitioning to 'SENT', sets sentAt to the current timestamp.
+- INotificationRepository.findByRecipient — idempotent; Returns an empty array (not null) when no notifications exist for the recipient; rejects (throws) on database errors.
+- INotificationService.notifyLeaveSubmitted — Returns Promise<void>. Persists a Notification with status 'PENDING' via the repository. Stubbed email sending logs non-PII metadata only (GP-004). Repository failures are caught and handled — no unhandled promise rejection (GP-006). Derives a placeholder recipientEmail from employeeId internally.
+- INotificationService.notifyLeaveStatusChange — Returns Promise<void>. Persists a Notification with status 'PENDING' via the repository, encoding the old→new status transition in the notification content. Stubbed email sending logs non-PII metadata only (GP-004). Repository failures are caught and handled — no unhandled promise rejection (GP-006). Derives a placeholder recipientEmail from employeeId internally.
 ### Integration points — connect to these
-- src/shared/utils/day-count.ts (countBusinessDays) — The repository's primary consumer contract: findByDateRange returns Holiday[] whose .date values are extracted and passed as the holidays: Date[] argument to countBusinessDays. The Phase 10 leave service will call findByDateRange, map results to Date[], and invoke countBusinessDays for business-day calculation.
-- src/shared/db/connection.ts (shared pg pool) — PgHolidayRepository depends on the shared Pool instance for all database queries, consistent with every other repository in the codebase.
-- Phase 10 leave service (ILeaveRequestService) — The leave service constructor will accept IHolidayRepository to fetch holidays for a leave request's date range, enabling accurate business-day counting that excludes public holidays per binding rule 2.
+- src/shared/db/connection.ts — PgNotificationRepository imports the shared pg pool from this module for all database access, matching every prior repository implementation.
+- src/shared/types/base-entity.interface.ts — The Notification entity extends BaseEntity, importing the interface from this Phase 1 file — the declared dependency for this phase.
+- src/modules/leave/leave.service.ts (Phase 10) — INotificationService is consumed by the future leave service (Phase 10) to dispatch notifications on leave lifecycle transitions (submit, approve, reject, cancel). This phase defines the interface the leave service will depend on; the leave service does not yet exist.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
