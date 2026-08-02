@@ -1,0 +1,145 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "audit"
+    ],
+    "affectedLayers": [
+      "domain-model",
+      "data-access"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The AuditRecord entity interface is exported from the audit module's model file and its `action` property is typed as `AuditAction` imported from `src/shared/types/index.ts` (relative path, no extension).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The IAuditRepository interface exposes exactly three operations: create (accepting Omit&lt;AuditRecord, 'id' | 'createdAt'&gt;, returning Promise&lt;AuditRecord&gt;), findByEntity (accepting entityType + entityId, returning Promise&lt;AuditRecord[]&gt;), and findByUser (accepting performedBy, returning Promise&lt;AuditRecord[]&gt;).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "AuditRepository.create persists a row via parameterized INSERT ... RETURNING * and returns a fully-populated AuditRecord whose id and createdAt are DB-generated (createdAt is a Date instance, not a raw string).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "AuditRepository.findByEntity and findByUser return an empty array (not null, not undefined) when no matching rows exist.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All repository methods propagate database errors by rejecting the promise (no catch/swallow/transform) \u2014 verified by a test that mocks pool.query to reject and asserts rejects.toThrow.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The module barrel (index.ts) re-exports the AuditRecord type and the IAuditRepository interface + AuditRepository class, matching the existing module barrel pattern.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Unit tests at tests/unit/modules/audit/audit.repository.spec.ts cover: happy-path create (asserting returned entity shape and that pool.query was called with INSERT ... RETURNING and the correct parameterized args), happy-path findByEntity/findByUser (asserting mapped camelCase results), empty-array returns when no rows, and error propagation via mockRejectedValueOnce + rejects.toThrow.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The module compiles under `tsc --noEmit` (strict mode) and contains no `any` type annotations \u2014 the row mapper uses Record&lt;string, unknown&gt; with `as` casts, consistent with existing repositories.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access must go through the AuditRepository class \u2014 no inline SQL or direct pool.query calls outside the repository file (GP-001 / no-direct-db-outside-repository).",
+    "No `any` type anywhere in the audit module; use `unknown` with type guards or `as` casts (no-any, severity high).",
+    "All SQL must use parameterized placeholders ($1, $2, ...) \u2014 no string-interpolated user values into queries.",
+    "The AuditRecord entity shape is authoritative as specified in the task: a single `details: Record<string, unknown> | null` field; do NOT add old_values/new_values, performedAt, or updatedAt columns/fields from the conceptual audit_logs schema.",
+    "The audit module imports AuditAction from `../../shared/types/index` (relative path, no extension) and the pool from `../../shared/db/connection` \u2014 matching the established import style of existing modules.",
+    "Test files use the `.spec.ts` extension (established codebase convention across all existing repository specs), placed under tests/unit/modules/audit/.",
+    "The audit repository is the audit sink, not a subject \u2014 it must NOT itself write an audit record for its own create/find operations (no audit-of-audit)."
+  ],
+  "outOfScope": [
+    "AuditService / IAuditService interface and implementation \u2014 the reconciled architecture lists these as owned by the audit module, but this phase (Phase 6 per PLAN.md) covers only the model, repository, and barrel; the service layer is not part of this phase.",
+    "Database migrations / DDL for the audit_logs table \u2014 no Knex migration files are created in this phase; the repository assumes the table exists.",
+    "Fastify routes, controller, or any HTTP surface for audit \u2014 this phase is repository-only.",
+    "Integration tests against a real PostgreSQL instance \u2014 only mocked-pool unit tests are in scope.",
+    "Audit record retention/purge, time-range queries (performed_at filtering), or action-type filtering beyond the three specified repository operations."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "AuditRecord",
+      "mustExistOrExtend": true,
+      "invariant": "An AuditRecord is immutable once persisted \u2014 the repository exposes no update or delete operation; the only write path is create, which inserts a new row and never mutates an existing one."
+    },
+    {
+      "entity": "AuditRecord",
+      "mustExistOrExtend": true,
+      "invariant": "The `action` value of every persisted AuditRecord must be a member of the AuditAction enum (CREATED, SUBMITTED, APPROVED, REJECTED, CANCELLED, BALANCE_DEDUCTED, BALANCE_RESTORED) imported from shared-types; the repository does not accept or persist arbitrary action strings."
+    },
+    {
+      "entity": "AuditRecord",
+      "mustExistOrExtend": true,
+      "invariant": "`id` and `createdAt` are always DB-generated and never supplied by the caller \u2014 create accepts Omit&lt;AuditRecord, 'id' | 'createdAt'&gt; and the returned record always carries both populated (createdAt as a Date)."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IAuditRepository.create",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Rejects the promise with the underlying pg error (e.g. unique-constraint violation, connection failure) without catching or transforming it; never returns null on the create path."
+    },
+    {
+      "operation": "IAuditRepository.findByEntity",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns an empty array when no rows match; rejects with the underlying pg error on failure."
+    },
+    {
+      "operation": "IAuditRepository.findByUser",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns an empty array when no rows match; rejects with the underlying pg error on failure."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The AuditRecord model file must import AuditAction from the shared-types barrel using the same relative-path style as the existing module models (e.g. leave-request.model.ts imports LeaveStatus from '../../shared/types/index').",
+      "referencePath": "src/modules/leave-request/leave-request.model.ts"
+    },
+    {
+      "requirement": "The AuditRepository must follow the established repository structure: interface + implementing class co-located in one .repository.ts file, a private rowTo<Entity> mapper converting snake_case DB columns to camelCase entity fields with new Date(...) wrapping for date columns, parameterized SQL via pool.query, INSERT ... RETURNING * for create, and empty-array / null returns for not-found.",
+      "referencePath": "src/modules/leave-request/leave-request.repository.ts"
+    },
+    {
+      "requirement": "The audit module barrel must re-export the model type plus the repository interface and class in the same shape as existing module barrels (e.g. export { AuditRecord } from './audit.model'; export { IAuditRepository, AuditRepository } from './audit.repository';).",
+      "referencePath": "src/modules/leave-request/index.ts"
+    },
+    {
+      "requirement": "The audit repository must import the module-level `pool` singleton directly from '../../shared/db/connection' (no constructor injection), matching how employee.repository.ts and leave-request.repository.ts access the pool.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "The unit test must mirror the existing repository spec structure: jest.mock the connection module as { pool: { query: jest.fn() } }, a makeRow helper returning snake_case rows, beforeEach that resets mocks and reinstantiates the repo, and happy-path / not-found / error-propagation cases \u2014 matching leave-request.repository.spec.ts.",
+      "referencePath": "tests/unit/modules/leave-request/leave-request.repository.spec.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts",
+      "why": "AuditAction enum is imported from the shared-types barrel; the audit module's only cross-module dependency is shared-types (per the reconciled dependency map: audit \u2192 shared-types)."
+    },
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "The module-level pg.Pool singleton is imported by AuditRepository for all SQL execution; no other DB access path is permitted."
+    },
+    {
+      "target": "src/modules/leave-request/ (future Phase 10)",
+      "why": "The LeaveRequestService will consume IAuditRepository.create to write audit records on every state-changing operation (GP-002); this phase establishes the repository contract that later phases depend on."
+    }
+  ]
+}
