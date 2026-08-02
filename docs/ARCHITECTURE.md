@@ -19,12 +19,12 @@ The architecture is modular, with a clear separation of concerns between models,
 src/modules/status/status.{model,service.interface,service}.ts
 src/modules/uptime/uptime.{model,service.interface,service,routes}.ts
 src/shared/db/connection.ts
-src/shared/types/           — Shared enums (LeaveType, LeaveStatus, AuditAction) and DTOs (LeaveRequestDTO, LeaveBalanceDTO) [Phase 1 complete]
+src/shared/types/           — Shared enums (LeaveType, LeaveStatus, AuditAction) and DTOs (LeaveRequestDTO, LeaveBalanceDTO). LeaveType members use lowercase identifiers matching their string values (annual, sick, emergency, unpaid, maternity, paternity). [Phase 1 complete]
 src/modules/employee/employee.{model,repository,service.interface,service}.ts — Employee entity + repository + service [Phase 2, 8 complete]
 src/modules/leave-policy/leave-policy.{model,repository,service.interface,service}.ts — LeaveType + LeavePolicy entities + repository + service [Phase 7 complete]
-src/modules/leave-balance/leave-balance.{model,repository,service.interface,service}.ts — LeaveBalance entity + repository + service [Phase 4, 9 complete]
+src/modules/leave-balance/leave-balance.{model,repository,service.interface,service}.ts — LeaveBalance entity + repository + service. remainingDays computed as totalEntitlement - usedDays at read time, never stored. [Phase 4, 9 complete]
 src/modules/leave-request/leave-request.{model,repository}.ts — LeaveRequest entity + repository [Phase 5 complete]
-src/modules/audit/audit.{model,repository}.ts — AuditRecord entity + repository [Phase 6 complete]
+src/modules/audit/audit.{model,repository}.ts — AuditRecord entity + repository. Uses `audit_records` table with a `details` JSON column (not the `audit_logs`/`old_values`/`new_values` shape from the reconciled architecture). [Phase 6 complete]
 src/modules/notification/notification.{service.interface,service}.ts — Notification service (console-log stub) [Phase 9 complete]
 ```
 
@@ -116,11 +116,12 @@ The leave management module enables employees to apply for annual, sick, emergen
 - **FKs**: employee_id → employees.id; leave_type_id → leave_types.id; policy_id → leave_policies.id
 - **Indexes**: employee_id, (employee_id, fiscal_year) unique, policy_id, fiscal_year, leave_type_id
 
-### audit_logs
-- **Fields**: id, entity_type, entity_id, action, old_values, new_values, performed_by, performed_at, created_at, updated_at
+### audit_records (as built — diverges from reconciled audit_logs spec)
+- **Fields**: id, entity_type, entity_id, action, performed_by, details, created_at
 - **PK**: id
 - **FKs**: performed_by → employees.id
-- **Indexes**: (entity_type, entity_id), performed_by, action, performed_at
+- **Indexes**: (entity_type, entity_id), performed_by, action
+- **Divergence note**: The reconciled architecture specified `audit_logs` with `old_values`/`new_values`/`performed_at`/`updated_at` columns. The implementation uses `audit_records` with a single `details` JSON column and `created_at` (no `updated_at`). This is the as-built shape; future phases may reconcile.
 
 ### notifications
 - **Fields**: id, recipient_id, type, title, message, related_entity_type, related_entity_id, status, created_at, read_at
@@ -130,7 +131,7 @@ The leave management module enables employees to apply for annual, sick, emergen
 
 ## Module Boundaries
 
-- **shared-types** (`src/shared/types/`): Enums (LeaveType, LeaveStatus, AuditAction) and DTOs. [Phase 1 complete]
+- **shared-types** (`src/shared/types/`): Enums (LeaveType, LeaveStatus, AuditAction) and DTOs. LeaveType members use lowercase identifiers (annual, sick, emergency, unpaid, maternity, paternity). [Phase 1 complete]
 - **employee** (`src/modules/employee/`): Employee entity, IEmployeeRepository, EmployeeRepository, IEmployeeService, EmployeeService. [Phase 2, 8 complete]
 - **leave-policy** (`src/modules/leave-policy/`): LeaveType entity, LeavePolicy entity, ILeavePolicyRepository, LeavePolicyRepository, ILeavePolicyService, LeavePolicyService. [Phase 7 complete]
 - **leave-balance** (`src/modules/leave-balance/`): LeaveBalance entity, ILeaveBalanceRepository, LeaveBalanceRepository, ILeaveBalanceService, LeaveBalanceService. [Phase 4, 9 complete]

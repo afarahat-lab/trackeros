@@ -1,103 +1,63 @@
-## base
+# Domain Model — trackeros
 
-Base entity providing common fields for domain models.
+This file documents the domain entities as they exist in the committed source code. It reflects the as-built implementation, not the planned shape.
 
-### BaseEntity
+## Shared Enums
 
-| Field | Type | Required |
-|-------|------|----------|
-| id | string | true |
-| created_at | Date | true |
-| updated_at | Date | true |
+Defined in `src/shared/types/enums.ts`.
 
-## leave
+### LeaveType (enum)
+String enum with lowercase member identifiers matching their string values:
+- `annual = 'annual'`
+- `sick = 'sick'`
+- `emergency = 'emergency'`
+- `unpaid = 'unpaid'`
+- `maternity = 'maternity'`
+- `paternity = 'paternity'`
 
-Represents a leave record managed by the `leave` module, including leave requests and related leave-tracking data.
+### LeaveStatus (enum)
+String enum with uppercase member identifiers matching their string values:
+- `DRAFT = 'DRAFT'`
+- `SUBMITTED = 'SUBMITTED'`
+- `APPROVED = 'APPROVED'`
+- `REJECTED = 'REJECTED'`
+- `CANCELLED = 'CANCELLED'`
 
-### LeaveStatus
+### AuditAction (enum)
+String enum with uppercase member identifiers matching their string values:
+- `CREATED = 'CREATED'`
+- `SUBMITTED = 'SUBMITTED'`
+- `APPROVED = 'APPROVED'`
+- `REJECTED = 'REJECTED'`
+- `CANCELLED = 'CANCELLED'`
+- `BALANCE_DEDUCTED = 'BALANCE_DEDUCTED'`
+- `BALANCE_RESTORED = 'BALANCE_RESTORED'`
 
-| Value | Description |
-|-------|-------------|
-| DRAFT | Leave request is in draft state |
-| SUBMITTED | Leave request has been submitted |
-| APPROVED | Leave request has been approved |
-| REJECTED | Leave request has been rejected |
-| CANCELLED | Leave request has been cancelled |
+## Shared DTOs
 
-### LeaveRequest
+Defined in `src/shared/types/dtos.ts`.
+
+### LeaveRequestDTO
+Transport shape for a LeaveRequest. All date fields are ISO strings.
 
 | Field | Type | Required |
 |-------|------|----------|
 | id | string | true |
 | employeeId | string | true |
 | leaveTypeId | string | true |
-| startDate | Date | true |
-| endDate | Date | true |
+| startDate | string | true |
+| endDate | string | true |
 | reason | string \| undefined | false |
-| status | LeaveRequestStatus | true |
-| approvedBy | string \| null | false |
-| approvedAt | Date \| null | false |
-| createdAt | Date | true |
-| updatedAt | Date | true |
+| rejectionReason | string \| undefined | false |
+| status | LeaveStatus | true |
+| approvedBy | string \| null | true |
+| approvedAt | string \| null | true |
+| cancelledAt | string \| null | true |
+| createdAt | string | true |
+| updatedAt | string | true |
 
-**Relationships**
-- `Employee` — many-to-one
-
-### CreateLeaveRequestDto
-
-| Field | Type | Required |
-|-------|------|----------|
-| employeeId | string | true |
-| leaveTypeId | string | true |
-| startDate | Date | true |
-| endDate | Date | true |
-| reason | string \| undefined | false |
-
-### UpdateLeaveRequestDto
-
-| Field | Type | Required |
-|-------|------|----------|
-| startDate | Date | false |
-| endDate | Date | false |
-| reason | string \| undefined | false |
-
-### LeaveRequestQueryParams
-
-| Field | Type | Required |
-|-------|------|----------|
-| status | LeaveRequestStatus | false |
-| leaveTypeId | string | false |
-| startDateFrom | Date | false |
-| startDateTo | Date | false |
-| endDateFrom | Date | false |
-| endDateTo | Date | false |
-| limit | number | false |
-| offset | number | false |
-
-## balance
-
-Represents leave balance data managed by the `balance` module, including tracked entitlement, accrual, and remaining leave amounts.
-
-### Balance
-
-| Field | Type | Required |
-|-------|------|----------|
-| id | string | true |
-| employeeId | string | true |
-| policyId | string | true |
-| totalEntitlement | number | true |
-| usedDays | number | true |
-| remainingDays | number | true |
-| fiscalYear | number | true |
-| status | string | true |
-| createdAt | Date | true |
-| updatedAt | Date | true |
-
-**Relationships**
-- `Employee` — many-to-one
-- `LeavePolicy` — many-to-one
-
-### LeaveBalance
+### LeaveBalanceDTO
+Transport shape for a LeaveBalance. All date fields are ISO strings.
 
 | Field | Type | Required |
 |-------|------|----------|
@@ -111,22 +71,14 @@ Represents leave balance data managed by the `balance` module, including tracked
 | remainingDays | number | true |
 | fiscalYear | number | true |
 | status | 'ACTIVE' \| 'EXHAUSTED' \| 'FROZEN' | true |
-| createdAt | Date | true |
-| updatedAt | Date | true |
+| createdAt | string | true |
+| updatedAt | string | true |
 
-**Relationships**
-- `Employee` — many-to-one
-- `LeavePolicy` — many-to-one
+## Employee Module
 
-**Notes**
-- `remainingDays` is computed at read time as `totalEntitlement - usedDays` and is never stored in the database.
-- `pendingDays` tracks days reserved for submitted-but-not-yet-resolved requests.
+Source: `src/modules/employee/`
 
-## employee
-
-Represents employee data managed by the `employee` module, including employee records and related personnel information.
-
-### Employee
+### Employee (entity)
 
 | Field | Type | Required |
 |-------|------|----------|
@@ -144,80 +96,119 @@ Represents employee data managed by the `employee` module, including employee re
 | updatedAt | Date | true |
 | deletedAt | Date \| null | false |
 
-## policy
+**Repository** (`IEmployeeRepository` / `EmployeeRepository`):
+- `findById`, `findByEmployeeNumber`, `findByManagerId`, `findAll`, `create`, `update`, `softDelete`
 
-Represents leave policy data managed by the `policy` module, including policy definitions, rules, and leave entitlement configurations.
+**Service** (`IEmployeeService` / `EmployeeService`):
+- `getEmployeeById`, `getEmployeeByNumber`, `getSubordinates`, `getAllEmployees`, `createEmployee`, `updateEmployee`, `terminateEmployee`
+- `terminateEmployee` sets `employmentStatus = 'TERMINATED'`, `terminationDate = now`, and calls `softDelete`.
 
-### Policy
+## Leave-Policy Module
+
+Source: `src/modules/leave-policy/`
+
+### LeaveType (entity)
+
+| Field | Type | Required |
+|-------|------|----------|
+| id | string | true |
+| code | string | true |
+| label | string | true |
+| description | string \| undefined | false |
+| isActive | boolean | true |
+| createdAt | Date | true |
+| updatedAt | Date | true |
+
+### LeavePolicy (entity)
 
 | Field | Type | Required |
 |-------|------|----------|
 | id | string | true |
 | policyName | string | true |
-| leaveType | string | true |
+| leaveTypeId | string | true |
 | entitlementDays | number | true |
-| accrualRate | number | false |
-| maxAccumulation | number | false |
-| minimumNoticeDays | number | false |
+| accrualRate | number \| undefined | false |
+| maxAccumulation | number \| undefined | false |
+| minimumNoticeDays | number \| undefined | false |
 | requiresManagerApproval | boolean | true |
 | isActive | boolean | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
-### LeaveType
+**Repository** (`ILeavePolicyRepository` / `LeavePolicyRepository`):
+- `findById`, `findByLeaveTypeId`, `findActiveByLeaveTypeId`, `findAll`, `create`, `update`
 
-| Value | Description |
-|-------|-------------|
-| annual | Annual leave |
-| sick | Sick leave |
-| emergency | Emergency leave |
-| unpaid | Unpaid leave |
-| maternity | Maternity leave |
-| paternity | Paternity leave |
+**Service** (`ILeavePolicyService` / `LeavePolicyService`):
+- `getActivePolicy`, `getPolicyById`, `getAllPolicies`, `createPolicy`, `updatePolicy`
 
-### LeavePolicy
+## Leave-Balance Module
+
+Source: `src/modules/leave-balance/`
+
+### LeaveBalance (entity)
 
 | Field | Type | Required |
 |-------|------|----------|
 | id | string | true |
-| policyName | string | true |
-| leaveType | string | true |
-| entitlementDays | number | true |
-| accrualRate | number | false |
-| maxAccumulation | number | false |
-| minimumNoticeDays | number | false |
-| requiresManagerApproval | boolean | true |
-| isActive | boolean | true |
+| employeeId | string | true |
+| leaveTypeId | string | true |
+| policyId | string | true |
+| totalEntitlement | number | true |
+| usedDays | number | true |
+| pendingDays | number | true |
+| remainingDays | number | true |
+| fiscalYear | number | true |
+| status | 'ACTIVE' \| 'EXHAUSTED' \| 'FROZEN' | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
-## notification
+**Key rule**: `remainingDays` is computed at read time as `totalEntitlement - usedDays` and is never stored in the database. The repository's `rowToLeaveBalance` mapper computes it, and `remainingDays` is excluded from INSERT/UPDATE (`READ_ONLY_FIELDS`).
 
-Represents notification data managed by the `notification` module, including notification records, delivery status, and related messaging information.
+**Repository** (`ILeaveBalanceRepository` / `LeaveBalanceRepository`):
+- `findById`, `findByEmployeeAndType`, `findByEmployee`, `create`, `update`, `incrementUsedDays`, `decrementUsedDays`
+- `incrementUsedDays` / `decrementUsedDays` use atomic SQL (`SET used_days = used_days +/- $2`).
 
-### Notification
+**Service** (`ILeaveBalanceService` / `LeaveBalanceService`):
+- `getBalance`, `getAllBalances`, `initializeBalance`, `deductDays`, `restoreDays`
+- `initializeBalance` looks up the active policy via `ILeavePolicyService`, creates a balance with `totalEntitlement = policy.entitlementDays`, `usedDays = 0`, `pendingDays = 0`, `status = 'ACTIVE'`.
+- `deductDays` checks `totalEntitlement - usedDays - days >= 0` before atomically incrementing `usedDays`. Throws `InsufficientBalanceError` if insufficient.
+- `restoreDays` atomically decrements `usedDays`. Throws if `usedDays` would go below zero.
+- Custom error classes: `NoActivePolicyError`, `BalanceNotFoundError`, `InsufficientBalanceError`.
+
+## Leave-Request Module
+
+Source: `src/modules/leave-request/`
+
+### LeaveRequest (entity)
 
 | Field | Type | Required |
 |-------|------|----------|
 | id | string | true |
-| recipientId | string | true |
-| type | string | true |
-| title | string | true |
-| message | string | true |
-| relatedEntityType | string \| null | false |
-| relatedEntityId | string \| null | false |
-| status | 'PENDING' \| 'SENT' \| 'READ' \| 'ARCHIVED' | true |
+| employeeId | string | true |
+| leaveTypeId | string | true |
+| startDate | Date | true |
+| endDate | Date | true |
+| reason | string \| undefined | false |
+| rejectionReason | string \| undefined | false |
+| status | LeaveStatus | true |
+| approvedBy | string \| null | false |
+| approvedAt | Date \| null | false |
+| cancelledAt | Date \| null | false |
 | createdAt | Date | true |
-| readAt | Date \| null | false |
+| updatedAt | Date | true |
 
-## audit
+**Repository** (`ILeaveRequestRepository` / `LeaveRequestRepository`):
+- `findById`, `findByEmployee`, `findByStatus`, `findByApprover`, `findPendingByManager`, `create`, `update`, `updateStatus`
+- `findPendingByManager` joins `employees` to find submitted requests for subordinates.
+- `updateStatus` accepts optional `extra` with `rejectionReason`, `approvedBy`, `approvedAt`, `cancelledAt`.
 
-Represents audit data managed by the `audit` module, including audit records, change history, and activity tracking information.
+**Service, controller, routes**: Not yet built (planned Phase 10).
 
-The `AuditAction` enum is defined in `src/shared/types/enums.ts`:
-`CREATED | SUBMITTED | APPROVED | REJECTED | CANCELLED | BALANCE_DEDUCTED | BALANCE_RESTORED`
+## Audit Module
 
-### Audit
+Source: `src/modules/audit/`
+
+### AuditRecord (entity)
 
 | Field | Type | Required |
 |-------|------|----------|
@@ -225,69 +216,38 @@ The `AuditAction` enum is defined in `src/shared/types/enums.ts`:
 | entityType | string | true |
 | entityId | string | true |
 | action | AuditAction | true |
-| oldValues | Record<string, any> \| null | false |
-| newValues | Record<string, any> \| null | false |
-| performedBy | string \| null | false |
-| performedAt | Date | true |
+| performedBy | string | true |
+| details | Record<string, unknown> \| null | false |
 | createdAt | Date | true |
-| updatedAt | Date | true |
 
-### AuditLog
+**Divergence note**: The reconciled architecture specified `audit_logs` with `old_values`/`new_values`/`performed_at`/`updated_at` columns. The implementation uses `audit_records` with a single `details` JSON column and `created_at` (no `updated_at`). This is the as-built shape.
 
-| Field | Type | Required |
-|-------|------|----------|
-| id | string | true |
-| entityType | string | true |
-| entityId | string | true |
-| action | AuditAction | true |
-| oldValues | Record<string, any> \| null | false |
-| newValues | Record<string, any> \| null | false |
-| performedBy | string \| null | false |
-| performedAt | Date | true |
+**Repository** (`IAuditRepository` / `AuditRepository`):
+- `create`, `findByEntity`, `findByUser`
 
-### AuditRecord
+## Notification Module
 
-| Field | Type | Required |
-|-------|------|----------|
-| entity_type | string | true |
-| entity_id | string | true |
-| action | string | true |
-| changed_by | string \| null | false |
-| old_values | Record<string, any> \| null | false |
-| new_values | Record<string, any> \| null | false |
-| ip_address | string \| null | false |
-| user_agent | string \| null | false |
+Source: `src/modules/notification/`
 
-### AuditServiceInterface
+### INotificationService / NotificationService
 
-| Field | Type | Required |
-|-------|------|----------|
-| id | string | true |
-| action | string | true |
-| resourceType | string | true |
-| resourceId | string | true |
-| actorId | string | true |
-| timestamp | Date | true |
-| metadata | Record<string, unknown> \| null | false |
+Console-log stub implementation. Methods:
+- `notifyLeaveSubmitted(request: LeaveRequestDTO): Promise<void>`
+- `notifyLeaveApproved(request: LeaveRequestDTO): Promise<void>`
+- `notifyLeaveRejected(request: LeaveRequestDTO): Promise<void>`
+- `notifyLeaveCancelled(request: LeaveRequestDTO): Promise<void>`
 
-## validation
+No database persistence — real email/SMS delivery is deferred.
 
-Represents validation data managed by the `validation` module, including validation results and related error information.
+## Status Module
 
-### ValidationResult
+Source: `src/modules/status/`
 
-| Field | Type | Required |
-|-------|------|----------|
-| isValid | boolean | true |
-| errors | string[] | true |
-
-## system
-
-Represents system-level status information, including health-check and version data.
-
-### SystemStatus
+### SystemStatus (value object)
 
 | Field | Type | Required |
 |-------|------|----------|
 | up | boolean | true |
 | version | string | true |
+
+No database or repository — purely read-only health check.
