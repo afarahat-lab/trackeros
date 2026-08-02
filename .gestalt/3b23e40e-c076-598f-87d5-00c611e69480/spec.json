@@ -1,0 +1,159 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "policy"
+    ],
+    "affectedLayers": [
+      "domain-model",
+      "data-access",
+      "unit-tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The LeavePolicy entity is defined as an interface extending BaseEntity, importing BaseEntity from the deep path ../../shared/types/base-entity.interface and LeaveType from ../../shared/types/enums, and compiles under strict TypeScript with no `any` types.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository interface declares all five operations (findById, findByLeaveType, findActive, create, update) with the exact signatures from the phase scope, and the PgLeavePolicyRepository class implements that interface and compiles without errors.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "create persists a new leave_policies row (INSERT ... RETURNING *) with a server-generated id (randomUUID) and createdAt/updatedAt, and returns the fully-populated LeavePolicy entity mapped from the returned row.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "update performs a read-then-write: it returns null when no row exists for the given id, otherwise merges the partial data onto the existing entity and issues an UPDATE ... RETURNING * that returns the updated LeavePolicy.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findByLeaveType returns the first matching LeavePolicy or null when no row matches the given LeaveType, and findActive returns an array of all LeavePolicy rows where is_active is true (empty array when none).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The barrel index.ts re-exports LeavePolicy, ILeavePolicyRepository, and PgLeavePolicyRepository so downstream modules can import from the module's public entry point.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests in tests/unit/modules/policy/policy.repository.test.ts mock the shared db pool, cover found/not-found/error cases for every repository method, and assert the exact SQL string and parameter array passed to pool.query.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No `any` type anywhere in the policy module source or tests \u2014 use `unknown` with type guards or precise types instead (HARNESS no-any rule, severity high).",
+    "All database access must go through the repository layer using the shared pg pool from src/shared/db/connection.ts \u2014 no inline SQL or direct pool usage outside the repository class (GP-001 / no-direct-db-outside-repository, severity critical).",
+    "Imports must use deep paths (../../shared/types/base-entity.interface, ../../shared/types/enums, ../../shared/db/connection), not the shared barrel, per PLAN.md literal instruction and the Employee module precedent.",
+    "All SQL queries must be parameterized with $1, $2, ... placeholders \u2014 no string interpolation or concatenation of user-supplied values into SQL text.",
+    "The module must compile under strict TypeScript (strict null checks, no implicit any) and pass the mechanical compile gate (npm run build + npx jest) before commit.",
+    "Test files must follow the project Jest convention (*.test.ts under tests/) and must not modify the Jest config; the db connection must be jest.mocked before the pool is imported, mirroring the Employee repository test precedent."
+  ],
+  "outOfScope": [
+    "Policy service, controller, and routes \u2014 the reconciled architecture lists these as owned by the policy module but this phase delivers only the model, repository interface, and repository implementation.",
+    "Database migrations for the leave_policies table \u2014 schema creation is not part of this phase; the repository assumes the table already exists.",
+    "Audit record writing (GP-002) \u2014 no state-changing operation in this phase is a business workflow; audit wiring belongs to the service/controller phases.",
+    "RBAC enforcement (GP-005) and input validation at API boundaries (GP-003) \u2014 these apply to HTTP endpoints, which are not built in this phase."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "Every LeavePolicy instance carries a server-generated id (randomUUID), createdAt, and updatedAt inherited from BaseEntity; the repository's create operation populates these server-side and never accepts them from the caller (the create input is Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>)."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "The leaveType field is typed as the LeaveType enum (string-valued); when mapping a database row back to the entity, the snake_case leave_type column value is cast to LeaveType \u2014 safe because the enum values are string literals matching the stored column values."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "LeavePolicy extends BaseEntity (interface inheritance); the entity is a pure data interface with no methods, mirroring the Employee model precedent."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "findById(id: string): Promise<LeavePolicy | null>",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns null when no row matches the id; propagates (rejects with) any pool query error unchanged."
+    },
+    {
+      "operation": "findByLeaveType(leaveType: LeaveType): Promise<LeavePolicy | null>",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the first matching row or null when no row matches the given leave type; propagates pool errors unchanged."
+    },
+    {
+      "operation": "findActive(): Promise<LeavePolicy[]>",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an array of all active policies (is_active = true); returns an empty array when none exist; propagates pool errors unchanged."
+    },
+    {
+      "operation": "create(policy: Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeavePolicy>",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Generates id and timestamps server-side, issues INSERT ... RETURNING *, and returns the persisted entity; propagates constraint violations and pool errors unchanged (e.g. duplicate-key errors surface as rejections)."
+    },
+    {
+      "operation": "update(id: string, data: Partial<LeavePolicy>): Promise<LeavePolicy | null>",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Read-then-write: fetches the existing row first; returns null immediately if absent (no write attempted); otherwise merges partial data, issues UPDATE ... RETURNING *, and returns the updated entity; propagates pool errors from either the read or the write unchanged."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The PgLeavePolicyRepository must follow the same structural pattern as PgEmployeeRepository: a private row-to-entity mapping function, typed row interface with snake_case columns, parameterized $N queries, INSERT ... RETURNING * for create, and read-then-write (findById \u2192 merge \u2192 UPDATE ... RETURNING *) for update.",
+      "referencePath": "src/modules/employee/employee.repository.ts"
+    },
+    {
+      "requirement": "The policy barrel (src/modules/policy/index.ts) must mirror the Employee barrel convention: export the entity as a type, the repository interface as a type, and the concrete repository class as a value.",
+      "referencePath": "src/modules/employee/index.ts"
+    },
+    {
+      "requirement": "LeavePolicy must extend the BaseEntity interface exactly as defined (id: string, createdAt: Date, updatedAt: Date) \u2014 no additional or renamed base fields.",
+      "referencePath": "src/shared/types/base-entity.interface.ts"
+    },
+    {
+      "requirement": "The leaveType field must reference the LeaveType enum from the shared enums file (ANNUAL, SICK, EMERGENCY, UNPAID, MATERNITY, PATERNITY) \u2014 the entity must not redefine or duplicate the enum.",
+      "referencePath": "src/shared/types/enums.ts"
+    },
+    {
+      "requirement": "The policy repository test must follow the Employee test conventions: jest.mock the connection module before importing pool, cast pool.query to jest.Mock, use snake_case factory (makeRow) and camelCase factory (makeEntity) helpers, reset mocks in beforeEach, and assert exact SQL + params via mock.calls for each method.",
+      "referencePath": "tests/unit/modules/employee/employee.repository.test.ts"
+    },
+    {
+      "requirement": "The leave_policies table column set must match the reconciled schema exactly: id, policy_name, leave_type, entitlement_days, accrual_rate, max_accumulation, minimum_notice_days, requires_manager_approval, is_active, created_at, updated_at \u2014 with PK on id and indexes on leave_type and is_active.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "The repository imports the shared pg Pool to execute all SQL queries; this is the sole database access path for the policy module."
+    },
+    {
+      "target": "src/shared/types/base-entity.interface.ts",
+      "why": "LeavePolicy extends BaseEntity, inheriting id/createdAt/updatedAt \u2014 the shared type contract that every domain entity depends on."
+    },
+    {
+      "target": "src/shared/types/enums.ts",
+      "why": "LeavePolicy.leaveType is typed as the LeaveType enum exported from the shared enums module; the repository's findByLeaveType accepts this enum as its parameter."
+    },
+    {
+      "target": "src/modules/balance/balance.model.ts (Phase 5)",
+      "why": "The LeaveBalance entity in the next phase references leavePolicyId pointing to a LeavePolicy; the policy model and repository produced here are the dependency that the balance module will consume through the policy barrel."
+    }
+  ]
+}
