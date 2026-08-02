@@ -54,7 +54,7 @@ user projects use whatever stack matches their description.
 1. Modules never import from each other's internals — only from index.ts
 2. All database access through the repository pattern (GP-001)
 3. Every state-changing operation produces an audit record (GP-002)
-4. RBAC enforced at middleware, never inline (GP-005)
+4. RBAC enforced at the service layer via custom error classes (GP-005). The controller reads `request.user` (shape: `{ id: string; role: string }`) for the authenticated identity and maps service-layer authorization errors to HTTP 403. The `request.user` decoration is populated by existing auth middleware (out of scope for domain modules).
 
 ## Test file conventions
 
