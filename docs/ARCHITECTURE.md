@@ -21,7 +21,8 @@ src/modules/balance/balance.{model,repository,service,controller,routes}.ts
 src/modules/employee/employee.{model,repository}.ts
 src/modules/employee/index.ts
 src/modules/policy/policy.{model,repository,service,controller,routes}.ts
-src/modules/notification/notification.{model,repository,service,controller,routes}.ts
+src/modules/notification/notification.{model,repository,service.interface,service}.ts
+src/modules/notification/index.ts
 src/modules/LeaveStatus/    — LeaveStatus module
 src/modules/BaseEntity/    — BaseEntity module
 src/modules/LeaveRequest/    — LeaveRequest module
@@ -126,7 +127,7 @@ src/shared/error types.ts
 - **leave_requests**: `id`, `employee_id`, `leave_policy_id`, `start_date`, `end_date`, `reason`, `status`, `approved_by`, `approved_at`, `rejected_by`, `rejected_at`, `rejection_reason`, `cancelled_by`, `cancelled_at`, `created_at`, `updated_at`
 - **leave_balances**: `id`, `employee_id`, `leave_policy_id`, `total_entitlement`, `used_days`, `fiscal_year`, `status`, `created_at`, `updated_at`
 - **audit_logs**: `id`, `entity_type`, `entity_id`, `action`, `old_values`, `new_values`, `performed_by`, `performed_at`, `ip_address`, `user_agent`, `created_at`
-- **notifications**: `id`, `recipient_id`, `type`, `title`, `message`, `related_entity_type`, `related_entity_id`, `status`, `created_at`, `read_at`
+- **notifications**: `id`, `recipient_id`, `recipient_email`, `subject`, `body`, `sent_at`, `status`, `created_at`, `updated_at`
 - **holidays**: `id`, `date`, `name`, `country`
 
 ### Implementation Phases
@@ -137,7 +138,7 @@ src/shared/error types.ts
 4. **Balance module** — balance tracking, deduction/restoration ✅ (Phase 4 complete)
 5. **Leave module (model + repository)** — LeaveRequest entity, repository with overlap queries ✅ (Phase 5 complete)
 6. **Holidays module** — holiday reference data model and repository ✅ (Phase 6 complete)
-7. **Notification module** — notification dispatch
+7. **Notification module** — notification dispatch ✅ (Phase 7 complete)
 8. **Audit module** — audit trail recording
 9. **Leave service** — full leave workflow orchestration
 
@@ -232,6 +233,28 @@ src/shared/error types.ts
 - No `create`/`update`/`delete` methods — holidays are assumed to be seeded reference data managed externally.
 
 **Out of scope (deferred):** Database migrations for the holidays table, holiday seed data, integration with the leave service's business-day counting pipeline.
+
+### Notification Module — Built (Phase 7)
+
+**Files delivered:**
+- `src/modules/notification/notification.model.ts` — `NotificationStatus` type (`'PENDING' | 'SENT' | 'FAILED'`), `Notification` interface extending `BaseEntity` with fields: `recipientId` (string), `recipientEmail` (string), `subject` (string), `body` (string), `sentAt` (Date | null), `status` (NotificationStatus)
+- `src/modules/notification/notification.repository.ts` — `INotificationRepository` interface (3 methods: `create`, `updateStatus`, `findByRecipient`) + `PgNotificationRepository` implementation using the shared `pool` from `src/shared/db/connection.ts`. Includes a private `NotificationRow` interface and `rowToNotification` mapper for snake_case → camelCase conversion.
+- `src/modules/notification/notification.service.interface.ts` — `INotificationService` interface with 2 methods: `notifyLeaveSubmitted(employeeId, leaveRequestId)`, `notifyLeaveStatusChange(employeeId, leaveRequestId, oldStatus, newStatus)`
+- `src/modules/notification/notification.service.ts` — `NotificationService` implementing `INotificationService`. Constructor takes `INotificationRepository`. Both methods derive `recipientEmail` as `${employeeId}@example.com`, create a `PENDING` notification via the repository, and log success/failure. Errors are caught and logged but never re-thrown — notifications are best-effort and must not block the calling workflow.
+- `src/modules/notification/index.ts` — barrel export of `Notification`, `NotificationStatus`, `INotificationRepository`, `PgNotificationRepository`, `INotificationService`, `NotificationService`
+- `tests/unit/modules/notification/notification.service.test.ts` — Jest unit tests mocking the repository, covering both service methods, email derivation, error handling (Error and non-Error rejections), and verifying notifications are always created with `status: 'PENDING'` and `sentAt: null`
+
+**Design decisions:**
+- `Notification` extends `BaseEntity` — follows the same pattern as all other domain modules (Employee, LeavePolicy, LeaveBalance, LeaveRequest). This gives it `id`, `createdAt`, `updatedAt` via the shared base interface.
+- `NotificationStatus` is a union type (`'PENDING' | 'SENT' | 'FAILED'`), not a plain `string`.
+- `updateStatus` automatically sets `sentAt` to `now` when the status transitions to `'SENT'`, using `COALESCE($3, sent_at)` in the SQL to avoid overwriting an existing `sentAt`.
+- `create` generates `id` via `randomUUID()` and populates `createdAt`/`updatedAt` server-side (same pattern as prior modules).
+- `BaseEntity` is imported from the deep path `../../shared/types/base-entity.interface` (same pattern as all prior modules).
+- The service is intentionally fire-and-forget: both `notifyLeaveSubmitted` and `notifyLeaveStatusChange` catch all errors internally and log them. They never throw, so a notification failure cannot abort a leave workflow transaction. This is a deliberate architectural choice — notifications are a side effect, not part of the transactional boundary.
+- `recipientEmail` is derived from `employeeId` using the `${employeeId}@example.com` convention. This is a placeholder; real email resolution will come from the Employee module in a future integration phase.
+- No controller or routes are included — the notification module is consumed programmatically by the leave service (Phase 9), not exposed as an HTTP API.
+
+**Out of scope (deferred):** Actual email sending (currently stubbed — log + persist only), database migrations for the notifications table, integration with the Employee module for real email resolution, notification read/acknowledgement endpoints.
 
 ### Open Questions
 
