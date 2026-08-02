@@ -29,7 +29,15 @@ src/modules/LeavePolicy/    — LeavePolicy module
 src/modules/AuditLog/    — AuditLog module
 src/modules/AuditRecord/    — AuditRecord module
 src/modules/AuditServiceInterface/    — AuditServiceInterface module
-src/shared/db connection.ts
+src/shared/db/connection.ts
+src/shared/types/           — Shared type definitions (Phase 1)
+  base-entity.interface.ts   — BaseEntity interface
+  leave-type.enum.ts         — LeaveType enum (ANNUAL, SICK, EMERGENCY, UNPAID, MATERNITY, PATERNITY)
+  leave-request-status.enum.ts — LeaveRequestStatus enum (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED)
+  leave-request.dto.ts       — CreateLeaveRequestDto, UpdateLeaveRequestDto
+  index.ts                   — Barrel export
+src/shared/utils/
+  day-count.ts               — countBusinessDays(startDate, endDate, holidays): number
 src/shared/base repository.ts
 src/shared/error types.ts
 ```
@@ -48,6 +56,19 @@ src/shared/error types.ts
 - All database access goes through a repository layer — no inline SQL
   / ORM calls in route handlers or business logic
 - No circular dependencies between modules
+
+## Shared utilities
+
+### countBusinessDays
+
+`src/shared/utils/day-count.ts` — the single shared day-count function used by all call sites (balance sufficiency check, deduction, restoration).
+
+- Counts business days (Mon–Fri) in the inclusive range `[startDate, endDate]`.
+- Excludes weekends (Saturday/Sunday) and the provided `holidays: Date[]` array.
+- Returns 0 when `startDate > endDate`.
+- Holiday comparison uses `isSameDay()` which compares local date components (year, month, day).
+
+**Known divergence from UTC spec:** The current implementation uses local-time getters (`getDay()`, `getFullYear()`, `getMonth()`, `getDate()`, `setHours()`) rather than UTC-based comparison. The clarification spec mandates normalizing every date to UTC midnight and comparing on the `YYYY-MM-DD` ISO date string. This will be corrected in a future phase.
 
 <!-- gestalt:architecture feature=c8e3d826-436d-4da1-aaf8-6a4bd895c61c START -->
 ## Leave Management Module — Reconciled Architecture
@@ -80,6 +101,7 @@ src/shared/error types.ts
 | Module | Path | Responsibilities |
 |--------|------|------------------|
 | `shared-types` | `src/shared/types/` | Enums, base interfaces, common DTOs |
+| `shared-utils` | `src/shared/utils/` | `countBusinessDays` — single shared day-count function |
 | `employee` | `src/modules/employee/` | Employee entity, repository, service, controller, routes |
 | `policy` | `src/modules/policy/` | LeavePolicy entity, repository, service |
 | `balance` | `src/modules/balance/` | LeaveBalance entity, repository, service, controller, routes |
@@ -89,7 +111,7 @@ src/shared/error types.ts
 
 ### Dependency Map
 
-- `leave` → `balance`, `policy`, `employee`, `notification`, `audit`, `shared-types`
+- `leave` → `balance`, `policy`, `employee`, `notification`, `audit`, `shared-types`, `shared-utils`
 - All other modules → `shared-types` only
 
 ### Conceptual Tables
@@ -103,13 +125,13 @@ src/shared/error types.ts
 
 ### Implementation Phases
 
-1. **Shared types** – enums, base interfaces
-2. **Employee module** – employee CRUD, manager hierarchy
-3. **Policy module** – leave policy CRUD, validation rules
-4. **Balance module** – balance tracking, deduction/restoration
-5. **Notification module** – notification dispatch
-6. **Audit module** – audit trail recording
-7. **Leave module** – full leave workflow orchestration
+1. **Shared types** — enums, base interfaces, DTOs, day-count utility ✅ (Phase 1 complete)
+2. **Employee module** — employee CRUD, manager hierarchy
+3. **Policy module** — leave policy CRUD, validation rules
+4. **Balance module** — balance tracking, deduction/restoration
+5. **Notification module** — notification dispatch
+6. **Audit module** — audit trail recording
+7. **Leave module** — full leave workflow orchestration
 
 ### Open Questions
 

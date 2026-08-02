@@ -7,14 +7,14 @@ Base entity providing common fields for domain models.
 | Field | Type | Required |
 |-------|------|----------|
 | id | string | true |
-| created_at | Date | true |
-| updated_at | Date | true |
+| createdAt | Date | true |
+| updatedAt | Date | true |
 
 ## leave
 
 Represents a leave record managed by the `leave` module, including leave requests and related leave-tracking data.
 
-### LeaveStatus
+### LeaveRequestStatus
 
 | Value | Description |
 |-------|-------------|
@@ -24,31 +24,23 @@ Represents a leave record managed by the `leave` module, including leave request
 | REJECTED | Leave request has been rejected |
 | CANCELLED | Leave request has been cancelled |
 
-### LeaveRequest
+### LeaveType
 
-| Field | Type | Required |
-|-------|------|----------|
-| id | string | true |
-| employeeId | string | true |
-| leaveTypeId | string | true |
-| startDate | Date | true |
-| endDate | Date | true |
-| reason | string \| undefined | false |
-| status | LeaveRequestStatus | true |
-| approvedBy | string \| null | false |
-| approvedAt | Date \| null | false |
-| createdAt | Date | true |
-| updatedAt | Date | true |
-
-**Relationships**
-- `Employee` — many-to-one
+| Value | Description |
+|-------|-------------|
+| ANNUAL | Annual leave |
+| SICK | Sick leave |
+| EMERGENCY | Emergency leave |
+| UNPAID | Unpaid leave |
+| MATERNITY | Maternity leave |
+| PATERNITY | Paternity leave |
 
 ### CreateLeaveRequestDto
 
 | Field | Type | Required |
 |-------|------|----------|
 | employeeId | string | true |
-| leaveTypeId | string | true |
+| leavePolicyId | string | true |
 | startDate | Date | true |
 | endDate | Date | true |
 | reason | string \| undefined | false |
@@ -57,22 +49,18 @@ Represents a leave record managed by the `leave` module, including leave request
 
 | Field | Type | Required |
 |-------|------|----------|
-| startDate | Date | false |
-| endDate | Date | false |
-| reason | string \| undefined | false |
-
-### LeaveRequestQueryParams
-
-| Field | Type | Required |
-|-------|------|----------|
 | status | LeaveRequestStatus | false |
-| leaveTypeId | string | false |
-| startDateFrom | Date | false |
-| startDateTo | Date | false |
-| endDateFrom | Date | false |
-| endDateTo | Date | false |
-| limit | number | false |
-| offset | number | false |
+| rejectionReason | string | false |
+
+## shared/utils
+
+### countBusinessDays
+
+`countBusinessDays(startDate: Date, endDate: Date, holidays: Date[]): number`
+
+Counts business days (Mon–Fri) in the inclusive range `[startDate, endDate]`, excluding weekends and the provided holidays array. Returns 0 when `startDate > endDate`.
+
+**Implementation note (divergence from UTC spec):** The current implementation uses local-time getters (`getDay()`, `getFullYear()`, `getMonth()`, `getDate()`, `setHours()`) for date comparison and weekend detection. The clarification spec mandates UTC-based comparison (using `getUTCDay()`, `getUTCFullYear()`, etc., and normalizing to UTC midnight). Holiday comparison uses `isSameDay()` which compares local date components rather than `YYYY-MM-DD` string equality against a `Set<string>`. This will be corrected in a future phase.
 
 ## balance
 
@@ -162,12 +150,12 @@ Represents leave policy data managed by the `policy` module, including policy de
 
 | Value | Description |
 |-------|-------------|
-| annual | Annual leave |
-| sick | Sick leave |
-| emergency | Emergency leave |
-| unpaid | Unpaid leave |
-| maternity | Maternity leave |
-| paternity | Paternity leave |
+| ANNUAL | Annual leave |
+| SICK | Sick leave |
+| EMERGENCY | Emergency leave |
+| UNPAID | Unpaid leave |
+| MATERNITY | Maternity leave |
+| PATERNITY | Paternity leave |
 
 ### LeavePolicy
 
