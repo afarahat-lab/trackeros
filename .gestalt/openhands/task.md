@@ -1,24 +1,24 @@
-# Implement this phase: Phase 3: LeavePolicy model and repository
+# Implement this phase: Phase 4: LeaveBalance model and repository
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/e207b7c2-5967-4897-aeeb-2fac2e370ce3/3`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/e207b7c2-5967-4897-aeeb-2fac2e370ce3/4`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the leave-policy module at `src/modules/leave-policy/`. This phase depends on `src/shared/types/index.ts` from Phase 1 — read it before generating.
+Create the leave-balance module at `src/modules/leave-balance/`. This phase depends on `src/shared/types/index.ts` from Phase 1, `src/modules/employee/employee.model.ts` from Phase 2, and `src/modules/leave-policy/leave-policy.model.ts` from Phase 3 — read all three before generating.
 
 Files to create:
 
-1. `src/modules/leave-policy/leave-policy.model.ts` — Define and export the `LeavePolicy` entity interface with canonical fields: `id: string`, `policyName: string`, `leaveTypeId: string`, `entitlementDays: number`, `accrualRate: number | undefined`, `maxAccumulation: number | undefined`, `minimumNoticeDays: number | undefined`, `requiresManagerApproval: boolean`, `isActive: boolean`, `createdAt: Date`, `updatedAt: Date`. Also define and export the `LeaveType` entity interface here if not already present in shared-types: `id: string`, `code: string`, `label: string`, `description: string | undefined`, `isActive: boolean`, `createdAt: Date`, `updatedAt: Date`.
+1. `src/modules/leave-balance/leave-balance.model.ts` — Define and export the `LeaveBalance` entity interface with canonical fields: `id: string`, `employeeId: string`, `leaveTypeId: string`, `policyId: string`, `totalEntitlement: number`, `usedDays: number`, `pendingDays: number`, `remainingDays: number`, `fiscalYear: number`, `status: 'ACTIVE' | 'EXHAUSTED' | 'FROZEN'`, `createdAt: Date`, `updatedAt: Date`. Import `LeaveType` from `src/shared/types/index.ts`.
 
-2. `src/modules/leave-policy/leave-policy.repository.ts` — Define and export:
-   - `ILeavePolicyRepository` interface: `findById(id: string): Promise<LeavePolicy | null>`, `findByLeaveTypeId(leaveTypeId: string): Promise<LeavePolicy[]>`, `findActiveByLeaveTypeId(leaveTypeId: string): Promise<LeavePolicy | null>`, `findAll(): Promise<LeavePolicy[]>`, `create(policy: Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeavePolicy>`, `update(id: string, data: Partial<LeavePolicy>): Promise<LeavePolicy | null>`
-   - `LeavePolicyRepository` class implementing the interface using the pg pool from `src/shared/db/connection.ts`.
+2. `src/modules/leave-balance/leave-balance.repository.ts` — Define and export:
+   - `ILeaveBalanceRepository` interface: `findById(id: string): Promise<LeaveBalance | null>`, `findByEmployeeAndType(employeeId: string, leaveTypeId: string, fiscalYear: number): Promise<LeaveBalance | null>`, `findByEmployee(employeeId: string, fiscalYear: number): Promise<LeaveBalance[]>`, `create(balance: Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeaveBalance>`, `update(id: string, data: Partial<LeaveBalance>): Promise<LeaveBalance | null>`, `incrementUsedDays(id: string, days: number): Promise<LeaveBalance | null>`, `decrementUsedDays(id: string, days: number): Promise<LeaveBalance | null>`
+   - `LeaveBalanceRepository` class implementing the interface using the pg pool from `src/shared/db/connection.ts`. The `incrementUsedDays` and `decrementUsedDays` methods must use atomic SQL updates (`UPDATE ... SET used_days = used_days + $1`) and return the updated row.
 
-3. `src/modules/leave-policy/index.ts` — barrel re-export.
+3. `src/modules/leave-balance/index.ts` — barrel re-export.
 
-Include Jest unit tests at `tests/unit/modules/leave-policy/leave-policy.repository.spec.ts`.
+Include Jest unit tests at `tests/unit/modules/leave-balance/leave-balance.repository.spec.ts`.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -38,43 +38,19 @@ These are resolved, feature-wide decisions. Wherever this phase touches the conc
 
 ## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
 The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
-- `LeavePolicy` — the entity MUST have exactly these fields:
+- `LeaveBalance` — the entity MUST have exactly these fields:
     - id: string
-    - policyName: string
+    - employeeId: string
     - leaveTypeId: string
-    - entitlementDays: number
-    - accrualRate: number | undefined
-    - maxAccumulation: number | undefined
-    - minimumNoticeDays: number | undefined
-    - requiresManagerApproval: boolean
-    - isActive: boolean
+    - policyId: string
+    - totalEntitlement: number
+    - usedDays: number
+    - pendingDays: number
+    - remainingDays: number
+    - fiscalYear: number
+    - status: 'ACTIVE' | 'EXHAUSTED' | 'FROZEN'
     - createdAt: Date
     - updatedAt: Date
-
-## Constraints & consistency
-You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
-### Reuse & consistency — match these exactly
-- The leave-policy repository must match the employee repository's structural pattern: COLUMN_MAP (camelCase→snake_case), READ_ONLY_FIELDS Set, rowToEntity mapper with `new Date(...)` and `?? null`, parameterized SQL with `RETURNING *`, dynamic SET clause in update appending `updated_at = NOW()`, and interface + class co-located in the same file with the class implementing the interface. (see `src/modules/employee/employee.repository.ts`)
-- The leave-policy repository test must match the employee repository spec's structure: jest.mock on the shared db connection path, mockQuery.mockReset() in beforeEach, a makeRow(overrides) helper producing snake_case rows, per-method test groups (success with exact mockQuery call args + mapped entity assertions, not-found/empty, error propagation via mockRejectedValueOnce), create asserting Date instances, and update asserting the SET clause excludes read-only fields via regex on the SQL string. (see `tests/unit/modules/employee/employee.repository.spec.ts`)
-- The leave-policy barrel index.ts must mirror the employee barrel pattern: re-export the model interface(s) and the repository interface + class from their respective files. (see `src/modules/employee/index.ts`)
-- The repository must import the `pool` (a pg.Pool) from the shared db connection module using the relative path `../../shared/db/connection` (module at src/modules/leave-policy/), matching how the employee repository imports it. (see `src/shared/db/connection.ts`)
-- The LeavePolicy and LeaveType entity field shapes must match the reconciled architecture's domain_entities definitions exactly — LeavePolicy (id, policyName, leaveTypeId, entitlementDays, accrualRate, maxAccumulation, minimumNoticeDays, requiresManagerApproval, isActive, createdAt, updatedAt) and LeaveType (id, code, label, description, isActive, createdAt, updatedAt). (see `.gestalt/architecture/reconciled.json`)
-### Entity invariants — enforce these
-- Reuse or extend `LeavePolicy`: At most one active policy may exist per leaveTypeId at any time — enforced by the unique index on (leave_type_id, is_active). The repository's `findActiveByLeaveTypeId` relies on this invariant to return a single `LeavePolicy | null`.
-- Reuse or extend `LeavePolicy`: The entity has no soft-delete lifecycle — there is no `deletedAt` field and no `deleted_at` column; `findAll` returns every row regardless of any deletion state.
-- Reuse or extend `LeaveType`: The `LeaveType` entity interface (id, code, label, description, isActive, createdAt, updatedAt) is distinct from the shared-types `LeaveType` enum (annual, sick, emergency, unpaid, maternity, paternity) — they share a name but represent different concepts (a persisted catalog row vs. a controlled vocabulary). The entity interface must be defined in the leave-policy model file, not re-exported from shared-types.
-### Interface contract — expose these operations (their shape is yours)
-- findById(id: string): Promise<LeavePolicy | null> — Returns null when no row matches the given id; propagates underlying database errors without swallowing them.
-- findByLeaveTypeId(leaveTypeId: string): Promise<LeavePolicy[]> — Returns an empty array when no policies exist for the given leave type; propagates database errors.
-- findActiveByLeaveTypeId(leaveTypeId: string): Promise<LeavePolicy | null> — Returns the single active policy for the leave type (guaranteed unique by the (leave_type_id, is_active) index) or null when none exists; propagates database errors.
-- findAll(): Promise<LeavePolicy[]> — Returns all leave-policy rows with no soft-delete filter; returns an empty array when the table is empty; propagates database errors.
-- create(policy: Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeavePolicy> — Persists a new row and returns the fully-mapped entity with database-generated id, createdAt, and updatedAt; propagates unique-constraint violations (e.g. duplicate active policy per leave type) and other database errors.
-- update(id: string, data: Partial<LeavePolicy>): Promise<LeavePolicy | null> — Applies only the provided non-read-only fields, appends updated_at = NOW(), and returns the updated entity or null when no row matches; when no updatable keys are provided, returns the existing entity without issuing an UPDATE; propagates database errors.
-### Integration points — connect to these
-- src/shared/db/connection.ts — The repository class depends on the shared pg `pool` for all database access; this is the only external dependency of the leave-policy module in this phase.
-- src/modules/leave-balance/ (Phase 4) — Phase 4 (leave-balance) will import the `LeavePolicy` entity interface from this module's barrel to type its `policyId` reference and to look up active policies; the barrel must export `LeavePolicy` for downstream consumption.
-- src/modules/leave-request/ (Phase 5) — Phase 5 (leave-request) will import `LeavePolicy` from this module's barrel to enforce policy rules (requiresManagerApproval, minimumNoticeDays, entitlementDays) during request submission; the barrel must export `LeavePolicy`.
-- src/modules/leave-policy/leave-policy.service.ts (Phase 7) — Phase 7 will build the service layer on top of the `ILeavePolicyRepository` interface and `LeavePolicyRepository` class produced in this phase; the repository interface must be exported from the barrel for constructor injection.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
