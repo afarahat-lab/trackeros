@@ -1,43 +1,55 @@
-# Implement this phase: Phase 9: LeaveBalance service and Notification service
+# Implement this phase: Phase 10: LeaveRequest service, controller, routes, and business-day utility
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/e207b7c2-5967-4897-aeeb-2fac2e370ce3/9`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/e207b7c2-5967-4897-aeeb-2fac2e370ce3/10`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create two service layers in one phase. This phase depends on:
-- `src/modules/leave-balance/leave-balance.model.ts` and `src/modules/leave-balance/leave-balance.repository.ts` from Phase 4
-- `src/modules/leave-policy/leave-policy.service.ts` from Phase 7
+Create the leave-request service, controller, routes, and a shared business-day utility. This phase depends on:
+- `src/modules/leave-request/leave-request.model.ts` and `src/modules/leave-request/leave-request.repository.ts` from Phase 5
+- `src/modules/audit/audit.model.ts` and `src/modules/audit/audit.repository.ts` from Phase 6
+- `src/modules/employee/employee.service.ts` from Phase 8
+- `src/modules/leave-balance/leave-balance.service.ts` from Phase 9
+- `src/modules/notification/notification.service.ts` from Phase 9
 - `src/shared/types/index.ts` from Phase 1
 Read all before generating.
 
 Files to create (approximately 5):
 
-**LeaveBalance service:**
-1. `src/modules/leave-balance/leave-balance.service.interface.ts` — Define `ILeaveBalanceService`:
-   - `getBalance(employeeId: string, leaveTypeId: string, fiscalYear: number): Promise<LeaveBalance | null>`
-   - `getAllBalances(employeeId: string, fiscalYear: number): Promise<LeaveBalance[]>`
-   - `initializeBalance(employeeId: string, leaveTypeId: string, fiscalYear: number): Promise<LeaveBalance>` — looks up active policy via `ILeavePolicyService`, sets `totalEntitlement` from policy, `usedDays=0`, `pendingDays=0`, `remainingDays=totalEntitlement` (computed), `status='ACTIVE'`
-   - `deductDays(employeeId: string, leaveTypeId: string, fiscalYear: number, days: number): Promise<LeaveBalance>` — atomically increments `usedDays`; throws if remaining would go below zero
-   - `restoreDays(employeeId: string, leaveTypeId: string, fiscalYear: number, days: number): Promise<LeaveBalance>` — atomically decrements `usedDays`
+1. `src/shared/utils/business-day.ts` — Export a single function `countBusinessDays(startDate: Date, endDate: Date, holidays: Date[]): number` that counts weekdays (Mon–Fri) between two dates inclusive, excluding weekends and the provided holiday dates. Export a constant `DEFAULT_HOLIDAYS: Date[]` as an empty array (placeholder for the future holidays table).
 
-2. `src/modules/leave-balance/leave-balance.service.ts` — Implement `LeaveBalanceService` class implementing `ILeaveBalanceService`. Inject `ILeaveBalanceRepository` and `ILeavePolicyService` via constructor. The `remainingDays` field must be computed as `totalEntitlement - usedDays` at query time — never stored. `deductDays` must check `totalEntitlement - usedDays - days >= 0` before proceeding.
+2. `src/modules/leave-request/leave-request.service.interface.ts` — Define `ILeaveRequestService`:
+   - `submitDraft(requestId: string, employeeId: string): Promise<LeaveRequest>` — transitions DRAFT→SUBMITTED. Validates the request belongs to the employee. Looks up active policy via `ILeavePolicyService`. Computes business days via `countBusinessDays`. Ensures balance exists (initializes if needed via `ILeaveBalanceService.initializeBalance`). Atomically deducts days via `ILeaveBalanceService.deductDays`. If employee has no manager (`managerId === null`), escalates to HR admin role (logs escalation; actual HR routing deferred). Creates audit record. Sends notification.
+   - `approveRequest(requestId: string, approverId: string): Promise<LeaveRequest>` — transitions SUBMITTED→APPROVED. Validates approver is the employee's manager or HR admin. Sets `approvedBy`, `approvedAt`. Creates audit. Sends notification.
+   - `rejectRequest(requestId: string, approverId: string, rejectionReason: string): Promise<LeaveRequest>` — transitions SUBMITTED→REJECTED. Requires non-empty `rejectionReason`. Validates approver authority. Restores balance days via `ILeaveBalanceService.restoreDays`. Creates audit. Sends notification.
+   - `cancelRequest(requestId: string, employeeId: string): Promise<LeaveRequest>` — transitions SUBMITTED/APPROVED→CANCELLED. Validates ownership. Restores balance days if previously deducted. Sets `cancelledAt`. Creates audit. Sends notification.
+   - `getRequestById(id: string): Promise<LeaveRequest | null>`
+   - `getEmployeeRequests(employeeId: string): Promise<LeaveRequest[]>`
+   - `getPendingForManager(managerId: string): Promise<LeaveRequest[]>`
 
-3. Update `src/modules/leave-balance/index.ts` to export the service.
+3. `src/modules/leave-request/leave-request.service.ts` — Implement `LeaveRequestService` class implementing `ILeaveRequestService`. Inject via constructor: `ILeaveRequestRepository`, `ILeaveBalanceService`, `IEmployeeService`, `ILeavePolicyService`, `IAuditRepository`, `INotificationService`. All state-transition methods must validate the current status before proceeding. Use `countBusinessDays` for day calculations. The `remainingDays` check in submit must use the formula `totalEntitlement - usedDays - requestedDays >= 0`.
 
-**Notification service:**
-4. `src/modules/notification/notification.service.interface.ts` — Define `INotificationService`:
-   - `notifyLeaveSubmitted(request: LeaveRequestDTO): Promise<void>`
-   - `notifyLeaveApproved(request: LeaveRequestDTO): Promise<void>`
-   - `notifyLeaveRejected(request: LeaveRequestDTO): Promise<void>`
-   - `notifyLeaveCancelled(request: LeaveRequestDTO): Promise<void>`
+4. `src/modules/leave-request/leave-request.controller.ts` — Define `LeaveRequestController` class with Fastify-compatible handler methods:
+   - `submit(request, reply)` — extracts `requestId` from params, `employeeId` from authenticated user context
+   - `approve(request, reply)` — extracts `requestId` from params, `approverId` from auth context
+   - `reject(request, reply)` — extracts `requestId` from params, `rejectionReason` from body, `approverId` from auth
+   - `cancel(request, reply)` — extracts `requestId` from params, `employeeId` from auth
+   - `getById(request, reply)`, `getMyRequests(request, reply)`, `getPendingForManager(request, reply)`
+   Each handler validates inputs (GP-003), calls the service, and returns appropriate HTTP status codes.
 
-5. `src/modules/notification/notification.service.ts` — Implement `NotificationService` class implementing `INotificationService`. Stub implementation that logs to console (real email/SMS deferred). Import `LeaveRequestDTO` from `src/shared/types/index.ts`.
+5. `src/modules/leave-request/leave-request.routes.ts` — Export `leaveRequestRoutes` Fastify plugin function registering all routes under prefix `/api/leave-requests`:
+   - `POST /api/leave-requests/:requestId/submit`
+   - `POST /api/leave-requests/:requestId/approve`
+   - `POST /api/leave-requests/:requestId/reject`
+   - `POST /api/leave-requests/:requestId/cancel`
+   - `GET /api/leave-requests/:requestId`
+   - `GET /api/leave-requests/my`
+   - `GET /api/leave-requests/pending`
 
-6. `src/modules/notification/index.ts` — barrel re-export.
+6. Update `src/modules/leave-request/index.ts` to export all new symbols.
 
-Include Jest unit tests at `tests/unit/modules/leave-balance/leave-balance.service.spec.ts` and `tests/unit/modules/notification/notification.service.spec.ts`.
+Include Jest unit tests at `tests/unit/modules/leave-request/leave-request.service.spec.ts` and `tests/unit/shared/utils/business-day.spec.ts`.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -57,17 +69,18 @@ These are resolved, feature-wide decisions. Wherever this phase touches the conc
 
 ## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
 The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
-- `LeaveBalance` — the entity MUST have exactly these fields:
+- `LeaveRequest` — the entity MUST have exactly these fields:
     - id: string
     - employeeId: string
     - leaveTypeId: string
-    - policyId: string
-    - totalEntitlement: number
-    - usedDays: number
-    - pendingDays: number
-    - remainingDays: number
-    - fiscalYear: number
-    - status: 'ACTIVE' | 'EXHAUSTED' | 'FROZEN'
+    - startDate: Date
+    - endDate: Date
+    - reason: string | undefined
+    - rejectionReason: string | undefined
+    - status: LeaveStatus
+    - approvedBy: string | null
+    - approvedAt: Date | null
+    - cancelledAt: Date | null
     - createdAt: Date
     - updatedAt: Date
 
