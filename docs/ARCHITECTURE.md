@@ -32,8 +32,7 @@ src/modules/AuditServiceInterface/    — AuditServiceInterface module
 src/shared/db/connection.ts
 src/shared/types/           — Shared type definitions (Phase 1)
   base-entity.interface.ts   — BaseEntity interface
-  leave-type.enum.ts         — LeaveType enum (ANNUAL, SICK, EMERGENCY, UNPAID, MATERNITY, PATERNITY)
-  leave-request-status.enum.ts — LeaveRequestStatus enum (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED)
+  enums.ts                   — LeaveType enum (ANNUAL, SICK, EMERGENCY, UNPAID, MATERNITY, PATERNITY) and LeaveRequestStatus enum (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED) consolidated into a single file
   leave-request.dto.ts       — CreateLeaveRequestDto, UpdateLeaveRequestDto
   index.ts                   — Barrel export
 src/shared/utils/
@@ -125,7 +124,7 @@ src/shared/error types.ts
 
 ### Implementation Phases
 
-1. **Shared types** — enums, base interfaces, DTOs, day-count utility ✅ (Phase 1 complete)
+1. **Shared types** — enums (consolidated `enums.ts`), base entity interface, DTOs, day-count utility ✅ (Phase 1 complete)
 2. **Employee module** — employee CRUD, manager hierarchy
 3. **Policy module** — leave policy CRUD, validation rules
 4. **Balance module** — balance tracking, deduction/restoration
