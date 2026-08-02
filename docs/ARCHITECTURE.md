@@ -79,7 +79,7 @@ src/shared/error types.ts
 - **LeaveType** (enum): `ANNUAL`, `SICK`, `EMERGENCY`, `UNPAID`, `MATERNITY`, `PATERNITY`
 - **LeaveRequest** (aggregate root): `id`, `employeeId`, `leavePolicyId`, `startDate`, `endDate`, `reason`, `status`, `approvedBy`, `approvedAt`, `rejectedBy`, `rejectedAt`, `rejectionReason`, `cancelledBy`, `cancelledAt`, `createdAt`, `updatedAt`
 - **LeavePolicy**: `id`, `policyName`, `leaveType`, `entitlementDays`, `accrualRate`, `maxAccumulation`, `minimumNoticeDays`, `requiresManagerApproval`, `isActive`, `createdAt`, `updatedAt`
-- **LeaveBalance**: `id`, `employeeId`, `leavePolicyId`, `totalEntitlement`, `usedDays`, `remainingDays`, `fiscalYear`, `status` (`ACTIVE`, `EXHAUSTED`, `CLOSED`), `createdAt`, `updatedAt`
+- **LeaveBalance**: `id`, `employeeId`, `leavePolicyId`, `totalEntitlement`, `usedDays`, `fiscalYear`, `status` (`ACTIVE`, `EXHAUSTED`, `CLOSED`), `createdAt`, `updatedAt`
 - **Employee**: `id`, `employeeNumber`, `firstName`, `lastName`, `email`, `managerId`, `department`, `hireDate`, `terminationDate`, `employmentStatus`, `createdAt`, `updatedAt`
 
 ### Business Rules (Binding)
@@ -119,7 +119,7 @@ src/shared/error types.ts
 - **employees**: `id`, `employee_number`, `first_name`, `last_name`, `email`, `manager_id`, `department`, `hire_date`, `termination_date`, `employment_status`, `created_at`, `updated_at`, `deleted_at`
 - **leave_policies**: `id`, `policy_name`, `leave_type`, `entitlement_days`, `accrual_rate`, `max_accumulation`, `minimum_notice_days`, `requires_manager_approval`, `is_active`, `created_at`, `updated_at`
 - **leave_requests**: `id`, `employee_id`, `leave_policy_id`, `start_date`, `end_date`, `reason`, `status`, `approved_by`, `approved_at`, `rejected_by`, `rejected_at`, `rejection_reason`, `cancelled_by`, `cancelled_at`, `created_at`, `updated_at`
-- **leave_balances**: `id`, `employee_id`, `leave_policy_id`, `total_entitlement`, `used_days`, `remaining_days`, `fiscal_year`, `status`, `created_at`, `updated_at`
+- **leave_balances**: `id`, `employee_id`, `leave_policy_id`, `total_entitlement`, `used_days`, `fiscal_year`, `status`, `created_at`, `updated_at`
 - **audit_logs**: `id`, `entity_type`, `entity_id`, `action`, `old_values`, `new_values`, `performed_by`, `performed_at`, `ip_address`, `user_agent`, `created_at`
 - **notifications**: `id`, `recipient_id`, `type`, `title`, `message`, `related_entity_type`, `related_entity_id`, `status`, `created_at`, `read_at`
 
@@ -128,7 +128,7 @@ src/shared/error types.ts
 1. **Shared types** — enums (consolidated `enums.ts`), base entity interface, DTOs, day-count utility ✅ (Phase 1 complete)
 2. **Employee module** — employee CRUD, manager hierarchy ✅ (Phase 2 complete)
 3. **Policy module** — leave policy CRUD, validation rules ✅ (Phase 3 complete)
-4. **Balance module** — balance tracking, deduction/restoration
+4. **Balance module** — balance tracking, deduction/restoration ✅ (Phase 4 complete)
 5. **Notification module** — notification dispatch
 6. **Audit module** — audit trail recording
 7. **Leave module** — full leave workflow orchestration
@@ -168,6 +168,25 @@ src/shared/error types.ts
 - `findActive` filters on `is_active = true`
 
 **Out of scope (deferred):** Policy service, controller, routes, validation rules enforcement, database migrations.
+
+### Balance Module — Built (Phase 4)
+
+**Files delivered:**
+- `src/modules/balance/balance.model.ts` — `LeaveBalanceStatus` type (`'ACTIVE' | 'EXHAUSTED' | 'CLOSED'`), `LeaveBalance` interface extending `BaseEntity` with fields: `employeeId` (string), `leavePolicyId` (string), `totalEntitlement` (number), `usedDays` (number), `fiscalYear` (number), `status` (LeaveBalanceStatus). Also defines `LeaveBalanceWithRemaining` extending `LeaveBalance` with a computed `remainingDays: number` field.
+- `src/modules/balance/balance.repository.ts` — `ILeaveBalanceRepository` interface (4 methods: `findByEmployeeAndPolicy`, `findByEmployeeId`, `create`, `updateUsedDays`) + `PgLeaveBalanceRepository` implementation using the shared `pool` from `src/shared/db/connection.ts`. Includes a private `rowToLeaveBalance` mapper for snake_case → camelCase conversion that computes `remainingDays` at query time.
+- `src/modules/balance/index.ts` — barrel export of `LeaveBalance`, `LeaveBalanceStatus`, `LeaveBalanceWithRemaining`, `ILeaveBalanceRepository`, `PgLeaveBalanceRepository`
+- `tests/unit/modules/balance/balance.repository.test.ts` — Jest unit tests mocking the pg pool, covering all CRUD paths, `remainingDays` computation, and error cases (connection refused, unique constraint violation, query timeout)
+
+**Design decisions:**
+- `remainingDays` is **never stored** in the database — it is computed at query time in `rowToLeaveBalance` as `totalEntitlement - usedDays`. This matches the binding rule that `remainingDays` is a derived value.
+- `LeaveBalanceWithRemaining` is a separate interface extending `LeaveBalance` that adds the computed `remainingDays` field. All repository methods return `LeaveBalanceWithRemaining` (not plain `LeaveBalance`), so callers always have access to the computed remaining balance.
+- `updateUsedDays` performs an atomic `UPDATE … SET used_days = $1, updated_at = $2 WHERE id = $3 RETURNING *` — the single mutation point for balance deduction and restoration. The caller (future leave service) is responsible for computing the new `usedDays` value before calling this method.
+- `status` is typed as the `LeaveBalanceStatus` union type, not a plain `string`.
+- `BaseEntity` is imported from the deep path `../../shared/types/base-entity.interface` (same pattern as employee and policy modules).
+- `create` generates `id` via `randomUUID()` and populates `createdAt`/`updatedAt` server-side (same pattern as prior modules).
+- `findByEmployeeAndPolicy` looks up a balance by the composite key `(employee_id, leave_policy_id, fiscal_year)`.
+
+**Out of scope (deferred):** Balance service, controller, routes, status transition logic (ACTIVE→EXHAUSTED→CLOSED), database migrations.
 
 ### Open Questions
 

@@ -64,26 +64,15 @@ Counts business days (Mon–Fri) in the inclusive range `[startDate, endDate]`, 
 
 ## balance
 
-Represents leave balance data managed by the `balance` module, including tracked entitlement, accrual, and remaining leave amounts.
+Represents leave balance data managed by the `balance` module. Tracks entitlement, used days, and fiscal-year balances per employee per policy.
 
-### Balance
+### LeaveBalanceStatus
 
-| Field | Type | Required |
-|-------|------|----------|
-| id | string | true |
-| employeeId | string | true |
-| policyId | string | true |
-| totalEntitlement | number | true |
-| usedDays | number | true |
-| remainingDays | number | true |
-| fiscalYear | number | true |
-| status | string | true |
-| createdAt | Date | true |
-| updatedAt | Date | true |
-
-**Relationships**
-- `Employee` — many-to-one
-- `LeavePolicy` — many-to-one
+| Value | Description |
+|-------|-------------|
+| ACTIVE | Balance has remaining days available |
+| EXHAUSTED | Balance has zero remaining days |
+| CLOSED | Balance is closed (e.g. fiscal year ended) |
 
 ### LeaveBalance
 
@@ -91,18 +80,26 @@ Represents leave balance data managed by the `balance` module, including tracked
 |-------|------|----------|
 | id | string | true |
 | employeeId | string | true |
-| policyId | string | true |
+| leavePolicyId | string | true |
 | totalEntitlement | number | true |
 | usedDays | number | true |
-| remainingDays | number | true |
 | fiscalYear | number | true |
-| status | string | true |
+| status | LeaveBalanceStatus | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
 **Relationships**
-- `Employee` — many-to-one
-- `LeavePolicy` — many-to-one
+- `Employee` — many-to-one (via `employeeId`)
+- `LeavePolicy` — many-to-one (via `leavePolicyId`)
+
+### LeaveBalanceWithRemaining
+
+Extends `LeaveBalance` with a computed field. All repository methods return this type.
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| (all LeaveBalance fields) | — | — | — |
+| remainingDays | number | true | Computed at query time as `totalEntitlement - usedDays`. Never stored in the database. |
 
 ## employee
 
@@ -118,44 +115,16 @@ Represents employee data managed by the `employee` module, including employee re
 | lastName | string | true |
 | email | string | true |
 | managerId | string \| null | false |
-| department | string \| null | false |
+| department | string | true |
 | hireDate | Date | true |
 | terminationDate | Date \| null | false |
-| employmentStatus | 'ACTIVE' \| 'INACTIVE' \| 'TERMINATED' | true |
+| employmentStatus | string | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
-| deletedAt | Date \| null | false |
 
 ## policy
 
 Represents leave policy data managed by the `policy` module, including policy definitions, rules, and leave entitlement configurations.
-
-### Policy
-
-| Field | Type | Required |
-|-------|------|----------|
-| id | string | true |
-| policyName | string | true |
-| leaveType | string | true |
-| entitlementDays | number | true |
-| accrualRate | number | false |
-| maxAccumulation | number | false |
-| minimumNoticeDays | number | false |
-| requiresManagerApproval | boolean | true |
-| isActive | boolean | true |
-| createdAt | Date | true |
-| updatedAt | Date | true |
-
-### LeaveType
-
-| Value | Description |
-|-------|-------------|
-| ANNUAL | Annual leave |
-| SICK | Sick leave |
-| EMERGENCY | Emergency leave |
-| UNPAID | Unpaid leave |
-| MATERNITY | Maternity leave |
-| PATERNITY | Paternity leave |
 
 ### LeavePolicy
 
@@ -163,11 +132,11 @@ Represents leave policy data managed by the `policy` module, including policy de
 |-------|------|----------|
 | id | string | true |
 | policyName | string | true |
-| leaveType | string | true |
+| leaveType | LeaveType | true |
 | entitlementDays | number | true |
-| accrualRate | number | false |
-| maxAccumulation | number | false |
-| minimumNoticeDays | number | false |
+| accrualRate | number \| null | false |
+| maxAccumulation | number \| null | false |
+| minimumNoticeDays | number \| null | false |
 | requiresManagerApproval | boolean | true |
 | isActive | boolean | true |
 | createdAt | Date | true |
