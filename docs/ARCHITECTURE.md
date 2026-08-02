@@ -21,12 +21,12 @@ src/modules/uptime/uptime.{model,service.interface,service,routes}.ts
 src/shared/db/connection.ts
 src/shared/types/           — Shared enums (LeaveType, LeaveStatus, AuditAction) and DTOs (LeaveRequestDTO, LeaveBalanceDTO) [Phase 1 complete]
 src/modules/employee/employee.{model,repository}.ts — Employee entity + repository [Phase 2 complete]
+src/modules/leave-policy/leave-policy.{model,repository}.ts — LeaveType + LeavePolicy entities + repository [Phase 3 complete]
 ```
 
 ### Planned modules (not yet built)
 
 ```
-src/modules/leave-policy/   — Phase 3 (next)
 src/modules/leave-balance/  — Phase 4
 src/modules/leave-request/  — Phase 5
 src/modules/audit/          — Phase 6
@@ -131,8 +131,8 @@ The leave management module enables employees to apply for annual, sick, emergen
 
 - **shared-types** (`src/shared/types/`): Enums (LeaveType, LeaveStatus, AuditAction) and DTOs. [Phase 1 complete]
 - **employee** (`src/modules/employee/`): Employee entity, IEmployeeRepository, EmployeeRepository. [Phase 2 complete]
+- **leave-policy** (`src/modules/leave-policy/`): LeaveType entity, LeavePolicy entity, ILeavePolicyRepository, LeavePolicyRepository. [Phase 3 complete]
 - **audit** (`src/modules/audit/`): AuditRecord entity, IAuditRepository, IAuditService, AuditService.
-- **leave-policy** (`src/modules/leave-policy/`): LeavePolicy entity, ILeavePolicyRepository, ILeavePolicyService, LeavePolicyService.
 - **leave-balance** (`src/modules/leave-balance/`): LeaveBalance entity, ILeaveBalanceRepository, ILeaveBalanceService, LeaveBalanceService.
 - **leave-request** (`src/modules/leave-request/`): LeaveRequest entity, ILeaveRequestRepository, ILeaveRequestService, LeaveRequestController, routes.
 - **notification** (`src/modules/notification/`): INotificationService, NotificationService.
