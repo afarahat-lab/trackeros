@@ -23,14 +23,8 @@ src/modules/employee/index.ts
 src/modules/policy/policy.{model,repository,service,controller,routes}.ts
 src/modules/notification/notification.{model,repository,service.interface,service}.ts
 src/modules/notification/index.ts
-src/modules/LeaveStatus/    — LeaveStatus module
-src/modules/BaseEntity/    — BaseEntity module
-src/modules/LeaveRequest/    — LeaveRequest module
-src/modules/LeaveType/    — LeaveType module
-src/modules/LeavePolicy/    — LeavePolicy module
-src/modules/AuditLog/    — AuditLog module
-src/modules/AuditRecord/    — AuditRecord module
-src/modules/AuditServiceInterface/    — AuditServiceInterface module
+src/modules/audit/audit.{model,repository}.ts
+src/modules/audit/index.ts
 src/shared/db/connection.ts
 src/shared/types/           — Shared type definitions (Phase 1)
   base-entity.interface.ts   — BaseEntity interface
@@ -139,7 +133,7 @@ src/shared/error types.ts
 5. **Leave module (model + repository)** — LeaveRequest entity, repository with overlap queries ✅ (Phase 5 complete)
 6. **Holidays module** — holiday reference data model and repository ✅ (Phase 6 complete)
 7. **Notification module** — notification dispatch ✅ (Phase 7 complete)
-8. **Audit module** — audit trail recording
+8. **Audit module** — audit trail recording ✅ (Phase 8 complete)
 9. **Leave service** — full leave workflow orchestration
 
 ### Employee Module — Built (Phase 2)
@@ -255,6 +249,28 @@ src/shared/error types.ts
 - No controller or routes are included — the notification module is consumed programmatically by the leave service (Phase 9), not exposed as an HTTP API.
 
 **Out of scope (deferred):** Actual email sending (currently stubbed — log + persist only), database migrations for the notifications table, integration with the Employee module for real email resolution, notification read/acknowledgement endpoints.
+
+### Audit Module — Built (Phase 8)
+
+**Files delivered:**
+- `src/modules/audit/audit.model.ts` — `AuditLog` interface extending `BaseEntity` with fields: `actorId` (string), `action` (string — e.g. `'LEAVE_SUBMITTED'`, `'LEAVE_APPROVED'`, `'LEAVE_REJECTED'`, `'LEAVE_CANCELLED'`), `targetId` (string), `targetType` (string — e.g. `'LeaveRequest'`), `details` (Record<string, unknown> | null), `timestamp` (Date)
+- `src/modules/audit/audit.repository.ts` — `IAuditLogRepository` interface (3 methods: `create`, `findByTarget`, `findByActor`) + `PgAuditLogRepository` implementation using the shared `pool` from `src/shared/db/connection.ts`. Includes a private `AuditLogRow` interface and `rowToAuditLog` mapper for snake_case → camelCase conversion.
+- `src/modules/audit/index.ts` — barrel export of `AuditLog`, `IAuditLogRepository`, `PgAuditLogRepository`
+- `tests/unit/modules/audit/audit.repository.test.ts` — Jest unit tests mocking the pg pool, covering `create` (with details, null details, unique constraint violation, pool error), `findByTarget` (matching rows, empty results, pool error, query timeout), and `findByActor` (matching rows, empty results, pool error, query timeout)
+
+**Design decisions:**
+- `AuditLog` extends `BaseEntity` — follows the same pattern as all other domain modules. This gives it `id`, `createdAt`, `updatedAt` via the shared base interface.
+- `action` is typed as `string` (not a union of specific action literals) — this keeps the audit module open for extension to other domain actions beyond leave management without requiring model changes.
+- `targetType` is typed as `string` (not a union) — same rationale: the audit module is a generic cross-cutting concern, not leave-specific.
+- `details` is `Record<string, unknown> | null` — flexible payload for storing action-specific context (e.g., old/new status values, rejection reasons). Nullable for actions that carry no extra context.
+- `timestamp` is a separate field from `createdAt` — `timestamp` records when the audited action occurred (set by the caller), while `createdAt` records when the audit row was inserted. This allows the audit trail to faithfully record action timing even if the audit write is slightly delayed.
+- `BaseEntity` is imported from the deep path `../../shared/types/base-entity.interface` (same pattern as all prior modules).
+- `create` generates `id` via `randomUUID()` and populates `createdAt`/`updatedAt` server-side (same pattern as prior modules).
+- `findByTarget` returns audit entries for a specific entity (e.g., all audit records for leave request `lr-001`), ordered by `timestamp DESC` (most recent first).
+- `findByActor` returns all audit entries performed by a specific user, ordered by `timestamp DESC`.
+- No `update` method — audit entries are immutable by design. Once written, they are never modified.
+
+**Out of scope (deferred):** Database migrations for the `audit_logs` table, integration with the leave service for automatic audit record writing on state changes, audit log retention/purging policies.
 
 ### Open Questions
 
