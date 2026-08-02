@@ -18,7 +18,8 @@ The architecture is modular, with a clear separation of concerns between models,
 ```
 src/modules/leave/leave.{model,repository,service,controller,routes}.ts
 src/modules/balance/balance.{model,repository,service,controller,routes}.ts
-src/modules/employee/employee.{model,repository,service,controller,routes}.ts
+src/modules/employee/employee.{model,repository}.ts
+src/modules/employee/index.ts
 src/modules/policy/policy.{model,repository,service,controller,routes}.ts
 src/modules/notification/notification.{model,repository,service,controller,routes}.ts
 src/modules/LeaveStatus/    — LeaveStatus module
@@ -125,12 +126,30 @@ src/shared/error types.ts
 ### Implementation Phases
 
 1. **Shared types** — enums (consolidated `enums.ts`), base entity interface, DTOs, day-count utility ✅ (Phase 1 complete)
-2. **Employee module** — employee CRUD, manager hierarchy
+2. **Employee module** — employee CRUD, manager hierarchy ✅ (Phase 2 complete)
 3. **Policy module** — leave policy CRUD, validation rules
 4. **Balance module** — balance tracking, deduction/restoration
 5. **Notification module** — notification dispatch
 6. **Audit module** — audit trail recording
 7. **Leave module** — full leave workflow orchestration
+
+### Employee Module — Built (Phase 2)
+
+**Files delivered:**
+- `src/modules/employee/employee.model.ts` — `Employee` interface extending `BaseEntity` with fields: `employeeNumber`, `firstName`, `lastName`, `email`, `managerId` (string | null), `department` (string), `hireDate`, `terminationDate` (Date | null), `employmentStatus` (string)
+- `src/modules/employee/employee.repository.ts` — `IEmployeeRepository` interface (7 methods: `findById`, `findByEmployeeNumber`, `findByEmail`, `findByManagerId`, `findAll`, `create`, `update`) + `PgEmployeeRepository` implementation using the shared `pool` from `src/shared/db/connection.ts`
+- `src/modules/employee/index.ts` — barrel export of `Employee`, `IEmployeeRepository`, `PgEmployeeRepository`
+- `tests/unit/modules/employee/employee.repository.test.ts` — Jest unit tests mocking the pg pool, covering all CRUD paths and error cases
+
+**Design decisions:**
+- `department` is typed as `string` (non-null), matching the reconciled architecture and PLAN.md
+- `employmentStatus` is typed as `string` (not a union), matching PLAN.md literal instruction
+- `deletedAt` is omitted from the Employee model (soft-delete is a DB-only concern for now)
+- `BaseEntity` is imported from the deep path `../../shared/types/base-entity.interface` rather than the shared barrel, per PLAN.md literal instruction
+- `create` generates `id` via `randomUUID()` and populates `createdAt`/`updatedAt` server-side
+- `update` does a read-then-write: fetches the existing row, merges, then updates all columns
+
+**Out of scope (deferred):** Employee service, controller, routes, RBAC enforcement, audit record writing, database migrations, soft-delete operations.
 
 ### Open Questions
 
