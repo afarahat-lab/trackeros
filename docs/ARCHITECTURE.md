@@ -21,7 +21,7 @@ src/modules/uptime/uptime.{model,service.interface,service,routes}.ts
 src/shared/db/connection.ts
 src/shared/types/           — Shared enums (LeaveType, LeaveStatus, AuditAction) and DTOs (LeaveRequestDTO, LeaveBalanceDTO) [Phase 1 complete]
 src/modules/employee/employee.{model,repository}.ts — Employee entity + repository [Phase 2 complete]
-src/modules/leave-policy/leave-policy.{model,repository}.ts — LeaveType + LeavePolicy entities + repository [Phase 3 complete]
+src/modules/leave-policy/leave-policy.{model,repository,service.interface,service}.ts — LeaveType + LeavePolicy entities + repository + service [Phase 7 complete]
 src/modules/leave-balance/leave-balance.{model,repository}.ts — LeaveBalance entity + repository [Phase 4 complete]
 src/modules/leave-request/leave-request.{model,repository}.ts — LeaveRequest entity + repository [Phase 5 complete]
 src/modules/audit/audit.{model,repository}.ts — AuditRecord entity + repository [Phase 6 complete]
@@ -31,6 +31,9 @@ src/modules/audit/audit.{model,repository}.ts — AuditRecord entity + repositor
 
 ```
 src/modules/notification/   — Phase 9
+src/modules/employee/       — service layer (Phase 8)
+src/modules/leave-balance/  — service layer (Phase 9)
+src/modules/leave-request/  — service, controller, routes (Phase 10)
 ```
 
 ## Key patterns
@@ -131,7 +134,7 @@ The leave management module enables employees to apply for annual, sick, emergen
 
 - **shared-types** (`src/shared/types/`): Enums (LeaveType, LeaveStatus, AuditAction) and DTOs. [Phase 1 complete]
 - **employee** (`src/modules/employee/`): Employee entity, IEmployeeRepository, EmployeeRepository. [Phase 2 complete]
-- **leave-policy** (`src/modules/leave-policy/`): LeaveType entity, LeavePolicy entity, ILeavePolicyRepository, LeavePolicyRepository. [Phase 3 complete]
+- **leave-policy** (`src/modules/leave-policy/`): LeaveType entity, LeavePolicy entity, ILeavePolicyRepository, LeavePolicyRepository, ILeavePolicyService, LeavePolicyService. [Phase 7 complete]
 - **leave-balance** (`src/modules/leave-balance/`): LeaveBalance entity, ILeaveBalanceRepository, LeaveBalanceRepository. [Phase 4 complete]
 - **leave-request** (`src/modules/leave-request/`): LeaveRequest entity, ILeaveRequestRepository, LeaveRequestRepository. [Phase 5 complete]
 - **audit** (`src/modules/audit/`): AuditRecord entity, IAuditRepository, AuditRepository. [Phase 6 complete]
