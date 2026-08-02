@@ -13,26 +13,24 @@ The architecture is modular, with a clear separation of concerns between models,
 - Frontend: React Native
 - Database: PostgreSQL
 
-## Module structure
+## Module structure (as built)
 
 ```
-src/modules/leave/leave.{model,repository,service,controller,routes}.ts
-src/modules/balance/balance.{model,repository,service,controller,routes}.ts
-src/modules/employee/employee.{model,repository,service,controller,routes}.ts
-src/modules/policy/policy.{model,repository,service,controller,routes}.ts
-src/modules/notification/notification.{model,repository,service,controller,routes}.ts
-src/modules/LeaveStatus/    — LeaveStatus module
-src/modules/BaseEntity/    — BaseEntity module
-src/modules/LeaveRequest/    — LeaveRequest module
-src/modules/LeaveType/    — LeaveType module
-src/modules/LeavePolicy/    — LeavePolicy module
-src/modules/AuditLog/    — AuditLog module
-src/modules/AuditRecord/    — AuditRecord module
-src/modules/AuditServiceInterface/    — AuditServiceInterface module
-src/shared/db connection.ts
-src/shared/base repository.ts
-src/shared/error types.ts
-src/shared/types/           — Shared enums (LeaveType, LeaveStatus, AuditAction) and DTOs (LeaveRequestDTO, LeaveBalanceDTO)
+src/modules/status/status.{model,service.interface,service}.ts
+src/modules/uptime/uptime.{model,service.interface,service,routes}.ts
+src/shared/db/connection.ts
+src/shared/types/           — Shared enums (LeaveType, LeaveStatus, AuditAction) and DTOs (LeaveRequestDTO, LeaveBalanceDTO) [Phase 1 complete]
+```
+
+### Planned modules (not yet built)
+
+```
+src/modules/employee/       — Phase 2 (next)
+src/modules/leave-policy/   — Phase 3
+src/modules/leave-balance/  — Phase 4
+src/modules/leave-request/  — Phase 5
+src/modules/audit/          — Phase 6
+src/modules/notification/   — Phase 9
 ```
 
 ## Key patterns
@@ -40,12 +38,13 @@ src/shared/types/           — Shared enums (LeaveType, LeaveStatus, AuditActio
 - See `AGENTS.md` for stack-specific coding conventions
 - See `docs/GOLDEN_PRINCIPLES.md` for the non-negotiable rules every
   cycle is checked against
+- Modules live under `src/modules/<name>/` with flat file naming: `<name>.model.ts`, `<name>.repository.ts`, `<name>.service.ts`, `<name>.service.interface.ts`, `<name>.routes.ts`, `<name>.controller.ts`, and barrel `index.ts`.
+- Tests mirror the `src/` structure under `tests/` with `.test.ts` extension.
 
 ## Dependency rules
 
 - Modules import from each other ONLY through their declared public
-  entry point (`index.ts`, `__init__.py`, package root — whatever the
-  stack uses)
+  entry point (`index.ts`)
 - All database access goes through a repository layer — no inline SQL
   / ORM calls in route handlers or business logic
 - No circular dependencies between modules
@@ -130,7 +129,7 @@ The leave management module enables employees to apply for annual, sick, emergen
 
 ## Module Boundaries
 
-- **shared-types** (`src/shared/types/`): Enums (LeaveType, LeaveStatus, AuditAction) and DTOs.
+- **shared-types** (`src/shared/types/`): Enums (LeaveType, LeaveStatus, AuditAction) and DTOs. [Phase 1 complete]
 - **audit** (`src/modules/audit/`): AuditRecord entity, IAuditRepository, IAuditService, AuditService.
 - **employee** (`src/modules/employee/`): Employee entity, IEmployeeRepository, IEmployeeService, EmployeeService.
 - **leave-policy** (`src/modules/leave-policy/`): LeavePolicy entity, ILeavePolicyRepository, ILeavePolicyService, LeavePolicyService.
