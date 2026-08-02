@@ -1,24 +1,24 @@
-# Implement this phase: Phase 4: LeaveBalance model and repository
+# Implement this phase: Phase 5: LeaveRequest model and repository
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/e207b7c2-5967-4897-aeeb-2fac2e370ce3/4`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/e207b7c2-5967-4897-aeeb-2fac2e370ce3/5`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the leave-balance module at `src/modules/leave-balance/`. This phase depends on `src/shared/types/index.ts` from Phase 1, `src/modules/employee/employee.model.ts` from Phase 2, and `src/modules/leave-policy/leave-policy.model.ts` from Phase 3 — read all three before generating.
+Create the leave-request module at `src/modules/leave-request/`. This phase depends on `src/shared/types/index.ts` from Phase 1, `src/modules/employee/employee.model.ts` from Phase 2, and `src/modules/leave-policy/leave-policy.model.ts` from Phase 3 — read all three before generating.
 
 Files to create:
 
-1. `src/modules/leave-balance/leave-balance.model.ts` — Define and export the `LeaveBalance` entity interface with canonical fields: `id: string`, `employeeId: string`, `leaveTypeId: string`, `policyId: string`, `totalEntitlement: number`, `usedDays: number`, `pendingDays: number`, `remainingDays: number`, `fiscalYear: number`, `status: 'ACTIVE' | 'EXHAUSTED' | 'FROZEN'`, `createdAt: Date`, `updatedAt: Date`. Import `LeaveType` from `src/shared/types/index.ts`.
+1. `src/modules/leave-request/leave-request.model.ts` — Define and export the `LeaveRequest` entity interface with canonical fields: `id: string`, `employeeId: string`, `leaveTypeId: string`, `startDate: Date`, `endDate: Date`, `reason: string | undefined`, `rejectionReason: string | undefined`, `status: LeaveStatus`, `approvedBy: string | null`, `approvedAt: Date | null`, `cancelledAt: Date | null`, `createdAt: Date`, `updatedAt: Date`. Import `LeaveStatus` from `src/shared/types/index.ts`.
 
-2. `src/modules/leave-balance/leave-balance.repository.ts` — Define and export:
-   - `ILeaveBalanceRepository` interface: `findById(id: string): Promise<LeaveBalance | null>`, `findByEmployeeAndType(employeeId: string, leaveTypeId: string, fiscalYear: number): Promise<LeaveBalance | null>`, `findByEmployee(employeeId: string, fiscalYear: number): Promise<LeaveBalance[]>`, `create(balance: Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeaveBalance>`, `update(id: string, data: Partial<LeaveBalance>): Promise<LeaveBalance | null>`, `incrementUsedDays(id: string, days: number): Promise<LeaveBalance | null>`, `decrementUsedDays(id: string, days: number): Promise<LeaveBalance | null>`
-   - `LeaveBalanceRepository` class implementing the interface using the pg pool from `src/shared/db/connection.ts`. The `incrementUsedDays` and `decrementUsedDays` methods must use atomic SQL updates (`UPDATE ... SET used_days = used_days + $1`) and return the updated row.
+2. `src/modules/leave-request/leave-request.repository.ts` — Define and export:
+   - `ILeaveRequestRepository` interface: `findById(id: string): Promise<LeaveRequest | null>`, `findByEmployee(employeeId: string): Promise<LeaveRequest[]>`, `findByStatus(status: LeaveStatus): Promise<LeaveRequest[]>`, `findByApprover(approvedBy: string): Promise<LeaveRequest[]>`, `findPendingByManager(managerId: string): Promise<LeaveRequest[]>`, `create(request: Omit<LeaveRequest, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeaveRequest>`, `update(id: string, data: Partial<LeaveRequest>): Promise<LeaveRequest | null>`, `updateStatus(id: string, status: LeaveStatus, extra?: { rejectionReason?: string; approvedBy?: string; approvedAt?: Date; cancelledAt?: Date }): Promise<LeaveRequest | null>`
+   - `LeaveRequestRepository` class implementing the interface using the pg pool from `src/shared/db/connection.ts`.
 
-3. `src/modules/leave-balance/index.ts` — barrel re-export.
+3. `src/modules/leave-request/index.ts` — barrel re-export.
 
-Include Jest unit tests at `tests/unit/modules/leave-balance/leave-balance.repository.spec.ts`.
+Include Jest unit tests at `tests/unit/modules/leave-request/leave-request.repository.spec.ts`.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -38,17 +38,18 @@ These are resolved, feature-wide decisions. Wherever this phase touches the conc
 
 ## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
 The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
-- `LeaveBalance` — the entity MUST have exactly these fields:
+- `LeaveRequest` — the entity MUST have exactly these fields:
     - id: string
     - employeeId: string
     - leaveTypeId: string
-    - policyId: string
-    - totalEntitlement: number
-    - usedDays: number
-    - pendingDays: number
-    - remainingDays: number
-    - fiscalYear: number
-    - status: 'ACTIVE' | 'EXHAUSTED' | 'FROZEN'
+    - startDate: Date
+    - endDate: Date
+    - reason: string | undefined
+    - rejectionReason: string | undefined
+    - status: LeaveStatus
+    - approvedBy: string | null
+    - approvedAt: Date | null
+    - cancelledAt: Date | null
     - createdAt: Date
     - updatedAt: Date
 
