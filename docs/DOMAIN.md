@@ -103,18 +103,24 @@ Represents leave balance data managed by the `balance` module, including tracked
 |-------|------|----------|
 | id | string | true |
 | employeeId | string | true |
+| leaveTypeId | string | true |
 | policyId | string | true |
 | totalEntitlement | number | true |
 | usedDays | number | true |
+| pendingDays | number | true |
 | remainingDays | number | true |
 | fiscalYear | number | true |
-| status | string | true |
+| status | 'ACTIVE' \| 'EXHAUSTED' \| 'FROZEN' | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
 **Relationships**
 - `Employee` — many-to-one
 - `LeavePolicy` — many-to-one
+
+**Notes**
+- `remainingDays` is computed at read time as `totalEntitlement - usedDays` and is never stored in the database.
+- `pendingDays` tracks days reserved for submitted-but-not-yet-resolved requests.
 
 ## employee
 

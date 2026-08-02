@@ -22,12 +22,12 @@ src/shared/db/connection.ts
 src/shared/types/           — Shared enums (LeaveType, LeaveStatus, AuditAction) and DTOs (LeaveRequestDTO, LeaveBalanceDTO) [Phase 1 complete]
 src/modules/employee/employee.{model,repository}.ts — Employee entity + repository [Phase 2 complete]
 src/modules/leave-policy/leave-policy.{model,repository}.ts — LeaveType + LeavePolicy entities + repository [Phase 3 complete]
+src/modules/leave-balance/leave-balance.{model,repository}.ts — LeaveBalance entity + repository [Phase 4 complete]
 ```
 
 ### Planned modules (not yet built)
 
 ```
-src/modules/leave-balance/  — Phase 4
 src/modules/leave-request/  — Phase 5
 src/modules/audit/          — Phase 6
 src/modules/notification/   — Phase 9
@@ -76,7 +76,7 @@ The leave management module enables employees to apply for annual, sick, emergen
 ### LeaveBalance
 - **Attributes**: id, employeeId, leaveTypeId, policyId, totalEntitlement, usedDays, pendingDays, remainingDays, fiscalYear, status, createdAt, updatedAt
 - **Lifecycle**: ACTIVE, EXHAUSTED, FROZEN
-- **Equation**: remainingDays = totalEntitlement - usedDays - pendingDays
+- **Equation**: remainingDays = totalEntitlement - usedDays (computed at read time, never stored)
 - **Transitions**: EXHAUSTED when remainingDays = 0; FROZEN when employee terminated; recovers to ACTIVE if pendingDays released.
 
 ### Employee
@@ -110,7 +110,7 @@ The leave management module enables employees to apply for annual, sick, emergen
 - **Indexes**: employee_id, status, start_date, end_date, (employee_id, status), (leave_type_id, status)
 
 ### leave_balances
-- **Fields**: id, employee_id, leave_type_id, policy_id, total_entitlement, used_days, pending_days, remaining_days, fiscal_year, status, created_at, updated_at
+- **Fields**: id, employee_id, leave_type_id, policy_id, total_entitlement, used_days, pending_days, fiscal_year, status, created_at, updated_at
 - **PK**: id
 - **FKs**: employee_id → employees.id; leave_type_id → leave_types.id; policy_id → leave_policies.id
 - **Indexes**: employee_id, (employee_id, fiscal_year) unique, policy_id, fiscal_year, leave_type_id
@@ -132,8 +132,8 @@ The leave management module enables employees to apply for annual, sick, emergen
 - **shared-types** (`src/shared/types/`): Enums (LeaveType, LeaveStatus, AuditAction) and DTOs. [Phase 1 complete]
 - **employee** (`src/modules/employee/`): Employee entity, IEmployeeRepository, EmployeeRepository. [Phase 2 complete]
 - **leave-policy** (`src/modules/leave-policy/`): LeaveType entity, LeavePolicy entity, ILeavePolicyRepository, LeavePolicyRepository. [Phase 3 complete]
+- **leave-balance** (`src/modules/leave-balance/`): LeaveBalance entity, ILeaveBalanceRepository, LeaveBalanceRepository. [Phase 4 complete]
 - **audit** (`src/modules/audit/`): AuditRecord entity, IAuditRepository, IAuditService, AuditService.
-- **leave-balance** (`src/modules/leave-balance/`): LeaveBalance entity, ILeaveBalanceRepository, ILeaveBalanceService, LeaveBalanceService.
 - **leave-request** (`src/modules/leave-request/`): LeaveRequest entity, ILeaveRequestRepository, ILeaveRequestService, LeaveRequestController, routes.
 - **notification** (`src/modules/notification/`): INotificationService, NotificationService.
 
