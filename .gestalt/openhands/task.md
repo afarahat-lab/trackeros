@@ -1,29 +1,43 @@
-# Implement this phase: Phase 8: Employee service
+# Implement this phase: Phase 9: LeaveBalance service and Notification service
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/e207b7c2-5967-4897-aeeb-2fac2e370ce3/8`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/e207b7c2-5967-4897-aeeb-2fac2e370ce3/9`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the employee service layer. This phase depends on `src/modules/employee/employee.model.ts` and `src/modules/employee/employee.repository.ts` from Phase 2 — read both before generating.
+Create two service layers in one phase. This phase depends on:
+- `src/modules/leave-balance/leave-balance.model.ts` and `src/modules/leave-balance/leave-balance.repository.ts` from Phase 4
+- `src/modules/leave-policy/leave-policy.service.ts` from Phase 7
+- `src/shared/types/index.ts` from Phase 1
+Read all before generating.
 
-Files to create:
+Files to create (approximately 5):
 
-1. `src/modules/employee/employee.service.interface.ts` — Define and export `IEmployeeService` interface:
-   - `getEmployeeById(id: string): Promise<Employee | null>`
-   - `getEmployeeByNumber(employeeNumber: string): Promise<Employee | null>`
-   - `getSubordinates(managerId: string): Promise<Employee[]>`
-   - `getAllEmployees(): Promise<Employee[]>`
-   - `createEmployee(data: Omit<Employee, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt'>): Promise<Employee>`
-   - `updateEmployee(id: string, data: Partial<Employee>): Promise<Employee | null>`
-   - `terminateEmployee(id: string): Promise<void>`
+**LeaveBalance service:**
+1. `src/modules/leave-balance/leave-balance.service.interface.ts` — Define `ILeaveBalanceService`:
+   - `getBalance(employeeId: string, leaveTypeId: string, fiscalYear: number): Promise<LeaveBalance | null>`
+   - `getAllBalances(employeeId: string, fiscalYear: number): Promise<LeaveBalance[]>`
+   - `initializeBalance(employeeId: string, leaveTypeId: string, fiscalYear: number): Promise<LeaveBalance>` — looks up active policy via `ILeavePolicyService`, sets `totalEntitlement` from policy, `usedDays=0`, `pendingDays=0`, `remainingDays=totalEntitlement` (computed), `status='ACTIVE'`
+   - `deductDays(employeeId: string, leaveTypeId: string, fiscalYear: number, days: number): Promise<LeaveBalance>` — atomically increments `usedDays`; throws if remaining would go below zero
+   - `restoreDays(employeeId: string, leaveTypeId: string, fiscalYear: number, days: number): Promise<LeaveBalance>` — atomically decrements `usedDays`
 
-2. `src/modules/employee/employee.service.ts` — Implement `EmployeeService` class implementing `IEmployeeService`. Inject `IEmployeeRepository` via constructor. The `terminateEmployee` method sets `employmentStatus` to `'TERMINATED'`, sets `terminationDate` to now, and calls `softDelete`.
+2. `src/modules/leave-balance/leave-balance.service.ts` — Implement `LeaveBalanceService` class implementing `ILeaveBalanceService`. Inject `ILeaveBalanceRepository` and `ILeavePolicyService` via constructor. The `remainingDays` field must be computed as `totalEntitlement - usedDays` at query time — never stored. `deductDays` must check `totalEntitlement - usedDays - days >= 0` before proceeding.
 
-3. Update `src/modules/employee/index.ts` to also export the service interface and class.
+3. Update `src/modules/leave-balance/index.ts` to export the service.
 
-Include Jest unit tests at `tests/unit/modules/employee/employee.service.spec.ts` with mocked repository.
+**Notification service:**
+4. `src/modules/notification/notification.service.interface.ts` — Define `INotificationService`:
+   - `notifyLeaveSubmitted(request: LeaveRequestDTO): Promise<void>`
+   - `notifyLeaveApproved(request: LeaveRequestDTO): Promise<void>`
+   - `notifyLeaveRejected(request: LeaveRequestDTO): Promise<void>`
+   - `notifyLeaveCancelled(request: LeaveRequestDTO): Promise<void>`
+
+5. `src/modules/notification/notification.service.ts` — Implement `NotificationService` class implementing `INotificationService`. Stub implementation that logs to console (real email/SMS deferred). Import `LeaveRequestDTO` from `src/shared/types/index.ts`.
+
+6. `src/modules/notification/index.ts` — barrel re-export.
+
+Include Jest unit tests at `tests/unit/modules/leave-balance/leave-balance.service.spec.ts` and `tests/unit/modules/notification/notification.service.spec.ts`.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -43,46 +57,43 @@ These are resolved, feature-wide decisions. Wherever this phase touches the conc
 
 ## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
 The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
-- `Employee` — the entity MUST have exactly these fields:
+- `LeaveBalance` — the entity MUST have exactly these fields:
     - id: string
-    - employeeNumber: string
-    - firstName: string
-    - lastName: string
-    - email: string
-    - managerId: string | null
-    - department: string | null
-    - hireDate: Date
-    - terminationDate: Date | null
-    - employmentStatus: 'ACTIVE' | 'INACTIVE' | 'TERMINATED'
+    - employeeId: string
+    - leaveTypeId: string
+    - policyId: string
+    - totalEntitlement: number
+    - usedDays: number
+    - pendingDays: number
+    - remainingDays: number
+    - fiscalYear: number
+    - status: 'ACTIVE' | 'EXHAUSTED' | 'FROZEN'
     - createdAt: Date
     - updatedAt: Date
-    - deletedAt: Date | null
 
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- The service interface and class must import and operate on the exact Employee type defined in employee.model.ts — do not redefine or narrow the entity shape; the create input must omit precisely id, createdAt, updatedAt, and deletedAt. (see `src/modules/employee/employee.model.ts`)
-- The service must delegate to the existing IEmployeeRepository method set (findById, findByEmployeeNumber, findByManagerId, findAll, create, update, softDelete) without adding or assuming repository methods; terminateEmployee must compose update then softDelete from this exact set. (see `src/modules/employee/employee.repository.ts`)
-- The employee service interface file must follow the leave-policy service-interface pattern: import only the model type, export the service interface with async method signatures, no repository import. (see `src/modules/leave-policy/leave-policy.service.interface.ts`)
-- The employee service class must follow the leave-policy service class pattern: constructor takes a private readonly repository typed as the repository interface, implements the service interface, and each method delegates directly to the repository. (see `src/modules/leave-policy/leave-policy.service.ts`)
-- The employee barrel must add the service interface and class exports in the same ordering convention as the leave-policy barrel (model, repository, service interface, service class). (see `src/modules/leave-policy/index.ts`)
-- The employee service test must mirror the leave-policy service test structure: a jest.Mocked<IEmployeeRepository> built in beforeEach, a makeEmployee() factory helper, delegation assertions (correct args + returned value), and error-propagation assertions (mockRejectedValueOnce → rejects.toThrow). (see `tests/unit/modules/leave-policy/leave-policy.service.spec.ts`)
+- The service's remainingDays computation must match the repository's rowToLeaveBalance formula exactly: remainingDays = totalEntitlement - usedDays (not totalEntitlement - usedDays - pendingDays). The repository already computes this at read time; the service must not recompute or override it with a different formula. (see `src/modules/leave-balance/leave-balance.repository.ts`)
+- The service must call the repository's atomic incrementUsedDays/decrementUsedDays methods for deduct/restore (which use UPDATE ... SET used_days = used_days +/- $n) rather than read-modify-write via update(); this preserves the atomic counter semantics established in Phase 4. (see `src/modules/leave-balance/leave-balance.repository.ts`)
+- The service must never include remainingDays in the create input passed to the repository — the repository's create signature is Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt' | 'remainingDays'> and remainingDays is in READ_ONLY_FIELDS, so any attempt to write it would be silently dropped or cause a type error. (see `src/modules/leave-balance/leave-balance.repository.ts`)
+- initializeBalance must source totalEntitlement and policyId from the LeavePolicy returned by ILeavePolicyService.getActivePolicy(leaveTypeId) — specifically policy.entitlementDays and policy.id — matching the field names established in the leave-policy model and service interface. (see `src/modules/leave-policy/leave-policy.service.interface.ts`)
+- NotificationService methods must accept the LeaveRequestDTO shape as defined in shared-types (id, employeeId, leaveTypeId, startDate, endDate, reason?, rejectionReason?, status, approvedBy, approvedAt, cancelledAt, createdAt, updatedAt) — imported from the shared-types barrel, not redefined locally. (see `src/shared/types/dtos.ts`)
+- The leave-balance barrel update must mirror the leave-policy barrel pattern: export both the service interface (ILeaveBalanceService) and the service class (LeaveBalanceService) alongside the existing model and repository exports, so cross-module consumers import through index.ts only. (see `src/modules/leave-policy/index.ts`)
 ### Entity invariants — enforce these
-- Reuse or extend `Employee`: Termination is a terminal lifecycle transition: terminateEmployee must move employmentStatus to 'TERMINATED' and set terminationDate to a non-null current timestamp before the record is soft-deleted; an employee cannot be terminated without both fields being persisted.
-- Reuse or extend `Employee`: Soft-deletion (deletedAt set) must only occur after the termination status fields are written, because the repository's update path excludes rows where deleted_at IS NOT NULL — the ordering preserves the status/terminationDate write.
-- Reuse or extend `IEmployeeService`: The service is a pure delegation layer over IEmployeeRepository for all read/create/update operations — it must not mutate, filter, or synthesize Employee data beyond the terminateEmployee status/terminationDate assignment.
+- Reuse or extend `LeaveBalance`: remainingDays is always derived as totalEntitlement - usedDays at read time and is never persisted or written through any create/update path; every balance returned by the service must satisfy remainingDays === totalEntitlement - usedDays.
+- Reuse or extend `LeaveBalance`: A newly initialized balance has usedDays=0, pendingDays=0, status='ACTIVE', and totalEntitlement equal to the active policy's entitlementDays for the given leaveTypeId; the policyId on the balance must reference the policy that was active at initialization time.
+- Reuse or extend `LeaveBalance`: usedDays must never become negative and must never exceed totalEntitlement as a result of service operations: deductDays is rejected before any mutation when totalEntitlement - usedDays - days < 0, and restoreDays must not drive usedDays below zero.
 ### Interface contract — expose these operations (their shape is yours)
-- getEmployeeById(id) — Delegates to repository.findById; returns Employee | null; propagates repository errors unchanged.
-- getEmployeeByNumber(employeeNumber) — Delegates to repository.findByEmployeeNumber; returns Employee | null; propagates repository errors unchanged.
-- getSubordinates(managerId) — Delegates to repository.findByManagerId; returns Employee[] (empty when none); propagates repository errors unchanged.
-- getAllEmployees() — Delegates to repository.findAll; returns Employee[] (empty when none); propagates repository errors unchanged.
-- createEmployee(data) — Delegates to repository.create with the provided data (omitting id/createdAt/updatedAt/deletedAt); returns the persisted Employee; propagates unique-constraint and other repository errors unchanged.
-- updateEmployee(id, data) — Delegates to repository.update; returns the updated Employee or null when no non-deleted row matches; propagates repository errors unchanged.
-- terminateEmployee(id) — Calls repository.update with employmentStatus 'TERMINATED' and terminationDate = now, then calls repository.softDelete; resolves void on success; propagates repository errors unchanged (an update failure must not trigger softDelete).
+- LeaveBalanceService.initializeBalance(employeeId, leaveTypeId, fiscalYear) — Must throw a typed error when no active policy exists for the given leaveTypeId (getActivePolicy returns null); on success returns a persisted LeaveBalance with status ACTIVE and entitlement sourced from the policy.
+- LeaveBalanceService.deductDays(employeeId, leaveTypeId, fiscalYear, days) — Must throw a typed error when the balance does not exist for the employee/type/year combination, or when totalEntitlement - usedDays - days < 0 (insufficient remaining); on success atomically increments usedDays and returns the updated balance.
+- LeaveBalanceService.restoreDays(employeeId, leaveTypeId, fiscalYear, days) — Must throw a typed error when the balance does not exist for the employee/type/year combination; on success atomically decrements usedDays and returns the updated balance.
+- NotificationService.notifyLeave<Event>(request: LeaveRequestDTO) — Must resolve to void without throwing for all four event variants (submitted, approved, rejected, cancelled); the stub logs to console and performs no external I/O, so no transient-failure retry semantics apply.
 ### Integration points — connect to these
-- src/modules/employee/employee.repository.ts (IEmployeeRepository) — The service consumes the repository interface as its sole dependency; all persistence operations flow through it.
-- src/modules/employee/index.ts (module barrel) — Downstream phases (Phase 10 leave-request orchestration) consume IEmployeeService and EmployeeService exclusively through the public barrel entry point per the module-boundary rule.
-- src/modules/leave-policy/leave-policy.service.ts (established service-layer pattern) — The employee service must structurally match the leave-policy service precedent so the codebase has one consistent service-layer shape.
+- src/modules/leave-policy (ILeavePolicyService.getActivePolicy) — LeaveBalanceService.initializeBalance depends on the leave-policy service to resolve the active policy for a leaveTypeId, sourcing policyId and entitlementDays for the new balance. This is the leave-balance → leave-policy dependency edge.
+- src/modules/leave-balance (ILeaveBalanceRepository) — LeaveBalanceService delegates all persistence (create, findByEmployeeAndType, findByEmployee, incrementUsedDays, decrementUsedDays) to the existing repository interface from Phase 4; no direct DB access.
+- src/shared/types (LeaveRequestDTO) — NotificationService imports LeaveRequestDTO from the shared-types barrel as the parameter type for all four notify methods; this is the notification → shared-types dependency edge.
+- Phase 10 — leave-request orchestration (ILeaveBalanceService, INotificationService) — Phase 10's LeaveRequestService will consume both new services: initializeBalance/deductDays on submit, restoreDays on reject/cancel, and the four notification methods on each lifecycle transition. The interfaces and barrel exports produced here are the contract Phase 10 depends on.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
