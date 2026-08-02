@@ -1,0 +1,145 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "notification"
+    ],
+    "affectedLayers": [
+      "domain-model",
+      "data-access",
+      "service-layer",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The Notification entity is defined extending BaseEntity with the PLAN.md-authoritative fields (recipientId, recipientEmail, subject, body, sentAt as Date|null, status as the union 'PENDING'|'SENT'|'FAILED') plus inherited id/createdAt/updatedAt; it compiles under strict TypeScript.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "INotificationRepository exposes create, updateStatus, and findByRecipient operations, and PgNotificationRepository implements that interface using the shared pg pool with parameterized queries and a snake_case-to-camelCase row mapper \u2014 matching the established repository pattern from prior modules.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "INotificationService exposes notifyLeaveSubmitted(employeeId, leaveRequestId) and notifyLeaveStatusChange(employeeId, leaveRequestId, oldStatus, newStatus), and NotificationService implements that interface by persisting a Notification via INotificationRepository with stubbed email sending (log + persist only, no real transport).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The notification module barrel (index.ts) re-exports the Notification entity, the repository interface and implementation, and the service interface and implementation, using export type for interfaces and export for classes \u2014 matching the established barrel convention.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The Jest unit test at tests/unit/modules/notification/notification.service.test.ts mocks INotificationRepository (not the pool) and verifies that notifyLeaveSubmitted and notifyLeaveStatusChange each persist a Notification with the correct recipientId, subject, body, and initial status, and that the service does not throw on success.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The full module compiles cleanly under tsc strict mode (no implicit any, strict null checks) and the Jest test suite passes \u2014 satisfying the project's mechanical compile gate (npm run build && npx jest).",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "GP-001 (Repository pattern): NotificationService must not access the database directly \u2014 all persistence goes through INotificationRepository. PgNotificationRepository is the only component that touches the shared pg pool.",
+    "no-direct-db-outside-repository (critical): No inline SQL or pool.query calls outside PgNotificationRepository. The service depends on the repository interface, never on the pool.",
+    "GP-004 (No sensitive data in logs): The stubbed email-sending log must not include PII such as recipientEmail, subject, or body content. Log only non-sensitive metadata (e.g. notification id, recipientId, status).",
+    "GP-006 (Error handling): All async operations in NotificationService must catch and handle errors \u2014 no unhandled promise rejections. A repository failure must not escape as an unhandled rejection; it should be caught and handled (e.g. logged and/or rethrown as a typed error).",
+    "no-any (high): Use unknown with type guards instead of any throughout the notification module. The status field must be the string union type, not plain any or string.",
+    "Dependency map: notification \u2192 shared-types only. The notification module must not import from the employee, leave, balance, policy, or audit modules. The service derives a placeholder recipientEmail from employeeId internally rather than importing IEmployeeRepository.",
+    "Module boundary: other modules import from notification only through its index.ts barrel. Internal files (model, repository, service) are not imported directly from outside the module.",
+    "Repository create() must generate id via randomUUID() and set createdAt/updatedAt server-side using INSERT ... RETURNING * with parameterized queries \u2014 matching the established pattern across all prior modules."
+  ],
+  "outOfScope": [
+    "Real email transport \u2014 sending actual emails via SMTP or any mail provider is stubbed (log + persist only) per PLAN.md Phase 8.",
+    "Notification controller and routes \u2014 no HTTP layer is built in this phase; the module exposes only model, repository, service interface, service, and barrel.",
+    "Database migrations for the notifications table \u2014 no Knex migration files are created in this phase.",
+    "Integration of NotificationService into the leave service workflow \u2014 wiring notifyLeaveSubmitted/notifyLeaveStatusChange into leave lifecycle transitions is deferred to Phase 10 (leave service).",
+    "Resolving the real recipient email from the Employee entity \u2014 the service uses a placeholder derived from employeeId; real email lookup is deferred to a later phase when the dependency constraint can be revisited or an employee-lookup abstraction is introduced."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "A newly created Notification always starts with status 'PENDING' and sentAt null; it transitions to 'SENT' (with sentAt set to the send timestamp) or 'FAILED' only via updateStatus. The status union is closed: 'PENDING' | 'SENT' | 'FAILED' \u2014 no other value is valid."
+    },
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "Notification extends BaseEntity, so every persisted Notification has a non-null id (UUID), createdAt, and updatedAt. The repository's create() generates these server-side; callers never supply id/createdAt/updatedAt."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "INotificationRepository.create",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Rejects (throws) on database errors (connection failure, constraint violation). Generates id via randomUUID() and sets createdAt/updatedAt server-side via INSERT ... RETURNING *. Accepts Omit<Notification, 'id' | 'createdAt' | 'updatedAt'> and returns the fully-populated Notification."
+    },
+    {
+      "operation": "INotificationRepository.updateStatus",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns null when no row matches the given id; rejects (throws) on database errors. Updates the status column and updatedAt; when transitioning to 'SENT', sets sentAt to the current timestamp."
+    },
+    {
+      "operation": "INotificationRepository.findByRecipient",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns an empty array (not null) when no notifications exist for the recipient; rejects (throws) on database errors."
+    },
+    {
+      "operation": "INotificationService.notifyLeaveSubmitted",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns Promise<void>. Persists a Notification with status 'PENDING' via the repository. Stubbed email sending logs non-PII metadata only (GP-004). Repository failures are caught and handled \u2014 no unhandled promise rejection (GP-006). Derives a placeholder recipientEmail from employeeId internally."
+    },
+    {
+      "operation": "INotificationService.notifyLeaveStatusChange",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns Promise<void>. Persists a Notification with status 'PENDING' via the repository, encoding the old\u2192new status transition in the notification content. Stubbed email sending logs non-PII metadata only (GP-004). Repository failures are caught and handled \u2014 no unhandled promise rejection (GP-006). Derives a placeholder recipientEmail from employeeId internally."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The Notification entity must extend BaseEntity from src/shared/types/base-entity.interface.ts, inheriting id (string), createdAt (Date), updatedAt (Date) \u2014 matching the pattern used by Employee, LeavePolicy, LeaveBalance, and LeaveRequest. Import BaseEntity with import type from the deep path ../../shared/types/base-entity.interface.",
+      "referencePath": "src/shared/types/base-entity.interface.ts"
+    },
+    {
+      "requirement": "PgNotificationRepository must follow the established repository implementation pattern: private *Row interface for snake_case DB columns, a rowTo* mapper converting snake_case to camelCase, I*Repository interface, and Pg*Repository class importing the shared pool from ../../shared/db/connection. create() uses randomUUID() + INSERT ... RETURNING * with parameterized queries.",
+      "referencePath": "src/modules/balance/balance.repository.ts"
+    },
+    {
+      "requirement": "The Notification status field must be typed as a string union type ('PENDING' | 'SENT' | 'FAILED') exported alongside the entity \u2014 matching the LeaveBalanceStatus pattern in balance.model.ts where the union type is defined and exported separately from the interface.",
+      "referencePath": "src/modules/balance/balance.model.ts"
+    },
+    {
+      "requirement": "The notification barrel (index.ts) must use export type for interfaces (INotificationRepository, INotificationService, Notification, status union type) and export for classes (PgNotificationRepository, NotificationService) \u2014 matching the established barrel convention in balance/index.ts.",
+      "referencePath": "src/modules/balance/index.ts"
+    },
+    {
+      "requirement": "The service unit test must follow the project's Jest convention: *.test.ts under tests/unit/modules/notification/, importing from the src path, using jest.mock and jest.fn for mocks. However, per the settled decision, the service test mocks INotificationRepository (a mock object implementing the interface) rather than mocking the shared pool \u2014 establishing the first service-test pattern in the project.",
+      "referencePath": "tests/unit/modules/balance/balance.repository.test.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "PgNotificationRepository imports the shared pg pool from this module for all database access, matching every prior repository implementation."
+    },
+    {
+      "target": "src/shared/types/base-entity.interface.ts",
+      "why": "The Notification entity extends BaseEntity, importing the interface from this Phase 1 file \u2014 the declared dependency for this phase."
+    },
+    {
+      "target": "src/modules/leave/leave.service.ts (Phase 10)",
+      "why": "INotificationService is consumed by the future leave service (Phase 10) to dispatch notifications on leave lifecycle transitions (submit, approve, reject, cancel). This phase defines the interface the leave service will depend on; the leave service does not yet exist."
+    }
+  ]
+}
