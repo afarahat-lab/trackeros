@@ -134,7 +134,7 @@ src/shared/error types.ts
 6. **Holidays module** — holiday reference data model and repository ✅ (Phase 6 complete)
 7. **Notification module** — notification dispatch ✅ (Phase 7 complete)
 8. **Audit module** — audit trail recording ✅ (Phase 8 complete)
-9. **Leave service** — full leave workflow orchestration
+9. **Leave service** — full leave workflow orchestration ✅ (Phase 9 complete)
 
 ### Employee Module — Built (Phase 2)
 
@@ -271,6 +271,84 @@ src/shared/error types.ts
 - No `update` method — audit entries are immutable by design. Once written, they are never modified.
 
 **Out of scope (deferred):** Database migrations for the `audit_logs` table, integration with the leave service for automatic audit record writing on state changes, audit log retention/purging policies.
+
+### Leave Service — Built (Phase 9)
+
+**Files delivered:**
+- `src/modules/leave/leave.service.interface.ts` — `ILeaveRequestService` interface with 7 methods + `ActorRole` type (`'employee' | 'manager' | 'hr_admin'`)
+- `src/modules/leave/leave.service.ts` — `LeaveRequestService` implementation with 9 custom error classes
+
+**Interface (`ILeaveRequestService`):**
+
+| Method | Signature | Role param? |
+|--------|-----------|-------------|
+| `submitDraft` | `(leaveRequestId: string, actorId: string): Promise<LeaveRequest>` | No — identity-based |
+| `approve` | `(leaveRequestId: string, approverId: string, approverRole: ActorRole): Promise<LeaveRequest>` | Yes — `approverRole` |
+| `reject` | `(leaveRequestId: string, rejectorId: string, rejectorRole: ActorRole, reason: string): Promise<LeaveRequest>` | Yes — `rejectorRole` |
+| `cancel` | `(leaveRequestId: string, actorId: string): Promise<LeaveRequest>` | No — identity-based |
+| `createDraft` | `(dto: CreateLeaveRequestDto): Promise<LeaveRequest>` | No |
+| `findById` | `(id: string): Promise<LeaveRequest \| null>` | No — read-only |
+| `findByEmployee` | `(employeeId: string): Promise<LeaveRequest[]>` | No — read-only |
+
+**Service constructor dependencies (7):**
+`ILeaveRequestRepository`, `IEmployeeRepository`, `ILeavePolicyRepository`, `ILeaveBalanceRepository`, `IHolidayRepository`, `INotificationService`, `IAuditLogRepository`
+
+**Operation details:**
+
+- **`submitDraft`**: Validates request exists and is DRAFT. Validates employee exists, policy exists and `isActive`. Derives `fiscalYear = startDate.getFullYear()`. Fetches holidays via `IHolidayRepository.findByDateRange`, calls `countBusinessDays`. Fetches balance via `findByEmployeeAndPolicy`; throws `BalanceNotFoundError` if none. Checks `remainingDays >= businessDays`; throws `InsufficientBalanceError` if not. Increments `usedDays` via `updateUsedDays(balance.id, balance.usedDays + businessDays)`. Transitions DRAFT → SUBMITTED. Writes audit (`LEAVE_SUBMITTED`). Fires `notifyLeaveSubmitted`. Returns updated `LeaveRequest`.
+
+- **`approve`**: Validates request exists and is SUBMITTED. Validates employee exists. Calls `validateApproverAuthorization(approverRole, approverId, employee.managerId)`. Transitions SUBMITTED → APPROVED, sets `approvedBy`/`approvedAt`. Does NOT change `usedDays`. Writes audit (`LEAVE_APPROVED`). Fires `notifyLeaveStatusChange(…, 'SUBMITTED', 'APPROVED')`.
+
+- **`reject`**: Validates request exists and is SUBMITTED. Validates `reason` is non-empty (throws `InvalidRejectionReasonError`). Validates employee exists. Calls `validateApproverAuthorization`. Computes business days, restores `usedDays` via `updateUsedDays(balance.id, Math.max(0, balance.usedDays - businessDays))` (guarded: only if balance exists). Transitions SUBMITTED → REJECTED, sets `rejectedBy`/`rejectedAt`/`rejectionReason`. Writes audit (`LEAVE_REJECTED`). Fires `notifyLeaveStatusChange(…, 'SUBMITTED', 'REJECTED')`.
+
+- **`cancel`**: Validates request exists and is SUBMITTED or APPROVED. Computes business days, restores `usedDays` via `updateUsedDays` (same guarded pattern as reject). Transitions to CANCELLED, sets `cancelledBy`/`cancelledAt`. Writes audit (`LEAVE_CANCELLED`). Fires `notifyLeaveStatusChange(…, oldStatus, 'CANCELLED')`.
+
+- **`createDraft`**: Creates a `LeaveRequest` with status DRAFT via `ILeaveRequestRepository.create`. No balance check, no day-count computation. Writes audit (`LEAVE_DRAFT_CREATED`). Returns the created `LeaveRequest`.
+
+- **`findById` / `findByEmployee`**: Simple delegation to `ILeaveRequestRepository`. No authorization at the service layer.
+
+**Authorization (`validateApproverAuthorization` private method):**
+
+| `role` | `managerId` condition | Result |
+|--------|-----------------------|--------|
+| `'employee'` | any | Always throws `ApproverNotAuthorizedError("Employee role is not authorized to approve or reject leave requests")` |
+| `'hr_admin'` | any | Always allowed |
+| `'manager'` | `null` | Throws `ApproverNotAuthorizedError("Employee has no manager; only HR admin may approve or reject")` |
+| `'manager'` | non-null, `actorId === managerId` | Allowed |
+| `'manager'` | non-null, `actorId !== managerId` | Throws `ApproverNotAuthorizedError("Manager is not the assigned manager of this employee")` |
+| unknown | any | Throws `ApproverNotAuthorizedError("Unknown role: …")` |
+
+The role is an explicit parameter (`approverRole` / `rejectorRole`) — the service never reads auth state from ambient sources. The controller is responsible for extracting `request.user.role` and passing it in.
+
+**Custom error classes (9):**
+`LeaveRequestNotFoundError`, `InvalidStatusTransitionError`, `EmployeeNotFoundError`, `PolicyNotFoundError`, `PolicyInactiveError`, `BalanceNotFoundError`, `InsufficientBalanceError`, `ApproverNotAuthorizedError`, `InvalidRejectionReasonError`
+
+All extend `Error` and set `this.name` to the class name for reliable `instanceof` checks.
+
+**Design decisions:**
+- **Deduct-on-submission, restore-on-reject/cancel**: `usedDays` is incremented in `submitDraft` and decremented in `reject`/`cancel`. `approve` never touches `usedDays`. This matches the binding rule that `usedDays` is a denormalized counter deducted at submission to reserve balance.
+- **`Math.max(0, restoredUsedDays)` guard**: Both `reject` and `cancel` clamp the restored `usedDays` to a minimum of 0, preventing negative values if the balance state is inconsistent.
+- **Balance-exists guard on restore**: `reject` and `cancel` only restore `usedDays` if a balance row is found (`if (balance)`). If the balance was deleted between submission and rejection, the operation still succeeds — the status transition and audit log are written, but the balance mutation is skipped.
+- **Fiscal year = calendar year of `startDate`**: `fiscalYear = leaveRequest.startDate.getFullYear()`. This is a simplification; the reconciled architecture's July–June fiscal calendar rule is not implemented.
+- **No transaction wrapper**: Operations use a check-then-update pattern across multiple repository calls without a `BEGIN`/`COMMIT` boundary. `updateUsedDays` is the single atomic mutation point for balance.
+- **Cross-module imports via barrels**: The service imports from `../employee/employee.repository`, `../policy/policy.repository`, `../balance/balance.repository`, `../notification/notification.service.interface`, `../audit/audit.repository`, and `../../shared/holidays/holiday.repository` — all through each module's public entry point (not internal files), except for shared types/utils which follow the established deep-path pattern (`../../shared/types/enums`, `../../shared/utils/day-count`).
+- **No `any` type**: All types are explicit; `details` uses `Record<string, unknown> | null`.
+
+**Known divergences from spec/plan:**
+
+1. **Barrel not updated**: `src/modules/leave/index.ts` was NOT updated to re-export `ILeaveRequestService`, `LeaveRequestService`, `ActorRole`, or the error classes. The barrel still only exports `LeaveRequest`, `ILeaveRequestRepository`, and `PgLeaveRequestRepository`. Consumers must import directly from the internal files until the barrel is updated.
+
+2. **No unit tests**: `tests/unit/modules/leave/leave.service.test.ts` was not created. The service is untested at the unit level.
+
+3. **Fiscal year simplification**: Uses `startDate.getFullYear()` (calendar year) rather than the July–June fiscal calendar described in the reconciled architecture (business rule #11). This matches the binding rule from the phase spec ("Fiscal/leave year = CALENDAR YEAR") but diverges from the earlier reconciled architecture document.
+
+4. **No overlap checking**: The service does not call `findByEmployeeAndDateRange` to enforce the "no overlapping requests" rule (business rule #10). This is explicitly deferred per the phase spec.
+
+5. **No auto-approve**: `submitDraft` always transitions to SUBMITTED regardless of `policy.requiresManagerApproval`. The auto-approve-on-submission path (business rule #6) is not implemented.
+
+6. **No minimum notice check**: The service does not validate `startDate - now >= policy.minimumNoticeDays` (business rule #7). This is deferred to the controller phase.
+
+**Out of scope (deferred):** Controller, routes, HTTP status code mapping, `request.user` extraction, API-boundary input validation (GP-003), overlap enforcement, auto-approve-on-submission, minimum notice enforcement, transactional atomicity (BEGIN/COMMIT), barrel exports for new symbols, unit tests.
 
 ### Open Questions
 
