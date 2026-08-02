@@ -1,0 +1,207 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "employee"
+    ],
+    "affectedLayers": [
+      "domain-model",
+      "data-access",
+      "unit-tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The Employee entity extends BaseEntity and is exported from the employee module's barrel (index.ts); it compiles under strict TypeScript with no implicit any.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "IEmployeeRepository declares all seven operations \u2014 findById, findByEmployeeNumber, findByEmail, findByManagerId, findAll, create, update \u2014 each returning the specified Promise<Employee | null>, Promise<Employee[]>, or Promise<Employee> type.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "PgEmployeeRepository implements IEmployeeRepository and obtains its database connection from the shared pg pool in src/shared/db/connection.ts (no separate Pool construction inside the module).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "create persists a new employee row and returns an Employee whose id, createdAt, and updatedAt are populated (not the caller-supplied input shape).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "update applies a partial update to an existing employee and returns the updated Employee, or returns null when no row matches the given id.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findById, findByEmployeeNumber, and findByEmail return null when no matching row exists; findByManagerId and findAll return an empty array when no rows match.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests at tests/unit/modules/employee/employee.repository.test.ts mock the pg pool and assert each CRUD path: create, read by id/employeeNumber/email/managerId, findAll, update, and the not-found (null/empty) cases.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The phase passes the mechanical verification gate: npm run build (tsc) succeeds with no type errors and npx jest runs the employee repository tests green.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access goes through the repository pattern (GP-001); PgEmployeeRepository is the only component in this phase that touches the pg pool \u2014 no inline SQL outside the repository.",
+    "Strict TypeScript: no implicit any, strict null checks; use unknown with type guards instead of any (HARNESS no-any rule).",
+    "Modules import from each other ONLY through their declared public entry point (index.ts); the employee module must not import another module's internals, and downstream consumers must import Employee/IEmployeeRepository/PgEmployeeRepository via src/modules/employee/index.ts.",
+    "No unhandled promise rejections (GP-006): every async repository method must surface errors via rejected promises or typed error handling rather than throwing synchronously out of an async boundary.",
+    "Test files must follow the project Jest convention: *.test.ts under tests/ (testMatch '**/tests/**/*.test.(ts|js)'); do not use .spec.ts or alter jest.config.js.",
+    "No hardcoded secrets (HARNESS no-hardcoded-secrets); the repository must consume the shared pool whose connection string comes from DATABASE_URL, not a locally constructed connection."
+  ],
+  "outOfScope": [
+    "Employee service, controller, and routes (employee.service.ts, employee.controller.ts, employee.routes.ts) \u2014 this phase covers only the model, repository interface, repository implementation, and barrel.",
+    "Audit record writing for employee create/update (GP-002) \u2014 no audit module exists yet; audit integration is deferred to the leave orchestration phase that wires GP-002.",
+    "RBAC enforcement on employee operations (GP-005) \u2014 there is no controller/route layer in this phase; RBAC is applied at the API boundary in a later phase.",
+    "Input validation at API boundaries (GP-003) \u2014 no API boundary exists in this phase; the repository accepts already-shaped Employee data.",
+    "Database migrations / schema creation for the employees table \u2014 this phase assumes the employees table exists per the reconciled architecture; migrations are out of scope.",
+    "Soft-delete (deleted_at) handling and delete operations \u2014 PLAN.md lists no delete method on IEmployeeRepository and the field list omits deletedAt; deletion is deferred."
+  ],
+  "ambiguities": [
+    {
+      "description": "PLAN.md specifies department as a non-null string, but DOMAIN.md lists department as string | null (required=false). The reconciled architecture lists it as a plain string. The Employee model's nullability for department is ambiguous.",
+      "options": [
+        "department: string (non-null, per PLAN.md and reconciled.json)",
+        "department: string | null (per DOMAIN.md)"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "PLAN.md types employmentStatus as a plain string; DOMAIN.md and the reconciled schema constrain it to the union 'ACTIVE' | 'INACTIVE' | 'TERMINATED'. The model's type for employmentStatus is ambiguous.",
+      "options": [
+        "employmentStatus: string (per PLAN.md literal instruction)",
+        "employmentStatus: 'ACTIVE' | 'INACTIVE' | 'TERMINATED' (per DOMAIN.md and reconciled schema)"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "The employees table schema in the reconciled architecture and DOMAIN.md includes a deleted_at column (soft delete), but PLAN.md's Employee field list omits deletedAt and BaseEntity has no deletedAt. Whether the Employee model exposes a deletedAt field is ambiguous.",
+      "options": [
+        "Omit deletedAt from the Employee model (match PLAN.md field list + BaseEntity); soft-delete is a DB-only concern",
+        "Include deletedAt: Date | null on the Employee model (match DOMAIN.md and DB schema)"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "description": "PLAN.md says import BaseEntity from ../../shared/types/base-entity.interface, but the module-boundary rule (AGENTS.md / ARCHITECTURE.md) requires modules to import shared types through the shared barrel (src/shared/types/index.ts). The correct import path for BaseEntity is ambiguous.",
+      "options": [
+        "Import BaseEntity from ../../shared/types/base-entity.interface (PLAN.md literal)",
+        "Import BaseEntity from ../../shared/types (barrel, per module-boundary rule)"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "Employee extends BaseEntity, so every Employee instance carries id (string), createdAt (Date), and updatedAt (Date) in addition to its own domain fields; the create operation must populate these three rather than accept them from the caller."
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "managerId is nullable (string | null): an employee with no manager is a valid state and must be representable; downstream leave-approval logic escalates managerless employees to HR admin rather than rejecting them."
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "terminationDate is nullable (Date | null): an actively employed employee has a null terminationDate; a non-null terminationDate indicates the employee is no longer active."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IEmployeeRepository.findById(id)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns null when no row matches; rejects the promise on a pool/query error (no unhandled rejection \u2014 GP-006)."
+    },
+    {
+      "operation": "IEmployeeRepository.findByEmployeeNumber(employeeNumber)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns null when no row matches; rejects on query error."
+    },
+    {
+      "operation": "IEmployeeRepository.findByEmail(email)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns null when no row matches; rejects on query error."
+    },
+    {
+      "operation": "IEmployeeRepository.findByManagerId(managerId)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an empty array (not null) when no direct reports exist; rejects on query error."
+    },
+    {
+      "operation": "IEmployeeRepository.findAll()",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an empty array when the table has no rows; rejects on query error."
+    },
+    {
+      "operation": "IEmployeeRepository.create(employee)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Accepts an Employee minus id/createdAt/updatedAt; returns a fully-populated Employee; rejects on a unique-constraint violation (duplicate employeeNumber or email) or query error."
+    },
+    {
+      "operation": "IEmployeeRepository.update(id, data)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Applies a partial update and returns the updated Employee, or returns null when no row matches the id; rejects on query error."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The Employee entity must extend the existing BaseEntity interface exactly as defined (id: string, createdAt: Date, updatedAt: Date) \u2014 do not redefine or widen those three fields.",
+      "referencePath": "src/shared/types/base-entity.interface.ts"
+    },
+    {
+      "requirement": "PgEmployeeRepository must obtain its database connection from the shared `pool` exported by src/shared/db/connection.ts rather than constructing its own pg.Pool.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "The Employee entity shape must match the reconciled architecture's Employee domain entity (employeeNumber, firstName, lastName, email, managerId, department, hireDate, terminationDate, employmentStatus plus BaseEntity fields); surface \u2014 do not silently diverge from \u2014 any difference between PLAN.md and the reconciled schema.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "The repository unit test must be placed at a path matching testMatch '**/tests/**/*.test.(ts|js)' (i.e. tests/unit/modules/employee/employee.repository.test.ts) and run under the existing ts-jest preset without modifying jest.config.js.",
+      "referencePath": "jest.config.js"
+    },
+    {
+      "requirement": "If BaseEntity is imported via the shared barrel rather than the deep path, the barrel must already re-export BaseEntity (it does: `export type { BaseEntity } from './base-entity.interface'`); the chosen import path must resolve against this existing export.",
+      "referencePath": "src/shared/types/index.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/base-entity.interface.ts (BaseEntity)",
+      "why": "Employee extends BaseEntity; this is the declared Phase 1 dependency the phase explicitly depends on."
+    },
+    {
+      "target": "src/shared/db/connection.ts (shared pg pool)",
+      "why": "PgEmployeeRepository consumes the shared pool for all database access (GP-001 repository pattern; no direct Pool construction)."
+    },
+    {
+      "target": "src/modules/employee/index.ts (module public entry point)",
+      "why": "Downstream phases (balance, leave) import Employee and IEmployeeRepository only through this barrel per the module-boundary rule; it must re-export all three symbols."
+    },
+    {
+      "target": "Future leave module (LeaveRequestService)",
+      "why": "The leave orchestration phase depends on IEmployeeRepository.findByManagerId and findById to resolve the submitter/approver manager hierarchy and the managerless-escalation rule; this phase establishes that contract."
+    }
+  ]
+}
