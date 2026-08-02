@@ -1,0 +1,163 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "employee"
+    ],
+    "affectedLayers": [
+      "service",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The service interface declares all seven operations with the specified async signatures: lookup by id (returns Employee | null), lookup by employee number (returns Employee | null), subordinates by manager id (returns Employee[]), all employees (returns Employee[]), create (input omits id/createdAt/updatedAt/deletedAt, returns Employee), update (id + partial, returns Employee | null), and terminate (id, returns void).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The service class implements the interface and, for every read/create/update operation, delegates to the injected repository, returning the repository's result unchanged and propagating repository errors without swallowing or wrapping them.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "terminateEmployee sets employmentStatus to 'TERMINATED' and terminationDate to the current time via the repository update, then calls softDelete \u2014 update is invoked BEFORE softDelete so the status/terminationDate write is not lost to the deleted_at filter.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The module barrel re-exports the service interface and the service class alongside the existing model and repository exports, so downstream modules can consume IEmployeeService through the public entry point.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Unit tests with a mocked repository verify, for each operation, that the service calls the repository with the correct arguments and returns its result; for terminateEmployee they assert update is called with employmentStatus 'TERMINATED' and a Date terminationDate before softDelete is called; and that repository errors propagate unchanged (mockRejectedValueOnce \u2192 rejects.toThrow).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The phase compiles under strict TypeScript (no implicit any, strict null checks) and the Jest suite passes with no failing tests.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The service must not access the database directly \u2014 all persistence goes through the injected IEmployeeRepository (GP-001 / no-direct-db-outside-repository).",
+    "The service interface file must import only the Employee model type (no repository or other module imports), mirroring the established leave-policy service-interface pattern.",
+    "The service class must inject only IEmployeeRepository via its constructor \u2014 no other dependencies (no audit repository, no notification service) are introduced in this phase.",
+    "terminateEmployee must call repository.update before repository.softDelete; reversing the order would cause the update (which filters WHERE deleted_at IS NULL) to match no rows and silently drop the status/terminationDate write.",
+    "The service must not write audit records for terminateEmployee in this phase; GP-002 audit compliance is deferred per the task scope and the established leave-policy service precedent.",
+    "No use of any \u2014 use unknown with type guards where dynamic typing is needed (no-any constraint).",
+    "The test file must use the .spec.ts extension and live under tests/unit/modules/employee/, mirroring the sibling employee.repository.spec.ts and the leave-policy service test."
+  ],
+  "outOfScope": [
+    "Audit record writing for terminateEmployee or any other service operation (GP-002 compliance deferred to a later phase).",
+    "Input validation at API boundaries (GP-003) \u2014 no controller/routes layer in this phase; the service receives already-typed arguments.",
+    "RBAC enforcement (GP-005) \u2014 no HTTP surface in this phase; authorization is a controller/middleware concern.",
+    "Transaction wrapping of the update-then-softDelete sequence in terminateEmployee \u2014 the repository methods are independent calls; transactional orchestration is not part of this service-layer phase.",
+    "Notification emission on employee termination \u2014 the notification module is built in a later phase."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "Termination is a terminal lifecycle transition: terminateEmployee must move employmentStatus to 'TERMINATED' and set terminationDate to a non-null current timestamp before the record is soft-deleted; an employee cannot be terminated without both fields being persisted."
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "Soft-deletion (deletedAt set) must only occur after the termination status fields are written, because the repository's update path excludes rows where deleted_at IS NOT NULL \u2014 the ordering preserves the status/terminationDate write."
+    },
+    {
+      "entity": "IEmployeeService",
+      "mustExistOrExtend": true,
+      "invariant": "The service is a pure delegation layer over IEmployeeRepository for all read/create/update operations \u2014 it must not mutate, filter, or synthesize Employee data beyond the terminateEmployee status/terminationDate assignment."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "getEmployeeById(id)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Delegates to repository.findById; returns Employee | null; propagates repository errors unchanged."
+    },
+    {
+      "operation": "getEmployeeByNumber(employeeNumber)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Delegates to repository.findByEmployeeNumber; returns Employee | null; propagates repository errors unchanged."
+    },
+    {
+      "operation": "getSubordinates(managerId)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Delegates to repository.findByManagerId; returns Employee[] (empty when none); propagates repository errors unchanged."
+    },
+    {
+      "operation": "getAllEmployees()",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Delegates to repository.findAll; returns Employee[] (empty when none); propagates repository errors unchanged."
+    },
+    {
+      "operation": "createEmployee(data)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Delegates to repository.create with the provided data (omitting id/createdAt/updatedAt/deletedAt); returns the persisted Employee; propagates unique-constraint and other repository errors unchanged."
+    },
+    {
+      "operation": "updateEmployee(id, data)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Delegates to repository.update; returns the updated Employee or null when no non-deleted row matches; propagates repository errors unchanged."
+    },
+    {
+      "operation": "terminateEmployee(id)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Calls repository.update with employmentStatus 'TERMINATED' and terminationDate = now, then calls repository.softDelete; resolves void on success; propagates repository errors unchanged (an update failure must not trigger softDelete)."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The service interface and class must import and operate on the exact Employee type defined in employee.model.ts \u2014 do not redefine or narrow the entity shape; the create input must omit precisely id, createdAt, updatedAt, and deletedAt.",
+      "referencePath": "src/modules/employee/employee.model.ts"
+    },
+    {
+      "requirement": "The service must delegate to the existing IEmployeeRepository method set (findById, findByEmployeeNumber, findByManagerId, findAll, create, update, softDelete) without adding or assuming repository methods; terminateEmployee must compose update then softDelete from this exact set.",
+      "referencePath": "src/modules/employee/employee.repository.ts"
+    },
+    {
+      "requirement": "The employee service interface file must follow the leave-policy service-interface pattern: import only the model type, export the service interface with async method signatures, no repository import.",
+      "referencePath": "src/modules/leave-policy/leave-policy.service.interface.ts"
+    },
+    {
+      "requirement": "The employee service class must follow the leave-policy service class pattern: constructor takes a private readonly repository typed as the repository interface, implements the service interface, and each method delegates directly to the repository.",
+      "referencePath": "src/modules/leave-policy/leave-policy.service.ts"
+    },
+    {
+      "requirement": "The employee barrel must add the service interface and class exports in the same ordering convention as the leave-policy barrel (model, repository, service interface, service class).",
+      "referencePath": "src/modules/leave-policy/index.ts"
+    },
+    {
+      "requirement": "The employee service test must mirror the leave-policy service test structure: a jest.Mocked<IEmployeeRepository> built in beforeEach, a makeEmployee() factory helper, delegation assertions (correct args + returned value), and error-propagation assertions (mockRejectedValueOnce \u2192 rejects.toThrow).",
+      "referencePath": "tests/unit/modules/leave-policy/leave-policy.service.spec.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/employee/employee.repository.ts (IEmployeeRepository)",
+      "why": "The service consumes the repository interface as its sole dependency; all persistence operations flow through it."
+    },
+    {
+      "target": "src/modules/employee/index.ts (module barrel)",
+      "why": "Downstream phases (Phase 10 leave-request orchestration) consume IEmployeeService and EmployeeService exclusively through the public barrel entry point per the module-boundary rule."
+    },
+    {
+      "target": "src/modules/leave-policy/leave-policy.service.ts (established service-layer pattern)",
+      "why": "The employee service must structurally match the leave-policy service precedent so the codebase has one consistent service-layer shape."
+    }
+  ]
+}
