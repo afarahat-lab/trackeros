@@ -1,24 +1,24 @@
-# Implement this phase: Phase 5: LeaveRequest model and repository
+# Implement this phase: Phase 6: Audit model and repository
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/e207b7c2-5967-4897-aeeb-2fac2e370ce3/5`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/e207b7c2-5967-4897-aeeb-2fac2e370ce3/6`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the leave-request module at `src/modules/leave-request/`. This phase depends on `src/shared/types/index.ts` from Phase 1, `src/modules/employee/employee.model.ts` from Phase 2, and `src/modules/leave-policy/leave-policy.model.ts` from Phase 3 — read all three before generating.
+Create the audit module at `src/modules/audit/`. This phase depends on `src/shared/types/index.ts` from Phase 1 — read it before generating.
 
 Files to create:
 
-1. `src/modules/leave-request/leave-request.model.ts` — Define and export the `LeaveRequest` entity interface with canonical fields: `id: string`, `employeeId: string`, `leaveTypeId: string`, `startDate: Date`, `endDate: Date`, `reason: string | undefined`, `rejectionReason: string | undefined`, `status: LeaveStatus`, `approvedBy: string | null`, `approvedAt: Date | null`, `cancelledAt: Date | null`, `createdAt: Date`, `updatedAt: Date`. Import `LeaveStatus` from `src/shared/types/index.ts`.
+1. `src/modules/audit/audit.model.ts` — Define and export the `AuditRecord` entity interface: `id: string`, `entityType: string`, `entityId: string`, `action: AuditAction`, `performedBy: string`, `details: Record<string, unknown> | null`, `createdAt: Date`. Import `AuditAction` from `src/shared/types/index.ts`.
 
-2. `src/modules/leave-request/leave-request.repository.ts` — Define and export:
-   - `ILeaveRequestRepository` interface: `findById(id: string): Promise<LeaveRequest | null>`, `findByEmployee(employeeId: string): Promise<LeaveRequest[]>`, `findByStatus(status: LeaveStatus): Promise<LeaveRequest[]>`, `findByApprover(approvedBy: string): Promise<LeaveRequest[]>`, `findPendingByManager(managerId: string): Promise<LeaveRequest[]>`, `create(request: Omit<LeaveRequest, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeaveRequest>`, `update(id: string, data: Partial<LeaveRequest>): Promise<LeaveRequest | null>`, `updateStatus(id: string, status: LeaveStatus, extra?: { rejectionReason?: string; approvedBy?: string; approvedAt?: Date; cancelledAt?: Date }): Promise<LeaveRequest | null>`
-   - `LeaveRequestRepository` class implementing the interface using the pg pool from `src/shared/db/connection.ts`.
+2. `src/modules/audit/audit.repository.ts` — Define and export:
+   - `IAuditRepository` interface: `create(record: Omit<AuditRecord, 'id' | 'createdAt'>): Promise<AuditRecord>`, `findByEntity(entityType: string, entityId: string): Promise<AuditRecord[]>`, `findByUser(performedBy: string): Promise<AuditRecord[]>`
+   - `AuditRepository` class implementing the interface using the pg pool from `src/shared/db/connection.ts`.
 
-3. `src/modules/leave-request/index.ts` — barrel re-export.
+3. `src/modules/audit/index.ts` — barrel re-export.
 
-Include Jest unit tests at `tests/unit/modules/leave-request/leave-request.repository.spec.ts`.
+Include Jest unit tests at `tests/unit/modules/audit/audit.repository.spec.ts`.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -36,22 +36,26 @@ These are resolved, feature-wide decisions. Wherever this phase touches the conc
 
 6. RBAC (GP-005): every endpoint enforces role-based access control — an employee may act only on their own requests; managers/HR admins on those they oversee. Validate all inputs at the API boundary (GP-003) before calling the service. [BINDING RULE — operator decision resolving: What is the fiscal year definition — calendar year (Jan 1 – Dec 31) or a custom fiscal year (e.g., Apr 1 – Mar 31)?; Should leave day counting use calendar days or business days (excluding weekends and/or public holidays)?; Should the system support half-day leave requests?; Should leave balances be pre-seeded at the start of each fiscal year, or lazily initialized on first request?; How are leave days counted — calendar days or business days (Mon–Fri excluding holidays)?; When does the fiscal year start, and should it be configurable per organization?; apply everywhere these apply, not in one place only]
 
-## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
-The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
-- `LeaveRequest` — the entity MUST have exactly these fields:
-    - id: string
-    - employeeId: string
-    - leaveTypeId: string
-    - startDate: Date
-    - endDate: Date
-    - reason: string | undefined
-    - rejectionReason: string | undefined
-    - status: LeaveStatus
-    - approvedBy: string | null
-    - approvedAt: Date | null
-    - cancelledAt: Date | null
-    - createdAt: Date
-    - updatedAt: Date
+## Constraints & consistency
+You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
+### Reuse & consistency — match these exactly
+- The AuditRecord model file must import AuditAction from the shared-types barrel using the same relative-path style as the existing module models (e.g. leave-request.model.ts imports LeaveStatus from '../../shared/types/index'). (see `src/modules/leave-request/leave-request.model.ts`)
+- The AuditRepository must follow the established repository structure: interface + implementing class co-located in one .repository.ts file, a private rowTo<Entity> mapper converting snake_case DB columns to camelCase entity fields with new Date(...) wrapping for date columns, parameterized SQL via pool.query, INSERT ... RETURNING * for create, and empty-array / null returns for not-found. (see `src/modules/leave-request/leave-request.repository.ts`)
+- The audit module barrel must re-export the model type plus the repository interface and class in the same shape as existing module barrels (e.g. export { AuditRecord } from './audit.model'; export { IAuditRepository, AuditRepository } from './audit.repository';). (see `src/modules/leave-request/index.ts`)
+- The audit repository must import the module-level `pool` singleton directly from '../../shared/db/connection' (no constructor injection), matching how employee.repository.ts and leave-request.repository.ts access the pool. (see `src/shared/db/connection.ts`)
+- The unit test must mirror the existing repository spec structure: jest.mock the connection module as { pool: { query: jest.fn() } }, a makeRow helper returning snake_case rows, beforeEach that resets mocks and reinstantiates the repo, and happy-path / not-found / error-propagation cases — matching leave-request.repository.spec.ts. (see `tests/unit/modules/leave-request/leave-request.repository.spec.ts`)
+### Entity invariants — enforce these
+- Reuse or extend `AuditRecord`: An AuditRecord is immutable once persisted — the repository exposes no update or delete operation; the only write path is create, which inserts a new row and never mutates an existing one.
+- Reuse or extend `AuditRecord`: The `action` value of every persisted AuditRecord must be a member of the AuditAction enum (CREATED, SUBMITTED, APPROVED, REJECTED, CANCELLED, BALANCE_DEDUCTED, BALANCE_RESTORED) imported from shared-types; the repository does not accept or persist arbitrary action strings.
+- Reuse or extend `AuditRecord`: `id` and `createdAt` are always DB-generated and never supplied by the caller — create accepts Omit&lt;AuditRecord, 'id' | 'createdAt'&gt; and the returned record always carries both populated (createdAt as a Date).
+### Interface contract — expose these operations (their shape is yours)
+- IAuditRepository.create — Rejects the promise with the underlying pg error (e.g. unique-constraint violation, connection failure) without catching or transforming it; never returns null on the create path.
+- IAuditRepository.findByEntity — idempotent; Returns an empty array when no rows match; rejects with the underlying pg error on failure.
+- IAuditRepository.findByUser — idempotent; Returns an empty array when no rows match; rejects with the underlying pg error on failure.
+### Integration points — connect to these
+- src/shared/types/index.ts — AuditAction enum is imported from the shared-types barrel; the audit module's only cross-module dependency is shared-types (per the reconciled dependency map: audit → shared-types).
+- src/shared/db/connection.ts — The module-level pg.Pool singleton is imported by AuditRepository for all SQL execution; no other DB access path is permitted.
+- src/modules/leave-request/ (future Phase 10) — The LeaveRequestService will consume IAuditRepository.create to write audit records on every state-changing operation (GP-002); this phase establishes the repository contract that later phases depend on.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
