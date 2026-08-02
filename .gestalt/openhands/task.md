@@ -1,26 +1,22 @@
-# Implement this phase: Phase 7: Notification module — model, repository, and service
+# Implement this phase: Phase 8: Audit module — model and repository
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/c8e3d826-436d-4da1-aaf8-6a4bd895c61c/8`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/c8e3d826-436d-4da1-aaf8-6a4bd895c61c/9`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Build the notification module. Depends on src/shared/types/base-entity.interface.ts from Phase 1 — read it before generating.
+Build the audit module. Depends on src/shared/types/base-entity.interface.ts from Phase 1 — read it before generating.
 
-Files to create (5 source files):
+Files to create (3 source files):
 
-1. **src/modules/notification/notification.model.ts** — Define `Notification` entity: id (string), recipientId (string), recipientEmail (string), subject (string), body (string), sentAt (Date | null), status ('PENDING' | 'SENT' | 'FAILED'), createdAt (Date), updatedAt (Date).
+1. **src/modules/audit/audit.model.ts** — Define `AuditLog` entity extending `BaseEntity` with fields: actorId (string), action (string — e.g. 'LEAVE_SUBMITTED', 'LEAVE_APPROVED', 'LEAVE_REJECTED', 'LEAVE_CANCELLED'), targetId (string), targetType (string — e.g. 'LeaveRequest'), details (Record<string, unknown> | null), timestamp (Date). Import BaseEntity from ../../shared/types/base-entity.interface.
 
-2. **src/modules/notification/notification.repository.ts** — Define `INotificationRepository` interface: create(notification: Omit<Notification, 'id' | 'createdAt' | 'updatedAt'>): Promise<Notification>, updateStatus(id: string, status: string): Promise<Notification | null>, findByRecipient(recipientId: string): Promise<Notification[]>. Implement `PgNotificationRepository` using the shared pg pool.
+2. **src/modules/audit/audit.repository.ts** — Define `IAuditLogRepository` interface: create(entry: Omit<AuditLog, 'id' | 'createdAt' | 'updatedAt'>): Promise<AuditLog>, findByTarget(targetId: string, targetType: string): Promise<AuditLog[]>, findByActor(actorId: string): Promise<AuditLog[]>. Implement `PgAuditLogRepository` using the shared pg pool from src/shared/db/connection.ts.
 
-3. **src/modules/notification/notification.service.interface.ts** — Define `INotificationService` interface: notifyLeaveSubmitted(employeeId: string, leaveRequestId: string): Promise<void>, notifyLeaveStatusChange(employeeId: string, leaveRequestId: string, oldStatus: string, newStatus: string): Promise<void>.
+3. **src/modules/audit/index.ts** — Barrel export of AuditLog, IAuditLogRepository, PgAuditLogRepository.
 
-4. **src/modules/notification/notification.service.ts** — Implement `NotificationService` implementing INotificationService. Uses INotificationRepository to persist notifications. For now, actual email sending is stubbed (log + persist).
-
-5. **src/modules/notification/index.ts** — Barrel export.
-
-Include Jest unit tests in **tests/unit/modules/notification/notification.service.test.ts**.
+Include Jest unit tests in **tests/unit/modules/audit/audit.repository.test.ts**.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -43,24 +39,26 @@ These are resolved, feature-wide decisions. Wherever this phase touches the conc
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- The Notification entity must extend BaseEntity from src/shared/types/base-entity.interface.ts, inheriting id (string), createdAt (Date), updatedAt (Date) — matching the pattern used by Employee, LeavePolicy, LeaveBalance, and LeaveRequest. Import BaseEntity with import type from the deep path ../../shared/types/base-entity.interface. (see `src/shared/types/base-entity.interface.ts`)
-- PgNotificationRepository must follow the established repository implementation pattern: private *Row interface for snake_case DB columns, a rowTo* mapper converting snake_case to camelCase, I*Repository interface, and Pg*Repository class importing the shared pool from ../../shared/db/connection. create() uses randomUUID() + INSERT ... RETURNING * with parameterized queries. (see `src/modules/balance/balance.repository.ts`)
-- The Notification status field must be typed as a string union type ('PENDING' | 'SENT' | 'FAILED') exported alongside the entity — matching the LeaveBalanceStatus pattern in balance.model.ts where the union type is defined and exported separately from the interface. (see `src/modules/balance/balance.model.ts`)
-- The notification barrel (index.ts) must use export type for interfaces (INotificationRepository, INotificationService, Notification, status union type) and export for classes (PgNotificationRepository, NotificationService) — matching the established barrel convention in balance/index.ts. (see `src/modules/balance/index.ts`)
-- The service unit test must follow the project's Jest convention: *.test.ts under tests/unit/modules/notification/, importing from the src path, using jest.mock and jest.fn for mocks. However, per the settled decision, the service test mocks INotificationRepository (a mock object implementing the interface) rather than mocking the shared pool — establishing the first service-test pattern in the project. (see `tests/unit/modules/balance/balance.repository.test.ts`)
+- The AuditLog entity must extend the BaseEntity interface exactly as defined — inheriting id (string), createdAt (Date), updatedAt (Date) — using `import type { BaseEntity } from '../../shared/types/base-entity.interface'`, matching the import path used by all 5 prior modules (employee, policy, balance, leave, notification). (see `src/shared/types/base-entity.interface.ts`)
+- The repository must import and use the shared `pool` (a pg.Pool instance) exported from this file at module level — `import { pool } from '../../shared/db/connection'` — with no constructor injection, matching the pattern in all 5 prior repository implementations (employee, policy, balance, leave, notification). (see `src/shared/db/connection.ts`)
+- The audit repository must follow the same structural pattern as this reference repository: crypto randomUUID import, pool import, model type import, private snake_case *Row interface, private rowTo* mapper function, exported I*Repository interface, exported Pg*Repository class implementing it, create() with randomUUID() + INSERT ... RETURNING *, array lookups via result.rows.map(rowMapper), no constructor, module-level pool usage. (see `src/modules/notification/notification.repository.ts`)
+- The audit module barrel must use the same export pattern: `export type { ... }` for interfaces and model types (AuditLog, IAuditLogRepository) and `export { ... }` for the concrete repository class (PgAuditLogRepository) — matching the barrel export convention across all prior modules. (see `src/modules/notification/index.ts`)
+- The audit repository test must follow the same test structure as this reference: jest.mock the shared db connection module before importing pool, cast pool.query as jest.Mock, use makeRow()/makeEntity() helper factories, beforeEach instantiates the repo and clears mocks, mock results cast `as never`, cover success (field mapping + SQL/params verification), empty results (empty array for array methods), and error cases (connection refused, query timeout, unique constraint violation). (see `tests/unit/modules/leave/leave.repository.test.ts`)
+- The audit repository's create() method must follow the same INSERT pattern: generate id via randomUUID(), set now = new Date() for createdAt/updatedAt, use parameterized INSERT with RETURNING *, and map the returned row through the row mapper — matching the established create() implementation across employee, policy, balance, leave, and notification repositories. (see `src/modules/employee/employee.repository.ts`)
 ### Entity invariants — enforce these
-- Reuse or extend `Notification`: A newly created Notification always starts with status 'PENDING' and sentAt null; it transitions to 'SENT' (with sentAt set to the send timestamp) or 'FAILED' only via updateStatus. The status union is closed: 'PENDING' | 'SENT' | 'FAILED' — no other value is valid.
-- Reuse or extend `Notification`: Notification extends BaseEntity, so every persisted Notification has a non-null id (UUID), createdAt, and updatedAt. The repository's create() generates these server-side; callers never supply id/createdAt/updatedAt.
+- Reuse or extend `AuditLog`: An AuditLog entry is immutable once created — the repository exposes no update or delete method; audit records are append-only and never modified or removed after insertion.
+- Reuse or extend `AuditLog`: Every AuditLog entry must have a non-null actorId, action, targetId, and targetType — these identify who performed the action, what action was performed, and what entity was acted upon; only the details field may be null.
+- Reuse or extend `AuditLog`: AuditLog extends BaseEntity, so every persisted entry carries a server-generated id (UUID via randomUUID), createdAt, and updatedAt — the caller never supplies these fields; they are populated by the repository on insert.
+- Reuse or extend `AuditLog`: The timestamp field records when the audited action occurred (distinct from the BaseEntity createdAt which records when the log entry itself was persisted) — both must be preserved through the create → persist → return round-trip.
 ### Interface contract — expose these operations (their shape is yours)
-- INotificationRepository.create — Rejects (throws) on database errors (connection failure, constraint violation). Generates id via randomUUID() and sets createdAt/updatedAt server-side via INSERT ... RETURNING *. Accepts Omit<Notification, 'id' | 'createdAt' | 'updatedAt'> and returns the fully-populated Notification.
-- INotificationRepository.updateStatus — Returns null when no row matches the given id; rejects (throws) on database errors. Updates the status column and updatedAt; when transitioning to 'SENT', sets sentAt to the current timestamp.
-- INotificationRepository.findByRecipient — idempotent; Returns an empty array (not null) when no notifications exist for the recipient; rejects (throws) on database errors.
-- INotificationService.notifyLeaveSubmitted — Returns Promise<void>. Persists a Notification with status 'PENDING' via the repository. Stubbed email sending logs non-PII metadata only (GP-004). Repository failures are caught and handled — no unhandled promise rejection (GP-006). Derives a placeholder recipientEmail from employeeId internally.
-- INotificationService.notifyLeaveStatusChange — Returns Promise<void>. Persists a Notification with status 'PENDING' via the repository, encoding the old→new status transition in the notification content. Stubbed email sending logs non-PII metadata only (GP-004). Repository failures are caught and handled — no unhandled promise rejection (GP-006). Derives a placeholder recipientEmail from employeeId internally.
+- IAuditLogRepository.create(entry: Omit<AuditLog, 'id' | 'createdAt' | 'updatedAt'>): Promise<AuditLog> — No auth enforcement at the repository layer — RBAC is enforced at the API boundary (GP-005); the repository is a pure data-access interface called by the service layer.; Rejects (propagates the underlying pg error) on connection failure, query timeout, or constraint violation — errors are never swallowed; the caller is responsible for handling.
+- IAuditLogRepository.findByTarget(targetId: string, targetType: string): Promise<AuditLog[]> — No auth enforcement at the repository layer — RBAC is enforced at the API boundary; the repository is a pure data-access interface.; idempotent; Rejects (propagates the underlying pg error) on connection failure or query timeout; returns an empty array (never null) when zero rows match the targetId + targetType composite.
+- IAuditLogRepository.findByActor(actorId: string): Promise<AuditLog[]> — No auth enforcement at the repository layer — RBAC is enforced at the API boundary; the repository is a pure data-access interface.; idempotent; Rejects (propagates the underlying pg error) on connection failure or query timeout; returns an empty array (never null) when zero rows match the actorId.
 ### Integration points — connect to these
-- src/shared/db/connection.ts — PgNotificationRepository imports the shared pg pool from this module for all database access, matching every prior repository implementation.
-- src/shared/types/base-entity.interface.ts — The Notification entity extends BaseEntity, importing the interface from this Phase 1 file — the declared dependency for this phase.
-- src/modules/leave/leave.service.ts (Phase 10) — INotificationService is consumed by the future leave service (Phase 10) to dispatch notifications on leave lifecycle transitions (submit, approve, reject, cancel). This phase defines the interface the leave service will depend on; the leave service does not yet exist.
+- src/shared/types/base-entity.interface.ts (BaseEntity interface) — AuditLog extends BaseEntity — the model file imports the interface to inherit id, createdAt, updatedAt; this is the sole external type dependency of the audit module per the reconciled architecture dependency map (audit → shared-types only).
+- src/shared/db/connection.ts (shared pg.Pool instance) — The PgAuditLogRepository implementation imports the module-level `pool` to execute all SQL queries — this is the sole database access point, satisfying the no-direct-db-outside-repository constraint.
+- src/modules/leave/leave.service.ts (Phase 10 — future) — The leave service will consume IAuditLogRepository.create() to write audit records on every state-changing operation (submit, approve, reject, cancel), satisfying GP-002; the audit module's barrel is the import surface the leave service will use.
+- .gestalt/architecture/reconciled.json (audit module ownership) — The reconciled architecture declares the audit module at src/modules/audit/ owning IAuditLogRepository, PgAuditLogRepository, and AuditLog entity — the implementation must match this declared ownership boundary; the dependency map shows audit → shared-types only (no other module dependencies).
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
