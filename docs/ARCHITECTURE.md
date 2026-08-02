@@ -38,6 +38,10 @@ src/shared/types/           — Shared type definitions (Phase 1)
   index.ts                   — Barrel export
 src/shared/utils/
   day-count.ts               — countBusinessDays(startDate, endDate, holidays): number
+src/shared/holidays/         — Holiday reference data (Phase 6)
+  holiday.model.ts           — Holiday interface (id, date, name, country)
+  holiday.repository.ts      — IHolidayRepository + PgHolidayRepository
+  index.ts                   — Barrel export
 src/shared/base repository.ts
 src/shared/error types.ts
 ```
@@ -102,6 +106,7 @@ src/shared/error types.ts
 |--------|------|------------------|
 | `shared-types` | `src/shared/types/` | Enums, base interfaces, common DTOs |
 | `shared-utils` | `src/shared/utils/` | `countBusinessDays` — single shared day-count function |
+| `shared-holidays` | `src/shared/holidays/` | Holiday reference data — model and repository for public holidays |
 | `employee` | `src/modules/employee/` | Employee entity, repository, service, controller, routes |
 | `policy` | `src/modules/policy/` | LeavePolicy entity, repository, service |
 | `balance` | `src/modules/balance/` | LeaveBalance entity, repository, service, controller, routes |
@@ -111,7 +116,7 @@ src/shared/error types.ts
 
 ### Dependency Map
 
-- `leave` → `balance`, `policy`, `employee`, `notification`, `audit`, `shared-types`, `shared-utils`
+- `leave` → `balance`, `policy`, `employee`, `notification`, `audit`, `shared-types`, `shared-utils`, `shared-holidays`
 - All other modules → `shared-types` only
 
 ### Conceptual Tables
@@ -122,6 +127,7 @@ src/shared/error types.ts
 - **leave_balances**: `id`, `employee_id`, `leave_policy_id`, `total_entitlement`, `used_days`, `fiscal_year`, `status`, `created_at`, `updated_at`
 - **audit_logs**: `id`, `entity_type`, `entity_id`, `action`, `old_values`, `new_values`, `performed_by`, `performed_at`, `ip_address`, `user_agent`, `created_at`
 - **notifications**: `id`, `recipient_id`, `type`, `title`, `message`, `related_entity_type`, `related_entity_id`, `status`, `created_at`, `read_at`
+- **holidays**: `id`, `date`, `name`, `country`
 
 ### Implementation Phases
 
@@ -130,9 +136,10 @@ src/shared/error types.ts
 3. **Policy module** — leave policy CRUD, validation rules ✅ (Phase 3 complete)
 4. **Balance module** — balance tracking, deduction/restoration ✅ (Phase 4 complete)
 5. **Leave module (model + repository)** — LeaveRequest entity, repository with overlap queries ✅ (Phase 5 complete)
-6. **Notification module** — notification dispatch
-7. **Audit module** — audit trail recording
-8. **Leave service** — full leave workflow orchestration
+6. **Holidays module** — holiday reference data model and repository ✅ (Phase 6 complete)
+7. **Notification module** — notification dispatch
+8. **Audit module** — audit trail recording
+9. **Leave service** — full leave workflow orchestration
 
 ### Employee Module — Built (Phase 2)
 
@@ -207,6 +214,24 @@ src/shared/error types.ts
 - `LeaveRequestRow` is a private interface (not exported) used only for mapping database rows.
 
 **Out of scope (deferred):** Leave service (orchestration with business rules), controller, routes, RBAC enforcement, audit record writing, database migrations.
+
+### Holidays Module — Built (Phase 6)
+
+**Files delivered:**
+- `src/shared/holidays/holiday.model.ts` — `Holiday` interface with fields: `id` (string), `date` (Date), `name` (string), `country` (string). Does NOT extend `BaseEntity` — holidays are reference data, not domain entities.
+- `src/shared/holidays/holiday.repository.ts` — `IHolidayRepository` interface (2 methods: `findByDateRange`, `findByYear`) + `PgHolidayRepository` implementation using the shared `pool` from `src/shared/db/connection.ts`. Includes a private `HolidayRow` interface and `rowToHoliday` mapper.
+- `src/shared/holidays/index.ts` — barrel export of `Holiday`, `IHolidayRepository`, `PgHolidayRepository`
+- `tests/unit/shared/holidays/holiday.repository.test.ts` — Jest unit tests mocking the pg pool, covering `findByDateRange`, `findByYear`, empty results, and error cases (connection refused, query timeout)
+
+**Design decisions:**
+- `Holiday` does NOT extend `BaseEntity` — it is reference/lookup data, not a domain entity with lifecycle tracking. This matches the PLAN.md specification.
+- `rowToHoliday` normalizes dates by parsing the ISO date string from the database row and constructing a local-date `new Date(year, month - 1, day)`. This ensures compatibility with `countBusinessDays` which uses local-time getters for date comparison.
+- Located under `src/shared/holidays/` rather than `src/modules/` — holidays are shared infrastructure consumed by the leave service, not a standalone domain module.
+- `findByDateRange` uses an inclusive SQL range (`date >= $1 AND date <= $2`) ordered by date.
+- `findByYear` uses `EXTRACT(YEAR FROM date) = $1` for calendar-year filtering.
+- No `create`/`update`/`delete` methods — holidays are assumed to be seeded reference data managed externally.
+
+**Out of scope (deferred):** Database migrations for the holidays table, holiday seed data, integration with the leave service's business-day counting pipeline.
 
 ### Open Questions
 
