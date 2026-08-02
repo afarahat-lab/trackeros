@@ -24,12 +24,12 @@ src/modules/employee/employee.{model,repository}.ts — Employee entity + reposi
 src/modules/leave-policy/leave-policy.{model,repository}.ts — LeaveType + LeavePolicy entities + repository [Phase 3 complete]
 src/modules/leave-balance/leave-balance.{model,repository}.ts — LeaveBalance entity + repository [Phase 4 complete]
 src/modules/leave-request/leave-request.{model,repository}.ts — LeaveRequest entity + repository [Phase 5 complete]
+src/modules/audit/audit.{model,repository}.ts — AuditRecord entity + repository [Phase 6 complete]
 ```
 
 ### Planned modules (not yet built)
 
 ```
-src/modules/audit/          — Phase 6
 src/modules/notification/   — Phase 9
 ```
 
@@ -134,7 +134,7 @@ The leave management module enables employees to apply for annual, sick, emergen
 - **leave-policy** (`src/modules/leave-policy/`): LeaveType entity, LeavePolicy entity, ILeavePolicyRepository, LeavePolicyRepository. [Phase 3 complete]
 - **leave-balance** (`src/modules/leave-balance/`): LeaveBalance entity, ILeaveBalanceRepository, LeaveBalanceRepository. [Phase 4 complete]
 - **leave-request** (`src/modules/leave-request/`): LeaveRequest entity, ILeaveRequestRepository, LeaveRequestRepository. [Phase 5 complete]
-- **audit** (`src/modules/audit/`): AuditRecord entity, IAuditRepository, IAuditService, AuditService.
+- **audit** (`src/modules/audit/`): AuditRecord entity, IAuditRepository, AuditRepository. [Phase 6 complete]
 - **notification** (`src/modules/notification/`): INotificationService, NotificationService.
 
 ## Dependency Map
