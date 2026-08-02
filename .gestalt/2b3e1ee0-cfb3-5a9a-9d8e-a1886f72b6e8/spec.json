@@ -1,0 +1,158 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-policy"
+    ],
+    "affectedLayers": [
+      "service",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The leave-policy module exposes an ILeavePolicyService interface with exactly five methods \u2014 getActivePolicy(leaveTypeId): Promise<LeavePolicy | null>, getPolicyById(id): Promise<LeavePolicy | null>, getAllPolicies(): Promise<LeavePolicy[]>, createPolicy(data: Omit<LeavePolicy,'id'|'createdAt'|'updatedAt'>): Promise<LeavePolicy>, and updatePolicy(id, data: Partial<LeavePolicy>): Promise<LeavePolicy | null> \u2014 each returning the declared type.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A LeavePolicyService class implements ILeavePolicyService and is constructible with an ILeavePolicyRepository injected via its constructor; every method delegates to the corresponding repository method (getActivePolicy\u2192findActiveByLeaveTypeId, getPolicyById\u2192findById, getAllPolicies\u2192findAll, createPolicy\u2192create, updatePolicy\u2192update) passing through the same arguments and returning the repository's result unchanged.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "getActivePolicy returns the active (isActive: true) policy for a given leave type id, or null when no active policy exists \u2014 observable by asserting the repository's findActiveByLeaveTypeId result is returned verbatim.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "createPolicy accepts an input shaped as Omit<LeavePolicy,'id'|'createdAt'|'updatedAt'> and returns the persisted LeavePolicy produced by the repository, with no field transformation between the service input and the repository create call.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "updatePolicy returns the updated LeavePolicy when the repository finds a matching row, and returns null when the repository reports no match \u2014 the null case is propagated, not swallowed or converted to an error.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The barrel index.ts re-exports the service interface (ILeavePolicyService) and service class (LeavePolicyService) alongside the existing model and repository symbols, so downstream modules can import them through the module's public entry point.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Unit tests at tests/unit/modules/leave-policy/leave-policy.service.spec.ts mock ILeavePolicyRepository as a typed object of jest.fn() methods (not the DB pool) and verify each service method invokes the expected repository method with the expected arguments and returns/propagates the mocked result, including the null case and repository-thrown errors.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The service implementation never imports or references the database pool or any SQL \u2014 all persistence is reached through the injected ILeavePolicyRepository, satisfying GP-001 (no direct DB access outside the repository layer).",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No `any` types (HARNESS.json no-any rule, severity high): use `unknown` with type guards or precise types; the service interface, implementation, and test mocks must be fully typed with no implicit or explicit `any`.",
+    "No direct database access outside the repository (HARNESS.json no-direct-db-outside-repository, severity critical / GP-001): the service must not import the pg pool, connection module, or write SQL; it may only depend on the ILeavePolicyRepository interface.",
+    "Strict TypeScript (no implicit any, strict null checks) per tsconfig.json \u2014 the service must compile under `tsc --noEmit` with the existing strict settings.",
+    "Constructor injection of ILeavePolicyRepository is required (settled decision): the service class must accept its repository dependency via the constructor, even though the existing status/uptime services have no constructor because they have no dependencies.",
+    "Module-boundary imports: cross-module consumers import leave-policy symbols only through index.ts; within-module files (service.interface.ts, service.ts) may import sibling files by direct relative path, matching the existing status/uptime service convention.",
+    "Test file naming uses .spec.ts (leave-policy.service.spec.ts) to stay consistent with the existing leave-policy.repository.spec.ts; jest.config.js testMatch accepts both .test.ts and .spec.ts.",
+    "Test mocks must be a typed object of jest.fn() methods matching ILeavePolicyRepository \u2014 not a mock of pool.query \u2014 because the service depends on the repository interface, not the DB pool."
+  ],
+  "outOfScope": [
+    "Controller, routes, and Fastify HTTP surface for leave-policy \u2014 this phase creates only the service interface and implementation; the API layer is not in scope.",
+    "RBAC enforcement / auth middleware (GP-005) and input validation at API boundaries (GP-003) \u2014 these apply at the controller/route layer, which is not built in this phase; the service itself performs no auth checks.",
+    "Audit record creation (GP-002) for policy create/update \u2014 the service delegates directly to the repository and does not write audit records; audit wiring is deferred to the orchestration phases.",
+    "Business-rule enforcement beyond delegation \u2014 the service does not validate \"at most one active policy per leaveTypeId\", entitlement ranges, or notice-day constraints; such validation belongs to later orchestration/controller phases.",
+    "The LeaveBalance service, Notification service, LeaveRequest service, and business-day utility \u2014 these are Phases 9 and 10 and are not part of the leave-policy service layer.",
+    "Integration/e2e tests against a real database \u2014 this phase ships only Jest unit tests with a mocked repository."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "At most one active policy exists per leaveTypeId (ARCHITECTURE.md / reconciled.json key rule). The service's getActivePolicy must surface this constraint by returning a single active policy or null \u2014 it must never return an array or silently pick among multiple active rows; the repository's findActiveByLeaveTypeId (which filters WHERE is_active = true and returns the first row) is the authoritative source."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "id, createdAt, and updatedAt are system-managed and never supplied by callers: createPolicy's input is Omit<LeavePolicy,'id'|'createdAt'|'updatedAt'>, and updatePolicy must not allow callers to overwrite id or createdAt (the repository already strips read-only fields; the service must not re-introduce them)."
+    },
+    {
+      "entity": "ILeavePolicyService",
+      "mustExistOrExtend": true,
+      "invariant": "The service contract is a pure delegation layer over ILeavePolicyRepository: each method maps one-to-one to a repository method with no additional persistence, no cross-module calls, and no business-rule side effects \u2014 it must remain substitutable by any ILeavePolicyRepository-backed implementation."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "getActivePolicy(leaveTypeId: string): Promise<LeavePolicy | null>",
+      "authRule": "No auth enforcement at the service layer (RBAC is deferred to the controller/middleware phase); the service performs no role checks.",
+      "idempotent": true,
+      "errorSemantics": "Read-only and idempotent; returns null when no active policy exists for the leave type; propagates repository errors unchanged without catching or wrapping."
+    },
+    {
+      "operation": "getPolicyById(id: string): Promise<LeavePolicy | null>",
+      "authRule": "No auth enforcement at the service layer.",
+      "idempotent": true,
+      "errorSemantics": "Read-only and idempotent; returns null when no policy matches the id; propagates repository errors unchanged."
+    },
+    {
+      "operation": "getAllPolicies(): Promise<LeavePolicy[]>",
+      "authRule": "No auth enforcement at the service layer.",
+      "idempotent": true,
+      "errorSemantics": "Read-only and idempotent; returns an empty array (never null) when no policies exist; propagates repository errors unchanged."
+    },
+    {
+      "operation": "createPolicy(data: Omit<LeavePolicy,'id'|'createdAt'|'updatedAt'>): Promise<LeavePolicy>",
+      "authRule": "No auth enforcement at the service layer; GP-002 audit recording is deferred to orchestration phases, so this method does not itself write an audit record.",
+      "idempotent": false,
+      "errorSemantics": "Not idempotent (each call persists a new row); propagates repository errors \u2014 including unique-constraint violations on (leave_type_id, is_active) \u2014 unchanged without catching or wrapping; returns the persisted LeavePolicy."
+    },
+    {
+      "operation": "updatePolicy(id: string, data: Partial<LeavePolicy>): Promise<LeavePolicy | null>",
+      "authRule": "No auth enforcement at the service layer; GP-002 audit recording is deferred to orchestration phases.",
+      "idempotent": true,
+      "errorSemantics": "Idempotent for no-op updates (returns the existing row when no mutable fields are supplied); returns null when no row matches the id (the null is propagated, not converted to a thrown error); propagates repository errors unchanged."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The ILeavePolicyService method signatures must align one-to-one with ILeavePolicyRepository: getActivePolicy\u2192findActiveByLeaveTypeId(leaveTypeId): Promise<LeavePolicy | null>, getPolicyById\u2192findById(id): Promise<LeavePolicy | null>, getAllPolicies\u2192findAll(): Promise<LeavePolicy[]>, createPolicy\u2192create(policy: Omit<LeavePolicy,'id'|'createdAt'|'updatedAt'>): Promise<LeavePolicy>, updatePolicy\u2192update(id, data: Partial<LeavePolicy>): Promise<LeavePolicy | null>. The createPolicy input type must be exactly Omit<LeavePolicy,'id'|'createdAt'|'updatedAt'> so it passes through to repo.create with no transformation.",
+      "referencePath": "src/modules/leave-policy/leave-policy.repository.ts"
+    },
+    {
+      "requirement": "The service interface and implementation must import and use the canonical LeavePolicy interface from leave-policy.model.ts (id, policyName, leaveTypeId, entitlementDays, accrualRate, maxAccumulation, minimumNoticeDays, requiresManagerApproval, isActive, createdAt, updatedAt) \u2014 no redefinition or drift of the entity shape.",
+      "referencePath": "src/modules/leave-policy/leave-policy.model.ts"
+    },
+    {
+      "requirement": "The barrel must continue to export the existing model and repository symbols (LeaveType, LeavePolicy, ILeavePolicyRepository, LeavePolicyRepository) and additionally export ILeavePolicyService and LeavePolicyService, matching the re-export pattern used by src/modules/status/index.ts and src/modules/uptime/index.ts (model, service interface, service class).",
+      "referencePath": "src/modules/leave-policy/index.ts"
+    },
+    {
+      "requirement": "The service interface file must follow the established convention: the interface file imports the model type and exports an I<Name>Service interface, and the implementation file imports the interface plus the model and declares a class that implements it \u2014 mirroring status.service.interface.ts / status.service.ts and uptime.service.interface.ts / uptime.service.ts.",
+      "referencePath": "src/modules/status/status.service.interface.ts"
+    },
+    {
+      "requirement": "The service spec must mirror the existing leave-policy.repository.spec.ts structure and location (tests/unit/modules/leave-policy/, .spec.ts extension, ts-jest preset) and use the same makeRow-style fixture pattern adapted for LeavePolicy objects, so the two leave-policy test files are stylistically consistent.",
+      "referencePath": "tests/unit/modules/leave-policy/leave-policy.repository.spec.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "ILeavePolicyRepository (src/modules/leave-policy/leave-policy.repository.ts)",
+      "why": "The service's sole dependency: constructor-injected and the only path to persistence. Every service method delegates to a repository method; the service has no other data source."
+    },
+    {
+      "target": "src/modules/leave-policy/index.ts (module public entry point)",
+      "why": "Downstream phases (Phase 9 LeaveBalanceService.initializeBalance looks up the active policy via ILeavePolicyService, and Phase 10 LeaveRequestService uses ILeavePolicyService) must import the service through the barrel, per the module-boundary import rule."
+    },
+    {
+      "target": "Jest test runner (jest.config.js, ts-jest preset)",
+      "why": "The new leave-policy.service.spec.ts must be discovered by the existing testMatch glob (**/tests/**/*.spec.(ts|js)) and compile under ts-jest with strict TypeScript."
+    }
+  ]
+}
