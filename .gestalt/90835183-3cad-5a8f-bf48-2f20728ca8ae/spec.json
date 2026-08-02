@@ -1,0 +1,179 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared-types",
+      "shared-utils"
+    ],
+    "affectedLayers": [
+      "domain-types",
+      "shared-utilities",
+      "unit-tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The LeaveType enum exposes exactly the six members ANNUAL, SICK, EMERGENCY, UNPAID, MATERNITY, PATERNITY as string-valued members, verifiable by a unit test asserting each value and the member count.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The LeaveRequestStatus enum exposes exactly the five members DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED as string-valued members, verifiable by a unit test asserting each value and the member count.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The BaseEntity interface is structurally assignable for an object containing id (string), createdAt (Date), updatedAt (Date), verifiable by a unit test that constructs such an object and asserts the fields.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "CreateLeaveRequestDto accepts the required employeeId, leavePolicyId, startDate, endDate and an optional reason; UpdateLeaveRequestDto accepts optional status (LeaveRequestStatus) and optional rejectionReason \u2014 verifiable by unit tests covering the required-only, optional-present, and empty-object cases.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The shared-types barrel (src/shared/types/index.ts) re-exports LeaveType, LeaveRequestStatus, BaseEntity, CreateLeaveRequestDto, and UpdateLeaveRequestDto so downstream modules import all symbols from the single public entry point, satisfying the module dependency rule.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "countBusinessDays counts Mon\u2013Fri inclusive of both start and end when both are business days, excludes Saturdays/Sundays, and excludes any date in the holidays array that falls on a business day \u2014 verifiable by unit tests for a single business day, a full Mon\u2013Fri week (5), a two-week span (10), a holiday on a weekday (\u22121), multiple holidays, and a holiday on a weekend (no double-count).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "countBusinessDays returns 0 when startDate is after endDate, and returns 0 when the entire inclusive range consists only of weekends or only of holidays \u2014 verifiable by unit tests for the inverted-range, weekend-only, and all-holidays cases.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The phase compiles cleanly under strict TypeScript (tsc --noEmit) and the Jest unit suite (tests/unit/shared/types/types.test.ts and tests/unit/shared/utils/day-count.test.ts) passes, satisfying the mechanical compile gate.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Strict TypeScript must hold: no implicit any and strict null checks (tsconfig strict: true). The shared types must not use `any`; use `unknown` with type guards where dynamic shapes are needed (HARNESS no-any rule, severity high).",
+    "Test files must follow the project Jest convention: `*.test.ts` under `tests/` matching testMatch `**/tests/**/*.test.(ts|js)`. Do not use `.spec.ts` and do not alter jest.config.js (binding rule).",
+    "countBusinessDays must be the single shared day-count function used by all call sites; no duplicate day-counting logic may be introduced in this or later phases (binding rule / ARCHITECTURE.md shared utilities).",
+    "Modules import from each other only through their declared public entry point (index.ts). The shared-types barrel must be the sole import surface for downstream modules; internal enum/interface files are not imported directly by other modules (ARCHITECTURE.md dependency rules).",
+    "No circular dependencies between modules; shared-types must have zero dependencies on domain modules (ARCHITECTURE.md dependency rules + reconciled dependency map: all modules \u2192 shared-types only).",
+    "No hardcoded secrets, API keys, or tokens in the shared types or day-count utility (HARNESS no-hardcoded-secrets, severity critical)."
+  ],
+  "outOfScope": [
+    "Correcting the day-count UTC normalization divergence (ARCHITECTURE.md \"Known divergence from UTC spec\") is deferred to a future phase; this phase must preserve the existing local-time comparison behavior and not introduce UTC-midnight normalization.",
+    "Domain modules (employee, policy, balance, leave, notification, audit), their models, repositories, services, controllers, and routes are out of scope \u2014 this phase is the shared-types foundation only.",
+    "Database access, migrations, the pg pool, and repository implementations are out of scope; this phase defines pure types and a pure function with no I/O.",
+    "Input validation at API boundaries (GP-003), RBAC enforcement (GP-005), and audit recording (GP-002) are out of scope \u2014 there are no API endpoints or state-changing operations in this phase."
+  ],
+  "ambiguities": [
+    {
+      "description": "The phase intent says to consolidate the two existing enum files (leave-type.enum.ts, leave-request-status.enum.ts) into a single enums.ts, but the current codebase and ARCHITECTURE.md module structure list them as separate files, and the existing tests import from the separate paths. It is ambiguous whether the separate enum files must be deleted/removed or retained alongside enums.ts.",
+      "options": [
+        "Consolidate into enums.ts and delete the two separate enum files, updating the barrel and tests to import from enums.ts only",
+        "Create enums.ts as the new canonical source and keep the two separate files as re-export shims for backward compatibility",
+        "Keep the two separate files as canonical and have enums.ts re-export from them"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "The phase intent specifies enums.ts as the single enum file, but PLAN.md Phase 1 and the existing ARCHITECTURE.md describe separate leave-type.enum.ts and leave-request-status.enum.ts files, and downstream phases (3, 4, 6) in PLAN.md reference './enums' while the existing code references './leave-request-status.enum'. The canonical enum file name/location for downstream imports is ambiguous.",
+      "options": [
+        "enums.ts is canonical; downstream phases import LeaveType and LeaveRequestStatus from './enums' or '../../shared/types/enums'",
+        "Separate enum files remain canonical; enums.ts is a convenience re-export only"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "countBusinessDays holiday comparison currently uses local-time getters (getDay/getFullYear/getMonth/getDate). ARCHITECTURE.md flags a known divergence from a UTC-midnight ISO-date-string spec to be corrected in a future phase, but it is ambiguous whether this phase must keep the local-time behavior or begin aligning to UTC.",
+      "options": [
+        "Preserve existing local-time comparison behavior unchanged (deferred to a future phase per ARCHITECTURE.md)",
+        "Align to UTC-midnight normalization now"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeaveType",
+      "mustExistOrExtend": true,
+      "invariant": "The enum's membership is closed and stable: exactly ANNUAL, SICK, EMERGENCY, UNPAID, MATERNITY, PATERNITY, each a string-valued member equal to its own name. No member may be added, removed, or renamed without breaking downstream policy/leave modules that switch on these values."
+    },
+    {
+      "entity": "LeaveRequestStatus",
+      "mustExistOrExtend": true,
+      "invariant": "The enum's membership is closed and stable: exactly DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED, each a string-valued member equal to its own name. These are the only legal lifecycle states for a LeaveRequest; the ordering DRAFT\u2192SUBMITTED\u2192(APPROVED|REJECTED|CANCELLED) is enforced by later phases, so the enum must not gain or lose members here."
+    },
+    {
+      "entity": "BaseEntity",
+      "mustExistOrExtend": true,
+      "invariant": "BaseEntity is the structural contract every persisted domain entity (Employee, LeavePolicy, LeaveBalance, LeaveRequest, AuditLog) extends: it carries identity (id: string) and lifecycle timestamps (createdAt, updatedAt). It must remain a pure interface with no behavior and no optional members, so every extending entity is guaranteed to be persistable and auditable."
+    },
+    {
+      "entity": "CreateLeaveRequestDto",
+      "mustExistOrExtend": true,
+      "invariant": "The DTO is the input shape for drafting a leave request: employeeId, leavePolicyId, startDate, endDate are required and reason is optional. It must not encode status or audit fields \u2014 status is set by the service lifecycle, never by the caller \u2014 so the DTO stays a pure transport object with no lifecycle authority."
+    },
+    {
+      "entity": "UpdateLeaveRequestDto",
+      "mustExistOrExtend": true,
+      "invariant": "The DTO is the input shape for transitioning a leave request: status (LeaveRequestStatus) and rejectionReason are both optional. It must reference LeaveRequestStatus by type so only legal lifecycle states can be expressed; it must not carry identity or balance fields, keeping it a pure transport object."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "countBusinessDays(startDate: Date, endDate: Date, holidays: Date[]): number",
+      "authRule": "None \u2014 pure function with no auth surface.",
+      "idempotent": true,
+      "errorSemantics": "Must be a pure, side-effect-free function. Returns 0 when startDate > endDate (inverted range). Must not throw for valid Date inputs or empty holidays arrays; holiday comparison must treat a holiday falling on a weekend as already-excluded (no negative contribution)."
+    },
+    {
+      "operation": "shared-types public entry point (src/shared/types/index.ts barrel export)",
+      "authRule": "None \u2014 barrel re-export has no auth surface.",
+      "idempotent": true,
+      "errorSemantics": "The barrel must re-export every public symbol (LeaveType, LeaveRequestStatus, BaseEntity, CreateLeaveRequestDto, UpdateLeaveRequestDto) so that a missing or misnamed export surfaces as a compile error at downstream import sites rather than a runtime failure."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The enum member sets must match the reconciled architecture exactly: LeaveType = ANNUAL, SICK, EMERGENCY, UNPAID, MATERNITY, PATERNITY; LeaveRequestStatus = DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED. No additional or missing members are permitted, since downstream entities (LeavePolicy.leaveType, LeaveRequest.status) and business rules (sufficiency skip for UNPAID; manager approval for SICK/EMERGENCY) depend on these exact values.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "countBusinessDays must remain the single shared day-count function at src/shared/utils/day-count.ts and must preserve its documented contract: counts Mon\u2013Fri in the inclusive range [startDate, endDate], excludes weekends and the provided holidays array, returns 0 when startDate > endDate, and compares holidays by calendar date (year/month/day). The known local-time-vs-UTC divergence is explicitly deferred and must not be \"fixed\" in this phase.",
+      "referencePath": "docs/ARCHITECTURE.md"
+    },
+    {
+      "requirement": "UpdateLeaveRequestDto.status must be typed as LeaveRequestStatus (imported from the canonical enum source), not as a string literal union or string, so the DTO and the enum cannot drift. If the enum source is consolidated into enums.ts, the DTO import path must be updated to match and must continue to resolve the same LeaveRequestStatus type.",
+      "referencePath": "src/shared/types/leave-request.dto.ts"
+    },
+    {
+      "requirement": "The barrel must re-export the same set of symbols the existing barrel exposes (LeaveType, LeaveRequestStatus, BaseEntity, CreateLeaveRequestDto, UpdateLeaveRequestDto) so downstream modules that import from the public entry point are unaffected by the internal file consolidation. The export kinds (value export for enums, type export for interfaces/DTOs) must be preserved.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The types test must continue to import the enums, BaseEntity, and DTOs and assert their values/shapes. If the enum source is consolidated into enums.ts, the test imports must be updated to the canonical path so the test still compiles and passes against the consolidated source \u2014 the test must not reference a deleted file.",
+      "referencePath": "tests/unit/shared/types/types.test.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/policy/policy.model.ts (Phase 3)",
+      "why": "LeavePolicy.leaveType is typed as LeaveType imported from the shared-types public entry point; this phase must expose LeaveType so the policy module can bind leave categories to entitlement rules."
+    },
+    {
+      "target": "src/modules/leave/leave.model.ts (Phase 5) and src/modules/leave/leave.service.ts (Phase 9)",
+      "why": "LeaveRequest.status is typed as LeaveRequestStatus and the service switches on lifecycle states (DRAFT\u2192SUBMITTED\u2192APPROVED/REJECTED/CANCELLED); this phase must expose the enum and DTOs so the leave module can model and transition requests."
+    },
+    {
+      "target": "src/modules/balance/balance.repository.ts (Phase 4) and src/modules/leave/leave.service.ts (Phase 9)",
+      "why": "The balance sufficiency check, deduction, and restoration all compute requested days via countBusinessDays; this phase must expose the single shared day-count function so every call site computes business days identically."
+    },
+    {
+      "target": "src/modules/employee/employee.model.ts (Phase 2), src/modules/policy/policy.model.ts (Phase 3), src/modules/balance/balance.model.ts (Phase 4), src/modules/leave/leave.model.ts (Phase 5), src/modules/audit/audit.model.ts (Phase 8)",
+      "why": "Every persisted domain entity extends BaseEntity to inherit id/createdAt/updatedAt; this phase must expose the BaseEntity interface as the structural contract for all entity models."
+    }
+  ]
+}
