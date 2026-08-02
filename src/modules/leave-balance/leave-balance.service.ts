@@ -1,7 +1,7 @@
 import { LeaveBalance } from './leave-balance.model';
 import { ILeaveBalanceRepository } from './leave-balance.repository';
 import { ILeaveBalanceService } from './leave-balance.service.interface';
-import { ILeavePolicyService } from '../leave-policy/leave-policy.service.interface';
+import { ILeavePolicyService } from '../leave-policy';
 
 export class NoActivePolicyError extends Error {
   constructor(leaveTypeId: string) {
