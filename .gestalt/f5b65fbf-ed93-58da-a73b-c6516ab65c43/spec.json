@@ -1,0 +1,146 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "employee"
+    ],
+    "affectedLayers": [
+      "domain-model",
+      "data-access"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The Employee domain model interface is exported from the employee module's public entry point and exposes the exact declared field set (id, employeeNumber, firstName, lastName, email, managerId nullable, department, hireDate, terminationDate nullable, employmentStatus union of ACTIVE|INACTIVE|TERMINATED, createdAt, updatedAt) with the declared types \u2014 a reviewer can confirm every field name and type matches the reconciled architecture.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The employee repository interface declares the three read operations (lookup by id, lookup by employeeNumber, list all) each returning Promise<Employee | null> or Promise<Employee[]> as appropriate, and a concrete implementation backed by the shared pg Pool exists and is exported from the module's public entry point.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findById returns a fully-populated Employee when a matching row exists and returns null when no row matches; findByEmployeeNumber returns a fully-populated Employee when a matching row exists and null otherwise; findAll returns an array of Employee (empty array when the table has no rows) \u2014 all verified by unit tests that mock the pg Pool so no live database is required.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All repository SQL uses parameterized queries (values bound via the pg Pool query API, never string-interpolated into the SQL text) so that employeeNumber and id lookups cannot introduce SQL injection \u2014 verifiable by inspecting that no user-supplied value is concatenated into a query string.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The generated code compiles under the project's strict TypeScript config (tsc --noEmit) with no errors and the Jest unit tests pass (npx jest) \u2014 the phase's verification command exits zero.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No use of `any` \u2014 use `unknown` with type guards instead (HARNESS.json constraints.rules no-any, severity high). Strict TypeScript with strict null checks is enabled in tsconfig.json.",
+    "All database access must go through the repository pattern (GP-001 / HARNESS.json no-direct-db-outside-repository, severity critical). The EmployeeRepository is the only component in this phase permitted to execute SQL; it must obtain the connection from the existing shared pool at src/shared/db/connection.ts rather than creating its own Pool.",
+    "No hardcoded secrets (HARNESS.json no-hardcoded-secrets, severity critical). The repository must not embed connection strings, passwords, or tokens; it reuses the shared pool which reads DATABASE_URL from the environment.",
+    "No unhandled promise rejections (GP-006). Every async repository method must handle errors from the pg Pool query call rather than letting them propagate unhandled \u2014 callers receive a typed result (Employee | null | Employee[]) or a caught/rethrown error, never a dangling rejected promise.",
+    "Modules import from each other only through their declared public entry point (index.ts) \u2014 never from internal files (AGENTS.md architecture rule 1). The employee barrel (index.ts) is the sole public surface; downstream phases import Employee and the repository from it, not from employee.model.ts or employee.repository.ts directly.",
+    "Test files must follow the project's Jest convention: *.test.ts under tests/ (jest.config.js testMatch is '**/tests/**/*.test.(ts|js)'), NOT *.spec.ts. The repository unit test must mock the pg Pool so tests run without a live PostgreSQL instance."
+  ],
+  "outOfScope": [
+    "Employee service layer, controller, and Fastify routes \u2014 PLAN.md scopes this phase to model + repository + barrel only; no service interface or HTTP surface is built here.",
+    "Write/mutation operations on Employee (create, update, terminate, change manager) \u2014 the repository interface in this phase declares only read methods (findById, findByEmployeeNumber, findAll); persistence of new or updated employees is not part of this phase.",
+    "Database migrations / CREATE TABLE DDL for the employees table \u2014 the architecture defines the conceptual schema but this phase builds the TypeScript model and repository; migration generation is not in scope.",
+    "Audit logging for Employee reads (GP-002 applies to state-changing operations; the read-only repository methods in this phase do not mutate state and therefore do not require audit records)."
+  ],
+  "ambiguities": [
+    {
+      "description": "The pg Pool returns rows as plain objects with snake_case column names (employee_number, manager_id, hire_date, etc. per the conceptual schema), but the Employee interface uses camelCase fields (employeeNumber, managerId, hireDate). The repository must map between database column names and the interface field names. The intent does not specify whether this mapping is done manually in the repository or via a row-mapping helper.",
+      "options": [
+        "Repository manually maps each snake_case DB column to the camelCase interface field in the row-to-Employee conversion",
+        "A shared row-mapping utility (e.g. a base repository or camelCase transform) performs the conversion",
+        "The query uses SQL column aliases (AS employeeNumber) so pg returns camelCase keys directly"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "The Employee interface declares hireDate, terminationDate, createdAt, updatedAt as Date, but pg returns timestamp columns as JavaScript Date objects by default (pg type parser for timestamptz/timestamp). It is unclear whether the repository must explicitly convert these to Date instances or whether relying on pg's default parser is acceptable. If a column is NULL (terminationDate), pg returns null which matches the nullable type.",
+      "options": [
+        "Rely on pg's default type parsing (timestamps arrive as Date instances, NULLs arrive as null) \u2014 no explicit conversion needed",
+        "Explicitly construct new Date(row.field) for every date column to guarantee Date type regardless of pg parser configuration"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "description": "The intent says the repository should use the existing `pool` from src/shared/db/connection.ts, but does not specify whether the EmployeeRepository receives the pool via constructor injection (dependency injection for testability) or imports it as a module-level singleton. The unit tests must mock the pg Pool, which is significantly harder if the pool is imported as a singleton (requires jest.mock of the connection module) vs. injected via constructor.",
+      "options": [
+        "Constructor injection \u2014 EmployeeRepository accepts a Pool (or a query-capable interface) in its constructor, defaulting to the shared pool; tests inject a mock",
+        "Module-level singleton import \u2014 EmployeeRepository imports `pool` directly from connection.ts; tests use jest.mock('...connection') to replace it"
+      ],
+      "impactIfWrong": "medium"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "managerId is a self-referential foreign key to employees.id (or null for an employee with no manager). An employee with managerId === null represents a top-level employee whose leave requests escalate to hr_admin rather than auto-approving \u2014 this null-manager semantics is a binding business rule that downstream phases rely on, so the model must preserve nullability faithfully (never coerce null to an empty string or undefined)."
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "employmentStatus is constrained to exactly three lifecycle states: 'ACTIVE', 'INACTIVE', 'TERMINATED'. The model must express this as a closed union type (not an open string) so that no other status value can be assigned; downstream leave logic treats only ACTIVE employees as eligible to submit leave."
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "employeeNumber and email are business-unique identifiers (the conceptual schema declares both as unique indexes). The repository's findByEmployeeNumber lookup relies on this uniqueness \u2014 it returns at most one Employee. The model must not weaken these to non-unique fields."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "findById(id: string): Promise<Employee | null>",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns null when no row matches the given id (not an error). Errors from the underlying pg Pool query (connection failure, etc.) must be caught and handled \u2014 no unhandled rejection (GP-006). The id must be passed as a parameterized query value, never interpolated into SQL."
+    },
+    {
+      "operation": "findByEmployeeNumber(employeeNumber: string): Promise<Employee | null>",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns null when no row matches the given employeeNumber (not an error). Errors from the underlying pg Pool query must be caught and handled (GP-006). The employeeNumber must be passed as a parameterized query value to prevent SQL injection."
+    },
+    {
+      "operation": "findAll(): Promise<Employee[]>",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns an empty array when no rows exist (not null, not an error). Errors from the underlying pg Pool query must be caught and handled (GP-006)."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The EmployeeRepository must obtain its database connection from the existing shared pg Pool exported as `pool` from src/shared/db/connection.ts \u2014 it must not instantiate a new Pool or read DATABASE_URL independently. This is the sanctioned shared-infrastructure import per AGENTS.md and the agents.yaml shared-infrastructure rule.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "The Employee interface field names and types must match the reconciled architecture's Employee entity definition exactly (id, employeeNumber, firstName, lastName, email, managerId: string|null, department, hireDate: Date, terminationDate: Date|null, employmentStatus: 'ACTIVE'|'INACTIVE'|'TERMINATED', createdAt: Date, updatedAt: Date). The conceptual SQL schema for the employees table (snake_case columns: id, employee_number, first_name, last_name, email, manager_id, department, hire_date, termination_date, employment_status, created_at, updated_at; unique indexes on employee_number and email; FK manager_id -> employees.id) must be the mapping target the repository queries against.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "The employee module must be placed at src/modules/employee/ with files employee.model.ts, employee.repository.ts, and index.ts \u2014 matching the module structure declared in ARCHITECTURE.md (src/modules/<name>/<name>.{model,repository,...}.ts) and the reconciled architecture's module boundary (path: src/modules/employee/, owns: Employee model, IEmployeeRepository interface, EmployeeRepository implementation).",
+      "referencePath": "docs/ARCHITECTURE.md"
+    },
+    {
+      "requirement": "The unit test file must be placed at tests/unit/modules/employee/employee.repository.test.ts to match the jest.config.js testMatch pattern ('**/tests/**/*.test.(ts|js)') and the phase's declared test path. The test must use the project's ts-jest preset and mock the pg Pool so no live database connection is required.",
+      "referencePath": "jest.config.js"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/db/connection.ts (shared pg Pool)",
+      "why": "The EmployeeRepository executes SQL through the shared pg Pool \u2014 this is the sole external dependency of the employee module in this phase. The repository delegates all connection management to this shared infrastructure rather than owning its own connection."
+    },
+    {
+      "target": "Downstream phases: leave-balance (Phase 5), leave-request (Phase 6/7), notification (Phase 9)",
+      "why": "The Employee model and repository are consumed by downstream modules via the employee module's public barrel (index.ts). leave-balance references employeeId; leave-request needs managerId to determine approval routing (escalate to hr_admin when null); notification targets recipientId (an employee). These phases import Employee from the employee module's index.ts, so the barrel must export both the model and the repository interface/implementation."
+    }
+  ]
+}
