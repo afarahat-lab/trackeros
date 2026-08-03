@@ -154,12 +154,11 @@ describe('LeaveBalanceRepository', () => {
   });
 
   describe('create', () => {
-    const createInput: Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt'> = {
+    const createInput: Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt' | 'remainingDays'> = {
       employeeId: 'emp-001',
       leavePolicyId: 'lp-001',
       totalEntitlement: 20,
       usedDays: 0,
-      remainingDays: 20,
       fiscalYear: 2026,
       status: 'ACTIVE',
     };

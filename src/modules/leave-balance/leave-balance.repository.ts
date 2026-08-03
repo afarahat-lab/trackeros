@@ -10,7 +10,7 @@ export interface ILeaveBalanceRepository {
   ): Promise<LeaveBalance | null>;
   findByEmployee(employeeId: string, fiscalYear: number): Promise<LeaveBalance[]>;
   create(
-    balance: Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt'>,
+    balance: Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt' | 'remainingDays'>,
   ): Promise<LeaveBalance>;
   updateUsedDays(id: string, usedDays: number): Promise<LeaveBalance>;
 }
@@ -78,7 +78,7 @@ export class LeaveBalanceRepository implements ILeaveBalanceRepository {
   }
 
   async create(
-    balance: Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt'>,
+    balance: Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt' | 'remainingDays'>,
   ): Promise<LeaveBalance> {
     try {
       const result: QueryResult = await this.db.query(
