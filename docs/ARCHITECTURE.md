@@ -16,22 +16,13 @@ The architecture is modular, with a clear separation of concerns between models,
 ## Module structure
 
 ```
-src/modules/leave/leave.{model,repository,service,controller,routes}.ts
-src/modules/balance/balance.{model,repository,service,controller,routes}.ts
-src/modules/employee/employee.{model,repository,service,controller,routes}.ts
-src/modules/policy/policy.{model,repository,service,controller,routes}.ts
-src/modules/notification/notification.{model,repository,service,controller,routes}.ts
-src/modules/LeaveStatus/    — LeaveStatus module
-src/modules/BaseEntity/    — BaseEntity module
-src/modules/LeaveRequest/    — LeaveRequest module
-src/modules/leave-type/    — LeaveType module
-src/modules/LeavePolicy/    — LeavePolicy module
-src/modules/AuditLog/    — AuditLog module
-src/modules/AuditRecord/    — AuditRecord module
-src/modules/AuditServiceInterface/    — AuditServiceInterface module
-src/shared/db connection.ts
-src/shared/base repository.ts
-src/shared/error types.ts
+src/modules/employee/employee.{model,repository}.ts
+src/modules/leave-type/leave-type.{model,repository}.ts
+src/modules/leave-policy/leave-policy.{model,repository,service.interface}.ts
+src/modules/leave-balance/leave-balance.{model,repository,service.interface}.ts
+src/modules/status/    — Status module (system health)
+src/modules/uptime/    — Uptime module (system health routes)
+src/shared/db/connection.ts
 src/shared/types/    — shared enums (LeaveTypeCode, LeaveRequestStatus)
 src/shared/utils/    — shared utilities (business-days)
 ```
@@ -58,7 +49,7 @@ src/shared/utils/    — shared utilities (business-days)
 - **Employee**: Core employee record with status and manager hierarchy.
 - **LeaveType**: Catalog of leave categories (annual, sick, emergency, etc.) with active/inactive lifecycle.
 - **LeavePolicy**: Rules per leave type (entitlement, accrual, notice, approval flag).
-- **LeaveBalance**: Per-employee, per-policy, per-fiscal-year tracking of entitlement, used, and remaining days. Lifecycle: ACTIVE → EXHAUSTED → CLOSED.
+- **LeaveBalance**: Per-employee, per-policy, per-fiscal-year tracking of entitlement, used, and remaining days. Lifecycle: ACTIVE → EXHAUSTED → CLOSED. `remainingDays` is a derived field computed as `totalEntitlement - usedDays` at query time in the repository row mapper — it is not stored in the database.
 - **LeaveRequest**: Employee leave application with full lifecycle: DRAFT → SUBMITTED → (APPROVED | REJECTED) → CANCELLED.
 - **LeaveRequestStatus**: Enum: DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED.
 - **AuditLog**: Immutable record of all state-changing operations (GP-002).
@@ -74,8 +65,8 @@ src/shared/utils/    — shared utilities (business-days)
 | shared-types | src/shared/types/ | LeaveTypeCode and LeaveRequestStatus enums |
 | employee | src/modules/employee/ | Employee model and repository |
 | leave-type | src/modules/leave-type/ | LeaveType catalog model and repository |
-| leave-policy | src/modules/leave-policy/ | LeavePolicy model, repository, service |
-| leave-balance | src/modules/leave-balance/ | LeaveBalance model, repository, service |
+| leave-policy | src/modules/leave-policy/ | LeavePolicy model, repository, service interface |
+| leave-balance | src/modules/leave-balance/ | LeaveBalance model, repository, service interface |
 | leave-request | src/modules/leave-request/ | LeaveRequest model, repository, service (orchestrator) |
 | audit-log | src/modules/audit-log/ | AuditLog model, repository, service |
 | notification | src/modules/notification/ | Notification model, repository, service |
@@ -88,7 +79,7 @@ All dependencies flow inward. leave-request orchestrates the full lifecycle, dep
 - **leave_types**: id, code (unique), name, is_active.
 - **leave_policies**: id, leave_type_id (FK), entitlement_days, accrual_rate, max_accumulation, minimum_notice_days, requires_manager_approval, is_active.
 - **leave_requests**: id, employee_id (FK), leave_policy_id (FK), start_date, end_date, status, approved_by (FK), etc.
-- **leave_balances**: id, employee_id (FK), leave_policy_id (FK), total_entitlement, used_days, remaining_days, fiscal_year, status; unique (employee_id, leave_policy_id, fiscal_year).
+- **leave_balances**: id, employee_id (FK), leave_policy_id (FK), total_entitlement, used_days, fiscal_year, status; unique (employee_id, leave_policy_id, fiscal_year). `remaining_days` is NOT a column — it is derived as `total_entitlement - used_days`.
 - **audit_logs**: id, entity_type, entity_id, action, old_values, new_values, performed_by, performed_at.
 - **notifications**: id, recipient_id (FK), type, message, is_read.
 

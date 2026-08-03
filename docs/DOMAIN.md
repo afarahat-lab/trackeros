@@ -143,28 +143,9 @@ Represents a leave record managed by the `leave` module, including leave request
 | limit | number | false |
 | offset | number | false |
 
-## balance
+## leave-balance
 
-Represents leave balance data managed by the `balance` module, including tracked entitlement, accrual, and remaining leave amounts.
-
-### Balance
-
-| Field | Type | Required |
-|-------|------|----------|
-| id | string | true |
-| employeeId | string | true |
-| policyId | string | true |
-| totalEntitlement | number | true |
-| usedDays | number | true |
-| remainingDays | number | true |
-| fiscalYear | number | true |
-| status | string | true |
-| createdAt | Date | true |
-| updatedAt | Date | true |
-
-**Relationships**
-- `Employee` — many-to-one
-- `LeavePolicy` — many-to-one
+Represents leave balance data managed by the `leave-balance` module (`src/modules/leave-balance/`). Tracks per-employee, per-policy, per-fiscal-year entitlement and usage.
 
 ### LeaveBalance
 
@@ -172,18 +153,33 @@ Represents leave balance data managed by the `balance` module, including tracked
 |-------|------|----------|
 | id | string | true |
 | employeeId | string | true |
-| policyId | string | true |
+| leavePolicyId | string | true |
 | totalEntitlement | number | true |
 | usedDays | number | true |
 | remainingDays | number | true |
 | fiscalYear | number | true |
-| status | string | true |
+| status | 'ACTIVE' \| 'EXHAUSTED' \| 'CLOSED' | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
-**Relationships**
-- `Employee` — many-to-one
-- `LeavePolicy` — many-to-one
+**Invariants**
+- `remainingDays` is a derived field computed as `totalEntitlement - usedDays` in the repository row mapper. It is NOT a stored database column.
+- Unique constraint on `(employee_id, leave_policy_id, fiscal_year)`.
+- Status lifecycle: ACTIVE → EXHAUSTED (when remainingDays reaches 0) → CLOSED (end of fiscal year).
+
+**Repository** (`ILeaveBalanceRepository` / `LeaveBalanceRepository`)
+- `findByEmployeeAndPolicy(employeeId, leavePolicyId, fiscalYear): Promise<LeaveBalance | null>` — returns the balance or null; parameterized query.
+- `findByEmployee(employeeId, fiscalYear): Promise<LeaveBalance[]>` — returns all balances for the employee in the given fiscal year.
+- `create(balance): Promise<LeaveBalance>` — inserts a new balance row.
+- `updateUsedDays(id, usedDays): Promise<LeaveBalance>` — atomically updates `used_days` and returns the updated balance with recomputed `remainingDays`.
+
+**Service Interface** (`ILeaveBalanceService`)
+- `getBalance(employeeId, leavePolicyId, fiscalYear): Promise<LeaveBalance & { remainingDays: number }>`
+- `deductDays(employeeId, leavePolicyId, fiscalYear, days): Promise<void>` — increments usedDays; throws if remaining would go below zero.
+- `restoreDays(employeeId, leavePolicyId, fiscalYear, days): Promise<void>` — decrements usedDays; floors at zero.
+
+**Dependencies**
+- Uses the shared `pool` from `src/shared/db/connection.ts` (injectable via constructor for testing).
 
 ## employee
 
@@ -207,36 +203,9 @@ Represents employee data managed by the `employee` module, including employee re
 | updatedAt | Date | true |
 | deletedAt | Date \| null | false |
 
-## policy
+## leave-policy
 
-Represents leave policy data managed by the `policy` module, including policy definitions, rules, and leave entitlement configurations.
-
-### Policy
-
-| Field | Type | Required |
-|-------|------|----------|
-| id | string | true |
-| policyName | string | true |
-| leaveType | string | true |
-| entitlementDays | number | true |
-| accrualRate | number | false |
-| maxAccumulation | number | false |
-| minimumNoticeDays | number | false |
-| requiresManagerApproval | boolean | true |
-| isActive | boolean | true |
-| createdAt | Date | true |
-| updatedAt | Date | true |
-
-### LeaveType
-
-| Value | Description |
-|-------|-------------|
-| annual | Annual leave |
-| sick | Sick leave |
-| emergency | Emergency leave |
-| unpaid | Unpaid leave |
-| maternity | Maternity leave |
-| paternity | Paternity leave |
+Represents leave policy data managed by the `leave-policy` module (`src/modules/leave-policy/`).
 
 ### LeavePolicy
 
@@ -244,15 +213,23 @@ Represents leave policy data managed by the `policy` module, including policy de
 |-------|------|----------|
 | id | string | true |
 | policyName | string | true |
-| leaveType | string | true |
+| leaveTypeId | string | true |
 | entitlementDays | number | true |
-| accrualRate | number | false |
-| maxAccumulation | number | false |
-| minimumNoticeDays | number | false |
+| accrualRate | number \| undefined | false |
+| maxAccumulation | number \| undefined | false |
+| minimumNoticeDays | number \| undefined | false |
 | requiresManagerApproval | boolean | true |
 | isActive | boolean | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
+
+**Repository** (`ILeavePolicyRepository` / `LeavePolicyRepository`)
+- `findById(id): Promise<LeavePolicy | null>`
+- `findByLeaveTypeId(leaveTypeId): Promise<LeavePolicy[]>`
+- `findAllActive(): Promise<LeavePolicy[]>`
+
+**Service Interface** (`ILeavePolicyService`)
+- `getPolicyForLeaveType(leaveTypeId): Promise<LeavePolicy | null>`
 
 ## notification
 
