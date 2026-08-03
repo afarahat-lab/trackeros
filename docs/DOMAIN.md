@@ -79,19 +79,9 @@ Represents the catalog of leave categories available in the system. Managed by t
 - Imports `LeaveTypeCode` from `src/shared/types/` (Phase 1).
 - Uses the shared `pool` from `src/shared/db/connection.ts` (injectable via constructor for testing).
 
-## leave
+## leave-request
 
-Represents a leave record managed by the `leave` module, including leave requests and related leave-tracking data. **NOT YET BUILT — forward-looking spec.**
-
-### LeaveStatus
-
-| Value | Description |
-|-------|-------------|
-| DRAFT | Leave request is in draft state |
-| SUBMITTED | Leave request has been submitted |
-| APPROVED | Leave request has been approved |
-| REJECTED | Leave request has been rejected |
-| CANCELLED | Leave request has been cancelled |
+Represents leave request data managed by the `leave-request` module (`src/modules/leave-request/`). Model and repository are built; service, controller, and routes are not yet built.
 
 ### LeaveRequest
 
@@ -99,7 +89,7 @@ Represents a leave record managed by the `leave` module, including leave request
 |-------|------|----------|
 | id | string | true |
 | employeeId | string | true |
-| leaveTypeId | string | true |
+| leavePolicyId | string | true |
 | startDate | Date | true |
 | endDate | Date | true |
 | reason | string \| undefined | false |
@@ -109,39 +99,32 @@ Represents a leave record managed by the `leave` module, including leave request
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
-**Relationships**
-- `Employee` — many-to-one
+**Invariants**
+- `status` is one of the five `LeaveRequestStatus` enum values.
+- Newly created requests always start in `DRAFT` status (enforced by the repository, not the caller).
+- `approvedBy` and `approvedAt` are null until the request is approved or rejected.
+- `reason` maps to/from SQL NULL: `undefined` in the domain model, `null` in the database.
 
 ### CreateLeaveRequestDto
 
 | Field | Type | Required |
 |-------|------|----------|
 | employeeId | string | true |
-| leaveTypeId | string | true |
+| leavePolicyId | string | true |
 | startDate | Date | true |
 | endDate | Date | true |
 | reason | string \| undefined | false |
 
-### UpdateLeaveRequestDto
+**Repository** (`ILeaveRequestRepository` / `LeaveRequestRepository`)
+- `findById(id: string): Promise<LeaveRequest | null>` — returns the LeaveRequest or null; parameterized query.
+- `findByEmployee(employeeId: string): Promise<LeaveRequest[]>` — returns all requests for the given employee; empty array when none.
+- `findByStatus(status: LeaveRequestStatus): Promise<LeaveRequest[]>` — returns all requests with the given status; empty array when none.
+- `create(dto: CreateLeaveRequestDto): Promise<LeaveRequest>` — inserts a new row with status `DRAFT`, null `approved_by` and `approved_at`. Returns the created LeaveRequest.
+- `updateStatus(id: string, status: LeaveRequestStatus, approvedBy?: string | null, approvedAt?: Date | null): Promise<LeaveRequest>` — atomically updates status, approved_by, approved_at, and updated_at. Returns the updated LeaveRequest.
 
-| Field | Type | Required |
-|-------|------|----------|
-| startDate | Date | false |
-| endDate | Date | false |
-| reason | string \| undefined | false |
-
-### LeaveRequestQueryParams
-
-| Field | Type | Required |
-|-------|------|----------|
-| status | LeaveRequestStatus | false |
-| leaveTypeId | string | false |
-| startDateFrom | Date | false |
-| startDateTo | Date | false |
-| endDateFrom | Date | false |
-| endDateTo | Date | false |
-| limit | number | false |
-| offset | number | false |
+**Dependencies**
+- Imports `LeaveRequestStatus` from `src/shared/types/`.
+- Uses the shared `pool` from `src/shared/db/connection.ts` (injectable via constructor for testing).
 
 ## leave-balance
 
