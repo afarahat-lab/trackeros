@@ -1,20 +1,19 @@
-# Implement this phase: Phase 1: Shared enums and business-days utility
+# Implement this phase: Phase 2: Employee module (model + repository)
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/8177937e-ec7c-4649-b943-9d9104b82731/1`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/8177937e-ec7c-4649-b943-9d9104b82731/2`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the foundational shared types and utility that every downstream module depends on.
+Build the Employee domain model and repository. This phase depends on no prior phase files (Employee has no dependency on the enums from Phase 1).
 
 Files to create:
-- `src/shared/types/leave-type-code.enum.ts` — Define the `LeaveTypeCode` enum with members: ANNUAL, SICK, EMERGENCY, UNPAID, MATERNITY, PATERNITY.
-- `src/shared/types/leave-request-status.enum.ts` — Define the `LeaveRequestStatus` enum with members: DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED.
-- `src/shared/utils/business-days.ts` — Implement and export `countBusinessDays(startDate: Date, endDate: Date, holidays: Date[]): number`. Exclude weekends (Saturday/Sunday) and the provided holidays array. Normalize all dates to UTC midnight for calendar-date comparison. Count whole business days only. For now, accept holidays as a parameter (the holidays table/repository comes in a later phase).
-- `src/shared/types/index.ts` — Barrel re-export of both enums.
+- `src/modules/employee/employee.model.ts` — Define the `Employee` interface with exact fields: id: string, employeeNumber: string, firstName: string, lastName: string, email: string, managerId: string | null, department: string, hireDate: Date, terminationDate: Date | null, employmentStatus: 'ACTIVE' | 'INACTIVE' | 'TERMINATED', createdAt: Date, updatedAt: Date.
+- `src/modules/employee/employee.repository.ts` — Define `IEmployeeRepository` interface with methods: findById(id: string): Promise<Employee | null>, findByEmployeeNumber(employeeNumber: string): Promise<Employee | null>, findAll(): Promise<Employee[]>. Implement `EmployeeRepository` class using the existing `pool` from `src/shared/db/connection.ts`. Use parameterized SQL queries via `pg` Pool.
+- `src/modules/employee/index.ts` — Barrel export of model and repository.
 
-Include Jest unit tests in `tests/unit/shared/types/` for enum value correctness and in `tests/unit/shared/utils/business-days.test.ts` covering: weekday range with no holidays, range spanning a weekend, range with holidays, same-day (zero days), and end-before-start (error).
+Include Jest unit tests in `tests/unit/modules/employee/employee.repository.test.ts` — mock the pg Pool, test findById returns Employee or null, findByEmployeeNumber, and findAll.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -36,22 +35,40 @@ These are resolved, feature-wide decisions. Wherever this phase touches the conc
 
 8. Test files use the project's Jest convention — `*.test.ts` under `tests/` (matching the configured testMatch), NOT `.spec.ts`; do not change the Jest config. [BINDING RULE — operator decision resolving: How is used_days on leave_balances computed — derived live from approved leave_requests or stored counter incremented/decremented on state changes?; Are leave days always whole days, or does the system need to support half-day or hourly leave requests?; When should leave balance be deducted — at application time or at approval time?; How is used_days on leave_balances computed — is it derived live from approved leave_requests (SUM of day counts where status=APPROVED) or is it a stored counter incremented/decremented on approval/rejection/cancellation?; apply everywhere these apply, not in one place only]
 
+## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
+The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
+- `Employee` — the entity MUST have exactly these fields:
+    - id: string
+    - employeeNumber: string
+    - firstName: string
+    - lastName: string
+    - email: string
+    - managerId: string | null
+    - department: string
+    - hireDate: Date
+    - terminationDate: Date | null
+    - employmentStatus: 'ACTIVE' | 'INACTIVE' | 'TERMINATED'
+    - createdAt: Date
+    - updatedAt: Date
+
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- The LeaveTypeCode enum members must match the reconciled architecture's shared-types module ownership: "LeaveTypeCode enum (ANNUAL, SICK, EMERGENCY, UNPAID, MATERNITY, PATERNITY)" and "LeaveRequestStatus enum (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED)". No member may be added, removed, or renamed without updating this source. (see `.gestalt/architecture/reconciled.json`)
-- The LeaveRequestStatus enum must match the architecture's declared lifecycle: "LeaveRequest: DRAFT → SUBMITTED → (APPROVED | REJECTED) → CANCELLED" — the five members DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED are the complete set. (see `docs/ARCHITECTURE.md`)
-- countBusinessDays must implement the reconciled business rule for day counting: "BUSINESS DAYS ONLY, excluding weekends AND public holidays ... Whole days only — no half-day/partial-day leave. Compare dates by CALENDAR-DATE equality in UTC (normalize each day/holiday/weekend check to UTC midnight; compare the YYYY-MM-DD triple), never by raw timestamp." The function signature and normalization behavior must conform to this rule. (see `.gestalt/architecture/reconciled.json`)
-- Test file placement and naming must conform to jest.config.js: testMatch ['**/tests/**/*.test.(ts|js)'] and moduleDirectories including 'src'. Tests must be discoverable by the configured runner without modifying the Jest config. (see `jest.config.js`)
+- The EmployeeRepository must obtain its database connection from the existing shared pg Pool exported as `pool` from src/shared/db/connection.ts — it must not instantiate a new Pool or read DATABASE_URL independently. This is the sanctioned shared-infrastructure import per AGENTS.md and the agents.yaml shared-infrastructure rule. (see `src/shared/db/connection.ts`)
+- The Employee interface field names and types must match the reconciled architecture's Employee entity definition exactly (id, employeeNumber, firstName, lastName, email, managerId: string|null, department, hireDate: Date, terminationDate: Date|null, employmentStatus: 'ACTIVE'|'INACTIVE'|'TERMINATED', createdAt: Date, updatedAt: Date). The conceptual SQL schema for the employees table (snake_case columns: id, employee_number, first_name, last_name, email, manager_id, department, hire_date, termination_date, employment_status, created_at, updated_at; unique indexes on employee_number and email; FK manager_id -> employees.id) must be the mapping target the repository queries against. (see `.gestalt/architecture/reconciled.json`)
+- The employee module must be placed at src/modules/employee/ with files employee.model.ts, employee.repository.ts, and index.ts — matching the module structure declared in ARCHITECTURE.md (src/modules/<name>/<name>.{model,repository,...}.ts) and the reconciled architecture's module boundary (path: src/modules/employee/, owns: Employee model, IEmployeeRepository interface, EmployeeRepository implementation). (see `docs/ARCHITECTURE.md`)
+- The unit test file must be placed at tests/unit/modules/employee/employee.repository.test.ts to match the jest.config.js testMatch pattern ('**/tests/**/*.test.(ts|js)') and the phase's declared test path. The test must use the project's ts-jest preset and mock the pg Pool so no live database connection is required. (see `jest.config.js`)
 ### Entity invariants — enforce these
-- Reuse or extend `LeaveTypeCode`: The enum's member set is closed and fixed at exactly {ANNUAL, SICK, EMERGENCY, UNPAID, MATERNITY, PATERNITY}; each member's string value equals its own uppercase name. No other leave-type code may be introduced without updating this enum and all downstream consumers.
-- Reuse or extend `LeaveRequestStatus`: The enum's member set is closed and fixed at exactly {DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED}; each member's string value equals its own uppercase name. These are the only valid lifecycle states a LeaveRequest may occupy.
+- Reuse or extend `Employee`: managerId is a self-referential foreign key to employees.id (or null for an employee with no manager). An employee with managerId === null represents a top-level employee whose leave requests escalate to hr_admin rather than auto-approving — this null-manager semantics is a binding business rule that downstream phases rely on, so the model must preserve nullability faithfully (never coerce null to an empty string or undefined).
+- Reuse or extend `Employee`: employmentStatus is constrained to exactly three lifecycle states: 'ACTIVE', 'INACTIVE', 'TERMINATED'. The model must express this as a closed union type (not an open string) so that no other status value can be assigned; downstream leave logic treats only ACTIVE employees as eligible to submit leave.
+- Reuse or extend `Employee`: employeeNumber and email are business-unique identifiers (the conceptual schema declares both as unique indexes). The repository's findByEmployeeNumber lookup relies on this uniqueness — it returns at most one Employee. The model must not weaken these to non-unique fields.
 ### Interface contract — expose these operations (their shape is yours)
-- countBusinessDays(startDate: Date, endDate: Date, holidays: Date[]): number — idempotent; Must throw when endDate is strictly before startDate (end-before-start). The thrown error must be a real Error (not a silent return of a negative/zero number).
+- findById(id: string): Promise<Employee | null> — idempotent; Returns null when no row matches the given id (not an error). Errors from the underlying pg Pool query (connection failure, etc.) must be caught and handled — no unhandled rejection (GP-006). The id must be passed as a parameterized query value, never interpolated into SQL.
+- findByEmployeeNumber(employeeNumber: string): Promise<Employee | null> — idempotent; Returns null when no row matches the given employeeNumber (not an error). Errors from the underlying pg Pool query must be caught and handled (GP-006). The employeeNumber must be passed as a parameterized query value to prevent SQL injection.
+- findAll(): Promise<Employee[]> — idempotent; Returns an empty array when no rows exist (not null, not an error). Errors from the underlying pg Pool query must be caught and handled (GP-006).
 ### Integration points — connect to these
-- src/modules/leave-type/leave-type.model.ts (Phase 3) — LeaveType.code is typed as LeaveTypeCode; the leave-type module imports this enum from src/shared/types. The enum's member set and string values must be stable before Phase 3 consumes them.
-- src/modules/leave-request/leave-request.model.ts (Phase 6) and leave-request.service.ts (Phase 7) — LeaveRequest.status is typed as LeaveRequestStatus, and the Phase 7 service computes business days via countBusinessDays (passing an empty holidays array for now). Both the enum and the utility are consumed by the leave-request orchestrator.
-- src/shared/types/index.ts (barrel) — All downstream modules import the enums through the shared-types barrel per the architecture's dependency rule (modules import only through declared public entry points). The barrel must re-export both enums so consumers never reach into individual enum files.
+- src/shared/db/connection.ts (shared pg Pool) — The EmployeeRepository executes SQL through the shared pg Pool — this is the sole external dependency of the employee module in this phase. The repository delegates all connection management to this shared infrastructure rather than owning its own connection.
+- Downstream phases: leave-balance (Phase 5), leave-request (Phase 6/7), notification (Phase 9) — The Employee model and repository are consumed by downstream modules via the employee module's public barrel (index.ts). leave-balance references employeeId; leave-request needs managerId to determine approval routing (escalate to hr_admin when null); notification targets recipientId (an employee). These phases import Employee from the employee module's index.ts, so the barrel must export both the model and the repository interface/implementation.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
