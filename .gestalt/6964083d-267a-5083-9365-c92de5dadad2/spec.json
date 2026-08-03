@@ -1,0 +1,151 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-request"
+    ],
+    "affectedLayers": [
+      "domain-model",
+      "repository",
+      "unit-tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The LeaveRequest domain model is exported from the leave-request module and exposes a LeaveRequest interface and a CreateLeaveRequestDto type that compile under strict TypeScript; LeaveRequestStatus is imported from the shared-types module rather than redefined.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository's findById returns the matching LeaveRequest when a row exists and null when no row matches; findByEmployee and findByStatus return arrays (empty array when no rows match) of correctly mapped LeaveRequest objects.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository's create persists a new leave_requests row with status defaulting to LeaveRequestStatus.DRAFT, approvedBy/approvedAt defaulting to null, and an omitted reason persisted as SQL NULL, then returns the created LeaveRequest mapped from the RETURNING row.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository's updateStatus updates the status, approvedBy, approvedAt, and updated_at columns of the matching row and returns the updated LeaveRequest; when approvedBy/approvedAt are omitted they are written as null.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Every repository method wraps its database call in try/catch (error: unknown) and throws a typed Error whose message begins with 'Failed to' and includes the underlying error message, satisfying GP-006 (no unhandled promise rejections).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository unit test suite covers, for each method, a happy-path case, a null/empty-result case, a SQL-injection parameterized-query assertion (verifying user input is passed as a bound parameter, not concatenated), and an error-throw case \u2014 matching the established test conventions of the employee, leave-policy, and leave-balance repository suites.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The leave-request module barrel (index.ts) re-exports the model types and the repository interface + implementation, and the module compiles cleanly under `npm run build` (tsc --noEmit) with strict mode enabled.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No use of `any` anywhere (HARNESS constraint `no-any`, severity high): row objects must be typed as `Record<string, unknown>`, catch blocks must use `error: unknown` with type guards, never `any`.",
+    "All database access must go through the repository layer (HARNESS constraint `no-direct-db-outside-repository`, severity critical): SQL may only appear inside leave-request.repository.ts; no inline SQL or direct pg Pool usage in the model or barrel.",
+    "All SQL must use parameterized queries with positional placeholders ($1, $2, ...); user-supplied values must never be string-concatenated into SQL text.",
+    "The repository must accept a pg Pool via constructor injection with the shared `pool` from src/shared/db/connection.ts as the default argument, matching the existing employee/leave-policy/leave-balance repositories \u2014 enabling test mocking.",
+    "Test files must use the project Jest convention `*.test.ts` under `tests/` (matching testMatch `**/tests/**/*.test.(ts|js)`), NOT `.spec.ts`; the Jest config must not be modified.",
+    "Modules must import from each other only through their declared public entry point (index.ts barrel); the leave-request module must import LeaveRequestStatus from the shared-types barrel, not from the enum file's internals."
+  ],
+  "outOfScope": [
+    "LeaveRequestService, its service interface, and any business logic (balance sufficiency checks, RBAC authorization, day counting, status-transition enforcement) \u2014 these belong to Phase 7.",
+    "Fastify controller, routes, and app registration for leave requests \u2014 Phase 8.",
+    "AuditLog and Notification modules and any audit-record emission or notification dispatch \u2014 Phase 9/10; the repository must not write audit records or send notifications.",
+    "Database migrations or schema DDL for the leave_requests table \u2014 the repository assumes the snake_case table already exists; no migration files are created in this phase."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "A newly created LeaveRequest always begins its lifecycle in the DRAFT status with approvedBy and approvedAt both null; the repository's create must never accept or inject a non-DRAFT initial status."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "The reason field follows the optional/undefined convention: a database NULL maps to `undefined` (not `null`) on read, and an omitted/undefined reason on create maps to SQL NULL on write \u2014 mirroring the LeavePolicy.accrualRate pattern, distinct from the nullable approvedBy/approvedAt which use `null`."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "The leave_requests row references valid employees and leave policies via foreign keys (employee_id \u2192 employees.id, leave_policy_id \u2192 leave_policies.id, approved_by \u2192 employees.id); the repository does not enforce referential integrity itself (the database does) but must persist the provided identifiers as-is."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "findById(id) \u2014 single-row lookup by primary key",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns null when no row matches (not an error); throws a typed Error prefixed 'Failed to' when the underlying query rejects."
+    },
+    {
+      "operation": "findByEmployee(employeeId) \u2014 list lookup by employee_id",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns an empty array when no rows match (not an error); throws a typed Error prefixed 'Failed to' when the underlying query rejects."
+    },
+    {
+      "operation": "findByStatus(status) \u2014 list lookup by status column",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns an empty array when no rows match (not an error); throws a typed Error prefixed 'Failed to' when the underlying query rejects."
+    },
+    {
+      "operation": "create(dto) \u2014 INSERT with RETURNING *",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the persisted LeaveRequest mapped from the RETURNING row; throws a typed Error prefixed 'Failed to' on any DB failure (including FK constraint violations). Not idempotent \u2014 repeated calls create distinct rows."
+    },
+    {
+      "operation": "updateStatus(id, status, approvedBy?, approvedAt?) \u2014 UPDATE with RETURNING *",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns the updated LeaveRequest mapped from the RETURNING row; throws a typed Error prefixed 'Failed to' on any DB failure. Optional approvedBy/approvedAt default to null when omitted."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The LeaveRequestRepository must follow the identical structural pattern as LeaveBalanceRepository: `import { Pool, QueryResult } from 'pg'` + `import { pool } from '../../shared/db/connection'`, constructor `constructor(dbPool: Pool = pool)`, a private `rowToLeaveRequest` mapper function, `await this.db.query(sql, [params])`, single-row methods returning null when `rows.length === 0`, and every method wrapped in `try/catch (error: unknown)` throwing `new Error('Failed to <action>: ${error instanceof Error ? error.message : String(error)}')`.",
+      "referencePath": "src/modules/leave-balance/leave-balance.repository.ts"
+    },
+    {
+      "requirement": "The row mapper's null/undefined handling must match the established conventions: optional fields (reason) use `(row.col as T | null) ?? undefined` (DB null \u2192 undefined), nullable fields (approvedBy) use `(row.col as string) ?? null`, nullable dates (approvedAt) use `row.col ? new Date(row.col as string) : null`, and all dates use `new Date(row.col as string)` \u2014 mirroring rowToLeavePolicy and rowToEmployee.",
+      "referencePath": "src/modules/leave-policy/leave-policy.repository.ts"
+    },
+    {
+      "requirement": "The LeaveRequest interface's status field and the repository's findByStatus/updateStatus parameters must use the LeaveRequestStatus enum imported from the shared-types module (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED) \u2014 the enum must not be redefined or duplicated in the leave-request module.",
+      "referencePath": "src/shared/types/leave-request-status.enum.ts"
+    },
+    {
+      "requirement": "The leave-request barrel (index.ts) must follow the same export pattern as the leave-balance and leave-policy barrels: `export { <ModelType>, <DtoType> } from './<module>.model'` and `export { I<Module>Repository, <Module>Repository } from './<module>.repository'`.",
+      "referencePath": "src/modules/leave-balance/index.ts"
+    },
+    {
+      "requirement": "The repository test suite must follow the established test pattern: `jest.mock('pg', () => { const mockQuery = jest.fn(); return { Pool: jest.fn().mockImplementation(() => ({ query: mockQuery })) }; })`, `Record<string, unknown>` row fixtures with snake_case keys and ISO date strings, a helper asserting mapped fields match the row, and per-method coverage of happy-path, null/empty, SQL-injection parameterized-query, and error-throw cases.",
+      "referencePath": "tests/unit/modules/leave-balance/leave-balance.repository.test.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/leave-request-status.enum.ts (via src/shared/types/index.ts barrel)",
+      "why": "The LeaveRequest model and repository depend on the LeaveRequestStatus enum (DRAFT/SUBMITTED/APPROVED/REJECTED/CANCELLED) for the status field and the findByStatus/updateStatus method signatures."
+    },
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "The repository imports the shared `pool` (pg Pool) as the default constructor argument for database access, consistent with all existing repositories."
+    },
+    {
+      "target": "src/modules/employee/employee.model.ts and src/modules/leave-policy/leave-policy.model.ts",
+      "why": "The leave_requests table foreign-keys employee_id \u2192 employees.id and leave_policy_id \u2192 leave_policies.id; the LeaveRequest model's employeeId and leavePolicyId fields are typed as string references to these entities' ids. No direct code import is required (referential integrity is enforced by the database), but the field semantics must align with these existing models."
+    }
+  ]
+}
