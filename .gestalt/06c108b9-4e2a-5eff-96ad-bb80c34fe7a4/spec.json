@@ -1,0 +1,214 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-request",
+      "leave-balance",
+      "leave-policy",
+      "employee",
+      "shared-types",
+      "shared-utils"
+    ],
+    "affectedLayers": [
+      "service",
+      "unit-tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The ILeaveRequestService interface declares submit, approve, reject, cancel, getById, and getByEmployee operations with the actor/approver role threaded as an explicit parameter on every state-changing method.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "submit rejects a past startDate and an endDate-before-startDate with a typed validation error before any persistence occurs.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "submit enforces the policy's minimumNoticeDays (when defined and > 0) against the gap between today and startDate, throwing a typed validation error when the notice is insufficient.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "submit computes requested leave days via countBusinessDays with an empty holidays array, and rejects a range that spans zero business days with a typed validation error.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "submit recomputes remaining balance inline as totalEntitlement - usedDays (not trusting a stored remainingDays field) and throws InsufficientBalanceError when the computed remaining is less than the requested business days.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "submit atomically increments usedDays on the LeaveBalance before/with persisting the request, and the resulting LeaveRequest has status SUBMITTED.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "submit does NOT auto-approve a request for a manager-less employee (managerId null); the request remains SUBMITTED and requires hr_admin approval.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "approve sets status to APPROVED with approvedBy and approvedAt populated, and does NOT modify usedDays on the LeaveBalance.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "approve authorizes only the employee's direct manager (approverId === employee.managerId) or, when managerId is null, only hr_admin; any other approver throws ApproverNotAuthorizedError.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "reject applies the same authorization rule as approve, sets status to REJECTED, and restores usedDays on the LeaveBalance (floored at zero) using the recomputed business days.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "cancel is permitted only when the prior status is SUBMITTED or APPROVED (other statuses throw a typed validation error); an employee may cancel only their own request while manager/hr_admin may cancel any.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "cancel restores usedDays on the LeaveBalance only when the prior status was SUBMITTED; cancelling an APPROVED request does NOT touch usedDays.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "getById returns the LeaveRequest or null, and getByEmployee returns the array of the employee's requests (empty array when none), delegating to the repository without authorization logic.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The barrel export (index.ts) re-exports the service interface, the service class, and the four typed error classes (InsufficientBalanceError, ApproverNotAuthorizedError, ValidationError, LeaveRequestNotFoundError).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The Jest test suite covers each method's happy path and error paths: insufficient balance, unauthorized approver, past startDate, endDate-before-startDate, insufficient notice, zero business days, missing employee/policy/balance, not-found request, wrong-status approve/reject/cancel, and cross-employee cancel \u2014 all using mocked repository dependencies.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access goes through repository interfaces (GP-001); the service must not import or call the pg Pool, connection, or any repository implementation class directly \u2014 only the ILeaveRequestRepository, ILeaveBalanceRepository, IEmployeeRepository, and ILeavePolicyRepository interfaces.",
+    "RBAC is enforced inside the service via the explicit actorRole/approverRole parameter (GP-005); the service must not read ambient auth state, and the role is never inferred from the Employee entity.",
+    "No use of any (HARNESS no-any rule); use unknown with type guards where dynamic values are handled.",
+    "remainingDays must never be written or trusted as a stored value; it is always recomputed inline as totalEntitlement - usedDays at the point of the balance-sufficiency check.",
+    "Business-day counting must use the shared countBusinessDays utility with an empty holidays array, comparing dates by UTC-midnight calendar-date equality (exclusive of the end day).",
+    "fiscalYear is derived as the calendar year of the request's startDate (UTC), not from a tenant configuration or a separate field.",
+    "Test files must use the *.test.ts convention under tests/ with jest.Mocked<Interface> and manual jest.fn() per method in beforeEach; no jest.mock() factory for service tests.",
+    "Modules import from each other only through their declared public entry point (index.ts); no imports of another module's internal files."
+  ],
+  "outOfScope": [
+    "Audit logging (GP-002 audit records) \u2014 deferred to Phase 9 (audit-log module) and Phase 10 (integration into LeaveRequestService).",
+    "Notification dispatch (LEAVE_APPLIED / LEAVE_DECISION / BALANCE_LOW) \u2014 deferred to Phase 9 (notification module) and Phase 10 (integration).",
+    "Fastify controller and routes (HTTP methods, paths, request.user consumption, GP-003 boundary validation) \u2014 Phase 8.",
+    "LeavePolicyService and LeaveBalanceService implementations \u2014 Phase 10; this phase consumes only the repository interfaces and the LeaveBalance service interface shape.",
+    "Public-holiday calendar / holidays table integration \u2014 countBusinessDays is called with an empty holidays array in this phase."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "Lifecycle is strictly DRAFT \u2192 SUBMITTED \u2192 (APPROVED | REJECTED) \u2192 CANCELLED; approve and reject operate only on a SUBMITTED request, and cancel operates only on a SUBMITTED or APPROVED request \u2014 any other source status is rejected with a typed validation error."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "usedDays is the denormalized source of truth: incremented atomically on submit, restored (floored at zero) on reject and on cancel-of-SUBMITTED, and untouched on approve and on cancel-of-APPROVED; remainingDays is always derived as totalEntitlement - usedDays and never persisted or trusted as stored."
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "A null managerId escalates approval authority to hr_admin only \u2014 the service must neither auto-approve nor permit a manager to approve/reject a manager-less employee's request."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "submit(dto, actorId, actorRole)",
+      "authRule": "An employee actor may submit only for themselves (actorId === dto.employeeId); manager and hr_admin actors may submit for any employee.",
+      "idempotent": false,
+      "errorSemantics": "Typed errors: ApproverNotAuthorizedError (employee submitting for another), ValidationError (past startDate, endDate before startDate, insufficient notice, zero business days, missing employee/policy/balance), InsufficientBalanceError (remaining < requested days)."
+    },
+    {
+      "operation": "approve(leaveRequestId, approverId, approverRole)",
+      "authRule": "Approver must be the employee's direct manager (approverId === employee.managerId) OR, when managerId is null, approverRole must be hr_admin; hr_admin may not approve when a manager exists, and a manager may not approve when managerId is null.",
+      "idempotent": false,
+      "errorSemantics": "Typed errors: LeaveRequestNotFoundError (no request), ValidationError (status not SUBMITTED, missing employee), ApproverNotAuthorizedError (wrong approver/role). Does not modify usedDays."
+    },
+    {
+      "operation": "reject(leaveRequestId, approverId, approverRole)",
+      "authRule": "Same authorization rule as approve: employee's direct manager, or hr_admin when managerId is null.",
+      "idempotent": false,
+      "errorSemantics": "Typed errors: LeaveRequestNotFoundError, ValidationError (status not SUBMITTED, missing employee), ApproverNotAuthorizedError. Restores usedDays (floored at zero) using recomputed business days; missing balance is tolerated (no update, no error)."
+    },
+    {
+      "operation": "cancel(leaveRequestId, actorId, actorRole)",
+      "authRule": "An employee actor may cancel only their own request (actorId === leaveRequest.employeeId); manager and hr_admin actors may cancel any request.",
+      "idempotent": false,
+      "errorSemantics": "Typed errors: LeaveRequestNotFoundError, ValidationError (prior status not SUBMITTED or APPROVED), ApproverNotAuthorizedError (employee cancelling another's request). Restores usedDays only when prior status was SUBMITTED; missing balance is tolerated."
+    },
+    {
+      "operation": "getById(leaveRequestId) / getByEmployee(employeeId)",
+      "authRule": "No authorization enforced in the service for these read operations (RBAC for reads is applied at the controller/middleware layer in Phase 8).",
+      "idempotent": true,
+      "errorSemantics": "getById returns LeaveRequest | null; getByEmployee returns LeaveRequest[] (empty array when none). Pure delegation to the repository; no typed errors thrown for not-found."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Business-day counting in the service must call the shared countBusinessDays(startDate, endDate, []) utility and rely on its exclusive-end, UTC-midnight semantics \u2014 the service must not re-implement day counting.",
+      "referencePath": "src/shared/utils/business-days.ts"
+    },
+    {
+      "requirement": "Status transitions must use the LeaveRequestStatus enum members (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED) imported from the shared-types barrel \u2014 no string literals for status.",
+      "referencePath": "src/shared/types/leave-request-status.enum.ts"
+    },
+    {
+      "requirement": "The service must call only the ILeaveRequestRepository operations (findById, findByEmployee, create, updateStatus) as declared in Phase 6; the create\u2192updateStatus(SUBMITTED) sequence must match the repository's contract where create persists with DRAFT status.",
+      "referencePath": "src/modules/leave-request/leave-request.repository.ts"
+    },
+    {
+      "requirement": "Balance lookups and mutations must use ILeaveBalanceRepository.findByEmployeeAndPolicy(employeeId, leavePolicyId, fiscalYear) and updateUsedDays(id, usedDays) as declared in Phase 5; the service recomputes remaining inline rather than reading the repository's derived remainingDays property.",
+      "referencePath": "src/modules/leave-balance/leave-balance.repository.ts"
+    },
+    {
+      "requirement": "The service must operate on the LeaveRequest and CreateLeaveRequestDto shapes defined in Phase 6, setting approvedBy/approvedAt on approve and reject and leaving them null on submit/cancel per the model contract.",
+      "referencePath": "src/modules/leave-request/leave-request.model.ts"
+    },
+    {
+      "requirement": "The barrel export must re-export the service interface, the service class, and all four typed error classes so downstream phases (controller, audit integration) import only through the public entry point.",
+      "referencePath": "src/modules/leave-request/index.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/leave-balance (ILeaveBalanceRepository)",
+      "why": "submit increments usedDays, reject and cancel-of-SUBMITTED restore usedDays via findByEmployeeAndPolicy + updateUsedDays."
+    },
+    {
+      "target": "src/modules/leave-policy (ILeavePolicyRepository)",
+      "why": "submit looks up the LeavePolicy by id to read minimumNoticeDays and validate the policy exists."
+    },
+    {
+      "target": "src/modules/employee (IEmployeeRepository)",
+      "why": "submit, approve, and reject look up the Employee to verify existence and read managerId for authorization/escalation."
+    },
+    {
+      "target": "src/shared/utils/business-days (countBusinessDays)",
+      "why": "submit, reject, and cancel compute requested/restored business days via the shared utility with an empty holidays array."
+    },
+    {
+      "target": "src/modules/leave-request/leave-request.service.interface.ts (ILeaveRequestService)",
+      "why": "Phase 8 controller consumes this interface to delegate all leave-request operations, passing request.user.id and request.user.role as actor parameters."
+    },
+    {
+      "target": "src/modules/audit-log + src/modules/notification (Phase 9/10)",
+      "why": "Phase 10 will inject IAuditService and INotificationService into LeaveRequestService to emit audit records and notifications on submit/approve/reject/cancel \u2014 the current service must remain structured to accept these additions without rewriting the business logic."
+    }
+  ]
+}
