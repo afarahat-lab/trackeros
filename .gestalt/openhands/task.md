@@ -1,19 +1,19 @@
-# Implement this phase: Phase 2: Employee module (model + repository)
+# Implement this phase: Phase 3: LeaveType module (model + repository)
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/8177937e-ec7c-4649-b943-9d9104b82731/2`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/8177937e-ec7c-4649-b943-9d9104b82731/3`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Build the Employee domain model and repository. This phase depends on no prior phase files (Employee has no dependency on the enums from Phase 1).
+Build the LeaveType domain model and repository. This phase depends on `src/shared/types/leave-type-code.enum.ts` from Phase 1 — read it before generating any code.
 
 Files to create:
-- `src/modules/employee/employee.model.ts` — Define the `Employee` interface with exact fields: id: string, employeeNumber: string, firstName: string, lastName: string, email: string, managerId: string | null, department: string, hireDate: Date, terminationDate: Date | null, employmentStatus: 'ACTIVE' | 'INACTIVE' | 'TERMINATED', createdAt: Date, updatedAt: Date.
-- `src/modules/employee/employee.repository.ts` — Define `IEmployeeRepository` interface with methods: findById(id: string): Promise<Employee | null>, findByEmployeeNumber(employeeNumber: string): Promise<Employee | null>, findAll(): Promise<Employee[]>. Implement `EmployeeRepository` class using the existing `pool` from `src/shared/db/connection.ts`. Use parameterized SQL queries via `pg` Pool.
-- `src/modules/employee/index.ts` — Barrel export of model and repository.
+- `src/modules/leave-type/leave-type.model.ts` — Define the `LeaveType` interface with exact fields: id: string, code: LeaveTypeCode (import from `src/shared/types/leave-type-code.enum.ts`), name: string, description: string | undefined, isActive: boolean, createdAt: Date, updatedAt: Date.
+- `src/modules/leave-type/leave-type.repository.ts` — Define `ILeaveTypeRepository` interface with methods: findById(id: string): Promise<LeaveType | null>, findByCode(code: LeaveTypeCode): Promise<LeaveType | null>, findAllActive(): Promise<LeaveType[]>. Implement `LeaveTypeRepository` class using the existing `pool` from `src/shared/db/connection.ts` with parameterized SQL.
+- `src/modules/leave-type/index.ts` — Barrel export of model and repository.
 
-Include Jest unit tests in `tests/unit/modules/employee/employee.repository.test.ts` — mock the pg Pool, test findById returns Employee or null, findByEmployeeNumber, and findAll.
+Include Jest unit tests in `tests/unit/modules/leave-type/leave-type.repository.test.ts` — mock the pg Pool, test findById, findByCode, findAllActive.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -37,38 +37,39 @@ These are resolved, feature-wide decisions. Wherever this phase touches the conc
 
 ## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
 The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
-- `Employee` — the entity MUST have exactly these fields:
+- `LeaveType` — the entity MUST have exactly these fields:
     - id: string
-    - employeeNumber: string
-    - firstName: string
-    - lastName: string
-    - email: string
-    - managerId: string | null
-    - department: string
-    - hireDate: Date
-    - terminationDate: Date | null
-    - employmentStatus: 'ACTIVE' | 'INACTIVE' | 'TERMINATED'
+    - code: string
+    - name: string
+    - description: string | undefined
+    - isActive: boolean
     - createdAt: Date
     - updatedAt: Date
 
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- The EmployeeRepository must obtain its database connection from the existing shared pg Pool exported as `pool` from src/shared/db/connection.ts — it must not instantiate a new Pool or read DATABASE_URL independently. This is the sanctioned shared-infrastructure import per AGENTS.md and the agents.yaml shared-infrastructure rule. (see `src/shared/db/connection.ts`)
-- The Employee interface field names and types must match the reconciled architecture's Employee entity definition exactly (id, employeeNumber, firstName, lastName, email, managerId: string|null, department, hireDate: Date, terminationDate: Date|null, employmentStatus: 'ACTIVE'|'INACTIVE'|'TERMINATED', createdAt: Date, updatedAt: Date). The conceptual SQL schema for the employees table (snake_case columns: id, employee_number, first_name, last_name, email, manager_id, department, hire_date, termination_date, employment_status, created_at, updated_at; unique indexes on employee_number and email; FK manager_id -> employees.id) must be the mapping target the repository queries against. (see `.gestalt/architecture/reconciled.json`)
-- The employee module must be placed at src/modules/employee/ with files employee.model.ts, employee.repository.ts, and index.ts — matching the module structure declared in ARCHITECTURE.md (src/modules/<name>/<name>.{model,repository,...}.ts) and the reconciled architecture's module boundary (path: src/modules/employee/, owns: Employee model, IEmployeeRepository interface, EmployeeRepository implementation). (see `docs/ARCHITECTURE.md`)
-- The unit test file must be placed at tests/unit/modules/employee/employee.repository.test.ts to match the jest.config.js testMatch pattern ('**/tests/**/*.test.(ts|js)') and the phase's declared test path. The test must use the project's ts-jest preset and mock the pg Pool so no live database connection is required. (see `jest.config.js`)
+- The LeaveTypeRepository must mirror the EmployeeRepository structural pattern: a module-private `rowToLeaveType` mapper using `Record<string, unknown>` + `as` casts, a `private readonly db: Pool` with `constructor(dbPool: Pool = pool)`, try/catch wrapping `this.db.query`, parameterized `$1` SQL, null on empty rows, and rethrow as `new Error('Failed to <action>: <message>')`. (see `src/modules/employee/employee.repository.ts`)
+- The LeaveType model must be a plain TypeScript interface (not a class) with camelCase field names, matching the Employee model's style; the row mapper performs the snake_case→camelCase conversion. (see `src/modules/employee/employee.model.ts`)
+- The leave-type barrel `index.ts` must re-export the model and the repository interface + implementation, matching the employee barrel's export shape. (see `src/modules/employee/index.ts`)
+- The leave-type repository test must follow the employee test conventions: `jest.mock('pg', ...)` exposing a `query` mock, `beforeEach` clearing mocks and constructing the repo with the mocked pool, snake_case mock rows with ISO-string dates, an `expectLeaveTypeMatchesRow` helper, and per-method happy/null/injection/error cases. (see `tests/unit/modules/employee/employee.repository.test.ts`)
+- The `code` field type and the `findByCode` parameter type must reference the existing LeaveTypeCode enum (ANNUAL, SICK, EMERGENCY, UNPAID, MATERNITY, PATERNITY) — do not redefine or duplicate the enum. (see `src/shared/types/leave-type-code.enum.ts`)
+- The repository's default pool must be the existing `pool` exported from `src/shared/db/connection.ts` (a pg.Pool built from process.env.DATABASE_URL); do not construct a second Pool. (see `src/shared/db/connection.ts`)
+- The row mapper must read the exact snake_case columns declared for the leave_types table in the reconciled schema: id, code, name, description, is_active, created_at, updated_at (PK id, unique index on code, index on is_active). (see `.gestalt/architecture/reconciled.json`)
 ### Entity invariants — enforce these
-- Reuse or extend `Employee`: managerId is a self-referential foreign key to employees.id (or null for an employee with no manager). An employee with managerId === null represents a top-level employee whose leave requests escalate to hr_admin rather than auto-approving — this null-manager semantics is a binding business rule that downstream phases rely on, so the model must preserve nullability faithfully (never coerce null to an empty string or undefined).
-- Reuse or extend `Employee`: employmentStatus is constrained to exactly three lifecycle states: 'ACTIVE', 'INACTIVE', 'TERMINATED'. The model must express this as a closed union type (not an open string) so that no other status value can be assigned; downstream leave logic treats only ACTIVE employees as eligible to submit leave.
-- Reuse or extend `Employee`: employeeNumber and email are business-unique identifiers (the conceptual schema declares both as unique indexes). The repository's findByEmployeeNumber lookup relies on this uniqueness — it returns at most one Employee. The model must not weaken these to non-unique fields.
+- Reuse or extend `LeaveType`: A LeaveType's `code` is one of the six LeaveTypeCode enum values (ANNUAL, SICK, EMERGENCY, UNPAID, MATERNITY, PATERNITY); the DB column is text but the model always presents it as the typed enum.
+- Reuse or extend `LeaveType`: The `code` value is unique across all leave_types rows (enforced by the DB unique index); findByCode returns at most one LeaveType.
+- Reuse or extend `LeaveType`: A LeaveType has an active/inactive lifecycle expressed by the `isActive` boolean; findAllActive returns only rows where is_active is true, while findById/findByCode return the record regardless of active state.
+- Reuse or extend `LeaveType`: `createdAt` and `updatedAt` are always presented as Date instances on the model, even though the database stores them as timestamps; the row mapper wraps the raw values in `new Date(...)`.
 ### Interface contract — expose these operations (their shape is yours)
-- findById(id: string): Promise<Employee | null> — idempotent; Returns null when no row matches the given id (not an error). Errors from the underlying pg Pool query (connection failure, etc.) must be caught and handled — no unhandled rejection (GP-006). The id must be passed as a parameterized query value, never interpolated into SQL.
-- findByEmployeeNumber(employeeNumber: string): Promise<Employee | null> — idempotent; Returns null when no row matches the given employeeNumber (not an error). Errors from the underlying pg Pool query must be caught and handled (GP-006). The employeeNumber must be passed as a parameterized query value to prevent SQL injection.
-- findAll(): Promise<Employee[]> — idempotent; Returns an empty array when no rows exist (not null, not an error). Errors from the underlying pg Pool query must be caught and handled (GP-006).
+- findById(id: string): Promise<LeaveType | null> — idempotent; Returns null when no row matches the id. On pool failure, rethrows as Error('Failed to find leave type by id: <message>').
+- findByCode(code: LeaveTypeCode): Promise<LeaveType | null> — idempotent; Returns null when no row matches the code. On pool failure, rethrows as Error('Failed to find leave type by code: <message>').
+- findAllActive(): Promise<LeaveType[]> — idempotent; Returns an empty array when no active rows exist. On pool failure, rethrows as Error('Failed to find all active leave types: <message>').
 ### Integration points — connect to these
-- src/shared/db/connection.ts (shared pg Pool) — The EmployeeRepository executes SQL through the shared pg Pool — this is the sole external dependency of the employee module in this phase. The repository delegates all connection management to this shared infrastructure rather than owning its own connection.
-- Downstream phases: leave-balance (Phase 5), leave-request (Phase 6/7), notification (Phase 9) — The Employee model and repository are consumed by downstream modules via the employee module's public barrel (index.ts). leave-balance references employeeId; leave-request needs managerId to determine approval routing (escalate to hr_admin when null); notification targets recipientId (an employee). These phases import Employee from the employee module's index.ts, so the barrel must export both the model and the repository interface/implementation.
+- src/shared/types/leave-type-code.enum.ts (re-exported via src/shared/types/index.ts) — The LeaveType model's `code` field and the `findByCode` parameter are typed as LeaveTypeCode; this is the Phase 1 dependency this phase builds on.
+- src/shared/db/connection.ts — The repository defaults its injected Pool to the shared `pool` exported here for production use; tests inject a mocked Pool instead.
+- src/modules/leave-policy (Phase 4) — Downstream consumer: LeavePolicy.leaveTypeId references a LeaveType id, and the leave-policy module will import the LeaveType model from this module's barrel.
+- src/modules/employee/employee.repository.ts — Established Phase 2 precedent that the leave-type repository and tests must structurally mirror for consistency.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
