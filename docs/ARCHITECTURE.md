@@ -135,6 +135,7 @@ src/shared/error types.ts
 7. **Notification module** — notification dispatch ✅ (Phase 7 complete)
 8. **Audit module** — audit trail recording ✅ (Phase 8 complete)
 9. **Leave service** — full leave workflow orchestration ✅ (Phase 9 complete)
+10. **Import-path cleanup** — barrel-import rewrite for leave.service.ts cross-module imports ✅ (Phase 10 complete)
 
 ### Employee Module — Built (Phase 2)
 
@@ -333,7 +334,7 @@ All extend `Error` and set `this.name` to the class name for reliable `instanceo
 - **Balance-exists guard on restore**: `reject` and `cancel` only restore `usedDays` if a balance row is found (`if (balance)`). If the balance was deleted between submission and rejection, the operation still succeeds — the status transition and audit log are written, but the balance mutation is skipped.
 - **Fiscal year = calendar year of `startDate`**: `fiscalYear = leaveRequest.startDate.getFullYear()`. This is a simplification; the reconciled architecture's July–June fiscal calendar rule is not implemented.
 - **No transaction wrapper**: Operations use a check-then-update pattern across multiple repository calls without a `BEGIN`/`COMMIT` boundary. `updateUsedDays` is the single atomic mutation point for balance.
-- **Cross-module imports via barrels**: The service imports from `../employee/employee.repository`, `../policy/policy.repository`, `../balance/balance.repository`, `../notification/notification.service.interface`, `../audit/audit.repository`, and `../../shared/holidays/holiday.repository` — all through each module's public entry point (not internal files), except for shared types/utils which follow the established deep-path pattern (`../../shared/types/enums`, `../../shared/utils/day-count`).
+- **Cross-module imports**: Domain-module dependencies (`IEmployeeRepository`, `ILeavePolicyRepository`, `ILeaveBalanceRepository`, `INotificationService`, `IAuditLogRepository`, `IHolidayRepository`) are imported through each module's public barrel (`index.ts`). Shared-types imports (`CreateLeaveRequestDto` from `../../shared/types/leave-request.dto`, `LeaveRequestStatus` from `../../shared/types/enums`) and the shared-utils import (`countBusinessDays` from `../../shared/utils/day-count`) use direct file paths — the shared/types barrel exists and re-exports both symbols but is not yet used by this module. The shared/utils directory has no barrel.
 - **No `any` type**: All types are explicit; `details` uses `Record<string, unknown> | null`.
 
 **Known divergences from spec/plan:**
@@ -345,6 +346,8 @@ All extend `Error` and set `this.name` to the class name for reliable `instanceo
 3. **No auto-approve**: `submitDraft` always transitions to SUBMITTED regardless of `policy.requiresManagerApproval`. The auto-approve-on-submission path (business rule #6) is not implemented.
 
 4. **No minimum notice check**: The service does not validate `startDate - now >= policy.minimumNoticeDays` (business rule #7). This is deferred to the controller phase.
+
+5. **Shared-types deep-path imports**: `CreateLeaveRequestDto` and `LeaveRequestStatus` are imported from deep paths (`../../shared/types/leave-request.dto`, `../../shared/types/enums`) rather than the shared/types barrel (`../../shared/types`), which re-exports both symbols. Domain-module imports (employee, policy, balance, notification, audit, holidays) correctly use barrels. This will be corrected in a future cleanup phase.
 
 **Out of scope (deferred):** Controller, routes, HTTP status code mapping, `request.user` extraction, API-boundary input validation (GP-003), overlap enforcement, auto-approve-on-submission, minimum notice enforcement, transactional atomicity (BEGIN/COMMIT).
 

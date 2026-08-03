@@ -52,6 +52,47 @@ Represents a leave record managed by the `leave` module, including leave request
 | status | LeaveRequestStatus | false |
 | rejectionReason | string | false |
 
+### LeaveRequest
+
+| Field | Type | Required |
+|-------|------|----------|
+| id | string | true |
+| employeeId | string | true |
+| leavePolicyId | string | true |
+| startDate | Date | true |
+| endDate | Date | true |
+| reason | string \| undefined | false |
+| status | LeaveRequestStatus | true |
+| approvedBy | string \| null | false |
+| approvedAt | Date \| null | false |
+| rejectedBy | string \| null | false |
+| rejectedAt | Date \| null | false |
+| rejectionReason | string \| null | false |
+| cancelledBy | string \| null | false |
+| cancelledAt | Date \| null | false |
+| createdAt | Date | true |
+| updatedAt | Date | true |
+
+### ActorRole
+
+| Value | Description |
+|-------|-------------|
+| employee | Standard employee — may submit/cancel own requests |
+| manager | Manager — may approve/reject direct reports' requests |
+| hr_admin | HR administrator — may approve/reject any request |
+
+### ILeaveRequestService
+
+| Method | Signature |
+|--------|-----------|
+| submitDraft | `(leaveRequestId: string, actorId: string): Promise<LeaveRequest>` |
+| approve | `(leaveRequestId: string, approverId: string, approverRole: ActorRole): Promise<LeaveRequest>` |
+| reject | `(leaveRequestId: string, rejectorId: string, rejectorRole: ActorRole, reason: string): Promise<LeaveRequest>` |
+| cancel | `(leaveRequestId: string, actorId: string): Promise<LeaveRequest>` |
+| createDraft | `(dto: CreateLeaveRequestDto): Promise<LeaveRequest>` |
+| findById | `(id: string): Promise<LeaveRequest \| null>` |
+| findByEmployee | `(employeeId: string): Promise<LeaveRequest[]>` |
+
 ## shared/utils
 
 ### countBusinessDays
@@ -144,7 +185,15 @@ Represents leave policy data managed by the `policy` module, including policy de
 
 ## notification
 
-Represents notification data managed by the `notification` module, including notification records, delivery status, and related messaging information.
+Represents notification data managed by the `notification` module. Notifications are a best-effort side effect — failures are logged but never propagated to the caller.
+
+### NotificationStatus
+
+| Value | Description |
+|-------|-------------|
+| PENDING | Notification created, not yet sent |
+| SENT | Notification successfully sent |
+| FAILED | Notification delivery failed |
 
 ### Notification
 
@@ -152,71 +201,55 @@ Represents notification data managed by the `notification` module, including not
 |-------|------|----------|
 | id | string | true |
 | recipientId | string | true |
-| type | string | true |
-| title | string | true |
-| message | string | true |
-| relatedEntityType | string \| null | false |
-| relatedEntityId | string \| null | false |
-| status | 'PENDING' \| 'SENT' \| 'READ' \| 'ARCHIVED' | true |
+| recipientEmail | string | true |
+| subject | string | true |
+| body | string | true |
+| sentAt | Date \| null | false |
+| status | NotificationStatus | true |
 | createdAt | Date | true |
-| readAt | Date \| null | false |
+| updatedAt | Date | true |
+
+### INotificationService
+
+| Method | Signature |
+|--------|-----------|
+| notifyLeaveSubmitted | `(employeeId: string, leaveRequestId: string): Promise<void>` |
+| notifyLeaveStatusChange | `(employeeId: string, leaveRequestId: string, oldStatus: string, newStatus: string): Promise<void>` |
 
 ## audit
 
-Represents audit data managed by the `audit` module, including audit records, change history, and activity tracking information.
-
-### Audit
-
-| Field | Type | Required |
-|-------|------|----------|
-| id | string | true |
-| entityType | string | true |
-| entityId | string | true |
-| action | 'CREATE' \| 'UPDATE' \| 'DELETE' \| 'APPROVE' \| 'REJECT' | true |
-| oldValues | Record<string, any> \| null | false |
-| newValues | Record<string, any> \| null | false |
-| performedBy | string \| null | false |
-| performedAt | Date | true |
-| createdAt | Date | true |
-| updatedAt | Date | true |
+Represents audit data managed by the `audit` module. Audit entries are immutable — once written, they are never modified.
 
 ### AuditLog
 
 | Field | Type | Required |
 |-------|------|----------|
 | id | string | true |
-| entityType | string | true |
-| entityId | string | true |
-| action | 'CREATE' \| 'UPDATE' \| 'DELETE' \| 'APPROVE' \| 'REJECT' | true |
-| oldValues | Record<string, any> \| null | false |
-| newValues | Record<string, any> \| null | false |
-| performedBy | string \| null | false |
-| performedAt | Date | true |
-
-### AuditRecord
-
-| Field | Type | Required |
-|-------|------|----------|
-| entity_type | string | true |
-| entity_id | string | true |
+| actorId | string | true |
 | action | string | true |
-| changed_by | string \| null | false |
-| old_values | Record<string, any> \| null | false |
-| new_values | Record<string, any> \| null | false |
-| ip_address | string \| null | false |
-| user_agent | string \| null | false |
+| targetId | string | true |
+| targetType | string | true |
+| details | Record<string, unknown> \| null | false |
+| timestamp | Date | true |
+| createdAt | Date | true |
+| updatedAt | Date | true |
 
-### AuditServiceInterface
+**Common action values:** `LEAVE_DRAFT_CREATED`, `LEAVE_SUBMITTED`, `LEAVE_APPROVED`, `LEAVE_REJECTED`, `LEAVE_CANCELLED`
+
+**Note:** `timestamp` records when the audited action occurred (set by the caller), while `createdAt` records when the audit row was inserted. This allows the audit trail to faithfully record action timing even if the audit write is slightly delayed.
+
+## holidays
+
+Holiday reference data consumed by the leave service for business-day counting. Holidays are reference/lookup data, not domain entities — they do not extend `BaseEntity`.
+
+### Holiday
 
 | Field | Type | Required |
 |-------|------|----------|
 | id | string | true |
-| action | string | true |
-| resourceType | string | true |
-| resourceId | string | true |
-| actorId | string | true |
-| timestamp | Date | true |
-| metadata | Record<string, unknown> \| null | false |
+| date | Date | true |
+| name | string | true |
+| country | string | true |
 
 ## validation
 
