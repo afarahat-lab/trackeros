@@ -84,10 +84,13 @@ All dependencies flow inward. leave-request orchestrates the full lifecycle, dep
 - **notifications**: id, recipient_id (FK), type, message, is_read.
 
 ### Implementation Phases
-1. **Foundation**: shared-types, audit-log, employee, leave-type (zero dependencies).
-2. **leave-policy**: depends on Phase 1.
-3. **leave-balance & notification**: parallel; balance depends on policy; notification depends on employee.
-4. **leave-request**: orchestration, depends on all prior phases.
+1. **Foundation** ✅ — shared-types, employee, leave-type (zero dependencies). COMPLETE.
+2. **leave-policy** ✅ — depends on Phase 1. COMPLETE.
+3. **leave-balance** ✅ — depends on policy. COMPLETE.
+4. **leave-request** — orchestration, depends on all prior phases. NOT YET BUILT.
+5. **audit-log & notification** — supporting modules for GP-002 and notifications. NOT YET BUILT.
+6. **Service implementations + integration** — LeavePolicyService, LeaveBalanceService, audit/notification integration into LeaveRequestService. NOT YET BUILT.
+7. **Controller + routes** — Fastify API surface for leave requests. NOT YET BUILT.
 
 ### Open Questions (require stakeholder decision)
 1. **used_days computation**: derived vs stored counter vs hybrid.

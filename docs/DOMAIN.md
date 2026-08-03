@@ -81,7 +81,7 @@ Represents the catalog of leave categories available in the system. Managed by t
 
 ## leave
 
-Represents a leave record managed by the `leave` module, including leave requests and related leave-tracking data.
+Represents a leave record managed by the `leave` module, including leave requests and related leave-tracking data. **NOT YET BUILT — forward-looking spec.**
 
 ### LeaveStatus
 
@@ -183,7 +183,7 @@ Represents leave balance data managed by the `leave-balance` module (`src/module
 
 ## employee
 
-Represents employee data managed by the `employee` module, including employee records and related personnel information.
+Represents employee data managed by the `employee` module (`src/modules/employee/`).
 
 ### Employee
 
@@ -195,13 +195,20 @@ Represents employee data managed by the `employee` module, including employee re
 | lastName | string | true |
 | email | string | true |
 | managerId | string \| null | false |
-| department | string \| null | false |
+| department | string | true |
 | hireDate | Date | true |
 | terminationDate | Date \| null | false |
 | employmentStatus | 'ACTIVE' \| 'INACTIVE' \| 'TERMINATED' | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
-| deletedAt | Date \| null | false |
+
+**Repository** (`IEmployeeRepository` / `EmployeeRepository`)
+- `findById(id: string): Promise<Employee | null>` — returns the Employee or null; parameterized query.
+- `findByEmployeeNumber(employeeNumber: string): Promise<Employee | null>` — returns the Employee or null; parameterized query.
+- `findAll(): Promise<Employee[]>` — returns all employees; empty array when none.
+
+**Dependencies**
+- Uses the shared `pool` from `src/shared/db/connection.ts` (injectable via constructor for testing).
 
 ## leave-policy
 
@@ -233,7 +240,7 @@ Represents leave policy data managed by the `leave-policy` module (`src/modules/
 
 ## notification
 
-Represents notification data managed by the `notification` module, including notification records, delivery status, and related messaging information.
+Represents notification data managed by the `notification` module. **NOT YET BUILT — forward-looking spec.**
 
 ### Notification
 
@@ -252,7 +259,7 @@ Represents notification data managed by the `notification` module, including not
 
 ## audit
 
-Represents audit data managed by the `audit` module, including audit records, change history, and activity tracking information.
+Represents audit data managed by the `audit` module. **NOT YET BUILT — forward-looking spec.**
 
 ### Audit
 
