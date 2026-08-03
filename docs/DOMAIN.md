@@ -49,6 +49,36 @@ countBusinessDays(startDate: Date, endDate: Date, holidays: Date[]): number
 
 Counts whole business days in the half-open interval `[startDate, endDate)`. Excludes weekends (Saturday/Sunday) and the provided holidays array. All dates are normalized to UTC midnight for calendar-date comparison. Throws if `endDate < startDate`.
 
+## leave-type
+
+Represents the catalog of leave categories available in the system. Managed by the `leave-type` module (`src/modules/leave-type/`).
+
+### LeaveType
+
+| Field | Type | Required |
+|-------|------|----------|
+| id | string | true |
+| code | LeaveTypeCode | true |
+| name | string | true |
+| description | string \| undefined | false |
+| isActive | boolean | true |
+| createdAt | Date | true |
+| updatedAt | Date | true |
+
+**Invariants**
+- `code` is one of the six `LeaveTypeCode` enum values and is unique across all rows.
+- `isActive` controls visibility in `findAllActive`; `findById` and `findByCode` return the record regardless of active state.
+- `createdAt` and `updatedAt` are presented as `Date` instances; the repository row mapper converts from the DB's snake_case timestamp columns.
+
+**Repository** (`ILeaveTypeRepository` / `LeaveTypeRepository`)
+- `findById(id: string): Promise<LeaveType | null>` — returns the LeaveType or null; parameterized query.
+- `findByCode(code: LeaveTypeCode): Promise<LeaveType | null>` — returns the LeaveType or null; parameterized query.
+- `findAllActive(): Promise<LeaveType[]>` — returns only rows where `is_active = true`; empty array when none.
+
+**Dependencies**
+- Imports `LeaveTypeCode` from `src/shared/types/` (Phase 1).
+- Uses the shared `pool` from `src/shared/db/connection.ts` (injectable via constructor for testing).
+
 ## leave
 
 Represents a leave record managed by the `leave` module, including leave requests and related leave-tracking data.
