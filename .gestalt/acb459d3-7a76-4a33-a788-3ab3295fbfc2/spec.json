@@ -1,0 +1,112 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-request"
+    ],
+    "affectedLayers": [
+      "api-boundary",
+      "unit-test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The submit handler returns HTTP 400 with a body of `{ error: 'Request body is required' }` when request.body is absent, null, or undefined \u2014 and this guard executes before any individual field validation or auth check runs.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The submit handler enforces the validation order body-presence \u2192 auth (request.user present, else 401) \u2192 individual field validation (else 400) \u2192 service delegation, so that a missing body never reaches field validation and an unauthenticated request never reaches the service.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "On a valid, authenticated request, the submit handler delegates to the LeaveRequestService.submit method, passing the authenticated actor's id and role (from request.user) as the actor parameters, and returns the service result with an appropriate success status.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The submit handler catches errors thrown by the service and maps them to appropriate HTTP status codes (e.g., ValidationError \u2192 400, ApproverNotAuthorizedError \u2192 403, InsufficientBalanceError \u2192 409 or 400, LeaveRequestNotFoundError \u2192 404) without any unhandled promise rejection (GP-006).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The submit handler never logs PII (employeeId, reason, dates) in error paths (GP-004); error responses contain only a generic error message, not request body contents.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No `any` type \u2014 use `unknown` with type guards (HARNESS.json no-any rule, severity high); the controller must type request.body and request.user safely.",
+    "GP-003: all inputs must be validated at the API boundary before the service is called; the body-presence guard is the first such check, followed by individual field validation.",
+    "GP-005 / business rule #6: the controller only consumes request.user (populated by existing auth middleware) \u2014 it must NOT implement authentication itself; it returns 401 when request.user is absent and passes request.user.id and request.user.role to the service.",
+    "GP-006: no unhandled promise rejections \u2014 every async handler must catch all errors and return an HTTP error response rather than letting the rejection propagate.",
+    "The controller must use the Fastify reply pattern `reply.status(<code>).send(<payload>)` established by the only existing HTTP handler (uptime.routes.ts); it must not throw or return raw values.",
+    "The controller must not perform database access directly (GP-001) \u2014 it delegates all persistence to the LeaveRequestService; no repository or pool import in the controller.",
+    "Test files must follow the project Jest convention: `*.test.ts` under `tests/` (not `.spec.ts`), and must not alter the Jest config (binding rule #8)."
+  ],
+  "outOfScope": [
+    "The approve, reject, cancel, getById, and getByEmployee handler implementations and their tests \u2014 this phase targets the submit handler's body-presence guard and validation order only.",
+    "Fastify route registration (leave-request.routes.ts) and app.ts wiring \u2014 route verb/path binding is not part of this phase's body-presence guard scope.",
+    "Audit logging and notification integration (Phase 9/10) \u2014 the controller delegates to the existing service contract; audit/notification are not added in this phase.",
+    "Building or modifying authentication middleware \u2014 the controller only consumes request.user; auth middleware is pre-existing and out of scope."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "The controller must never set or mutate the LeaveRequest status directly \u2014 status transitions (DRAFT\u2192SUBMITTED\u2192APPROVED/REJECTED\u2192CANCELLED) are owned exclusively by the service; the controller only reads the service's returned entity."
+    },
+    {
+      "entity": "request.user",
+      "mustExistOrExtend": true,
+      "invariant": "The authenticated identity consumed by the controller is exactly { id: string, role: 'employee' | 'manager' | 'hr_admin' }, populated by existing auth middleware; the controller must not synthesize, default, or alter this identity \u2014 it returns 401 when it is absent and passes id+role verbatim to the service."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "submit a leave request (delegate to LeaveRequestService.submit)",
+      "authRule": "Requires an authenticated request.user ({ id, role }); return 401 when request.user is absent. The controller passes request.user.id and request.user.role as the actor parameters to the service; RBAC is enforced inside the service, not re-implemented in the controller.",
+      "idempotent": false,
+      "errorSemantics": "Return 400 with { error: 'Request body is required' } when request.body is absent/null/undefined (first guard). Return 400 on invalid individual fields. Catch all service-thrown errors and map them to HTTP status codes without unhandled rejections (GP-006); never leak PII in error bodies (GP-004)."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The submit handler must delegate to the ILeaveRequestService.submit(dto, actorId, actorRole) signature exactly as declared \u2014 passing the DTO, request.user.id, and request.user.role in that parameter order; it must not invent a different service method or parameter order.",
+      "referencePath": "src/modules/leave-request/leave-request.service.interface.ts"
+    },
+    {
+      "requirement": "The controller's error handling must match the typed error classes exported by the service (InsufficientBalanceError, ApproverNotAuthorizedError, ValidationError, LeaveRequestNotFoundError) \u2014 it must catch and distinguish these by name/type rather than treating all errors as generic, so each maps to an appropriate HTTP status.",
+      "referencePath": "src/modules/leave-request/leave-request.service.ts"
+    },
+    {
+      "requirement": "The controller must use the Fastify reply pattern established by the only existing HTTP handler \u2014 reply.status(<code>).send(<payload>) with a try/catch that logs via request.log.error and returns a 500 on unexpected errors \u2014 rather than introducing a different response convention.",
+      "referencePath": "src/modules/uptime/uptime.routes.ts"
+    },
+    {
+      "requirement": "The DTO passed to the service must conform to the CreateLeaveRequestDto shape declared in the model (employeeId, leavePolicyId, startDate, endDate, reason?) \u2014 the controller must not add, rename, or omit fields when constructing the delegation payload.",
+      "referencePath": "src/modules/leave-request/leave-request.model.ts"
+    },
+    {
+      "requirement": "Any new controller export must be added to the module's barrel index.ts so it is reachable only through the declared public entry point (AGENTS.md architecture rule #1: modules import from each other only via index.ts).",
+      "referencePath": "src/modules/leave-request/index.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "LeaveRequestService (src/modules/leave-request/leave-request.service.ts)",
+      "why": "The submit handler delegates the full business logic (balance check, day count, status transition, RBAC) to the service; the controller is a thin boundary that validates inputs and maps errors to HTTP."
+    },
+    {
+      "target": "Existing auth middleware (request.user population)",
+      "why": "The controller consumes request.user = { id, role } populated by the app's pre-existing auth middleware; it does not build auth, only reads it and returns 401 when absent."
+    },
+    {
+      "target": "Fastify reply/request API (reply.status().send(), request.body, request.user, request.log)",
+      "why": "The handler interacts with the Fastify request/reply objects to read the body, read the authenticated user, send status-coded responses, and log errors \u2014 matching the pattern in uptime.routes.ts."
+    }
+  ]
+}
