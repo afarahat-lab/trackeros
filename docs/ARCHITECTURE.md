@@ -32,6 +32,8 @@ src/modules/AuditServiceInterface/    — AuditServiceInterface module
 src/shared/db connection.ts
 src/shared/base repository.ts
 src/shared/error types.ts
+src/shared/types/    — shared enums (LeaveTypeCode, LeaveRequestStatus)
+src/shared/utils/    — shared utilities (business-days)
 ```
 
 ## Key patterns

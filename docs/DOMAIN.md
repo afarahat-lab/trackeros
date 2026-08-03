@@ -10,6 +10,45 @@ Base entity providing common fields for domain models.
 | created_at | Date | true |
 | updated_at | Date | true |
 
+## shared-types
+
+Shared enums and utilities used across domain modules.
+
+### LeaveTypeCode
+
+String enum with uppercase values. Defined in `src/shared/types/leave-type-code.enum.ts`.
+
+| Value | Description |
+|-------|-------------|
+| ANNUAL | Annual leave |
+| SICK | Sick leave |
+| EMERGENCY | Emergency leave |
+| UNPAID | Unpaid leave |
+| MATERNITY | Maternity leave |
+| PATERNITY | Paternity leave |
+
+### LeaveRequestStatus
+
+String enum with uppercase values. Defined in `src/shared/types/leave-request-status.enum.ts`.
+
+| Value | Description |
+|-------|-------------|
+| DRAFT | Leave request is in draft state |
+| SUBMITTED | Leave request has been submitted |
+| APPROVED | Leave request has been approved |
+| REJECTED | Leave request has been rejected |
+| CANCELLED | Leave request has been cancelled |
+
+### countBusinessDays
+
+Utility function in `src/shared/utils/business-days.ts`.
+
+```
+countBusinessDays(startDate: Date, endDate: Date, holidays: Date[]): number
+```
+
+Counts whole business days in the half-open interval `[startDate, endDate)`. Excludes weekends (Saturday/Sunday) and the provided holidays array. All dates are normalized to UTC midnight for calendar-date comparison. Throws if `endDate < startDate`.
+
 ## leave
 
 Represents a leave record managed by the `leave` module, including leave requests and related leave-tracking data.
