@@ -1,0 +1,117 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared-types",
+      "shared-utils"
+    ],
+    "affectedLayers": [
+      "shared"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The LeaveTypeCode enum exposes exactly the members ANNUAL, SICK, EMERGENCY, UNPAID, MATERNITY, PATERNITY, each mapping to a string value equal to its uppercase member name (e.g. ANNUAL = 'ANNUAL'). A unit test asserts each member's value.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The LeaveRequestStatus enum exposes exactly the members DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED, each mapping to a string value equal to its uppercase member name (e.g. DRAFT = 'DRAFT'). A unit test asserts each member's value.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "countBusinessDays returns the correct count of whole business days (Mon\u2013Fri) excluding weekends and the provided holidays array, for: a weekday range with no holidays, a range spanning a weekend, and a range containing one or more holidays. Unit tests assert the exact expected integer for each case.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "countBusinessDays returns 0 when startDate and endDate are the same calendar day (exclusive of one endpoint). A unit test asserts the zero result.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "countBusinessDays throws an error when endDate is before startDate (end-before-start). A unit test asserts that the call throws.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The barrel re-export at src/shared/types/index.ts makes both LeaveTypeCode and LeaveRequestStatus importable from that single entry point, so downstream modules import only from src/shared/types. A unit test (or compile check) confirms both symbols are exported.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The phase passes the mechanical verification gate: `npm run build` (tsc --noEmit) exits 0 with no type errors, and `npx jest` runs the new test files (matching **/tests/**/*.test.ts) with all assertions passing.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No use of `any` anywhere in the new source or test files (HARNESS.json no-any rule, severity high). Use `unknown` with type guards where a broad type is needed; enum members and function parameters must be explicitly typed.",
+    "TypeScript strict mode must be satisfied (tsconfig strict: true, ES2022/commonjs). No implicit any, no implicit returns, strict null checks \u2014 the new files must compile cleanly under tsc --noEmit.",
+    "countBusinessDays must normalize all input dates (startDate, endDate, and every entry in the holidays array) to UTC midnight and compare calendar dates by the YYYY-MM-DD triple, never by raw timestamp, so a holiday matches regardless of time-of-day or timezone of the input Date.",
+    "countBusinessDays must accept holidays as a Date[] parameter (the holidays table/repository is deferred to a later phase). No database access, no repository import, and no holidays-table dependency may exist in this phase.",
+    "Test files must be named *.test.ts (not .spec.ts) and live under tests/ (e.g. tests/unit/shared/types/, tests/unit/shared/utils/business-days.test.ts) to match jest.config.js testMatch ['**/tests/**/*.test.(ts|js)']. .spec.ts files would not be picked up by the runner.",
+    "The new shared types and utility must have zero dependencies on other leave-management phases/modules \u2014 they are the foundation layer. No imports from src/modules/* or from any not-yet-created file."
+  ],
+  "outOfScope": [
+    "The holidays table, holidays repository, and any holiday-data loading mechanism \u2014 holidays are accepted only as a Date[] parameter to countBusinessDays in this phase.",
+    "Any module under src/modules/* (employee, leave-type, leave-policy, leave-balance, leave-request, audit-log, notification) \u2014 those are later phases.",
+    "Reconciling the BR-DAY-COUNT inclusive-counting rule (endDate - startDate + 1) with countBusinessDays' exclusive semantics. Phase 1 follows PLAN.md (same-day = 0, business-day exclusive counting); the reconciliation with the architecture's inclusive rule is deferred to before Phase 7.",
+    "Any HTTP routes, controllers, services, database migrations, or repository implementations \u2014 this phase is pure shared types and a pure utility function with no I/O."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveTypeCode",
+      "mustExistOrExtend": true,
+      "invariant": "The enum's member set is closed and fixed at exactly {ANNUAL, SICK, EMERGENCY, UNPAID, MATERNITY, PATERNITY}; each member's string value equals its own uppercase name. No other leave-type code may be introduced without updating this enum and all downstream consumers."
+    },
+    {
+      "entity": "LeaveRequestStatus",
+      "mustExistOrExtend": true,
+      "invariant": "The enum's member set is closed and fixed at exactly {DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED}; each member's string value equals its own uppercase name. These are the only valid lifecycle states a LeaveRequest may occupy."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "countBusinessDays(startDate: Date, endDate: Date, holidays: Date[]): number",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Must throw when endDate is strictly before startDate (end-before-start). The thrown error must be a real Error (not a silent return of a negative/zero number)."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The LeaveTypeCode enum members must match the reconciled architecture's shared-types module ownership: \"LeaveTypeCode enum (ANNUAL, SICK, EMERGENCY, UNPAID, MATERNITY, PATERNITY)\" and \"LeaveRequestStatus enum (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED)\". No member may be added, removed, or renamed without updating this source.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "The LeaveRequestStatus enum must match the architecture's declared lifecycle: \"LeaveRequest: DRAFT \u2192 SUBMITTED \u2192 (APPROVED | REJECTED) \u2192 CANCELLED\" \u2014 the five members DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED are the complete set.",
+      "referencePath": "docs/ARCHITECTURE.md"
+    },
+    {
+      "requirement": "countBusinessDays must implement the reconciled business rule for day counting: \"BUSINESS DAYS ONLY, excluding weekends AND public holidays ... Whole days only \u2014 no half-day/partial-day leave. Compare dates by CALENDAR-DATE equality in UTC (normalize each day/holiday/weekend check to UTC midnight; compare the YYYY-MM-DD triple), never by raw timestamp.\" The function signature and normalization behavior must conform to this rule.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "Test file placement and naming must conform to jest.config.js: testMatch ['**/tests/**/*.test.(ts|js)'] and moduleDirectories including 'src'. Tests must be discoverable by the configured runner without modifying the Jest config.",
+      "referencePath": "jest.config.js"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/leave-type/leave-type.model.ts (Phase 3)",
+      "why": "LeaveType.code is typed as LeaveTypeCode; the leave-type module imports this enum from src/shared/types. The enum's member set and string values must be stable before Phase 3 consumes them."
+    },
+    {
+      "target": "src/modules/leave-request/leave-request.model.ts (Phase 6) and leave-request.service.ts (Phase 7)",
+      "why": "LeaveRequest.status is typed as LeaveRequestStatus, and the Phase 7 service computes business days via countBusinessDays (passing an empty holidays array for now). Both the enum and the utility are consumed by the leave-request orchestrator."
+    },
+    {
+      "target": "src/shared/types/index.ts (barrel)",
+      "why": "All downstream modules import the enums through the shared-types barrel per the architecture's dependency rule (modules import only through declared public entry points). The barrel must re-export both enums so consumers never reach into individual enum files."
+    }
+  ]
+}
