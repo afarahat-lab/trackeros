@@ -277,6 +277,8 @@ src/shared/error types.ts
 **Files delivered:**
 - `src/modules/leave/leave.service.interface.ts` — `ILeaveRequestService` interface with 7 methods + `ActorRole` type (`'employee' | 'manager' | 'hr_admin'`)
 - `src/modules/leave/leave.service.ts` — `LeaveRequestService` implementation with 9 custom error classes
+- `src/modules/leave/index.ts` — Updated barrel re-exporting `ILeaveRequestService`, `ActorRole`, `LeaveRequestService`, and all 9 error classes
+- `tests/unit/modules/leave/leave.service.test.ts` — Jest unit tests covering all service methods, authorization rules, error paths, and edge cases
 
 **Interface (`ILeaveRequestService`):**
 
@@ -336,19 +338,15 @@ All extend `Error` and set `this.name` to the class name for reliable `instanceo
 
 **Known divergences from spec/plan:**
 
-1. **Barrel not updated**: `src/modules/leave/index.ts` was NOT updated to re-export `ILeaveRequestService`, `LeaveRequestService`, `ActorRole`, or the error classes. The barrel still only exports `LeaveRequest`, `ILeaveRequestRepository`, and `PgLeaveRequestRepository`. Consumers must import directly from the internal files until the barrel is updated.
+1. **Fiscal year simplification**: Uses `startDate.getFullYear()` (calendar year) rather than the July–June fiscal calendar described in the reconciled architecture (business rule #11). This matches the binding rule from the phase spec ("Fiscal/leave year = CALENDAR YEAR") but diverges from the earlier reconciled architecture document.
 
-2. **No unit tests**: `tests/unit/modules/leave/leave.service.test.ts` was not created. The service is untested at the unit level.
+2. **No overlap checking**: The service does not call `findByEmployeeAndDateRange` to enforce the "no overlapping requests" rule (business rule #10). This is explicitly deferred per the phase spec.
 
-3. **Fiscal year simplification**: Uses `startDate.getFullYear()` (calendar year) rather than the July–June fiscal calendar described in the reconciled architecture (business rule #11). This matches the binding rule from the phase spec ("Fiscal/leave year = CALENDAR YEAR") but diverges from the earlier reconciled architecture document.
+3. **No auto-approve**: `submitDraft` always transitions to SUBMITTED regardless of `policy.requiresManagerApproval`. The auto-approve-on-submission path (business rule #6) is not implemented.
 
-4. **No overlap checking**: The service does not call `findByEmployeeAndDateRange` to enforce the "no overlapping requests" rule (business rule #10). This is explicitly deferred per the phase spec.
+4. **No minimum notice check**: The service does not validate `startDate - now >= policy.minimumNoticeDays` (business rule #7). This is deferred to the controller phase.
 
-5. **No auto-approve**: `submitDraft` always transitions to SUBMITTED regardless of `policy.requiresManagerApproval`. The auto-approve-on-submission path (business rule #6) is not implemented.
-
-6. **No minimum notice check**: The service does not validate `startDate - now >= policy.minimumNoticeDays` (business rule #7). This is deferred to the controller phase.
-
-**Out of scope (deferred):** Controller, routes, HTTP status code mapping, `request.user` extraction, API-boundary input validation (GP-003), overlap enforcement, auto-approve-on-submission, minimum notice enforcement, transactional atomicity (BEGIN/COMMIT), barrel exports for new symbols, unit tests.
+**Out of scope (deferred):** Controller, routes, HTTP status code mapping, `request.user` extraction, API-boundary input validation (GP-003), overlap enforcement, auto-approve-on-submission, minimum notice enforcement, transactional atomicity (BEGIN/COMMIT).
 
 ### Open Questions
 
