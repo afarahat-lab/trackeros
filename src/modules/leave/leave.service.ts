@@ -1,12 +1,12 @@
 import type { ILeaveRequestService, ActorRole } from './leave.service.interface';
 import type { LeaveRequest } from './leave.model';
 import type { ILeaveRequestRepository } from './leave.repository';
-import type { IEmployeeRepository } from '../employee/employee.repository';
-import type { ILeavePolicyRepository } from '../policy/policy.repository';
-import type { ILeaveBalanceRepository } from '../balance/balance.repository';
-import type { IHolidayRepository } from '../../shared/holidays/holiday.repository';
-import type { INotificationService } from '../notification/notification.service.interface';
-import type { IAuditLogRepository } from '../audit/audit.repository';
+import type { IEmployeeRepository } from '../employee';
+import type { ILeavePolicyRepository } from '../policy';
+import type { ILeaveBalanceRepository } from '../balance';
+import type { IHolidayRepository } from '../../shared/holidays';
+import type { INotificationService } from '../notification';
+import type { IAuditLogRepository } from '../audit';
 import type { CreateLeaveRequestDto } from '../../shared/types/leave-request.dto';
 import { LeaveRequestStatus } from '../../shared/types/enums';
 import { countBusinessDays } from '../../shared/utils/day-count';
