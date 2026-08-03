@@ -81,7 +81,7 @@ Represents the catalog of leave categories available in the system. Managed by t
 
 ## leave-request
 
-Represents leave request data managed by the `leave-request` module (`src/modules/leave-request/`). Model and repository are built; service, controller, and routes are not yet built.
+Represents leave request data managed by the `leave-request` module (`src/modules/leave-request/`). Model, repository, and service are built; controller and routes are not yet built.
 
 ### LeaveRequest
 
@@ -122,9 +122,41 @@ Represents leave request data managed by the `leave-request` module (`src/module
 - `create(dto: CreateLeaveRequestDto): Promise<LeaveRequest>` — inserts a new row with status `DRAFT`, null `approved_by` and `approved_at`. Returns the created LeaveRequest.
 - `updateStatus(id: string, status: LeaveRequestStatus, approvedBy?: string | null, approvedAt?: Date | null): Promise<LeaveRequest>` — atomically updates status, approved_by, approved_at, and updated_at. Returns the updated LeaveRequest.
 
+**Service Interface** (`ILeaveRequestService`)
+- `submit(dto: CreateLeaveRequestDto, actorId: string, actorRole: 'employee' | 'manager' | 'hr_admin'): Promise<LeaveRequest>`
+- `approve(leaveRequestId: string, approverId: string, approverRole: 'manager' | 'hr_admin'): Promise<LeaveRequest>`
+- `reject(leaveRequestId: string, approverId: string, approverRole: 'manager' | 'hr_admin'): Promise<LeaveRequest>`
+- `cancel(leaveRequestId: string, actorId: string, actorRole: 'employee' | 'manager' | 'hr_admin'): Promise<LeaveRequest>`
+- `getById(leaveRequestId: string): Promise<LeaveRequest | null>`
+- `getByEmployee(employeeId: string): Promise<LeaveRequest[]>`
+
+**Service Implementation** (`LeaveRequestService`)
+
+Constructor injects four repository dependencies: `ILeaveRequestRepository`, `ILeaveBalanceRepository`, `IEmployeeRepository`, `ILeavePolicyRepository`.
+
+Business rules enforced by the service:
+
+- **submit**: Validates startDate is not in the past and startDate ≤ endDate. Looks up the employee, leave policy, and leave balance. Checks minimumNoticeDays on the policy. Computes business days via `countBusinessDays` (empty holidays array). Validates remainingDays ≥ business days; throws `InsufficientBalanceError` if not. Atomically increments usedDays on the balance via `updateUsedDays`. Creates the request (DRAFT) then transitions to SUBMITTED. Employees may only submit for themselves; managers and hr_admin may submit for any employee. Does NOT auto-approve when employee has no manager.
+
+- **approve**: Only valid for requests in SUBMITTED status. If the employee has a manager, only that manager may approve. If the employee has no manager (`managerId === null`), only hr_admin may approve. Sets status to APPROVED with `approvedBy` and `approvedAt`. Does NOT change usedDays (already deducted at submit).
+
+- **reject**: Same authorization rules as approve. Sets status to REJECTED. Restores usedDays on the balance by subtracting the business-day count from `usedDays` (floored at zero). Gracefully handles missing balance (no-op restore).
+
+- **cancel**: Only SUBMITTED or APPROVED requests may be cancelled. Employees may only cancel their own requests; managers and hr_admin may cancel any. If the prior status was SUBMITTED, restores usedDays (same logic as reject). If APPROVED, does NOT restore usedDays.
+
+- **getById / getByEmployee**: Simple delegation to the repository.
+
+**Error classes** (all exported from `leave-request.service.ts`):
+- `ValidationError` — invalid input (past date, date order, missing entity, zero business days, wrong status for operation, minimum notice not met).
+- `InsufficientBalanceError` — remaining balance too low for the requested days.
+- `ApproverNotAuthorizedError` — actor lacks authorization for the operation.
+- `LeaveRequestNotFoundError` — leave request ID not found.
+
 **Dependencies**
 - Imports `LeaveRequestStatus` from `src/shared/types/`.
-- Uses the shared `pool` from `src/shared/db/connection.ts` (injectable via constructor for testing).
+- Imports `countBusinessDays` from `src/shared/utils/business-days`.
+- Depends on repository interfaces from `leave-request`, `leave-balance`, `employee`, and `leave-policy` modules.
+- Audit logging and notification integration are NOT YET BUILT (awaiting audit-log and notification modules).
 
 ## leave-balance
 

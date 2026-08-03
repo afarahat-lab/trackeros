@@ -20,7 +20,7 @@ src/modules/employee/employee.{model,repository}.ts
 src/modules/leave-type/leave-type.{model,repository}.ts
 src/modules/leave-policy/leave-policy.{model,repository,service.interface}.ts
 src/modules/leave-balance/leave-balance.{model,repository,service.interface}.ts
-src/modules/leave-request/leave-request.{model,repository}.ts
+src/modules/leave-request/leave-request.{model,repository,service.interface,service}.ts
 src/modules/status/    — Status module (system health)
 src/modules/uptime/    — Uptime module (system health routes)
 src/shared/db/connection.ts
@@ -68,7 +68,7 @@ src/shared/utils/    — shared utilities (business-days)
 | leave-type | src/modules/leave-type/ | LeaveType catalog model and repository |
 | leave-policy | src/modules/leave-policy/ | LeavePolicy model, repository, service interface |
 | leave-balance | src/modules/leave-balance/ | LeaveBalance model, repository, service interface |
-| leave-request | src/modules/leave-request/ | LeaveRequest model, repository (service, controller, routes not yet built) |
+| leave-request | src/modules/leave-request/ | LeaveRequest model, repository, service interface, service (controller and routes not yet built) |
 | audit-log | src/modules/audit-log/ | AuditLog model, repository, service |
 | notification | src/modules/notification/ | Notification model, repository, service |
 
@@ -88,7 +88,7 @@ All dependencies flow inward. leave-request orchestrates the full lifecycle, dep
 1. **Foundation** ✅ — shared-types, employee, leave-type (zero dependencies). COMPLETE.
 2. **leave-policy** ✅ — depends on Phase 1. COMPLETE.
 3. **leave-balance** ✅ — depends on policy. COMPLETE.
-4. **leave-request** — model + repository ✅. Service (orchestration), controller, and routes NOT YET BUILT.
+4. **leave-request** — model + repository ✅. Service ✅. Controller and routes NOT YET BUILT.
 5. **audit-log & notification** — supporting modules for GP-002 and notifications. NOT YET BUILT.
 6. **Service implementations + integration** — LeavePolicyService, LeaveBalanceService, audit/notification integration into LeaveRequestService. NOT YET BUILT.
 7. **Controller + routes** — Fastify API surface for leave requests. NOT YET BUILT.
