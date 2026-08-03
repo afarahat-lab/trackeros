@@ -1,0 +1,174 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-type"
+    ],
+    "affectedLayers": [
+      "domain-model",
+      "repository",
+      "unit-tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The LeaveType model interface is exported from the module barrel and its `code` field is typed as `LeaveTypeCode` (the Phase 1 enum), not `string`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`findById` returns a fully-mapped LeaveType when a row matches the given id, and returns null when no row matches.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`findByCode` returns a fully-mapped LeaveType when a row matches the given LeaveTypeCode, and returns null when no row matches.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`findAllActive` returns an array of LeaveType containing only rows whose is_active flag is true, and returns an empty array when no active rows exist.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The row mapper converts snake_case DB columns to camelCase model fields and constructs Date instances for created_at and updated_at.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Every repository query uses parameterized placeholders ($1) for user-supplied values; no string interpolation or concatenation of input into SQL.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Repository methods catch errors and rethrow as `Error('Failed to <action>: <message>')` with the underlying error message preserved.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Unit tests cover, for each of findById/findByCode/findAllActive: a happy path (asserting exact SQL and params), a null/empty path, a SQL-injection parameterization check, and an error path (rejected query rethrows 'Failed to ...: <message>').",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The module barrel `index.ts` re-exports the LeaveType model and the repository interface plus implementation.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`npm run build` and `npx jest` both pass with the new files added (no type errors under the strict tsconfig, no test failures).",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "No use of `any` anywhere in the model, repository, or tests \u2014 use `unknown` with `as` casts in the row mapper (HARNESS constraint `no-any`, severity high).",
+    "All database access must occur inside the repository class only; no inline SQL or direct pool usage outside `leave-type.repository.ts` (GP-001 + HARNESS constraint `no-direct-db-outside-repository`, severity critical).",
+    "The repository must accept a `Pool` in its constructor (defaulting to the shared `pool`) so tests can inject a mocked pool without touching the real database connection.",
+    "TypeScript strict mode is enforced (strict null checks, no implicit any); the new files must compile cleanly under the existing tsconfig.",
+    "The `code` field on the LeaveType model must be typed as `LeaveTypeCode` (the Phase 1 enum), imported from the shared types module \u2014 not as `string`.",
+    "The module must import LeaveTypeCode only through the shared types public entry point (`src/shared/types/index.ts` or the enum file it re-exports), not from another module's internals.",
+    "No state-changing operations are introduced in this phase \u2014 the repository exposes read methods only (findById, findByCode, findAllActive); create/update/delete are out of scope."
+  ],
+  "outOfScope": [
+    "LeaveType service, controller, and routes \u2014 this phase builds only the model and repository (Phase 3 scope).",
+    "Create/update/delete/activation-deactivation operations on leave_types \u2014 only read methods (findById, findByCode, findAllActive) are in scope.",
+    "LeavePolicy module and any leave_policy table access \u2014 that is Phase 4, which depends on this phase's model.",
+    "Database migrations or schema changes \u2014 the `leave_types` table schema is already defined in the reconciled architecture; this phase only reads it.",
+    "Audit logging (GP-002) \u2014 read-only queries produce no audit records; audit integration for LeaveType is not part of this phase.",
+    "Integration tests against a real PostgreSQL instance \u2014 only Jest unit tests with a mocked pg Pool are in scope."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveType",
+      "mustExistOrExtend": true,
+      "invariant": "A LeaveType's `code` is one of the six LeaveTypeCode enum values (ANNUAL, SICK, EMERGENCY, UNPAID, MATERNITY, PATERNITY); the DB column is text but the model always presents it as the typed enum."
+    },
+    {
+      "entity": "LeaveType",
+      "mustExistOrExtend": true,
+      "invariant": "The `code` value is unique across all leave_types rows (enforced by the DB unique index); findByCode returns at most one LeaveType."
+    },
+    {
+      "entity": "LeaveType",
+      "mustExistOrExtend": true,
+      "invariant": "A LeaveType has an active/inactive lifecycle expressed by the `isActive` boolean; findAllActive returns only rows where is_active is true, while findById/findByCode return the record regardless of active state."
+    },
+    {
+      "entity": "LeaveType",
+      "mustExistOrExtend": true,
+      "invariant": "`createdAt` and `updatedAt` are always presented as Date instances on the model, even though the database stores them as timestamps; the row mapper wraps the raw values in `new Date(...)`."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "findById(id: string): Promise<LeaveType | null>",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns null when no row matches the id. On pool failure, rethrows as Error('Failed to find leave type by id: <message>')."
+    },
+    {
+      "operation": "findByCode(code: LeaveTypeCode): Promise<LeaveType | null>",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns null when no row matches the code. On pool failure, rethrows as Error('Failed to find leave type by code: <message>')."
+    },
+    {
+      "operation": "findAllActive(): Promise<LeaveType[]>",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns an empty array when no active rows exist. On pool failure, rethrows as Error('Failed to find all active leave types: <message>')."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The LeaveTypeRepository must mirror the EmployeeRepository structural pattern: a module-private `rowToLeaveType` mapper using `Record<string, unknown>` + `as` casts, a `private readonly db: Pool` with `constructor(dbPool: Pool = pool)`, try/catch wrapping `this.db.query`, parameterized `$1` SQL, null on empty rows, and rethrow as `new Error('Failed to <action>: <message>')`.",
+      "referencePath": "src/modules/employee/employee.repository.ts"
+    },
+    {
+      "requirement": "The LeaveType model must be a plain TypeScript interface (not a class) with camelCase field names, matching the Employee model's style; the row mapper performs the snake_case\u2192camelCase conversion.",
+      "referencePath": "src/modules/employee/employee.model.ts"
+    },
+    {
+      "requirement": "The leave-type barrel `index.ts` must re-export the model and the repository interface + implementation, matching the employee barrel's export shape.",
+      "referencePath": "src/modules/employee/index.ts"
+    },
+    {
+      "requirement": "The leave-type repository test must follow the employee test conventions: `jest.mock('pg', ...)` exposing a `query` mock, `beforeEach` clearing mocks and constructing the repo with the mocked pool, snake_case mock rows with ISO-string dates, an `expectLeaveTypeMatchesRow` helper, and per-method happy/null/injection/error cases.",
+      "referencePath": "tests/unit/modules/employee/employee.repository.test.ts"
+    },
+    {
+      "requirement": "The `code` field type and the `findByCode` parameter type must reference the existing LeaveTypeCode enum (ANNUAL, SICK, EMERGENCY, UNPAID, MATERNITY, PATERNITY) \u2014 do not redefine or duplicate the enum.",
+      "referencePath": "src/shared/types/leave-type-code.enum.ts"
+    },
+    {
+      "requirement": "The repository's default pool must be the existing `pool` exported from `src/shared/db/connection.ts` (a pg.Pool built from process.env.DATABASE_URL); do not construct a second Pool.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "The row mapper must read the exact snake_case columns declared for the leave_types table in the reconciled schema: id, code, name, description, is_active, created_at, updated_at (PK id, unique index on code, index on is_active).",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/leave-type-code.enum.ts (re-exported via src/shared/types/index.ts)",
+      "why": "The LeaveType model's `code` field and the `findByCode` parameter are typed as LeaveTypeCode; this is the Phase 1 dependency this phase builds on."
+    },
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "The repository defaults its injected Pool to the shared `pool` exported here for production use; tests inject a mocked Pool instead."
+    },
+    {
+      "target": "src/modules/leave-policy (Phase 4)",
+      "why": "Downstream consumer: LeavePolicy.leaveTypeId references a LeaveType id, and the leave-policy module will import the LeaveType model from this module's barrel."
+    },
+    {
+      "target": "src/modules/employee/employee.repository.ts",
+      "why": "Established Phase 2 precedent that the leave-type repository and tests must structurally mirror for consistency."
+    }
+  ]
+}
