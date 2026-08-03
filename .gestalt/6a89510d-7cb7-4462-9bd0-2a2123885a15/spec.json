@@ -1,0 +1,136 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "service"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "Every cross-module import in src/modules/leave/leave.service.ts that has an existing barrel (index.ts) is rewritten to import from that barrel path rather than a deep internal file path. Specifically, the 8 barrel-eligible imports (employee, policy, balance, notification, audit, shared/holidays, shared/types for both leave-request.dto and enums) must resolve through their module's index.ts.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The import from ../../shared/utils/day-count remains unchanged because no barrel (index.ts) exists in src/shared/utils/ \u2014 it must not be redirected and no new barrel must be created for it.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The rewritten leave.service.ts compiles cleanly under tsc --noEmit (strict mode) \u2014 all barrel-imported symbols resolve to the same types they resolved to via deep paths, with no type errors introduced by the import-path change.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All existing Jest unit tests for the leave service (tests/unit/modules/leave/leave.service.test.ts) continue to pass unchanged \u2014 the import-path rewrite is purely structural and alters no runtime behavior, type signatures, or exported symbols.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "No cross-module import in leave.service.ts targets an internal file path (a path containing a segment like *.repository, *.service.interface, *.model, *.dto, or enums) when a barrel exists for that module \u2014 a reviewer can grep the import block and find zero deep-path cross-module imports except the single shared/utils/day-count exception.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Every cross-module import in leave.service.ts must go through the target module's public barrel (index.ts). Deep internal file paths (e.g. ../employee/employee.repository, ../../shared/types/enums) are prohibited when a barrel re-exports the needed symbol. This enforces AGENTS.md Architecture rule #1 and ARCHITECTURE.md dependency rules.",
+    "The import from ../../shared/utils/day-count must remain as a direct file import \u2014 no barrel exists in src/shared/utils/ and creating one is out of scope for this phase.",
+    "The import-path rewrite must not alter any runtime behavior, type signatures, constructor parameters, method bodies, error classes, or exported symbols of leave.service.ts \u2014 only the import source paths change. The service's public API and all business logic remain identical.",
+    "No new files (including no new barrel/index.ts files) may be created in this phase \u2014 the fix rewrites existing import statements in leave.service.ts only. All target barrels already exist and re-export the required symbols."
+  ],
+  "outOfScope": [
+    "Creating a barrel (index.ts) for src/shared/utils/ to redirect the day-count import \u2014 this is explicitly deferred; the import stays as a direct file path.",
+    "Adding the barrel-import rule as a coded constraint in HARNESS.json constraints.rules \u2014 the rule remains an architecture convention enforced by review, not an automated gate. Hardening the harness is out of scope for this intent update.",
+    "Correcting the false claim in ARCHITECTURE.md's Phase 9 section that states cross-module imports already go through barrels \u2014 documentation correction is a separate concern from the code fix, though the code fix will make the claim true after application.",
+    "Rewriting deep-path imports in other modules (employee, policy, balance, notification, audit, leave.model, leave.repository) that also import BaseEntity or enums from ../../shared/types/base-entity.interface or ../../shared/types/enums instead of the shared barrel \u2014 only leave.service.ts is in scope for this phase."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequestService (module public surface)",
+      "mustExistOrExtend": true,
+      "invariant": "The set of symbols exported from src/modules/leave/index.ts and the constructor signature, method signatures, and error classes of LeaveRequestService must remain identical before and after the import rewrite \u2014 the barrel-path change is transparent to all consumers of the leave module."
+    },
+    {
+      "entity": "LeaveRequestService (dependency injection)",
+      "mustExistOrExtend": true,
+      "invariant": "The 7 constructor dependencies (ILeaveRequestRepository, IEmployeeRepository, ILeavePolicyRepository, ILeaveBalanceRepository, IHolidayRepository, INotificationService, IAuditLogRepository) must remain the same types resolved from the same modules \u2014 only the import source path changes, not the types injected."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "LeaveRequestService constructor \u2014 accepts 7 repository/service dependencies whose types are imported from cross-module barrels rather than deep internal paths; the constructor signature itself is unchanged.",
+      "authRule": "N/A \u2014 this is a service constructor, not an API endpoint; RBAC is enforced at the controller/middleware layer (GP-005), not here.",
+      "idempotent": false,
+      "errorSemantics": "No change to error semantics \u2014 the 9 custom error classes and their throw conditions remain identical; the import rewrite introduces no new error paths."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The IEmployeeRepository type imported by leave.service.ts must resolve to the same symbol re-exported by the employee module barrel \u2014 the barrel exports `export type { IEmployeeRepository } from './employee.repository'`.",
+      "referencePath": "src/modules/employee/index.ts"
+    },
+    {
+      "requirement": "The ILeavePolicyRepository type imported by leave.service.ts must resolve to the same symbol re-exported by the policy module barrel \u2014 the barrel exports `export type { ILeavePolicyRepository } from './policy.repository'`.",
+      "referencePath": "src/modules/policy/index.ts"
+    },
+    {
+      "requirement": "The ILeaveBalanceRepository type imported by leave.service.ts must resolve to the same symbol re-exported by the balance module barrel \u2014 the barrel exports `export type { ILeaveBalanceRepository } from './balance.repository'`.",
+      "referencePath": "src/modules/balance/index.ts"
+    },
+    {
+      "requirement": "The INotificationService type imported by leave.service.ts must resolve to the same symbol re-exported by the notification module barrel \u2014 the barrel exports `export type { INotificationService } from './notification.service.interface'`.",
+      "referencePath": "src/modules/notification/index.ts"
+    },
+    {
+      "requirement": "The IAuditLogRepository type imported by leave.service.ts must resolve to the same symbol re-exported by the audit module barrel \u2014 the barrel exports `export type { IAuditLogRepository } from './audit.repository'`.",
+      "referencePath": "src/modules/audit/index.ts"
+    },
+    {
+      "requirement": "The IHolidayRepository type imported by leave.service.ts must resolve to the same symbol re-exported by the shared holidays barrel \u2014 the barrel exports `export { IHolidayRepository, PgHolidayRepository } from './holiday.repository'`.",
+      "referencePath": "src/shared/holidays/index.ts"
+    },
+    {
+      "requirement": "The CreateLeaveRequestDto type and LeaveRequestStatus enum imported by leave.service.ts must both resolve to the same symbols re-exported by the shared types barrel \u2014 the barrel exports `export { LeaveType, LeaveRequestStatus } from './enums'` and `export type { CreateLeaveRequestDto, UpdateLeaveRequestDto } from './leave-request.dto'`. Both deep-path imports (leave-request.dto and enums) collapse to a single barrel import from ../../shared/types.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The countBusinessDays import from ../../shared/utils/day-count must remain a direct file import \u2014 there is no index.ts in src/shared/utils/ (only day-count.ts exists), so no barrel is available to route through. This is the sole permitted deep-path cross-module import in leave.service.ts.",
+      "referencePath": "src/shared/utils/day-count.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/employee/index.ts (employee module barrel)",
+      "why": "leave.service.ts imports IEmployeeRepository from this barrel instead of the deep path ../employee/employee.repository; the barrel must re-export the interface type."
+    },
+    {
+      "target": "src/modules/policy/index.ts (policy module barrel)",
+      "why": "leave.service.ts imports ILeavePolicyRepository from this barrel instead of the deep path ../policy/policy.repository; the barrel must re-export the interface type."
+    },
+    {
+      "target": "src/modules/balance/index.ts (balance module barrel)",
+      "why": "leave.service.ts imports ILeaveBalanceRepository from this barrel instead of the deep path ../balance/balance.repository; the barrel must re-export the interface type."
+    },
+    {
+      "target": "src/modules/notification/index.ts (notification module barrel)",
+      "why": "leave.service.ts imports INotificationService from this barrel instead of the deep path ../notification/notification.service.interface; the barrel must re-export the interface type."
+    },
+    {
+      "target": "src/modules/audit/index.ts (audit module barrel)",
+      "why": "leave.service.ts imports IAuditLogRepository from this barrel instead of the deep path ../audit/audit.repository; the barrel must re-export the interface type."
+    },
+    {
+      "target": "src/shared/holidays/index.ts (shared holidays barrel)",
+      "why": "leave.service.ts imports IHolidayRepository from this barrel instead of the deep path ../../shared/holidays/holiday.repository; the barrel must re-export the interface type."
+    },
+    {
+      "target": "src/shared/types/index.ts (shared types barrel)",
+      "why": "leave.service.ts imports CreateLeaveRequestDto and LeaveRequestStatus from this barrel instead of the deep paths ../../shared/types/leave-request.dto and ../../shared/types/enums; the barrel must re-export both symbols."
+    }
+  ]
+}
