@@ -1,76 +1,127 @@
-# Fix specific quality-gate violations: Phase 7: LeaveRequest service (business logic)
+# Implement this phase: Phase 7: LeaveRequest service (business logic)
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/fix/8177937e-ec7c-4649-b943-9d9104b82731/7/1`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/8177937e-ec7c-4649-b943-9d9104b82731/7`. Do not clone anything; work only in this directory.
 
-You are fixing SPECIFIC violations the quality gate found in EXISTING, already-committed files. Make the targeted edits listed below — do NOT refactor, regenerate, or change unrelated code.
+## What to build
+(no phase architecture provided — infer from the success criteria below)
 
-The files ALREADY EXIST. You MUST edit them in place with the `str_replace_editor` tool. Reading or viewing a file is NOT sufficient — you have NOT finished until you have edited EVERY file listed below.
+## Success criteria
+Implement the LeaveRequest service with full business logic. This phase depends on `src/modules/leave-balance/leave-balance.service.interface.ts` from Phase 5 and `src/modules/leave-request/leave-request.model.ts` + `src/modules/leave-request/leave-request.repository.ts` from Phase 6 — read all before generating.
 
-## Required edits
+Files to create:
+- `src/modules/leave-request/leave-request.service.interface.ts` — Define `ILeaveRequestService` interface with methods: submit(dto: CreateLeaveRequestDto, actorId: string, actorRole: 'employee' | 'manager' | 'hr_admin'): Promise<LeaveRequest>, approve(leaveRequestId: string, approverId: string, approverRole: 'manager' | 'hr_admin'): Promise<LeaveRequest>, reject(leaveRequestId: string, approverId: string, approverRole: 'manager' | 'hr_admin'): Promise<LeaveRequest>, cancel(leaveRequestId: string, actorId: string, actorRole: 'employee' | 'manager' | 'hr_admin'): Promise<LeaveRequest>, getById(leaveRequestId: string): Promise<LeaveRequest | null>, getByEmployee(employeeId: string): Promise<LeaveRequest[]>.
+- `src/modules/leave-request/leave-request.service.ts` — Implement `LeaveRequestService` class. Key business rules to enforce:
+  - **submit**: Validate startDate not in past, startDate <= endDate. Look up the LeavePolicy to check minimumNoticeDays. Compute business days via `countBusinessDays` from Phase 1 (pass an empty holidays array for now). Look up LeaveBalance for the employee+policy+fiscalYear (fiscalYear = calendar year of startDate). Check remainingDays >= computed days; if not, throw error. Atomically increment usedDays on the balance. Set status to SUBMITTED. If employee has no manager (managerId is null), the request is escalated to hr_admin — do NOT auto-approve.
+  - **approve**: Verify approver is the employee's manager OR hr_admin (when managerId is null). Set status to APPROVED, set approvedBy and approvedAt. Do NOT change usedDays again.
+  - **reject**: Same authorization as approve. Set status to REJECTED. Restore usedDays on the balance.
+  - **cancel**: Only the employee who owns the request (or a manager/hr_admin) may cancel. Set status to CANCELLED. If the prior status was SUBMITTED, restore usedDays.
+  - **RBAC**: Thread actor role into every method; the service enforces authorization, not the controller.
+- `src/modules/leave-request/index.ts` — Update barrel export to include service interface and service.
 
-### Coherent change 1 — apply as ONE atomic edit across ALL sites below
+Include Jest unit tests in `tests/unit/modules/leave-request/leave-request.service.test.ts` — mock all repository dependencies, test each method's happy path and error paths (insufficient balance, unauthorized approver, past startDate, etc.).
 
-Unifying change (do this now): Replace all three cross-module repository imports in src/modules/leave-request/leave-request.service.ts with their module barrel exports: import ILeaveBalanceRepository from '../leave-balance', IEmployeeRepository from '../employee', and ILeavePolicyRepository from '../leave-policy' instead of reaching into the internal *.repository.ts files.
+## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
+These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
+- Consolidated decision (apply consistently across annual, sick, and emergency leave):
 
-The sites below are the SAME underlying issue. Fixing some but not others leaves the code incoherent and the quality gate WILL re-flag it — apply the one change above consistently to EVERY site:
+1. Fiscal/leave year = CALENDAR YEAR (Jan 1 – Dec 31). Derive fiscalYear = the calendar year of the request start_date. Not tenant-configurable for now.
 
-- Site 1
-File: src/modules/leave-request/leave-request.service.ts
-Line: 2
-Offending code: `import { ILeaveBalanceRepository } from '../leave-balance/leave-balance.repository';`
-Rule violated: barrel-export-only
-Action (do this now): Edit `src/modules/leave-request/leave-request.service.ts` at line 2 in place to fix the `barrel-export-only` violation.
-What the quality gate found — apply this: [barrel-export-only] Cross-module import bypasses the public barrel export. The leave-balance module's index.ts exports ILeaveBalanceRepository, but this import reaches directly into the internal leave-balance.repository.ts file. Per ARCHITECTURE.md: "Modules import from each other ONLY through their declared public entry point (index.ts)".
+2. Day counting = BUSINESS DAYS ONLY, excluding weekends AND public holidays, applied uniformly to ALL leave types. A single shared countBusinessDays function + a `holidays` table (public-holiday calendar) is used by every call site (balance sufficiency check, deduction, restoration). Whole days only — no half-day/partial-day leave. Compare dates by CALENDAR-DATE equality in UTC (normalize each day/holiday/weekend check to UTC midnight; compare the YYYY-MM-DD triple), never by raw timestamp — so a holiday matches regardless of time-of-day/timezone.
 
-- Site 2
-File: src/modules/leave-request/leave-request.service.ts
-Line: 3
-Offending code: `import { IEmployeeRepository } from '../employee/employee.repository';`
-Rule violated: barrel-export-only
-Action (do this now): Edit `src/modules/leave-request/leave-request.service.ts` at line 3 in place to fix the `barrel-export-only` violation.
-What the quality gate found — apply this: [barrel-export-only] Cross-module import bypasses the public barrel export. The employee module's index.ts exports IEmployeeRepository, but this import reaches directly into the internal employee.repository.ts file. Per ARCHITECTURE.md: "Modules import from each other ONLY through their declared public entry point (index.ts)".
+3. Employee with no manager (managerId is null): ESCALATE to the HR admin role for approval. Do NOT auto-approve and do NOT block submission.
 
-- Site 3
-File: src/modules/leave-request/leave-request.service.ts
-Line: 4
-Offending code: `import { ILeavePolicyRepository } from '../leave-policy/leave-policy.repository';`
-Rule violated: barrel-export-only
-Action (do this now): Edit `src/modules/leave-request/leave-request.service.ts` at line 4 in place to fix the `barrel-export-only` violation.
-What the quality gate found — apply this: [barrel-export-only] Cross-module import bypasses the public barrel export. The leave-policy module's index.ts exports ILeavePolicyRepository, but this import reaches directly into the internal leave-policy.repository.ts file. Per ARCHITECTURE.md: "Modules import from each other ONLY through their declared public entry point (index.ts)".
+4. leave_balances.used_days = DENORMALIZED COUNTER and the source of truth (O(1) reads). Deduct-on-submission: increment used_days atomically, in the same transaction, when a LeaveRequest is SUBMITTED (reserving the balance so an employee cannot over-book). Restore-on-reject/cancel: decrement used_days when that request is REJECTED or CANCELLED. Approval does NOT change used_days again. A submission must fail if it would drive remaining below zero.
 
-- Site 4
-File: src/modules/leave-request/leave-request.service.ts
-Line: 2
-Offending code: `import { ILeaveBalanceRepository } from '../leave-balance/leave-balance.repository';`
-Rule violated: review/architecture
-Action (do this now): Edit `src/modules/leave-request/leave-request.service.ts` at line 2 in place to fix the `review/architecture` violation.
-What the quality gate found — apply this: [review/architecture] Cross-module import bypasses the public entry point. ARCHITECTURE.md requires modules to import from each other ONLY through their declared public entry point (index.ts). The leave-balance module's index.ts already exports ILeaveBalanceRepository. Import from '../leave-balance' instead of '../leave-balance/leave-balance.repository'.
+5. remainingDays = COMPUTED/DERIVED, never stored: remainingDays = totalEntitlement - usedDays, at query time. No code path writes remainingDays directly.
 
-- Site 5
-File: src/modules/leave-request/leave-request.service.ts
-Line: 3
-Offending code: `import { IEmployeeRepository } from '../employee/employee.repository';`
-Rule violated: review/architecture
-Action (do this now): Edit `src/modules/leave-request/leave-request.service.ts` at line 3 in place to fix the `review/architecture` violation.
-What the quality gate found — apply this: [review/architecture] Cross-module import bypasses the public entry point. ARCHITECTURE.md requires modules to import from each other ONLY through their declared public entry point (index.ts). The employee module's index.ts already exports IEmployeeRepository. Import from '../employee' instead of '../employee/employee.repository'.
+6. RBAC (GP-005): every endpoint enforces role-based access control — an employee may act only on their own requests; managers/HR admins on those they oversee. The authenticated identity/role comes from the request context (`request.user` = { id, role }, role ∈ 'employee'|'manager'|'hr_admin'), populated by the app's existing auth middleware — do NOT build auth here; the controller only CONSUMES request.user (401 if absent). Validate all inputs at the API boundary (GP-003) before calling the service (400 on invalid: startDate not in the past, startDate <= endDate, minimum notice). Do NOT add a role field to the Employee entity.
 
-- Site 6
-File: src/modules/leave-request/leave-request.service.ts
-Line: 4
-Offending code: `import { ILeavePolicyRepository } from '../leave-policy/leave-policy.repository';`
-Rule violated: review/architecture
-Action (do this now): Edit `src/modules/leave-request/leave-request.service.ts` at line 4 in place to fix the `review/architecture` violation.
-What the quality gate found — apply this: [review/architecture] Cross-module import bypasses the public entry point. ARCHITECTURE.md requires modules to import from each other ONLY through their declared public entry point (index.ts). The leave-policy module's index.ts already exports ILeavePolicyRepository. Import from '../leave-policy' instead of '../leave-policy/leave-policy.repository'.
+7. Service authorization: thread the actor's role INTO the service — approve(leaveRequestId, approverId, approverRole) and reject(..., approverRole). The controller reads request.user and passes id + role; the service enforces the business rule (approver must be the employee's manager, or hr_admin when no manager, else throw ApproverNotAuthorizedError). Role is an explicit parameter, never ambient state read inside the service.
 
-Then check the rest of these files (and the surrounding module) for ANY OTHER occurrence of the same pattern beyond the specific lines listed above, and apply the same change there too — do NOT limit the fix to only the enumerated sites.
+8. Test files use the project's Jest convention — `*.test.ts` under `tests/` (matching the configured testMatch), NOT `.spec.ts`; do not change the Jest config. [BINDING RULE — operator decision resolving: How is used_days on leave_balances computed — derived live from approved leave_requests or stored counter incremented/decremented on state changes?; Are leave days always whole days, or does the system need to support half-day or hourly leave requests?; When should leave balance be deducted — at application time or at approval time?; How is used_days on leave_balances computed — is it derived live from approved leave_requests (SUM of day counts where status=APPROVED) or is it a stored counter incremented/decremented on approval/rejection/cancellation?; apply everywhere these apply, not in one place only]
+
+## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
+The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
+- `LeaveRequest` — the entity MUST have exactly these fields:
+    - id: string
+    - employeeId: string
+    - leavePolicyId: string
+    - startDate: Date
+    - endDate: Date
+    - reason: string | undefined
+    - status: LeaveRequestStatus
+    - approvedBy: string | null
+    - approvedAt: Date | null
+    - createdAt: Date
+    - updatedAt: Date
+
+## Constraints & consistency
+You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
+### Reuse & consistency — match these exactly
+- Business-day counting must reuse the shared countBusinessDays(startDate, endDate, holidays) helper, which normalizes dates to UTC midnight, excludes weekends and the provided holidays, and treats the end day as EXCLUSIVE (Mon–Fri = 4 days). The service must call it with an empty holidays array and must not reimplement day-counting logic. (see `src/shared/utils/business-days.ts`)
+- The service must use ILeaveRequestRepository exactly as declared: create(dto) inserts as DRAFT, then updateStatus(id, status, approvedBy?, approvedAt?) transitions the status; findById and findByEmployee are the read paths. The service must not bypass these methods or assume a different repository shape. (see `src/modules/leave-request/leave-request.repository.ts`)
+- Balance operations must use ILeaveBalanceRepository.findByEmployeeAndPolicy(employeeId, leavePolicyId, fiscalYear) for lookup and updateUsedDays(id, usedDays) for mutation — the service uses the repository directly (not ILeaveBalanceService), consistent with the settled Phase 7 dependency decision. remainingDays on the returned LeaveBalance is a derived field the service must NOT trust; it recomputes totalEntitlement - usedDays itself. (see `src/modules/leave-balance/leave-balance.repository.ts`)
+- The service must operate on the LeaveRequest and CreateLeaveRequestDto shapes exactly as defined in the model; submit accepts CreateLeaveRequestDto and all methods return LeaveRequest (or null/array for reads). The status field uses the LeaveRequestStatus enum from shared types. (see `src/modules/leave-request/leave-request.model.ts`)
+- The deduct-on-submission / restore-on-reject / restore-on-cancel-from-SUBMITTED (not from APPROVED) / no-change-on-approve balance semantics, calendar-year fiscalYear, business-days-only exclusive-end counting, and manager-less escalation-to-hr_admin rules must match the binding business_rules in reconciled.json exactly — the implementation must not diverge from these settled decisions. (see `.gestalt/architecture/reconciled.json`)
+- The barrel must re-export the service interface (ILeaveRequestService), the service class (LeaveRequestService), and all four error classes (InsufficientBalanceError, ApproverNotAuthorizedError, ValidationError, LeaveRequestNotFoundError) so downstream Phase 8 controller and Phase 10 audit integration can import them through the public entry point only. (see `src/modules/leave-request/index.ts`)
+### Entity invariants — enforce these
+- Reuse or extend `LeaveRequest`: Lifecycle is strictly DRAFT → SUBMITTED → (APPROVED | REJECTED) → CANCELLED; the service creates via repository (always DRAFT) then transitions to SUBMITTED. approve/reject require the current status to be SUBMITTED; cancel requires SUBMITTED or APPROVED; DRAFT/REJECTED/CANCELLED are terminal or non-cancellable and reject any further transition with a ValidationError.
+- Reuse or extend `LeaveBalance`: usedDays is the denormalized source-of-truth counter: incremented atomically on submit (deduct-on-submission), decremented on reject and on cancel-from-SUBMITTED, and NOT changed on approve or cancel-from-APPROVED. A decrement is floored at zero. remainingDays is always derived as totalEntitlement - usedDays and is never written by the service.
+- Reuse or extend `LeaveRequest authorization`: An employee actor may only act on a request whose employeeId equals their own actorId (submit and cancel); manager and hr_admin actors may act on any employee's request. For approve/reject, when the owning employee's managerId is null only hr_admin is authorized; otherwise the approverId must equal the employee's managerId. Every violation throws ApproverNotAuthorizedError.
+### Interface contract — expose these operations (their shape is yours)
+- submit(dto, actorId, actorRole) — employee actor may only submit when actorId === dto.employeeId; manager/hr_admin may submit for any employee.; ValidationError for past startDate, end-before-start, weekend-only/zero-business-day range, missing employee/policy/balance, or unmet minimumNoticeDays; InsufficientBalanceError when recomputed remainingDays < business days; ApproverNotAuthorizedError when an employee submits for another employee.
+- approve(leaveRequestId, approverId, approverRole) — When employee.managerId is null only approverRole 'hr_admin' is authorized; otherwise approverId must equal employee.managerId. Request must be in SUBMITTED status.; LeaveRequestNotFoundError when the request does not exist; ValidationError when status is not SUBMITTED; ApproverNotAuthorizedError for any approver mismatch. Does NOT modify usedDays.
+- reject(leaveRequestId, approverId, approverRole) — Same authorization rule as approve: hr_admin only when managerId is null, else approverId === employee.managerId. Request must be in SUBMITTED status.; LeaveRequestNotFoundError when absent; ValidationError when status is not SUBMITTED; ApproverNotAuthorizedError on mismatch. Restores usedDays (decrement by business days, floored at zero); a missing balance row does not cause failure.
+- cancel(leaveRequestId, actorId, actorRole) — employee actor may cancel only their own request (actorId === employeeId); manager/hr_admin may cancel any. Request must be in SUBMITTED or APPROVED status.; LeaveRequestNotFoundError when absent; ValidationError when status is DRAFT/REJECTED/CANCELLED; ApproverNotAuthorizedError when an employee cancels another's request. Restores usedDays only if prior status was SUBMITTED; a missing balance row does not cause failure.
+- getById(leaveRequestId) — No authorization enforced at the service layer — pure read pass-through to the repository (RBAC for read visibility is the controller's concern in Phase 8).; idempotent; Returns the LeaveRequest or null; never throws on a missing record.
+- getByEmployee(employeeId) — No authorization enforced at the service layer — pure read pass-through; RBAC scoping is the controller's concern in Phase 8.; idempotent; Returns the array of the employee's requests (empty when none); delegates directly to the repository.
+### Integration points — connect to these
+- src/modules/leave-balance (ILeaveBalanceRepository) — submit deducts usedDays and reject/cancel-from-SUBMITTED restore usedDays by calling findByEmployeeAndPolicy and updateUsedDays on the balance repository directly.
+- src/modules/employee (IEmployeeRepository) — submit, approve, and reject look up the owning Employee via findById to validate existence and to read managerId for RBAC authorization and manager-less escalation.
+- src/modules/leave-policy (ILeavePolicyRepository) — submit looks up the LeavePolicy via findById to enforce minimumNoticeDays before deducting balance.
+- src/shared/utils/business-days.ts (countBusinessDays) — submit, reject, and cancel-from-SUBMITTED all compute the request's business-day count via the shared helper to drive balance deduction/restoration.
+- src/shared/types (LeaveRequestStatus enum) — The service references LeaveRequestStatus.DRAFT/SUBMITTED/APPROVED/REJECTED/CANCELLED for all status transitions and guards.
+
+## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
+Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
+- Use unknown with type guards instead of any (rule: `no-any`)
+- Database calls must go through repository pattern (rule: `no-direct-db-outside-repository`)
+- No hardcoded passwords, API keys, or tokens (rule: `no-hardcoded-secrets`)
+- Do not add @gestalt/* packages as project dependencies — these are Gestalt platform internals not available on npm (rule: `no-gestalt-internal-deps`)
+
+## Architecture & constraint rules the quality gate enforces (satisfy these now)
+The quality gate judges your code against the rules below and BLOCKS the phase on any violation — a violation it rates critical escalates to a human with no automatic retry. These are the same rules the gate checks, so comply up front rather than leaving them for the gate:
+- Data access is only permitted in the designated data access layer of this project. Code in business logic, presentation, or routing layers must delegate all data operations to the data access layer.
+- The data access layer is the only layer permitted to contain connection management, query execution, and direct interaction with the data store.
+- Each architectural layer communicates only with its immediately adjacent layer. Layers must not bypass intermediate layers.
+- Dependencies flow in one direction only — from outer layers toward inner layers. Inner layers must not depend on outer layers.
+- Error handling must be explicit. Callers must not be exposed to unhandled failures from dependencies.
+
+## Golden principles (NON-NEGOTIABLE — satisfy every one that applies)
+These are the project's non-negotiable invariants. A violation is a GOLDEN_PRINCIPLE_BREACH: the quality gate BLOCKS the phase and escalates to a human with NO automatic retry, so it is far more costly than an ordinary finding. Apply EVERY principle relevant to the code you write in this phase — e.g. enforce role-based access control on every API endpoint you add, and validate all inputs at API boundaries before use:
+- GP-001 — Repository pattern: All database access goes through repository interfaces. Never query the database directly from services or controllers.
+- GP-002 — Audit records: All state-changing operations write an audit record.
+- GP-003 — Input validation: Validate all inputs at API boundaries before processing.
+- GP-004 — No sensitive data in logs: Never log passwords, tokens, PII, or financial data.
+- GP-005 — RBAC enforcement: All API endpoints enforce role-based access control.
+- GP-006 — Error handling: No unhandled promise rejections. All async errors are caught and handled.
+
+## Project stack & references
+Before writing code, read the referenced files below (those present in the working directory) to learn the project's language, framework, test runner, and conventions, and the cross-cutting rules your code must satisfy — then follow the existing repository conventions:
+- `HARNESS.json`
+- `docs/ARCHITECTURE.md`
+- `docs/GOLDEN_PRINCIPLES.md`
+- `AGENTS.md`
+- `PLAN.md`
 
 ## Verify before you finish (MANDATORY)
-After making the edits above, the code MUST still compile and its tests MUST pass — a compilation/type error, or a test your change breaks, must NEVER be left for CI or the quality gate to find. Before you declare this task done:
-- Read the project's build / type-check / test commands from `package.json` (scripts) and `HARNESS.json`, install dependencies if they are not already installed, then RUN the type-check / build (e.g. `npm run build` or `tsc --noEmit`) AND the tests (e.g. `npm test`).
-- FIX every compilation error, type error, and failing test that YOUR edits introduced — including updating a test whose expectation your change legitimately invalidated (e.g. a new required field, a new status code such as 401/403 from an added authorization check, added input validation) — and re-run until they pass.
+The code you write MUST compile and its tests MUST pass — a compilation or type error must NEVER be left for CI to find. Before you declare this task done:
+- Read the project's build / type-check / test commands from `package.json` (scripts) and `HARNESS.json`.
+- Install dependencies if they are not already installed, then RUN the type-check / build (e.g. `npm run build` or `tsc --noEmit`) AND the tests (e.g. `npm test`) for the files this phase touches.
+- FIX every compilation error, type error, and failing test you introduced — including in test files — and re-run until they pass.
 - Only when the build and the tests pass may you consider the task complete. If a dependency install genuinely cannot be made to work, say so explicitly in your final message rather than declaring success on unverified code.
 
 ## Constraints (mandatory)
-- Keep the change SURGICAL: make the required edits above and fix only what they broke (compile/type errors and the tests they invalidated). Do NOT refactor, regenerate, or change unrelated code, and do not add / delete / rename source files beyond what a required edit — or a test-fix for it — needs.
-- Do NOT run `git commit`, `git push`, `git add`, or any git command. The platform handles all git operations. (Running the build / type-check / tests above is expected and encouraged — that is NOT a git operation.)
-- When the listed edits are made and the build + tests pass, stop.
+- Write and modify source files ONLY. Do NOT run `git commit`, `git push`, `git add`, or any other git command. The platform handles all git operations. (Running the build / type-check / tests above is expected and encouraged — that is NOT a git operation.)
+- Do not create a new repository or change the git remote.
+- Stay within the scope of this phase; do not implement deferred/later work.
