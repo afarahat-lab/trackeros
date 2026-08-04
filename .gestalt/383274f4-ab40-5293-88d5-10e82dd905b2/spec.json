@@ -1,0 +1,105 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared-types"
+    ],
+    "affectedLayers": [
+      "shared"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The LeaveType enum exposes exactly the members ANNUAL, SICK, EMERGENCY \u2014 no more, no fewer \u2014 and is exported as a named export from src/shared/types/leave-type.enum.ts.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The LeaveRequestStatus enum exposes exactly the members DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED \u2014 no more, no fewer \u2014 and is exported as a named export from src/shared/types/leave-request-status.enum.ts.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests under tests/unit/shared/types/ assert each enum's exact member set (membership and count) and pass when run via npx jest --passWithNoTests.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The verification gate exits zero: npm install --include=dev --no-audit --no-fund, then tsc --noEmit (npm run build), then npx jest --passWithNoTests all succeed with no type or test errors.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No use of the `any` type (HARNESS.json no-any rule, severity high) \u2014 use `unknown` with type guards where runtime narrowing is needed; pure enum declarations inherently satisfy this.",
+    "TypeScript strict mode must pass under tsc --noEmit: strict null checks, no implicit any, forceConsistentCasingInFileNames (tsconfig.json).",
+    "No @gestalt/* packages may be added as project dependencies (HARNESS.json no-gestalt-internal-deps, severity critical).",
+    "Enum files must use named exports only (no default exports), matching the existing module convention (e.g. src/modules/uptime/index.ts, src/modules/status/index.ts re-export named symbols).",
+    "The enums must be string enums (not numeric), since these domain values persist to PostgreSQL and are consumed across modules \u2014 string enums are the type-safe default for persisted domain values.",
+    "No dependencies on any existing module files \u2014 the enum files are self-contained declarations with no imports from src/modules/* or other domain code."
+  ],
+  "outOfScope": [
+    "Employee, LeavePolicy, LeaveBalance, LeaveRequest, Audit, and Notification modules (models, repositories, services, controllers, routes) \u2014 deferred to Phases 2\u201310.",
+    "Database migrations, Knex schema definitions, and any PostgreSQL table creation \u2014 no persistence layer in this phase.",
+    "Fastify routes, controllers, RBAC middleware, and API endpoint definitions \u2014 no HTTP surface in this phase.",
+    "Business-day counting utility (src/shared/utils/business-days.ts) and balance computation logic \u2014 deferred to Phase 9."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveType",
+      "mustExistOrExtend": true,
+      "invariant": "The enum's member set is exactly {ANNUAL, SICK, EMERGENCY}; each member maps to a distinct string value, and no additional members exist. This set is the canonical leave-type vocabulary consumed by LeavePolicy.leaveType and persisted to the leave_policies.leave_type column."
+    },
+    {
+      "entity": "LeaveRequestStatus",
+      "mustExistOrExtend": true,
+      "invariant": "The enum's member set is exactly {DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED}; each member maps to a distinct string value, and no additional members exist. This set is the canonical LeaveRequest lifecycle vocabulary (DRAFT \u2192 SUBMITTED \u2192 APPROVED / REJECTED / CANCELLED) consumed by LeaveRequest.status and persisted to the leave_requests.status column."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "Public export of LeaveType and LeaveRequestStatus from the shared-types module's barrel (index.ts) \u2014 downstream modules import these enums solely through the module's public entry point, never from internal files, per the architecture's dependency rule (modules import only through declared public entry points).",
+      "authRule": "N/A \u2014 pure type declarations with no runtime operations or access control.",
+      "idempotent": true,
+      "errorSemantics": "N/A \u2014 enum declarations have no runtime failure modes; import resolution failures surface as tsc --noEmit compile errors, not runtime errors."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The LeaveType enum members (ANNUAL, SICK, EMERGENCY) must exactly match the shared-types module's declared ownership in the reconciled architecture \u2014 no extra or missing members.",
+      "referencePath": ".gestalt/architecture/reconciled.json \u2192 modules[name=shared-types].owns"
+    },
+    {
+      "requirement": "The LeaveRequestStatus enum members (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED) must exactly match the LeaveRequest lifecycle states documented in the reconciled architecture entity table and the ARCHITECTURE.md reconciled section.",
+      "referencePath": ".gestalt/architecture/reconciled.json \u2192 domain_entities[name=LeaveRequest] + docs/ARCHITECTURE.md (Leave Management Module \u2013 Reconciled Architecture, Domain Entities table)"
+    },
+    {
+      "requirement": "File placement must follow the reconciled architecture's Module Boundaries: the shared-types module owns LeaveType and LeaveRequestStatus at path src/shared/types/ \u2014 the enum files must live under that exact directory, not under src/modules/.",
+      "referencePath": ".gestalt/architecture/reconciled.json \u2192 modules[name=shared-types].path"
+    },
+    {
+      "requirement": "Export style (named exports, no defaults) and per-module barrel re-export must match the existing module convention established by src/modules/uptime/index.ts and src/modules/status/index.ts.",
+      "referencePath": "src/modules/uptime/index.ts, src/modules/status/index.ts"
+    },
+    {
+      "requirement": "Test file naming and location must match jest.config.js's testMatch glob (**/tests/**/*.test.(ts|js)) \u2014 tests must be *.test.ts files under a tests/ directory, compiled by ts-jest (not tsc, which excludes tests/).",
+      "referencePath": "jest.config.js (testMatch, preset: ts-jest) + tsconfig.json (exclude: [\"tests\"])"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "leave-policy module (Phase 3) \u2014 LeavePolicy.leaveType is typed as LeaveType; the enum must be importable via the bare path resolved through moduleDirectories (node_modules, src) so downstream consumers can import from shared/types/.",
+      "why": "LeavePolicy persists leaveType to the leave_policies.leave_type column; the enum is the canonical vocabulary for that field."
+    },
+    {
+      "target": "leave-request module (Phase 5) \u2014 LeaveRequest.status is typed as LeaveRequestStatus; the enum must be importable via the bare path resolved through moduleDirectories (node_modules, src) so downstream consumers can import from shared/types/.",
+      "why": "LeaveRequest persists status to the leave_requests.status column and drives the DRAFT \u2192 SUBMITTED \u2192 APPROVED/REJECTED/CANCELLED lifecycle; the enum is the canonical vocabulary for that field."
+    },
+    {
+      "target": "All domain modules (employee, leave-policy, leave-balance, leave-request, audit, notification) \u2014 per the reconciled dependency map, every module depends on shared-types; the barrel must re-export both enums as the single public entry point for cross-module consumption.",
+      "why": "The architecture's dependency map declares shared-types as a dependency of all modules; the barrel is the sanctioned import surface per the \"modules import only through declared public entry points\" rule."
+    }
+  ]
+}
