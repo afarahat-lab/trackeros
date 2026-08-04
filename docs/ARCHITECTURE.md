@@ -29,6 +29,10 @@ src/
 │   │   ├── index.ts               # Barrel: Employee, IEmployeeRepository, EmployeeRepository
 │   │   ├── employee.model.ts      # Employee entity (camelCase, standalone — does not extend BaseEntity)
 │   │   └── employee.repository.ts # IEmployeeRepository + EmployeeRepository (parameterised queries, soft-delete, snake→camel mapping)
+│   ├── policy/                    # LeavePolicy model + repository (Phase 3)
+│   │   ├── index.ts               # Barrel: LeavePolicy, IPolicyRepository, PolicyRepository
+│   │   ├── policy.model.ts        # LeavePolicy entity (camelCase interface)
+│   │   └── policy.repository.ts   # IPolicyRepository + PolicyRepository (parameterised queries, snake→camel mapping, dynamic UPDATE)
 │   ├── status/                    # System status module (health-check)
 │   │   ├── index.ts
 │   │   ├── status.model.ts
@@ -48,15 +52,16 @@ tests/
 │   ├── shared/
 │   │   └── business-days.test.ts  # Jest tests for countBusinessDays
 │   └── modules/
-│       └── employee/
-│           └── employee.repository.test.ts  # Jest tests for EmployeeRepository
+│       ├── employee/
+│       │   └── employee.repository.test.ts  # Jest tests for EmployeeRepository
+│       └── policy/
+│           └── policy.repository.test.ts    # Jest tests for PolicyRepository
 ```
 
 ### Planned modules (not yet built)
 
 The following modules are planned per the leave-management feature design but have not been implemented yet:
 
-- `src/modules/policy/` — LeavePolicy model + repository
 - `src/modules/balance/` — LeaveBalance model + repository + service
 - `src/modules/notification/` — Notification model + repository + service
 - `src/modules/audit/` — AuditRecord model + repository + service
@@ -123,7 +128,7 @@ src/
 │   └── db/             # PostgreSQL connection pool (pg Pool)
 ├── modules/
 │   ├── employee/       # Employee CRUD, status checks ✅ built (Phase 2)
-│   ├── policy/         # LeavePolicy CRUD, active policy lookups
+│   ├── policy/         # LeavePolicy CRUD, active policy lookups ✅ built (Phase 3)
 │   ├── balance/        # LeaveBalance management, deduction/restoration
 │   ├── notification/   # Notification creation and retrieval
 │   ├── audit/          # Audit trail recording and querying
@@ -139,7 +144,7 @@ src/
 ### Recommended Build Phases
 
 1. **Shared types + Employee module** — foundation enums and employee vertical slice. ✅ Done
-2. **Policy module** — policy vertical slice.
+2. **Policy module** — policy vertical slice. ✅ Done
 3. **Balance module** — balance vertical slice (depends on employee & policy).
 4. **Notification + Audit modules** — independent mid-layer slices.
 5. **Leave module** — orchestrator (depends on all above).
