@@ -1,22 +1,22 @@
-# Implement this phase: Phase 4: Notification module (model + repository + service)
+# Implement this phase: Phase 5: Audit module (model + repository + service)
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/4fbbfee4-4feb-4a2b-8127-85025f82af24/4`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/4fbbfee4-4feb-4a2b-8127-85025f82af24/5`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the notification module at `src/modules/notification/`. This phase depends on `src/shared/types/index.ts` from Phase 1 — read it before generating any code.
+Create the audit module at `src/modules/audit/`. This phase depends on `src/shared/types/index.ts` from Phase 1 — read it before generating any code.
 
-Create `src/modules/notification/notification.model.ts` with the Notification entity: id, recipientId, type, title, message, relatedEntityType (string|null), relatedEntityId (string|null), status ('PENDING'|'SENT'|'READ'|'ARCHIVED'), createdAt, readAt (Date|null).
+Create `src/modules/audit/audit.model.ts` with the AuditRecord entity: id, entityType, entityId, action (AuditAction enum from shared types), oldValues (Record<string, unknown>|null), newValues (Record<string, unknown>|null), performedBy (string|null), performedAt (Date), createdAt, updatedAt.
 
-Create `src/modules/notification/notification.repository.ts` with INotificationRepository interface and NotificationRepository class using `src/shared/db/connection.ts`. Methods: create(notification), findByRecipient(recipientId), markSent(id), markRead(id).
+Create `src/modules/audit/audit.repository.ts` with IAuditRepository interface and AuditRepository class using `src/shared/db/connection.ts`. Methods: create(record), findByEntity(entityType, entityId), findByPerformer(performedBy, limit?, offset?).
 
-Create `src/modules/notification/notification.service.ts` with INotificationService interface and NotificationService class. The service wraps the repository and exposes: notify(recipientId, type, title, message, relatedEntityType?, relatedEntityId?): Promise<Notification> — creates and returns the notification.
+Create `src/modules/audit/audit.service.ts` with IAuditService interface and AuditService class. The service wraps the repository and exposes: record(action, entityType, entityId, performedBy, oldValues?, newValues?): Promise<AuditRecord> — creates an audit record with performedAt set to now.
 
-Create `src/modules/notification/index.ts` barrel.
+Create `src/modules/audit/index.ts` barrel.
 
-Include Jest unit tests in `tests/unit/modules/notification/notification.service.test.ts`.
+Include Jest unit tests in `tests/unit/modules/audit/audit.service.test.ts`.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -41,26 +41,24 @@ These are resolved, feature-wide decisions. Wherever this phase touches the conc
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- The NotificationRepository must follow the established repository pattern: import pool from shared/db/connection, define a standalone INotificationRepository interface, use a private snake_case row interface with a mapRowToNotification mapper, use parameterised queries with NOW() and RETURNING *, and return Notification | null from update-style methods (markSent/markRead) — matching the employee repository's create/update/softDelete conventions. (see `src/modules/employee/employee.repository.ts`)
-- The Notification model interface must be a standalone camelCase interface (not extending BaseEntity), matching the employee and policy model convention; NotificationStatus is defined locally in notification.model.ts as a string-literal union, not imported from shared types. (see `src/modules/employee/employee.model.ts`)
-- The notification barrel (index.ts) must re-export the model, repository interface + class, and service interface + class from their respective files, matching the employee/policy barrel export pattern. (see `src/modules/employee/index.ts`)
-- The NotificationService must follow the established service pattern: a standalone INotificationService interface and a NotificationService class implementing it in a single service file, receiving its dependency (INotificationRepository) via constructor injection — matching the status service interface+class split and the constructor-injection convention. (see `src/modules/status/status.service.ts`)
-- The notification service test must follow the established Jest test conventions: file named *.test.ts under tests/unit/modules/notification/, bare module paths (e.g. modules/notification/...) enabled by jest.config moduleDirectories ['node_modules','src'], and mocking the injected repository (INotificationRepository) rather than the pool — matching how the employee test mocks its dependency. (see `tests/unit/modules/employee/employee.repository.test.ts`)
-- The notification module's dependency direction must match the reconciled architecture: notification depends only on src/shared/types/ and src/shared/db/ — it must not import employee, policy, balance, audit, or leave modules (notification is an independent mid-layer module). (see `.gestalt/architecture/reconciled.json`)
+- The AuditService must follow the NotificationService pattern: constructor-injected repository interface, service generates the UUID via crypto.randomUUID() and sets performedAt to new Date(), then delegates to repository.create() with a CreateAuditRecordInput — the service must not import the pool. (see `src/modules/notification/notification.service.ts`)
+- The AuditRepository must follow the NotificationRepository pattern: import pool from ../../shared/db/connection, use parameterised queries, define a private snake_case AuditRow interface, and map rows to camelCase AuditRecord via a mapRowToAuditRecord helper. (see `src/modules/notification/notification.repository.ts`)
+- The audit barrel index.ts must mirror the notification barrel: re-export the model, the repository interface + class, and the service interface + class. (see `src/modules/notification/index.ts`)
+- The AuditRecord.action field and the CreateAuditRecordInput.action field must be typed as the AuditAction enum imported from src/shared/types/index.ts — the enum must not be redefined in the audit module. (see `src/shared/types/index.ts`)
+- The audit service test must mirror the notification service test conventions: jest.Mocked<IAuditRepository> with jest.fn() per method, a makeAuditRecord(overrides) factory, describe('AuditService') → describe('record') → it cases covering create-and-return, null defaults for optional args, unique id per call, and repository error propagation. (see `tests/unit/modules/notification/notification.service.test.ts`)
 ### Entity invariants — enforce these
-- Reuse or extend `Notification`: A newly created Notification always starts in the PENDING status with readAt null; status may only advance through the defined sequence PENDING → SENT → READ, with ARCHIVED as a terminal disposition.
-- Reuse or extend `Notification`: readAt is null until the notification is marked READ; marking read sets both status to READ and readAt to the current timestamp.
-- Reuse or extend `Notification`: A Notification is always scoped to exactly one recipient (recipientId is non-null); relatedEntityType and relatedEntityId are either both null or both set, linking the notification to an optional domain entity.
+- Reuse or extend `AuditRecord`: An AuditRecord is immutable once persisted — there is no update or delete operation in the repository; the only write path is create().
+- Reuse or extend `AuditRecord`: Every persisted AuditRecord has a non-null performedAt timestamp set by the service at creation time (now); performedAt is never left unset or null.
+- Reuse or extend `AuditRecord`: The action field of an AuditRecord must be one of the AuditAction enum values (CREATE, UPDATE, DELETE, APPROVE, REJECT) defined in src/shared/types/index.ts.
 ### Interface contract — expose these operations (their shape is yours)
-- notificationRepository.create(notification) — Rejects the promise on DB errors (e.g. constraint violations); never swallows. createdAt is DB-assigned via NOW(), not caller-supplied.
-- notificationRepository.findByRecipient(recipientId) — Returns an empty array (not null) when no notifications exist for the recipient; rejects the promise on DB errors.
-- notificationRepository.markSent(id) — Returns the updated Notification with status SENT, or null when no row matches the id; rejects the promise on DB errors.
-- notificationRepository.markRead(id) — Returns the updated Notification with status READ and readAt set, or null when no row matches the id; rejects the promise on DB errors.
-- notificationService.notify(recipientId, type, title, message, relatedEntityType?, relatedEntityId?) — Generates a unique id, sets status PENDING, defaults omitted related-entity params to null, delegates to repository.create, and returns the persisted Notification; propagates repository errors as rejected promises.
+- auditService.record(action, entityType, entityId, performedBy, oldValues?, newValues?) — Repository errors (e.g. DB connection failure) propagate as rejected promises; the service does not catch, wrap, or swallow them.
+- auditRepository.create(record) — On database failure the promise rejects with the underlying pg error; on success it returns the persisted AuditRecord with DB-populated createdAt/updatedAt.
+- auditRepository.findByEntity(entityType, entityId) — Returns an empty array when no records match (not null); rejects on database failure.
+- auditRepository.findByPerformer(performedBy, limit?, offset?) — Returns an empty array when no records match (not null); rejects on database failure. Optional limit/offset are applied only when provided.
 ### Integration points — connect to these
-- src/modules/leave/ (LeaveService, Phase 8) — The leave orchestrator will inject INotificationService to send notifications to a manager on submission and to the employee on approve/reject; this phase must expose a stable notify(...) service interface and barrel export for that downstream consumption.
-- src/shared/db/connection.ts — The NotificationRepository imports the pg Pool from the shared DB connection to execute parameterised queries against the notifications table.
-- src/shared/types/index.ts — The notification module depends on Phase 1 shared types; NotificationStatus is defined locally but the module must not duplicate or contradict the canonical shared enums.
+- src/shared/types/index.ts — The audit module imports the AuditAction enum from shared types; this is the only shared-types dependency for the audit module.
+- src/shared/db/connection.ts — The AuditRepository imports the pg Pool from the shared db connection to execute parameterised queries against the audit_logs table.
+- src/modules/leave/ (future Phase 7/8) — The LeaveService orchestrator will consume IAuditService via constructor injection to write audit records on state-changing operations (GP-002); this phase produces the interface that later phases depend on.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
