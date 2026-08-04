@@ -1,0 +1,151 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "notification"
+    ],
+    "affectedLayers": [
+      "domain",
+      "persistence",
+      "unit-tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The Notification entity type is exported from the notification module and exposes the lifecycle status type covering exactly PENDING, SENT, READ, ARCHIVED.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The notification repository persists a notification via create and returns the created Notification with DB-assigned createdAt; findByRecipient returns all notifications for a given recipient; markSent transitions status to SENT and markRead transitions status to READ and sets readAt, both returning the updated Notification or null when no row matches.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The notification service notify(recipientId, type, title, message, relatedEntityType?, relatedEntityId?) creates a notification with status PENDING, defaults relatedEntityType and relatedEntityId to null when omitted, generates a unique id, delegates persistence to the injected repository, and returns the resulting Notification.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The notification service does not import or reference the database pool directly; all persistence is delegated to the injected INotificationRepository (constructor injection).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The notification module barrel (index.ts) re-exports the Notification entity, the NotificationStatus type, the repository interface and class, and the service interface and class, so downstream modules import only through the barrel.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests at tests/unit/modules/notification/notification.service.test.ts cover notify creating a PENDING notification with defaulted null related-entity fields, passing the generated id and supplied fields to the repository, and returning the repository result; the test mocks the repository (not the pool).",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No use of `any` \u2014 use `unknown` with type guards (HARNESS constraint no-any, tsconfig strict).",
+    "No direct database access outside the repository \u2014 the service must not import or use the pool; all DB access goes through INotificationRepository (GP-001, HARNESS constraint no-direct-db-outside-repository).",
+    "Repository queries must use parameterised queries only (no string-interpolated values) and set createdAt via NOW() with RETURNING *, matching the employee/policy repository convention.",
+    "Modules import from each other only through their declared public entry point (index.ts barrel); no imports of another module's internals (AGENTS.md architecture rule 1).",
+    "No unhandled promise rejections \u2014 all async errors in the service and repository are propagated as rejected promises, not swallowed (GP-006).",
+    "No hardcoded secrets, passwords, API keys, or tokens (HARNESS constraint no-hardcoded-secrets)."
+  ],
+  "outOfScope": [
+    "Controller, routes, and HTTP/RBAC wiring for the notification module \u2014 deferred to later controller/routes phases.",
+    "Zod validation schemas for notification inputs \u2014 deferred to the validation-schemas phase.",
+    "Repository unit tests (notification.repository.test.ts) \u2014 this phase only requires the service test; repository tests are not mandated by the phase scope.",
+    "Adding NotificationStatus to src/shared/types/index.ts \u2014 it is defined locally in notification.model.ts per the settled decision.",
+    "Actual notification delivery (email/push/fanout via BullMQ) \u2014 this phase only creates and persists the notification record; delivery is out of scope."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "A newly created Notification always starts in the PENDING status with readAt null; status may only advance through the defined sequence PENDING \u2192 SENT \u2192 READ, with ARCHIVED as a terminal disposition."
+    },
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "readAt is null until the notification is marked READ; marking read sets both status to READ and readAt to the current timestamp."
+    },
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "A Notification is always scoped to exactly one recipient (recipientId is non-null); relatedEntityType and relatedEntityId are either both null or both set, linking the notification to an optional domain entity."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "notificationRepository.create(notification)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Rejects the promise on DB errors (e.g. constraint violations); never swallows. createdAt is DB-assigned via NOW(), not caller-supplied."
+    },
+    {
+      "operation": "notificationRepository.findByRecipient(recipientId)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an empty array (not null) when no notifications exist for the recipient; rejects the promise on DB errors."
+    },
+    {
+      "operation": "notificationRepository.markSent(id)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the updated Notification with status SENT, or null when no row matches the id; rejects the promise on DB errors."
+    },
+    {
+      "operation": "notificationRepository.markRead(id)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the updated Notification with status READ and readAt set, or null when no row matches the id; rejects the promise on DB errors."
+    },
+    {
+      "operation": "notificationService.notify(recipientId, type, title, message, relatedEntityType?, relatedEntityId?)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Generates a unique id, sets status PENDING, defaults omitted related-entity params to null, delegates to repository.create, and returns the persisted Notification; propagates repository errors as rejected promises."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The NotificationRepository must follow the established repository pattern: import pool from shared/db/connection, define a standalone INotificationRepository interface, use a private snake_case row interface with a mapRowToNotification mapper, use parameterised queries with NOW() and RETURNING *, and return Notification | null from update-style methods (markSent/markRead) \u2014 matching the employee repository's create/update/softDelete conventions.",
+      "referencePath": "src/modules/employee/employee.repository.ts"
+    },
+    {
+      "requirement": "The Notification model interface must be a standalone camelCase interface (not extending BaseEntity), matching the employee and policy model convention; NotificationStatus is defined locally in notification.model.ts as a string-literal union, not imported from shared types.",
+      "referencePath": "src/modules/employee/employee.model.ts"
+    },
+    {
+      "requirement": "The notification barrel (index.ts) must re-export the model, repository interface + class, and service interface + class from their respective files, matching the employee/policy barrel export pattern.",
+      "referencePath": "src/modules/employee/index.ts"
+    },
+    {
+      "requirement": "The NotificationService must follow the established service pattern: a standalone INotificationService interface and a NotificationService class implementing it in a single service file, receiving its dependency (INotificationRepository) via constructor injection \u2014 matching the status service interface+class split and the constructor-injection convention.",
+      "referencePath": "src/modules/status/status.service.ts"
+    },
+    {
+      "requirement": "The notification service test must follow the established Jest test conventions: file named *.test.ts under tests/unit/modules/notification/, bare module paths (e.g. modules/notification/...) enabled by jest.config moduleDirectories ['node_modules','src'], and mocking the injected repository (INotificationRepository) rather than the pool \u2014 matching how the employee test mocks its dependency.",
+      "referencePath": "tests/unit/modules/employee/employee.repository.test.ts"
+    },
+    {
+      "requirement": "The notification module's dependency direction must match the reconciled architecture: notification depends only on src/shared/types/ and src/shared/db/ \u2014 it must not import employee, policy, balance, audit, or leave modules (notification is an independent mid-layer module).",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/leave/ (LeaveService, Phase 8)",
+      "why": "The leave orchestrator will inject INotificationService to send notifications to a manager on submission and to the employee on approve/reject; this phase must expose a stable notify(...) service interface and barrel export for that downstream consumption."
+    },
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "The NotificationRepository imports the pg Pool from the shared DB connection to execute parameterised queries against the notifications table."
+    },
+    {
+      "target": "src/shared/types/index.ts",
+      "why": "The notification module depends on Phase 1 shared types; NotificationStatus is defined locally but the module must not duplicate or contradict the canonical shared enums."
+    }
+  ]
+}
