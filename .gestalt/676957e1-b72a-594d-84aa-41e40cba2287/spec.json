@@ -1,0 +1,135 @@
+{
+  "scope": {
+    "affectedDomains": [],
+    "affectedLayers": [],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The LeaveRequest entity type is exported from the leave module and its `status` field is typed as the canonical `LeaveStatus` enum imported from `src/shared/types/index.ts` \u2014 not a locally redefined enum or string literal union.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The create-leave-request Zod schema rejects input where startDate is not after endDate (i.e. startDate >= endDate is invalid), and accepts input where startDate is strictly before endDate. The update schema applies the same cross-field rule only when both dates are present.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The create-leave-request and update-leave-request Zod schemas reject any date field value that is not a parseable ISO date string (e.g. 'not-a-date' fails), and accept valid ISO 8601 strings.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository `create` operation persists a new leave_requests row with status set to the DRAFT value of the canonical LeaveStatus enum and returns the persisted entity mapped to camelCase; it does not accept or pass an explicit `id` (the id is DB-generated).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository `findByApprover` operation returns leave requests for employees whose `manager_id` equals the supplied approver id, by joining leave_requests to employees on the employee id \u2014 not by filtering on an approved_by column.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository `update` operation applies only the mutable fields actually supplied in the update DTO (startDate, endDate, reason) and, when no mutable fields are supplied, returns the existing row without issuing an UPDATE statement.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository `updateStatus` operation conditionally sets approved_by and approved_at only when those optional arguments are provided, and always sets status and updated_at; it returns null when no row matches the id.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository `findByEmployee` operation applies the optional query filters (status, leaveTypeId, startDateFrom/To, endDateFrom/To, limit, offset) as parameterised conditions when present and omits them when absent, returning an empty array when no rows match.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The leave module barrel (`index.ts`) re-exports the LeaveRequest entity type, the DTO/query-param types, the LeaveStatus enum (re-exported from shared types), the repository interface and class, and both Zod schemas \u2014 so downstream phases can import everything from the module root.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests exist for the repository (covering findById, findByEmployee, findByApprover, create, updateStatus, update \u2014 including null/empty/error cases) and for the validation schemas (covering valid input, missing/empty required fields, invalid dates, and startDate>=endDate rejection), and these tests pass under the project's Jest configuration.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No use of `any` \u2014 use `unknown` with type guards/casts instead (HARNESS.json no-any rule, severity high). Repository query parameter arrays must be typed `unknown[]`.",
+    "All database access must go through the repository pattern using the shared `pool` from `src/shared/db/connection.ts` \u2014 no inline SQL outside the repository (GP-001 / no-direct-db-outside-repository, severity critical).",
+    "All SQL queries must use parameterised placeholders ($1, $2, \u2026) \u2014 no string-interpolated user values in SQL (established convention across employee/policy/balance/audit repositories; prevents SQL injection).",
+    "The repository must map database snake_case rows to camelCase entity objects via a private row-mapping function, and map camelCase DTO fields to snake_case columns for writes \u2014 matching the convention in employee/policy/balance repositories.",
+    "Modules must import from each other ONLY through their declared public entry point (`index.ts`) \u2014 no imports of sibling-module internals (AGENTS.md architecture rule 1). The leave module imports LeaveStatus from `src/shared/types/index.ts`, not from a redefined local enum.",
+    "Test files must use the project's Jest convention: `*.test.ts` under `tests/`, with bare module specifiers (e.g. `modules/leave/...`, `shared/db/connection`) resolved via tsconfig baseUrl + jest moduleDirectories \u2014 not `.spec.ts` and not relative paths that bypass the baseUrl (reconciled.json binding rule 8).",
+    "Repository tests must mock the shared db pool via `jest.mock('shared/db/connection')` and reset the mock in `beforeEach`, asserting exact SQL strings and parameter arrays \u2014 matching the established pattern in employee/policy repository tests.",
+    "No hardcoded secrets, passwords, API keys, or tokens (HARNESS.json no-hardcoded-secrets, severity critical)."
+  ],
+  "outOfScope": [
+    "LeaveService / ILeaveService \u2014 the service layer (submit, approve, reject, cancel, create, update, findById, findByEmployee with RBAC) is Phase 8, not this phase.",
+    "LeaveController and leave routes (Fastify route plugin, HTTP method/path registration, request.user consumption, 401/400 handling) \u2014 Phase 9, not this phase.",
+    "Business-rule enforcement that belongs in the service layer: balance deduction/restoration, overlap detection, minimum-notice-days enforcement, auto-approval when requiresManagerApproval=false, ACTIVE-employee gating, and audit-record writing. The repository in this phase is a pure persistence layer and must not embed these rules.",
+    "RBAC enforcement (GP-005) \u2014 role-based access control is applied in the service/controller layers (Phases 8\u20139), not in the repository. The repository methods do not take an actor/role parameter.",
+    "Audit-record creation for leave request state changes (GP-002) \u2014 audit writing is the service layer's responsibility (Phase 8); the repository in this phase does not call AuditService.",
+    "Notification sending on leave events \u2014 the notification fan-out is a service-layer concern (Phase 8); the repository does not call NotificationService."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "A newly created LeaveRequest always starts in the DRAFT status \u2014 the repository create operation hard-codes the initial status to LeaveStatus.DRAFT and does not accept a status from the caller."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "The `reason` field is nullable at the persistence boundary (stored as null when absent) but surfaced as `string | undefined` on the entity \u2014 a null database row maps to undefined, never to an empty string or null on the camelCase object."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "The `approvedBy` and `approvedAt` fields are null until an approval decision is recorded; `updateStatus` only sets them when explicitly supplied, so a status change to a non-approval state (e.g. CANCELLED) must not populate them."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "The `leaveTypeId` is a string foreign key referencing `leave_policies.id` (not the LeaveType enum) \u2014 the repository treats it as an opaque string FK and does not validate it against the LeaveType enum values."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "ILeaveRepository.findById(id)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns null when no row matches the id; propagates database errors as rejected promises (does not swallow or wrap them)."
+    },
+    {
+      "operation": "ILeaveRepository.findByEmployee(employeeId, queryParams?)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an empty array when no rows match (never null); propagates database errors as rejected promises."
+    },
+    {
+      "operation": "ILeaveRepository.findByApprover(approverId, queryParams?)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an empty array when no rows match (never null); propagates database errors as rejected promises."
+    },
+    {
+      "operation": "ILeaveRepository.create(dto)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the persisted entity on success; propagates database errors (e.g. foreign-key violation, unique constraint) as rejected promises \u2014 does not return null or a sentinel."
+    },
+    {
+      "operation": "ILeaveRepository.updateStatus(id, status, approvedBy?, approvedAt?)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns null when no row matches the id (idempotent read-after-miss); propagates database errors as rejected promises."
+    }
+  ],
+  "consistencyRequirements": [],
+  "integrationPoints": []
+}
