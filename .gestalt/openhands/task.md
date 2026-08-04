@@ -1,22 +1,20 @@
-# Implement this phase: Phase 1: Shared enums (LeaveType, LeaveRequestStatus)
+# Implement this phase: Phase 2: Employee model + repository
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/be068fd3-a1c9-4eb0-ae38-156852fec5c5/1`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/be068fd3-a1c9-4eb0-ae38-156852fec5c5/2`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the two shared enum files that every downstream module depends on.
+Create the Employee domain model and repository. This phase depends on no prior module files.
 
-Create `src/shared/types/leave-type.enum.ts` with:
-- `LeaveType` enum: ANNUAL, SICK, EMERGENCY
+Create `src/modules/employee/employee.model.ts` with the Employee entity using the exact canonical fields: id, employeeNumber, firstName, lastName, email, managerId, department, hireDate, terminationDate, employmentStatus ('ACTIVE' | 'INACTIVE' | 'TERMINATED'), createdAt, updatedAt, deletedAt.
 
-Create `src/shared/types/leave-request-status.enum.ts` with:
-- `LeaveRequestStatus` enum: DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED
+Create `src/modules/employee/employee.repository.ts` with:
+- `IEmployeeRepository` interface declaring: findById(id), findByEmployeeNumber(employeeNumber), findByManagerId(managerId), findByDepartment(department), findActive(), save(employee), update(id, partial), softDelete(id)
+- `PgEmployeeRepository` class implementing IEmployeeRepository using the shared db connection at `src/shared/db/connection.ts`
 
-Include Jest unit tests in `tests/unit/shared/types/` verifying each enum has exactly the members listed above.
-
-No dependencies on any existing module files.
+Include Jest unit tests in `tests/unit/modules/employee/` for both model validation and repository methods (mocked db).
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -28,23 +26,22 @@ These are resolved, feature-wide decisions. Wherever this phase touches the conc
 
 Additional standing rules: whole days only (no partial/half days); leave year is the calendar year; when an employee has no assigned manager, escalate the approval to an HR admin; enforce RBAC on every endpoint (an employee sees/acts only on their own requests; a manager/HR acts on their reports); validate all inputs at API boundaries. [BINDING RULE — operator decision resolving: How are leave days counted from startDate and endDate? Is it inclusive (endDate - startDate + 1), exclusive (endDate - startDate), or business-days-only?; How are leave_balances.used_days and remaining_days computed — are they derived live from approved leave_requests (sum of day counts) or are they materialized and updated transactionally on each approval/rejection?; How are leave days counted from startDate and endDate? Is it inclusive (endDate - startDate + 1), exclusive (endDate - startDate), or business-days-only? This affects balance sufficiency checks, balance deductions, entitlement comparisons, and reporting.; apply everywhere these apply, not in one place only]
 
-## Constraints & consistency
-You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
-### Reuse & consistency — match these exactly
-- The LeaveType enum members (ANNUAL, SICK, EMERGENCY) must exactly match the shared-types module's declared ownership in the reconciled architecture — no extra or missing members. (see `.gestalt/architecture/reconciled.json → modules[name=shared-types].owns`)
-- The LeaveRequestStatus enum members (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED) must exactly match the LeaveRequest lifecycle states documented in the reconciled architecture entity table and the ARCHITECTURE.md reconciled section. (see `.gestalt/architecture/reconciled.json → domain_entities[name=LeaveRequest] + docs/ARCHITECTURE.md (Leave Management Module – Reconciled Architecture, Domain Entities table)`)
-- File placement must follow the reconciled architecture's Module Boundaries: the shared-types module owns LeaveType and LeaveRequestStatus at path src/shared/types/ — the enum files must live under that exact directory, not under src/modules/. (see `.gestalt/architecture/reconciled.json → modules[name=shared-types].path`)
-- Export style (named exports, no defaults) and per-module barrel re-export must match the existing module convention established by src/modules/uptime/index.ts and src/modules/status/index.ts. (see `src/modules/uptime/index.ts, src/modules/status/index.ts`)
-- Test file naming and location must match jest.config.js's testMatch glob (**/tests/**/*.test.(ts|js)) — tests must be *.test.ts files under a tests/ directory, compiled by ts-jest (not tsc, which excludes tests/). (see `jest.config.js (testMatch, preset: ts-jest) + tsconfig.json (exclude: ["tests"])`)
-### Entity invariants — enforce these
-- Reuse or extend `LeaveType`: The enum's member set is exactly {ANNUAL, SICK, EMERGENCY}; each member maps to a distinct string value, and no additional members exist. This set is the canonical leave-type vocabulary consumed by LeavePolicy.leaveType and persisted to the leave_policies.leave_type column.
-- Reuse or extend `LeaveRequestStatus`: The enum's member set is exactly {DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED}; each member maps to a distinct string value, and no additional members exist. This set is the canonical LeaveRequest lifecycle vocabulary (DRAFT → SUBMITTED → APPROVED / REJECTED / CANCELLED) consumed by LeaveRequest.status and persisted to the leave_requests.status column.
-### Interface contract — expose these operations (their shape is yours)
-- Public export of LeaveType and LeaveRequestStatus from the shared-types module's barrel (index.ts) — downstream modules import these enums solely through the module's public entry point, never from internal files, per the architecture's dependency rule (modules import only through declared public entry points). — N/A — pure type declarations with no runtime operations or access control.; idempotent; N/A — enum declarations have no runtime failure modes; import resolution failures surface as tsc --noEmit compile errors, not runtime errors.
-### Integration points — connect to these
-- leave-policy module (Phase 3) — LeavePolicy.leaveType is typed as LeaveType; the enum must be importable via the bare path resolved through moduleDirectories (node_modules, src) so downstream consumers can import from shared/types/. — LeavePolicy persists leaveType to the leave_policies.leave_type column; the enum is the canonical vocabulary for that field.
-- leave-request module (Phase 5) — LeaveRequest.status is typed as LeaveRequestStatus; the enum must be importable via the bare path resolved through moduleDirectories (node_modules, src) so downstream consumers can import from shared/types/. — LeaveRequest persists status to the leave_requests.status column and drives the DRAFT → SUBMITTED → APPROVED/REJECTED/CANCELLED lifecycle; the enum is the canonical vocabulary for that field.
-- All domain modules (employee, leave-policy, leave-balance, leave-request, audit, notification) — per the reconciled dependency map, every module depends on shared-types; the barrel must re-export both enums as the single public entry point for cross-module consumption. — The architecture's dependency map declares shared-types as a dependency of all modules; the barrel is the sanctioned import surface per the "modules import only through declared public entry points" rule.
+## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
+The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
+- `Employee` — the entity MUST have exactly these fields:
+    - id: string
+    - employeeNumber: string
+    - firstName: string
+    - lastName: string
+    - email: string
+    - managerId: string | null
+    - department: string | null
+    - hireDate: Date
+    - terminationDate: Date | null
+    - employmentStatus: 'ACTIVE' | 'INACTIVE' | 'TERMINATED'
+    - createdAt: Date
+    - updatedAt: Date
+    - deletedAt: Date | null
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
