@@ -1,0 +1,166 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "audit"
+    ],
+    "affectedLayers": [
+      "domain",
+      "persistence",
+      "unit-tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The AuditRecord entity is defined as a camelCase interface whose action field is typed as the AuditAction enum imported from shared types, with oldValues/newValues typed as Record<string, unknown> | null, performedBy as string | null, and performedAt as Date.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The audit repository create operation persists a row into the audit_logs table using parameterised queries and returns the persisted AuditRecord mapped from the snake_case database row to the camelCase domain entity.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "The audit repository findByEntity operation returns all audit records matching a given entityType and entityId, ordered chronologically by performedAt.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "The audit repository findByPerformer operation returns audit records for a given performer, honouring optional limit and offset pagination parameters when supplied and omitting them from the query when undefined.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "The audit service record operation generates a unique id, sets performedAt to the current time, defaults oldValues and newValues to null when omitted, delegates to the repository create, and returns the persisted AuditRecord.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Repository and service errors propagate as rejected promises without being swallowed, so a database failure surfaces to the caller.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The audit module barrel re-exports the public surface: AuditRecord, the create-input type, the repository interface and class, and the service interface and class.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests under tests/unit/modules/audit/ cover the service record operation across four scenarios \u2014 full create-and-return with performedAt being a Date, null-defaulting of omitted oldValues/newValues, unique id generation across calls, and repository error propagation \u2014 and all pass.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access must go through the repository layer (GP-001 / no-direct-db-outside-repository); the audit service must never touch the pg pool directly and must obtain its repository via constructor injection of the repository interface.",
+    "Use unknown with type guards instead of any (no-any rule); oldValues and newValues must be typed as Record<string, unknown> | null, never any.",
+    "All SQL must use parameterised queries \u2014 no string-interpolated user values in any audit repository query.",
+    "Strict TypeScript must hold (no implicit any, strict null checks); the module must compile under tsc --noEmit.",
+    "Modules import from each other only through their declared public entry point (index.ts); the audit module must import AuditAction from shared/types, not from another module's internals.",
+    "No unhandled promise rejections (GP-006); async errors in the service and repository must surface to the caller rather than being silently caught.",
+    "Test files must use the project's Jest convention \u2014 *.test.ts under tests/ \u2014 matching the configured testMatch; do not change the Jest config or use .spec.ts naming.",
+    "No hardcoded secrets, passwords, API keys, or tokens in the audit module (no-hardcoded-secrets rule)."
+  ],
+  "outOfScope": [
+    "Audit controller and HTTP routes \u2014 the audit module exposes only model, repository, service, and barrel this phase; no Fastify route plugin or controller is built.",
+    "Zod validation schemas for audit inputs \u2014 validation schemas are a later phase and audit has no API boundary to validate at in this phase.",
+    "Database migrations for the audit_logs table \u2014 schema creation is not part of this module phase; the repository assumes the table exists.",
+    "Integration tests against a live PostgreSQL instance \u2014 only Jest unit tests with mocked repository/pool are in scope this phase.",
+    "Audit consumption by the leave orchestrator \u2014 wiring IAuditService into LeaveService is a later phase; this phase only delivers the audit module as a consumable dependency."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "AuditRecord",
+      "mustExistOrExtend": true,
+      "invariant": "Every persisted audit record has a non-empty unique id and a performedAt timestamp set at creation time; performedAt is never null and is always a Date instance in the domain entity."
+    },
+    {
+      "entity": "AuditRecord",
+      "mustExistOrExtend": true,
+      "invariant": "oldValues and newValues are nullable \u2014 when the caller omits them the service must normalise them to null rather than undefined, so the persisted record always carries an explicit null or a value snapshot."
+    },
+    {
+      "entity": "AuditRecord",
+      "mustExistOrExtend": true,
+      "invariant": "action is constrained to the AuditAction enum values (CREATE, UPDATE, DELETE, APPROVE, REJECT) sourced from shared types; the repository casts the stored string back to AuditAction on read."
+    },
+    {
+      "entity": "AuditRecord",
+      "mustExistOrExtend": true,
+      "invariant": "createdAt and updatedAt are server-assigned at insert time (NOW()) and are never set by the caller; the domain entity exposes them as Date but the create input does not include them."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "auditRepository.create(record)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Database errors (connection, constraint violations) propagate as rejected promises to the caller; no silent swallowing."
+    },
+    {
+      "operation": "auditRepository.findByEntity(entityType, entityId)",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns an empty array when no rows match; database errors propagate as rejected promises."
+    },
+    {
+      "operation": "auditRepository.findByPerformer(performedBy, limit?, offset?)",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns an empty array when no rows match; optional limit/offset are applied only when defined; database errors propagate as rejected promises."
+    },
+    {
+      "operation": "auditService.record(action, entityType, entityId, performedBy, oldValues?, newValues?)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Repository failures propagate as rejected promises (GP-006); the service does not catch-and-mask them."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The AuditAction enum (CREATE, UPDATE, DELETE, APPROVE, REJECT) must be imported from shared types and used as the action type throughout the audit module; the module must not redefine the enum locally.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The audit repository must obtain its database connection via the shared pg pool exported from shared/db/connection, matching the pattern used by the employee, policy, and notification repositories.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "The audit service must follow the NotificationService pattern: constructor injection of the repository interface, id generation via crypto.randomUUID, and null-defaulting of optional values via ?? null; the service must never touch the pool directly.",
+      "referencePath": "src/modules/notification/notification.service.ts"
+    },
+    {
+      "requirement": "The audit repository must follow the NotificationRepository pattern: a private snake-case row interface, a mapRow-to-camelCase-entity function, parameterised pool.query calls, and NOW() for server-assigned timestamps rather than passing them from the caller.",
+      "referencePath": "src/modules/notification/notification.repository.ts"
+    },
+    {
+      "requirement": "The audit barrel must mirror the notification barrel structure, re-exporting the entity, create-input type, repository interface and class, and service interface and class from their respective files.",
+      "referencePath": "src/modules/notification/index.ts"
+    },
+    {
+      "requirement": "The audit service test must follow the notification service test conventions: jest.Mocked of the repository interface with all methods mocked, a factory helper for records, bare module path imports resolved via moduleDirectories, and *.test.ts naming.",
+      "referencePath": "tests/unit/modules/notification/notification.service.test.ts"
+    },
+    {
+      "requirement": "The audit module's owned artifacts must match the reconciled architecture's audit module ownership list: AuditRecord entity, IAuditRepository interface, AuditRepository class, IAuditService interface, AuditService class, and index.ts barrel \u2014 no more, no less.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts",
+      "why": "Source of the AuditAction enum that types the action field across the audit model, repository, and service."
+    },
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "Provides the pg pool that the audit repository uses for all parameterised queries against the audit_logs table."
+    },
+    {
+      "target": "src/modules/leave/ (future phase)",
+      "why": "The leave orchestrator will consume IAuditService via constructor injection to write audit records on every state-changing operation (GP-002); this phase delivers the consumable service interface."
+    }
+  ]
+}
