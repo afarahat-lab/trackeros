@@ -29,6 +29,11 @@ src/
 │   │   ├── index.ts               # Barrel: Employee, IEmployeeRepository, EmployeeRepository
 │   │   ├── employee.model.ts      # Employee entity (camelCase, standalone — does not extend BaseEntity)
 │   │   └── employee.repository.ts # IEmployeeRepository + EmployeeRepository (parameterised queries, soft-delete, snake→camel mapping)
+│   ├── notification/              # Notification model + repository + service (Phase 4)
+│   │   ├── index.ts               # Barrel: Notification, NotificationStatus, CreateNotificationInput, INotificationRepository, NotificationRepository, INotificationService, NotificationService
+│   │   ├── notification.model.ts  # Notification entity + NotificationStatus type (PENDING | SENT | READ | ARCHIVED)
+│   │   ├── notification.repository.ts # INotificationRepository + NotificationRepository (parameterised queries, snake→camel mapping, create/findByRecipient/markSent/markRead)
+│   │   └── notification.service.ts    # INotificationService + NotificationService (notify method — generates UUID, delegates to repository)
 │   ├── policy/                    # LeavePolicy model + repository (Phase 3)
 │   │   ├── index.ts               # Barrel: LeavePolicy, IPolicyRepository, PolicyRepository
 │   │   ├── policy.model.ts        # LeavePolicy entity (camelCase interface)
@@ -54,6 +59,8 @@ tests/
 │   └── modules/
 │       ├── employee/
 │       │   └── employee.repository.test.ts  # Jest tests for EmployeeRepository
+│       ├── notification/
+│       │   └── notification.service.test.ts # Jest tests for NotificationService
 │       └── policy/
 │           └── policy.repository.test.ts    # Jest tests for PolicyRepository
 ```
@@ -63,7 +70,6 @@ tests/
 The following modules are planned per the leave-management feature design but have not been implemented yet:
 
 - `src/modules/balance/` — LeaveBalance model + repository + service
-- `src/modules/notification/` — Notification model + repository + service
 - `src/modules/audit/` — AuditRecord model + repository + service
 - `src/modules/leave/` — LeaveRequest model + repository + validation + service + controller + routes
 
@@ -97,6 +103,7 @@ The leave management module enables employees to apply for annual, sick, and eme
 | **LeavePolicy** | Rules and entitlements for a leave type. | ACTIVE, INACTIVE |
 | **LeaveBalance** | Employee's entitlement, usage, and remaining days per policy per fiscal year. | ACTIVE → EXHAUSTED (when remainingDays=0); ACTIVE/EXHAUSTED → CLOSED (fiscal year end) |
 | **Employee** | Organisation member with reporting line and employment status. | ACTIVE, INACTIVE, TERMINATED |
+| **Notification** | System notification to employees/managers about leave events. | PENDING → SENT → READ / ARCHIVED |
 
 **Key Business Rules (binding across all layers):**
 - Day count = `endDate - startDate + 1` (inclusive calendar days).
@@ -129,8 +136,8 @@ src/
 ├── modules/
 │   ├── employee/       # Employee CRUD, status checks ✅ built (Phase 2)
 │   ├── policy/         # LeavePolicy CRUD, active policy lookups ✅ built (Phase 3)
+│   ├── notification/   # Notification creation and retrieval ✅ built (Phase 4)
 │   ├── balance/        # LeaveBalance management, deduction/restoration
-│   ├── notification/   # Notification creation and retrieval
 │   ├── audit/          # Audit trail recording and querying
 │   └── leave/          # Orchestrator: submit, approve, reject, cancel
 ```
