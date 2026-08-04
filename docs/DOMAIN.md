@@ -162,12 +162,9 @@ Represents leave policy data managed by the `policy` module, including policy de
 
 | Value | Description |
 |-------|-------------|
-| annual | Annual leave |
-| sick | Sick leave |
-| emergency | Emergency leave |
-| unpaid | Unpaid leave |
-| maternity | Maternity leave |
-| paternity | Paternity leave |
+| ANNUAL | Annual leave |
+| SICK | Sick leave |
+| EMERGENCY | Emergency leave |
 
 ### LeavePolicy
 

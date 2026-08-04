@@ -29,6 +29,7 @@ src/modules/LeavePolicy/    — LeavePolicy module
 src/modules/AuditLog/    — AuditLog module
 src/modules/AuditRecord/    — AuditRecord module
 src/modules/AuditServiceInterface/    — AuditServiceInterface module
+src/shared/types/    — Shared TypeScript enums and types (LeaveType, LeaveRequestStatus)
 src/shared/db connection.ts
 src/shared/base repository.ts
 src/shared/error types.ts
