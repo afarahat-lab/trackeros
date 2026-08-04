@@ -39,11 +39,12 @@ src/
 │   │   ├── index.ts               # Barrel: Employee, IEmployeeRepository, EmployeeRepository
 │   │   ├── employee.model.ts      # Employee entity (camelCase, standalone — does not extend BaseEntity)
 │   │   └── employee.repository.ts # IEmployeeRepository + EmployeeRepository (parameterised queries, soft-delete, snake→camel mapping)
-│   ├── leave/                     # LeaveRequest model + repository + validation + barrel (Phase 7)
-│   │   ├── index.ts               # Barrel: LeaveRequest, CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveRequestQueryParams, LeaveStatus (re-export), ILeaveRepository, LeaveRepository, createLeaveRequestSchema, updateLeaveRequestSchema
+│   ├── leave/                     # LeaveRequest model + repository + validation + service + barrel (Phases 7–8)
+│   │   ├── index.ts               # Barrel: LeaveRequest, CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveRequestQueryParams, LeaveStatus (re-export), ILeaveRepository, LeaveRepository, createLeaveRequestSchema, updateLeaveRequestSchema, ILeaveService, LeaveService, InsufficientBalanceError, ApproverNotAuthorizedError, LeaveRequestNotFoundError, InvalidStateTransitionError
 │   │   ├── leave.model.ts         # LeaveRequest entity, CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveRequestQueryParams
 │   │   ├── leave.repository.ts    # ILeaveRepository + LeaveRepository (parameterised queries, snake→camel mapping, findByEmployee with dynamic filters, findByApprover via JOIN on employees.manager_id, create with DRAFT default status, updateStatus with dynamic SET, update with dynamic SET)
-│   │   └── leave.validation.ts    # Zod schemas: createLeaveRequestSchema (ISO date strings, startDate < endDate), updateLeaveRequestSchema (optional fields, cross-field date validation)
+│   │   ├── leave.validation.ts    # Zod schemas: createLeaveRequestSchema (ISO date strings, startDate < endDate), updateLeaveRequestSchema (optional fields, cross-field date validation)
+│   │   └── leave.service.ts       # ILeaveService + LeaveService (create, update, findById, findByEmployee fully implemented with Zod validation, RBAC, and audit; submit/approve/reject/cancel are stubs — see Phase 8b). Custom errors: InsufficientBalanceError, ApproverNotAuthorizedError, LeaveRequestNotFoundError, InvalidStateTransitionError. RBAC helper: enforceRbac (hr_admin sees all, employee sees own, manager sees own + direct reports).
 │   ├── notification/              # Notification model + repository + service (Phase 4)
 │   │   ├── index.ts               # Barrel: Notification, NotificationStatus, CreateNotificationInput, INotificationRepository, NotificationRepository, INotificationService, NotificationService
 │   │   ├── notification.model.ts  # Notification entity + NotificationStatus type (PENDING | SENT | READ | ARCHIVED)
@@ -91,7 +92,8 @@ tests/
 
 The following modules are planned per the leave-management feature design but have not been implemented yet:
 
-- `src/modules/leave/` — service layer, controller, routes
+- `src/modules/leave/` — controller, routes (service layer is partially built: create/update/findById/findByEmployee are implemented; submit/approve/reject/cancel are stubs awaiting Phase 8b)
+- `tests/unit/modules/leave/leave.service.test.ts` — service-layer tests (not yet created)
 
 ## Key patterns
 
@@ -159,7 +161,7 @@ src/
 │   ├── notification/   # Notification creation and retrieval ✅ built (Phase 4)
 │   ├── audit/          # Audit trail recording and querying ✅ built (Phase 5)
 │   ├── balance/        # LeaveBalance management, deduction/restoration ✅ built (Phase 6)
-│   └── leave/          # LeaveRequest model + repository + validation + barrel ✅ built (Phase 7); service, controller, routes still planned
+│   └── leave/          # LeaveRequest model + repository + validation ✅ built (Phase 7); service layer partially built (Phase 8a): create, update, findById, findByEmployee implemented with Zod validation, RBAC, and audit; submit/approve/reject/cancel are stubs; controller + routes still planned
 ```
 
 **Dependency direction (acyclic):**
@@ -176,8 +178,9 @@ src/
 4. **Notification module** — notification vertical slice. ✅ Done
 5. **Audit module** — audit vertical slice. ✅ Done
 6. **Leave module — model, repository, validation, barrel, tests** — LeaveRequest entity, ILeaveRepository + LeaveRepository (findById, findByEmployee with dynamic filters, findByApprover via JOIN, create with DRAFT default, updateStatus with dynamic SET, update with dynamic SET), Zod schemas (createLeaveRequestSchema, updateLeaveRequestSchema with cross-field date validation), barrel export (`index.ts`), Jest unit tests for repository and validation. ✅ Done (Phase 7)
-7. **Leave module — service layer** — ILeaveService + LeaveService (submit, approve, reject, cancel, create, update, findById, findByEmployee with RBAC). Planned
-8. **Leave module — controller + routes** — Fastify route plugin, controller with auth stubs. Planned
+7. **Leave module — service layer (Phase 8a)** — ILeaveService + LeaveService with `create` (Zod validation, RBAC: employee creates own only, audit), `update` (Zod validation, DRAFT-only, ownership check, audit), `findById` (RBAC: hr_admin sees all, employee sees own, manager sees own + direct reports), `findByEmployee` (same RBAC). Custom error classes: InsufficientBalanceError, ApproverNotAuthorizedError, LeaveRequestNotFoundError, InvalidStateTransitionError. `submit`, `approve`, `reject`, `cancel` are stubs throwing "Not implemented — see Phase 8b". No service tests yet. ✅ Done (Phase 8a)
+8. **Leave module — service layer (Phase 8b)** — full implementation of submit (balance deduction, policy lookup, notification), approve (authorisation, balance check, notification), reject (authorisation, balance restoration, notification), cancel (state-dependent balance restoration, notification). Planned
+9. **Leave module — controller + routes** — Fastify route plugin, controller with auth stubs. Planned
 
 ### Open Questions (Require Stakeholder Decision)
 
