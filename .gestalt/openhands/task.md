@@ -1,12 +1,20 @@
-# Implement this phase: Phase 1: Shared types and business-day utility
+# Implement this phase: Phase 2: Employee module (model + repository)
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/4fbbfee4-4feb-4a2b-8127-85025f82af24/1`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/4fbbfee4-4feb-4a2b-8127-85025f82af24/2`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create `src/shared/types/index.ts` with all canonical enums and interfaces: LeaveType (annual, sick, emergency, unpaid, maternity, paternity), LeaveStatus (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED), EmploymentStatus (ACTIVE, INACTIVE, TERMINATED), AuditAction (CREATE, UPDATE, DELETE, APPROVE, REJECT), BaseEntity (id: string, created_at: Date, updated_at: Date), and AuthenticatedUser ({ id: string; role: 'employee'|'manager'|'hr_admin' }). Also create `src/shared/utils/business-days.ts` exporting `countBusinessDays(start: Date, end: Date, holidays: Date[]): number` — counts business days (Mon–Fri) excluding weekends and the supplied holiday dates, normalising all dates to UTC midnight for calendar-date comparison. Include Jest unit tests in `tests/unit/shared/business-days.test.ts`.
+Create the employee module at `src/modules/employee/`. This phase depends on `src/shared/types/index.ts` from Phase 1 — read it before generating any code.
+
+Create `src/modules/employee/employee.model.ts` with the Employee entity (id, employeeNumber, firstName, lastName, email, managerId: string|null, department: string|null, hireDate: Date, terminationDate: Date|null, employmentStatus: EmploymentStatus, createdAt: Date, updatedAt: Date, deletedAt: Date|null) — importing EmploymentStatus from `src/shared/types/index.ts`.
+
+Create `src/modules/employee/employee.repository.ts` with IEmployeeRepository interface and EmployeeRepository class. The repository must use the existing `src/shared/db/connection.ts` pool. Methods: findById(id), findByEmail(email), findByManagerId(managerId), findAll(filters?), create(employee), update(id, partial), softDelete(id). Use parameterised queries only.
+
+Create `src/modules/employee/index.ts` barrel exporting the model and repository.
+
+Include Jest unit tests in `tests/unit/modules/employee/employee.repository.test.ts`.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -28,29 +36,49 @@ These are resolved, feature-wide decisions. Wherever this phase touches the conc
 
 8. Test files use the project's Jest convention — `*.test.ts` under `tests/` (matching the configured testMatch), NOT `.spec.ts`. Do not change the Jest config. [BINDING RULE — operator decision resolving: How is the fiscal year defined for leave balances — calendar year (Jan 1 – Dec 31), a configurable start month, or company-specific fiscal calendar?; How is totalEntitlement determined for an employee hired mid-year — full annual entitlement or pro-rated?; Who is authorised to cancel a LeaveRequest? Can a manager or HR admin cancel an approved leave on behalf of the employee?; Does emergency leave have special domain behaviour (e.g. bypassing minimum notice, auto-approval) or does it follow the same rules as other leave types governed by their LeavePolicy?; How should partial-day leave deductions be rounded?; How are leave days counted — calendar days or business/working days?; What is the fiscal-year boundary for leave balances?; How are leave requests spanning two fiscal years handled for balance deduction?; What are the valid values for LeaveBalance.status?; apply everywhere these apply, not in one place only]
 
+## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
+The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
+- `Employee` — the entity MUST have exactly these fields:
+    - id: string
+    - employeeNumber: string
+    - firstName: string
+    - lastName: string
+    - email: string
+    - managerId: string | null
+    - department: string | null
+    - hireDate: Date
+    - terminationDate: Date | null
+    - employmentStatus: EmploymentStatus
+    - createdAt: Date
+    - updatedAt: Date
+    - deletedAt: Date | null
+
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- The shared-types module's owned symbols (LeaveType, LeaveStatus, EmploymentStatus, AuditAction, BaseEntity) must match exactly the names and value sets declared in the reconciled architecture's modules array — the shared-types module at path src/shared/types/ owns these five symbols. (see `.gestalt/architecture/reconciled.json`)
-- The business-day counting rule must match the binding business rule: day counting = BUSINESS DAYS ONLY (Mon–Fri), excluding weekends AND public holidays, with calendar-date comparison via UTC-midnight normalization (never raw timestamp comparison). countBusinessDays is the single shared function every call site (balance check, deduction, restoration) must use. (see `.gestalt/architecture/reconciled.json`)
-- The new shared utility and types modules must follow the same placement convention as the existing shared infrastructure: src/shared/db/connection.ts exports a bare named export (pool) with no barrel indirection — the new src/shared/types/index.ts and src/shared/utils/business-days.ts must use named exports consistent with this project's existing shared-module style. (see `src/shared/db/connection.ts`)
-- Test file placement must match the configured testMatch glob ('**/tests/**/*.test.(ts|js)') and moduleDirectories (['node_modules', 'src']) — the business-days test at tests/unit/shared/business-days.test.ts must resolve imports via the src baseUrl so that 'shared/utils/business-days' style imports work without relative path drift. (see `jest.config.js`)
-- All new source must compile under the existing tsconfig (strict: true, target ES2022, module commonjs, baseUrl ./src, rootDir ./src) — the shared types and utility must not require tsconfig changes and must not introduce any type that relies on permissive compiler defaults. (see `tsconfig.json`)
+- The EmploymentStatus enum must be imported from and match the canonical definition in src/shared/types/index.ts (values ACTIVE, INACTIVE, TERMINATED); the employee module must not declare a competing enum. (see `src/shared/types/index.ts`)
+- The repository must obtain its database connection by importing the existing `pool` export from src/shared/db/connection.ts; it must not create a new Pool or duplicate connection logic. (see `src/shared/db/connection.ts`)
+- The repository's SQL must target the employees table using the snake_case column names documented in the reconciled architecture (id, employee_number, first_name, last_name, email, manager_id, department, hire_date, termination_date, employment_status, created_at, updated_at, deleted_at); the row-to-entity mapper converts these to the camelCase Employee fields. (see `.gestalt/architecture/reconciled.json`)
+- The employee module's barrel (src/modules/employee/index.ts) must follow the established barrel-export convention demonstrated by src/modules/status/index.ts and src/modules/uptime/index.ts — re-exporting the model, interface, and implementation from index.ts as the module's sole public surface. (see `src/modules/status/index.ts`)
+- The IEmployeeRepository interface naming must follow the existing I<Name>Service pattern (e.g. IStatusService in src/modules/status/status.service.interface.ts) — interface prefixed with I, implementation class unprefixed — to keep repository/interface naming consistent with the codebase convention. (see `src/modules/status/status.service.interface.ts`)
+- The repository test file must follow the existing test conventions shown in tests/unit/shared/business-days.test.ts: Jest *.test.ts under tests/, bare-path imports relative to src (e.g. 'modules/employee', 'shared/db/connection') leveraging the moduleDirectories config, not relative file paths. (see `tests/unit/shared/business-days.test.ts`)
 ### Entity invariants — enforce these
-- Reuse or extend `LeaveType`: The enum's value set is closed and exactly {annual, sick, emergency, unpaid, maternity, paternity} — no additional leave types may be added without an architecture change, since LeavePolicy.leaveType and leave request creation depend on this fixed set.
-- Reuse or extend `LeaveStatus`: The enum's value set is closed and exactly {DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED} — these correspond to the binding LeaveRequest lifecycle (DRAFT → SUBMITTED → APPROVED/REJECTED; APPROVED → CANCELLED; SUBMITTED → CANCELLED) and must not be extended independently of that lifecycle.
-- Reuse or extend `EmploymentStatus`: The enum's value set is closed and exactly {ACTIVE, INACTIVE, TERMINATED} — only ACTIVE employees may submit leave (binding business rule), so the ACTIVE value must be distinguishable and stable.
-- Reuse or extend `AuditAction`: The enum's value set is closed and exactly {CREATE, UPDATE, DELETE, APPROVE, REJECT} — these map to the audit_logs.action column and the audit records written by every state-changing operation (GP-002); no other action values are permitted.
-- Reuse or extend `AuthenticatedUser`: The role field is a closed union of exactly 'employee' | 'manager' | 'hr_admin' — these are the only three roles the system recognizes for RBAC (GP-005); the type must not accept any other string, and no role field is added to the Employee entity (binding decision).
-- Reuse or extend `BaseEntity`: BaseEntity is a pure data shape (no owned behavior) used by more than one module, so it must reside under src/shared/types/ — not in a single-purpose module directory — per the shared value-type placement rule.
+- Reuse or extend `Employee`: An Employee's employmentStatus must be one of the canonical EmploymentStatus enum values (ACTIVE, INACTIVE, TERMINATED) imported from shared types; the entity never carries a free-form status string.
+- Reuse or extend `Employee`: A soft-deleted Employee (deletedAt set) is excluded from all read operations and cannot be soft-deleted again; the deletedAt timestamp, once set, is immutable via the repository's update path (update excludes deletedAt from the mutable field set).
+- Reuse or extend `Employee`: The Employee entity is a standalone interface that does not extend BaseEntity; its audit fields are camelCase (createdAt, updatedAt) plus a deletedAt field, which is structurally incompatible with BaseEntity's snake_case shape.
+- Reuse or extend `Employee`: The identity and audit fields (id, createdAt) are immutable through the repository's update operation; only mutable, non-identity, non-audit fields may be changed via the partial update payload.
 ### Interface contract — expose these operations (their shape is yours)
-- countBusinessDays(start: Date, end: Date, holidays: Date[]): number — N/A — pure function with no authentication; callable from any layer (shared utility); idempotent; Must not perform I/O or throw on valid date inputs; behavior on inverted ranges (start > end) is unspecified by the intent — see ambiguity. All date comparison is done after UTC-midnight normalization so timezone construction differences do not cause errors.
+- findById(id) — Returns the Employee with the given id if it exists and is not soft-deleted, or null if no live row matches; database errors propagate as rejected promises (GP-006).
+- findByEmail(email) — Returns the Employee matching the given email among non-deleted rows, or null if none; database errors propagate as rejected promises.
+- findByManagerId(managerId) — Returns all non-deleted Employees whose managerId equals the given value; returns an empty array when no reports exist; database errors propagate as rejected promises.
+- findAll(filters?) — Returns all non-deleted Employees, optionally narrowed by the supplied filter dimensions (employmentStatus, department, managerId); omitted filter fields must not constrain the result; database errors propagate as rejected promises.
+- create(employee) — Persists a new Employee row and returns the created Employee mapped from the inserted row; database errors (e.g. unique constraint violations on email/employee_number) propagate as rejected promises.
+- update(id, partial) — Applies only the supplied mutable fields to the live row matching id (deleted_at IS NULL) and returns the updated Employee, or null if no live row matches; identity/audit fields (id, createdAt, deletedAt) are excluded from the mutable set; database errors propagate as rejected promises.
+- softDelete(id) — Sets deleted_at to the current timestamp for the row matching id where deleted_at IS NULL and returns true if a row was affected, false if no live row matched (already deleted or not found); database errors propagate as rejected promises.
 ### Integration points — connect to these
-- src/modules/employee/employee.model.ts (Phase 2) — Employee entity imports EmploymentStatus from src/shared/types/index.ts — the enum must be exported and stable before the employee module is built.
-- src/modules/policy/policy.model.ts (Phase 3) — LeavePolicy entity imports LeaveType from src/shared/types/index.ts — the enum must be exported and stable before the policy module is built.
-- src/modules/audit/audit.model.ts (Phase 5) — AuditRecord entity imports AuditAction from src/shared/types/index.ts — the enum must be exported and stable before the audit module is built.
-- src/modules/leave/leave.service.ts (Phase 8) — LeaveService imports AuthenticatedUser from src/shared/types/index.ts and calls countBusinessDays from src/shared/utils/business-days.ts to compute business days for balance sufficiency checks and deduction — both must be exported and correct before the leave service is built.
-- src/modules/leave/leave.controller.ts (Phase 9) — LeaveController consumes request.user typed as AuthenticatedUser from src/shared/types/index.ts — the type must be exported and match the { id: string; role: 'employee'|'manager'|'hr_admin' } shape the existing auth middleware populates.
+- src/shared/types/index.ts — The Employee entity imports the canonical EmploymentStatus enum from shared types; this is the employee module's only shared-types dependency and must remain the single source of truth for employment status values.
+- src/shared/db/connection.ts — The EmployeeRepository consumes the shared pg.Pool instance for all database access, satisfying GP-001 (repository pattern) and the no-direct-db-outside-repository constraint; no other connection source is permitted.
+- src/modules/employee/index.ts (public barrel) — Downstream modules (balance, leave) depend on the employee module solely through its index.ts barrel per the acyclic dependency map in the reconciled architecture; the barrel must expose the Employee model and IEmployeeRepository so later phases can consume them without reaching into internal files.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
