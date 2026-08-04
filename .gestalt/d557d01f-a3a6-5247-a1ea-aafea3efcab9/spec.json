@@ -1,0 +1,200 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "policy"
+    ],
+    "affectedLayers": [
+      "domain-model",
+      "persistence-repository",
+      "unit-tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The LeavePolicy entity interface is exported from the policy module barrel and uses the canonical camelCase field set with leaveType typed as the LeaveType enum imported from shared types.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findById returns a fully mapped LeavePolicy (snake_case row \u2192 camelCase entity) when a row exists, and returns null when no row matches.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findByLeaveType returns an array of mapped LeavePolicy entities for the given leave type; it returns an empty array (never null) when no policies match.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findAllActive returns only policies where is_active is true; it returns an empty array (never null) when no active policies exist.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "create persists a new row via INSERT with NOW() for created_at and updated_at, and returns the created LeavePolicy entity mapped from the returned row.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "update applies only supplied mutable fields via a dynamic SET clause (excluding id, createdAt, updatedAt from the mutable allowlist), falls back to a read of the existing row when no mutable fields are supplied, and returns null when no row matches the id.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "deactivate sets is_active to false and updated_at to NOW(), returning true when a row was affected (rowCount > 0) and false when no row matched.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Every repository query uses parameterized placeholders ($1, $2, \u2026) for all user-supplied or entity-supplied values; no value is interpolated into the SQL string.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Database errors (connection failures, constraint violations, permission errors) propagate as rejected promises from every repository method; no error is swallowed or silently caught.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The Jest test suite at tests/unit/modules/policy/policy.repository.test.ts covers each repository method with happy-path (asserting mapped entity + exact SQL + params), not-found/null, empty-array, and error-propagation cases, and all tests pass.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The module compiles under strict TypeScript (strict: true) with zero `any` types \u2014 query parameter arrays are typed as unknown[] and row casts use type-safe narrowing.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access must go through the repository pattern (GP-001); the policy repository is the only component that issues SQL against the leave_policies table.",
+    "No `any` type anywhere in the policy module (HARNESS no-any, severity high) \u2014 use `unknown` with type guards and type parameter arrays as `unknown[]`.",
+    "All SQL queries must use parameterized placeholders ($1, $2, \u2026) for every value; no string interpolation or concatenation of values into SQL (SQL-injection prevention).",
+    "Timestamps (created_at, updated_at) must be set by the database via NOW() in INSERT and UPDATE statements, never supplied as application-side Date values.",
+    "The policy module may only depend on src/shared/types and src/shared/db \u2014 it is a foundation module with zero domain-module dependencies (acyclic dependency rule).",
+    "Modules must import from each other only through their declared public entry point (index.ts barrel); no cross-module imports of internal files.",
+    "Tests must use bare-path imports (modules/policy/policy.repository, shared/db/connection, shared/types/index) with no src/ prefix and no relative paths, matching jest.config.js moduleDirectories: ['node_modules', 'src'].",
+    "Test files must follow the project Jest convention: *.test.ts under tests/, matching testMatch ['**/tests/**/*.test.(ts|js)'] \u2014 not .spec.ts.",
+    "The LeavePolicy entity must be a standalone camelCase interface that does NOT extend BaseEntity (BaseEntity uses snake_case created_at/updated_at; domain entities use camelCase createdAt/updatedAt)."
+  ],
+  "outOfScope": [
+    "Policy service layer (IPolicyService / PolicyService) \u2014 deferred to a later phase; this phase builds only model + repository + barrel.",
+    "Policy controller and routes (HTTP translation, Fastify plugin registration) \u2014 deferred to later phases.",
+    "Zod validation schemas for policy inputs (policy.validation.ts) \u2014 deferred to the validation-schemas phase.",
+    "Audit record creation (GP-002) for policy create/update/deactivate \u2014 the repository layer does not write audit records; audit is a service-layer concern deferred to later phases.",
+    "RBAC enforcement (GP-005) on policy operations \u2014 no HTTP endpoints exist in this phase; RBAC is enforced at the route/middleware layer in later phases.",
+    "Database migrations / DDL (CREATE TABLE leave_policies) \u2014 migrations are generated separately by the code agent; this phase assumes the leave_policies table schema exists.",
+    "Integration tests against a real PostgreSQL instance \u2014 this phase includes only Jest unit tests with a mocked pool.query."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "A LeavePolicy's lifecycle is ACTIVE \u2192 INACTIVE; deactivation is the only state transition and is irreversible through the repository (there is no reactivate method). The isActive flag is the sole lifecycle indicator."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "The leaveType field must be one of the six LeaveType enum members (annual, sick, emergency, unpaid, maternity, paternity); the repository casts the stored string back to the LeaveType enum on read."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "The id, createdAt, and updatedAt fields are immutable through update \u2014 the mutable-field allowlist excludes them; only business fields (policyName, leaveType, entitlementDays, accrualRate, maxAccumulation, minimumNoticeDays, requiresManagerApproval, isActive) may be changed."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "The nullable numeric fields (accrualRate, maxAccumulation, minimumNoticeDays) may be null or a non-negative number; the repository must preserve null values through create and update without coercion."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "findById(id)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns LeavePolicy | null; null when no row matches. Database errors propagate as rejected promises (not swallowed)."
+    },
+    {
+      "operation": "findByLeaveType(leaveType)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns LeavePolicy[] (empty array, never null, when no match). Database errors propagate as rejected promises."
+    },
+    {
+      "operation": "findAllActive()",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns LeavePolicy[] (empty array, never null, when no active policies). Database errors propagate as rejected promises."
+    },
+    {
+      "operation": "create(policy)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the created LeavePolicy. Unique-constraint / check-constraint violations propagate as rejected promises."
+    },
+    {
+      "operation": "update(id, partial)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns LeavePolicy | null. When no mutable fields are supplied, falls back to a read (findById) and returns the existing entity or null. Returns null when no row matches the id. Database errors propagate as rejected promises."
+    },
+    {
+      "operation": "deactivate(id)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns boolean: true when a row was affected (rowCount > 0), false when no row matched. Database errors propagate as rejected promises."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The policy repository must mirror the employee repository's structural pattern: an interface + implementation class, an internal snake_case Row interface, a mapRowToEntity helper, a camelToSnake helper, parameterized pool.query calls, a dynamic-SET update with a mutableFields allowlist and empty-partial fallback to findById, and a boolean-returning terminal operation (deactivate \u2261 employee softDelete) driven by rowCount.",
+      "referencePath": "src/modules/employee/employee.repository.ts"
+    },
+    {
+      "requirement": "The LeavePolicy.leaveType field must be typed as the LeaveType enum imported from shared types (not a raw string), and the repository must cast the stored leave_type string back to LeaveType on read \u2014 matching how the employee repository casts employment_status to EmploymentStatus.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The policy repository must obtain its database connection by importing the existing `pool` export from shared/db/connection \u2014 it must not instantiate its own Pool or use a different connection mechanism.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "The policy barrel (index.ts) must re-export the entity interface, the repository interface, and the repository class \u2014 matching the employee barrel's export surface (entity + interface + implementation).",
+      "referencePath": "src/modules/employee/index.ts"
+    },
+    {
+      "requirement": "The policy test file must follow the employee test's conventions: jest.mock('shared/db/connection') with a mocked pool.query, makeRow() (snake_case) and makePolicy() (camelCase) helpers, per-method describe blocks, and coverage of happy-path (exact SQL + params via toHaveBeenCalledWith), not-found/null, empty-array, and error-propagation cases.",
+      "referencePath": "tests/unit/modules/employee/employee.repository.test.ts"
+    },
+    {
+      "requirement": "The LeavePolicy entity field set and the leave_policies table column set must match the reconciled architecture exactly: id, policy_name/policyName, leave_type/leaveType, entitlement_days/entitlementDays, accrual_rate/accrualRate, max_accumulation/maxAccumulation, minimum_notice_days/minimumNoticeDays, requires_manager_approval/requiresManagerApproval, is_active/isActive, created_at/createdAt, updated_at/updatedAt \u2014 no foreign keys.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts",
+      "why": "The policy module imports the LeaveType enum to type the leaveType field and to cast the stored string back on read."
+    },
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "The policy repository imports the shared `pool` (pg Pool) to execute all SQL against the leave_policies table."
+    },
+    {
+      "target": "src/modules/employee/ (sibling pattern)",
+      "why": "The policy module mirrors the employee module's repository pattern (interface + class, Row mapping, camelToSnake, dynamic SET, boolean terminal op) to maintain cross-module consistency."
+    },
+    {
+      "target": "src/modules/balance/ (future Phase 6)",
+      "why": "The balance module will depend on the policy module (via its barrel) to look up LeavePolicy entitlement and accrual configuration; the policy barrel's public export surface is the contract balance will consume."
+    },
+    {
+      "target": "src/modules/leave/ (future Phase 7-8)",
+      "why": "The leave orchestrator will depend on the policy module to resolve LeavePolicy by leaveTypeId for minimumNoticeDays enforcement and requiresManagerApproval auto-approval logic."
+    }
+  ]
+}
