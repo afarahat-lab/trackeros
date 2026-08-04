@@ -1,0 +1,165 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-policy"
+    ],
+    "affectedLayers": [
+      "domain-model",
+      "repository",
+      "unit-tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The LeavePolicy entity interface is exported with exactly the 11 canonical fields (id, policyName, leaveType, entitlementDays, accrualRate, maxAccumulation, minimumNoticeDays, requiresManagerApproval, isActive, createdAt, updatedAt) and no deletedAt field; leaveType is typed as the LeaveType enum imported from the shared-types module.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The ILeavePolicyRepository interface declares all six required operations: findById(id), findByLeaveType(leaveType), findActive(), findAll(), save(policy), update(id, partial) \u2014 and no softDelete method.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The PgLeavePolicyRepository class implements ILeavePolicyRepository and persists/retrieves LeavePolicy rows against the leave_policies table via the shared db connection pool; findById returns null when no row matches, findByLeaveType/findActive/findAll return arrays (empty when no rows), save inserts and returns the persisted entity, and update performs a read-then-merge returning null when the id is not found.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository maps snake_case database columns to camelCase entity fields (and vice versa) so that a row with leave_type, entitlement_days, accrual_rate, max_accumulation, minimum_notice_days, requires_manager_approval, is_active, created_at, updated_at round-trips to a LeavePolicy with leaveType, entitlementDays, accrualRate, maxAccumulation, minimumNoticeDays, requiresManagerApproval, isActive, createdAt, updatedAt.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The three nullable numeric fields (accrualRate, maxAccumulation, minimumNoticeDays) round-trip as null when the database column is null, and the boolean fields (requiresManagerApproval, isActive) map correctly from their database representations.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The module's index.ts re-exports the LeavePolicy entity type and the ILeavePolicyRepository interface and PgLeavePolicyRepository class as the module's public entry point, matching the Employee module's index.ts convention.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests exist in tests/unit/modules/leave-policy/ covering the model (exact field set via Object.keys().sort(), nullability of the three numeric fields, all LeaveType enum cases) and the repository (each of the six methods with mocked pool.query, including the not-found null path and the update read-then-merge path), and the full suite passes under the verification command.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No `any` type anywhere in the new module or tests (HARNESS no-any rule, severity high): use `unknown` with type guards / `as` casts, mirroring the Employee repository's `mapRow(row: Record<string, unknown>)` pattern.",
+    "All database access goes through the repository layer (HARNESS no-direct-db-outside-repository, severity critical; GP-001): the PgLeavePolicyRepository is the only component that touches the pool; no inline SQL outside it.",
+    "The LeavePolicy module imports LeaveType only from the shared-types module (src/shared/types) and the pool only from src/shared/db/connection \u2014 no imports from another domain module's internals; cross-module access is via declared public entry points only (ARCHITECTURE dependency rules).",
+    "Strict TypeScript must pass (tsc --noEmit / npm run build) with no implicit any and strict null checks; the new files must compile cleanly within the existing tsconfig.",
+    "No soft-delete for LeavePolicy: there is no deletedAt field and no softDelete repository method; deactivation is performed via update(id, { isActive: false }).",
+    "The new module must not exceed the planner's maxFilesPerPhase limit (5 files): leave-policy.model.ts, leave-policy.repository.ts, index.ts, and two test files \u2014 no service/controller/routes in this phase."
+  ],
+  "outOfScope": [
+    "LeavePolicy service, controller, and routes (ILeavePolicyService, LeavePolicyService, LeavePolicyController, leavePolicyRoutes) \u2014 these are Phase 7.",
+    "RBAC enforcement, input validation at API boundaries, and audit-record writing for LeavePolicy state changes \u2014 these belong to the service/controller phases (Phase 7) and the audit module (Phase 10), not the model+repository phase.",
+    "Database migrations / DDL for the leave_policies table \u2014 this phase assumes the table schema exists as specified in reconciled.json; no migration files are created.",
+    "LeaveBalance and LeaveRequest modules that depend on LeavePolicy \u2014 Phase 4 and Phase 5 respectively."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "A LeavePolicy has exactly two lifecycle states expressed via the isActive boolean (ACTIVE when true, INACTIVE when false); there is no deleted/terminated state and no deletedAt field \u2014 a policy is deactivated, never hard-deleted, through the repository."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "The leaveType of a LeavePolicy is constrained to the LeaveType enum members (ANNUAL, SICK, EMERGENCY) defined in the shared-types module; a policy cannot be created or persisted with a leaveType outside that set."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "The three numeric fields accrualRate, maxAccumulation, and minimumNoticeDays are nullable (number | null) \u2014 a policy may legitimately omit accrual/accumulation/notice configuration by setting them to null; the repository must preserve null rather than coercing to 0 or undefined."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "ILeavePolicyRepository.findById(id)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the matching LeavePolicy or null when no row exists for the id; never throws on a missing row."
+    },
+    {
+      "operation": "ILeavePolicyRepository.findByLeaveType(leaveType)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an array of LeavePolicy rows matching the given LeaveType (possibly empty); never returns null."
+    },
+    {
+      "operation": "ILeavePolicyRepository.findActive()",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an array of LeavePolicy rows where isActive is true (possibly empty); never returns null."
+    },
+    {
+      "operation": "ILeavePolicyRepository.findAll()",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an array of all LeavePolicy rows regardless of isActive state (possibly empty); never returns null."
+    },
+    {
+      "operation": "ILeavePolicyRepository.save(policy)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Inserts the given LeavePolicy and returns the persisted entity as read back from the database (via RETURNING *); the caller supplies the id and timestamps."
+    },
+    {
+      "operation": "ILeavePolicyRepository.update(id, partial)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Performs a read-then-merge: returns null when no existing row is found for the id (no INSERT/upsert); otherwise merges the partial onto the existing entity, sets updatedAt to the current time, writes all columns, and returns the updated entity or null if the row vanished between read and write."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The LeavePolicy entity must be a plain exported interface (not a class) mirroring the Employee model's declaration style, so downstream modules consume it the same way.",
+      "referencePath": "src/modules/employee/employee.model.ts"
+    },
+    {
+      "requirement": "The PgLeavePolicyRepository must follow the Employee repository's structural pattern: an interface declaring the operations, a class implementing it, a private mapRow(row: Record<string, unknown>) using `as` casts (no `any`), and an update that does findById-then-merge-then-full-column UPDATE returning null when not found.",
+      "referencePath": "src/modules/employee/employee.repository.ts"
+    },
+    {
+      "requirement": "The leave-policy index.ts must re-export the model type(s) and the repository interface + class from their files, matching the Employee index.ts re-export convention so the module is consumed only through its public entry point.",
+      "referencePath": "src/modules/employee/index.ts"
+    },
+    {
+      "requirement": "The LeavePolicy entity's leaveType field must be typed as the LeaveType enum exported from this file (ANNUAL/SICK/EMERGENCY), not a string literal union or a re-declared enum, so the shared-types contract stays the single source of truth.",
+      "referencePath": "src/shared/types/leave-type.enum.ts"
+    },
+    {
+      "requirement": "The repository must obtain its database connection by importing the `pool` export from this file, not by constructing a new Pool, so all modules share one connection source.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "The repository tests must mirror the Employee repository test conventions: jest.mock('shared/db/connection', () => ({ pool: { query: jest.fn() } })), a makeEntity(overrides) helper, a makeRow(entity) helper producing snake_case rows, and per-method describe blocks covering the found and not-found paths.",
+      "referencePath": "tests/unit/modules/employee/employee.repository.test.ts"
+    },
+    {
+      "requirement": "The model test must mirror the Employee model test conventions: assert the exact canonical field set via Object.keys().sort() comparison, assert nullability of the nullable fields, and assert all enum member cases are accepted.",
+      "referencePath": "tests/unit/modules/employee/employee.model.test.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "shared-types module (src/shared/types/leave-type.enum.ts)",
+      "why": "LeavePolicy imports the LeaveType enum to type its leaveType field; this is the only cross-module dependency for this phase and is declared in the reconciled dependency map (leave-policy \u2192 shared-types)."
+    },
+    {
+      "target": "shared db connection (src/shared/db/connection.ts)",
+      "why": "PgLeavePolicyRepository uses the shared `pool` for all queries against the leave_policies table; this is the database integration point governed by GP-001 and the no-direct-db-outside-repository constraint."
+    },
+    {
+      "target": "leave-balance module (Phase 4) and leave-request module (Phase 5)",
+      "why": "Downstream modules will import the LeavePolicy type and ILeavePolicyRepository from this module's public entry point to reference policy entitlements and validate policies; this phase establishes the contract they depend on."
+    }
+  ]
+}
