@@ -39,6 +39,10 @@ src/
 │   │   ├── index.ts               # Barrel: Employee, IEmployeeRepository, EmployeeRepository
 │   │   ├── employee.model.ts      # Employee entity (camelCase, standalone — does not extend BaseEntity)
 │   │   └── employee.repository.ts # IEmployeeRepository + EmployeeRepository (parameterised queries, soft-delete, snake→camel mapping)
+│   ├── leave/                     # LeaveRequest model + repository + validation (Phase 7 — partial)
+│   │   ├── leave.model.ts         # LeaveRequest entity, CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveRequestQueryParams
+│   │   ├── leave.repository.ts    # ILeaveRepository + LeaveRepository (parameterised queries, snake→camel mapping, findByEmployee with dynamic filters, findByApprover via JOIN on employees.manager_id, create with DRAFT default status, updateStatus with dynamic SET, update with dynamic SET)
+│   │   └── leave.validation.ts    # Zod schemas: createLeaveRequestSchema (ISO date strings, startDate < endDate), updateLeaveRequestSchema (optional fields, cross-field date validation)
 │   ├── notification/              # Notification model + repository + service (Phase 4)
 │   │   ├── index.ts               # Barrel: Notification, NotificationStatus, CreateNotificationInput, INotificationRepository, NotificationRepository, INotificationService, NotificationService
 │   │   ├── notification.model.ts  # Notification entity + NotificationStatus type (PENDING | SENT | READ | ARCHIVED)
@@ -83,7 +87,7 @@ tests/
 
 The following modules are planned per the leave-management feature design but have not been implemented yet:
 
-- `src/modules/leave/` — LeaveRequest model + repository + validation + service + controller + routes
+- `src/modules/leave/` — service layer, controller, routes, barrel (`index.ts`), and tests
 
 ## Key patterns
 
@@ -151,7 +155,7 @@ src/
 │   ├── notification/   # Notification creation and retrieval ✅ built (Phase 4)
 │   ├── audit/          # Audit trail recording and querying ✅ built (Phase 5)
 │   ├── balance/        # LeaveBalance management, deduction/restoration ✅ built (Phase 6)
-│   └── leave/          # Orchestrator: submit, approve, reject, cancel
+│   └── leave/          # LeaveRequest model + repository + validation ✅ built (Phase 7); service, controller, routes, barrel, tests still planned
 ```
 
 **Dependency direction (acyclic):**
@@ -160,17 +164,22 @@ src/
 - `notification` and `audit` are independent mid-layer modules.
 - `leave` orchestrates all five downstream modules via constructor injection.
 
-### Recommended Build Phases
+### Build Phases — Status
 
 1. **Shared types + Employee module** — foundation enums and employee vertical slice. ✅ Done
 2. **Policy module** — policy vertical slice. ✅ Done
 3. **Balance module** — balance vertical slice (depends on employee & policy). ✅ Done
 4. **Notification module** — notification vertical slice. ✅ Done
 5. **Audit module** — audit vertical slice. ✅ Done
-6. **Leave module** — orchestrator (depends on all above).
-7. **Validation schemas** — Zod schemas for all modules.
-8. **Controllers** — HTTP translation layer.
-9. **Routes + app registration** — Fastify route plugins, RBAC stubs, app.ts wiring.
+6. **Leave module — model, repository, validation** — LeaveRequest entity, ILeaveRepository + LeaveRepository (findById, findByEmployee with dynamic filters, findByApprover via JOIN, create with DRAFT default, updateStatus with dynamic SET, update with dynamic SET), Zod schemas (createLeaveRequestSchema, updateLeaveRequestSchema with cross-field date validation). ✅ Done (Phase 7)
+7. **Leave module — service layer** — ILeaveService + LeaveService (submit, approve, reject, cancel, create, update, findById, findByEmployee with RBAC). Planned
+8. **Leave module — controller + routes** — Fastify route plugin, controller with auth stubs. Planned
+9. **Leave module — barrel + tests** — `index.ts` barrel export, Jest unit tests for repository and validation. Planned
+
+### Known divergences (Phase 7)
+
+- **No barrel (`index.ts`):** The leave module currently has no barrel export, unlike all other modules. Consumers must import directly from individual files.
+- **No tests:** The plan prescribed `tests/unit/modules/leave/leave.repository.test.ts` and `tests/unit/modules/leave/leave.validation.test.ts`; neither was created in this phase.
 
 ### Open Questions (Require Stakeholder Decision)
 
