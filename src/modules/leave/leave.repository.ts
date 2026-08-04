@@ -1,4 +1,3 @@
-import { randomUUID } from 'crypto';
 import { pool } from '../../shared/db/connection';
 import { LeaveRequest, CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveRequestQueryParams } from './leave.model';
 import { LeaveStatus } from '../../shared/types/index';
