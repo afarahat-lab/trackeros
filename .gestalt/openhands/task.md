@@ -1,24 +1,26 @@
-# Implement this phase: Phase 6: Balance module (model + repository + service)
+# Implement this phase: Phase 7: Leave module — model, repository, and validation
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/4fbbfee4-4feb-4a2b-8127-85025f82af24/6`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/4fbbfee4-4feb-4a2b-8127-85025f82af24/7`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the balance module at `src/modules/balance/`. This phase depends on `src/shared/types/index.ts` from Phase 1, `src/modules/employee/employee.model.ts` from Phase 2, and `src/modules/policy/policy.model.ts` from Phase 3 — read all three before generating any code.
+Create the leave module foundation at `src/modules/leave/`. This phase depends on `src/shared/types/index.ts` from Phase 1, `src/modules/employee/employee.model.ts` from Phase 2, `src/modules/policy/policy.model.ts` from Phase 3, `src/modules/audit/audit.service.ts` from Phase 5, and `src/modules/balance/balance.service.ts` from Phase 6 — read all five before generating any code.
 
-Create `src/modules/balance/balance.model.ts` with:
-- BalanceStatus enum: ACTIVE, EXHAUSTED, EXPIRED
-- LeaveBalance entity: id, employeeId, policyId, totalEntitlement, usedDays, remainingDays (COMPUTED — never stored, derived as totalEntitlement - usedDays at query time), fiscalYear (calendar year of the request, Jan 1–Dec 31), status: BalanceStatus, createdAt, updatedAt.
+Create `src/modules/leave/leave.model.ts` with:
+- LeaveRequest entity using canonical fields: id, employeeId, leaveTypeId, startDate, endDate, reason (string|undefined), status (LeaveStatus), approvedBy (string|null), approvedAt (Date|null), createdAt, updatedAt.
+- CreateLeaveRequestDto: employeeId, leaveTypeId, startDate, endDate, reason?.
+- UpdateLeaveRequestDto: startDate?, endDate?, reason?.
+- LeaveRequestQueryParams: status?, leaveTypeId?, startDateFrom?, startDateTo?, endDateFrom?, endDateTo?, limit?, offset?.
 
-Create `src/modules/balance/balance.repository.ts` with IBalanceRepository interface and BalanceRepository class using `src/shared/db/connection.ts`. Methods: findByEmployeeAndPolicy(employeeId, policyId, fiscalYear), findByEmployee(employeeId, fiscalYear), create(balance), incrementUsedDays(id, days) — atomic UPDATE used_days = used_days + $1 WHERE id = $2 RETURNING *, decrementUsedDays(id, days) — atomic UPDATE used_days = used_days - $1 WHERE id = $2 AND used_days >= $1 RETURNING *. All reads compute remainingDays as totalEntitlement - usedDays in the query.
+Create `src/modules/leave/leave.validation.ts` with Zod schemas for createLeaveRequestSchema and updateLeaveRequestSchema — validate startDate < endDate, dates are valid ISO strings, required fields present.
 
-Create `src/modules/balance/balance.service.ts` with IBalanceService interface and BalanceService class. Methods: getBalance(employeeId, policyId, fiscalYear), getBalances(employeeId, fiscalYear), initializeBalance(employeeId, policyId, totalEntitlement, fiscalYear), deductDays(balanceId, days) — delegates to repository.incrementUsedDays, throws InsufficientBalanceError if remaining would go below zero, restoreDays(balanceId, days) — delegates to repository.decrementUsedDays.
+Create `src/modules/leave/leave.repository.ts` with ILeaveRepository interface and LeaveRepository class using `src/shared/db/connection.ts`. Methods: findById(id), findByEmployee(employeeId, queryParams?), findByApprover(approverId, queryParams?), create(dto), updateStatus(id, status, approvedBy?, approvedAt?), update(id, dto).
 
-Create `src/modules/balance/index.ts` barrel.
+Create `src/modules/leave/index.ts` barrel.
 
-Include Jest unit tests in `tests/unit/modules/balance/balance.service.test.ts`.
+Include Jest unit tests in `tests/unit/modules/leave/leave.repository.test.ts` and `tests/unit/modules/leave/leave.validation.test.ts`.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -39,6 +41,37 @@ These are resolved, feature-wide decisions. Wherever this phase touches the conc
 7. Service authorization: thread the actor's role INTO the service — approve(leaveRequestId, approverId, approverRole), reject(..., approverRole). The controller reads request.user, passes id + role; the service enforces (approver must be the employee's manager, or hr_admin when no manager, else throw ApproverNotAuthorizedError). Role is an explicit parameter, never ambient state inside the service.
 
 8. Test files use the project's Jest convention — `*.test.ts` under `tests/` (matching the configured testMatch), NOT `.spec.ts`. Do not change the Jest config. [BINDING RULE — operator decision resolving: How is the fiscal year defined for leave balances — calendar year (Jan 1 – Dec 31), a configurable start month, or company-specific fiscal calendar?; How is totalEntitlement determined for an employee hired mid-year — full annual entitlement or pro-rated?; Who is authorised to cancel a LeaveRequest? Can a manager or HR admin cancel an approved leave on behalf of the employee?; Does emergency leave have special domain behaviour (e.g. bypassing minimum notice, auto-approval) or does it follow the same rules as other leave types governed by their LeavePolicy?; How should partial-day leave deductions be rounded?; How are leave days counted — calendar days or business/working days?; What is the fiscal-year boundary for leave balances?; How are leave requests spanning two fiscal years handled for balance deduction?; What are the valid values for LeaveBalance.status?; apply everywhere these apply, not in one place only]
+
+## Constraints & consistency
+You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
+### Reuse & consistency — match these exactly
+- The LeaveRepository must replicate the established repository pattern: co-located ILeaveRepository interface + LeaveRepository class + private snake_case Row type + mapRowToLeaveRequest function; parameterised $N placeholders with incremental paramIndex; dynamic SET/WHERE via conditions[]/params[] arrays; create() uses INSERT ... NOW(), NOW() RETURNING *; update() builds dynamic SET from mutableFields + appends updated_at = NOW() + falls back to findById. (see `src/modules/employee/employee.repository.ts`)
+- The LeaveRequest.status field and the validation schemas must use the LeaveStatus enum (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED) imported from the canonical shared types; the repository must cast the snake_case status column back to LeaveStatus at the mapping boundary. (see `src/shared/types/index.ts`)
+- The findByApprover query must join the employees table on manager_id to resolve the approver's direct reports, consistent with the Employee entity's managerId field being the approval-routing key (approved_by is null for pending requests and cannot be used to find a manager's queue). (see `src/modules/employee/employee.model.ts`)
+- The leave barrel (index.ts) must follow the sibling barrel convention: re-export model types, repository interface + class, and validation schemas; downstream modules are consumed only through barrels in later phases. (see `src/modules/employee/index.ts`)
+- The leave repository and validation tests must follow the established test conventions: jest.mock('shared/db/connection', () => ({ pool: { query: jest.fn() } })), makeRow()/makeEntity() factory helpers with overrides, beforeEach mock reset, exact-SQL assertions via toHaveBeenCalledWith and stringContaining, and found/not-found/empty/error coverage per method. (see `tests/unit/modules/employee/employee.repository.test.ts`)
+- The leave_requests table column set (id, employee_id, leave_type_id, start_date, end_date, reason, status, approved_by, approved_at, created_at, updated_at) in the reconciled schema must be the exact set the repository reads and writes; no extra columns and no omitted columns. (see `.gestalt/architecture/reconciled.json`)
+### Entity invariants — enforce these
+- Reuse or extend `LeaveRequest`: A LeaveRequest's status is always one of the LeaveStatus enum values (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED); the repository never persists or returns an out-of-enum status string.
+- Reuse or extend `LeaveRequest`: A LeaveRequest's endDate is strictly greater than its startDate; the validation schemas enforce this and the repository persists the dates as supplied without reordering them.
+- Reuse or extend `LeaveRequest`: approvedBy and approvedAt are nullable and are null while the request is in DRAFT/SUBMITTED status; they are populated only when the request transitions to APPROVED or REJECTED via updateStatus.
+- Reuse or extend `LeaveRequest`: createdAt and updatedAt are set by the database (NOW()) on insert and updatedAt is refreshed on every update; the repository never accepts or persists caller-supplied timestamp values for these fields.
+### Interface contract — expose these operations (their shape is yours)
+- ILeaveRepository.findById(id) — Returns null when no row matches; propagates database errors as rejected promises.
+- ILeaveRepository.findByEmployee(employeeId, queryParams?) — Returns an empty array when no rows match; propagates database errors as rejected promises.
+- ILeaveRepository.findByApprover(approverId, queryParams?) — Returns an empty array when the approver has no matching direct-report requests; propagates database errors as rejected promises.
+- ILeaveRepository.create(dto) — Returns the persisted entity; propagates constraint violations (e.g. duplicate key, FK violations) as rejected promises.
+- ILeaveRepository.updateStatus(id, status, approvedBy?, approvedAt?) — Returns the updated entity or null when no row matches; propagates database errors as rejected promises.
+- ILeaveRepository.update(id, dto) — Returns the updated entity, the existing entity when no mutable fields are supplied, or null when no row matches; propagates database errors as rejected promises.
+- createLeaveRequestSchema.parse / safeParse — Rejects missing required fields, non-ISO dates, and startDate >= endDate with a typed Zod error; accepts valid input and produces a typed output object.
+- updateLeaveRequestSchema.parse / safeParse — Rejects non-ISO dates and startDate >= endDate (when both present) with a typed Zod error; accepts valid partial or empty input.
+### Integration points — connect to these
+- src/shared/types/index.ts — LeaveRequest.status is typed as LeaveStatus; the model imports LeaveStatus from the canonical shared types.
+- src/shared/db/connection.ts — LeaveRepository is the sole pool consumer in the leave module (GP-001); it imports the shared pool for all queries.
+- src/modules/employee/employee.model.ts — findByApprover joins the employees table on manager_id to resolve the approver's direct reports; the Employee entity's managerId field is the approval-routing key.
+- src/modules/policy/policy.model.ts — LeaveRequest.leaveTypeId references a LeavePolicy; the model/DTO type for leaveTypeId is consistent with the policy id type (string). Phase 7 only declares the type relationship; the service resolves it in Phase 8.
+- src/modules/audit/audit.service.ts — Declared as a Phase 7 dependency for context; the repository does not call it (audit writing is the service layer's job in Phase 8), but the leave module's later service will consume IAuditService.
+- src/modules/balance/balance.service.ts — Declared as a Phase 7 dependency for context; the repository does not call it (balance deduction/restoration is the service layer's job in Phase 8), but the leave module's later service will consume IBalanceService.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
