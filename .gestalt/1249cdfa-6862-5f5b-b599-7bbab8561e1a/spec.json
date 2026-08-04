@@ -1,0 +1,187 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared-types",
+      "shared-utils"
+    ],
+    "affectedLayers": [
+      "shared"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "LeaveType exposes exactly six values: annual, sick, emergency, unpaid, maternity, paternity \u2014 no more, no less \u2014 and is importable from src/shared/types/index.ts",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "LeaveStatus exposes exactly five values: DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED \u2014 matching the reconciled LeaveRequest lifecycle \u2014 and is importable from src/shared/types/index.ts",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "EmploymentStatus exposes exactly three values: ACTIVE, INACTIVE, TERMINATED \u2014 matching the Employee entity lifecycle \u2014 and is importable from src/shared/types/index.ts",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "AuditAction exposes exactly five values: CREATE, UPDATE, DELETE, APPROVE, REJECT \u2014 matching the audit_logs action column \u2014 and is importable from src/shared/types/index.ts",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "AuthenticatedUser is exported as a type with id: string and role restricted to the union 'employee' | 'manager' | 'hr_admin' \u2014 no other role values are assignable",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "countBusinessDays returns the correct count of Monday\u2013Friday days within the inclusive [start, end] range, excluding weekend days and any date in the holidays array that falls on a business day within the range",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "countBusinessDays normalizes all input dates (start, end, each holiday) to UTC midnight before comparison, so dates constructed in different timezones representing the same calendar day are treated as equal",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests in tests/unit/shared/business-days.test.ts pass and cover: full-week business-day count, weekend exclusion, holiday exclusion, UTC-normalization across timezones, same-day start===end, empty holidays array, and a multi-week range",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The project compiles cleanly under tsc --noEmit with strict mode (no implicit any, strict null checks) after the new files are added",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "TypeScript strict mode is enforced (tsconfig.json: strict: true, noImplicitAny, strictNullChecks) \u2014 no use of `any`; use `unknown` with type guards per HARNESS.json no-any rule",
+    "All new source files must live under src/ (rootDir: ./src, baseUrl: ./src) \u2014 the shared types module at src/shared/types/ and the utility at src/shared/utils/ per the reconciled architecture's Module Boundaries",
+    "Test files must use the project's Jest convention: *.test.ts under tests/ (jest.config.js testMatch: '**/tests/**/*.test.(ts|js)') \u2014 not .spec.ts; do not modify the Jest config",
+    "No database access is performed in this phase \u2014 countBusinessDays is a pure function with no I/O; the shared types module declares only enums and interfaces with no runtime side effects",
+    "No @gestalt/* packages may be added as dependencies (HARNESS.json no-gestalt-internal-deps, severity critical)",
+    "No hardcoded secrets, passwords, API keys, or tokens (HARNESS.json no-hardcoded-secrets, severity critical)"
+  ],
+  "outOfScope": [
+    "Employee, policy, balance, notification, audit, and leave modules \u2014 these are Phases 2\u20139; only the shared types and business-days utility are built this phase",
+    "Database migrations, repository implementations, and any SQL \u2014 no persistence layer is touched in this phase",
+    "HTTP routes, controllers, Fastify plugins, and auth middleware \u2014 no presentation layer in this phase",
+    "Zod validation schemas \u2014 deferred to a later phase per PLAN.md",
+    "A holidays data source / holidays table \u2014 countBusinessDays receives holidays as a parameter; loading or persisting holidays is out of scope"
+  ],
+  "ambiguities": [
+    {
+      "description": "BaseEntity field naming convention: the intent specifies snake_case (id, created_at, updated_at) and DOMAIN.md confirms BaseEntity uses created_at/updated_at, but every domain entity in the reconciled architecture (Employee, LeavePolicy, LeaveBalance, LeaveRequest) uses camelCase (createdAt, updatedAt). It is unclear whether BaseEntity is meant to be extended by those entities (which would force a naming inconsistency) or is a standalone shared shape that domain entities do not extend.",
+      "options": [
+        "BaseEntity uses snake_case (created_at, updated_at) exactly as specified and is NOT extended by domain entities \u2014 it is a standalone shared shape",
+        "BaseEntity uses camelCase (createdAt, updatedAt) to match the domain entities that will extend it, deviating from the intent's literal wording",
+        "BaseEntity uses snake_case as specified AND domain entities extend it, accepting the naming inconsistency between base and derived fields"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "LeaveType enum value casing: the intent lists lowercase values (annual, sick, emergency, unpaid, maternity, paternity) and DOMAIN.md confirms lowercase, but LeaveStatus, EmploymentStatus, and AuditAction all use UPPERCASE values. The reconciled architecture's business rules and the older ARCHITECTURE.md reference both casings. It is unclear whether LeaveType should remain lowercase (matching the intent) or be uppercased for consistency with the other enums.",
+      "options": [
+        "LeaveType values are lowercase (annual, sick, ...) exactly as the intent and DOMAIN.md specify",
+        "LeaveType values are UPPERCASE (ANNUAL, SICK, ...) for consistency with LeaveStatus/EmploymentStatus/AuditAction"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "countBusinessDays behavior when start is after end (inverted range): the intent does not specify whether the function should return 0, throw, or return a negative count. This affects how the leave service (Phase 8) handles invalid date ranges and whether validation must happen before the call.",
+      "options": [
+        "Return 0 when start > end (defensive, no throw)",
+        "Throw a typed error when start > end (fail fast)",
+        "Return a negative count mirroring the raw day difference"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeaveType",
+      "mustExistOrExtend": true,
+      "invariant": "The enum's value set is closed and exactly {annual, sick, emergency, unpaid, maternity, paternity} \u2014 no additional leave types may be added without an architecture change, since LeavePolicy.leaveType and leave request creation depend on this fixed set."
+    },
+    {
+      "entity": "LeaveStatus",
+      "mustExistOrExtend": true,
+      "invariant": "The enum's value set is closed and exactly {DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED} \u2014 these correspond to the binding LeaveRequest lifecycle (DRAFT \u2192 SUBMITTED \u2192 APPROVED/REJECTED; APPROVED \u2192 CANCELLED; SUBMITTED \u2192 CANCELLED) and must not be extended independently of that lifecycle."
+    },
+    {
+      "entity": "EmploymentStatus",
+      "mustExistOrExtend": true,
+      "invariant": "The enum's value set is closed and exactly {ACTIVE, INACTIVE, TERMINATED} \u2014 only ACTIVE employees may submit leave (binding business rule), so the ACTIVE value must be distinguishable and stable."
+    },
+    {
+      "entity": "AuditAction",
+      "mustExistOrExtend": true,
+      "invariant": "The enum's value set is closed and exactly {CREATE, UPDATE, DELETE, APPROVE, REJECT} \u2014 these map to the audit_logs.action column and the audit records written by every state-changing operation (GP-002); no other action values are permitted."
+    },
+    {
+      "entity": "AuthenticatedUser",
+      "mustExistOrExtend": true,
+      "invariant": "The role field is a closed union of exactly 'employee' | 'manager' | 'hr_admin' \u2014 these are the only three roles the system recognizes for RBAC (GP-005); the type must not accept any other string, and no role field is added to the Employee entity (binding decision)."
+    },
+    {
+      "entity": "BaseEntity",
+      "mustExistOrExtend": true,
+      "invariant": "BaseEntity is a pure data shape (no owned behavior) used by more than one module, so it must reside under src/shared/types/ \u2014 not in a single-purpose module directory \u2014 per the shared value-type placement rule."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "countBusinessDays(start: Date, end: Date, holidays: Date[]): number",
+      "authRule": "N/A \u2014 pure function with no authentication; callable from any layer (shared utility)",
+      "idempotent": true,
+      "errorSemantics": "Must not perform I/O or throw on valid date inputs; behavior on inverted ranges (start > end) is unspecified by the intent \u2014 see ambiguity. All date comparison is done after UTC-midnight normalization so timezone construction differences do not cause errors."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The shared-types module's owned symbols (LeaveType, LeaveStatus, EmploymentStatus, AuditAction, BaseEntity) must match exactly the names and value sets declared in the reconciled architecture's modules array \u2014 the shared-types module at path src/shared/types/ owns these five symbols.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "The business-day counting rule must match the binding business rule: day counting = BUSINESS DAYS ONLY (Mon\u2013Fri), excluding weekends AND public holidays, with calendar-date comparison via UTC-midnight normalization (never raw timestamp comparison). countBusinessDays is the single shared function every call site (balance check, deduction, restoration) must use.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "The new shared utility and types modules must follow the same placement convention as the existing shared infrastructure: src/shared/db/connection.ts exports a bare named export (pool) with no barrel indirection \u2014 the new src/shared/types/index.ts and src/shared/utils/business-days.ts must use named exports consistent with this project's existing shared-module style.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "Test file placement must match the configured testMatch glob ('**/tests/**/*.test.(ts|js)') and moduleDirectories (['node_modules', 'src']) \u2014 the business-days test at tests/unit/shared/business-days.test.ts must resolve imports via the src baseUrl so that 'shared/utils/business-days' style imports work without relative path drift.",
+      "referencePath": "jest.config.js"
+    },
+    {
+      "requirement": "All new source must compile under the existing tsconfig (strict: true, target ES2022, module commonjs, baseUrl ./src, rootDir ./src) \u2014 the shared types and utility must not require tsconfig changes and must not introduce any type that relies on permissive compiler defaults.",
+      "referencePath": "tsconfig.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/employee/employee.model.ts (Phase 2)",
+      "why": "Employee entity imports EmploymentStatus from src/shared/types/index.ts \u2014 the enum must be exported and stable before the employee module is built."
+    },
+    {
+      "target": "src/modules/policy/policy.model.ts (Phase 3)",
+      "why": "LeavePolicy entity imports LeaveType from src/shared/types/index.ts \u2014 the enum must be exported and stable before the policy module is built."
+    },
+    {
+      "target": "src/modules/audit/audit.model.ts (Phase 5)",
+      "why": "AuditRecord entity imports AuditAction from src/shared/types/index.ts \u2014 the enum must be exported and stable before the audit module is built."
+    },
+    {
+      "target": "src/modules/leave/leave.service.ts (Phase 8)",
+      "why": "LeaveService imports AuthenticatedUser from src/shared/types/index.ts and calls countBusinessDays from src/shared/utils/business-days.ts to compute business days for balance sufficiency checks and deduction \u2014 both must be exported and correct before the leave service is built."
+    },
+    {
+      "target": "src/modules/leave/leave.controller.ts (Phase 9)",
+      "why": "LeaveController consumes request.user typed as AuthenticatedUser from src/shared/types/index.ts \u2014 the type must be exported and match the { id: string; role: 'employee'|'manager'|'hr_admin' } shape the existing auth middleware populates."
+    }
+  ]
+}
