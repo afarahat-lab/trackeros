@@ -30,6 +30,11 @@ src/
 │   │   ├── audit.model.ts         # AuditRecord entity (camelCase interface)
 │   │   ├── audit.repository.ts    # IAuditRepository + AuditRepository (parameterised queries, snake→camel mapping, JSON serialisation for oldValues/newValues)
 │   │   └── audit.service.ts       # IAuditService + AuditService (record method — generates UUID, delegates to repository, sets performedAt)
+│   ├── balance/                   # LeaveBalance model + repository + service (Phase 6)
+│   │   ├── index.ts               # Barrel: LeaveBalance, BalanceStatus, IBalanceRepository, BalanceRepository, CreateLeaveBalanceInput, IBalanceService, BalanceService, InsufficientBalanceError
+│   │   ├── balance.model.ts       # LeaveBalance entity + BalanceStatus enum (ACTIVE | EXHAUSTED | EXPIRED); remainingDays is computed (totalEntitlement - usedDays) at the repository mapping layer, never stored
+│   │   ├── balance.repository.ts  # IBalanceRepository + BalanceRepository (parameterised queries, snake→camel mapping, atomic incrementUsedDays/decrementUsedDays with RETURNING)
+│   │   └── balance.service.ts     # IBalanceService + BalanceService (initializeBalance, deductDays with rollback on negative remaining, restoreDays; InsufficientBalanceError custom error)
 │   ├── employee/                  # Employee model + repository (Phase 2)
 │   │   ├── index.ts               # Barrel: Employee, IEmployeeRepository, EmployeeRepository
 │   │   ├── employee.model.ts      # Employee entity (camelCase, standalone — does not extend BaseEntity)
@@ -64,6 +69,8 @@ tests/
 │   └── modules/
 │       ├── audit/
 │       │   └── audit.service.test.ts    # Jest tests for AuditService
+│       ├── balance/
+│       │   └── balance.service.test.ts  # Jest tests for BalanceService (getBalance, getBalances, initializeBalance, deductDays with rollback, restoreDays)
 │       ├── employee/
 │       │   └── employee.repository.test.ts  # Jest tests for EmployeeRepository
 │       ├── notification/
@@ -76,7 +83,6 @@ tests/
 
 The following modules are planned per the leave-management feature design but have not been implemented yet:
 
-- `src/modules/balance/` — LeaveBalance model + repository + service
 - `src/modules/leave/` — LeaveRequest model + repository + validation + service + controller + routes
 
 ## Key patterns
@@ -107,7 +113,7 @@ The leave management module enables employees to apply for annual, sick, and eme
 |--------|---------|------------------|
 | **LeaveRequest** | Employee leave application. Tracks from draft to terminal states. | DRAFT → SUBMITTED → APPROVED / REJECTED; APPROVED → CANCELLED; SUBMITTED → CANCELLED |
 | **LeavePolicy** | Rules and entitlements for a leave type. | ACTIVE, INACTIVE |
-| **LeaveBalance** | Employee's entitlement, usage, and remaining days per policy per fiscal year. | ACTIVE → EXHAUSTED (when remainingDays=0); ACTIVE/EXHAUSTED → CLOSED (fiscal year end) |
+| **LeaveBalance** | Employee's entitlement, usage, and remaining days per policy per fiscal year. | ACTIVE → EXHAUSTED (when remainingDays=0); ACTIVE/EXHAUSTED → EXPIRED (fiscal year end) |
 | **Employee** | Organisation member with reporting line and employment status. | ACTIVE, INACTIVE, TERMINATED |
 | **Notification** | System notification to employees/managers about leave events. | PENDING → SENT → READ / ARCHIVED |
 
@@ -124,7 +130,7 @@ The leave management module enables employees to apply for annual, sick, and eme
 | Table | Key Fields | Primary Key | Foreign Keys |
 |-------|------------|-------------|--------------|
 | `leave_requests` | id, employee_id, leave_type_id, start_date, end_date, reason, status, approved_by, approved_at, created_at, updated_at | id | employee_id → employees.id, leave_type_id → leave_policies.id, approved_by → employees.id |
-| `leave_balances` | id, employee_id, policy_id, total_entitlement, used_days, remaining_days, fiscal_year, status, created_at, updated_at | id | employee_id → employees.id, policy_id → leave_policies.id |
+| `leave_balances` | id, employee_id, policy_id, total_entitlement, used_days, fiscal_year, status, created_at, updated_at | id | employee_id → employees.id, policy_id → leave_policies.id |
 | `employees` | id, employee_number, first_name, last_name, email, manager_id, department, hire_date, termination_date, employment_status, created_at, updated_at, deleted_at | id | manager_id → employees.id |
 | `leave_policies` | id, policy_name, leave_type, entitlement_days, accrual_rate, max_accumulation, minimum_notice_days, requires_manager_approval, is_active, created_at, updated_at | id | — |
 | `audit_logs` | id, entity_type, entity_id, action, old_values, new_values, performed_by, performed_at, created_at, updated_at | id | performed_by → employees.id |
@@ -144,7 +150,7 @@ src/
 │   ├── policy/         # LeavePolicy CRUD, active policy lookups ✅ built (Phase 3)
 │   ├── notification/   # Notification creation and retrieval ✅ built (Phase 4)
 │   ├── audit/          # Audit trail recording and querying ✅ built (Phase 5)
-│   ├── balance/        # LeaveBalance management, deduction/restoration
+│   ├── balance/        # LeaveBalance management, deduction/restoration ✅ built (Phase 6)
 │   └── leave/          # Orchestrator: submit, approve, reject, cancel
 ```
 
@@ -158,7 +164,7 @@ src/
 
 1. **Shared types + Employee module** — foundation enums and employee vertical slice. ✅ Done
 2. **Policy module** — policy vertical slice. ✅ Done
-3. **Balance module** — balance vertical slice (depends on employee & policy).
+3. **Balance module** — balance vertical slice (depends on employee & policy). ✅ Done
 4. **Notification module** — notification vertical slice. ✅ Done
 5. **Audit module** — audit vertical slice. ✅ Done
 6. **Leave module** — orchestrator (depends on all above).
