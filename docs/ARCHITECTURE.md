@@ -13,26 +13,48 @@ The architecture is modular, with a clear separation of concerns between models,
 - Frontend: React Native
 - Database: PostgreSQL
 
-## Module structure
+## Module structure (as built)
 
 ```
-src/modules/leave/leave.{model,repository,service,controller,routes}.ts
-src/modules/balance/balance.{model,repository,service,controller,routes}.ts
-src/modules/employee/employee.{model,repository,service,controller,routes}.ts
-src/modules/policy/policy.{model,repository,service,controller,routes}.ts
-src/modules/notification/notification.{model,repository,service,controller,routes}.ts
-src/modules/LeaveStatus/    — LeaveStatus module
-src/modules/BaseEntity/    — BaseEntity module
-src/modules/LeaveRequest/    — LeaveRequest module
-src/modules/LeaveType/    — LeaveType module
-src/modules/LeavePolicy/    — LeavePolicy module
-src/modules/AuditLog/    — AuditLog module
-src/modules/AuditRecord/    — AuditRecord module
-src/modules/AuditServiceInterface/    — AuditServiceInterface module
-src/shared/db connection.ts
-src/shared/base repository.ts
-src/shared/error types.ts
+src/
+├── shared/
+│   ├── db/
+│   │   └── connection.ts          # PostgreSQL connection pool (pg Pool)
+│   ├── types/
+│   │   └── index.ts               # Canonical enums + interfaces (LeaveType, LeaveStatus, EmploymentStatus, AuditAction, BaseEntity, AuthenticatedUser)
+│   └── utils/
+│       └── business-days.ts       # countBusinessDays(start, end, holidays) — Mon–Fri excluding weekends + supplied holidays, UTC-midnight normalised
+├── modules/
+│   ├── status/                    # System status module (health-check)
+│   │   ├── index.ts
+│   │   ├── status.model.ts
+│   │   ├── status.service.interface.ts
+│   │   └── status.service.ts
+│   └── uptime/                    # Uptime module (version + health routes)
+│       ├── index.ts
+│       ├── uptime.model.ts
+│       ├── uptime.routes.ts
+│       ├── uptime.service.interface.ts
+│       └── uptime.service.ts
+├── app.ts                         # Fastify app instance + route registration
+└── index.ts                       # Entry point (starts server on port 3000)
+
+tests/
+└── unit/
+    └── shared/
+        └── business-days.test.ts  # Jest tests for countBusinessDays
 ```
+
+### Planned modules (not yet built)
+
+The following modules are planned per the leave-management feature design but have not been implemented yet:
+
+- `src/modules/employee/` — Employee model + repository
+- `src/modules/policy/` — LeavePolicy model + repository
+- `src/modules/balance/` — LeaveBalance model + repository + service
+- `src/modules/notification/` — Notification model + repository + service
+- `src/modules/audit/` — AuditRecord model + repository + service
+- `src/modules/leave/` — LeaveRequest model + repository + validation + service + controller + routes
 
 ## Key patterns
 
