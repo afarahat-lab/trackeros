@@ -1,0 +1,185 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "employee"
+    ],
+    "affectedLayers": [
+      "domain",
+      "persistence"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The Employee entity interface is declared in src/modules/employee/employee.model.ts with all required fields (id, employeeNumber, firstName, lastName, email, managerId, department, hireDate, terminationDate, employmentStatus, createdAt, updatedAt, deletedAt) using camelCase naming, and it imports EmploymentStatus from src/shared/types/index.ts rather than redefining it.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The IEmployeeRepository interface declares all seven operations (findById, findByEmail, findByManagerId, findAll with optional filters, create, update with a partial, softDelete) and the EmployeeRepository class implements that interface using the pool imported from src/shared/db/connection.ts.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Every repository query uses parameterised placeholders ($1, $2, ...) with a values array \u2014 no string interpolation of user-supplied input into SQL text \u2014 so the implementation satisfies the no-direct-db-outside-repository and injection-safety constraints.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All read operations (findById, findByEmail, findByManagerId, findAll) exclude tombstoned rows by filtering on deleted_at IS NULL, and softDelete sets deleted_at to the current timestamp only for rows where deleted_at IS NULL, returning a boolean indicating whether a row was affected.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository maps snake_case database rows (from the employees table) to the camelCase Employee entity, converting timestamp columns to Date instances, so callers receive Employee objects with camelCase fields and Date types rather than raw DB rows.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The update operation accepts a partial payload covering only mutable, non-identity, non-audit fields (excluding id, createdAt, and deletedAt) and persists only the supplied fields, leaving omitted fields unchanged.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The src/modules/employee/index.ts barrel re-exports the Employee model, the IEmployeeRepository interface, and the EmployeeRepository class so downstream modules import only through the module's public entry point.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests exist at tests/unit/modules/employee/employee.repository.test.ts covering the repository's query construction and row-mapping behaviour (e.g. that findById filters deleted rows, create persists and returns the mapped entity, softDelete guards against double-deletion), and the test suite passes under the configured ts-jest runner.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The employee module compiles cleanly under the project's strict TypeScript configuration (no implicit any, strict null checks) \u2014 npm run build (tsc --noEmit over src/) succeeds with no errors from the new employee module files.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No use of `any` (HARNESS.json no-any rule, severity high): the repository must use typed query results (e.g. pool.query<RowType>) and a typed row-to-entity mapper; use `unknown` with type guards where dynamic shapes appear, never `any`.",
+    "All database access goes through the repository pattern (GP-001 + HARNESS.json no-direct-db-outside-repository, severity critical): the EmployeeRepository is the sole component that issues SQL against the employees table; no other module or layer writes inline SQL for employees.",
+    "Parameterised queries only: every SQL statement must use positional placeholders ($1, $2, ...) with a separate values array; user input must never be concatenated or interpolated into the query text.",
+    "The repository must obtain its database connection by importing the existing `pool` from src/shared/db/connection.ts \u2014 it must not instantiate a new Pool or open an independent connection.",
+    "The Employee entity must be a standalone plain `export interface` (no class, no decorators) and must NOT extend BaseEntity, because BaseEntity uses snake_case audit fields and lacks deletedAt, making the shapes incompatible.",
+    "EmploymentStatus must be imported from src/shared/types/index.ts (the canonical Phase 1 enum with values ACTIVE, INACTIVE, TERMINATED); it must not be redefined or duplicated inside the employee module.",
+    "Modules import from each other ONLY through their declared public entry point (index.ts) \u2014 the employee barrel is the sole import surface for downstream modules; internal files (employee.model.ts, employee.repository.ts) are not imported directly from outside the module.",
+    "No unhandled promise rejections (GP-006): repository methods must propagate database errors as rejected promises to callers rather than swallowing them; the repository layer does not silently catch and discard errors.",
+    "No hardcoded secrets (HARNESS.json no-hardcoded-secrets, severity critical): the repository must not embed credentials, connection strings, or tokens; it relies entirely on the shared pool which reads DATABASE_URL from the environment."
+  ],
+  "outOfScope": [
+    "Employee service layer (IEmployeeService / EmployeeService), controller, routes, and Zod validation schemas \u2014 the reconciled architecture lists these as module-owned artifacts, but this phase covers only the model + repository + barrel; the service/controller/routes are built in later phases.",
+    "HTTP endpoints, RBAC middleware, and request.user handling for employees \u2014 GP-005 RBAC enforcement and GP-003 input validation at API boundaries are not in scope for a repository-only phase; they belong to the controller/routes phases.",
+    "Audit record creation for employee state changes (GP-002) \u2014 the repository persists rows but does not itself write audit records; audit wiring is the responsibility of the service/orchestrator layer in a later phase.",
+    "Database migrations / schema creation for the employees table \u2014 this phase assumes the employees table (snake_case columns per reconciled.json) already exists or will be provisioned separately; no migration files are produced here.",
+    "Hard-delete (physical row removal) \u2014 only soft delete (setting deleted_at) is in scope; permanent deletion of employee records is not implemented."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "An Employee's employmentStatus must be one of the canonical EmploymentStatus enum values (ACTIVE, INACTIVE, TERMINATED) imported from shared types; the entity never carries a free-form status string."
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "A soft-deleted Employee (deletedAt set) is excluded from all read operations and cannot be soft-deleted again; the deletedAt timestamp, once set, is immutable via the repository's update path (update excludes deletedAt from the mutable field set)."
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "The Employee entity is a standalone interface that does not extend BaseEntity; its audit fields are camelCase (createdAt, updatedAt) plus a deletedAt field, which is structurally incompatible with BaseEntity's snake_case shape."
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "The identity and audit fields (id, createdAt) are immutable through the repository's update operation; only mutable, non-identity, non-audit fields may be changed via the partial update payload."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "findById(id)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the Employee with the given id if it exists and is not soft-deleted, or null if no live row matches; database errors propagate as rejected promises (GP-006)."
+    },
+    {
+      "operation": "findByEmail(email)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the Employee matching the given email among non-deleted rows, or null if none; database errors propagate as rejected promises."
+    },
+    {
+      "operation": "findByManagerId(managerId)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns all non-deleted Employees whose managerId equals the given value; returns an empty array when no reports exist; database errors propagate as rejected promises."
+    },
+    {
+      "operation": "findAll(filters?)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns all non-deleted Employees, optionally narrowed by the supplied filter dimensions (employmentStatus, department, managerId); omitted filter fields must not constrain the result; database errors propagate as rejected promises."
+    },
+    {
+      "operation": "create(employee)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Persists a new Employee row and returns the created Employee mapped from the inserted row; database errors (e.g. unique constraint violations on email/employee_number) propagate as rejected promises."
+    },
+    {
+      "operation": "update(id, partial)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Applies only the supplied mutable fields to the live row matching id (deleted_at IS NULL) and returns the updated Employee, or null if no live row matches; identity/audit fields (id, createdAt, deletedAt) are excluded from the mutable set; database errors propagate as rejected promises."
+    },
+    {
+      "operation": "softDelete(id)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Sets deleted_at to the current timestamp for the row matching id where deleted_at IS NULL and returns true if a row was affected, false if no live row matched (already deleted or not found); database errors propagate as rejected promises."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The EmploymentStatus enum must be imported from and match the canonical definition in src/shared/types/index.ts (values ACTIVE, INACTIVE, TERMINATED); the employee module must not declare a competing enum.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The repository must obtain its database connection by importing the existing `pool` export from src/shared/db/connection.ts; it must not create a new Pool or duplicate connection logic.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "The repository's SQL must target the employees table using the snake_case column names documented in the reconciled architecture (id, employee_number, first_name, last_name, email, manager_id, department, hire_date, termination_date, employment_status, created_at, updated_at, deleted_at); the row-to-entity mapper converts these to the camelCase Employee fields.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "The employee module's barrel (src/modules/employee/index.ts) must follow the established barrel-export convention demonstrated by src/modules/status/index.ts and src/modules/uptime/index.ts \u2014 re-exporting the model, interface, and implementation from index.ts as the module's sole public surface.",
+      "referencePath": "src/modules/status/index.ts"
+    },
+    {
+      "requirement": "The IEmployeeRepository interface naming must follow the existing I<Name>Service pattern (e.g. IStatusService in src/modules/status/status.service.interface.ts) \u2014 interface prefixed with I, implementation class unprefixed \u2014 to keep repository/interface naming consistent with the codebase convention.",
+      "referencePath": "src/modules/status/status.service.interface.ts"
+    },
+    {
+      "requirement": "The repository test file must follow the existing test conventions shown in tests/unit/shared/business-days.test.ts: Jest *.test.ts under tests/, bare-path imports relative to src (e.g. 'modules/employee', 'shared/db/connection') leveraging the moduleDirectories config, not relative file paths.",
+      "referencePath": "tests/unit/shared/business-days.test.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts",
+      "why": "The Employee entity imports the canonical EmploymentStatus enum from shared types; this is the employee module's only shared-types dependency and must remain the single source of truth for employment status values."
+    },
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "The EmployeeRepository consumes the shared pg.Pool instance for all database access, satisfying GP-001 (repository pattern) and the no-direct-db-outside-repository constraint; no other connection source is permitted."
+    },
+    {
+      "target": "src/modules/employee/index.ts (public barrel)",
+      "why": "Downstream modules (balance, leave) depend on the employee module solely through its index.ts barrel per the acyclic dependency map in the reconciled architecture; the barrel must expose the Employee model and IEmployeeRepository so later phases can consume them without reaching into internal files."
+    }
+  ]
+}
