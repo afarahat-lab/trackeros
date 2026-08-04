@@ -1,22 +1,24 @@
-# Implement this phase: Phase 5: Audit module (model + repository + service)
+# Implement this phase: Phase 6: Balance module (model + repository + service)
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/4fbbfee4-4feb-4a2b-8127-85025f82af24/5`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/4fbbfee4-4feb-4a2b-8127-85025f82af24/6`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the audit module at `src/modules/audit/`. This phase depends on `src/shared/types/index.ts` from Phase 1 — read it before generating any code.
+Create the balance module at `src/modules/balance/`. This phase depends on `src/shared/types/index.ts` from Phase 1, `src/modules/employee/employee.model.ts` from Phase 2, and `src/modules/policy/policy.model.ts` from Phase 3 — read all three before generating any code.
 
-Create `src/modules/audit/audit.model.ts` with the AuditRecord entity: id, entityType, entityId, action (AuditAction enum from shared types), oldValues (Record<string, unknown>|null), newValues (Record<string, unknown>|null), performedBy (string|null), performedAt (Date), createdAt, updatedAt.
+Create `src/modules/balance/balance.model.ts` with:
+- BalanceStatus enum: ACTIVE, EXHAUSTED, EXPIRED
+- LeaveBalance entity: id, employeeId, policyId, totalEntitlement, usedDays, remainingDays (COMPUTED — never stored, derived as totalEntitlement - usedDays at query time), fiscalYear (calendar year of the request, Jan 1–Dec 31), status: BalanceStatus, createdAt, updatedAt.
 
-Create `src/modules/audit/audit.repository.ts` with IAuditRepository interface and AuditRepository class using `src/shared/db/connection.ts`. Methods: create(record), findByEntity(entityType, entityId), findByPerformer(performedBy, limit?, offset?).
+Create `src/modules/balance/balance.repository.ts` with IBalanceRepository interface and BalanceRepository class using `src/shared/db/connection.ts`. Methods: findByEmployeeAndPolicy(employeeId, policyId, fiscalYear), findByEmployee(employeeId, fiscalYear), create(balance), incrementUsedDays(id, days) — atomic UPDATE used_days = used_days + $1 WHERE id = $2 RETURNING *, decrementUsedDays(id, days) — atomic UPDATE used_days = used_days - $1 WHERE id = $2 AND used_days >= $1 RETURNING *. All reads compute remainingDays as totalEntitlement - usedDays in the query.
 
-Create `src/modules/audit/audit.service.ts` with IAuditService interface and AuditService class. The service wraps the repository and exposes: record(action, entityType, entityId, performedBy, oldValues?, newValues?): Promise<AuditRecord> — creates an audit record with performedAt set to now.
+Create `src/modules/balance/balance.service.ts` with IBalanceService interface and BalanceService class. Methods: getBalance(employeeId, policyId, fiscalYear), getBalances(employeeId, fiscalYear), initializeBalance(employeeId, policyId, totalEntitlement, fiscalYear), deductDays(balanceId, days) — delegates to repository.incrementUsedDays, throws InsufficientBalanceError if remaining would go below zero, restoreDays(balanceId, days) — delegates to repository.decrementUsedDays.
 
-Create `src/modules/audit/index.ts` barrel.
+Create `src/modules/balance/index.ts` barrel.
 
-Include Jest unit tests in `tests/unit/modules/audit/audit.service.test.ts`.
+Include Jest unit tests in `tests/unit/modules/balance/balance.service.test.ts`.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
