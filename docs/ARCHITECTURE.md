@@ -25,6 +25,11 @@ src/
 │   └── utils/
 │       └── business-days.ts       # countBusinessDays(start, end, holidays) — Mon–Fri excluding weekends + supplied holidays, UTC-midnight normalised
 ├── modules/
+│   ├── audit/                     # Audit model + repository + service (Phase 5)
+│   │   ├── index.ts               # Barrel: AuditRecord, CreateAuditRecordInput, IAuditRepository, AuditRepository, IAuditService, AuditService
+│   │   ├── audit.model.ts         # AuditRecord entity (camelCase interface)
+│   │   ├── audit.repository.ts    # IAuditRepository + AuditRepository (parameterised queries, snake→camel mapping, JSON serialisation for oldValues/newValues)
+│   │   └── audit.service.ts       # IAuditService + AuditService (record method — generates UUID, delegates to repository, sets performedAt)
 │   ├── employee/                  # Employee model + repository (Phase 2)
 │   │   ├── index.ts               # Barrel: Employee, IEmployeeRepository, EmployeeRepository
 │   │   ├── employee.model.ts      # Employee entity (camelCase, standalone — does not extend BaseEntity)
@@ -57,6 +62,8 @@ tests/
 │   ├── shared/
 │   │   └── business-days.test.ts  # Jest tests for countBusinessDays
 │   └── modules/
+│       ├── audit/
+│       │   └── audit.service.test.ts    # Jest tests for AuditService
 │       ├── employee/
 │       │   └── employee.repository.test.ts  # Jest tests for EmployeeRepository
 │       ├── notification/
@@ -70,7 +77,6 @@ tests/
 The following modules are planned per the leave-management feature design but have not been implemented yet:
 
 - `src/modules/balance/` — LeaveBalance model + repository + service
-- `src/modules/audit/` — AuditRecord model + repository + service
 - `src/modules/leave/` — LeaveRequest model + repository + validation + service + controller + routes
 
 ## Key patterns
@@ -121,7 +127,7 @@ The leave management module enables employees to apply for annual, sick, and eme
 | `leave_balances` | id, employee_id, policy_id, total_entitlement, used_days, remaining_days, fiscal_year, status, created_at, updated_at | id | employee_id → employees.id, policy_id → leave_policies.id |
 | `employees` | id, employee_number, first_name, last_name, email, manager_id, department, hire_date, termination_date, employment_status, created_at, updated_at, deleted_at | id | manager_id → employees.id |
 | `leave_policies` | id, policy_name, leave_type, entitlement_days, accrual_rate, max_accumulation, minimum_notice_days, requires_manager_approval, is_active, created_at, updated_at | id | — |
-| `audit_logs` | id, entity_type, entity_id, action, old_values, new_values, performed_by, performed_at, ip_address, user_agent, created_at | id | performed_by → employees.id |
+| `audit_logs` | id, entity_type, entity_id, action, old_values, new_values, performed_by, performed_at, created_at, updated_at | id | performed_by → employees.id |
 | `notifications` | id, recipient_id, type, title, message, related_entity_type, related_entity_id, status, created_at, read_at | id | recipient_id → employees.id |
 
 Indexes are defined for frequent access patterns: employee lookups, status filtering, date-range scans, compound unique constraints, and audit trails.
@@ -137,8 +143,8 @@ src/
 │   ├── employee/       # Employee CRUD, status checks ✅ built (Phase 2)
 │   ├── policy/         # LeavePolicy CRUD, active policy lookups ✅ built (Phase 3)
 │   ├── notification/   # Notification creation and retrieval ✅ built (Phase 4)
+│   ├── audit/          # Audit trail recording and querying ✅ built (Phase 5)
 │   ├── balance/        # LeaveBalance management, deduction/restoration
-│   ├── audit/          # Audit trail recording and querying
 │   └── leave/          # Orchestrator: submit, approve, reject, cancel
 ```
 
@@ -153,11 +159,12 @@ src/
 1. **Shared types + Employee module** — foundation enums and employee vertical slice. ✅ Done
 2. **Policy module** — policy vertical slice. ✅ Done
 3. **Balance module** — balance vertical slice (depends on employee & policy).
-4. **Notification + Audit modules** — independent mid-layer slices.
-5. **Leave module** — orchestrator (depends on all above).
-6. **Validation schemas** — Zod schemas for all modules.
-7. **Controllers** — HTTP translation layer.
-8. **Routes + app registration** — Fastify route plugins, RBAC stubs, app.ts wiring.
+4. **Notification module** — notification vertical slice. ✅ Done
+5. **Audit module** — audit vertical slice. ✅ Done
+6. **Leave module** — orchestrator (depends on all above).
+7. **Validation schemas** — Zod schemas for all modules.
+8. **Controllers** — HTTP translation layer.
+9. **Routes + app registration** — Fastify route plugins, RBAC stubs, app.ts wiring.
 
 ### Open Questions (Require Stakeholder Decision)
 
