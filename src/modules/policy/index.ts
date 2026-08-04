@@ -1,2 +1,2 @@
 export { LeavePolicy } from './policy.model';
-export { IPolicyRepository, PolicyRepository } from './policy.repository';
+export { CreateLeavePolicyInput, IPolicyRepository, PolicyRepository, UpdateLeavePolicyInput } from './policy.repository';
