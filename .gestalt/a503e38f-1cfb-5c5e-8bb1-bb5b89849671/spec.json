@@ -1,0 +1,184 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-request"
+    ],
+    "affectedLayers": [
+      "api",
+      "controller",
+      "routes"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "Every controller handler returns HTTP 401 when request.user is absent/undefined, before any other processing.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The controller returns HTTP 400 with a descriptive error when startDate is in the past, startDate is after endDate, or required submit fields are missing \u2014 and this rejection happens before the service is called (boundary validation, GP-003).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Each service error class maps to its documented HTTP status: ValidationError\u2192400, ApproverNotAuthorizedError\u2192403, LeaveRequestNotFoundError\u2192404, InsufficientBalanceError\u2192409, and any other/unexpected Error\u2192500.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "For every state-changing delegation, the controller passes request.user.id as the actor/approver id and request.user.role as the role argument into the matching LeaveRequestService method.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Route-level RBAC is enforced: submit rejects manager/hr_admin with 403 (employee-only); approve and reject reject employee with 403 (manager/hr_admin-only); get-by-id returns 403 for an employee requesting another employee's request; list forces an employee to their own employeeId; cancel permits the owning employee or manager/hr_admin.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The controller parses ISO date strings from the request body into Date objects before constructing the CreateLeaveRequestDto (the DTO declares startDate/endDate as Date).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The leave routes are registered on the Fastify app in src/app.ts via app.register, and src/modules/leave-request/index.ts exports both the controller and the routes function.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "Unit tests mock the LeaveRequestService and assert, per handler, the correct HTTP status code, RBAC enforcement, and input-validation rejection \u2014 covering happy paths and each error class.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "No PII (request.user.id, employee IDs, reasons, or dates) appears in any log statement or error response payload (GP-004).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Every async handler catches errors with a 500 fallback so no unhandled promise rejection can escape (GP-006).",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Do NOT build, implement, or mock auth middleware, login/JWT/session, or any runtime auth provider in this feature. The controller only consumes request.user, which is assumed already populated by existing app infrastructure.",
+    "Declare a type-only AuthenticatedUser interface { id: string; role: 'employee' | 'manager' | 'hr_admin' } in this module (e.g. auth.types.ts or alongside the controller). It is a compile-time declaration only \u2014 no runtime middleware code.",
+    "No `any` (HARNESS no-any rule): use unknown with type guards, or FastifyRequest module augmentation / type assertion, to read request.user as AuthenticatedUser | undefined.",
+    "The controller must not bypass the service's own validation; boundary validation (startDate-not-in-past, startDate<=endDate, required fields) is defense-in-depth that runs before the service call and returns 400 on failure.",
+    "The controller must not re-implement business rules (balance sufficiency, notice days, approver authorization, status transitions) \u2014 those live in the service and surface as typed errors.",
+    "No direct database access from the controller or routes (GP-001); all persistence goes through LeaveRequestService.",
+    "Route registration must follow the existing uptime.routes.ts pattern: an async function registering handlers that use reply.status(code).send(body) with try/catch + request.log.error(error) and a 500 fallback, registered via app.register in src/app.ts.",
+    "Tests must use *.test.ts (not .spec.ts) under tests/, mock the service with jest.Mocked<ILeaveRequestService> and jest.fn() per method, matching the existing leave-request.service.test.ts pattern and jest.config.js testMatch.",
+    "Modules import from each other only through their declared public entry point (index.ts); the controller/routes import the service and types via the leave-request barrel, not from internal files."
+  ],
+  "outOfScope": [
+    "Building, implementing, or mocking auth middleware, JWT/session handling, or any runtime auth provider \u2014 auth is existing app infrastructure consumed, not built, in this phase.",
+    "Audit logging and notification dispatch (GP-002 audit records, LEAVE_APPLIED/LEAVE_DECISION notifications) \u2014 deferred to Phase 9 (AuditLog + Notification modules) and Phase 10 (service integration).",
+    "LeavePolicyService and LeaveBalanceService implementations \u2014 deferred to Phase 10.",
+    "Frontend/React Native client and @trackeros/contracts REST surface \u2014 backend API surface only.",
+    "Integration/e2e tests against a real Fastify instance or database \u2014 this phase ships unit tests with a mocked service only."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "AuthenticatedUser",
+      "mustExistOrExtend": true,
+      "invariant": "Declared as a type-only interface with exactly { id: string; role: 'employee' | 'manager' | 'hr_admin' }; it carries no runtime implementation and exists solely so the controller and tests can read request.user in a typed way."
+    },
+    {
+      "entity": "LeaveRequestController",
+      "mustExistOrExtend": true,
+      "invariant": "Every handler treats request.user as AuthenticatedUser | undefined: if undefined it short-circuits with 401 and never reaches the service; if present it forwards id and role as the actor/approver parameters to the corresponding LeaveRequestService method."
+    },
+    {
+      "entity": "LeaveRequest (API lifecycle)",
+      "mustExistOrExtend": true,
+      "invariant": "The controller never mutates LeaveRequest state directly; all state transitions (submit\u2192SUBMITTED, approve\u2192APPROVED, reject\u2192REJECTED, cancel\u2192CANCELLED) are delegated to the service, which owns the lifecycle and balance side-effects."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "Submit a new leave request",
+      "authRule": "Employee-only at the route layer (manager/hr_admin receive 403); requires an authenticated user (401 if absent). The controller passes request.user.id and request.user.role into the service submit method.",
+      "idempotent": false,
+      "errorSemantics": "400 for missing/invalid fields, past startDate, or startDate after endDate (boundary validation before service call); service ValidationError\u2192400, InsufficientBalanceError\u2192409, ApproverNotAuthorizedError\u2192403; unexpected Error\u2192500."
+    },
+    {
+      "operation": "Get a single leave request by id",
+      "authRule": "Requires authenticated user (401 if absent). Employees may retrieve only their own request (403 otherwise); manager and hr_admin may retrieve any.",
+      "idempotent": true,
+      "errorSemantics": "LeaveRequestNotFoundError\u2192404; role-not-permitted\u2192403; unexpected Error\u2192500."
+    },
+    {
+      "operation": "List leave requests filtered by employeeId",
+      "authRule": "Requires authenticated user (401 if absent). An employee is forced to query only their own employeeId (their own requests); manager/hr_admin may query any employeeId.",
+      "idempotent": true,
+      "errorSemantics": "Role-not-permitted/forced-own-only enforcement\u2192403 where applicable; unexpected Error\u2192500."
+    },
+    {
+      "operation": "Approve a leave request",
+      "authRule": "Manager/hr_admin-only at the route layer (employee receives 403); requires authenticated user (401 if absent). The controller passes request.user.id as approverId and request.user.role as approverRole into the service approve method.",
+      "idempotent": false,
+      "errorSemantics": "LeaveRequestNotFoundError\u2192404; ApproverNotAuthorizedError\u2192403; ValidationError (wrong status)\u2192400; unexpected Error\u2192500."
+    },
+    {
+      "operation": "Reject a leave request",
+      "authRule": "Manager/hr_admin-only at the route layer (employee receives 403); requires authenticated user (401 if absent). The controller passes request.user.id as approverId and request.user.role as approverRole into the service reject method.",
+      "idempotent": false,
+      "errorSemantics": "LeaveRequestNotFoundError\u2192404; ApproverNotAuthorizedError\u2192403; ValidationError (wrong status)\u2192400; unexpected Error\u2192500."
+    },
+    {
+      "operation": "Cancel a leave request",
+      "authRule": "Permitted for the owning employee or for manager/hr_admin; requires authenticated user (401 if absent). The controller passes request.user.id and request.user.role into the service cancel method, which enforces ownership for employees.",
+      "idempotent": false,
+      "errorSemantics": "LeaveRequestNotFoundError\u2192404; ApproverNotAuthorizedError\u2192403 (non-owner employee); ValidationError (non-cancellable status)\u2192400; unexpected Error\u2192500."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The controller must call the six ILeaveRequestService methods with the exact signatures and parameter order defined in the service interface: submit(dto, actorId, actorRole), approve(leaveRequestId, approverId, approverRole), reject(leaveRequestId, approverId, approverRole), cancel(leaveRequestId, actorId, actorRole), getById(leaveRequestId), getByEmployee(employeeId).",
+      "referencePath": "src/modules/leave-request/leave-request.service.interface.ts"
+    },
+    {
+      "requirement": "The error-to-status mapping must match the four exported error classes and their documented semantics: ValidationError\u2192400, ApproverNotAuthorizedError\u2192403, LeaveRequestNotFoundError\u2192404, InsufficientBalanceError\u2192409.",
+      "referencePath": "src/modules/leave-request/leave-request.service.ts"
+    },
+    {
+      "requirement": "The submit DTO constructed by the controller must conform to CreateLeaveRequestDto (employeeId, leavePolicyId, startDate: Date, endDate: Date, reason?), parsing ISO date strings to Date before construction.",
+      "referencePath": "src/modules/leave-request/leave-request.model.ts"
+    },
+    {
+      "requirement": "Route registration and app wiring must match the established pattern: an exported async routes function registering handlers with reply.status().send() and try/catch + request.log.error + 500 fallback, registered via app.register in src/app.ts.",
+      "referencePath": "src/modules/uptime/uptime.routes.ts"
+    },
+    {
+      "requirement": "The barrel must be extended (not replaced) to export the controller and routes alongside the existing model, repository, service interface, service, and error-class exports.",
+      "referencePath": "src/modules/leave-request/index.ts"
+    },
+    {
+      "requirement": "The AuthenticatedUser type and RBAC semantics must match reconciled business rule 6: request.user = { id, role }, role \u2208 'employee'|'manager'|'hr_admin', populated by existing auth middleware; controller consumes it (401 if absent) and passes id + role into the service.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "LeaveRequestService (src/modules/leave-request/leave-request.service.ts)",
+      "why": "The controller delegates all six operations to the service, passing request.user.id and request.user.role as actor/approver parameters; the service owns business rules, balance side-effects, and typed errors."
+    },
+    {
+      "target": "Fastify app instance (src/app.ts)",
+      "why": "The leave routes function must be registered on the shared Fastify app via app.register, mirroring the existing uptimeRoutes registration."
+    },
+    {
+      "target": "Existing auth middleware (application infrastructure, out of scope)",
+      "why": "The controller consumes request.user populated by this middleware; it must not re-implement auth, only read the authenticated identity and return 401 when absent."
+    },
+    {
+      "target": "Leave-request module barrel (src/modules/leave-request/index.ts)",
+      "why": "The controller and routes must be exported through the module's public entry point so app.ts and tests import via the barrel, per the module-boundary rule."
+    }
+  ]
+}
