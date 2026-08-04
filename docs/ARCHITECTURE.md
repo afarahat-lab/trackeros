@@ -25,6 +25,10 @@ src/
 │   └── utils/
 │       └── business-days.ts       # countBusinessDays(start, end, holidays) — Mon–Fri excluding weekends + supplied holidays, UTC-midnight normalised
 ├── modules/
+│   ├── employee/                  # Employee model + repository (Phase 2)
+│   │   ├── index.ts               # Barrel: Employee, IEmployeeRepository, EmployeeRepository
+│   │   ├── employee.model.ts      # Employee entity (camelCase, standalone — does not extend BaseEntity)
+│   │   └── employee.repository.ts # IEmployeeRepository + EmployeeRepository (parameterised queries, soft-delete, snake→camel mapping)
 │   ├── status/                    # System status module (health-check)
 │   │   ├── index.ts
 │   │   ├── status.model.ts
@@ -40,16 +44,18 @@ src/
 └── index.ts                       # Entry point (starts server on port 3000)
 
 tests/
-└── unit/
-    └── shared/
-        └── business-days.test.ts  # Jest tests for countBusinessDays
+├── unit/
+│   ├── shared/
+│   │   └── business-days.test.ts  # Jest tests for countBusinessDays
+│   └── modules/
+│       └── employee/
+│           └── employee.repository.test.ts  # Jest tests for EmployeeRepository
 ```
 
 ### Planned modules (not yet built)
 
 The following modules are planned per the leave-management feature design but have not been implemented yet:
 
-- `src/modules/employee/` — Employee model + repository
 - `src/modules/policy/` — LeavePolicy model + repository
 - `src/modules/balance/` — LeaveBalance model + repository + service
 - `src/modules/notification/` — Notification model + repository + service
@@ -116,7 +122,7 @@ src/
 │   ├── types/          # Enums (LeaveType, LeaveStatus, EmploymentStatus, AuditAction), BaseEntity
 │   └── db/             # PostgreSQL connection pool (pg Pool)
 ├── modules/
-│   ├── employee/       # Employee CRUD, status checks
+│   ├── employee/       # Employee CRUD, status checks ✅ built (Phase 2)
 │   ├── policy/         # LeavePolicy CRUD, active policy lookups
 │   ├── balance/        # LeaveBalance management, deduction/restoration
 │   ├── notification/   # Notification creation and retrieval
@@ -132,7 +138,7 @@ src/
 
 ### Recommended Build Phases
 
-1. **Shared types + Employee module** — foundation enums and employee vertical slice.
+1. **Shared types + Employee module** — foundation enums and employee vertical slice. ✅ Done
 2. **Policy module** — policy vertical slice.
 3. **Balance module** — balance vertical slice (depends on employee & policy).
 4. **Notification + Audit modules** — independent mid-layer slices.
