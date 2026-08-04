@@ -39,7 +39,8 @@ src/
 │   │   ├── index.ts               # Barrel: Employee, IEmployeeRepository, EmployeeRepository
 │   │   ├── employee.model.ts      # Employee entity (camelCase, standalone — does not extend BaseEntity)
 │   │   └── employee.repository.ts # IEmployeeRepository + EmployeeRepository (parameterised queries, soft-delete, snake→camel mapping)
-│   ├── leave/                     # LeaveRequest model + repository + validation (Phase 7 — partial)
+│   ├── leave/                     # LeaveRequest model + repository + validation + barrel (Phase 7)
+│   │   ├── index.ts               # Barrel: LeaveRequest, CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveRequestQueryParams, LeaveStatus (re-export), ILeaveRepository, LeaveRepository, createLeaveRequestSchema, updateLeaveRequestSchema
 │   │   ├── leave.model.ts         # LeaveRequest entity, CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveRequestQueryParams
 │   │   ├── leave.repository.ts    # ILeaveRepository + LeaveRepository (parameterised queries, snake→camel mapping, findByEmployee with dynamic filters, findByApprover via JOIN on employees.manager_id, create with DRAFT default status, updateStatus with dynamic SET, update with dynamic SET)
 │   │   └── leave.validation.ts    # Zod schemas: createLeaveRequestSchema (ISO date strings, startDate < endDate), updateLeaveRequestSchema (optional fields, cross-field date validation)
@@ -77,6 +78,9 @@ tests/
 │       │   └── balance.service.test.ts  # Jest tests for BalanceService (getBalance, getBalances, initializeBalance, deductDays with rollback, restoreDays)
 │       ├── employee/
 │       │   └── employee.repository.test.ts  # Jest tests for EmployeeRepository
+│       ├── leave/
+│       │   ├── leave.repository.test.ts     # Jest tests for LeaveRepository (findById, findByEmployee, findByApprover, create, updateStatus, update)
+│       │   └── leave.validation.test.ts     # Jest tests for createLeaveRequestSchema and updateLeaveRequestSchema
 │       ├── notification/
 │       │   └── notification.service.test.ts # Jest tests for NotificationService
 │       └── policy/
@@ -87,7 +91,7 @@ tests/
 
 The following modules are planned per the leave-management feature design but have not been implemented yet:
 
-- `src/modules/leave/` — service layer, controller, routes, barrel (`index.ts`), and tests
+- `src/modules/leave/` — service layer, controller, routes
 
 ## Key patterns
 
@@ -155,7 +159,7 @@ src/
 │   ├── notification/   # Notification creation and retrieval ✅ built (Phase 4)
 │   ├── audit/          # Audit trail recording and querying ✅ built (Phase 5)
 │   ├── balance/        # LeaveBalance management, deduction/restoration ✅ built (Phase 6)
-│   └── leave/          # LeaveRequest model + repository + validation ✅ built (Phase 7); service, controller, routes, barrel, tests still planned
+│   └── leave/          # LeaveRequest model + repository + validation + barrel ✅ built (Phase 7); service, controller, routes still planned
 ```
 
 **Dependency direction (acyclic):**
@@ -171,15 +175,9 @@ src/
 3. **Balance module** — balance vertical slice (depends on employee & policy). ✅ Done
 4. **Notification module** — notification vertical slice. ✅ Done
 5. **Audit module** — audit vertical slice. ✅ Done
-6. **Leave module — model, repository, validation** — LeaveRequest entity, ILeaveRepository + LeaveRepository (findById, findByEmployee with dynamic filters, findByApprover via JOIN, create with DRAFT default, updateStatus with dynamic SET, update with dynamic SET), Zod schemas (createLeaveRequestSchema, updateLeaveRequestSchema with cross-field date validation). ✅ Done (Phase 7)
+6. **Leave module — model, repository, validation, barrel, tests** — LeaveRequest entity, ILeaveRepository + LeaveRepository (findById, findByEmployee with dynamic filters, findByApprover via JOIN, create with DRAFT default, updateStatus with dynamic SET, update with dynamic SET), Zod schemas (createLeaveRequestSchema, updateLeaveRequestSchema with cross-field date validation), barrel export (`index.ts`), Jest unit tests for repository and validation. ✅ Done (Phase 7)
 7. **Leave module — service layer** — ILeaveService + LeaveService (submit, approve, reject, cancel, create, update, findById, findByEmployee with RBAC). Planned
 8. **Leave module — controller + routes** — Fastify route plugin, controller with auth stubs. Planned
-9. **Leave module — barrel + tests** — `index.ts` barrel export, Jest unit tests for repository and validation. Planned
-
-### Known divergences (Phase 7)
-
-- **No barrel (`index.ts`):** The leave module currently has no barrel export, unlike all other modules. Consumers must import directly from individual files.
-- **No tests:** The plan prescribed `tests/unit/modules/leave/leave.repository.test.ts` and `tests/unit/modules/leave/leave.validation.test.ts`; neither was created in this phase.
 
 ### Open Questions (Require Stakeholder Decision)
 
