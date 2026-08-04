@@ -1,0 +1,76 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "policy"
+    ],
+    "affectedLayers": [
+      "module-barrel"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The policy module barrel (src/modules/policy/index.ts) re-exports CreateLeavePolicyInput and UpdateLeavePolicyInput so both are importable from the barrel entry point 'src/modules/policy' (not from the internal policy.repository.ts).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A downstream module can import CreateLeavePolicyInput and UpdateLeavePolicyInput from 'src/modules/policy' (the barrel) and the project typechecks under tsc --noEmit with no missing-export errors.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "The existing barrel re-exports (LeavePolicy, IPolicyRepository, PolicyRepository) remain intact and importable from 'src/modules/policy' after the change \u2014 no existing export is removed or renamed.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Only src/modules/policy/index.ts may be modified. No other source file, test file, or config may be changed.",
+    "The re-exported DTOs must originate from ./policy.repository (the file that already defines and exports them); the barrel must not re-declare or duplicate the interface definitions.",
+    "Per AGENTS.md Architecture rule #1, downstream modules must import policy types only through the barrel (src/modules/policy/index.ts), never from internal files like policy.repository.ts. The barrel must therefore expose every public type used on the IPolicyRepository interface."
+  ],
+  "outOfScope": [
+    "Re-exporting CreateEmployeeInput/UpdateEmployeeInput from the employee barrel (src/modules/employee/index.ts) \u2014 the same latent gap exists there but is a separate module and not part of this phase.",
+    "Adding any new types, methods, or fields to the policy module \u2014 only the barrel re-export wiring changes.",
+    "Modifying downstream consumers (balance, leave modules) to consume the DTOs through the barrel \u2014 no downstream imports exist yet; this phase only closes the latent gap at the barrel."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "CreateLeavePolicyInput",
+      "mustExistOrExtend": true,
+      "invariant": "The interface shape defined in policy.repository.ts is the single source of truth; the barrel re-exports that exact definition without altering, narrowing, or widening it."
+    },
+    {
+      "entity": "UpdateLeavePolicyInput",
+      "mustExistOrExtend": true,
+      "invariant": "The interface shape defined in policy.repository.ts is the single source of truth; the barrel re-exports that exact definition without altering, narrowing, or widening it."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "Policy module barrel re-export surface \u2014 must expose CreateLeavePolicyInput and UpdateLeavePolicyInput alongside the already-exported LeavePolicy, IPolicyRepository, and PolicyRepository, all sourced from their defining internal files.",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "If a re-exported symbol does not exist in its source file, tsc --noEmit must fail with a missing-export error; the barrel must not silently swallow or alias away the absence."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The barrel re-export of CreateLeavePolicyInput and UpdateLeavePolicyInput must reference the exact exported interface names and source module (./policy.repository) that already define them \u2014 matching the existing pattern used for IPolicyRepository and PolicyRepository in the same barrel.",
+      "referencePath": "src/modules/policy/policy.repository.ts"
+    },
+    {
+      "requirement": "The barrel re-export style must remain consistent with the sibling employee barrel (src/modules/employee/index.ts), which re-exports the model and repository symbols from their internal files \u2014 no new export mechanism or convention is introduced.",
+      "referencePath": "src/modules/employee/index.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/policy/index.ts (policy module barrel)",
+      "why": "Downstream modules balance and leave depend on src/modules/policy/ per the reconciled architecture dependency map; the barrel is their only permitted import surface (AGENTS.md rule #1), so the DTOs used on IPolicyRepository.create/update must be reachable through it."
+    }
+  ]
+}
