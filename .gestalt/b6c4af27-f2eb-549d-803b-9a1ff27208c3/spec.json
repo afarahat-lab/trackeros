@@ -1,0 +1,219 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository",
+      "validation",
+      "tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The LeaveRequest entity and the three DTOs (CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveRequestQueryParams) are exported from the leave model with the canonical type shapes: status typed as LeaveStatus, approvedBy as string|null, approvedAt as Date|null, reason as string|undefined.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "createLeaveRequestSchema rejects input that is missing required fields, contains non-ISO date strings, or has startDate >= endDate; it accepts input with all required fields, valid ISO dates, and startDate < endDate.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "updateLeaveRequestSchema rejects non-ISO date strings and rejects startDate >= endDate when both dates are present; it accepts valid partial input (any subset of optional fields) and empty input.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Repository.create persists a row via INSERT with NOW(), NOW() timestamps and RETURNING *, and returns the mapped camelCase LeaveRequest entity (not the raw snake_case row).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Repository.findById returns the mapped LeaveRequest entity when a row matches and returns null when no row matches.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Repository.findByEmployee applies each supplied queryParams field (status, leaveTypeId, startDateFrom/To, endDateFrom/To, limit, offset) as a dynamic WHERE/limit clause using parameterised placeholders, and omits undefined fields.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Repository.findByApprover resolves the approver's queue by joining the employees table on manager_id (not by filtering approved_by), so pending/SUBMITTED requests whose approved_by is null are returned for the approver's direct reports; supplied queryParams are applied as additional conditions on the joined query.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Repository.updateStatus sets the status column, sets approved_by and approved_at when supplied, appends updated_at = NOW(), and returns the updated entity or null when no row matches.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Repository.update applies only the supplied mutable fields (startDate, endDate, reason) via a dynamic SET clause, appends updated_at = NOW(), and falls back to findById when no mutable fields are supplied.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The leave barrel (index.ts) re-exports the model types, the repository interface and class, and the validation schemas; it does not export service/controller/routes (those are later phases).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Unit tests cover found, not-found, empty-result, and database-error cases for every repository method, asserting exact SQL via toHaveBeenCalledWith / stringContaining; validation tests cover valid and each invalid-input case.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "No `any` type appears anywhere in the leave module source; repository query parameter arrays are typed as unknown[] with type guards/casts at the mapping boundary.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access in the leave module must go through the LeaveRepository class using the shared pool (GP-001); no inline SQL or direct pool usage outside the repository.",
+    "No `any` type is permitted; use `unknown` with type guards/casts at the row-mapping boundary (HARNESS no-any rule, severity high).",
+    "Modules import each other only through their declared index.ts barrel; the leave module imports shared types via ../../shared/types/index and the db pool via ../../shared/db/connection.",
+    "All SQL must use parameterised $N placeholders with incremental paramIndex; no string-interpolated user values in queries.",
+    "Test files must be named *.test.ts under tests/ and import via path aliases rooted at src (jest moduleDirectories: ['node_modules', 'src']); the pool must be mocked via jest.mock('shared/db/connection', () => ({ pool: { query: jest.fn() } })).",
+    "The LeaveRequest entity uses camelCase fields and does not extend BaseEntity (which is snake_case); the repository maps between snake_case DB rows and camelCase entities via a private Row type and mapRow function.",
+    "Zod schemas must be imported from the canonical 'zod' entry point (package.json lists zod@^4.4.3); this is the first validation file in the repo so no in-repo pattern exists to copy."
+  ],
+  "outOfScope": [
+    "LeaveService and its business rules (submit/approve/reject/cancel orchestration, balance deduction, overlap detection, minimum-notice enforcement, auto-approval) \u2014 Phase 8.",
+    "LeaveController and leave.routes.ts (HTTP translation, RBAC enforcement, request.user consumption) \u2014 Phase 9.",
+    "Audit record writing for leave state changes (GP-002) \u2014 the repository does not write audit records; that is the service layer's responsibility in Phase 8.",
+    "RBAC enforcement on repository methods \u2014 the repository is unauthenticated data access; authorization is enforced in the service/controller layers (Phases 8\u20139).",
+    "Validation schemas for approve/reject/cancel/query operations \u2014 Phase 7 only requires createLeaveRequestSchema and updateLeaveRequestSchema.",
+    "Custom error classes (InsufficientBalanceError, ApproverNotAuthorizedError, LeaveRequestNotFoundError, InvalidStateTransitionError) \u2014 Phase 8."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "A LeaveRequest's status is always one of the LeaveStatus enum values (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED); the repository never persists or returns an out-of-enum status string."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "A LeaveRequest's endDate is strictly greater than its startDate; the validation schemas enforce this and the repository persists the dates as supplied without reordering them."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "approvedBy and approvedAt are nullable and are null while the request is in DRAFT/SUBMITTED status; they are populated only when the request transitions to APPROVED or REJECTED via updateStatus."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "createdAt and updatedAt are set by the database (NOW()) on insert and updatedAt is refreshed on every update; the repository never accepts or persists caller-supplied timestamp values for these fields."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "ILeaveRepository.findById(id)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns null when no row matches; propagates database errors as rejected promises."
+    },
+    {
+      "operation": "ILeaveRepository.findByEmployee(employeeId, queryParams?)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an empty array when no rows match; propagates database errors as rejected promises."
+    },
+    {
+      "operation": "ILeaveRepository.findByApprover(approverId, queryParams?)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an empty array when the approver has no matching direct-report requests; propagates database errors as rejected promises."
+    },
+    {
+      "operation": "ILeaveRepository.create(dto)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the persisted entity; propagates constraint violations (e.g. duplicate key, FK violations) as rejected promises."
+    },
+    {
+      "operation": "ILeaveRepository.updateStatus(id, status, approvedBy?, approvedAt?)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the updated entity or null when no row matches; propagates database errors as rejected promises."
+    },
+    {
+      "operation": "ILeaveRepository.update(id, dto)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the updated entity, the existing entity when no mutable fields are supplied, or null when no row matches; propagates database errors as rejected promises."
+    },
+    {
+      "operation": "createLeaveRequestSchema.parse / safeParse",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Rejects missing required fields, non-ISO dates, and startDate >= endDate with a typed Zod error; accepts valid input and produces a typed output object."
+    },
+    {
+      "operation": "updateLeaveRequestSchema.parse / safeParse",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Rejects non-ISO dates and startDate >= endDate (when both present) with a typed Zod error; accepts valid partial or empty input."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The LeaveRepository must replicate the established repository pattern: co-located ILeaveRepository interface + LeaveRepository class + private snake_case Row type + mapRowToLeaveRequest function; parameterised $N placeholders with incremental paramIndex; dynamic SET/WHERE via conditions[]/params[] arrays; create() uses INSERT ... NOW(), NOW() RETURNING *; update() builds dynamic SET from mutableFields + appends updated_at = NOW() + falls back to findById.",
+      "referencePath": "src/modules/employee/employee.repository.ts"
+    },
+    {
+      "requirement": "The LeaveRequest.status field and the validation schemas must use the LeaveStatus enum (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED) imported from the canonical shared types; the repository must cast the snake_case status column back to LeaveStatus at the mapping boundary.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The findByApprover query must join the employees table on manager_id to resolve the approver's direct reports, consistent with the Employee entity's managerId field being the approval-routing key (approved_by is null for pending requests and cannot be used to find a manager's queue).",
+      "referencePath": "src/modules/employee/employee.model.ts"
+    },
+    {
+      "requirement": "The leave barrel (index.ts) must follow the sibling barrel convention: re-export model types, repository interface + class, and validation schemas; downstream modules are consumed only through barrels in later phases.",
+      "referencePath": "src/modules/employee/index.ts"
+    },
+    {
+      "requirement": "The leave repository and validation tests must follow the established test conventions: jest.mock('shared/db/connection', () => ({ pool: { query: jest.fn() } })), makeRow()/makeEntity() factory helpers with overrides, beforeEach mock reset, exact-SQL assertions via toHaveBeenCalledWith and stringContaining, and found/not-found/empty/error coverage per method.",
+      "referencePath": "tests/unit/modules/employee/employee.repository.test.ts"
+    },
+    {
+      "requirement": "The leave_requests table column set (id, employee_id, leave_type_id, start_date, end_date, reason, status, approved_by, approved_at, created_at, updated_at) in the reconciled schema must be the exact set the repository reads and writes; no extra columns and no omitted columns.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts",
+      "why": "LeaveRequest.status is typed as LeaveStatus; the model imports LeaveStatus from the canonical shared types."
+    },
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "LeaveRepository is the sole pool consumer in the leave module (GP-001); it imports the shared pool for all queries."
+    },
+    {
+      "target": "src/modules/employee/employee.model.ts",
+      "why": "findByApprover joins the employees table on manager_id to resolve the approver's direct reports; the Employee entity's managerId field is the approval-routing key."
+    },
+    {
+      "target": "src/modules/policy/policy.model.ts",
+      "why": "LeaveRequest.leaveTypeId references a LeavePolicy; the model/DTO type for leaveTypeId is consistent with the policy id type (string). Phase 7 only declares the type relationship; the service resolves it in Phase 8."
+    },
+    {
+      "target": "src/modules/audit/audit.service.ts",
+      "why": "Declared as a Phase 7 dependency for context; the repository does not call it (audit writing is the service layer's job in Phase 8), but the leave module's later service will consume IAuditService."
+    },
+    {
+      "target": "src/modules/balance/balance.service.ts",
+      "why": "Declared as a Phase 7 dependency for context; the repository does not call it (balance deduction/restoration is the service layer's job in Phase 8), but the leave module's later service will consume IBalanceService."
+    }
+  ]
+}
