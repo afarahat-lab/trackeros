@@ -1,0 +1,57 @@
+{
+  "scope": {
+    "affectedDomains": [],
+    "affectedLayers": [],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The Employee entity type is exported from the employee module and declares exactly the canonical fields with their canonical types from the reconciled architecture: id (string), employeeNumber (string), firstName (string), lastName (string), email (string), managerId (string|null), department (string|null), hireDate (Date), terminationDate (Date|null), employmentStatus ('ACTIVE'|'INACTIVE'|'TERMINATED'), createdAt (Date), updatedAt (Date), deletedAt (Date|null). employmentStatus is a string-literal union, not a runtime enum.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The IEmployeeRepository interface declares all eight operations from the phase scope: findById(id), findByEmployeeNumber(employeeNumber), findByManagerId(managerId), findByDepartment(department), findActive(), save(employee), update(id, partial), softDelete(id). A concrete PgEmployeeRepository class implements IEmployeeRepository and is exported from the module's public entry point.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository persists and retrieves Employee rows against the employees table, mapping snake_case DB columns (employee_number, first_name, last_name, manager_id, hire_date, termination_date, employment_status, created_at, updated_at, deleted_at) to/from the camelCase domain model fields. A row round-tripped through save then findById returns an Employee whose domain fields equal the input.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "All read operations (findById, findByEmployeeNumber, findByManagerId, findByDepartment, findActive) exclude soft-deleted rows \u2014 rows where deleted_at IS NOT NULL are never returned. softDelete(id) sets deleted_at (and does not physically delete the row), after which findById(id) returns null/undefined for that id.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "findActive() returns only employees whose employmentStatus is 'ACTIVE' (and are not soft-deleted). findByEmployeeNumber returns the unique employee matching that employee number (or null when none), respecting the unique index on employee_number.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "save(employee) inserts a new employee row and returns the persisted Employee; update(id, partial) applies only the supplied fields and returns the updated Employee (updatedAt is refreshed). softDelete(id) is idempotent \u2014 calling it on an already-deleted id does not error.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "Jest unit tests exist under tests/unit/modules/employee/ covering both the Employee model (field/type shape) and every IEmployeeRepository method (with the pg Pool mocked), and the full test suite passes via the project's configured test command.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The employee module's public entry point (index.ts) re-exports the Employee type, the IEmployeeRepository interface, and the PgEmployeeRepository class, so downstream phases (LeaveBalance, LeaveRequest, Employee service) can import them through the module boundary only.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [],
+  "outOfScope": [],
+  "ambiguities": [],
+  "entityInvariants": [],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [],
+  "integrationPoints": []
+}
