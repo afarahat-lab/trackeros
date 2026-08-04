@@ -1,26 +1,42 @@
-# Implement this phase: Phase 7: Leave module — model, repository, and validation
+# Implement this phase: Phase 8a: Leave Service — Foundation, Errors & CRUD
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/4fbbfee4-4feb-4a2b-8127-85025f82af24/7`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/4fbbfee4-4feb-4a2b-8127-85025f82af24/8`. Do not clone anything; work only in this directory.
 
 ## What to build
-(no phase architecture provided — infer from the success criteria below)
+File src/modules/leave/leave.service.ts exists and compiles without errors
+All 4 custom error classes are exported and have correct properties
+ILeaveService interface is exported with all 8 method signatures
+LeaveService class is exported with constructor injection of all 5 dependencies
+create() validates with Zod, enforces employee-self-only, persists DRAFT, writes audit CREATE
+update() validates DRAFT-only, employee-ownership, applies partial updates, writes audit UPDATE
+findById() enforces RBAC (employee/manager/hr_admin) and throws on unauthorized access
+findByEmployee() enforces same RBAC and delegates filtering to repository
+submit/approve/reject/cancel are stubbed to throw 'Not implemented'
 
 ## Success criteria
-Create the leave module foundation at `src/modules/leave/`. This phase depends on `src/shared/types/index.ts` from Phase 1, `src/modules/employee/employee.model.ts` from Phase 2, `src/modules/policy/policy.model.ts` from Phase 3, `src/modules/audit/audit.service.ts` from Phase 5, and `src/modules/balance/balance.service.ts` from Phase 6 — read all five before generating any code.
+Create `src/modules/leave/leave.service.ts`. This sub-phase depends on all prior phases — read `src/modules/leave/leave.model.ts`, `src/modules/leave/leave.repository.ts`, `src/modules/leave/leave.validation.ts` from Phase 7, `src/modules/balance/balance.service.ts` from Phase 6, `src/modules/audit/audit.service.ts` from Phase 5, `src/modules/notification/notification.service.ts` from Phase 4, `src/modules/policy/policy.model.ts` from Phase 3, `src/modules/employee/employee.model.ts` from Phase 2, and `src/shared/types/index.ts` + `src/shared/utils/business-days.ts` from Phase 1 — before generating any code.
 
-Create `src/modules/leave/leave.model.ts` with:
-- LeaveRequest entity using canonical fields: id, employeeId, leaveTypeId, startDate, endDate, reason (string|undefined), status (LeaveStatus), approvedBy (string|null), approvedAt (Date|null), createdAt, updatedAt.
-- CreateLeaveRequestDto: employeeId, leaveTypeId, startDate, endDate, reason?.
-- UpdateLeaveRequestDto: startDate?, endDate?, reason?.
-- LeaveRequestQueryParams: status?, leaveTypeId?, startDateFrom?, startDateTo?, endDateFrom?, endDateTo?, limit?, offset?.
+Implement in this sub-phase:
 
-Create `src/modules/leave/leave.validation.ts` with Zod schemas for createLeaveRequestSchema and updateLeaveRequestSchema — validate startDate < endDate, dates are valid ISO strings, required fields present.
+1. **Custom error classes** — define and export:
+   - `InsufficientBalanceError` (extends Error, includes remainingBalance and requestedDays properties)
+   - `ApproverNotAuthorizedError` (extends Error, includes approverId and requiredRole)
+   - `LeaveRequestNotFoundError` (extends Error, includes leaveRequestId)
+   - `InvalidStateTransitionError` (extends Error, includes currentStatus and targetStatus)
 
-Create `src/modules/leave/leave.repository.ts` with ILeaveRepository interface and LeaveRepository class using `src/shared/db/connection.ts`. Methods: findById(id), findByEmployee(employeeId, queryParams?), findByApprover(approverId, queryParams?), create(dto), updateStatus(id, status, approvedBy?, approvedAt?), update(id, dto).
+2. **ILeaveService interface** — declare all method signatures: `create`, `update`, `submit`, `approve`, `reject`, `cancel`, `findById`, `findByEmployee`. (Method bodies for submit/approve/reject/cancel will be implemented in Phase 8b; stub them to throw `new Error('Not implemented')` for now.)
 
-Create `src/modules/leave/index.ts` barrel.
+3. **LeaveService class** — constructor injects: `LeaveRepository`, `BalanceService`, `AuditService`, `NotificationService`, `LeavePolicyRepository` (or model), `EmployeeRepository` (or model). Store as private readonly fields.
 
-Include Jest unit tests in `tests/unit/modules/leave/leave.repository.test.ts` and `tests/unit/modules/leave/leave.validation.test.ts`.
+4. **`create(dto: CreateLeaveRequestDto, actor: AuthenticatedUser): Promise<LeaveRequest>`** — validate dto via Zod schema from leave.validation.ts. Employee can only create for themselves (actor.employeeId must match dto.employeeId). Generate a unique ID. Create the LeaveRequest with status DRAFT. Persist via repository. Write audit record (action: CREATE, entity: 'leave_request', entityId). Return the created request.
+
+5. **`update(leaveRequestId: string, dto: UpdateLeaveRequestDto, actor: AuthenticatedUser): Promise<LeaveRequest>`** — fetch the request, throw LeaveRequestNotFoundError if missing. Only DRAFT status allowed (else throw InvalidStateTransitionError). Only the owning employee can update (actor.employeeId === request.employeeId). Validate dto via Zod partial schema. Apply allowed field updates (startDate, endDate, leaveTypeId, reason). Persist via repository. Write audit record (action: UPDATE). Return updated request.
+
+6. **`findById(id: string, actor: AuthenticatedUser): Promise<LeaveRequest>`** — fetch request, throw LeaveRequestNotFoundError if missing. RBAC: employee sees own only; manager sees own + direct reports (look up employee by request.employeeId, check managerId === actor.employeeId); hr_admin sees all. Throw ApproverNotAuthorizedError if unauthorized.
+
+7. **`findByEmployee(employeeId: string, queryParams: LeaveRequestQueryParams, actor: AuthenticatedUser): Promise<LeaveRequest[]>`** — same RBAC rules as findById. Delegate to repository with filters from queryParams (status, dateRange, leaveTypeId, pagination).
+
+Stub methods for submit, approve, reject, cancel — each throws `new Error('Not implemented — see Phase 8b')`. These stubs ensure the file compiles and the interface is satisfied.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -42,19 +58,22 @@ These are resolved, feature-wide decisions. Wherever this phase touches the conc
 
 8. Test files use the project's Jest convention — `*.test.ts` under `tests/` (matching the configured testMatch), NOT `.spec.ts`. Do not change the Jest config. [BINDING RULE — operator decision resolving: How is the fiscal year defined for leave balances — calendar year (Jan 1 – Dec 31), a configurable start month, or company-specific fiscal calendar?; How is totalEntitlement determined for an employee hired mid-year — full annual entitlement or pro-rated?; Who is authorised to cancel a LeaveRequest? Can a manager or HR admin cancel an approved leave on behalf of the employee?; Does emergency leave have special domain behaviour (e.g. bypassing minimum notice, auto-approval) or does it follow the same rules as other leave types governed by their LeavePolicy?; How should partial-day leave deductions be rounded?; How are leave days counted — calendar days or business/working days?; What is the fiscal-year boundary for leave balances?; How are leave requests spanning two fiscal years handled for balance deduction?; What are the valid values for LeaveBalance.status?; apply everywhere these apply, not in one place only]
 
-## Constraints & consistency
-You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
-### Entity invariants — enforce these
-- Reuse or extend `LeaveRequest`: A newly created LeaveRequest always starts in the DRAFT status — the repository create operation hard-codes the initial status to LeaveStatus.DRAFT and does not accept a status from the caller.
-- Reuse or extend `LeaveRequest`: The `reason` field is nullable at the persistence boundary (stored as null when absent) but surfaced as `string | undefined` on the entity — a null database row maps to undefined, never to an empty string or null on the camelCase object.
-- Reuse or extend `LeaveRequest`: The `approvedBy` and `approvedAt` fields are null until an approval decision is recorded; `updateStatus` only sets them when explicitly supplied, so a status change to a non-approval state (e.g. CANCELLED) must not populate them.
-- Reuse or extend `LeaveRequest`: The `leaveTypeId` is a string foreign key referencing `leave_policies.id` (not the LeaveType enum) — the repository treats it as an opaque string FK and does not validate it against the LeaveType enum values.
-### Interface contract — expose these operations (their shape is yours)
-- ILeaveRepository.findById(id) — Returns null when no row matches the id; propagates database errors as rejected promises (does not swallow or wrap them).
-- ILeaveRepository.findByEmployee(employeeId, queryParams?) — Returns an empty array when no rows match (never null); propagates database errors as rejected promises.
-- ILeaveRepository.findByApprover(approverId, queryParams?) — Returns an empty array when no rows match (never null); propagates database errors as rejected promises.
-- ILeaveRepository.create(dto) — Returns the persisted entity on success; propagates database errors (e.g. foreign-key violation, unique constraint) as rejected promises — does not return null or a sentinel.
-- ILeaveRepository.updateStatus(id, status, approvedBy?, approvedAt?) — Returns null when no row matches the id (idempotent read-after-miss); propagates database errors as rejected promises.
+## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
+The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
+- `Employee` — the entity MUST have exactly these fields:
+    - id: string
+    - employeeNumber: string
+    - firstName: string
+    - lastName: string
+    - email: string
+    - managerId: string | null
+    - department: string | null
+    - hireDate: Date
+    - terminationDate: Date | null
+    - employmentStatus: EmploymentStatus
+    - createdAt: Date
+    - updatedAt: Date
+    - deletedAt: Date | null
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
