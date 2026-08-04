@@ -227,6 +227,7 @@ agents:
     - Each architectural layer communicates only with its immediately adjacent layer. Layers must not bypass intermediate layers.
     - Dependencies flow in one direction only — from outer layers toward inner layers. Inner layers must not depend on outer layers.
     - Error handling must be explicit. Callers must not be exposed to unhandled failures from dependencies.
+    - Do not redefine a symbol another module already owns. Before declaring an error class, DTO, interface, enum, or constant, check whether a symbol representing the SAME concept is already exported by another module; if so, import it from that module's public entry point instead of declaring a second copy. The test is conceptual identity, NOT name identity — a symbol that shares a name but represents a genuinely DIFFERENT concept (different fields or meaning, owned by THIS module) is a legitimately distinct declaration and is not a violation; only flag a declaration that duplicates the shape and meaning of an existing exported symbol.
     verificationGuidance:
     - Before evaluating any finding, read ARCHITECTURE.md to understand this project's specific layer names, boundaries, and directory structure. Use this to determine what constitutes the data access layer, business logic layer, and routing layer for this project.
     - A finding is only valid if it violates a rule given the actual structure of this project as described in ARCHITECTURE.md.
