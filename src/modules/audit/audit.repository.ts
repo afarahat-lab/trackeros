@@ -75,14 +75,14 @@ export class AuditRepository implements IAuditRepository {
 
   async findByEntity(entityType: string, entityId: string): Promise<AuditRecord[]> {
     const result = await pool.query(
-      'SELECT * FROM audit_logs WHERE entity_type = $1 AND entity_id = $2 ORDER BY performed_at DESC',
+      'SELECT * FROM audit_logs WHERE entity_type = $1 AND entity_id = $2 ORDER BY performed_at ASC',
       [entityType, entityId],
     );
     return result.rows.map((row: AuditRow) => mapRowToAuditRecord(row));
   }
 
   async findByPerformer(performedBy: string, limit?: number, offset?: number): Promise<AuditRecord[]> {
-    let query = 'SELECT * FROM audit_logs WHERE performed_by = $1 ORDER BY performed_at DESC';
+    let query = 'SELECT * FROM audit_logs WHERE performed_by = $1 ORDER BY performed_at ASC';
     const params: (string | number)[] = [performedBy];
 
     if (limit !== undefined) {
