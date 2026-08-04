@@ -1,0 +1,109 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave",
+      "balance"
+    ],
+    "affectedLayers": [
+      "service",
+      "module-barrel"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The leave service no longer defines its own InsufficientBalanceError class; it imports the canonical one from the balance module barrel, so there is exactly one definition of that error across the codebase.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The leave barrel (leave/index.ts) re-exports InsufficientBalanceError from the balance module barrel rather than from the leave service file, so consumers importing it from the leave barrel receive the balance module's canonical class.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All five cross-module imports in leave.service.ts (IBalanceService, IAuditService, INotificationService, IPolicyRepository, IEmployeeRepository) resolve through their respective module barrel files (../balance, ../audit, ../notification, ../policy, ../employee) with no remaining imports of internal file paths from other modules.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The create() authorization guard restricts only actors with role 'employee' to self-creation (actor.id === dto.employeeId); actors with role 'manager' or 'hr_admin' can create a leave request for any employeeId without being blocked.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The project compiles cleanly (tsc --noEmit / npm run build) and the existing Jest test suite passes after the changes, with no new test files required for this phase.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Modules must import from each other ONLY through their declared public entry point (index.ts barrel) \u2014 AGENTS.md Architecture rule #1 and docs/ARCHITECTURE.md Dependency rules. No cross-module imports of internal file paths (e.g. ../balance/balance.service) may remain in leave.service.ts.",
+    "The balance module owns the canonical InsufficientBalanceError definition (constructor signature: balanceId, requested, remaining). The leave module must not redefine it; it must import and re-export the balance module's version.",
+    "The other three leave-specific error classes (ApproverNotAuthorizedError, LeaveRequestNotFoundError, InvalidStateTransitionError) remain defined locally in leave.service.ts and continue to be exported from the leave barrel \u2014 they are not moved or removed.",
+    "RBAC enforcement follows the established role model: AuthenticatedUser.role \u2208 'employee' | 'manager' | 'hr_admin'. The create() guard must align with the existing enforceRbac pattern \u2014 employees act only on their own data; managers and hr_admins have broader access.",
+    "Strict TypeScript must remain satisfied (no implicit any, strict null checks). The change to import InsufficientBalanceError from the balance barrel must not introduce type errors from the divergent constructor signature, since the leave version is never instantiated."
+  ],
+  "outOfScope": [
+    "Implementing the stub methods submit, approve, reject, cancel \u2014 these remain stubs throwing 'Not implemented \u2014 see Phase 8b' and are not part of this fix phase.",
+    "Creating leave service unit tests (tests/unit/modules/leave/leave.service.test.ts) \u2014 no leave service tests currently exist and this phase does not add them; the fix is verified by compilation and the existing test suite passing.",
+    "Building the leave controller or routes (Phase 9) \u2014 out of scope; this phase only fixes the service and barrel.",
+    "Changing the update() ownership check or the enforceRbac helper \u2014 only the create() authorization guard is modified; update() remains owner-only and enforceRbac logic is unchanged."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "InsufficientBalanceError",
+      "mustExistOrExtend": true,
+      "invariant": "There is exactly one canonical definition of InsufficientBalanceError in the codebase, owned by the balance module. The leave module consumes and re-exports it but never defines its own. The error's constructor contract (balanceId, requested, remaining) is the balance module's, not a divergent leave-local signature."
+    },
+    {
+      "entity": "LeaveService",
+      "mustExistOrExtend": true,
+      "invariant": "LeaveService depends on its five downstream modules (balance, audit, notification, policy, employee) exclusively through their barrel entry points; it never reaches into their internal files. Its public interface (ILeaveService) and constructor injection contract remain unchanged \u2014 only import sources and the create() authorization logic change."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "LeaveService.create(dto, actor)",
+      "authRule": "Only actors with role 'employee' are restricted to self-creation (actor.id must equal dto.employeeId). Actors with role 'manager' or 'hr_admin' may create a leave request for any employeeId. A role-mismatched employee attempting to create for another employee is rejected with an error.",
+      "idempotent": false,
+      "errorSemantics": "An employee actor whose id differs from dto.employeeId is rejected (throws an Error indicating self-creation restriction). Invalid input is rejected via Zod validation before the authorization check."
+    },
+    {
+      "operation": "leave/index.ts barrel re-export of InsufficientBalanceError",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "The barrel must re-export InsufficientBalanceError sourced from the balance module barrel (../balance), not from the leave service file. Consumers importing InsufficientBalanceError from the leave barrel receive the balance module's canonical class with its canonical constructor signature."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The InsufficientBalanceError imported and re-exported by the leave module must be the exact same class defined in the balance module \u2014 same constructor signature (balanceId, requested, remaining), same name property, same message format. The leave module must not introduce a second, divergent definition.",
+      "referencePath": "src/modules/balance/balance.service.ts"
+    },
+    {
+      "requirement": "The five cross-module symbols imported by leave.service.ts (IBalanceService, IAuditService, INotificationService, IPolicyRepository, IEmployeeRepository) must be sourced from their respective module barrels, matching the symbols those barrels already export. The barrel export lists confirm all five are available: balance/index.ts exports IBalanceService; audit/index.ts exports IAuditService; notification/index.ts exports INotificationService; policy/index.ts exports IPolicyRepository; employee/index.ts exports IEmployeeRepository.",
+      "referencePath": "src/modules/balance/index.ts"
+    },
+    {
+      "requirement": "The create() authorization fix must align with the existing enforceRbac role-dispatch pattern in the same file: hr_admin has unrestricted access, employee is restricted to own data, manager has broader access. The fix restricts only the 'employee' role to self-creation, consistent with business rule #6 (employee acts only on own requests; managers/HR admins on those they oversee).",
+      "referencePath": "src/modules/leave/leave.service.ts"
+    },
+    {
+      "requirement": "The leave barrel's re-export of InsufficientBalanceError must trace to the balance barrel (../balance), which itself re-exports from balance.service.ts. The re-export chain must not introduce a circular dependency \u2014 leave depends on balance (acyclic per the reconciled dependency map), and balance does not depend on leave.",
+      "referencePath": "src/modules/leave/index.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "balance module barrel (../balance)",
+      "why": "Leave service imports IBalanceService and InsufficientBalanceError from the balance barrel instead of internal file paths; the leave barrel re-exports InsufficientBalanceError from the balance barrel. This is the primary cross-module dependency being corrected."
+    },
+    {
+      "target": "audit, notification, policy, employee module barrels (../audit, ../notification, ../policy, ../employee)",
+      "why": "Leave service imports IAuditService, INotificationService, IPolicyRepository, IEmployeeRepository from these four barrels instead of their internal file paths, satisfying the barrel-only import rule."
+    }
+  ]
+}

@@ -1,0 +1,175 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "service"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The LeaveService class implements the ILeaveService interface with all 8 methods declared: create, update, submit, approve, reject, cancel, findById, findByEmployee \u2014 the file compiles under strict TypeScript with no implicit any.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "create() validates the DTO via the Zod createLeaveRequestSchema, rejects invalid input (e.g. startDate >= endDate) with a thrown error, enforces that an employee actor can only create for themselves (actor.id === dto.employeeId), persists a LeaveRequest with status DRAFT via the repository, writes an audit record with action CREATE and entity 'leave_request', and returns the persisted request.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "update() fetches the request and throws LeaveRequestNotFoundError when it does not exist; throws InvalidStateTransitionError when the request status is not DRAFT; throws an error when actor.id does not match request.employeeId (only the owning employee can update); validates the DTO via the Zod updateLeaveRequestSchema; persists allowed field updates via the repository; writes an audit record with action UPDATE including old and new values; and returns the updated request.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findById() fetches the request and throws LeaveRequestNotFoundError when missing; enforces RBAC so that hr_admin sees all, employee sees only own (actor.id === request.employeeId), and manager sees own plus direct reports (employee.managerId === actor.id); throws ApproverNotAuthorizedError when unauthorized.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findByEmployee() applies the same RBAC rules as findById (hr_admin-all, employee-own, manager-own+direct-reports) before delegating to the repository with the provided queryParams filters (status, dateRange, leaveTypeId, pagination), returning the filtered LeaveRequest array.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "submit, approve, reject, and cancel are stubbed \u2014 each throws new Error('Not implemented \u2014 see Phase 8b') \u2014 so the file compiles and the ILeaveService interface is fully satisfied without implementing the Phase 8b business logic.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All four custom error classes are exported and available from the leave module barrel: InsufficientBalanceError (re-exported from balance), ApproverNotAuthorizedError (with approverId and requiredRole properties), LeaveRequestNotFoundError (with leaveRequestId property), and InvalidStateTransitionError (with currentStatus and targetStatus properties). Each extends Error and sets its name property.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The LeaveService constructor injects exactly 6 dependencies as private readonly fields: LeaveRepository (ILeaveRepository), BalanceService (IBalanceService), AuditService (IAuditService), NotificationService (INotificationService), PolicyRepository (IPolicyRepository), and EmployeeRepository (IEmployeeRepository) \u2014 all imported through their respective module barrels, never from internal files.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All module-to-module imports must go through the declared public entry point (index.ts barrel) \u2014 the leave service imports balance, audit, notification, policy, and employee only through their respective index.ts files, never from internal module files.",
+    "No database access outside the repository pattern (GP-001) \u2014 the LeaveService must not issue SQL or access the pool directly; all persistence goes through ILeaveRepository and the injected downstream service/repository interfaces.",
+    "Every state-changing operation (create, update) must write an audit record (GP-002) with the correct AuditAction enum value, entity type 'leave_request', the entity ID, and the actor's identifier as performedBy.",
+    "RBAC must be enforced on every service method that reads or mutates a LeaveRequest (GP-005) \u2014 employee acts only on own requests, manager on own + direct reports (verified via Employee.managerId), hr_admin on all; unauthorized access throws ApproverNotAuthorizedError.",
+    "All inputs must be validated before processing (GP-003) \u2014 create and update validate the DTO via the Zod schemas from leave.validation.ts before any persistence or audit action occurs.",
+    "Strict TypeScript with no implicit any and strict null checks \u2014 the file must pass tsc --noEmit with zero errors; the no-any rule from HARNESS.json constraints requires using unknown with type guards instead of any.",
+    "The actor's identity for ownership and RBAC checks is actor.id (the AuthenticatedUser.id field) \u2014 there is no separate employeeId field on AuthenticatedUser; task references to actor.employeeId map to actor.id.",
+    "InsufficientBalanceError is re-exported from the balance module (../balance) rather than newly defined in leave.service.ts \u2014 the balance module's error class (with balanceId, requested, remaining properties) is the single source of truth already used by BalanceService.deductDays."
+  ],
+  "outOfScope": [
+    "Full implementation of submit (balance deduction, policy lookup, minimum-notice enforcement, notification to manager/HR) \u2014 deferred to Phase 8b.",
+    "Full implementation of approve (authorisation via managerId, balance check, status transition to APPROVED, notification to employee) \u2014 deferred to Phase 8b.",
+    "Full implementation of reject (authorisation, balance restoration via restoreDays, status transition to REJECTED, notification to employee) \u2014 deferred to Phase 8b.",
+    "Full implementation of cancel (state-dependent balance restoration, cancellation authorisation rules, status transition to CANCELLED) \u2014 deferred to Phase 8b.",
+    "Controller and routes layer (leave.controller.ts, leave.routes.ts, Fastify plugin registration) \u2014 deferred to Phase 9.",
+    "Jest unit tests for the leave service (tests/unit/modules/leave/leave.service.test.ts) \u2014 not yet created; the architecture notes this file as planned but not built in this phase."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "A LeaveRequest created via the service always starts in DRAFT status \u2014 the repository.create call defaults status to LeaveStatus.DRAFT; the service never creates a request in any other initial status."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "A LeaveRequest can only be updated (via the update method) when its current status is DRAFT \u2014 any other status triggers InvalidStateTransitionError; this enforces the lifecycle rule that edits are only allowed before submission."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "A LeaveRequest's owning employee (employeeId) is the only actor permitted to update it \u2014 the service enforces actor.id === request.employeeId; no role-based override exists for the update operation in this phase."
+    },
+    {
+      "entity": "AuthenticatedUser",
+      "mustExistOrExtend": true,
+      "invariant": "AuthenticatedUser is exactly { id: string; role: 'employee' | 'manager' | 'hr_admin' } \u2014 the service uses actor.id as the employee identifier for all ownership and manager-comparison checks; no employeeId field is added to this type."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "LeaveService.create(dto: CreateLeaveRequestDto, actor: AuthenticatedUser): Promise<LeaveRequest>",
+      "authRule": "Employee actor must have actor.id === dto.employeeId (can only create for themselves); managers and hr_admins can create for any employee.",
+      "idempotent": false,
+      "errorSemantics": "Throws Error on Zod validation failure; throws Error when employee actor attempts to create for another employee; persists via repository.create and writes audit record with AuditAction.CREATE."
+    },
+    {
+      "operation": "LeaveService.update(leaveRequestId: string, dto: UpdateLeaveRequestDto, actor: AuthenticatedUser): Promise<LeaveRequest>",
+      "authRule": "Only the owning employee (actor.id === request.employeeId) can update; no role override.",
+      "idempotent": false,
+      "errorSemantics": "Throws LeaveRequestNotFoundError when the request does not exist; throws InvalidStateTransitionError when status is not DRAFT; throws Error on Zod validation failure or ownership violation; writes audit record with AuditAction.UPDATE including old and new values."
+    },
+    {
+      "operation": "LeaveService.findById(id: string, actor: AuthenticatedUser): Promise<LeaveRequest>",
+      "authRule": "hr_admin sees all; employee sees only own (actor.id === request.employeeId); manager sees own + direct reports (employee.managerId === actor.id).",
+      "idempotent": true,
+      "errorSemantics": "Throws LeaveRequestNotFoundError when the request does not exist; throws ApproverNotAuthorizedError when the actor lacks authorization for the target employee's data."
+    },
+    {
+      "operation": "LeaveService.findByEmployee(employeeId: string, queryParams: LeaveRequestQueryParams, actor: AuthenticatedUser): Promise<LeaveRequest[]>",
+      "authRule": "Same RBAC as findById: hr_admin sees all; employee sees only own; manager sees own + direct reports (verified via employeeRepository.findById then checking managerId === actor.id).",
+      "idempotent": true,
+      "errorSemantics": "Throws ApproverNotAuthorizedError when the actor lacks authorization for the target employee; throws LeaveRequestNotFoundError when the target employee cannot be found during manager RBAC check; returns empty array when authorized but no matching requests exist."
+    },
+    {
+      "operation": "LeaveService.submit / approve / reject / cancel (stub methods)",
+      "authRule": "Not enforced in this phase \u2014 stubs throw immediately before any authorization logic.",
+      "idempotent": false,
+      "errorSemantics": "Each stub throws new Error('Not implemented \u2014 see Phase 8b') unconditionally; no persistence, audit, or notification side effects occur."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The create and update methods must validate input using the exact Zod schemas exported from leave.validation.ts (createLeaveRequestSchema and updateLeaveRequestSchema) \u2014 the service converts Date fields to ISO strings before parsing to match the schema's isoDateString refinement; validation must occur before any persistence or audit write.",
+      "referencePath": "src/modules/leave/leave.validation.ts"
+    },
+    {
+      "requirement": "The service must delegate all persistence to ILeaveRepository methods (findById, findByEmployee, create, update) \u2014 the repository's create defaults status to DRAFT and its update applies only the mutable fields (startDate, endDate, reason); the service must not bypass the repository or assume a different return shape (LeaveRequest | null for findById/update).",
+      "referencePath": "src/modules/leave/leave.repository.ts"
+    },
+    {
+      "requirement": "InsufficientBalanceError must be the same class exported from the balance module (../balance) \u2014 its constructor signature is (balanceId: string, requested: number, remaining: number); the leave service re-exports this class rather than defining a duplicate, ensuring BalanceService.deductDays and the leave module throw the identical error type.",
+      "referencePath": "src/modules/balance/balance.service.ts"
+    },
+    {
+      "requirement": "Audit records must be written via IAuditService.record(action, entityType, entityId, performedBy, oldValues?, newValues?) \u2014 the service calls this with AuditAction enum values (CREATE, UPDATE), entity type 'leave_request', the request ID as entityId, and actor.id as performedBy; oldValues and newValues are passed as Record<string, unknown> objects serialising Date fields to ISO strings.",
+      "referencePath": "src/modules/audit/audit.service.ts"
+    },
+    {
+      "requirement": "The service must use the canonical AuthenticatedUser type ({ id: string; role: 'employee' | 'manager' | 'hr_admin' }) and LeaveStatus enum (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED) from shared/types \u2014 actor.id is the employee identifier for all ownership checks; LeaveStatus.DRAFT is the only status that permits updates.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The leave module barrel must export all symbols consumed by downstream phases: ILeaveService, LeaveService, ApproverNotAuthorizedError, LeaveRequestNotFoundError, InvalidStateTransitionError from leave.service.ts, and InsufficientBalanceError re-exported from ../balance \u2014 the barrel must remain consistent with the service file's exports so Phase 8b and Phase 9 can import through the public entry point.",
+      "referencePath": "src/modules/leave/index.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/balance (IBalanceService, InsufficientBalanceError)",
+      "why": "The leave service imports IBalanceService for constructor injection (used in Phase 8b for deductDays/restoreDays) and re-exports InsufficientBalanceError as the shared error type for insufficient balance failures."
+    },
+    {
+      "target": "src/modules/audit (IAuditService)",
+      "why": "The leave service calls auditService.record() after every state-changing operation (create, update) to satisfy GP-002; the audit service generates the record ID and sets performedAt."
+    },
+    {
+      "target": "src/modules/notification (INotificationService)",
+      "why": "The leave service injects INotificationService for constructor injection \u2014 used in Phase 8b to notify managers/employees on submit/approve/reject/cancel; not called in Phase 8a but must be wired for the stub methods to become functional in 8b."
+    },
+    {
+      "target": "src/modules/policy (IPolicyRepository)",
+      "why": "The leave service injects IPolicyRepository for constructor injection \u2014 used in Phase 8b to look up LeavePolicy by leaveTypeId for entitlement, minimumNoticeDays, and requiresManagerApproval checks; not called in Phase 8a but must be wired for 8b."
+    },
+    {
+      "target": "src/modules/employee (IEmployeeRepository)",
+      "why": "The leave service uses employeeRepository.findById() in the enforceRbac helper to verify manager-direct-report relationships (employee.managerId === actor.id) for findById and findByEmployee RBAC enforcement; also needed in Phase 8b for approver authorisation checks."
+    }
+  ]
+}
