@@ -1,26 +1,16 @@
 import { LeaveRequest, CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveRequestQueryParams } from './leave.model';
 import { ILeaveRepository } from './leave.repository';
 import { createLeaveRequestSchema, updateLeaveRequestSchema } from './leave.validation';
-import { IBalanceService } from '../balance/balance.service';
-import { IAuditService } from '../audit/audit.service';
-import { INotificationService } from '../notification/notification.service';
-import { IPolicyRepository } from '../policy/policy.repository';
-import { IEmployeeRepository } from '../employee/employee.repository';
+import { IBalanceService, InsufficientBalanceError } from '../balance';
+import { IAuditService } from '../audit';
+import { INotificationService } from '../notification';
+import { IPolicyRepository } from '../policy';
+import { IEmployeeRepository } from '../employee';
 import { AuthenticatedUser, AuditAction, LeaveStatus } from '../../shared/types/index';
 
 // ── Custom error classes ──────────────────────────────────────────
 
-export class InsufficientBalanceError extends Error {
-  constructor(
-    public readonly remainingBalance: number,
-    public readonly requestedDays: number,
-  ) {
-    super(
-      `Insufficient balance: requested ${requestedDays} days but only ${remainingBalance} remaining`,
-    );
-    this.name = 'InsufficientBalanceError';
-  }
-}
+export { InsufficientBalanceError } from '../balance';
 
 export class ApproverNotAuthorizedError extends Error {
   constructor(
@@ -99,8 +89,8 @@ export class LeaveService implements ILeaveService {
       );
     }
 
-    // Employee can only create for themselves
-    if (actor.id !== dto.employeeId) {
+    // Employee can only create for themselves; managers and hr_admins can create for any employee
+    if (actor.role === 'employee' && actor.id !== dto.employeeId) {
       throw new Error('Employee can only create leave requests for themselves');
     }
 

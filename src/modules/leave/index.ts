@@ -5,8 +5,8 @@ export { createLeaveRequestSchema, updateLeaveRequestSchema } from './leave.vali
 export {
   ILeaveService,
   LeaveService,
-  InsufficientBalanceError,
   ApproverNotAuthorizedError,
   LeaveRequestNotFoundError,
   InvalidStateTransitionError,
 } from './leave.service';
+export { InsufficientBalanceError } from '../balance';
