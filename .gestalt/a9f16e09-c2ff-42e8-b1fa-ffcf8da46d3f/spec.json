@@ -1,0 +1,170 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "unit-tests",
+      "module-barrel",
+      "repository"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "A barrel file exists at src/modules/leave/index.ts that re-exports the LeaveRequest model types (LeaveRequest, CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveRequestQueryParams), the repository interface and class (ILeaveRepository, LeaveRepository), and the validation schemas (createLeaveRequestSchema, updateLeaveRequestSchema) plus their inferred input types, so that consumers can import the leave module's public surface from a single entry point \u2014 matching the employee module barrel convention.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The unused `randomUUID` import in src/modules/leave/leave.repository.ts is resolved: either removed entirely (no dangling/unused imports remain) OR wired into the create method so it explicitly generates the id and passes it to the INSERT statement, matching the employee repository pattern where create receives/persists an explicit id. Either way, `npm run build` (tsc --noEmit) passes with no unused-import or strict-mode errors.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "tests/unit/modules/leave/leave.repository.test.ts exists and covers, for each repository method (findById, findByEmployee, findByApprover, create, updateStatus, update): the found case (returns a mapped LeaveRequest entity), the not-found/empty-result case (returns null or empty array as appropriate), and the database-error case (rejects the promise propagating the underlying error). Tests mock the shared db pool (jest.mock on shared/db/connection) and assert both the returned entity shape and the parameterised SQL/params passed to pool.query, following the employee repository test pattern.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "tests/unit/modules/leave/leave.validation.test.ts exists and covers createLeaveRequestSchema and updateLeaveRequestSchema: valid input parses successfully (returns the parsed object); invalid input is rejected \u2014 including missing required fields, non-ISO date strings, and startDate >= endDate (the cross-field date-order rule). For updateLeaveRequestSchema, the optional-fields case (partial input with only some fields) parses, and the both-dates-present-but-out-of-order case is rejected. Each rejection asserts the parse result is a failure (ZodError or .success === false).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The full verification command (npm install --include=dev && npm run build && npx jest --passWithNoTests) exits zero: the project compiles under strict TypeScript with no errors, and all Jest unit tests (including the two new leave test files) pass.",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "No new source logic may be added beyond the barrel re-exports and the randomUUID resolution; the existing leave.model.ts, leave.validation.ts, and leave.repository.ts behavior must remain unchanged except for the import fix. This phase is gap-fill (barrel + tests + import cleanup), not a feature build.",
+    "Test files must use the project's Jest convention: *.test.ts under tests/, with jest.mock('shared/db/connection') mocking pool.query \u2014 matching the employee and policy repository test patterns. Do not change jest.config.js or tsconfig.json.",
+    "Strict TypeScript (no implicit any, strict null checks) must hold; no `any` types \u2014 use `unknown` with type guards where needed (HARNESS no-any rule, severity high). The barrel must not introduce circular imports.",
+    "Modules import from each other ONLY through their declared public entry point (index.ts) \u2014 AGENTS.md architecture rule 1. The leave barrel must be the single public surface; downstream consumers import from src/modules/leave/index.ts, not from internal files.",
+    "All database access stays through the repository pattern (GP-001). The new tests must mock the pool, not hit a real database; no inline SQL in test assertions beyond verifying the parameterised query the repository already issues."
+  ],
+  "outOfScope": [
+    "LeaveService, ILeaveService, and the service-layer business logic (submit/approve/reject/cancel/create/update/findById/findByEmployee with RBAC, balance deduction, audit, notifications) \u2014 these belong to Phase 8 (PLAN.md) and are not part of this barrel+tests phase.",
+    "LeaveController, leave.routes.ts, Fastify route plugin, and app.ts route registration \u2014 these belong to Phase 9 (PLAN.md) and are out of scope for this phase.",
+    "Modifying the existing leave.model.ts entity shape, leave.validation.ts schema rules, or the repository method signatures/SQL behavior beyond the randomUUID import resolution. No new repository methods or validation schemas.",
+    "leave.service.test.ts and leave.controller.test.ts \u2014 only leave.repository.test.ts and leave.validation.test.ts are in scope for this phase."
+  ],
+  "ambiguities": [
+    {
+      "description": "The intent offers two acceptable resolutions for the unused `randomUUID` import in leave.repository.ts: (a) remove the import entirely, or (b) wire it into the create method to explicitly generate the id and pass it to the INSERT, matching the employee repository pattern where create persists an explicit id. The current leave create method does NOT include id in its INSERT (relies on a DB default/sequence), whereas the employee create method takes id as an explicit input parameter. These are functionally different: option (b) changes the create method's SQL and parameter list (and would require the corresponding repository test to assert the generated UUID is passed), while option (a) is a pure cleanup with no behavior change.",
+      "options": [
+        "Remove the unused randomUUID import (pure cleanup, no behavior change, lowest risk)",
+        "Wire randomUUID into create to explicitly generate and persist the id, matching the employee repository pattern (changes create's SQL/params and requires test updates)"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "The barrel's exact export set is underspecified relative to other modules. The employee barrel exports only the model type and repository interface/class. The leave module additionally has validation schemas and inferred input types (CreateLeaveRequestInput, UpdateLeaveRequestInput). The intent says \"re-exporting model types, repository interface/class, and validation schemas\" \u2014 it is unclear whether the inferred Zod input types (CreateLeaveRequestInput, UpdateLeaveRequestInput) should also be re-exported, since they are part of the validation module's public surface but not explicitly named in the intent.",
+      "options": [
+        "Re-export only what the intent names: model types, repository interface/class, and the two Zod schema objects",
+        "Also re-export the inferred input types (CreateLeaveRequestInput, UpdateLeaveRequestInput) for completeness, since Phase 8/9 consumers will need them"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "The LeaveRequest entity's shape and lifecycle states (DRAFT \u2192 SUBMITTED \u2192 APPROVED/REJECTED; APPROVED/SUBMITTED \u2192 CANCELLED) must remain unchanged by this phase. The barrel re-export must expose the same LeaveRequest interface already defined in leave.model.ts without altering or narrowing it."
+    },
+    {
+      "entity": "LeaveRepository",
+      "mustExistOrExtend": true,
+      "invariant": "The LeaveRepository class must continue to implement ILeaveRepository with the existing method contracts (findById returns LeaveRequest|null, findByEmployee/findByApprover return LeaveRequest[], create returns LeaveRequest with DRAFT default status, updateStatus/update return LeaveRequest|null). The randomUUID resolution must not break any existing method's return-type contract or parameterised-query behavior."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "LeaveRepository.findById",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns null when no row matches the id; rejects the promise (propagates the underlying pg error) on database failure. Must use a parameterised query (id bound as $1)."
+    },
+    {
+      "operation": "LeaveRepository.findByEmployee",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an empty array when no rows match (never null); rejects the promise on database failure. Applies dynamic query filters from LeaveRequestQueryParams with parameterised placeholders and optional LIMIT/OFFSET."
+    },
+    {
+      "operation": "LeaveRepository.findByApprover",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an empty array when no rows match; rejects the promise on database failure. Joins employees on manager_id to scope to the approver's direct reports, with the same dynamic filter behavior as findByEmployee."
+    },
+    {
+      "operation": "LeaveRepository.create",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Persists a row and returns the mapped LeaveRequest with status defaulting to DRAFT; rejects the promise on database failure (e.g. constraint violation). If randomUUID is wired in, the generated id must be passed as an explicit INSERT parameter; otherwise the INSERT omits id (DB-generated)."
+    },
+    {
+      "operation": "LeaveRepository.updateStatus",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns null when no row matches the id; returns the updated LeaveRequest on success; rejects the promise on database failure. Dynamically includes approved_by/approved_at in the SET clause only when supplied."
+    },
+    {
+      "operation": "LeaveRepository.update",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns null when no row matches the id; returns the existing LeaveRequest (via findById) when no mutable fields are supplied; returns the updated LeaveRequest otherwise; rejects the promise on database failure. Only startDate, endDate, reason are mutable; id/createdAt/status are excluded from the SET clause."
+    },
+    {
+      "operation": "createLeaveRequestSchema (Zod parse)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Accepts valid input (required employeeId, leaveTypeId, valid ISO startDate/endDate with startDate < endDate, optional reason); rejects invalid input with a Zod failure (missing required fields, non-ISO dates, or startDate >= endDate). Parse is synchronous; no auth concern at this layer."
+    },
+    {
+      "operation": "updateLeaveRequestSchema (Zod parse)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Accepts partial input (any subset of optional startDate/endDate/reason); rejects when both startDate and endDate are present but startDate >= endDate; rejects non-ISO date strings. Parse is synchronous."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The leave barrel (src/modules/leave/index.ts) must follow the same re-export convention as the employee barrel: export the model type(s) and the repository interface + class from their respective files. The leave barrel additionally exports the validation schemas, which the employee barrel does not have \u2014 but the export style (named re-exports from sibling files, no default export, no logic) must match.",
+      "referencePath": "src/modules/employee/index.ts"
+    },
+    {
+      "requirement": "The leave repository test must match the employee repository test's structure and conventions: jest.mock('shared/db/connection') with pool.query as jest.Mock, a makeRow helper producing snake_case DB rows, a makeLeaveRequest helper producing camelCase entities, beforeEach resetting mocks, and per-method describe blocks covering found/not-found/empty/database-error with assertions on both returned entity shape and the pool.query call args (SQL string + params array).",
+      "referencePath": "tests/unit/modules/employee/employee.repository.test.ts"
+    },
+    {
+      "requirement": "The repository test must exercise the exact method signatures, SQL patterns, and snake\u2192camel mapping already implemented in leave.repository.ts \u2014 including the dynamic filter builder (buildQueryFilters), the findByApprover JOIN on employees.manager_id, the create method's DRAFT default status, and the update method's mutable-field restriction (startDate, endDate, reason only). The test must not assume behavior that differs from the existing implementation.",
+      "referencePath": "src/modules/leave/leave.repository.ts"
+    },
+    {
+      "requirement": "The validation test must exercise the exact schema rules already defined: createLeaveRequestSchema requires employeeId/leaveTypeId (min 1), ISO-date startDate/endDate with startDate < endDate (superRefine cross-field check), optional reason; updateLeaveRequestSchema has optional fields with the same cross-field date-order check applied only when both dates are present. The test must not invent rules not present in the schemas.",
+      "referencePath": "src/modules/leave/leave.validation.ts"
+    },
+    {
+      "requirement": "Test imports must use the path-mapping convention enabled by jest.config.js moduleDirectories: ['node_modules', 'src'] \u2014 i.e. import from 'modules/leave/leave.repository' and 'shared/db/connection' and 'shared/types/index', not relative paths \u2014 matching the employee repository test's import style.",
+      "referencePath": "jest.config.js"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/leave/index.ts (barrel) \u2192 downstream Phase 8/9 consumers (LeaveService, LeaveController, leave.routes)",
+      "why": "The barrel is the single public entry point through which the future service, controller, and routes layers will import the leave module's model types, repository, and validation schemas. Per AGENTS.md rule 1, all cross-module imports go through index.ts."
+    },
+    {
+      "target": "src/modules/leave/leave.repository.ts \u2192 src/shared/db/connection.ts (pool)",
+      "why": "The repository test must mock this integration point (jest.mock('shared/db/connection')) to assert parameterised queries without hitting a real database, matching the employee/policy repository test pattern."
+    },
+    {
+      "target": "src/modules/leave/leave.validation.ts \u2192 src/shared/types/index.ts (LeaveStatus)",
+      "why": "The validation schemas import LeaveStatus from shared types; the validation test must exercise schemas consistent with the canonical enum values already defined there."
+    }
+  ]
+}
