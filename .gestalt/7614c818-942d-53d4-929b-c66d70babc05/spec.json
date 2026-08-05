@@ -1,0 +1,201 @@
+{
+  "scope": {
+    "affectedDomains": [],
+    "affectedLayers": [],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The LeaveRequest entity is exported from src/modules/leave-request/leave-request.model.ts with exactly the canonical fields (id, employeeId, leavePolicyId, startDate, endDate, reason, status, approvedBy, approvedAt, cancelledBy, cancelledAt, createdAt, updatedAt) and the status field is typed as LeaveRequestStatus imported from src/shared/types/leave-request-status.enum.ts; nullable fields (reason, approvedBy, approvedAt, cancelledBy, cancelledAt) use the nullable union types matching the reconciled architecture.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The ILeaveRequestRepository interface declares all eight required operations: findById, findByEmployeeId, findByStatus, findByEmployeeAndStatus, findPendingForManager, save, update, and updateStatus \u2014 each with a signature consistent with the sibling repositories (single-entity lookups return the entity or null, collection lookups return an array, save returns the persisted entity).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "PgLeaveRequestRepository implements ILeaveRequestRepository and performs all database access exclusively through the shared pool imported from src/shared/db/connection.ts (GP-001 repository pattern); no inline SQL or direct pg calls exist outside the repository class.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findPendingForManager(managerId) returns leave requests whose employee's managerId equals the given managerId and whose status is a pending state (DRAFT or SUBMITTED), enabling the manager approval workflow; the query joins or filters against the employee reporting line so only direct reports' requests are returned.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "updateStatus(id, status, metadata) atomically transitions the request's status and stamps the corresponding actor/timestamp fields from metadata (e.g. approvedBy/approvedAt on APPROVED, cancelledBy/cancelledAt on CANCELLED) in a single UPDATE, returning the updated entity or null when the id does not exist.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests exist under tests/unit/modules/leave-request/ covering the model field shape and every repository method (findById, findByEmployeeId, findByStatus, findByEmployeeAndStatus, findPendingForManager, save, update, updateStatus) with the db pool mocked, including the not-found (null/empty) and happy-path branches \u2014 matching the test structure of the sibling leave-balance tests.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The module compiles under strict TypeScript (npm run build / tsc --noEmit) with no implicit any and no type errors, and the Jest suite (npx jest) passes for the new leave-request tests.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No use of `any` \u2014 use `unknown` with type guards instead (HARNESS.json no-any rule, severity high); the mapRow helper and all query result handling must type-cast from Record<string, unknown> as the sibling repositories do.",
+    "All database access must go through the repository pattern (GP-001 / HARNESS.json no-direct-db-outside-repository, severity critical); PgLeaveRequestRepository is the only component that issues SQL, using the shared pool from src/shared/db/connection.ts.",
+    "Modules import from each other ONLY through their declared public entry point (index.ts) per ARCHITECTURE.md dependency rules; the leave-request model may import Employee and LeavePolicy reference types via their module index, and LeaveRequestStatus via the shared types path, but must not reach into sibling module internals.",
+    "No circular dependencies between modules (ARCHITECTURE.md); leave-request may depend on employee, leave-policy, and shared-types but those modules must not import back from leave-request.",
+    "Repository methods that must be atomic with a caller's transaction accept an optional PoolClient as their last parameter and use `const db = client ?? pool` (the optional-client pattern documented in ARCHITECTURE.md); updateStatus and any method participating in the approval balance-deduction transaction must support this so Phase 9 can run them inside the same unit of work as incrementUsedDays.",
+    "No unhandled promise rejections (GP-006); all async repository methods must propagate errors via returned/rejected promises without swallowing them, consistent with the sibling repository implementations."
+  ],
+  "outOfScope": [
+    "LeaveRequest service, controller, and routes (Phase 9) \u2014 no business-rule enforcement (submit/approve/reject/cancel workflow, balance deduction, minimum-notice validation, RBAC) belongs in this phase; the repository is a pure persistence layer.",
+    "Audit logging of leave request state transitions (GP-002 / Phase 10) \u2014 the repository must not write audit records; that is the service layer's responsibility in later phases.",
+    "Input validation at API boundaries (GP-003) and RBAC enforcement (GP-005) \u2014 these are controller/middleware concerns (Phase 9), not repository concerns; the repository trusts its callers.",
+    "Business-day counting utility (src/shared/utils/business-days.ts) and balance sufficiency checks \u2014 these are service-layer concerns (Phase 9); the repository persists dates as-is without computing day counts.",
+    "Database migrations / DDL for the leave_requests table \u2014 this phase creates TypeScript model and repository code only; the SQL schema is documented in the reconciled architecture but migrations are not part of this phase's deliverables."
+  ],
+  "ambiguities": [
+    {
+      "description": "The `updateStatus(id, status, metadata)` signature's `metadata` parameter shape is unspecified. It must carry the actor and timestamp for the transition (approvedBy/approvedAt for APPROVED, cancelledBy/cancelledAt for CANCELLED), but whether it is a typed object, a Partial<LeaveRequest>, or a generic record is left to the code agent. The risk is that Phase 9's service expects a specific shape.",
+      "options": [
+        "metadata is a Partial<LeaveRequest> containing only the actor/timestamp fields relevant to the transition",
+        "metadata is a dedicated typed object { approvedBy?, approvedAt?, cancelledBy?, cancelledAt?, reason? }",
+        "metadata is a generic Record<string, unknown> the repository maps onto columns"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "findPendingForManager(managerId) must return requests for a manager's direct reports in a pending state, but \"pending\" is not precisely defined. The LeaveRequestStatus enum has DRAFT and SUBMITTED as pre-decision states; APPROVED/REJECTED/CANCELLED are terminal. Whether DRAFT requests (not yet submitted) should appear in a manager's pending queue is ambiguous \u2014 a manager typically only acts on SUBMITTED requests.",
+      "options": [
+        "pending = SUBMITTED only (manager acts on submitted requests, not drafts)",
+        "pending = DRAFT or SUBMITTED (any non-terminal state)",
+        "pending = SUBMITTED, and DRAFT is excluded because the employee has not yet submitted"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "findPendingForManager requires resolving the employee reporting line (employees whose managerId = managerId). The leave_requests table has no manager_id column, so the repository must either join to the employees table or the service must pre-resolve report IDs. Whether the repository is permitted to JOIN across tables (crossing the employee module's data) or must receive pre-resolved employee IDs is an architectural boundary question.",
+      "options": [
+        "repository JOINs leave_requests to employees on employee_id where employees.manager_id = $1 (single query)",
+        "repository receives a list of employee IDs and filters leave_requests by employee_id IN (...) (no cross-table join, service resolves reports)",
+        "repository exposes findByEmployeeIds(ids[]) and the service composes findPendingForManager from employee lookups"
+      ],
+      "impactIfWrong": "medium"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "The status field must always be one of the LeaveRequestStatus enum values (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED); the entity's status lifecycle follows DRAFT \u2192 SUBMITTED \u2192 APPROVED | REJECTED | CANCELLED, though the repository itself does not enforce transition legality (that is the service's job in Phase 9) \u2014 it only persists whatever status it is given."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "The actor/timestamp fields are coupled to the terminal status: approvedBy and approvedAt are non-null only when status is APPROVED; cancelledBy and cancelledAt are non-null only when status is CANCELLED; when status is DRAFT or SUBMITTED these four fields are null. The repository's updateStatus must stamp the correct pair for the target status and leave the others null."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "startDate must not be after endDate (a leave request spans a non-negative date range); while the repository does not validate this (validation is an API-boundary concern), the entity shape must allow the dates to be compared and the persisted row must preserve both endpoints exactly."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "employeeId and leavePolicyId are non-nullable foreign keys referencing employees.id and leave_policies.id respectively (per the reconciled SQL schema); a LeaveRequest cannot exist without an owning employee and a governing policy. The repository persists these as required columns."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "ILeaveRequestRepository.findById(id)",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns the LeaveRequest with the given id, or null when no row matches; never throws on not-found. Errors from the database propagate as rejected promises (GP-006)."
+    },
+    {
+      "operation": "ILeaveRequestRepository.findByEmployeeId(employeeId)",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns an array of all leave requests for the employee (possibly empty); never returns null. Database errors propagate as rejected promises."
+    },
+    {
+      "operation": "ILeaveRequestRepository.findByStatus(status)",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns an array of leave requests matching the given LeaveRequestStatus (possibly empty); never null. Database errors propagate as rejected promises."
+    },
+    {
+      "operation": "ILeaveRequestRepository.findByEmployeeAndStatus(employeeId, status)",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns an array of leave requests for the employee filtered by status (possibly empty); never null. Database errors propagate as rejected promises."
+    },
+    {
+      "operation": "ILeaveRequestRepository.findPendingForManager(managerId)",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns an array of pending leave requests submitted by the manager's direct reports (possibly empty); never null. Database errors propagate as rejected promises."
+    },
+    {
+      "operation": "ILeaveRequestRepository.save(request)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Inserts the request and returns the persisted entity (with any database-generated values); a unique-constraint violation or other DB error propagates as a rejected promise. Not idempotent \u2014 calling twice with the same id attempts a duplicate insert."
+    },
+    {
+      "operation": "ILeaveRequestRepository.update(id, partial)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Merges the partial onto the existing row (read-then-write, matching the sibling repositories), sets updatedAt to the current time, and returns the updated entity or null when the id does not exist. Database errors propagate as rejected promises."
+    },
+    {
+      "operation": "ILeaveRequestRepository.updateStatus(id, status, metadata)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Atomically sets the status and stamps the corresponding actor/timestamp fields from metadata in a single UPDATE, returning the updated entity or null when the id does not exist. Must accept an optional PoolClient so Phase 9 can run it inside the same transaction as the balance deduction. Database errors propagate as rejected promises."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The LeaveRequest entity's status field must be typed as LeaveRequestStatus imported from this exact file (not a re-declared string union); the enum members DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED are the only valid status values.",
+      "referencePath": "src/shared/types/leave-request-status.enum.ts"
+    },
+    {
+      "requirement": "The PgLeaveRequestRepository must follow the same structural pattern as PgEmployeeRepository: import pool from the shared db connection, use a private mapRow(row: Record<string, unknown>) helper to convert snake_case DB columns to camelCase entity fields, use parameterized queries ($1, $2, ...) with a values array, and have update perform a read-then-write merge that sets updatedAt to new Date().",
+      "referencePath": "src/modules/employee/employee.repository.ts"
+    },
+    {
+      "requirement": "The optional-client transaction pattern (const db = client ?? pool; optional PoolClient as last parameter) established by PgLeaveBalanceRepository.incrementUsedDays must be applied to updateStatus (and any method that Phase 9 will call inside the approval transaction) so the status transition and balance deduction can share one unit of work.",
+      "referencePath": "src/modules/leave-balance/leave-balance.repository.ts"
+    },
+    {
+      "requirement": "The LeaveRequest model must follow the same module-structure convention as LeaveBalance: an exported interface for the entity, reference types (Pick<Employee,'id'> / Pick<LeavePolicy,'id'>) imported via the sibling module index.ts for foreign-key documentation, and the status enum imported from the shared types path \u2014 not redeclared locally.",
+      "referencePath": "src/modules/leave-balance/leave-balance.model.ts"
+    },
+    {
+      "requirement": "The leave-request repository tests must match the established test pattern: jest.mock('shared/db/connection') with a mocked pool.query, a makeRequest() factory and makeRow() snake_case mapper, beforeEach mockReset, and per-method describe blocks covering found / not-found branches \u2014 using the moduleDirectories:['node_modules','src'] import paths (e.g. 'modules/leave-request', 'shared/db/connection').",
+      "referencePath": "tests/unit/modules/leave-balance/leave-balance.repository.test.ts"
+    },
+    {
+      "requirement": "The LeaveRequest entity attributes must match the reconciled architecture exactly: id, employeeId, leavePolicyId, startDate (Date), endDate (Date), reason (string | undefined), status (LeaveRequestStatus), approvedBy (string | null), approvedAt (Date | null), cancelledBy (string | null), cancelledAt (Date | null), createdAt (Date), updatedAt (Date) \u2014 including the nullable unions for reason and the actor/timestamp fields.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/leave-request-status.enum.ts (Phase 1)",
+      "why": "LeaveRequest.status is typed as LeaveRequestStatus from this enum; the repository's findByStatus and updateStatus operations consume its values."
+    },
+    {
+      "target": "src/modules/employee (Phase 2)",
+      "why": "LeaveRequest.employeeId, approvedBy, and cancelledBy reference employees.id; findPendingForManager must resolve the manager\u2192direct-reports relationship through the employee module's data (managerId field). The model imports Employee reference types via the employee module index."
+    },
+    {
+      "target": "src/modules/leave-policy (Phase 3)",
+      "why": "LeaveRequest.leavePolicyId references leave_policies.id; the model imports LeavePolicy reference types via the leave-policy module index for foreign-key type documentation."
+    }
+  ]
+}
