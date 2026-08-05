@@ -62,7 +62,7 @@ export class PgLeaveBalanceRepository implements ILeaveBalanceRepository {
         balance.policyId,
         balance.totalEntitlement,
         balance.usedDays,
-        balance.remainingDays,
+        balance.totalEntitlement - balance.usedDays,
         balance.fiscalYear,
         balance.status,
         balance.createdAt,
@@ -79,6 +79,7 @@ export class PgLeaveBalanceRepository implements ILeaveBalanceRepository {
     }
 
     const merged = { ...existing, ...partial, id, updatedAt: new Date() };
+    merged.remainingDays = merged.totalEntitlement - merged.usedDays;
     const result = await pool.query(
       `UPDATE leave_balances SET
         employee_id = $1, policy_id = $2, total_entitlement = $3,
