@@ -109,6 +109,12 @@ export class PgLeaveBalanceRepository implements ILeaveBalanceRepository {
       return null;
     }
 
+    if (existing.status !== 'ACTIVE') {
+      throw new Error(
+        `Balance ${id} is not ACTIVE (status: ${existing.status}); only ACTIVE balances can be modified`
+      );
+    }
+
     const result = await pool.query(
       `UPDATE leave_balances SET
         used_days = used_days + $2,

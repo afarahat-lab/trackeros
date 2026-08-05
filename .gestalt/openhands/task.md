@@ -1,6 +1,6 @@
 # Fix specific quality-gate violations: Phase 4: LeaveBalance model + repository
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/fix/be068fd3-a1c9-4eb0-ae38-156852fec5c5/4/1`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/fix/be068fd3-a1c9-4eb0-ae38-156852fec5c5/4/2`. Do not clone anything; work only in this directory.
 
 You are fixing SPECIFIC violations the quality gate found in EXISTING, already-committed files. Make the targeted edits listed below — do NOT refactor, regenerate, or change unrelated code.
 
@@ -8,27 +8,12 @@ The files ALREADY EXIST. You MUST edit them in place with the `str_replace_edito
 
 ## Required edits
 
-### Coherent change 1 — apply as ONE atomic edit across ALL sites below
-
-Unifying change (do this now): Enforce the entity invariant remainingDays = totalEntitlement - usedDays in the repository: in save, compute remainingDays from totalEntitlement - usedDays in the INSERT (e.g., $4 - $5) instead of persisting the caller-supplied value; in update, after merging the partial onto existing, recompute merged.remainingDays = merged.totalEntitlement - merged.usedDays (or compute remaining_days = total_entitlement - used_days directly in the UPDATE SQL) so the stored row always satisfies the invariant.
-
-The sites below are the SAME underlying issue. Fixing some but not others leaves the code incoherent and the quality gate WILL re-flag it — apply the one change above consistently to EVERY site:
-
-- Site 1
+### Edit 1
 File: src/modules/leave-balance/leave-balance.repository.ts
-Offending code: `const merged = { ...existing, ...partial, id, updatedAt: new Date() };`
-Rule violated: review/correctness
-Action (do this now): Edit `src/modules/leave-balance/leave-balance.repository.ts` in place to fix the `review/correctness` violation.
-What the quality gate found — apply this: [review/correctness] The `update` method does not recompute `remainingDays` when `totalEntitlement` or `usedDays` changes in the partial. The merged object retains the stale `remainingDays` from `existing`, violating the entity invariant that `remainingDays` must equal `totalEntitlement - usedDays` at all times. If a caller passes `{ totalEntitlement: 30 }` on a balance with `totalEntitlement: 20, usedDays: 5, remainingDays: 15`, the stored row will have `totalEntitlement: 30, remainingDays: 15` instead of `25`.
-
-- Site 2
-File: src/modules/leave-balance/leave-balance.repository.ts
-Offending code: `balance.remainingDays,`
-Rule violated: review/correctness
-Action (do this now): Edit `src/modules/leave-balance/leave-balance.repository.ts` in place to fix the `review/correctness` violation.
-What the quality gate found — apply this: [review/correctness] The `save` method stores `balance.remainingDays` as passed by the caller without computing it from `totalEntitlement - usedDays`. This violates the entity invariant that `remainingDays` must equal `totalEntitlement - usedDays` at all times and must never be independently set to an arbitrary value. A caller could pass `remainingDays: 99` with `totalEntitlement: 20, usedDays: 5` and the repository would persist the inconsistency.
-
-Then check the rest of these files (and the surrounding module) for ANY OTHER occurrence of the same pattern beyond the specific lines listed above, and apply the same change there too — do NOT limit the fix to only the enumerated sites.
+Line: 33
+Rule violated: test-failure
+Action (do this now): Edit `src/modules/leave-balance/leave-balance.repository.ts` at line 33 in place to fix the `test-failure` violation.
+What the quality gate found — apply this: Failing test: PgLeaveBalanceRepository › incrementUsedDays › should throw BalanceNotActiveError when balance is CLOSED. expect(received).rejects.toThrow(expected) Expected substring: "Balance lb-001 is not ACTIVE (status: CLOSED); only ACTIVE balances can be modified" Received message:   "Cannot read properties of undefined (reading 'rows')" at Object.toThrow (node_modules/expect/build/index.js:218:22)
 
 ## Verify before you finish (MANDATORY)
 After making the edits above, the code MUST still compile and its tests MUST pass — a compilation/type error, or a test your change breaks, must NEVER be left for CI or the quality gate to find. Before you declare this task done:
