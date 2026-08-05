@@ -14,7 +14,7 @@ Base entity providing common fields for domain models.
 
 Represents a leave record managed by the `leave` module, including leave requests and related leave-tracking data.
 
-### LeaveStatus
+### LeaveRequestStatus
 
 | Value | Description |
 |-------|-------------|
@@ -30,18 +30,46 @@ Represents a leave record managed by the `leave` module, including leave request
 |-------|------|----------|
 | id | string | true |
 | employeeId | string | true |
-| leaveTypeId | string | true |
+| leavePolicyId | string | true |
 | startDate | Date | true |
 | endDate | Date | true |
 | reason | string \| undefined | false |
 | status | LeaveRequestStatus | true |
 | approvedBy | string \| null | false |
 | approvedAt | Date \| null | false |
+| cancelledBy | string \| null | false |
+| cancelledAt | Date \| null | false |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
 **Relationships**
-- `Employee` — many-to-one
+- `Employee` — many-to-one (via `employeeId`)
+- `LeavePolicy` — many-to-one (via `leavePolicyId`)
+
+**Invariants**
+- `approvedBy` and `approvedAt` are non-null only when `status` is `APPROVED`.
+- `cancelledBy` and `cancelledAt` are non-null only when `status` is `CANCELLED`.
+- When `status` is `DRAFT` or `SUBMITTED`, all four actor/timestamp fields are null.
+- `startDate` must not be after `endDate` (enforced at the service/API layer, not the repository).
+
+### ILeaveRequestRepository
+
+| Method | Signature | Notes |
+|--------|-----------|-------|
+| findById | `(id: string) => Promise<LeaveRequest \| null>` | |
+| findByEmployeeId | `(employeeId: string) => Promise<LeaveRequest[]>` | |
+| findByStatus | `(status: LeaveRequestStatus) => Promise<LeaveRequest[]>` | |
+| findByEmployeeAndStatus | `(employeeId: string, status: LeaveRequestStatus) => Promise<LeaveRequest[]>` | |
+| findPendingForManager | `(managerId: string) => Promise<LeaveRequest[]>` | JOINs `employees` on `employee_id` where `employees.manager_id = $1` and `lr.status = 'SUBMITTED'` |
+| save | `(request: LeaveRequest) => Promise<LeaveRequest>` | |
+| update | `(id: string, partial: Partial<LeaveRequest>) => Promise<LeaveRequest \| null>` | Read-then-write merge; sets `updatedAt` to current time |
+| updateStatus | `(id: string, status: LeaveRequestStatus, metadata: UpdateStatusMetadata, client?: PoolClient) => Promise<LeaveRequest \| null>` | Atomically stamps actor/timestamp fields for the target status; accepts optional `PoolClient` for caller-owned transactions |
+
+### UpdateStatusMetadata
+
+| Field | Type | Required |
+|-------|------|----------|
+| actorId | string | true |
 
 ### CreateLeaveRequestDto
 

@@ -19,6 +19,7 @@ The architecture is modular, with a clear separation of concerns between models,
 src/modules/employee/          — Employee model, repository
 src/modules/leave-policy/      — LeavePolicy model, repository
 src/modules/leave-balance/     — LeaveBalance model, repository
+src/modules/leave-request/     — LeaveRequest model, repository
 src/modules/status/            — Status model, service
 src/modules/uptime/            — Uptime model, service, routes
 src/shared/types/              — Shared TypeScript enums (LeaveType, LeaveRequestStatus)
