@@ -1,0 +1,200 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-balance"
+    ],
+    "affectedLayers": [
+      "domain-model",
+      "repository",
+      "unit-tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The LeaveBalance entity exposes exactly the canonical fields (id, employeeId, policyId, totalEntitlement, usedDays, remainingDays, fiscalYear, status, createdAt, updatedAt) with status constrained to 'ACTIVE' | 'CLOSED' | 'FORECAST', and imports Employee and LeavePolicy types from their respective module entry points for reference typing.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The ILeaveBalanceRepository interface declares all seven operations: findById, findByEmployeeId, findByEmployeeAndPolicy, findByEmployeeAndFiscalYear, save, update, and incrementUsedDays.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "PgLeaveBalanceRepository implements ILeaveBalanceRepository and performs all database access exclusively through the shared pool in src/shared/db/connection.ts (no inline SQL outside the repository).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "incrementUsedDays performs an atomic increment of used_days (supporting positive and negative deltas) and returns the updated balance row, satisfying the materialized balance rule that deductions/restorations happen transactionally.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests in tests/unit/modules/leave-balance/ cover the model field shape and every repository method (including the not-found/null paths and the atomic increment path), with the shared db pool mocked.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No use of `any` \u2014 use `unknown` with type guards instead (HARNESS.json no-any rule, severity high).",
+    "All database access must go through the repository pattern via the shared pool in src/shared/db/connection.ts; no direct DB calls outside the repository (GP-001 / no-direct-db-outside-repository, critical).",
+    "Modules import from each other ONLY through their declared public entry point (index.ts); leave-balance must import Employee and LeavePolicy types via the employee and leave-policy module index files, not from internal model files (AGENTS.md architecture rule 1).",
+    "Strict TypeScript must pass (no implicit any, strict null checks) \u2014 the phase must compile under tsc --noEmit and pass the Jest unit suite.",
+    "No circular dependencies: leave-balance depends on employee and leave-policy, which must not import back from leave-balance (AGENTS.md architecture rule 1 / reconciled dependency map)."
+  ],
+  "outOfScope": [
+    "LeaveBalance service (ILeaveBalanceService / LeaveBalanceService) \u2014 deferred to Phase 8.",
+    "LeaveBalance controller and Fastify routes \u2014 balance is read/written internally by the LeaveRequest service in later phases; no HTTP surface this phase.",
+    "Database migrations / DDL for the leave_balances table \u2014 this phase creates the model and repository only, not the schema migration.",
+    "Balance initialization logic, sufficiency checks, and business-day counting \u2014 these are service-layer concerns (Phase 8 / Phase 9), not repository concerns.",
+    "Audit logging for balance mutations (GP-002) \u2014 audit module does not exist yet (Phase 10); the repository layer itself does not emit audit records."
+  ],
+  "ambiguities": [
+    {
+      "description": "The binding business rule states remaining_days = total_entitlement - used_days is \"computed, not stored\", yet the canonical LeaveBalance entity includes remainingDays as a field and the reconciled SQL schema lists remaining_days as a stored column. It is ambiguous whether the repository must persist remaining_days or recompute it on read/write.",
+      "options": [
+        "Store remaining_days as a column and keep it in sync (remaining = total - used) on every write, including incrementUsedDays",
+        "Treat remainingDays as a computed/transient field not persisted to the table, derived from totalEntitlement - usedDays at map time"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "incrementUsedDays must not allow used_days to exceed total_entitlement, but it is unspecified whether the repository enforces this guard itself (rejecting the increment) or whether enforcement is deferred to the service layer (Phase 8/9).",
+      "options": [
+        "Repository enforces the guard: incrementUsedDays rejects/clamps when used_days + delta > total_entitlement",
+        "Repository performs a pure atomic increment without guard; the service layer validates sufficiency before calling"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "The phase scope says to \"import Employee and LeavePolicy types from their respective modules for reference typing\" but does not specify whether these imports are used only as type-only imports (import type) for documentation/FK typing, or whether the repository performs existence checks against the employee/policy repositories at save time.",
+      "options": [
+        "Type-only imports for FK reference typing; no cross-repository existence checks in the repository layer",
+        "Repository validates employeeId/policyId existence by querying employee and leave-policy repositories before save"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "A LeaveBalance row is unique per (employeeId, policyId, fiscalYear) combination \u2014 there is at most one balance row per employee per policy per fiscal year (reconciled schema unique constraint on employee_id + policy_id + fiscal_year)."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "remainingDays must equal totalEntitlement minus usedDays at all times \u2014 remaining_days is a computed/materialized value of total_entitlement - used_days, never independently set to an arbitrary value (binding business rule: materialized transactional balance)."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "status is constrained to the lifecycle states ACTIVE, CLOSED, or FORECAST; only ACTIVE balances are drawable, CLOSED are historical, FORECAST are future-year balances not yet usable."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "usedDays must never exceed totalEntitlement (an employee cannot consume more leave than entitled) \u2014 the atomic increment must not drive used_days above total_entitlement."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "employeeId references an existing Employee and policyId references an existing LeavePolicy (foreign keys to employees.id and leave_policies.id per the reconciled conceptual data model)."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "ILeaveBalanceRepository.findById(id)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the matching LeaveBalance or null when no row exists; never throws on not-found."
+    },
+    {
+      "operation": "ILeaveBalanceRepository.findByEmployeeId(employeeId)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an array (possibly empty) of all LeaveBalance rows for the employee; never null."
+    },
+    {
+      "operation": "ILeaveBalanceRepository.findByEmployeeAndPolicy(employeeId, policyId)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the matching LeaveBalance or null; resolves the unique (employee, policy) lookup."
+    },
+    {
+      "operation": "ILeaveBalanceRepository.findByEmployeeAndFiscalYear(employeeId, fiscalYear)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an array (possibly empty) of LeaveBalance rows for the employee in the given fiscal year."
+    },
+    {
+      "operation": "ILeaveBalanceRepository.save(balance)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Persists a new LeaveBalance row and returns the persisted entity; a duplicate (employeeId, policyId, fiscalYear) must be rejected rather than silently overwriting."
+    },
+    {
+      "operation": "ILeaveBalanceRepository.update(id, partial)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Applies a partial update to the existing balance, refreshes updatedAt, and returns the updated entity or null when the id does not exist."
+    },
+    {
+      "operation": "ILeaveBalanceRepository.incrementUsedDays(id, days)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Atomically increments used_days by the given delta (positive for deduction, negative for restoration) within a single statement, recomputes remaining_days = total_entitlement - used_days, and returns the updated balance or null when the id does not exist; must not allow used_days to exceed total_entitlement."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The LeaveBalance entity shape must match the reconciled canonical attributes exactly (id, employeeId, policyId, totalEntitlement, usedDays, remainingDays, fiscalYear, status, createdAt, updatedAt) and the status union ('ACTIVE' | 'CLOSED' | 'FORECAST') \u2014 do not add, rename, or omit fields.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "The Employee type must be imported via the employee module's public entry point (index.ts), matching how leave-policy imports LeaveType from shared-types \u2014 never import directly from employee.model.ts.",
+      "referencePath": "src/modules/employee/index.ts"
+    },
+    {
+      "requirement": "The LeavePolicy type must be imported via the leave-policy module's public entry point (index.ts), consistent with the module-boundary rule that cross-module imports go through index.ts only.",
+      "referencePath": "src/modules/leave-policy/index.ts"
+    },
+    {
+      "requirement": "PgLeaveBalanceRepository must obtain its database connection from the shared pool exported by src/shared/db/connection.ts, matching the pattern established by PgEmployeeRepository and PgLeavePolicyRepository.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "The repository must follow the established repository pattern: an interface (ILeaveBalanceRepository) paired with a Pg* implementation class, a private mapRow helper converting snake_case DB columns to camelCase entity fields, and update returning null on missing id \u2014 matching PgEmployeeRepository and PgLeavePolicyRepository conventions.",
+      "referencePath": "src/modules/employee/employee.repository.ts"
+    },
+    {
+      "requirement": "Unit tests must mock the shared db pool via jest.mock('shared/db/connection') and assert both the returned entity mapping and the SQL/parameters passed to pool.query, matching the test conventions in the employee and leave-policy repository test files.",
+      "referencePath": "tests/unit/modules/leave-policy/leave-policy.repository.test.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "employee module (src/modules/employee/index.ts)",
+      "why": "LeaveBalance.employeeId references Employee; the model imports the Employee type for reference typing and the repository's foreign-key semantics depend on employees.id existing."
+    },
+    {
+      "target": "leave-policy module (src/modules/leave-policy/index.ts)",
+      "why": "LeaveBalance.policyId references LeavePolicy; the model imports the LeavePolicy type for reference typing and the repository's foreign-key semantics depend on leave_policies.id existing."
+    },
+    {
+      "target": "shared db connection (src/shared/db/connection.ts)",
+      "why": "PgLeaveBalanceRepository executes SQL against PostgreSQL through the shared pool, the single permitted database access point."
+    },
+    {
+      "target": "leave-request module (downstream, Phase 9)",
+      "why": "The LeaveRequest service will consume ILeaveBalanceRepository.incrementUsedDays to atomically deduct and restore balance on approval/rejection/cancellation \u2014 this repository's atomic increment contract is the integration seam for the materialized balance rule."
+    },
+    {
+      "target": "leave-balance service (downstream, Phase 8)",
+      "why": "The future LeaveBalanceService will inject ILeaveBalanceRepository to implement getBalance, initializeBalance, getRemainingDays, and hasSufficientBalance \u2014 the repository interface defined this phase is the service's dependency seam."
+    }
+  ]
+}
