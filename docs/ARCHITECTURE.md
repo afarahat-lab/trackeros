@@ -16,7 +16,7 @@ The architecture is modular, with a clear separation of concerns between models,
 ## Module structure
 
 ```
-src/modules/employee/          — Employee model, repository
+src/modules/employee/          — Employee model, repository, service, controller, routes
 src/modules/leave-policy/      — LeavePolicy model, repository
 src/modules/leave-balance/     — LeaveBalance model, repository
 src/modules/leave-request/     — LeaveRequest model, repository
@@ -25,6 +25,17 @@ src/modules/uptime/            — Uptime model, service, routes
 src/shared/types/              — Shared TypeScript enums (LeaveType, LeaveRequestStatus)
 src/shared/db/connection.ts    — PostgreSQL connection pool (pg)
 ```
+
+### What is built vs planned
+
+| Module | Model | Repository | Service | Controller | Routes |
+|--------|-------|------------|---------|------------|--------|
+| employee | ✅ | ✅ | ✅ | ✅ | ✅ |
+| leave-policy | ✅ | ✅ | — | — | — |
+| leave-balance | ✅ | ✅ | — | — | — |
+| leave-request | ✅ | ✅ | — | — | — |
+| audit | — | — | — | — | — |
+| notification | — | — | — | — | — |
 
 ## Key patterns
 
@@ -52,6 +63,11 @@ The caller (typically a service) owns the unit of work: it acquires a
 client via `pool.connect()`, issues `BEGIN`, passes that same client
 to every participating repository method, then `COMMIT` (or `ROLLBACK`
 on error) and releases the client in a `finally` block.
+
+Two repository methods currently support this pattern:
+
+- `PgLeaveBalanceRepository.incrementUsedDays(id, days, client?)` — atomic increment/decrement of used_days with automatic remaining_days recomputation
+- `PgLeaveRequestRepository.updateStatus(id, status, metadata, client?)` — atomic status transition with actor/timestamp stamping
 
 Example — `PgLeaveBalanceRepository.incrementUsedDays`:
 ```ts
@@ -89,13 +105,13 @@ this is the standard optional-client unit-of-work pattern.
 
 ### Module Boundaries
 
-- **shared-types** (`src/shared/types/`) – `LeaveType`, `LeaveRequestStatus` enums.
-- **employee** (`src/modules/employee/`) – Employee entity, repository, service, controller, routes.
-- **leave-policy** (`src/modules/leave-policy/`) – LeavePolicy entity, repository, service, controller, routes.
-- **leave-balance** (`src/modules/leave-balance/`) – LeaveBalance entity, repository, service.
-- **leave-request** (`src/modules/leave-request/`) – LeaveRequest entity, repository, service, controller, routes.
-- **audit** (`src/modules/audit/`) – AuditLog entity, repository, service.
-- **notification** (`src/modules/notification/`) – Notification entity, repository, service.
+- **shared-types** (`src/shared/types/`) – `LeaveType`, `LeaveRequestStatus` enums. ✅ Built.
+- **employee** (`src/modules/employee/`) – Employee entity, repository, service, controller, routes. ✅ Built.
+- **leave-policy** (`src/modules/leave-policy/`) – LeavePolicy entity, repository. ✅ Built (model + repository only; service/controller/routes planned).
+- **leave-balance** (`src/modules/leave-balance/`) – LeaveBalance entity, repository. ✅ Built (model + repository only; service planned).
+- **leave-request** (`src/modules/leave-request/`) – LeaveRequest entity, repository. ✅ Built (model + repository only; service/controller/routes planned).
+- **audit** (`src/modules/audit/`) – AuditLog entity, repository, service. Planned.
+- **notification** (`src/modules/notification/`) – Notification entity, repository, service. Planned.
 
 ### Dependency Map
 
@@ -108,12 +124,20 @@ this is the standard optional-client unit-of-work pattern.
 
 Six tables: `employees`, `leave_requests`, `leave_policies`, `leave_balances`, `audit_logs`, `notifications`. All foreign keys reference `employees.id` or `leave_policies.id`. Indexes support common query patterns (lookup by employee, status, date range, fiscal year).
 
-### Recommended Implementation Phases
+### Implementation Status
 
-1. **Foundation** – Shared types, Employee & LeavePolicy modules.
-2. **Leave Balance** – Balance tracking with policy integration.
-3. **Leave Request Core** – Full lifecycle, balance deduction, audit, notifications.
-4. **API & Integration** – Fastify endpoints, validation, end-to-end tests.
+| Phase | Description | Status |
+|-------|-------------|--------|
+| 1 | Shared enums (LeaveType, LeaveRequestStatus) | ✅ Complete |
+| 2 | Employee model + repository | ✅ Complete |
+| 3 | LeavePolicy model + repository | ✅ Complete |
+| 4 | LeaveBalance model + repository | ✅ Complete |
+| 5 | LeaveRequest model + repository | ✅ Complete |
+| 6 | Employee service + controller + routes | ✅ Complete |
+| 7 | LeavePolicy service + controller + routes | Planned |
+| 8 | LeaveBalance service | Planned |
+| 9 | LeaveRequest service + controller + routes | Planned |
+| 10 | Audit + Notification modules | Planned |
 
 ### Open Questions
 
