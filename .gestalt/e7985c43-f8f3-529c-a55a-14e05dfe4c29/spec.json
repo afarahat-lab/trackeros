@@ -1,0 +1,169 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-balance"
+    ],
+    "affectedLayers": [
+      "domain-model",
+      "repository",
+      "unit-tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The LeaveBalance entity exposes exactly the canonical fields (id, employeeId, policyId, totalEntitlement, usedDays, remainingDays, fiscalYear, status, createdAt, updatedAt) with status typed as the union 'ACTIVE' | 'CLOSED' | 'FORECAST', and imports Employee and LeavePolicy types from their module entry points for FK reference typing.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "ILeaveBalanceRepository declares all required operations: findById, findByEmployeeId, findByEmployeeAndPolicy, findByEmployeeAndFiscalYear, save, update, and incrementUsedDays \u2014 and PgLeaveBalanceRepository implements that interface.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "incrementUsedDays accepts an optional client parameter as its last argument; when the client is provided the increment query executes on that client (the caller's open transaction), and when omitted it falls back to the shared pool from src/shared/db/connection.ts (auto-commit).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "incrementUsedDays performs the increment atomically in a single statement that both adds the delta to used_days and recomputes remaining_days = total_entitlement - used_days, and rejects (throws a typed error) any positive increment that would make used_days exceed total_entitlement.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "incrementUsedDays accepts a negative delta to restore balance (for reversal of a previously-approved request) and correctly decrements used_days / recomputes remaining_days without throwing when the result stays within [0, total_entitlement].",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "save rejects a duplicate (employeeId, policyId, fiscalYear) tuple with a typed error, enforcing one balance row per employee per policy per fiscal year.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests exist under tests/unit/modules/leave-balance/ covering the model field shape, every repository read/write operation, the client-provided vs client-omitted execution paths for incrementUsedDays, the entitlement-ceiling rejection, and negative-delta restoration.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access goes through the repository pattern (GP-001 / no-direct-db-outside-repository); the repository must obtain its connection from src/shared/db/connection.ts and must not be bypassed by inline SQL elsewhere.",
+    "Strict TypeScript: no implicit any, strict null checks (HARNESS.json no-any rule) \u2014 use unknown with type guards instead of any for row mapping.",
+    "Modules import from each other ONLY through their declared public entry point (index.ts); leave-balance must import Employee and LeavePolicy types via ../employee and ../leave-policy, never from internal files.",
+    "remaining_days is a materialized/computed value equal to total_entitlement - used_days (binding materialized-balance rule); it must never be set independently of that formula on save, update, or incrementUsedDays.",
+    "No circular dependencies: leave-balance depends on employee and leave-policy (per the reconciled dependency map) but neither of those modules may import leave-balance.",
+    "No hardcoded secrets (HARNESS.json no-hardcoded-secrets); the repository must source the connection string from the shared pool, not inline credentials."
+  ],
+  "outOfScope": [
+    "LeaveBalance service, controller, and routes \u2014 balance is read/written internally by the LeaveRequest service in Phase 8/9; no HTTP surface is built in this phase.",
+    "Business-day counting utility and leave-request balance deduction workflow \u2014 the actual deduction-on-approval unit of work is owned by the LeaveRequest service in Phase 9; this phase only provides the atomic incrementUsedDays primitive.",
+    "Balance accrual scheduling / BullMQ background jobs and fiscal-year rollover logic.",
+    "Audit logging of balance mutations (GP-002) \u2014 audit records are emitted by the LeaveRequest service layer in Phase 10, not by the repository in this phase.",
+    "Database migrations / DDL for the leave_balances table \u2014 this phase assumes the table exists per the reconciled SQL schema; it does not create migrations."
+  ],
+  "ambiguities": [
+    {
+      "description": "The existing incrementUsedDays unit test asserts the exact SQL string and the two-call (findById + UPDATE) sequence. Adding the optional client parameter changes the execution path (query runs on client.query vs pool.query when a client is supplied), so the existing test's mock setup (which only mocks pool.query) and its exact-SQL assertion will break. The code agent must update the test to mock both pool.query and client.query paths rather than preserving the current assertion verbatim.",
+      "options": [
+        "Update the existing test to mock both pool.query (client omitted) and client.query (client provided) execution paths, relaxing the exact-SQL assertion to a stringContaining check",
+        "Keep the exact-SQL assertion but add a separate test case for the client-provided path that mocks client.query",
+        "Rewrite the incrementUsedDays test suite from scratch to cover both paths without asserting the literal SQL"
+      ],
+      "impactIfWrong": "medium"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "A LeaveBalance row is unique per (employeeId, policyId, fiscalYear); at most one balance exists for a given employee, policy, and fiscal year."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "remainingDays is always equal to totalEntitlement - usedDays; it is a derived/materialized value and must be recomputed whenever usedDays or totalEntitlement changes (on save, update, and incrementUsedDays)."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "usedDays must remain within [0, totalEntitlement]; an increment that would push usedDays above totalEntitlement is rejected, and usedDays must never go negative."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "status lifecycle is ACTIVE (drawable) \u2192 CLOSED (historical); FORECAST is a future-year balance that is not yet drawable. Only ACTIVE balances are eligible for usedDays increments."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "incrementUsedDays(id, days, client?)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws a typed error when a positive delta would make used_days exceed total_entitlement; returns null when the balance id does not exist. Must execute atomically \u2014 the used_days increment and remaining_days recompute occur in a single statement so no intermediate state is observable."
+    },
+    {
+      "operation": "save(balance)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws a typed error on a duplicate (employeeId, policyId, fiscalYear) tuple; persists and returns the balance with remainingDays recomputed as totalEntitlement - usedDays."
+    },
+    {
+      "operation": "update(id, partial)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns null when the balance id does not exist; on success recomputes remainingDays = totalEntitlement - usedDays and refreshes updatedAt."
+    },
+    {
+      "operation": "findById / findByEmployeeId / findByEmployeeAndPolicy / findByEmployeeAndFiscalYear",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Pure read operations; return null (single-result) or empty array (multi-result) when no rows match. No state mutation."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The LeaveBalance entity shape must match the reconciled canonical attributes exactly (id, employeeId, policyId, totalEntitlement, usedDays, remainingDays, fiscalYear, status 'ACTIVE'|'CLOSED'|'FORECAST', createdAt, updatedAt) and the materialized-balance business rule (remaining_days = total_entitlement - used_days; deduction on approval via atomic increment).",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "The repository must obtain its pooled connection from the shared pool exported here; the optional-client fallback path uses this same pool, and the client type must be compatible with the node-postgres PoolClient so Phase 9 can pass a pool.connect() client through.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "Employee type for the employeeId FK reference must be imported via the employee module's public entry point (../employee), matching the existing index.ts re-export pattern, not from internal model files.",
+      "referencePath": "src/modules/employee/index.ts"
+    },
+    {
+      "requirement": "LeavePolicy type for the policyId FK reference must be imported via the leave-policy module's public entry point (../leave-policy), matching the existing index.ts re-export pattern.",
+      "referencePath": "src/modules/leave-policy/index.ts"
+    },
+    {
+      "requirement": "The leave-balance module's public entry point must re-export the LeaveBalance entity, the LeaveBalanceStatus type, the ILeaveBalanceRepository interface, and the PgLeaveBalanceRepository class, matching the existing sibling-module index.ts convention so downstream phases import only through index.ts.",
+      "referencePath": "src/modules/leave-balance/index.ts"
+    },
+    {
+      "requirement": "The repository implementation pattern (interface + Pg*Repository class, pool.query usage, private mapRow helper casting Record<string, unknown> to the entity, snake_case column mapping) must be consistent with the established Employee and LeavePolicy repositories.",
+      "referencePath": "src/modules/employee/employee.repository.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/employee (Employee entity)",
+      "why": "leave-balance depends on Employee for the employeeId foreign-key reference typing; imported via the employee module entry point per the reconciled dependency map."
+    },
+    {
+      "target": "src/modules/leave-policy (LeavePolicy entity)",
+      "why": "leave-balance depends on LeavePolicy for the policyId foreign-key reference typing; imported via the leave-policy module entry point per the reconciled dependency map."
+    },
+    {
+      "target": "src/shared/db/connection.ts (pg Pool / PoolClient)",
+      "why": "The repository uses the shared pool for auto-commit queries and accepts an optional PoolClient so Phase 9's LeaveRequest service can pass its open transaction client to incrementUsedDays for atomic balance deduction."
+    },
+    {
+      "target": "Phase 9 LeaveRequest service (future)",
+      "why": "incrementUsedDays is the atomic primitive the Phase 9 leave-request approval/rejection/cancellation workflow calls within its unit-of-work transaction (BEGIN \u2192 status update + incrementUsedDays on the same client \u2192 COMMIT/ROLLBACK). The optional-client signature is the contract this phase delivers for that consumer."
+    }
+  ]
+}
