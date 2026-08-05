@@ -78,6 +78,14 @@ Represents a leave record managed by the `leave` module, including leave request
 
 Represents leave balance data managed by the `balance` module, including tracked entitlement, accrual, and remaining leave amounts.
 
+### LeaveBalanceStatus
+
+| Value | Description |
+|-------|-------------|
+| ACTIVE | Balance is in effect for the current fiscal year |
+| CLOSED | Balance has been finalised (year-end rollover) |
+| FORECAST | Projected balance for a future fiscal year |
+
 ### Balance
 
 | Field | Type | Required |
@@ -108,13 +116,28 @@ Represents leave balance data managed by the `balance` module, including tracked
 | usedDays | number | true |
 | remainingDays | number | true |
 | fiscalYear | number | true |
-| status | string | true |
+| status | LeaveBalanceStatus | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
 **Relationships**
 - `Employee` — many-to-one
 - `LeavePolicy` — many-to-one
+
+**Invariants**
+- `remainingDays = totalEntitlement - usedDays` — enforced by the repository on every write path (`save`, `update`, `incrementUsedDays`).
+
+### ILeaveBalanceRepository
+
+| Method | Signature | Notes |
+|--------|-----------|-------|
+| findById | `(id: string) => Promise<LeaveBalance \| null>` | |
+| findByEmployeeId | `(employeeId: string) => Promise<LeaveBalance[]>` | |
+| findByEmployeeAndPolicy | `(employeeId: string, policyId: string) => Promise<LeaveBalance \| null>` | Filters to `status = 'ACTIVE'` |
+| findByEmployeeAndFiscalYear | `(employeeId: string, fiscalYear: number) => Promise<LeaveBalance[]>` | |
+| save | `(balance: LeaveBalance) => Promise<LeaveBalance>` | |
+| update | `(id: string, partial: Partial<LeaveBalance>) => Promise<LeaveBalance \| null>` | Recomputes `remainingDays` from `totalEntitlement - usedDays` |
+| incrementUsedDays | `(id: string, days: number, client?: PoolClient) => Promise<LeaveBalance \| null>` | Atomic SQL increment; accepts optional transaction client for caller-owned units of work |
 
 ## employee
 

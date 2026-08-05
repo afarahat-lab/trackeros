@@ -18,6 +18,7 @@ The architecture is modular, with a clear separation of concerns between models,
 ```
 src/modules/employee/          — Employee model, repository
 src/modules/leave-policy/      — LeavePolicy model, repository
+src/modules/leave-balance/     — LeaveBalance model, repository
 src/modules/status/            — Status model, service
 src/modules/uptime/            — Uptime model, service, routes
 src/shared/types/              — Shared TypeScript enums (LeaveType, LeaveRequestStatus)
@@ -37,6 +38,39 @@ src/shared/db/connection.ts    — PostgreSQL connection pool (pg)
 - All database access goes through a repository layer — no inline SQL
   / ORM calls in route handlers or business logic
 - No circular dependencies between modules
+
+## Transaction propagation — optional-client pattern
+
+Repository methods that must be atomic with a caller's transaction
+accept an optional `PoolClient` as their last parameter. When the
+client is provided, the method runs its query on that client (the
+caller's open transaction); when omitted, it falls back to the shared
+pool from `src/shared/db/connection.ts` (auto-commit).
+
+The caller (typically a service) owns the unit of work: it acquires a
+client via `pool.connect()`, issues `BEGIN`, passes that same client
+to every participating repository method, then `COMMIT` (or `ROLLBACK`
+on error) and releases the client in a `finally` block.
+
+Example — `PgLeaveBalanceRepository.incrementUsedDays`:
+```ts
+async incrementUsedDays(id: string, days: number, client?: PoolClient): Promise<LeaveBalance | null> {
+  const db = client ?? pool;
+  const result = await db.query(
+    `UPDATE leave_balances SET
+       used_days = used_days + $2,
+       remaining_days = total_entitlement - (used_days + $2),
+       updated_at = NOW()
+     WHERE id = $1
+     RETURNING *`,
+    [id, days]
+  );
+  return result.rows[0] ? this.mapRow(result.rows[0]) : null;
+}
+```
+
+No distributed-transaction framework or propagation library is used —
+this is the standard optional-client unit-of-work pattern.
 
 <!-- gestalt:architecture feature=be068fd3-a1c9-4eb0-ae38-156852fec5c5 START -->
 ## Leave Management Module – Reconciled Architecture
