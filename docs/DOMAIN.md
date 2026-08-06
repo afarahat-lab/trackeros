@@ -43,9 +43,9 @@ Shared types used across domain modules.
 | REJECTED | Leave request has been rejected |
 | CANCELLED | Leave request has been cancelled |
 
-## leave
+## leave-request
 
-Represents a leave record managed by the `leave` module, including leave requests and related leave-tracking data.
+Represents leave request data managed by the `leave-request` module.
 
 ### LeaveRequest
 
@@ -54,48 +54,42 @@ Represents a leave record managed by the `leave` module, including leave request
 | id | string | true |
 | employeeId | string | true |
 | leaveTypeId | string | true |
+| leavePolicyId | string | true |
 | startDate | Date | true |
 | endDate | Date | true |
+| daysCount | number | true |
 | reason | string \| undefined | false |
 | status | LeaveRequestStatus | true |
 | approvedBy | string \| null | false |
 | approvedAt | Date \| null | false |
+| cancelledBy | string \| null | false |
+| cancelledAt | Date \| null | false |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
 **Relationships**
-- `Employee` — many-to-one
+- `Employee` — many-to-one (employeeId)
+- `LeaveType` — many-to-one (leaveTypeId)
+- `LeavePolicy` — many-to-one (leavePolicyId)
 
-### CreateLeaveRequestDto
-
-| Field | Type | Required |
-|-------|------|----------|
-| employeeId | string | true |
-| leaveTypeId | string | true |
-| startDate | Date | true |
-| endDate | Date | true |
-| reason | string \| undefined | false |
-
-### UpdateLeaveRequestDto
+### LeaveRequestFilters
 
 | Field | Type | Required |
 |-------|------|----------|
-| startDate | Date | false |
-| endDate | Date | false |
-| reason | string \| undefined | false |
-
-### LeaveRequestQueryParams
-
-| Field | Type | Required |
-|-------|------|----------|
+| employeeId | string | false |
 | status | LeaveRequestStatus | false |
 | leaveTypeId | string | false |
 | startDateFrom | Date | false |
 | startDateTo | Date | false |
-| endDateFrom | Date | false |
-| endDateTo | Date | false |
-| limit | number | false |
-| offset | number | false |
+
+### LeaveRequestStatusMetadata
+
+| Field | Type | Required |
+|-------|------|----------|
+| approvedBy | string \| null | false |
+| approvedAt | Date \| null | false |
+| cancelledBy | string \| null | false |
+| cancelledAt | Date \| null | false |
 
 ## balance
 
