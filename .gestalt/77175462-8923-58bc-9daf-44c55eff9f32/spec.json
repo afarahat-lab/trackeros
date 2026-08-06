@@ -1,0 +1,164 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-balance"
+    ],
+    "affectedLayers": [
+      "domain-model",
+      "data-access"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The LeaveBalance entity interface is exported from the leave-balance module and exposes exactly the fields id, employeeId, policyId, totalEntitlement, usedDays, remainingDays, fiscalYear, status ('ACTIVE'|'EXHAUSTED'|'CLOSED'), createdAt, updatedAt \u2014 with status as an inline string union (no shared-types enum import).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The ILeaveBalanceRepository interface declares findById, findByEmployeeId, findByEmployeeAndPolicy, findByEmployeeAndFiscalYear, create, update, and upsert; the concrete PgLeaveBalanceRepository class implements it and compiles under strict TypeScript with no `any` types.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findById/findByEmployeeId/findByEmployeeAndPolicy/findByEmployeeAndFiscalYear return a mapped LeaveBalance when a valid row is found, return null when no row matches, return null when the row fails the type guard, and propagate underlying database errors.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "create persists a new leave_balances row (generating id and timestamps), returns the mapped LeaveBalance, and throws a typed error when the insert returns no row or a row that fails the type guard.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "update builds a dynamic SET clause from the provided partial fields, appends updated_at, returns the updated LeaveBalance (or null when not found), and delegates to findById when no fields are supplied.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "upsert performs an INSERT ... ON CONFLICT (employee_id, leave_policy_id, fiscal_year) DO UPDATE that inserts a new balance when no conflict occurs and updates total_entitlement, used_days, remaining_days, status, and updated_at when a conflict occurs, returning the mapped LeaveBalance in both paths.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The Jest unit test suite at tests/unit/modules/leave-balance/leave-balance.repository.test.ts covers every repository method for success, not-found, type-guard-failure, and error propagation, plus upsert insert-path and conflict-path, and the full suite passes via `npm run build && npx jest --passWithNoTests`.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No `any` types anywhere in the model, interface, repository, or tests \u2014 use `unknown` with type guards (HARNESS.json no-any, high severity).",
+    "All database access goes through the repository layer using the shared pool from src/shared/db/connection.ts; no inline SQL outside the repository (GP-001 / no-direct-db-outside-repository, critical).",
+    "The repository must follow the established pattern from PgEmployeeRepository/PgLeavePolicyRepository: a private inner class extending BaseRepository instantiated as `private readonly base`, a snake_case Row interface with a `[key: string]: unknown` index signature, a rowToLeaveBalance mapper, an isLeaveBalanceRow type guard using unknown (no any), and direct `this.base.query<RowType>` calls with RETURNING * rather than the generic insert/update helpers.",
+    "The entity field policyId maps to the DB column leave_policy_id (not policy_id); all other camelCase entity fields map to their snake_case DB columns (employeeId\u2192employee_id, totalEntitlement\u2192total_entitlement, usedDays\u2192used_days, remainingDays\u2192remaining_days, fiscalYear\u2192fiscal_year, createdAt\u2192created_at, updatedAt\u2192updated_at).",
+    "create input is Omit<LeaveBalance,'id'|'createdAt'|'updatedAt'> with a randomUUID() id and new Date() timestamps generated inside the method; update input is Partial<Omit<LeaveBalance,'id'|'createdAt'|'updatedAt'>>; upsert input is Omit<LeaveBalance,'id'|'createdAt'|'updatedAt'>.",
+    "The LeaveBalance status field is an inline string union 'ACTIVE'|'EXHAUSTED'|'CLOSED' \u2014 no import from src/shared/types is required for this module (shared-types exports only LeaveType, LeaveRequestStatus, UserRole enums).",
+    "create throws the error message 'Failed to create leave balance' when the insert returns no row or a row failing the type guard, matching the established error-message convention from the employee and leave-policy repositories."
+  ],
+  "outOfScope": [
+    "LeaveBalanceService, ILeaveBalanceService, and any business logic (deductDays, restoreDays, getAvailableBalance, initializeBalance) \u2014 these belong to Phase 9.",
+    "Enforcement of the LeaveBalance lifecycle transitions (ACTIVE\u2192EXHAUSTED when remainingDays=0, EXHAUSTED\u2192ACTIVE on cancellation reversal, CLOSED terminal) \u2014 the repository persists whatever status it is given; lifecycle enforcement is a service-layer concern (Phase 9).",
+    "Fastify routes, controllers, RBAC guards, and HTTP error-response mapping for leave balances \u2014 these belong to Phase 10.",
+    "Database migrations / Knex schema creation for the leave_balances table \u2014 this phase assumes the table and its unique constraint (employee_id, leave_policy_id, fiscal_year) already exist per the reconciled architecture.",
+    "Audit logging (GP-002) for balance create/update/upsert operations \u2014 audit wiring is a service-layer concern; the repository itself does not write audit records."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "Lifecycle is ACTIVE \u2192 EXHAUSTED (when remainingDays reaches 0) or CLOSED (at fiscal-year end); EXHAUSTED \u2192 ACTIVE is permitted on cancellation reversal; CLOSED is terminal and cannot transition to any other status. The repository must not reject any of these status values but is not responsible for enforcing transition legality."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "The natural key is (employeeId, policyId, fiscalYear); at most one ACTIVE/EXHAUSTED balance row may exist per employee per policy per fiscal year, enforced by the unique constraint on (employee_id, leave_policy_id, fiscal_year) which upsert relies on."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "remainingDays is the derived balance (totalEntitlement \u2212 usedDays); the entity is updated atomically on APPROVED and CANCELLED-from-APPROVED leave-request transitions, but the repository only persists the values it is given \u2014 it does not recompute remainingDays."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "ILeaveBalanceRepository.findById(id)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the mapped LeaveBalance or null when not found / type-guard failure; propagates underlying database errors unchanged."
+    },
+    {
+      "operation": "ILeaveBalanceRepository.findByEmployeeId(employeeId)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an array of mapped LeaveBalance rows (filtering out type-guard failures); propagates database errors unchanged."
+    },
+    {
+      "operation": "ILeaveBalanceRepository.findByEmployeeAndPolicy(employeeId, policyId)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the mapped LeaveBalance or null when not found / type-guard failure; propagates database errors unchanged."
+    },
+    {
+      "operation": "ILeaveBalanceRepository.findByEmployeeAndFiscalYear(employeeId, fiscalYear)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an array of mapped LeaveBalance rows (filtering out type-guard failures); propagates database errors unchanged."
+    },
+    {
+      "operation": "ILeaveBalanceRepository.create(balance)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws 'Failed to create leave balance' when the insert returns no row or a row failing the type guard; propagates underlying database errors unchanged."
+    },
+    {
+      "operation": "ILeaveBalanceRepository.update(id, balance)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the updated LeaveBalance or null when not found / type-guard failure; delegates to findById when no fields are supplied; propagates database errors unchanged."
+    },
+    {
+      "operation": "ILeaveBalanceRepository.upsert(balance)",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns the mapped LeaveBalance in both the insert and conflict-update paths; throws when the returned row fails the type guard; propagates underlying database errors unchanged."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "PgLeaveBalanceRepository must extend BaseRepository (via a private inner class) and use its generic query<T extends Record<string, unknown>> helper for all SQL, matching the BaseRepository signature in src/shared/base-repository.ts.",
+      "referencePath": "src/shared/base-repository.ts"
+    },
+    {
+      "requirement": "The repository structure (private inner BaseRepository subclass as `private readonly base`, snake_case Row interface with [key:string]:unknown index signature, rowToLeaveBalance mapper, isLeaveBalanceRow type guard using unknown, create with randomUUID id + new Date timestamps + RETURNING *, update with dynamic SET clauses + updated_at append + findById delegation, error message 'Failed to create leave balance') must mirror the established pattern in src/modules/leave-policy/leave-policy.repository.ts and src/modules/employee/employee.repository.ts.",
+      "referencePath": "src/modules/leave-policy/leave-policy.repository.ts"
+    },
+    {
+      "requirement": "The test file must follow the established test pattern: jest.mock the db connection BEFORE importing pool, makeLeaveBalanceRow() (snake_case) and makeLeaveBalance() (camelCase) helpers, beforeEach mockQuery.mockReset(), and per-method coverage of success/not-found/type-guard-failure/error \u2014 matching tests/unit/modules/leave-policy/leave-policy.repository.test.ts and tests/unit/modules/employee/employee.repository.test.ts.",
+      "referencePath": "tests/unit/modules/leave-policy/leave-policy.repository.test.ts"
+    },
+    {
+      "requirement": "The leave_balances table columns and the unique constraint (employee_id, leave_policy_id, fiscal_year) that upsert's ON CONFLICT targets must match the reconciled architecture's sql_schemas entry for leave_balances in .gestalt/architecture/reconciled.json.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/base-repository.ts (Phase 1)",
+      "why": "PgLeaveBalanceRepository extends BaseRepository and uses its query helper for all database access."
+    },
+    {
+      "target": "src/shared/db/connection.ts (Phase 1)",
+      "why": "The repository (via BaseRepository) uses the exported pool for PostgreSQL queries; tests mock this module's pool.query."
+    },
+    {
+      "target": "leave-policy module (Phase 3) and employee module (Phase 2)",
+      "why": "Per the reconciled dependency map, leave-balance depends on leave-policy, employee, and shared-types; this phase's repository references policyId and employeeId as foreign keys to those modules' tables, though it does not import their code directly."
+    },
+    {
+      "target": "Phase 9 LeaveBalanceService",
+      "why": "The ILeaveBalanceRepository interface and PgLeaveBalanceRepository created here are the data-access contract that the future LeaveBalanceService (deductDays, restoreDays, getAvailableBalance) will inject and call."
+    }
+  ]
+}
