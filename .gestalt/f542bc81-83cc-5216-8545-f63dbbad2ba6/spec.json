@@ -1,0 +1,175 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared-types",
+      "shared-infrastructure"
+    ],
+    "affectedLayers": [
+      "data-access",
+      "shared-types"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "LeaveType, LeaveRequestStatus, and UserRole are exported from src/shared/types/index.ts as string-literal union types with exactly the specified values (LeaveType: annual|sick|emergency|unpaid|maternity|paternity; LeaveRequestStatus: DRAFT|SUBMITTED|APPROVED|REJECTED|CANCELLED; UserRole: employee|manager|hr_admin) and are importable by other modules.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The base repository is an abstract class that cannot be instantiated directly \u2014 it serves as the base for concrete repositories in later phases.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The base repository exposes exactly six methods (query, findById, findAll, insert, update, delete), each delegating query execution to the shared pool imported from src/shared/db/connection.ts.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The base repository methods use TypeScript generics so concrete repositories receive typed results without resorting to any.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "No any type appears in the new source files; unknown with type guards is used instead, satisfying strict tsconfig and the no-any harness constraint.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All base repository methods use async/await with explicit error handling so no unhandled promise rejections escape (GP-006).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Unit tests in tests/unit/shared/base-repository.test.ts mock the shared pool (no live PostgreSQL required) and verify each of the six methods issues the expected query against the pool and returns or propagates results correctly.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "npm run build (tsc --noEmit) passes with zero errors for the new files and npx jest runs the new test file successfully.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The base repository does not accept a PoolClient parameter on any of its six methods \u2014 transaction support is deferred to concrete repositories in later phases per the settled architect decision.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No any type \u2014 use unknown with type guards instead (HARNESS no-any, high severity; tsconfig strict: true).",
+    "All database access goes through the repository pattern \u2014 the base repository is the sanctioned data-access layer and may import pool from src/shared/db/connection.ts; no other layer may import the pool directly (GP-001, no-direct-db-outside-repository).",
+    "Use async/await throughout, never callbacks; wrap pool operations in explicit try/catch so no unhandled promise rejections escape (GP-006).",
+    "New files must compile under the existing tsconfig (strict: true, ES2022, commonjs, baseUrl ./src, rootDir ./src) without loosening any settings.",
+    "The base repository must implement exactly the six specified method signatures (query, findById, findAll, insert, update, delete) with no PoolClient overload \u2014 transaction support deferred to concrete repositories in later phases.",
+    "Tests must mock the shared pool rather than require a live PostgreSQL instance; jest.config moduleDirectories allows shared/db/connection as a mock path.",
+    "No hardcoded secrets \u2014 the base repository must not embed connection strings or credentials; it consumes the already-configured pool (no-hardcoded-secrets)."
+  ],
+  "outOfScope": [
+    "Concrete repository implementations (PgEmployeeRepository, PgLeavePolicyRepository, PgLeaveBalanceRepository, PgLeaveRequestRepository, PgAuditLogRepository, PgNotificationRepository) \u2014 deferred to Phases 2\u20137.",
+    "Transaction/PoolClient support on the base repository \u2014 deferred to concrete repositories in later phases per the settled decision.",
+    "Employee model and repository \u2014 Phase 2.",
+    "SQL migrations / DDL \u2014 the base repository issues queries against existing or future tables but creates no schema.",
+    "Audit logging (GP-002) \u2014 the base repository is a generic data-access helper, not a state-changing domain operation; audit applies to domain operations in later phases.",
+    "RBAC enforcement (GP-005) and input validation at API boundaries (GP-003) \u2014 no API surface in this phase."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveType",
+      "mustExistOrExtend": true,
+      "invariant": "The exported LeaveType type is a string-literal union whose members are exactly 'annual', 'sick', 'emergency', 'unpaid', 'maternity', 'paternity' \u2014 no more, no fewer \u2014 matching the reconciled architecture's LeaveType value object."
+    },
+    {
+      "entity": "LeaveRequestStatus",
+      "mustExistOrExtend": true,
+      "invariant": "The exported LeaveRequestStatus type is a string-literal union whose members are exactly 'DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED', 'CANCELLED' \u2014 no more, no fewer \u2014 matching the reconciled architecture's LeaveRequestStatus value object that governs the DRAFT\u2192SUBMITTED\u2192(APPROVED|REJECTED|CANCELLED) lifecycle."
+    },
+    {
+      "entity": "UserRole",
+      "mustExistOrExtend": true,
+      "invariant": "The exported UserRole type is a string-literal union whose members are exactly 'employee', 'manager', 'hr_admin' \u2014 no more, no fewer \u2014 matching the Auth Contract's role model (request.user.role: UserRole)."
+    },
+    {
+      "entity": "BaseRepository",
+      "mustExistOrExtend": true,
+      "invariant": "The base repository is an abstract class that cannot be instantiated directly; it exists only to be extended by concrete repositories and provides no domain-specific behavior."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "BaseRepository.query \u2014 execute an arbitrary SQL text with bind parameters against the shared pool and return the typed query result.",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Pool/query errors must be caught and re-thrown or handled explicitly; no unhandled promise rejections (GP-006)."
+    },
+    {
+      "operation": "BaseRepository.findById \u2014 retrieve a single row by primary key from a given table; returns the row or a not-found sentinel (null/undefined) when no row matches.",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Pool/query errors must be caught and handled explicitly; a missing row is a normal result, not an error."
+    },
+    {
+      "operation": "BaseRepository.findAll \u2014 retrieve all rows from a given table.",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Pool/query errors must be caught and handled explicitly (GP-006)."
+    },
+    {
+      "operation": "BaseRepository.insert \u2014 persist a new row into a given table from a data object and return the inserted row.",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Pool/query errors (including constraint violations) must be caught and handled explicitly; no unhandled promise rejections (GP-006)."
+    },
+    {
+      "operation": "BaseRepository.update \u2014 update an existing row by primary key in a given table from a data object and return the updated row (or a not-found sentinel when no row matches).",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Pool/query errors must be caught and handled explicitly; a missing row is a normal result, not an error (GP-006)."
+    },
+    {
+      "operation": "BaseRepository.delete \u2014 remove a row by primary key from a given table and indicate whether a row was removed.",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Pool/query errors must be caught and handled explicitly (GP-006)."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The base repository must obtain its database connection by importing the existing exported pool from src/shared/db/connection.ts (the sanctioned shared connection pool), not by constructing a new Pool or reading DATABASE_URL itself.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "The three shared enums must be placed under the shared-types module at src/shared/types/ exactly as the reconciled architecture's Module Boundaries declare (shared-types owns LeaveType, LeaveRequestStatus, UserRole), and their values must match the reconciled domain_entities definitions.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "The base repository must reside at src/shared/base-repository.ts as a shared utility under src/shared/, consistent with the architecture's declared shared utilities location (db connection, base repository, error types).",
+      "referencePath": "docs/ARCHITECTURE.md"
+    },
+    {
+      "requirement": "The test file must live under tests/ and match the jest.config testMatch pattern (**/tests/**/*.test.(ts|js)) so ts-jest picks it up; tests must run in the node environment and may use moduleDirectories (node_modules, src) to mock shared/db/connection.",
+      "referencePath": "jest.config.js"
+    },
+    {
+      "requirement": "All new source files must compile under the existing tsconfig (strict: true, target ES2022, module commonjs, baseUrl ./src, rootDir ./src) without adding compiler options or loosening strictness.",
+      "referencePath": "tsconfig.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/db/connection.ts (shared pg Pool)",
+      "why": "The base repository imports the existing pool to execute all queries; this is the sanctioned data-access-layer import per GP-001 and the no-direct-db-outside-repository constraint."
+    },
+    {
+      "target": "Concrete repositories in Phases 2\u20137 (PgEmployeeRepository, PgLeavePolicyRepository, PgLeaveBalanceRepository, PgLeaveRequestRepository, PgAuditLogRepository, PgNotificationRepository)",
+      "why": "The base repository is the foundation that all concrete PostgreSQL repositories will extend; its method contract and generics shape must be stable enough for later phases to rely on."
+    },
+    {
+      "target": "src/shared/types/index.ts (shared-types module)",
+      "why": "Every domain module (employee, leave-policy, leave-balance, leave-request, audit, notification) imports LeaveType, LeaveRequestStatus, and/or UserRole from this shared types entry point per the reconciled dependency map."
+    }
+  ]
+}
