@@ -16,8 +16,8 @@ The architecture is modular, with a clear separation of concerns between models,
 ## Module structure
 
 ```
-src/modules/employee/          — Employee model, repository interface, repository
-src/modules/leave-policy/      — LeavePolicy model, repository interface, repository
+src/modules/employee/          — Employee model, repository interface, repository, service interface, service
+src/modules/leave-policy/      — LeavePolicy model, repository interface, repository, service interface, service
 src/modules/leave-balance/     — LeaveBalance model, repository interface, repository
 src/modules/leave-request/     — LeaveRequest model, repository interface, repository
 src/modules/audit/             — AuditLog model, repository interface, repository
@@ -26,6 +26,7 @@ src/modules/status/            — Status module (model, service)
 src/modules/uptime/            — Uptime module (model, service, routes)
 src/shared/db/connection.ts    — PostgreSQL pool (pg)
 src/shared/base-repository.ts  — Abstract BaseRepository with query helpers
+src/shared/errors.ts           — Shared error types: AppError, ValidationError, NotFoundError, InternalError
 src/shared/types/index.ts      — Shared enums: LeaveType, LeaveRequestStatus, UserRole
 ```
 
@@ -36,11 +37,13 @@ src/shared/types/index.ts      — Shared enums: LeaveType, LeaveRequestStatus, 
 | Model | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Repository interface | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Repository (Pg*) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Service interface | — | — | — | — | — | — |
-| Service | — | — | — | — | — | — |
+| Service interface | ✅ | ✅ | — | — | — | — |
+| Service | ✅ | ✅ | — | — | — | — |
 | Routes | — | — | — | — | — | — |
 
 All repository implementations extend `BaseRepository` from `src/shared/base-repository.ts`, use the shared `pool` from `src/shared/db/connection.ts`, and employ `unknown` + type guards (no `any`). Row-to-entity mapping functions (`rowTo*`) and type guard functions (`is*Row`) are private to each repository file. IDs are generated via `crypto.randomUUID()` and timestamps via `new Date()` at the repository layer.
+
+Services follow a consistent pattern: constructor-injected repository dependency, input validation at every public method boundary using `isNonEmptyString` and value-set guards, and structured errors (`ValidationError`, `NotFoundError`, `InternalError`) from `src/shared/errors.ts`. Repository errors are caught and re-thrown (domain errors pass through; unexpected errors are wrapped in `InternalError`).
 
 ## Key patterns
 

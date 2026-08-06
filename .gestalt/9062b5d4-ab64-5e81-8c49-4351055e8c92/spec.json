@@ -1,0 +1,234 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "employee",
+      "leave-policy"
+    ],
+    "affectedLayers": [
+      "service"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "IEmployeeService interface declares all eight methods (findById, findByEmployeeNumber, findByEmail, getDirectReports, isManagerOf, createEmployee, updateEmployee, terminateEmployee) and EmployeeService class implements it, delegating to the injected IEmployeeRepository.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "ILeavePolicyService interface declares all nine methods (findById, findByLeaveType, getAllActive, getEntitlementDays, requiresManagerApproval, getMinimumNoticeDays, createPolicy, updatePolicy, deactivatePolicy) and LeavePolicyService class implements it, delegating to the injected ILeavePolicyRepository.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Every public service method validates its arguments before delegating to the repository: empty or whitespace-only string IDs/emails/employeeNumbers/managerIds are rejected with ValidationError (code VALIDATION_ERROR) and the repository is never called.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "createEmployee validates required string fields (employeeNumber, firstName, lastName, email) are non-empty and employmentStatus is one of ACTIVE/INACTIVE/TERMINATED; invalid values are rejected with ValidationError before the repository create is invoked.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "isManagerOf returns true when the looked-up employee's managerId equals the supplied managerId, false when it differs or the employee has a null managerId, and throws NotFoundError (code NOT_FOUND) when the employee does not exist.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "terminateEmployee delegates to the repository update with employmentStatus set to TERMINATED and terminationDate set to the current date; when the repository update returns null (employee not found), it throws NotFoundError (code NOT_FOUND).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "LeavePolicyService.findByLeaveType validates that the supplied leaveType is a valid LeaveType enum value before delegating; an invalid value is rejected with ValidationError and the repository is not called.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "LeavePolicyService accessors getEntitlementDays, requiresManagerApproval, and getMinimumNoticeDays each load the policy by id first; when the policy is not found they throw NotFoundError (code NOT_FOUND), otherwise they return the corresponding policy attribute.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "createPolicy validates required fields (policyName non-empty, leaveType is a valid LeaveType, entitlementDays is a non-negative number, requiresManagerApproval is a boolean, isActive is a boolean); invalid values are rejected with ValidationError before the repository create is invoked.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Repository errors are caught and re-thrown: domain errors (ValidationError, NotFoundError) pass through unchanged; unexpected errors are wrapped in InternalError (code INTERNAL_ERROR) with the original message preserved.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The Jest unit test file tests/unit/modules/employee/employee.service.test.ts passes, covering all eight EmployeeService methods with a mocked IEmployeeRepository \u2014 including happy paths, not-found cases, and validation-error rejections.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No `any` types \u2014 use `unknown` with type guards per HARNESS.json constraint no-any (severity high).",
+    "All database access goes through the injected repository interface (IEmployeeRepository / ILeavePolicyRepository); the service must never query the database directly (GP-001, HARNESS.json no-direct-db-outside-repository severity critical).",
+    "Services receive their repository dependency via constructor injection; no service-level singleton or global state.",
+    "Input validation must occur at every public service method boundary before delegation to the repository (GP-003).",
+    "No unhandled promise rejections \u2014 all async errors are caught and handled (GP-006); domain errors pass through, unexpected errors wrapped in InternalError.",
+    "Modules import from each other only through their declared public entry points; the employee and leave-policy services must not import internals of other modules beyond their own model, repository interface, and shared types/errors.",
+    "Strict TypeScript must pass (no implicit any, strict null checks) \u2014 the verification gate runs npm run build (tsc) before tests."
+  ],
+  "outOfScope": [
+    "Audit logging (GP-002) for createEmployee/updateEmployee/terminateEmployee/createPolicy/updatePolicy/deactivatePolicy \u2014 audit is wired at the route/controller layer in Phase 10, not in these data-access services.",
+    "RBAC enforcement (GP-005) \u2014 role-based access control is enforced at the Fastify route layer via requireRole guards in Phase 10, not inside the service methods.",
+    "LeavePolicyService unit tests \u2014 PLAN.md Phase 8 only requires a Jest unit test for the employee service (tests/unit/modules/employee/employee.service.test.ts); leave-policy service tests are not mandated for this phase.",
+    "Controllers, routes, Fastify registration, and HTTP error-response mapping \u2014 these belong to Phase 10.",
+    "LeaveBalanceService and LeaveRequestService \u2014 these are Phase 9 and depend on the services created in this phase."
+  ],
+  "ambiguities": [
+    {
+      "description": "getDirectReports delegates to repository.findByManagerId which returns all non-deleted employees with that managerId. It is unclear whether the service should additionally filter to only ACTIVE employmentStatus employees or return all non-deleted direct reports as the repository does.",
+      "options": [
+        "Return all non-deleted direct reports as-is from the repository (no additional status filtering)",
+        "Filter to only ACTIVE employees before returning"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "The existing employee.service.test.ts expects terminateEmployee to call repository.update with employmentStatus TERMINATED and a terminationDate, and to throw NotFoundError when update returns null. It does not test whether the service first checks the employee exists via findById before calling update. The implementation could either (a) call update directly and interpret null as not-found, or (b) findById first then update. The test is compatible with both but they differ in behavior when the employee is soft-deleted.",
+      "options": [
+        "Call repository.update directly and throw NotFoundError when it returns null",
+        "Call findById first to confirm existence, then update"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "description": "LeavePolicyService.findByLeaveType delegates to repository.findByLeaveType which only returns active policies (WHERE is_active = true). It is unclear whether the service should throw NotFoundError when no active policy exists for a leave type, or return null like the repository does. The employee service read methods (findById, findByEmail) return null on not-found, suggesting null is the consistent choice.",
+      "options": [
+        "Return null when no active policy is found (consistent with read-method convention)",
+        "Throw NotFoundError when no active policy is found"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "LeavePolicyService.deactivatePolicy delegates to repository.deactivate which returns a boolean (true if a row was updated, false if not found). It is unclear whether the service should throw NotFoundError when deactivate returns false, or return the boolean as-is.",
+      "options": [
+        "Return the boolean as-is from the repository",
+        "Throw NotFoundError when the repository returns false (policy not found)"
+      ],
+      "impactIfWrong": "medium"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "An employee's employmentStatus transitions are constrained to the set {ACTIVE, INACTIVE, TERMINATED}; terminateEmployee must set it to TERMINATED and populate terminationDate \u2014 no other status value may be written by the terminate operation."
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "The manager-employee relationship is a self-referential link: isManagerOf(managerId, employeeId) is true if and only if the employee identified by employeeId exists and its managerId field equals the supplied managerId; a null managerId means the employee has no manager."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "A LeavePolicy's leaveType must be a member of the LeaveType enum (annual, sick, emergency, unpaid, maternity, paternity); the service must reject any value outside this set at the boundary before persistence."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "Deactivation is a one-way lifecycle transition: deactivatePolicy sets isActive to false; the service must not silently re-activate a policy through the deactivate operation."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IEmployeeService.findById",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Empty/whitespace-only id \u2192 ValidationError (VALIDATION_ERROR); repository NotFoundError passes through; unexpected errors wrapped in InternalError."
+    },
+    {
+      "operation": "IEmployeeService.isManagerOf",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Empty managerId or employeeId \u2192 ValidationError; employee not found \u2192 NotFoundError (NOT_FOUND); unexpected errors wrapped in InternalError."
+    },
+    {
+      "operation": "IEmployeeService.createEmployee",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Missing/empty required string fields or invalid employmentStatus \u2192 ValidationError; repository errors wrapped in InternalError (domain errors pass through)."
+    },
+    {
+      "operation": "IEmployeeService.terminateEmployee",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Empty id \u2192 ValidationError; employee not found (repository update returns null) \u2192 NotFoundError; unexpected errors wrapped in InternalError."
+    },
+    {
+      "operation": "ILeavePolicyService.findByLeaveType",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Invalid leaveType (not a LeaveType enum member) \u2192 ValidationError; unexpected errors wrapped in InternalError."
+    },
+    {
+      "operation": "ILeavePolicyService.getEntitlementDays / requiresManagerApproval / getMinimumNoticeDays",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Empty policyId \u2192 ValidationError; policy not found \u2192 NotFoundError; unexpected errors wrapped in InternalError."
+    },
+    {
+      "operation": "ILeavePolicyService.createPolicy",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Empty policyName, invalid leaveType, non-numeric/negative entitlementDays, or non-boolean requiresManagerApproval/isActive \u2192 ValidationError; repository errors wrapped in InternalError."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "EmployeeService must delegate to the exact method signatures declared in IEmployeeRepository \u2014 findById, findByEmployeeNumber, findByEmail, findByManagerId (for getDirectReports), create (for createEmployee), update (for updateEmployee and terminateEmployee). The service must not bypass or rename these repository operations.",
+      "referencePath": "src/modules/employee/employee.repository.interface.ts"
+    },
+    {
+      "requirement": "LeavePolicyService must delegate to the exact method signatures declared in ILeavePolicyRepository \u2014 findById, findByLeaveType, findAllActive (for getAllActive), create (for createPolicy), update (for updatePolicy), deactivate (for deactivatePolicy). The accessor methods (getEntitlementDays, requiresManagerApproval, getMinimumNoticeDays) must load the policy via findById before reading its attributes.",
+      "referencePath": "src/modules/leave-policy/leave-policy.repository.interface.ts"
+    },
+    {
+      "requirement": "All service-thrown errors must use the shared error classes from src/shared/errors.ts \u2014 ValidationError (code VALIDATION_ERROR), NotFoundError (code NOT_FOUND), InternalError (code INTERNAL_ERROR) \u2014 all extending AppError. The service must not throw plain Error or introduce new error classes.",
+      "referencePath": "src/shared/errors.ts"
+    },
+    {
+      "requirement": "LeavePolicyService must import and validate against the LeaveType enum from src/shared/types/index.ts; the valid value set is exactly the enum members (annual, sick, emergency, unpaid, maternity, paternity). No hardcoded duplicate of this set may diverge from the enum.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "EmployeeService must operate on the Employee interface as defined in employee.model.ts; the employmentStatus union type ('ACTIVE' | 'INACTIVE' | 'TERMINATED') and the managerId nullable type must be respected \u2014 terminateEmployee writes TERMINATED, isManagerOf handles null managerId.",
+      "referencePath": "src/modules/employee/employee.model.ts"
+    },
+    {
+      "requirement": "The EmployeeService implementation must satisfy the behavioral expectations already encoded in the existing test file: constructor takes IEmployeeRepository, isManagerOf throws NotFoundError on missing employee, terminateEmployee throws NotFoundError when update returns null, validation rejects empty/whitespace strings, and repository errors propagate. The implementation must make this test pass without modification.",
+      "referencePath": "tests/unit/modules/employee/employee.service.test.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "IEmployeeRepository (src/modules/employee/employee.repository.interface.ts)",
+      "why": "EmployeeService depends on the repository interface for all data access; the concrete PgEmployeeRepository satisfies this interface and is the expected injection in production."
+    },
+    {
+      "target": "ILeavePolicyRepository (src/modules/leave-policy/leave-policy.repository.interface.ts)",
+      "why": "LeavePolicyService depends on the repository interface for all data access; the concrete PgLeavePolicyRepository satisfies this interface and is the expected injection in production."
+    },
+    {
+      "target": "IEmployeeService (src/modules/employee/employee.service.interface.ts)",
+      "why": "Phase 9 LeaveRequestService injects IEmployeeService to resolve manager hierarchy (isManagerOf, getDirectReports) and employee lookups for RBAC checks and escalation-when-no-manager logic."
+    },
+    {
+      "target": "ILeavePolicyService (src/modules/leave-policy/leave-policy.service.interface.ts)",
+      "why": "Phase 9 LeaveBalanceService and LeaveRequestService inject ILeavePolicyService to load entitlement days, manager-approval requirement, and minimum-notice-days for balance initialization and request validation."
+    },
+    {
+      "target": "src/shared/errors.ts",
+      "why": "Both services import ValidationError, NotFoundError, and InternalError from the shared error module to produce structured errors with consistent codes consumed by the future controller/error-response mapping layer."
+    }
+  ]
+}

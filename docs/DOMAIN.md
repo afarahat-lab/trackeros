@@ -1,15 +1,3 @@
-## base
-
-Base entity providing common fields for domain models.
-
-### BaseEntity
-
-| Field | Type | Required |
-|-------|------|----------|
-| id | string | true |
-| created_at | Date | true |
-| updated_at | Date | true |
-
 ## shared
 
 Shared types used across domain modules.
@@ -91,28 +79,9 @@ Represents leave request data managed by the `leave-request` module.
 | cancelledBy | string \| null | false |
 | cancelledAt | Date \| null | false |
 
-## balance
+## leave-balance
 
-Represents leave balance data managed by the `balance` module, including tracked entitlement, accrual, and remaining leave amounts.
-
-### Balance
-
-| Field | Type | Required |
-|-------|------|----------|
-| id | string | true |
-| employeeId | string | true |
-| policyId | string | true |
-| totalEntitlement | number | true |
-| usedDays | number | true |
-| remainingDays | number | true |
-| fiscalYear | number | true |
-| status | string | true |
-| createdAt | Date | true |
-| updatedAt | Date | true |
-
-**Relationships**
-- `Employee` — many-to-one
-- `LeavePolicy` — many-to-one
+Represents leave balance data managed by the `leave-balance` module.
 
 ### LeaveBalance
 
@@ -125,7 +94,7 @@ Represents leave balance data managed by the `balance` module, including tracked
 | usedDays | number | true |
 | remainingDays | number | true |
 | fiscalYear | number | true |
-| status | string | true |
+| status | 'ACTIVE' \| 'EXHAUSTED' \| 'CLOSED' | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
@@ -135,7 +104,7 @@ Represents leave balance data managed by the `balance` module, including tracked
 
 ## employee
 
-Represents employee data managed by the `employee` module, including employee records and related personnel information.
+Represents employee data managed by the `employee` module.
 
 ### Employee
 
@@ -155,25 +124,9 @@ Represents employee data managed by the `employee` module, including employee re
 | updatedAt | Date | true |
 | deletedAt | Date \| null | false |
 
-## policy
+## leave-policy
 
-Represents leave policy data managed by the `policy` module, including policy definitions, rules, and leave entitlement configurations.
-
-### Policy
-
-| Field | Type | Required |
-|-------|------|----------|
-| id | string | true |
-| policyName | string | true |
-| leaveType | string | true |
-| entitlementDays | number | true |
-| accrualRate | number | false |
-| maxAccumulation | number | false |
-| minimumNoticeDays | number | false |
-| requiresManagerApproval | boolean | true |
-| isActive | boolean | true |
-| createdAt | Date | true |
-| updatedAt | Date | true |
+Represents leave policy data managed by the `leave-policy` module.
 
 ### LeavePolicy
 
@@ -181,11 +134,11 @@ Represents leave policy data managed by the `policy` module, including policy de
 |-------|------|----------|
 | id | string | true |
 | policyName | string | true |
-| leaveType | string | true |
+| leaveType | LeaveType | true |
 | entitlementDays | number | true |
-| accrualRate | number | false |
-| maxAccumulation | number | false |
-| minimumNoticeDays | number | false |
+| accrualRate | number \| undefined | false |
+| maxAccumulation | number \| undefined | false |
+| minimumNoticeDays | number \| undefined | false |
 | requiresManagerApproval | boolean | true |
 | isActive | boolean | true |
 | createdAt | Date | true |
@@ -193,7 +146,7 @@ Represents leave policy data managed by the `policy` module, including policy de
 
 ## notification
 
-Represents notification data managed by the `notification` module, including notification records, delivery status, and related messaging information.
+Represents notification data managed by the `notification` module.
 
 ### Notification
 
@@ -201,18 +154,18 @@ Represents notification data managed by the `notification` module, including not
 |-------|------|----------|
 | id | string | true |
 | recipientId | string | true |
-| type | string | true |
+| type | 'LEAVE_SUBMITTED' \| 'LEAVE_APPROVED' \| 'LEAVE_REJECTED' \| 'LEAVE_CANCELLED' | true |
 | title | string | true |
 | message | string | true |
-| relatedEntityType | string \| null | false |
-| relatedEntityId | string \| null | false |
+| relatedEntityType | 'LeaveRequest' | true |
+| relatedEntityId | string | true |
 | status | 'PENDING' \| 'SENT' \| 'READ' \| 'ARCHIVED' | true |
 | createdAt | Date | true |
 | readAt | Date \| null | false |
 
 ## audit
 
-Represents audit data managed by the `audit` module, including audit records, change history, and activity tracking information.
+Represents audit data managed by the `audit` module.
 
 ### AuditLog
 
@@ -236,9 +189,20 @@ Represents audit data managed by the `audit` module, including audit records, ch
 - `performedAt` is caller-supplied (records when the audited action occurred, distinct from the persistence timestamp `createdAt`).
 - `performedBy`, `ipAddress`, `userAgent`, `oldValues`, and `newValues` are all nullable.
 
+### AuditLogFilters
+
+| Field | Type | Required |
+|-------|------|----------|
+| entityType | string | false |
+| entityId | string | false |
+| performedBy | string | false |
+| action | string | false |
+| performedFrom | Date | false |
+| performedTo | Date | false |
+
 ## validation
 
-Represents validation data managed by the `validation` module, including validation results and related error information.
+Represents validation data managed by the `validation` module.
 
 ### ValidationResult
 

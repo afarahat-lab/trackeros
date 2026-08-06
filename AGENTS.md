@@ -55,8 +55,9 @@ user projects use whatever stack matches their description.
 src/shared/types/index.ts          — LeaveType, LeaveRequestStatus, UserRole enums
 src/shared/base-repository.ts      — Abstract BaseRepository with query helpers
 src/shared/db/connection.ts        — PostgreSQL pool (pg)
-src/modules/employee/              — Employee model, IEmployeeRepository, PgEmployeeRepository
-src/modules/leave-policy/          — LeavePolicy model, ILeavePolicyRepository, PgLeavePolicyRepository
+src/shared/errors.ts               — AppError, ValidationError, NotFoundError, InternalError
+src/modules/employee/              — Employee model, IEmployeeRepository, PgEmployeeRepository, IEmployeeService, EmployeeService
+src/modules/leave-policy/          — LeavePolicy model, ILeavePolicyRepository, PgLeavePolicyRepository, ILeavePolicyService, LeavePolicyService
 src/modules/leave-balance/         — LeaveBalance model, ILeaveBalanceRepository, PgLeaveBalanceRepository
 src/modules/leave-request/         — LeaveRequest model, ILeaveRequestRepository, PgLeaveRequestRepository
 src/modules/audit/                 — AuditLog model, IAuditLogRepository, PgAuditLogRepository
@@ -65,7 +66,16 @@ src/modules/status/                — Status module (model, service)
 src/modules/uptime/                — Uptime module (model, service, routes)
 ```
 
-Service layers, controllers, and routes are not yet implemented.
+Service layers exist for employee and leave-policy. Remaining modules (leave-balance, leave-request, audit, notification) have repositories only — services, controllers, and routes are not yet implemented.
+
+## Service layer conventions
+
+Services follow a consistent pattern established in this phase:
+
+- **Constructor injection**: Each service receives its repository dependency via the constructor.
+- **Input validation at every boundary**: Every public method validates its arguments before delegating to the repository. String IDs are checked with `isNonEmptyString`; enum-like values are checked against `ReadonlySet` guards.
+- **Structured errors**: Validation failures throw `ValidationError` (code: `VALIDATION_ERROR`); missing entities throw `NotFoundError` (code: `NOT_FOUND`); unexpected internal failures throw `InternalError` (code: `INTERNAL_ERROR`). All extend `AppError` from `src/shared/errors.ts`.
+- **Error propagation**: Repository errors are caught; domain errors (`ValidationError`, `NotFoundError`) pass through unchanged; unexpected errors are wrapped in an `InternalError` with the original message.
 
 ## Architecture rules
 
