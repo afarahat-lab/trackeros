@@ -10,11 +10,30 @@ Base entity providing common fields for domain models.
 | created_at | Date | true |
 | updated_at | Date | true |
 
-## leave
+## shared
 
-Represents a leave record managed by the `leave` module, including leave requests and related leave-tracking data.
+Shared types used across domain modules.
 
-### LeaveStatus
+### UserRole
+
+| Value | Description |
+|-------|-------------|
+| employee | Standard employee |
+| manager | Manager with direct reports |
+| hr_admin | HR administrator with full access |
+
+### LeaveType
+
+| Value | Description |
+|-------|-------------|
+| annual | Annual leave |
+| sick | Sick leave |
+| emergency | Emergency leave |
+| unpaid | Unpaid leave |
+| maternity | Maternity leave |
+| paternity | Paternity leave |
+
+### LeaveRequestStatus
 
 | Value | Description |
 |-------|-------------|
@@ -23,6 +42,10 @@ Represents a leave record managed by the `leave` module, including leave request
 | APPROVED | Leave request has been approved |
 | REJECTED | Leave request has been rejected |
 | CANCELLED | Leave request has been cancelled |
+
+## leave
+
+Represents a leave record managed by the `leave` module, including leave requests and related leave-tracking data.
 
 ### LeaveRequest
 
@@ -157,17 +180,6 @@ Represents leave policy data managed by the `policy` module, including policy de
 | isActive | boolean | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
-
-### LeaveType
-
-| Value | Description |
-|-------|-------------|
-| annual | Annual leave |
-| sick | Sick leave |
-| emergency | Emergency leave |
-| unpaid | Unpaid leave |
-| maternity | Maternity leave |
-| paternity | Paternity leave |
 
 ### LeavePolicy
 
