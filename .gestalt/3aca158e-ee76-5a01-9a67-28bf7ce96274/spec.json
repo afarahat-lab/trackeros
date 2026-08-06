@@ -1,0 +1,179 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "notification"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The Notification entity interface is defined and exported with inline string-literal unions for `type` (the four LEAVE_* values) and `status` (PENDING | SENT | READ | ARCHIVED), and does NOT import anything from src/shared/types \u2014 the notification\u2192shared-types dependency is reserved for the Phase 10 service layer.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository interface exposes exactly six operations: findById, findByRecipient (with an optional status filter parameter), create, updateStatus, markAsRead, and findByRelatedEntity \u2014 each with return types matching the established repository conventions (single-row getters return the entity or null; list methods return an array).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The concrete repository implementation persists and retrieves Notification rows against the `notifications` table, extending BaseRepository from src/shared/base-repository.ts and routing all queries through the base query helper.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "create() accepts input that omits id and createdAt, generates id via randomUUID and createdAt via new Date at the repository layer, persists the row, and returns the fully-populated Notification entity.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "markAsRead() sets the notification status to READ and sets readAt to the current timestamp, returning the updated Notification (or null if no row exists).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Malformed or invalid database rows are rejected safely: single-row getters (findById, updateStatus, markAsRead) return null when the row is absent or fails the type guard; list methods (findByRecipient, findByRelatedEntity) filter out rows that fail the type guard; create() throws a typed error ('Failed to create notification') when the inserted row is absent or invalid.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Unit tests at tests/unit/modules/notification/notification.repository.test.ts cover every repository method, mock the shared pool.query, and assert the exact SQL query strings and parameter arrays issued \u2014 matching the test conventions of the audit and leave-request repository test files.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The entire notification module (model, interface, repository) compiles under strict TypeScript with zero `any` types \u2014 all dynamic row data is handled via `unknown` and type guards.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No `any` types anywhere in the notification module \u2014 use `unknown` with type guards for all untyped row data (HARNESS.json constraint `no-any`, severity high).",
+    "All database access must go through the repository pattern (GP-001) \u2014 the notification repository routes every query through BaseRepository's query helper backed by the shared pool; no inline SQL or direct pool calls outside the repository.",
+    "The notification model must use inline string-literal unions for `type` and `status` and must NOT import from src/shared/types in this phase \u2014 the notification\u2192shared-types dependency is reserved for the Phase 10 service layer.",
+    "Strict TypeScript must pass (tsconfig.json: strict true, no implicit any, strict null checks) and the module must compile under `npm run build`.",
+    "Tests must run under the ts-jest preset with testMatch `**/tests/**/*.test.(ts|js)` and moduleDirectories `['node_modules', 'src']` \u2014 the test file must live at tests/unit/modules/notification/notification.repository.test.ts (the notification subdirectory under tests/unit/modules must be created).",
+    "The repository must follow the established composition pattern: a public class implementing the interface, holding a private inner class that extends BaseRepository, with a private NotificationRow interface, a rowToNotification mapper, and an isNotificationRow type guard \u2014 mirroring the audit and leave-request repositories."
+  ],
+  "outOfScope": [
+    "NotificationService and INotificationService (the service layer that creates notifications with type/title/message and status='PENDING') \u2014 deferred to Phase 10.",
+    "Notification routes, controllers, and RBAC wiring \u2014 deferred to Phase 10.",
+    "Database migrations for the `notifications` table \u2014 this phase defines the model and repository only; the table schema is specified in the reconciled architecture but no migration file is created here.",
+    "Importing or reusing enums from src/shared/types within the notification model \u2014 reserved for the Phase 10 service layer per the settled decision.",
+    "BullMQ notification fanout / background job scheduling \u2014 out of scope for this repository phase."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "The status lifecycle is PENDING \u2192 SENT \u2192 READ \u2192 ARCHIVED; markAsRead transitions a notification to READ and populates readAt with the current timestamp."
+    },
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "id and createdAt are server-generated at the repository layer (randomUUID and new Date respectively) and are never supplied by the caller \u2014 create() input omits both."
+    },
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "readAt is nullable and is null until the notification is marked as read; it must be a Date instance (or null) in any mapped entity."
+    },
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "relatedEntityType is constrained to 'LeaveRequest' and relatedEntityId links the notification to a specific leave request \u2014 findByRelatedEntity retrieves all notifications for a given (entityType, entityId) pair."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "findById(id)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the Notification entity when found and the row passes the type guard; returns null when no row exists or the row is invalid. Database errors propagate."
+    },
+    {
+      "operation": "findByRecipient(recipientId, status?)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an array of notifications for the recipient; when the optional status filter is provided, results are constrained to that status. Invalid rows are filtered out (never thrown). Database errors propagate."
+    },
+    {
+      "operation": "create(notification)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Accepts input omitting id and createdAt, generates both server-side, persists the row, and returns the full Notification. Throws 'Failed to create notification' when the inserted row is absent or fails the type guard. Database errors propagate."
+    },
+    {
+      "operation": "updateStatus(id, status)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Updates the notification's status and returns the updated Notification, or null when no row exists or the returned row fails the type guard. Database errors propagate."
+    },
+    {
+      "operation": "markAsRead(id)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Sets status to READ and readAt to the current timestamp, returning the updated Notification, or null when no row exists or the returned row fails the type guard. Database errors propagate."
+    },
+    {
+      "operation": "findByRelatedEntity(entityType, entityId)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an array of notifications linked to the given (entityType, entityId) pair. Invalid rows are filtered out (never thrown). Database errors propagate."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The notification repository must extend BaseRepository and route all queries through its generic `query<T extends Record<string, unknown>>(text, params?)` helper backed by the shared pool \u2014 matching how the audit, leave-request, leave-balance, leave-policy, and employee repositories compose a private inner class extending BaseRepository.",
+      "referencePath": "src/shared/base-repository.ts"
+    },
+    {
+      "requirement": "The notification repository must mirror the audit repository's structural pattern: a private NotificationRow interface with an index signature, a rowToNotification mapper, an isNotificationRow type guard (validating string-literal unions against arrays, nullable fields, and Date instanceof checks), a private inner class extending BaseRepository, and a public class implementing the interface via composition.",
+      "referencePath": "src/modules/audit/audit.repository.ts"
+    },
+    {
+      "requirement": "The create() error message must follow the audit repository's convention: throw `new Error('Failed to create notification')` when the inserted row is absent or fails the type guard \u2014 paralleling 'Failed to create audit log entry' and 'Failed to create leave request'.",
+      "referencePath": "src/modules/audit/audit.repository.ts"
+    },
+    {
+      "requirement": "The type guard must validate the `type` and `status` string-literal unions against explicit value arrays (as leave-request validates status against VALID_STATUSES), and must validate nullable fields (readAt === null || readAt instanceof Date) and Date instanceof checks for createdAt \u2014 matching the established isLeaveRequestRow / isAuditLogRow guard conventions.",
+      "referencePath": "src/modules/leave-request/leave-request.repository.ts"
+    },
+    {
+      "requirement": "The unit test file must follow the audit/leave-request test conventions: jest.mock the shared db/connection pool.query before importing the repository, define makeNotificationRow/makeNotification helpers, use describe\u2192beforeEach\u2192nested describe-per-method structure, and assert exact SQL query strings and parameter arrays via mockQuery.mock.calls.",
+      "referencePath": "tests/unit/modules/audit/audit.repository.test.ts"
+    },
+    {
+      "requirement": "The Notification entity shape and the `notifications` table column mapping (snake_case: recipient_id, related_entity_type, related_entity_id, created_at, read_at) must match the reconciled architecture's Notification domain entity and notifications conceptual table definition exactly.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/base-repository.ts",
+      "why": "The notification repository extends BaseRepository and uses its query helper to execute SQL against the shared pool \u2014 the foundational dependency from Phase 1."
+    },
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "The shared PostgreSQL pool is transitively used by BaseRepository.query; the unit tests mock this module's pool.query before importing the repository."
+    },
+    {
+      "target": "src/modules/notification/notification.model.ts",
+      "why": "The repository interface and implementation both import the Notification entity type from the model file \u2014 the model is the canonical type definition consumed by this phase's repository and by the Phase 10 service layer."
+    },
+    {
+      "target": "src/modules/notification/notification.repository.interface.ts",
+      "why": "The concrete PgNotificationRepository implements INotificationRepository; this interface is the contract that the Phase 10 NotificationService will depend on (dependency injection)."
+    },
+    {
+      "target": "src/modules/leave-request/leave-request.repository.ts",
+      "why": "The notification repository follows the same composition + type-guard + error-handling conventions established by the leave-request and audit repositories; consistency with these siblings is a binding requirement."
+    }
+  ]
+}
