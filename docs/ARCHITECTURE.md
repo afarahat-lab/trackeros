@@ -21,14 +21,13 @@ src/modules/balance/balance.{model,repository,service,controller,routes}.ts
 src/modules/employee/employee.{model,repository,service,controller,routes}.ts
 src/modules/policy/policy.{model,repository,service,controller,routes}.ts
 src/modules/notification/notification.{model,repository,service,controller,routes}.ts
+src/modules/employee/    — Employee module (model, repository)
 src/modules/leave-policy/    — LeavePolicy module (model, repository)
-src/modules/LeaveStatus/    — LeaveStatus module
-src/modules/BaseEntity/    — BaseEntity module
-src/modules/LeaveRequest/    — LeaveRequest module
-src/modules/LeaveType/    — LeaveType module
-src/modules/AuditLog/    — AuditLog module
-src/modules/AuditRecord/    — AuditRecord module
-src/modules/AuditServiceInterface/    — AuditServiceInterface module
+src/modules/leave-balance/    — LeaveBalance module (model, repository)
+src/modules/leave-request/    — LeaveRequest module (model, repository)
+src/modules/audit/    — AuditLog module (model, repository)
+src/modules/status/    — Status module (model, service)
+src/modules/uptime/    — Uptime module (model, service, routes)
 src/shared/db connection.ts
 src/shared/base repository.ts
 src/shared/error types.ts
@@ -89,7 +88,7 @@ src/shared/error types.ts
 
 ### AuditLog
 - **Attributes**: id, entityType, entityId, action, oldValues, newValues, performedBy, performedAt, ipAddress, userAgent, createdAt
-- **Purpose**: Immutable record of every LeaveRequest state transition.
+- **Purpose**: Immutable record of every LeaveRequest state transition. id and createdAt are server-generated (randomUUID, now). performedAt is caller-supplied (records when the audited action occurred). No update or delete operations — audit records are immutable (GP-002).
 
 ## Conceptual Tables
 
