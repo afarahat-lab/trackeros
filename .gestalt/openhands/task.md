@@ -1,20 +1,21 @@
-# Implement this phase: Phase 1: Shared types and base repository
+# Implement this phase: Phase 2: Employee model + repository
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/219727ae-a952-461a-b605-c6d40c0c1e42/1`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/219727ae-a952-461a-b605-c6d40c0c1e42/2`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the foundational shared types and base repository.
+Create the Employee domain model and repository.
 
 Files to create:
-- `src/shared/types/index.ts` — Define and export the three enums exactly as specified: `LeaveType` (values: 'annual' | 'sick' | 'emergency' | 'unpaid' | 'maternity' | 'paternity'), `LeaveRequestStatus` (values: 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED'), `UserRole` (values: 'employee' | 'manager' | 'hr_admin').
-- `src/shared/base-repository.ts` — Abstract base class providing common PostgreSQL query helpers using the `pool` from `src/shared/db/connection.ts`. Include methods: `query(text, params)`, `findById(table, id)`, `findAll(table)`, `insert(table, data)`, `update(table, id, data)`, `delete(table, id)`. Use TypeScript generics. No `any` types — use `unknown` with type guards.
+- `src/modules/employee/employee.model.ts` — Define the `Employee` entity interface with exact fields: id: string, employeeNumber: string, firstName: string, lastName: string, email: string, managerId: string | null, department: string | null, hireDate: Date, terminationDate: Date | null, employmentStatus: 'ACTIVE' | 'INACTIVE' | 'TERMINATED', createdAt: Date, updatedAt: Date, deletedAt: Date | null.
+- `src/modules/employee/employee.repository.interface.ts` — Define `IEmployeeRepository` interface with methods: findById(id), findByEmployeeNumber(employeeNumber), findByEmail(email), findByManagerId(managerId), findAll(), create(employee), update(id, employee), softDelete(id).
+- `src/modules/employee/employee.repository.ts` — Implement `PgEmployeeRepository` class implementing IEmployeeRepository, extending the base repository from `src/shared/base-repository.ts`. Use the pool from `src/shared/db/connection.ts`.
 
-Existing files to read before generating: `src/shared/db/connection.ts` (for the pool export).
+This phase depends on `src/shared/types/index.ts` and `src/shared/base-repository.ts` from Phase 1 — read both before generating any code.
 
-Include Jest unit tests in `tests/unit/shared/base-repository.test.ts`.
+Include Jest unit tests in `tests/unit/modules/employee/employee.repository.test.ts`.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -28,30 +29,22 @@ These are resolved, feature-wide decisions. Wherever this phase touches the conc
 10 (available balance): entitled - (used + pending) — pending requests consume balance immediately to prevent double-booking.
 Standing rules: whole days only (no partial/half days); used_days is deducted on APPROVAL and restored on reject/cancel of a previously-approved request; when an employee has no assigned manager, escalate the approval to an HR admin; enforce RBAC on every endpoint (employee acts on own requests; manager acts on direct reports; HR admin acts on all) and validate all inputs at API boundaries. [BINDING RULE — operator decision resolving: How are leave days counted from startDate and endDate? Is the range inclusive of both boundaries, exclusive of endDate, or based on calendar business days excluding weekends/holidays?; For the minimumNoticeDays check, is 'submission date' the date the request was created (createdAt) or the date it transitioned to SUBMITTED? And is the day count measured as calendar days or business days?; For the overlapping-leave check, are adjacent date ranges (e.g., request A ends Friday, request B starts Saturday) considered overlapping?; How is the fiscal year defined — calendar year (Jan 1 – Dec 31) or a custom fiscal year (e.g. Apr 1 – Mar 31)?; How should unused annual leave be handled at fiscal-year rollover — carry over fully, carry over with a cap, or expire?; Should emergency leave be drawn from the same annual/sick balance pools, or is it a separate entitlement with its own policy rules?; How are leave days counted from startDate and endDate? Is the range inclusive of both boundaries (days = endDate - startDate + 1), exclusive of endDate (days = endDate - startDate), or based on calendar business days excluding weekends/holidays?; For the minimumNoticeDays check, is "submission date" the date the request was created (createdAt) or the date it transitioned to SUBMITTED? And is the day count measured as calendar days or business days?; How are leave days counted — calendar days or business days? Are weekends and public holidays excluded from the day count?; What is the binding computation for available balance — entitled minus (used + pending), or entitled minus used only?; apply everywhere these apply, not in one place only]
 
-## Constraints & consistency
-You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
-### Reuse & consistency — match these exactly
-- The base repository must import and use the single shared `pool` exported from the db connection module (new Pool({ connectionString: process.env.DATABASE_URL, ... })) rather than creating its own Pool, so that all repositories share one connection pool and the no-direct-db-outside-repository constraint holds at the foundation. (see `src/shared/db/connection.ts`)
-- The three exported enums (LeaveType, LeaveRequestStatus, UserRole) must match exactly the value sets declared in the reconciled architecture's domain_entities and modules sections — LeaveType: annual|sick|emergency|unpaid|maternity|paternity; LeaveRequestStatus: DRAFT|SUBMITTED|APPROVED|REJECTED|CANCELLED; UserRole: employee|manager|hr_admin — because every downstream module (employee, leave-policy, leave-balance, leave-request, audit, notification) imports from shared-types per the dependency map. (see `.gestalt/architecture/reconciled.json`)
-- All shared types and base repository source must compile under the project's strict CommonJS/ES2022 tsconfig (strict: true, baseUrl: ./src) so that `npm run build` (tsc --noEmit) exits 0. (see `tsconfig.json`)
-- The base repository unit tests must run under the project's ts-jest configuration (preset: ts-jest, testMatch: **/tests/**/*.test.(ts|js), moduleDirectories including src) so that `npx jest --passWithNoTests` discovers and passes them. (see `jest.config.js`)
-- The base repository must remain a thin, generic, table-parameterized helper with no domain-specific query logic, consistent with ARCHITECTURE.md's "thin repository layer" pattern and the module boundary that places shared utilities (db connection, base repository, error types) under src/shared/. (see `docs/ARCHITECTURE.md`)
-### Entity invariants — enforce these
-- Reuse or extend `LeaveType`: The enum is closed over exactly six members — annual, sick, emergency, unpaid, maternity, paternity — each mapping to its lowercase string value; no member may be added, removed, or renamed without a reconciled-architecture change, because every LeavePolicy and LeaveBalance in later phases keys off these values.
-- Reuse or extend `LeaveRequestStatus`: The enum is closed over exactly five members — DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED — each mapping to its uppercase string value; these are the only valid lifecycle states a LeaveRequest may hold, and the LeaveRequest state machine in Phase 9 depends on this exact set.
-- Reuse or extend `UserRole`: The enum is closed over exactly three members — employee, manager, hr_admin — each mapping to its lowercase string value; these are the only roles the Auth Contract (request.user.role) and RBAC guards in Phase 10 may accept.
-- Reuse or extend `BaseRepository`: BaseRepository is abstract and cannot be instantiated directly; it provides only generic, table-parameterized query helpers and owns no domain-specific logic, so every concrete repository in Phases 2–7 must extend it rather than re-implementing pool access.
-### Interface contract — expose these operations (their shape is yours)
-- BaseRepository.query — execute an arbitrary parameterized SQL text against the shared pool and return the typed QueryResult — Any error from the underlying pool (connection, syntax, constraint) must propagate to the caller unchanged; the method must not swallow or transform it.
-- BaseRepository.findById — select a single row by primary key from a named table — idempotent; Returns the row when found, null when no row matches; pool errors propagate unchanged.
-- BaseRepository.findAll — select all rows from a named table — idempotent; Returns an array of rows (empty array when the table has no rows); pool errors propagate unchanged.
-- BaseRepository.insert — insert a row from a key/value map into a named table and return the inserted row — Returns the inserted row (via RETURNING *); constraint-violation and other pool errors propagate unchanged.
-- BaseRepository.update — update the row matching a primary key in a named table from a key/value map and return the updated row — Returns the updated row when a row matched (via RETURNING *), null when no row matched the id; pool errors propagate unchanged.
-- BaseRepository.delete — delete the row matching a primary key from a named table — idempotent; Returns true when a row was removed (rowCount > 0), false when no row matched; pool errors propagate unchanged.
-### Integration points — connect to these
-- src/shared/types/index.ts → all domain modules (employee, leave-policy, leave-balance, leave-request, audit, notification) in Phases 2–7 — Every concrete repository and service imports LeaveType, LeaveRequestStatus, and/or UserRole from this module per the reconciled dependency map (all modules → shared-types); the enum value sets are the contract those modules compile against.
-- src/shared/base-repository.ts → concrete Pg*Repository classes (PgEmployeeRepository, PgLeavePolicyRepository, PgLeaveBalanceRepository, PgLeaveRequestRepository, PgAuditLogRepository, PgNotificationRepository) in Phases 2–7 — Each concrete repository extends BaseRepository to inherit the generic query/find/insert/update/delete helpers and shared pool access, satisfying GP-001 (repository pattern) and the no-direct-db-outside-repository constraint without re-implementing pool wiring.
-- src/shared/db/connection.ts → src/shared/base-repository.ts (and transitively all concrete repositories) — The single shared pool is the only database connection source; the base repository consumes it and every concrete repository inherits that consumption, ensuring one connection pool across the application.
+## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
+The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
+- `Employee` — the entity MUST have exactly these fields:
+    - id: string
+    - employeeNumber: string
+    - firstName: string
+    - lastName: string
+    - email: string
+    - managerId: string | null
+    - department: string | null
+    - hireDate: Date
+    - terminationDate: Date | null
+    - employmentStatus: 'ACTIVE' | 'INACTIVE' | 'TERMINATED'
+    - createdAt: Date
+    - updatedAt: Date
+    - deletedAt: Date | null
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
