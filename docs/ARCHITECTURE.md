@@ -21,6 +21,7 @@ src/modules/leave-policy/      — LeavePolicy model, repository interface, repo
 src/modules/leave-balance/     — LeaveBalance model, repository interface, repository
 src/modules/leave-request/     — LeaveRequest model, repository interface, repository
 src/modules/audit/             — AuditLog model, repository interface, repository
+src/modules/notification/      — Notification model, repository interface, repository
 src/modules/status/            — Status module (model, service)
 src/modules/uptime/            — Uptime module (model, service, routes)
 src/shared/db/connection.ts    — PostgreSQL pool (pg)
@@ -32,9 +33,9 @@ src/shared/types/index.ts      — Shared enums: LeaveType, LeaveRequestStatus, 
 
 | Layer | employee | leave-policy | leave-balance | leave-request | audit | notification |
 |-------|----------|-------------|---------------|---------------|-------|-------------|
-| Model | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| Repository interface | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| Repository (Pg*) | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| Model | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Repository interface | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Repository (Pg*) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Service interface | — | — | — | — | — | — |
 | Service | — | — | — | — | — | — |
 | Routes | — | — | — | — | — | — |

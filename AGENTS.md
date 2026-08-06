@@ -60,11 +60,12 @@ src/modules/leave-policy/          — LeavePolicy model, ILeavePolicyRepository
 src/modules/leave-balance/         — LeaveBalance model, ILeaveBalanceRepository, PgLeaveBalanceRepository
 src/modules/leave-request/         — LeaveRequest model, ILeaveRequestRepository, PgLeaveRequestRepository
 src/modules/audit/                 — AuditLog model, IAuditLogRepository, PgAuditLogRepository
+src/modules/notification/          — Notification model, INotificationRepository, PgNotificationRepository
 src/modules/status/                — Status module (model, service)
 src/modules/uptime/                — Uptime module (model, service, routes)
 ```
 
-Service layers, controllers, routes, and the notification module are not yet implemented.
+Service layers, controllers, and routes are not yet implemented.
 
 ## Architecture rules
 
