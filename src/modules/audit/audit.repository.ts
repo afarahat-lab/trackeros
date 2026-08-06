@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import { BaseRepository } from '../../shared/base-repository';
 import { AuditLog } from './audit.model';
-import { IAuditLogRepository } from './audit.repository.interface';
+import { AuditLogFilters, IAuditLogRepository } from './audit.repository.interface';
 
 interface AuditLogRow {
   [key: string]: unknown;
@@ -131,9 +131,7 @@ export class PgAuditLogRepository implements IAuditLogRepository {
     return rowToAuditLog(row);
   }
 
-  async findAll(
-    filters: Partial<Pick<AuditLog, 'entityType' | 'entityId' | 'action' | 'performedBy'>>
-  ): Promise<AuditLog[]> {
+  async findAll(filters: AuditLogFilters): Promise<AuditLog[]> {
     const clauses: string[] = [];
     const values: unknown[] = [];
     let paramIndex = 1;
@@ -153,6 +151,14 @@ export class PgAuditLogRepository implements IAuditLogRepository {
     if (filters.performedBy !== undefined) {
       clauses.push(`performed_by = $${paramIndex++}`);
       values.push(filters.performedBy);
+    }
+    if (filters.performedFrom !== undefined) {
+      clauses.push(`performed_at >= $${paramIndex++}`);
+      values.push(filters.performedFrom);
+    }
+    if (filters.performedTo !== undefined) {
+      clauses.push(`performed_at <= $${paramIndex++}`);
+      values.push(filters.performedTo);
     }
 
     const whereClause = clauses.length > 0 ? ` WHERE ${clauses.join(' AND ')}` : '';
