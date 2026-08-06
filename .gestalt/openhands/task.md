@@ -1,21 +1,21 @@
-# Implement this phase: Phase 5: LeaveRequest model + repository
+# Implement this phase: Phase 6: AuditLog model + repository
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/219727ae-a952-461a-b605-c6d40c0c1e42/5`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/219727ae-a952-461a-b605-c6d40c0c1e42/6`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the LeaveRequest domain model and repository.
+Create the AuditLog domain model and repository.
 
 Files to create:
-- `src/modules/leave-request/leave-request.model.ts` — Define the `LeaveRequest` entity interface with exact fields: id: string, employeeId: string, leaveTypeId: string, leavePolicyId: string, startDate: Date, endDate: Date, daysCount: number, reason: string | undefined, status: LeaveRequestStatus, approvedBy: string | null, approvedAt: Date | null, cancelledBy: string | null, cancelledAt: Date | null, createdAt: Date, updatedAt: Date. Import LeaveRequestStatus from `src/shared/types/index.ts`.
-- `src/modules/leave-request/leave-request.repository.interface.ts` — Define `ILeaveRequestRepository` interface with methods: findById(id), findByEmployeeId(employeeId), findByEmployeeAndStatus(employeeId, status), findOverlapping(employeeId, startDate, endDate), findPendingByManagerId(managerId), findAll(filters), create(request), update(id, request), updateStatus(id, status, metadata).
-- `src/modules/leave-request/leave-request.repository.ts` — Implement `PgLeaveRequestRepository` class implementing ILeaveRequestRepository, extending the base repository from `src/shared/base-repository.ts`.
+- `src/modules/audit/audit.model.ts` — Define the `AuditLog` entity interface with exact fields: id: string, entityType: string, entityId: string, action: string, oldValues: Record<string, unknown> | null, newValues: Record<string, unknown> | null, performedBy: string | null, performedAt: Date, ipAddress: string | null, userAgent: string | null, createdAt: Date.
+- `src/modules/audit/audit.repository.interface.ts` — Define `IAuditLogRepository` interface with methods: findById(id), findByEntity(entityType, entityId), findByPerformedBy(performedBy, limit?), create(entry), findAll(filters).
+- `src/modules/audit/audit.repository.ts` — Implement `PgAuditLogRepository` class implementing IAuditLogRepository, extending the base repository from `src/shared/base-repository.ts`.
 
 This phase depends on `src/shared/types/index.ts` and `src/shared/base-repository.ts` from Phase 1 — read both before generating any code.
 
-Include Jest unit tests in `tests/unit/modules/leave-request/leave-request.repository.test.ts`.
+Include Jest unit tests in `tests/unit/modules/audit/audit.repository.test.ts`.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -31,52 +31,44 @@ Standing rules: whole days only (no partial/half days); used_days is deducted on
 
 ## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
 The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
-- `LeaveRequest` — the entity MUST have exactly these fields:
+- `AuditLog` — the entity MUST have exactly these fields:
     - id: string
-    - employeeId: string
-    - leaveTypeId: string
-    - leavePolicyId: string
-    - startDate: Date
-    - endDate: Date
-    - daysCount: number
-    - reason: string | undefined
-    - status: LeaveRequestStatus
-    - approvedBy: string | null
-    - approvedAt: Date | null
-    - cancelledBy: string | null
-    - cancelledAt: Date | null
+    - entityType: string
+    - entityId: string
+    - action: string
+    - oldValues: Record<string, unknown> | null
+    - newValues: Record<string, unknown> | null
+    - performedBy: string | null
+    - performedAt: Date
+    - ipAddress: string | null
+    - userAgent: string | null
     - createdAt: Date
-    - updatedAt: Date
 
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- The concrete repository must extend BaseRepository and use its query<T> helper for all SQL execution, matching how PgEmployeeRepository, PgLeavePolicyRepository, and PgLeaveBalanceRepository delegate to an inner BaseRepository subclass. (see `src/shared/base-repository.ts`)
-- The LeaveRequest entity's status field and the repository's status-related method parameters must use the LeaveRequestStatus enum exported from src/shared/types/index.ts, not a locally redefined union, matching how LeavePolicy imports LeaveType from the same source. (see `src/shared/types/index.ts`)
-- The repository must follow the established implementation pattern: an inner class extending BaseRepository, a snake_case Row interface, an isXxxRow type guard using unknown, a rowToXxx mapper, randomUUID() for ids, dynamic SET clauses in update with updated_at always appended, and a fallback to findById when update receives no mutable fields. (see `src/modules/leave-balance/leave-balance.repository.ts`)
-- The unit test file must follow the established test pattern: jest.mock the shared db/connection pool, reset the mock in beforeEach, provide a makeXxxRow factory, and cover each method with success, not-found/null, type-guard-rejection, and error-propagation cases. (see `tests/unit/modules/leave-balance/leave-balance.repository.test.ts`)
-- The leave_requests table column names used in SQL must match the reconciled schema (id, employee_id, leave_type_id, leave_policy_id, start_date, end_date, days_count, reason, status, approved_by, approved_at, cancelled_by, cancelled_at, created_at, updated_at), and the entity-to-column mapping must be bijective with the LeaveRequest interface attributes. (see `.gestalt/architecture/reconciled.json`)
+- The AuditLog entity interface must match the authoritative AuditLog entity shape in the reconciled architecture (id, entityType, entityId, action, oldValues, newValues, performedBy, performedAt, ipAddress, userAgent, createdAt) — do not adopt the divergent docs/DOMAIN.md AuditLog shape which types action as a union and omits ipAddress/userAgent/createdAt. (see `.gestalt/architecture/reconciled.json`)
+- The concrete repository must extend BaseRepository and route all SQL through its query helper, matching the base class's generic query<T extends Record<string, unknown>> signature and its insert/findAll/findById conventions. (see `src/shared/base-repository.ts`)
+- The repository implementation pattern (snake_case *Row interface with index signature, rowTo* mapper, is*Row type guard, private BaseRepository wrapper, randomUUID() id, server-set createdAt, explicit INSERT ... RETURNING *, findAll via filter(is*Row).map(rowTo*)) must mirror the established PgEmployeeRepository exactly so the audit module is structurally consistent with the employee module. (see `src/modules/employee/employee.repository.ts`)
+- The repository interface declaration style (methods returning Promise<Entity | null> for single-record lookups, Promise<Entity[]> for collections, create input typed as Omit<Entity, server-generated fields>) must match the IEmployeeRepository convention. (see `src/modules/employee/employee.repository.interface.ts`)
+- The unit test must mock src/shared/db/connection as { pool: { query: jest.fn() } } before importing the repository, use make*Row()/make*() factory helpers with override partials, reset the mock in beforeEach, and assert exact SQL text + params via mockQuery.mock.calls — mirroring the employee repository test. (see `tests/unit/modules/employee/employee.repository.test.ts`)
+- The audit_logs table column names the repository queries against (entity_type, entity_id, action, old_values, new_values, performed_by, performed_at, ip_address, user_agent, created_at) and its indexes ((entity_type, entity_id), performed_by, performed_at, action) must match the conceptual table schema in the reconciled architecture. (see `.gestalt/architecture/reconciled.json`)
 ### Entity invariants — enforce these
-- Reuse or extend `LeaveRequest`: A LeaveRequest's status must always be one of the LeaveRequestStatus enum values (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED); the repository must never persist or return a status outside this set, and the type guard must reject rows with an invalid status.
-- Reuse or extend `LeaveRequest`: A LeaveRequest's date range must satisfy startDate <= endDate (the entity does not model reversed ranges); daysCount is a derived non-negative value computed from the range, and the repository must preserve whatever daysCount is supplied without recomputing it.
-- Reuse or extend `LeaveRequest`: The approval metadata (approvedBy, approvedAt) and cancellation metadata (cancelledBy, cancelledAt) are nullable and mutually independent; the repository must round-trip null values faithfully and must not coerce null to undefined or vice versa for these fields.
-- Reuse or extend `LeaveRequest`: createdAt and updatedAt are always present (non-null) timestamps set by the repository on create and updated on every mutating operation; the entity interface types them as Date (not Date | null).
+- Reuse or extend `AuditLog`: An AuditLog record is immutable once created: it can be inserted and read but never updated or deleted through the repository, and it has no deletedAt field (GP-002).
+- Reuse or extend `AuditLog`: The id and createdAt fields are server-generated (randomUUID() and now respectively) and are never supplied by the caller; create() accepts Omit<AuditLog, 'id' | 'createdAt'> as its input.
+- Reuse or extend `AuditLog`: performedAt is supplied by the caller (it records when the audited action occurred, distinct from the server-set createdAt persistence timestamp); performedBy, ipAddress, userAgent, oldValues, and newValues are all nullable.
 ### Interface contract — expose these operations (their shape is yours)
-- ILeaveRequestRepository.findById(id) — Returns null when no row exists or the row fails the type guard; propagates database errors unchanged. Must not throw on a missing row.
-- ILeaveRequestRepository.findByEmployeeId(employeeId) — Returns an empty array when no rows match; filters out rows failing the type guard; propagates database errors.
-- ILeaveRequestRepository.findByEmployeeAndStatus(employeeId, status) — Returns an empty array when no rows match; filters out rows failing the type guard; propagates database errors.
-- ILeaveRequestRepository.findOverlapping(employeeId, startDate, endDate) — Returns an empty array when no overlapping rows exist; uses inclusive overlap semantics (startA <= endB AND startB <= endA); propagates database errors.
-- ILeaveRequestRepository.findPendingByManagerId(managerId) — Returns an empty array when no pending requests exist for the manager's direct reports; joins employees on manager_id; propagates database errors.
-- ILeaveRequestRepository.findAll(filters) — Returns an empty array when no rows match the supplied filters; filters out rows failing the type guard; propagates database errors.
-- ILeaveRequestRepository.create(request) — Throws a typed error when the insert returns no row or a row that fails the type guard; propagates database errors. Generates id and timestamps internally.
-- ILeaveRequestRepository.update(id, request) — Returns null when the row is not found; falls back to returning the current entity when no mutable fields are supplied; propagates database errors.
-- ILeaveRequestRepository.updateStatus(id, status, metadata) — Returns null when the row is not found; applies the status and associated metadata fields atomically in a single UPDATE; propagates database errors.
+- IAuditLogRepository.findById(id) — Returns the matching AuditLog or null when not found / when the returned row fails the type guard; propagates underlying database errors unchanged.
+- IAuditLogRepository.findByEntity(entityType, entityId) — Returns an array of all AuditLog records matching the (entityType, entityId) pair (empty array when none); rows failing the type guard are filtered out; propagates database errors unchanged.
+- IAuditLogRepository.findByPerformedBy(performedBy, limit?) — Returns matching AuditLog records; when limit is omitted no LIMIT clause is emitted, when provided a LIMIT clause is applied; rows failing the type guard are filtered out; propagates database errors unchanged.
+- IAuditLogRepository.create(entry) — Persists a new immutable audit row with server-generated id and createdAt via INSERT ... RETURNING *, maps and returns the AuditLog; throws when the insert returns no row or a row that fails the type guard; propagates database errors unchanged.
+- IAuditLogRepository.findAll(filters) — Returns AuditLog records matching only the provided filter fields (absent/undefined filters impose no constraint); rows failing the type guard are filtered out; propagates database errors unchanged.
 ### Integration points — connect to these
-- src/shared/types/index.ts — Imports LeaveRequestStatus for the LeaveRequest entity's status field and for status-typed method parameters.
-- src/shared/base-repository.ts — The concrete repository extends BaseRepository and uses its query helper for all SQL execution.
-- src/shared/db/connection.ts — BaseRepository internally uses the exported pool; the test file mocks this module's pool.query to isolate the repository from the database.
-- employees table (src/modules/employee) — findPendingByManagerId must join leave_requests to employees on employee_id and filter by employees.manager_id = managerId to resolve the manager-direct-report relationship; the leave_requests.employee_id and approved_by columns are FKs to employees.id per the reconciled schema.
-- src/modules/leave-request/leave-request.service.ts (Phase 9) — The ILeaveRequestRepository interface defined here is the contract the future LeaveRequestService will depend on for all leave-request data access; its method signatures must remain stable for Phase 9 to consume.
+- src/shared/base-repository.ts — The concrete PgAuditLogRepository must extend BaseRepository and use its query/insert/findById/findAll helpers for all database access (GP-001).
+- src/shared/db/connection.ts — BaseRepository resolves the pg.Pool from this module; the unit test must mock its `pool.query` export before importing the repository under test.
+- src/shared/types/index.ts — The audit module's only declared domain dependency per the reconciled dependency map is shared-types; the repository may import shared enums if needed but must not import other domain modules.
+- src/modules/employee/employee.repository.ts — Establishes the binding implementation pattern (Row interface, mapper, type guard, BaseRepository wrapper, randomUUID, INSERT ... RETURNING *) that the audit repository must replicate for cross-module consistency.
+- Phase 10 — AuditService / IAuditService — This phase produces only the AuditLog entity and IAuditLogRepository; the AuditService that consumes the repository (logCreate/logUpdate/logDelete + findByEntity/findByPerformer) is built in Phase 10 and depends on this repository interface existing.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
