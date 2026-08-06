@@ -1,0 +1,104 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "audit"
+    ],
+    "affectedLayers": [
+      "repository",
+      "tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "A named AuditLogFilters type is exported from the audit repository interface module and is used as the parameter type for findAll in both IAuditLogRepository and PgAuditLogRepository, replacing the inline Partial<Pick<AuditLog, ...>> type.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "AuditLogFilters exposes optional entityType, entityId, action, performedBy, performedFrom (Date), and performedTo (Date) fields; every field is optional so existing findAll({}), findAll({ entityType }), findAll({ entityType, action }), and findAll({ entityType, entityId, action, performedBy }) test calls continue to compile and pass without modification.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "When performedFrom is present, PgAuditLogRepository.findAll emits a WHERE clause comparing performed_at >= $N with the provided Date bound as the positional parameter; when performedTo is present, it emits performed_at <= $N. Both use the existing paramIndex-increment pattern so existing parameter positions are not renumbered.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "New test cases cover performedFrom-only, performedTo-only, and performedFrom+performedTo (combined with existing fields) filtering, asserting the generated SQL text contains the expected performed_at >= / <= comparison and the correct positional parameter values are passed.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The project compiles cleanly under strict TypeScript (tsc --noEmit) and the Jest suite passes, including the existing audit repository tests and the new date-range tests.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No `any` types (HARNESS.json no-any, severity high): the new AuditLogFilters fields and the findAll WHERE-clause construction must continue to use `unknown` with type guards (e.g., isAuditLogRow) and `values: unknown[]`, matching the existing audit repository implementation.",
+    "All database access stays inside the repository layer (GP-001 / no-direct-db-outside-repository, severity critical): the performed_at range filtering is implemented solely within PgAuditLogRepository; no service, controller, or route touches SQL or the pool directly.",
+    "Strict null checks (HARNESS.json): performedFrom and performedTo must be optional (Date | undefined) so that omitting them is type-safe and the existing paramIndex-guarded branch pattern (`if (filters.X !== undefined)`) applies unchanged.",
+    "Blast radius is limited to the audit repository interface, the PgAuditLogRepository implementation, and the audit repository test file; no service-layer, controller, route, or other module files are modified (audit.service.interface.ts / audit.service.ts do not exist yet \u2014 Phase 10)."
+  ],
+  "outOfScope": [
+    "AuditService, IAuditService, and any service-layer consumption of AuditLogFilters (planned for Phase 10) \u2014 this phase only touches the repository interface, implementation, and tests.",
+    "Any HTTP route, controller, or RBAC wiring exposing audit log querying \u2014 no API surface is added in this phase.",
+    "Pagination, ordering (ORDER BY), or result-limiting for findAll \u2014 only the existing equality filters plus the two new performed_at range bounds are in scope."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "AuditLog remains an immutable, append-only record (GP-002): this phase adds only read-side filtering (findAll date-range queries); no update or delete operation is introduced and the existing create/find methods are unchanged."
+    },
+    {
+      "entity": "AuditLogFilters",
+      "mustExistOrExtend": true,
+      "invariant": "AuditLogFilters is a pure optional-fields filter value object with no lifecycle of its own; every field is optional so an empty object is a valid (match-all) filter and no field combination is required."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IAuditLogRepository.findAll / PgAuditLogRepository.findAll",
+      "authRule": "No auth rule at the repository layer (RBAC is enforced at route/middleware per GP-005, out of scope for this phase); the repository method is a pure data-access operation.",
+      "idempotent": true,
+      "errorSemantics": "Read-only query; database errors propagate as thrown errors (matching the existing findAll/findByEntity behavior that lets connection/query failures bubble). Returns AuditLog[] (empty array when no rows match); rows failing the isAuditLogRow type guard are filtered out, never thrown."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "AuditLogFilters must mirror the established LeaveRequestFilters precedent: a named interface exported from the repository interface module, with date-range fields named <column>From / <column>To (performedFrom / performedTo) mapping to performed_at >= $N / performed_at <= $N, exactly as LeaveRequestFilters uses startDateFrom / startDateTo \u2192 start_date >= / <=.",
+      "referencePath": "src/modules/leave-request/leave-request.repository.interface.ts"
+    },
+    {
+      "requirement": "The performed_at range WHERE clauses in PgAuditLogRepository.findAll must follow the same dynamic paramIndex-increment pattern used by PgLeaveRequestRepository.findAll (clauses[] + values: unknown[] + `if (field !== undefined) { clauses.push(\\`col = $${paramIndex++}\\`); values.push(field); }`), so existing audit param positions are not renumbered and the convention is uniform across repositories.",
+      "referencePath": "src/modules/leave-request/leave-request.repository.ts"
+    },
+    {
+      "requirement": "The performedFrom / performedTo filter fields map to the performed_at column already declared on AuditLog.performedAt (Date) and indexed on audit_logs.performed_at per the reconciled architecture; the filter type must not introduce a new column or rename the existing one.",
+      "referencePath": "src/modules/audit/audit.model.ts"
+    },
+    {
+      "requirement": "Existing findAll test cases (no filters, entityType only, multiple fields, all four supported fields, empty result, type-guard filtering, error propagation) must remain valid and unchanged because every AuditLogFilters field is optional; new performedFrom/performedTo cases are added alongside them using the same makeAuditLogRow/makeAuditLog helpers and mockQuery assertion style.",
+      "referencePath": "tests/unit/modules/audit/audit.repository.test.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/audit/audit.repository.interface.ts (IAuditLogRepository.findAll signature)",
+      "why": "The findAll parameter type changes from the inline Partial<Pick<AuditLog, ...>> to the new AuditLogFilters; this is the single interface contract that the implementation and (future Phase 10) service will consume."
+    },
+    {
+      "target": "src/modules/audit/audit.repository.ts (PgAuditLogRepository.findAll implementation)",
+      "why": "The implementation must accept AuditLogFilters and append performed_at >= / <= branches using the existing paramIndex pattern; it is the only consumer of the new date-range fields in this phase."
+    },
+    {
+      "target": "src/modules/leave-request/leave-request.repository.interface.ts (LeaveRequestFilters)",
+      "why": "Established codebase precedent for named repository filter interfaces with date-range fields; AuditLogFilters must follow the same naming/operator conventions to keep repository filter patterns consistent."
+    }
+  ]
+}
