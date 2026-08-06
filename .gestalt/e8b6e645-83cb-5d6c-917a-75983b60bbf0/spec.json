@@ -1,0 +1,253 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-request"
+    ],
+    "affectedLayers": [
+      "domain-model",
+      "data-access",
+      "unit-tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The LeaveRequest entity interface is exported from the leave-request module with all specified attributes (id, employeeId, leaveTypeId, leavePolicyId, startDate, endDate, daysCount, reason, status, approvedBy, approvedAt, cancelledBy, cancelledAt, createdAt, updatedAt) and its status field is typed as LeaveRequestStatus imported from src/shared/types/index.ts.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The ILeaveRequestRepository interface declares all nine methods: findById, findByEmployeeId, findByEmployeeAndStatus, findOverlapping, findPendingByManagerId, findAll, create, update, and updateStatus \u2014 each with TypeScript signatures matching the intent (e.g. create accepts an Omit of auto-generated fields and returns a LeaveRequest; reads return LeaveRequest | null or LeaveRequest[]).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The concrete repository class implements ILeaveRequestRepository and extends BaseRepository from src/shared/base-repository.ts, delegating SQL execution through the base query helper rather than importing the pool directly in business methods.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "create persists a new leave_requests row with a generated UUID and createdAt/updatedAt timestamps, maps the returned snake_case row to the LeaveRequest entity, and throws a typed error when the insert returns no row or a row that fails the type guard.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findById returns the mapped LeaveRequest when a row exists and passes the type guard, returns null when no row is found or the row fails the type guard, and propagates database errors without swallowing them.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findByEmployeeId and findByEmployeeAndStatus return arrays of mapped LeaveRequest entities filtered by employee_id (and status where applicable), filtering out any rows that fail the type guard, and return an empty array when no rows match.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findOverlapping returns leave requests for the given employee whose date ranges inclusively overlap the supplied [startDate, endDate] range (startA <= endB AND startB <= endA per the binding business rule), returning an array of mapped entities.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findPendingByManagerId returns SUBMITTED leave requests for employees whose manager_id matches the supplied managerId, joining the employees table to resolve the manager-direct-report relationship, returning an array of mapped entities.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "update applies only the provided partial fields as dynamic SET clauses, always sets updatedAt to the current timestamp, returns the updated mapped entity or null when the row is not found, and falls back to returning the current entity when no mutable fields are supplied.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "updateStatus updates the status column and the associated metadata fields (approvedBy/approvedAt or cancelledBy/cancelledAt as applicable) in a single UPDATE, sets updatedAt, and returns the updated mapped entity or null when not found.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests in tests/unit/modules/leave-request/leave-request.repository.test.ts mock the shared pool and cover every repository method with at least: a successful-return case, a not-found/null case (where applicable), a type-guard-rejection case, and a database-error-propagation case.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "No `any` type appears anywhere in the model, interface, repository, or test files; all database row handling uses `unknown` with type-guard functions before mapping, satisfying the no-any HARNESS constraint.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access must go through the repository pattern (GP-001 / no-direct-db-outside-repository); the repository must extend BaseRepository and use its query helper rather than importing the pool directly in business methods.",
+    "No `any` types anywhere (HARNESS no-any rule); use `unknown` with type guards for all database row handling, matching the pattern established by PgEmployeeRepository, PgLeavePolicyRepository, and PgLeaveBalanceRepository.",
+    "The repository must map snake_case database columns (leave_requests table) to camelCase LeaveRequest entity fields via a rowToLeaveRequest mapper, consistent with the existing repository implementations.",
+    "create must generate the id via randomUUID() and set createdAt/updatedAt to the current timestamp, matching the established create pattern in the sibling repositories.",
+    "The LeaveRequest entity's status field must be typed as LeaveRequestStatus imported from src/shared/types/index.ts, not a locally redefined union.",
+    "The repository must not enforce state-transition rules, RBAC, audit logging, or balance logic \u2014 those are service-layer concerns (Phases 9\u201310). The repository is a pure data-access layer.",
+    "Strict TypeScript must pass (no implicit any, strict null checks); the phase must compile under `npm run build` and the Jest suite must pass under `npx jest --passWithNoTests`."
+  ],
+  "outOfScope": [
+    "LeaveRequestService, ILeaveRequestService, and any business logic (day counting, notice-period validation, balance checks, RBAC, state-transition enforcement) \u2014 deferred to Phase 9.",
+    "Audit logging on state changes (GP-002) \u2014 the repository does not write audit records; that is the service's responsibility in Phase 9/10.",
+    "Notification creation on leave events \u2014 deferred to Phase 7 (repository) and Phase 10 (service wiring).",
+    "Fastify routes, controllers, RBAC guards, and Zod input validation \u2014 deferred to Phase 10.",
+    "Database migrations for the leave_requests table \u2014 this phase assumes the table schema exists per the reconciled architecture; no migration files are created here.",
+    "Transaction/client-parameter support (optional PoolClient) \u2014 the reconciled transaction contract applies to multi-step service writes; this repository phase may implement single-statement methods without the client parameter, leaving transaction joining to be added when the service layer is built."
+  ],
+  "ambiguities": [
+    {
+      "description": "The intent lists findPendingByManagerId(managerId) but does not specify which statuses count as \"pending.\" The reconciled lifecycle defines SUBMITTED as the state awaiting manager decision, but the method name \"pending\" could be interpreted more broadly.",
+      "options": [
+        "pending = SUBMITTED only (the state awaiting manager decision)",
+        "pending = SUBMITTED and DRAFT (any non-terminal pre-approval state)",
+        "pending = any non-terminal status (SUBMITTED, DRAFT, and not yet APPROVED/REJECTED/CANCELLED)"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "The intent lists findAll(filters) without specifying the shape of the filters parameter. The reconciled architecture indexes suggest filtering by employee_id, status, leave_type_id, and date ranges, but the exact filter contract is undefined.",
+      "options": [
+        "filters is an optional partial object with employeeId, status, leaveTypeId, and/or date range fields, all applied as AND conditions when present",
+        "filters is a generic record of key-value pairs applied dynamically",
+        "filters is required and always includes at least employeeId or managerId for RBAC scoping"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "The intent lists updateStatus(id, status, metadata) without specifying the shape of the metadata parameter. The LeaveRequest entity has approvedBy/approvedAt and cancelledBy/cancelledAt pairs that are set on specific transitions, but whether metadata is a typed object or a generic record is undefined.",
+      "options": [
+        "metadata is a typed object with optional approvedBy, approvedAt, cancelledBy, cancelledAt fields, applied only when present",
+        "metadata is a generic Record<string, unknown> merged into the update",
+        "metadata is a discriminated union keyed by the target status (e.g. { approvedBy, approvedAt } for APPROVED, { cancelledBy, cancelledAt } for CANCELLED)"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "The intent lists findOverlapping(employeeId, startDate, endDate) but does not specify whether overlapping results should be restricted to non-terminal statuses. A CANCELLED or REJECTED request in the same date range would not represent an actual conflict, but the repository may not know the caller's intent.",
+      "options": [
+        "return all requests in the date range regardless of status (filtering by status is the caller's concern)",
+        "return only non-terminal requests (SUBMITTED, APPROVED, DRAFT) since cancelled/rejected ranges are not real conflicts",
+        "return only SUBMITTED and APPROVED requests"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "A LeaveRequest's status must always be one of the LeaveRequestStatus enum values (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED); the repository must never persist or return a status outside this set, and the type guard must reject rows with an invalid status."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "A LeaveRequest's date range must satisfy startDate <= endDate (the entity does not model reversed ranges); daysCount is a derived non-negative value computed from the range, and the repository must preserve whatever daysCount is supplied without recomputing it."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "The approval metadata (approvedBy, approvedAt) and cancellation metadata (cancelledBy, cancelledAt) are nullable and mutually independent; the repository must round-trip null values faithfully and must not coerce null to undefined or vice versa for these fields."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "createdAt and updatedAt are always present (non-null) timestamps set by the repository on create and updated on every mutating operation; the entity interface types them as Date (not Date | null)."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "ILeaveRequestRepository.findById(id)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns null when no row exists or the row fails the type guard; propagates database errors unchanged. Must not throw on a missing row."
+    },
+    {
+      "operation": "ILeaveRequestRepository.findByEmployeeId(employeeId)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an empty array when no rows match; filters out rows failing the type guard; propagates database errors."
+    },
+    {
+      "operation": "ILeaveRequestRepository.findByEmployeeAndStatus(employeeId, status)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an empty array when no rows match; filters out rows failing the type guard; propagates database errors."
+    },
+    {
+      "operation": "ILeaveRequestRepository.findOverlapping(employeeId, startDate, endDate)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an empty array when no overlapping rows exist; uses inclusive overlap semantics (startA <= endB AND startB <= endA); propagates database errors."
+    },
+    {
+      "operation": "ILeaveRequestRepository.findPendingByManagerId(managerId)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an empty array when no pending requests exist for the manager's direct reports; joins employees on manager_id; propagates database errors."
+    },
+    {
+      "operation": "ILeaveRequestRepository.findAll(filters)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an empty array when no rows match the supplied filters; filters out rows failing the type guard; propagates database errors."
+    },
+    {
+      "operation": "ILeaveRequestRepository.create(request)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws a typed error when the insert returns no row or a row that fails the type guard; propagates database errors. Generates id and timestamps internally."
+    },
+    {
+      "operation": "ILeaveRequestRepository.update(id, request)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns null when the row is not found; falls back to returning the current entity when no mutable fields are supplied; propagates database errors."
+    },
+    {
+      "operation": "ILeaveRequestRepository.updateStatus(id, status, metadata)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns null when the row is not found; applies the status and associated metadata fields atomically in a single UPDATE; propagates database errors."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The concrete repository must extend BaseRepository and use its query<T> helper for all SQL execution, matching how PgEmployeeRepository, PgLeavePolicyRepository, and PgLeaveBalanceRepository delegate to an inner BaseRepository subclass.",
+      "referencePath": "src/shared/base-repository.ts"
+    },
+    {
+      "requirement": "The LeaveRequest entity's status field and the repository's status-related method parameters must use the LeaveRequestStatus enum exported from src/shared/types/index.ts, not a locally redefined union, matching how LeavePolicy imports LeaveType from the same source.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The repository must follow the established implementation pattern: an inner class extending BaseRepository, a snake_case Row interface, an isXxxRow type guard using unknown, a rowToXxx mapper, randomUUID() for ids, dynamic SET clauses in update with updated_at always appended, and a fallback to findById when update receives no mutable fields.",
+      "referencePath": "src/modules/leave-balance/leave-balance.repository.ts"
+    },
+    {
+      "requirement": "The unit test file must follow the established test pattern: jest.mock the shared db/connection pool, reset the mock in beforeEach, provide a makeXxxRow factory, and cover each method with success, not-found/null, type-guard-rejection, and error-propagation cases.",
+      "referencePath": "tests/unit/modules/leave-balance/leave-balance.repository.test.ts"
+    },
+    {
+      "requirement": "The leave_requests table column names used in SQL must match the reconciled schema (id, employee_id, leave_type_id, leave_policy_id, start_date, end_date, days_count, reason, status, approved_by, approved_at, cancelled_by, cancelled_at, created_at, updated_at), and the entity-to-column mapping must be bijective with the LeaveRequest interface attributes.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts",
+      "why": "Imports LeaveRequestStatus for the LeaveRequest entity's status field and for status-typed method parameters."
+    },
+    {
+      "target": "src/shared/base-repository.ts",
+      "why": "The concrete repository extends BaseRepository and uses its query helper for all SQL execution."
+    },
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "BaseRepository internally uses the exported pool; the test file mocks this module's pool.query to isolate the repository from the database."
+    },
+    {
+      "target": "employees table (src/modules/employee)",
+      "why": "findPendingByManagerId must join leave_requests to employees on employee_id and filter by employees.manager_id = managerId to resolve the manager-direct-report relationship; the leave_requests.employee_id and approved_by columns are FKs to employees.id per the reconciled schema."
+    },
+    {
+      "target": "src/modules/leave-request/leave-request.service.ts (Phase 9)",
+      "why": "The ILeaveRequestRepository interface defined here is the contract the future LeaveRequestService will depend on for all leave-request data access; its method signatures must remain stable for Phase 9 to consume."
+    }
+  ]
+}
