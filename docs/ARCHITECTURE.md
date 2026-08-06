@@ -16,22 +16,30 @@ The architecture is modular, with a clear separation of concerns between models,
 ## Module structure
 
 ```
-src/modules/leave/leave.{model,repository,service,controller,routes}.ts
-src/modules/balance/balance.{model,repository,service,controller,routes}.ts
-src/modules/employee/employee.{model,repository,service,controller,routes}.ts
-src/modules/policy/policy.{model,repository,service,controller,routes}.ts
-src/modules/notification/notification.{model,repository,service,controller,routes}.ts
-src/modules/employee/    — Employee module (model, repository)
-src/modules/leave-policy/    — LeavePolicy module (model, repository)
-src/modules/leave-balance/    — LeaveBalance module (model, repository)
-src/modules/leave-request/    — LeaveRequest module (model, repository)
-src/modules/audit/    — AuditLog module (model, repository)
-src/modules/status/    — Status module (model, service)
-src/modules/uptime/    — Uptime module (model, service, routes)
-src/shared/db connection.ts
-src/shared/base repository.ts
-src/shared/error types.ts
+src/modules/employee/          — Employee model, repository interface, repository
+src/modules/leave-policy/      — LeavePolicy model, repository interface, repository
+src/modules/leave-balance/     — LeaveBalance model, repository interface, repository
+src/modules/leave-request/     — LeaveRequest model, repository interface, repository
+src/modules/audit/             — AuditLog model, repository interface, repository
+src/modules/status/            — Status module (model, service)
+src/modules/uptime/            — Uptime module (model, service, routes)
+src/shared/db/connection.ts    — PostgreSQL pool (pg)
+src/shared/base-repository.ts  — Abstract BaseRepository with query helpers
+src/shared/types/index.ts      — Shared enums: LeaveType, LeaveRequestStatus, UserRole
 ```
+
+### Implementation status (as-built)
+
+| Layer | employee | leave-policy | leave-balance | leave-request | audit | notification |
+|-------|----------|-------------|---------------|---------------|-------|-------------|
+| Model | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| Repository interface | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| Repository (Pg*) | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| Service interface | — | — | — | — | — | — |
+| Service | — | — | — | — | — | — |
+| Routes | — | — | — | — | — | — |
+
+All repository implementations extend `BaseRepository` from `src/shared/base-repository.ts`, use the shared `pool` from `src/shared/db/connection.ts`, and employ `unknown` + type guards (no `any`). Row-to-entity mapping functions (`rowTo*`) and type guard functions (`is*Row`) are private to each repository file. IDs are generated via `crypto.randomUUID()` and timestamps via `new Date()` at the repository layer.
 
 ## Key patterns
 

@@ -49,12 +49,29 @@ Note: the Gestalt platform itself runs on Node 20 + pnpm 9.x as a
 self-imposed constraint. That has no bearing on this project —
 user projects use whatever stack matches their description.
 
+## Current module structure (as-built)
+
+```
+src/shared/types/index.ts          — LeaveType, LeaveRequestStatus, UserRole enums
+src/shared/base-repository.ts      — Abstract BaseRepository with query helpers
+src/shared/db/connection.ts        — PostgreSQL pool (pg)
+src/modules/employee/              — Employee model, IEmployeeRepository, PgEmployeeRepository
+src/modules/leave-policy/          — LeavePolicy model, ILeavePolicyRepository, PgLeavePolicyRepository
+src/modules/leave-balance/         — LeaveBalance model, ILeaveBalanceRepository, PgLeaveBalanceRepository
+src/modules/leave-request/         — LeaveRequest model, ILeaveRequestRepository, PgLeaveRequestRepository
+src/modules/audit/                 — AuditLog model, IAuditLogRepository, PgAuditLogRepository
+src/modules/status/                — Status module (model, service)
+src/modules/uptime/                — Uptime module (model, service, routes)
+```
+
+Service layers, controllers, routes, and the notification module are not yet implemented.
+
 ## Architecture rules
 
 1. Modules never import from each other's internals — only from index.ts
-2. All database access through the repository pattern
-3. Every state-changing operation produces an audit record (GP-001)
-4. RBAC enforced at middleware, never inline (GP-002)
+2. All database access through the repository pattern (GP-001)
+3. Every state-changing operation produces an audit record (GP-002)
+4. RBAC enforced at middleware, never inline (GP-005)
 
 ## What agents must never do
 
