@@ -1,0 +1,171 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared-types",
+      "shared-infrastructure"
+    ],
+    "affectedLayers": [
+      "shared",
+      "data-access",
+      "unit-tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The shared types module exports three string enums \u2014 LeaveType (annual, sick, emergency, unpaid, maternity, paternity), LeaveRequestStatus (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED), and UserRole (employee, manager, hr_admin) \u2014 each with exactly the specified values and no extras or missing members.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "BaseRepository is an abstract class that cannot be instantiated directly and exposes six generic methods (query, findById, findAll, insert, update, delete) usable by concrete subclasses; a concrete subclass can be instantiated and all six methods are callable.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "No `any` type appears anywhere in the shared types module, the base repository, or its unit tests \u2014 the no-any HARNESS constraint is satisfied (verified by typecheck and source search).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "BaseRepository obtains its database connection exclusively from the shared pool exported by the db connection module; it does not instantiate its own Pool or import pg.Pool directly, satisfying the no-direct-db-outside-repository constraint at the foundation layer.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findById returns the matching row or null when absent; findAll returns an array (empty when the table has no rows); insert returns the inserted row; update returns the updated row or null when no row matches the id; delete returns a boolean indicating whether a row was removed (true when rowCount > 0, false otherwise).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Errors thrown by the underlying pool (connection failures, constraint violations, missing tables) propagate unchanged from every base repository method rather than being swallowed or masked.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The unit test suite for the base repository covers, at minimum: successful query/find/insert/update/delete, not-found (null) for findById and update, empty-array for findAll, error propagation from the pool, constraint-violation error propagation on insert, and the true/false boolean return of delete \u2014 all without using `any`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The project builds cleanly (tsc --noEmit exits 0) and the Jest unit tests pass (jest --passWithNoTests exits 0) with the shared types and base repository in place.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No `any` types anywhere in the shared types module, base repository, or its tests \u2014 use `unknown` with type guards / `Record<string, unknown>` instead (HARNESS no-any, severity high).",
+    "All database access in the base repository must go through the shared `pool` exported by the db connection module; the base class must not instantiate its own Pool or bypass the repository pattern (HARNESS no-direct-db-outside-repository, severity critical; GP-001).",
+    "TypeScript strict mode must pass \u2014 no implicit any, strict null checks \u2014 per tsconfig.json (strict: true) and AGENTS.md.",
+    "The base repository must use TypeScript generics on its data-access methods so concrete repositories can obtain typed rows without casts to `any`.",
+    "The base repository must NOT accept a `client: PoolClient` parameter or implement transaction joining in Phase 1 \u2014 transaction support is deferred to concrete repositories in later phases per the reconciled architecture's Transaction Contract.",
+    "No hardcoded secrets, passwords, API keys, or tokens in the shared types or base repository (HARNESS no-hardcoded-secrets, severity critical).",
+    "No `@gestalt/*` packages may be added as project dependencies (HARNESS no-gestalt-internal-deps, severity critical)."
+  ],
+  "outOfScope": [
+    "Employee model, repository, and service (Phase 2) \u2014 not created in this phase despite the reconciled architecture grouping \"Shared types + Employee foundation\" together; PLAN.md Phase 1 is limited to shared types and the base repository only.",
+    "Concrete domain repositories (Employee, LeavePolicy, LeaveBalance, LeaveRequest, AuditLog, Notification) \u2014 Phases 2\u20137; the base repository is abstract and provides only generic helpers.",
+    "Transaction joining via an optional `client: PoolClient` parameter \u2014 deferred to concrete repository methods in Phases 2\u20137 per the Transaction Contract; the base class query helper does not accept a client.",
+    "Service layers, controllers, Fastify routes, RBAC guards, and audit/notification wiring \u2014 Phases 8\u201310.",
+    "Database migrations / Knex schema definitions for the conceptual tables \u2014 not part of this phase; the base repository operates on table names passed by callers.",
+    "Error type classes in src/shared/error-types.ts \u2014 referenced by ARCHITECTURE.md module structure but not in PLAN.md Phase 1 scope; the base repository propagates raw pool errors."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveType",
+      "mustExistOrExtend": true,
+      "invariant": "The enum is closed over exactly six members \u2014 annual, sick, emergency, unpaid, maternity, paternity \u2014 each mapping to its lowercase string value; no member may be added, removed, or renamed without a reconciled-architecture change, because every LeavePolicy and LeaveBalance in later phases keys off these values."
+    },
+    {
+      "entity": "LeaveRequestStatus",
+      "mustExistOrExtend": true,
+      "invariant": "The enum is closed over exactly five members \u2014 DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED \u2014 each mapping to its uppercase string value; these are the only valid lifecycle states a LeaveRequest may hold, and the LeaveRequest state machine in Phase 9 depends on this exact set."
+    },
+    {
+      "entity": "UserRole",
+      "mustExistOrExtend": true,
+      "invariant": "The enum is closed over exactly three members \u2014 employee, manager, hr_admin \u2014 each mapping to its lowercase string value; these are the only roles the Auth Contract (request.user.role) and RBAC guards in Phase 10 may accept."
+    },
+    {
+      "entity": "BaseRepository",
+      "mustExistOrExtend": true,
+      "invariant": "BaseRepository is abstract and cannot be instantiated directly; it provides only generic, table-parameterized query helpers and owns no domain-specific logic, so every concrete repository in Phases 2\u20137 must extend it rather than re-implementing pool access."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "BaseRepository.query \u2014 execute an arbitrary parameterized SQL text against the shared pool and return the typed QueryResult",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Any error from the underlying pool (connection, syntax, constraint) must propagate to the caller unchanged; the method must not swallow or transform it."
+    },
+    {
+      "operation": "BaseRepository.findById \u2014 select a single row by primary key from a named table",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns the row when found, null when no row matches; pool errors propagate unchanged."
+    },
+    {
+      "operation": "BaseRepository.findAll \u2014 select all rows from a named table",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns an array of rows (empty array when the table has no rows); pool errors propagate unchanged."
+    },
+    {
+      "operation": "BaseRepository.insert \u2014 insert a row from a key/value map into a named table and return the inserted row",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the inserted row (via RETURNING *); constraint-violation and other pool errors propagate unchanged."
+    },
+    {
+      "operation": "BaseRepository.update \u2014 update the row matching a primary key in a named table from a key/value map and return the updated row",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the updated row when a row matched (via RETURNING *), null when no row matched the id; pool errors propagate unchanged."
+    },
+    {
+      "operation": "BaseRepository.delete \u2014 delete the row matching a primary key from a named table",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns true when a row was removed (rowCount > 0), false when no row matched; pool errors propagate unchanged."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The base repository must import and use the single shared `pool` exported from the db connection module (new Pool({ connectionString: process.env.DATABASE_URL, ... })) rather than creating its own Pool, so that all repositories share one connection pool and the no-direct-db-outside-repository constraint holds at the foundation.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "The three exported enums (LeaveType, LeaveRequestStatus, UserRole) must match exactly the value sets declared in the reconciled architecture's domain_entities and modules sections \u2014 LeaveType: annual|sick|emergency|unpaid|maternity|paternity; LeaveRequestStatus: DRAFT|SUBMITTED|APPROVED|REJECTED|CANCELLED; UserRole: employee|manager|hr_admin \u2014 because every downstream module (employee, leave-policy, leave-balance, leave-request, audit, notification) imports from shared-types per the dependency map.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "All shared types and base repository source must compile under the project's strict CommonJS/ES2022 tsconfig (strict: true, baseUrl: ./src) so that `npm run build` (tsc --noEmit) exits 0.",
+      "referencePath": "tsconfig.json"
+    },
+    {
+      "requirement": "The base repository unit tests must run under the project's ts-jest configuration (preset: ts-jest, testMatch: **/tests/**/*.test.(ts|js), moduleDirectories including src) so that `npx jest --passWithNoTests` discovers and passes them.",
+      "referencePath": "jest.config.js"
+    },
+    {
+      "requirement": "The base repository must remain a thin, generic, table-parameterized helper with no domain-specific query logic, consistent with ARCHITECTURE.md's \"thin repository layer\" pattern and the module boundary that places shared utilities (db connection, base repository, error types) under src/shared/.",
+      "referencePath": "docs/ARCHITECTURE.md"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts \u2192 all domain modules (employee, leave-policy, leave-balance, leave-request, audit, notification) in Phases 2\u20137",
+      "why": "Every concrete repository and service imports LeaveType, LeaveRequestStatus, and/or UserRole from this module per the reconciled dependency map (all modules \u2192 shared-types); the enum value sets are the contract those modules compile against."
+    },
+    {
+      "target": "src/shared/base-repository.ts \u2192 concrete Pg*Repository classes (PgEmployeeRepository, PgLeavePolicyRepository, PgLeaveBalanceRepository, PgLeaveRequestRepository, PgAuditLogRepository, PgNotificationRepository) in Phases 2\u20137",
+      "why": "Each concrete repository extends BaseRepository to inherit the generic query/find/insert/update/delete helpers and shared pool access, satisfying GP-001 (repository pattern) and the no-direct-db-outside-repository constraint without re-implementing pool wiring."
+    },
+    {
+      "target": "src/shared/db/connection.ts \u2192 src/shared/base-repository.ts (and transitively all concrete repositories)",
+      "why": "The single shared pool is the only database connection source; the base repository consumes it and every concrete repository inherits that consumption, ensuring one connection pool across the application."
+    }
+  ]
+}
