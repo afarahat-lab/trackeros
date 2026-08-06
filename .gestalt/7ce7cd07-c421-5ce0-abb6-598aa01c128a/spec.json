@@ -1,0 +1,158 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "audit"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The AuditLog entity interface is exported from the audit model file and exposes exactly the fields: id, entityType, entityId, action, oldValues (Record<string,unknown> | null), newValues (Record<string,unknown> | null), performedBy (string | null), performedAt (Date), ipAddress (string | null), userAgent (string | null), createdAt (Date).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The IAuditLogRepository interface declares all five operations: findById(id), findByEntity(entityType, entityId), findByPerformedBy(performedBy, limit?), create(entry), findAll(filters) \u2014 each with the correct return type (single AuditLog | null for findById, AuditLog[] for collection queries, AuditLog for create).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The PgAuditLogRepository class implements IAuditLogRepository and extends BaseRepository from src/shared/base-repository.ts; it uses the shared pool from src/shared/db/connection.ts for all queries (no direct DB access outside the repository pattern).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "create(entry) persists a new audit_logs row with a server-generated id (randomUUID) and createdAt (now), accepts the caller-supplied performedAt, and returns the persisted AuditLog; it throws a typed error when the insert returns no row or a row failing the type guard.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findByEntity(entityType, entityId) returns all audit_logs rows matching both columns; findByPerformedBy(performedBy, limit?) applies an optional LIMIT clause only when limit is provided; findAll(filters) builds a parameterized WHERE clause from any provided filter fields and returns matching rows \u2014 all return an empty array (never null) when no rows match.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests in tests/unit/modules/audit/audit.repository.test.ts mock the shared pool and cover every repository method: success path, not-found/empty result, type-guard rejection of invalid rows, and database error propagation \u2014 and the full suite passes under `npx jest`.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No `any` types \u2014 use `unknown` with type guards for row-to-entity mapping (HARNESS.json no-any rule, severity high).",
+    "All database access must go through the repository pattern \u2014 PgAuditLogRepository must use the shared pool via BaseRepository.query, never inline SQL outside the repository (GP-001, HARNESS.json no-direct-db-outside-repository, severity critical).",
+    "AuditLog records are immutable \u2014 the repository must expose no update or delete operation (GP-002; reconciled architecture states \"No update or delete operations \u2014 audit records are immutable\").",
+    "IDs must be generated via crypto.randomUUID() and timestamps via new Date() at the repository layer, matching the established pattern in sibling repositories (ARCHITECTURE.md as-built notes).",
+    "Strict TypeScript must pass (tsc --noEmit) with no implicit any and strict null checks enabled; the module must compile cleanly."
+  ],
+  "outOfScope": [
+    "AuditService (IAuditService / AuditService) \u2014 deferred to Phase 10; this phase covers only the model, repository interface, and repository implementation.",
+    "Database migrations / schema creation for the audit_logs table \u2014 this phase assumes the table exists per the reconciled architecture; no migration files are produced here.",
+    "HTTP routes, controllers, RBAC guards, and Fastify registration for the audit module \u2014 deferred to later phases.",
+    "Transaction (PoolClient) support in repository methods \u2014 the audit repository's create is a single-row insert; multi-step transactional audit writes are orchestrated by the calling service in later phases, not by this repository."
+  ],
+  "ambiguities": [
+    {
+      "description": "The findAll(filters) interface declares an AuditLogFilters type with optional fields (entityType, entityId, performedBy, action, performedFrom, performedTo). PLAN.md only says \"findAll(filters)\" without specifying which filter fields are supported. The existing implementation already defines performedFrom/performedTo date-range filters, but the phase intent does not enumerate them.",
+      "options": [
+        "Accept the existing AuditLogFilters shape (entityType, entityId, performedBy, action, performedFrom, performedTo) as the canonical filter contract",
+        "Restrict findAll filters to only the fields explicitly named in PLAN.md (entityType, entityId, performedBy, action) and drop date-range filters"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "description": "The create(entry) input type is Omit<AuditLog, 'id' | 'createdAt'>, meaning performedAt is caller-supplied. The reconciled architecture confirms performedAt is \"caller-supplied (records when the audited action occurred)\" while id and createdAt are server-generated. However, it is ambiguous whether the repository should default performedAt to now() when the caller omits it \u2014 the current type makes it required (non-optional Date), so omission is a compile error, but a reviewer might expect a fallback.",
+      "options": [
+        "Keep performedAt as a required field in the create input (caller must always supply it) \u2014 matches the current Omit type and reconciled architecture",
+        "Make performedAt optional and default to new Date() when omitted"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "An AuditLog record is immutable once created \u2014 it can be inserted and read but never updated or deleted; the repository exposes no mutation operations other than create."
+    },
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "id and createdAt are always server-generated at the repository layer (randomUUID and new Date respectively); the caller never supplies them \u2014 create accepts Omit<AuditLog, 'id' | 'createdAt'>."
+    },
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "performedAt is caller-supplied and records when the audited action occurred, distinct from createdAt which records when the log row was persisted; the two timestamps are independent and must not be conflated."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IAuditLogRepository.findById(id)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the matching AuditLog or null when not found / when the row fails the type guard; database errors propagate as thrown errors (no silent swallow)."
+    },
+    {
+      "operation": "IAuditLogRepository.findByEntity(entityType, entityId)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an array (empty when no matches, never null); rows failing the type guard are filtered out; database errors propagate as thrown errors."
+    },
+    {
+      "operation": "IAuditLogRepository.findByPerformedBy(performedBy, limit?)",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns an array (empty when no matches); applies LIMIT only when the optional limit is provided; database errors propagate as thrown errors."
+    },
+    {
+      "operation": "IAuditLogRepository.create(entry)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Persists a row with server-generated id and createdAt, returns the created AuditLog; throws a typed error when the insert returns no row or a row failing the type guard; database errors propagate."
+    },
+    {
+      "operation": "IAuditLogRepository.findAll(filters)",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns an array (empty when no matches, never null); builds a parameterized WHERE clause from provided filter fields; rows failing the type guard are filtered out; database errors propagate."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "PgAuditLogRepository must extend BaseRepository and route all SQL through its query helper (or the inherited findById/findAll/insert helpers) using the shared pool \u2014 matching the pattern established by PgEmployeeRepository and the other sibling repositories.",
+      "referencePath": "src/shared/base-repository.ts"
+    },
+    {
+      "requirement": "The repository must follow the established row-mapping pattern: a private AuditLogRow interface with snake_case columns, a rowToAuditLog mapper, an isAuditLogRow type guard using unknown + property checks (no any), and a private BaseRepository subclass instance \u2014 matching the structure used by PgEmployeeRepository.",
+      "referencePath": "src/modules/employee/employee.repository.ts"
+    },
+    {
+      "requirement": "The AuditLog entity fields and the audit_logs table columns must match the reconciled architecture exactly: entity_type, entity_id, action, old_values, new_values, performed_by, performed_at, ip_address, user_agent, created_at \u2014 with indexes on (entity_type, entity_id), performed_by, performed_at, and action.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "The audit module's only cross-module dependency is shared-types; it must not import from employee, leave-request, or any other domain module \u2014 matching the dependency map (audit \u2192 shared-types only).",
+      "referencePath": "src/shared/types/index.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/base-repository.ts",
+      "why": "PgAuditLogRepository extends BaseRepository and uses its query helper for all database access."
+    },
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "The repository uses the shared PostgreSQL pool (transitively via BaseRepository) for all queries \u2014 no separate connection management."
+    },
+    {
+      "target": "src/modules/audit/audit.repository.interface.ts (consumed by future AuditService in Phase 10)",
+      "why": "The IAuditLogRepository interface is the contract that the future AuditService (Phase 10) and the leave-request/balance services will depend on to write audit records for state-changing operations (GP-002)."
+    }
+  ]
+}
