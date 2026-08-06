@@ -1,21 +1,21 @@
-# Implement this phase: Phase 4: LeaveBalance model + repository
+# Implement this phase: Phase 5: LeaveRequest model + repository
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/219727ae-a952-461a-b605-c6d40c0c1e42/4`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/219727ae-a952-461a-b605-c6d40c0c1e42/5`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the LeaveBalance domain model and repository.
+Create the LeaveRequest domain model and repository.
 
 Files to create:
-- `src/modules/leave-balance/leave-balance.model.ts` — Define the `LeaveBalance` entity interface with exact fields: id: string, employeeId: string, policyId: string, totalEntitlement: number, usedDays: number, remainingDays: number, fiscalYear: number, status: 'ACTIVE' | 'EXHAUSTED' | 'CLOSED', createdAt: Date, updatedAt: Date.
-- `src/modules/leave-balance/leave-balance.repository.interface.ts` — Define `ILeaveBalanceRepository` interface with methods: findById(id), findByEmployeeId(employeeId), findByEmployeeAndPolicy(employeeId, policyId), findByEmployeeAndFiscalYear(employeeId, fiscalYear), create(balance), update(id, balance), upsert(balance).
-- `src/modules/leave-balance/leave-balance.repository.ts` — Implement `PgLeaveBalanceRepository` class implementing ILeaveBalanceRepository, extending the base repository from `src/shared/base-repository.ts`.
+- `src/modules/leave-request/leave-request.model.ts` — Define the `LeaveRequest` entity interface with exact fields: id: string, employeeId: string, leaveTypeId: string, leavePolicyId: string, startDate: Date, endDate: Date, daysCount: number, reason: string | undefined, status: LeaveRequestStatus, approvedBy: string | null, approvedAt: Date | null, cancelledBy: string | null, cancelledAt: Date | null, createdAt: Date, updatedAt: Date. Import LeaveRequestStatus from `src/shared/types/index.ts`.
+- `src/modules/leave-request/leave-request.repository.interface.ts` — Define `ILeaveRequestRepository` interface with methods: findById(id), findByEmployeeId(employeeId), findByEmployeeAndStatus(employeeId, status), findOverlapping(employeeId, startDate, endDate), findPendingByManagerId(managerId), findAll(filters), create(request), update(id, request), updateStatus(id, status, metadata).
+- `src/modules/leave-request/leave-request.repository.ts` — Implement `PgLeaveRequestRepository` class implementing ILeaveRequestRepository, extending the base repository from `src/shared/base-repository.ts`.
 
 This phase depends on `src/shared/types/index.ts` and `src/shared/base-repository.ts` from Phase 1 — read both before generating any code.
 
-Include Jest unit tests in `tests/unit/modules/leave-balance/leave-balance.repository.test.ts`.
+Include Jest unit tests in `tests/unit/modules/leave-request/leave-request.repository.test.ts`.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -31,42 +31,52 @@ Standing rules: whole days only (no partial/half days); used_days is deducted on
 
 ## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
 The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
-- `LeaveBalance` — the entity MUST have exactly these fields:
+- `LeaveRequest` — the entity MUST have exactly these fields:
     - id: string
     - employeeId: string
-    - policyId: string
-    - totalEntitlement: number
-    - usedDays: number
-    - remainingDays: number
-    - fiscalYear: number
-    - status: 'ACTIVE' | 'EXHAUSTED' | 'CLOSED'
+    - leaveTypeId: string
+    - leavePolicyId: string
+    - startDate: Date
+    - endDate: Date
+    - daysCount: number
+    - reason: string | undefined
+    - status: LeaveRequestStatus
+    - approvedBy: string | null
+    - approvedAt: Date | null
+    - cancelledBy: string | null
+    - cancelledAt: Date | null
     - createdAt: Date
     - updatedAt: Date
 
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- PgLeaveBalanceRepository must extend BaseRepository (via a private inner class) and use its generic query<T extends Record<string, unknown>> helper for all SQL, matching the BaseRepository signature in src/shared/base-repository.ts. (see `src/shared/base-repository.ts`)
-- The repository structure (private inner BaseRepository subclass as `private readonly base`, snake_case Row interface with [key:string]:unknown index signature, rowToLeaveBalance mapper, isLeaveBalanceRow type guard using unknown, create with randomUUID id + new Date timestamps + RETURNING *, update with dynamic SET clauses + updated_at append + findById delegation, error message 'Failed to create leave balance') must mirror the established pattern in src/modules/leave-policy/leave-policy.repository.ts and src/modules/employee/employee.repository.ts. (see `src/modules/leave-policy/leave-policy.repository.ts`)
-- The test file must follow the established test pattern: jest.mock the db connection BEFORE importing pool, makeLeaveBalanceRow() (snake_case) and makeLeaveBalance() (camelCase) helpers, beforeEach mockQuery.mockReset(), and per-method coverage of success/not-found/type-guard-failure/error — matching tests/unit/modules/leave-policy/leave-policy.repository.test.ts and tests/unit/modules/employee/employee.repository.test.ts. (see `tests/unit/modules/leave-policy/leave-policy.repository.test.ts`)
-- The leave_balances table columns and the unique constraint (employee_id, leave_policy_id, fiscal_year) that upsert's ON CONFLICT targets must match the reconciled architecture's sql_schemas entry for leave_balances in .gestalt/architecture/reconciled.json. (see `.gestalt/architecture/reconciled.json`)
+- The concrete repository must extend BaseRepository and use its query<T> helper for all SQL execution, matching how PgEmployeeRepository, PgLeavePolicyRepository, and PgLeaveBalanceRepository delegate to an inner BaseRepository subclass. (see `src/shared/base-repository.ts`)
+- The LeaveRequest entity's status field and the repository's status-related method parameters must use the LeaveRequestStatus enum exported from src/shared/types/index.ts, not a locally redefined union, matching how LeavePolicy imports LeaveType from the same source. (see `src/shared/types/index.ts`)
+- The repository must follow the established implementation pattern: an inner class extending BaseRepository, a snake_case Row interface, an isXxxRow type guard using unknown, a rowToXxx mapper, randomUUID() for ids, dynamic SET clauses in update with updated_at always appended, and a fallback to findById when update receives no mutable fields. (see `src/modules/leave-balance/leave-balance.repository.ts`)
+- The unit test file must follow the established test pattern: jest.mock the shared db/connection pool, reset the mock in beforeEach, provide a makeXxxRow factory, and cover each method with success, not-found/null, type-guard-rejection, and error-propagation cases. (see `tests/unit/modules/leave-balance/leave-balance.repository.test.ts`)
+- The leave_requests table column names used in SQL must match the reconciled schema (id, employee_id, leave_type_id, leave_policy_id, start_date, end_date, days_count, reason, status, approved_by, approved_at, cancelled_by, cancelled_at, created_at, updated_at), and the entity-to-column mapping must be bijective with the LeaveRequest interface attributes. (see `.gestalt/architecture/reconciled.json`)
 ### Entity invariants — enforce these
-- Reuse or extend `LeaveBalance`: Lifecycle is ACTIVE → EXHAUSTED (when remainingDays reaches 0) or CLOSED (at fiscal-year end); EXHAUSTED → ACTIVE is permitted on cancellation reversal; CLOSED is terminal and cannot transition to any other status. The repository must not reject any of these status values but is not responsible for enforcing transition legality.
-- Reuse or extend `LeaveBalance`: The natural key is (employeeId, policyId, fiscalYear); at most one ACTIVE/EXHAUSTED balance row may exist per employee per policy per fiscal year, enforced by the unique constraint on (employee_id, leave_policy_id, fiscal_year) which upsert relies on.
-- Reuse or extend `LeaveBalance`: remainingDays is the derived balance (totalEntitlement − usedDays); the entity is updated atomically on APPROVED and CANCELLED-from-APPROVED leave-request transitions, but the repository only persists the values it is given — it does not recompute remainingDays.
+- Reuse or extend `LeaveRequest`: A LeaveRequest's status must always be one of the LeaveRequestStatus enum values (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED); the repository must never persist or return a status outside this set, and the type guard must reject rows with an invalid status.
+- Reuse or extend `LeaveRequest`: A LeaveRequest's date range must satisfy startDate <= endDate (the entity does not model reversed ranges); daysCount is a derived non-negative value computed from the range, and the repository must preserve whatever daysCount is supplied without recomputing it.
+- Reuse or extend `LeaveRequest`: The approval metadata (approvedBy, approvedAt) and cancellation metadata (cancelledBy, cancelledAt) are nullable and mutually independent; the repository must round-trip null values faithfully and must not coerce null to undefined or vice versa for these fields.
+- Reuse or extend `LeaveRequest`: createdAt and updatedAt are always present (non-null) timestamps set by the repository on create and updated on every mutating operation; the entity interface types them as Date (not Date | null).
 ### Interface contract — expose these operations (their shape is yours)
-- ILeaveBalanceRepository.findById(id) — Returns the mapped LeaveBalance or null when not found / type-guard failure; propagates underlying database errors unchanged.
-- ILeaveBalanceRepository.findByEmployeeId(employeeId) — Returns an array of mapped LeaveBalance rows (filtering out type-guard failures); propagates database errors unchanged.
-- ILeaveBalanceRepository.findByEmployeeAndPolicy(employeeId, policyId) — Returns the mapped LeaveBalance or null when not found / type-guard failure; propagates database errors unchanged.
-- ILeaveBalanceRepository.findByEmployeeAndFiscalYear(employeeId, fiscalYear) — Returns an array of mapped LeaveBalance rows (filtering out type-guard failures); propagates database errors unchanged.
-- ILeaveBalanceRepository.create(balance) — Throws 'Failed to create leave balance' when the insert returns no row or a row failing the type guard; propagates underlying database errors unchanged.
-- ILeaveBalanceRepository.update(id, balance) — Returns the updated LeaveBalance or null when not found / type-guard failure; delegates to findById when no fields are supplied; propagates database errors unchanged.
-- ILeaveBalanceRepository.upsert(balance) — idempotent; Returns the mapped LeaveBalance in both the insert and conflict-update paths; throws when the returned row fails the type guard; propagates underlying database errors unchanged.
+- ILeaveRequestRepository.findById(id) — Returns null when no row exists or the row fails the type guard; propagates database errors unchanged. Must not throw on a missing row.
+- ILeaveRequestRepository.findByEmployeeId(employeeId) — Returns an empty array when no rows match; filters out rows failing the type guard; propagates database errors.
+- ILeaveRequestRepository.findByEmployeeAndStatus(employeeId, status) — Returns an empty array when no rows match; filters out rows failing the type guard; propagates database errors.
+- ILeaveRequestRepository.findOverlapping(employeeId, startDate, endDate) — Returns an empty array when no overlapping rows exist; uses inclusive overlap semantics (startA <= endB AND startB <= endA); propagates database errors.
+- ILeaveRequestRepository.findPendingByManagerId(managerId) — Returns an empty array when no pending requests exist for the manager's direct reports; joins employees on manager_id; propagates database errors.
+- ILeaveRequestRepository.findAll(filters) — Returns an empty array when no rows match the supplied filters; filters out rows failing the type guard; propagates database errors.
+- ILeaveRequestRepository.create(request) — Throws a typed error when the insert returns no row or a row that fails the type guard; propagates database errors. Generates id and timestamps internally.
+- ILeaveRequestRepository.update(id, request) — Returns null when the row is not found; falls back to returning the current entity when no mutable fields are supplied; propagates database errors.
+- ILeaveRequestRepository.updateStatus(id, status, metadata) — Returns null when the row is not found; applies the status and associated metadata fields atomically in a single UPDATE; propagates database errors.
 ### Integration points — connect to these
-- src/shared/base-repository.ts (Phase 1) — PgLeaveBalanceRepository extends BaseRepository and uses its query helper for all database access.
-- src/shared/db/connection.ts (Phase 1) — The repository (via BaseRepository) uses the exported pool for PostgreSQL queries; tests mock this module's pool.query.
-- leave-policy module (Phase 3) and employee module (Phase 2) — Per the reconciled dependency map, leave-balance depends on leave-policy, employee, and shared-types; this phase's repository references policyId and employeeId as foreign keys to those modules' tables, though it does not import their code directly.
-- Phase 9 LeaveBalanceService — The ILeaveBalanceRepository interface and PgLeaveBalanceRepository created here are the data-access contract that the future LeaveBalanceService (deductDays, restoreDays, getAvailableBalance) will inject and call.
+- src/shared/types/index.ts — Imports LeaveRequestStatus for the LeaveRequest entity's status field and for status-typed method parameters.
+- src/shared/base-repository.ts — The concrete repository extends BaseRepository and uses its query helper for all SQL execution.
+- src/shared/db/connection.ts — BaseRepository internally uses the exported pool; the test file mocks this module's pool.query to isolate the repository from the database.
+- employees table (src/modules/employee) — findPendingByManagerId must join leave_requests to employees on employee_id and filter by employees.manager_id = managerId to resolve the manager-direct-report relationship; the leave_requests.employee_id and approved_by columns are FKs to employees.id per the reconciled schema.
+- src/modules/leave-request/leave-request.service.ts (Phase 9) — The ILeaveRequestRepository interface defined here is the contract the future LeaveRequestService will depend on for all leave-request data access; its method signatures must remain stable for Phase 9 to consume.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
