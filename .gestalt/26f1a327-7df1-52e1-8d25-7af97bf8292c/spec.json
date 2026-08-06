@@ -1,0 +1,234 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "employee",
+      "leave-policy",
+      "shared-types"
+    ],
+    "affectedLayers": [
+      "service"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "IEmployeeService interface declares all eight operations (findById, findByEmployeeNumber, findByEmail, getDirectReports, isManagerOf, createEmployee, updateEmployee, terminateEmployee) and EmployeeService implements it; ILeavePolicyService declares all nine operations (findById, findByLeaveType, getAllActive, getEntitlementDays, requiresManagerApproval, getMinimumNoticeDays, createPolicy, updatePolicy, deactivatePolicy) and LeavePolicyService implements it. Both classes compile under strict TypeScript with no `any`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Each service is constructed by injecting its repository interface (IEmployeeRepository / ILeavePolicyRepository) and delegates every read/write to that repository \u2014 no direct SQL, pool, or BaseRepository access inside the service classes (GP-001). Unit tests inject a mock repository and assert the corresponding repository method is called with the validated arguments.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Invalid input is rejected before any repository call with a typed error (GP-003): empty/whitespace id, employeeNumber, email, policyName strings; non-positive entitlementDays; invalid LeaveType enum value; invalid employmentStatus. The unit test verifies the repository mock is NOT called and the rejection is a typed error carrying a VALIDATION_ERROR-style code.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Lookup-by-id operations that must return a derived value (getEntitlementDays, requiresManagerApproval, getMinimumNoticeDays) and isManagerOf reject with a NOT_FOUND-style typed error when the referenced policy/employee does not exist, rather than returning undefined or throwing a generic Error.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "isManagerOf(managerId, employeeId) returns true only when the loaded employee's managerId strictly equals the supplied managerId, and false otherwise \u2014 verified by unit test with a matching and a non-matching managerId. getDirectReports delegates to the repository's manager-based query and returns the array unchanged.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "terminateEmployee sets employmentStatus to TERMINATED and supplies a terminationDate, delegating the persistence to the repository update path; the unit test verifies the repository is called with the TERMINATED status and a termination date, and that the returned/updated employee reflects the terminated state.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "createEmployee and createPolicy delegate to the repository create method with the validated payload and return the persisted entity; updateEmployee and updatePolicy delegate to the repository update method with the id and partial payload; deactivatePolicy delegates to the repository deactivate method. Unit tests assert each repository method receives the correct arguments and the service returns the repository's result.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The Jest unit test file tests/unit/modules/employee/employee.service.test.ts exists and passes, covering: successful delegation for each IEmployeeService method, validation rejection paths, not-found rejection for isManagerOf, and the terminateEmployee status/date assertion \u2014 all using a mock IEmployeeRepository with no database dependency.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No `any` type anywhere in the service files or interfaces \u2014 use `unknown` with type guards where dynamic values appear (HARNESS.json no-any rule, severity high). Strict TypeScript must pass `tsc --noEmit`.",
+    "Services must not import or reference the concrete PgEmployeeRepository / PgLeavePolicyRepository, the shared pool, BaseRepository, or any SQL \u2014 they depend only on the repository interfaces (IEmployeeRepository / ILeavePolicyRepository) per GP-001 and the module dependency rules.",
+    "All async methods must catch or propagate errors without unhandled promise rejections (GP-006); repository errors must surface as typed errors, not bare `Error` or swallowed.",
+    "Input validation must occur at the service boundary before delegating to the repository (GP-003): required string fields must be non-empty after trim, numeric entitlements must be positive, enum values must be members of LeaveType, and ids must be non-empty strings.",
+    "The employee and leave-policy modules must import shared types only from src/shared/types (LeaveType) and must not import internals of other domain modules \u2014 respecting the module-boundary rule. The leave-policy service depends only on shared-types + its own repository interface; the employee service depends only on shared-types + its own repository interface."
+  ],
+  "outOfScope": [
+    "Controllers, Fastify routes, and RBAC middleware wiring \u2014 these are Phase 10. The services expose no HTTP surface and perform no role checks themselves (RBAC is enforced at the route layer per GP-005).",
+    "AuditLog writing for state-changing service operations (createEmployee, updateEmployee, terminateEmployee, createPolicy, updatePolicy, deactivatePolicy) \u2014 the AuditService and IAuditLogRepository do not exist until Phase 10, so audit integration is deferred to that phase.",
+    "LeavePolicyService unit test file \u2014 PLAN.md only requires tests/unit/modules/employee/employee.service.test.ts for this phase; leave-policy service testing is not mandated here.",
+    "Transaction/client-passing semantics \u2014 the employee and leave-policy services perform single-step writes with no multi-table atomicity requirement in this phase; the PoolClient transaction contract applies to leave-request/balance orchestration in Phase 9."
+  ],
+  "ambiguities": [
+    {
+      "description": "No typed error classes exist in the codebase (no ValidationError, NotFoundError, AppError). GP-003 requires invalid input rejected with a typed error and the error-response contract defines codes (VALIDATION_ERROR, NOT_FOUND), but the concrete error class shape the services should throw is undefined. The services must produce typed errors but there is no shared error-type module to reuse.",
+      "options": [
+        "Define minimal typed error classes (e.g. a ValidationError and NotFoundError) locally in each service file or a new shared error module",
+        "Throw the built-in Error subclass with a `code` property attached, matching the error-response contract codes",
+        "Defer typed-error creation and throw generic Error with a message, leaving error typing to Phase 10"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "The module-boundary rule (AGENTS.md / ARCHITECTURE.md) states modules import from each other ONLY through their declared public entry point (index.ts), but no index.ts barrel files exist in the employee or leave-policy modules. The service files must import the Employee/LeavePolicy models and repository interfaces, but the canonical import path is unclear.",
+      "options": [
+        "Import directly from the sibling files (employee.model.ts, employee.repository.interface.ts) since no index.ts exists yet",
+        "Create an index.ts barrel in each module as part of this phase and import through it",
+        "Import through index.ts assuming it will be created \u2014 risk of broken imports if not"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "description": "terminateEmployee is a state-changing operation (sets employmentStatus=TERMINATED + terminationDate). GP-002 mandates an audit record for every state-changing operation, but the AuditService does not exist until Phase 10. It is unclear whether terminateEmployee (and create/update operations) must be considered GP-002-compliant in this phase or whether audit is explicitly deferred.",
+      "options": [
+        "Treat audit as deferred to Phase 10 \u2014 services perform the state change now without audit, and Phase 10 retrofits audit calls",
+        "Block the phase until audit infrastructure exists \u2014 violates the phase ordering",
+        "Add a no-op audit hook interface now that Phase 10 fills in"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "createEmployee must supply employmentStatus and hireDate to the repository create method (which requires Omit<Employee,'id'|'createdAt'|'updatedAt'|'deletedAt'>). It is unclear whether the service should default employmentStatus to ACTIVE and hireDate to now when the caller omits them, or require the caller to supply all mandatory fields.",
+      "options": [
+        "Service defaults employmentStatus to ACTIVE and hireDate to the current date when not provided by the caller",
+        "Service requires the caller to supply all mandatory fields and rejects if any are missing",
+        "Service passes through whatever the caller provides and lets the repository/database enforce required fields"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "createPolicy must supply isActive to the repository create method (which requires Omit<LeavePolicy,'id'|'createdAt'|'updatedAt'>). It is unclear whether the service defaults isActive to true for new policies, or requires the caller to set it explicitly.",
+      "options": [
+        "Service defaults isActive to true when the caller omits it",
+        "Service requires the caller to supply isActive explicitly and rejects if missing",
+        "Service passes through the caller value without defaulting"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "An Employee's employmentStatus may only be ACTIVE, INACTIVE, or TERMINATED. terminateEmployee is the only service operation that transitions an employee to TERMINATED, and it must simultaneously set a non-null terminationDate. The service must reject any attempt to set employmentStatus to an out-of-set value."
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "The manager-employee relationship is expressed by Employee.managerId pointing to another Employee's id (or null). isManagerOf(managerId, employeeId) must resolve to true iff the employee identified by employeeId has managerId equal to the supplied managerId; a missing employee makes the check fail with a not-found error rather than a false positive."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "A LeavePolicy's leaveType must be a member of the LeaveType enum (annual, sick, emergency, unpaid, maternity, paternity) and its entitlementDays must be a positive number. The service must reject createPolicy/updatePolicy payloads that violate either constraint before persisting."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "A LeavePolicy has an ACTIVE/INACTIVE lifecycle. deactivatePolicy transitions a policy to inactive and is the designated service operation for that transition; getEntitlementDays, requiresManagerApproval, and getMinimumNoticeDays must operate on the policy identified by id regardless of active state (the repository findById does not filter by is_active), returning the stored value or rejecting with not-found when the policy is absent."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IEmployeeService.findById",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Rejects empty/whitespace id with a typed VALIDATION_ERROR before any repository call. Returns the Employee or null when not found \u2014 a missing record is a normal null result, not an error."
+    },
+    {
+      "operation": "IEmployeeService.isManagerOf",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Rejects empty managerId or employeeId with a typed VALIDATION_ERROR. Rejects with a typed NOT_FOUND error when the employee identified by employeeId does not exist. Returns a boolean (true only when the loaded employee's managerId equals the supplied managerId)."
+    },
+    {
+      "operation": "IEmployeeService.createEmployee",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Validates all required fields (non-empty employeeNumber, firstName, lastName, email; valid employmentStatus) before delegating to the repository. Rejects invalid input with a typed VALIDATION_ERROR. Propagates repository errors as typed errors (GP-006). Returns the persisted Employee."
+    },
+    {
+      "operation": "IEmployeeService.terminateEmployee",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Rejects empty id with a typed VALIDATION_ERROR. Delegates to the repository update path setting employmentStatus=TERMINATED and a terminationDate. Returns the updated Employee or rejects with a typed NOT_FOUND when the employee does not exist."
+    },
+    {
+      "operation": "ILeavePolicyService.getEntitlementDays",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Rejects empty policyId with a typed VALIDATION_ERROR. Resolves the policy by id; rejects with a typed NOT_FOUND when the policy is absent. Returns the policy's entitlementDays (a positive number)."
+    },
+    {
+      "operation": "ILeavePolicyService.requiresManagerApproval",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Rejects empty policyId with a typed VALIDATION_ERROR. Resolves the policy by id; rejects with a typed NOT_FOUND when absent. Returns the policy's requiresManagerApproval boolean."
+    },
+    {
+      "operation": "ILeavePolicyService.getMinimumNoticeDays",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Rejects empty policyId with a typed VALIDATION_ERROR. Resolves the policy by id; rejects with a typed NOT_FOUND when absent. Returns the policy's minimumNoticeDays (may be undefined when the policy does not specify one)."
+    },
+    {
+      "operation": "ILeavePolicyService.createPolicy",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Validates policyName (non-empty), leaveType (valid LeaveType enum member), entitlementDays (positive) before delegating. Rejects invalid input with a typed VALIDATION_ERROR. Returns the persisted LeavePolicy."
+    },
+    {
+      "operation": "ILeavePolicyService.deactivatePolicy",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Rejects empty policyId with a typed VALIDATION_ERROR. Delegates to the repository deactivate method. Returns a boolean indicating whether a policy was deactivated (false when no matching policy existed is a normal result, not an error)."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The EmployeeService must delegate to IEmployeeRepository exactly as declared: findById\u2192findById, findByEmployeeNumber\u2192findByEmployeeNumber, findByEmail\u2192findByEmail, getDirectReports\u2192findByManagerId, createEmployee\u2192create, updateEmployee\u2192update, terminateEmployee\u2192update (with TERMINATED status + terminationDate). The service must not invent repository methods or bypass the interface.",
+      "referencePath": "src/modules/employee/employee.repository.interface.ts"
+    },
+    {
+      "requirement": "The LeavePolicyService must delegate to ILeavePolicyRepository exactly as declared: findById\u2192findById, findByLeaveType\u2192findByLeaveType, getAllActive\u2192findAllActive, getEntitlementDays/requiresManagerApproval/getMinimumNoticeDays\u2192findById (then read the field), createPolicy\u2192create, updatePolicy\u2192update, deactivatePolicy\u2192deactivate. The service must not invent repository methods or bypass the interface.",
+      "referencePath": "src/modules/leave-policy/leave-policy.repository.interface.ts"
+    },
+    {
+      "requirement": "The EmployeeService must use the Employee interface as the entity type for all return values and create/update payloads, matching the field names and the employmentStatus union ('ACTIVE' | 'INACTIVE' | 'TERMINATED') exactly. The create payload type must align with the repository's Omit<Employee,'id'|'createdAt'|'updatedAt'|'deletedAt'>.",
+      "referencePath": "src/modules/employee/employee.model.ts"
+    },
+    {
+      "requirement": "The LeavePolicyService must use the LeavePolicy interface as the entity type for all return values and create/update payloads, matching the field names and the optional numeric fields (accrualRate, maxAccumulation, minimumNoticeDays as number | undefined) exactly. The create payload type must align with the repository's Omit<LeavePolicy,'id'|'createdAt'|'updatedAt'>.",
+      "referencePath": "src/modules/leave-policy/leave-policy.model.ts"
+    },
+    {
+      "requirement": "The LeavePolicyService must validate leaveType against the LeaveType enum exported from src/shared/types/index.ts (ANNUAL, SICK, EMERGENCY, UNPAID, MATERNITY, PATERNITY) and reject any value not in that set. The service must import LeaveType from this shared location, not redefine it.",
+      "referencePath": "src/shared/types/index.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "IEmployeeRepository (src/modules/employee/employee.repository.interface.ts)",
+      "why": "EmployeeService is constructed with an IEmployeeRepository instance and delegates all persistence to it; this is the primary integration surface and the seam unit tests mock."
+    },
+    {
+      "target": "ILeavePolicyRepository (src/modules/leave-policy/leave-policy.repository.interface.ts)",
+      "why": "LeavePolicyService is constructed with an ILeavePolicyRepository instance and delegates all persistence to it; this is the primary integration surface and the seam unit tests mock."
+    },
+    {
+      "target": "LeaveRequestService and LeaveBalanceService (Phase 9)",
+      "why": "Phase 9 consumes IEmployeeService (isManagerOf, getDirectReports, findById) and ILeavePolicyService (getEntitlementDays, requiresManagerApproval, getMinimumNoticeDays, findByLeaveType) as injected dependencies. The interface contracts defined in this phase are the binding integration surface for the request/balance orchestration."
+    },
+    {
+      "target": "AuditService (Phase 10)",
+      "why": "The state-changing operations in both services (createEmployee, updateEmployee, terminateEmployee, createPolicy, updatePolicy, deactivatePolicy) are GP-002 audit candidates; Phase 10 will retrofit audit logging around these service operations once IAuditService exists."
+    }
+  ]
+}
