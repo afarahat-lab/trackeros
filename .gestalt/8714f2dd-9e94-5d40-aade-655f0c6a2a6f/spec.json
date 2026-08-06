@@ -1,0 +1,171 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-policy"
+    ],
+    "affectedLayers": [
+      "domain-model",
+      "data-access"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The LeavePolicy entity interface is exported with all specified fields and correct types (id, policyName, leaveType as LeaveType, entitlementDays, accrualRate, maxAccumulation, minimumNoticeDays, requiresManagerApproval, isActive, createdAt, updatedAt), importing LeaveType from src/shared/types/index.ts.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository interface exposes six methods with correct signatures: findById(id)\u2192LeavePolicy|null, findByLeaveType(leaveType)\u2192LeavePolicy|null, findAllActive()\u2192LeavePolicy[], create(Omit<LeavePolicy,'id'|'createdAt'|'updatedAt'>)\u2192LeavePolicy, update(id, Partial<Omit<...>>)\u2192LeavePolicy|null, deactivate(id)\u2192boolean.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "create() persists a new leave_policies row with a generated UUID id and current timestamps, and returns the mapped LeavePolicy entity; it throws a typed error when the insert returns no row or a row that fails the type guard.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findByLeaveType() returns the single active LeavePolicy for a given leave type (filtering is_active = true) or null when none exists; findAllActive() returns only policies where is_active = true.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "update() with partial input persists only the provided fields, always bumps updated_at, and returns the updated entity or null on not-found; when no fields are provided it falls back to findById and returns the current record.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "deactivate() sets is_active = false and updated_at to now, and returns true when a row was affected (rowCount > 0) or false when the id was not found.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Rows that fail the type guard are rejected safely: findById and update return null, findByLeaveType and findAllActive skip them, and create throws rather than returning an invalid entity.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "No `any` type appears anywhere in the module; the type guard narrows from `unknown` without casting to `any`, and the row interface uses an index signature with `unknown`-compatible values.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Unit tests cover found, not-found, type-guard-failure, and DB-error cases for each repository method, mocking pool.query and asserting SQL text contains the expected table and clause fragments.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access must go through the repository pattern (GP-001); the repository implementation must extend BaseRepository from src/shared/base-repository.ts and issue SQL via its query helper \u2014 no direct pool.query calls in the repository class itself.",
+    "No `any` type anywhere (HARNESS constraint no-any); use `unknown` with type guards for row validation, mirroring the Employee repository's isEmployeeRow pattern.",
+    "The repository must import LeaveType from src/shared/types/index.ts and type the leaveType field/column against that enum \u2014 no local redefinition of the enum.",
+    "The DB table is leave_policies with snake_case columns; the row mapper must convert snake_case DB columns to camelCase entity fields and vice versa for create/update, matching the Employee repository convention.",
+    "IDs must be generated with randomUUID() and timestamps with new Date() at create time, matching the Employee repository pattern; the repository does not rely on DB defaults for id/createdAt/updatedAt.",
+    "Unit tests must mock the pool from src/shared/db/connection before importing the repository, cast pool.query as jest.Mock, and reset it in beforeEach \u2014 matching the Employee repository test structure."
+  ],
+  "outOfScope": [
+    "LeavePolicyService, ILeavePolicyService, controllers, routes, and RBAC wiring \u2014 these belong to Phase 8 (services) and Phase 10 (routes), not this repository/model phase.",
+    "Database migrations or schema DDL for the leave_policies table \u2014 this phase defines the model and repository only; migrations are handled separately.",
+    "A leave_types table, leave_type_id FK, or a leave-types module \u2014 the settled decision stores leaveType directly as a string column holding the LeaveType enum value; no such table or module exists or is planned.",
+    "Audit logging (GP-002) within the repository \u2014 the repository is a data-access layer; audit records are written by the service layer in later phases, not by the repository itself.",
+    "Input validation (GP-003) \u2014 validation at API boundaries is a service/controller concern in later phases; the repository accepts already-shaped domain input."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "Lifecycle is ACTIVE/INACTIVE governed by the isActive boolean; deactivate() transitions a policy to inactive (is_active = false) and is the only state-changing operation in this phase \u2014 there is no hard delete, only deactivation."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "Each leave type maps to a single active LeavePolicy; findByLeaveType returns at most one record (the first active row for that leave type), reflecting the architecture's one-active-policy-per-leave-type rule."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "createdAt and updatedAt are set to the current time on creation and updatedAt is always bumped on any update or deactivation; the repository never accepts caller-supplied id, createdAt, or updatedAt (they are Omit'd from create and update input types)."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "findById(id)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the LeavePolicy or null when not found or when the row fails the type guard; propagates underlying database errors without swallowing them."
+    },
+    {
+      "operation": "findByLeaveType(leaveType)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the single active LeavePolicy for the given leave type or null when none exists or the row fails the type guard; propagates database errors."
+    },
+    {
+      "operation": "findAllActive()",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an array of active LeavePolicy entities, filtering out any rows that fail the type guard; returns an empty array when none exist; propagates database errors."
+    },
+    {
+      "operation": "create(policy)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Persists a new row with a generated UUID and current timestamps and returns the mapped entity; throws a typed Error when the insert returns no row or a row failing the type guard; propagates database errors."
+    },
+    {
+      "operation": "update(id, policy)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Persists only provided fields, always bumps updated_at, returns the updated entity or null on not-found/type-guard failure; falls back to findById returning the current record when no fields are provided; propagates database errors."
+    },
+    {
+      "operation": "deactivate(id)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Sets is_active=false and updated_at=now; returns true when a row was affected (rowCount > 0) or false when the id was not found; propagates database errors."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The repository implementation must mirror the Employee repository structure: a private row interface with snake_case columns and an index signature, a rowToEntity mapper, an isEntityRow type guard narrowing from unknown without any, a private inner class extending BaseRepository instantiated as this.base, hand-written SQL via this.base.query, randomUUID() for IDs, new Date() for timestamps, and a dynamic SET-clause builder with a paramIndex counter for update.",
+      "referencePath": "src/modules/employee/employee.repository.ts"
+    },
+    {
+      "requirement": "The LeaveType enum (annual | sick | emergency | unpaid | maternity | paternity) must be imported from src/shared/types/index.ts and used as the type of LeavePolicy.leaveType; the model must not redefine the enum locally.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The repository must extend BaseRepository (via a private inner class) and use its generic query<T extends Record<string, unknown>> helper for all SQL; it must not call pool.query directly or bypass the repository pattern.",
+      "referencePath": "src/shared/base-repository.ts"
+    },
+    {
+      "requirement": "The unit test must follow the Employee repository test structure: jest.mock the db connection pool before importing the repository, cast pool.query as jest.Mock, provide makeRow (snake_case) and makeEntity (camelCase) helpers, reset the mock in beforeEach, and assert SQL text contains expected table/clause fragments for each method.",
+      "referencePath": "tests/unit/modules/employee/employee.repository.test.ts"
+    },
+    {
+      "requirement": "The repository interface must use the same Omit/Partial<Omit> create/update signature convention as IEmployeeRepository \u2014 create accepts Omit<LeavePolicy,'id'|'createdAt'|'updatedAt'> and update accepts Partial<Omit<LeavePolicy,'id'|'createdAt'|'updatedAt'>>.",
+      "referencePath": "src/modules/employee/employee.repository.interface.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts",
+      "why": "Imports the LeaveType enum used to type LeavePolicy.leaveType; this is the sole cross-module dependency for the leave-policy module per the reconciled dependency map (leave-policy \u2192 shared-types)."
+    },
+    {
+      "target": "src/shared/base-repository.ts",
+      "why": "The repository implementation extends BaseRepository to inherit the generic query helper and pool access; required by the repository-pattern constraint (GP-001) and the Employee module template."
+    },
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "The pool is consumed transitively via BaseRepository; unit tests mock this module's pool export before importing the repository, matching the Employee test pattern."
+    },
+    {
+      "target": "src/modules/employee/employee.repository.ts (and its test)",
+      "why": "The Employee repository is the direct structural template for the LeavePolicy repository (row interface, mapper, type guard, base class, SQL style, update SET-clause builder, create error throw); the implementation and tests must be structurally consistent with it."
+    }
+  ]
+}
