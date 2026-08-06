@@ -1,21 +1,21 @@
-# Implement this phase: Phase 6: AuditLog model + repository
+# Implement this phase: Phase 7: Notification model + repository
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/219727ae-a952-461a-b605-c6d40c0c1e42/6`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/219727ae-a952-461a-b605-c6d40c0c1e42/7`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the AuditLog domain model and repository.
+Create the Notification domain model and repository.
 
 Files to create:
-- `src/modules/audit/audit.model.ts` — Define the `AuditLog` entity interface with exact fields: id: string, entityType: string, entityId: string, action: string, oldValues: Record<string, unknown> | null, newValues: Record<string, unknown> | null, performedBy: string | null, performedAt: Date, ipAddress: string | null, userAgent: string | null, createdAt: Date.
-- `src/modules/audit/audit.repository.interface.ts` — Define `IAuditLogRepository` interface with methods: findById(id), findByEntity(entityType, entityId), findByPerformedBy(performedBy, limit?), create(entry), findAll(filters).
-- `src/modules/audit/audit.repository.ts` — Implement `PgAuditLogRepository` class implementing IAuditLogRepository, extending the base repository from `src/shared/base-repository.ts`.
+- `src/modules/notification/notification.model.ts` — Define the `Notification` entity interface with exact fields: id: string, recipientId: string, type: 'LEAVE_SUBMITTED' | 'LEAVE_APPROVED' | 'LEAVE_REJECTED' | 'LEAVE_CANCELLED', title: string, message: string, relatedEntityType: 'LeaveRequest', relatedEntityId: string, status: 'PENDING' | 'SENT' | 'READ' | 'ARCHIVED', createdAt: Date, readAt: Date | null.
+- `src/modules/notification/notification.repository.interface.ts` — Define `INotificationRepository` interface with methods: findById(id), findByRecipient(recipientId, status?), create(notification), updateStatus(id, status), markAsRead(id), findByRelatedEntity(entityType, entityId).
+- `src/modules/notification/notification.repository.ts` — Implement `PgNotificationRepository` class implementing INotificationRepository, extending the base repository from `src/shared/base-repository.ts`.
 
 This phase depends on `src/shared/types/index.ts` and `src/shared/base-repository.ts` from Phase 1 — read both before generating any code.
 
-Include Jest unit tests in `tests/unit/modules/audit/audit.repository.test.ts`.
+Include Jest unit tests in `tests/unit/modules/notification/notification.repository.test.ts`.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -31,40 +31,45 @@ Standing rules: whole days only (no partial/half days); used_days is deducted on
 
 ## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
 The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
-- `AuditLog` — the entity MUST have exactly these fields:
+- `Notification` — the entity MUST have exactly these fields:
     - id: string
-    - entityType: string
-    - entityId: string
-    - action: string
-    - oldValues: Record<string, unknown> | null
-    - newValues: Record<string, unknown> | null
-    - performedBy: string | null
-    - performedAt: Date
-    - ipAddress: string | null
-    - userAgent: string | null
+    - recipientId: string
+    - type: 'LEAVE_SUBMITTED' | 'LEAVE_APPROVED' | 'LEAVE_REJECTED' | 'LEAVE_CANCELLED'
+    - title: string
+    - message: string
+    - relatedEntityType: 'LeaveRequest'
+    - relatedEntityId: string
+    - status: 'PENDING' | 'SENT' | 'READ' | 'ARCHIVED'
     - createdAt: Date
+    - readAt: Date | null
 
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- PgAuditLogRepository must extend BaseRepository and route all SQL through its query helper (or the inherited findById/findAll/insert helpers) using the shared pool — matching the pattern established by PgEmployeeRepository and the other sibling repositories. (see `src/shared/base-repository.ts`)
-- The repository must follow the established row-mapping pattern: a private AuditLogRow interface with snake_case columns, a rowToAuditLog mapper, an isAuditLogRow type guard using unknown + property checks (no any), and a private BaseRepository subclass instance — matching the structure used by PgEmployeeRepository. (see `src/modules/employee/employee.repository.ts`)
-- The AuditLog entity fields and the audit_logs table columns must match the reconciled architecture exactly: entity_type, entity_id, action, old_values, new_values, performed_by, performed_at, ip_address, user_agent, created_at — with indexes on (entity_type, entity_id), performed_by, performed_at, and action. (see `.gestalt/architecture/reconciled.json`)
-- The audit module's only cross-module dependency is shared-types; it must not import from employee, leave-request, or any other domain module — matching the dependency map (audit → shared-types only). (see `src/shared/types/index.ts`)
+- The notification repository must extend BaseRepository and route all queries through its generic `query<T extends Record<string, unknown>>(text, params?)` helper backed by the shared pool — matching how the audit, leave-request, leave-balance, leave-policy, and employee repositories compose a private inner class extending BaseRepository. (see `src/shared/base-repository.ts`)
+- The notification repository must mirror the audit repository's structural pattern: a private NotificationRow interface with an index signature, a rowToNotification mapper, an isNotificationRow type guard (validating string-literal unions against arrays, nullable fields, and Date instanceof checks), a private inner class extending BaseRepository, and a public class implementing the interface via composition. (see `src/modules/audit/audit.repository.ts`)
+- The create() error message must follow the audit repository's convention: throw `new Error('Failed to create notification')` when the inserted row is absent or fails the type guard — paralleling 'Failed to create audit log entry' and 'Failed to create leave request'. (see `src/modules/audit/audit.repository.ts`)
+- The type guard must validate the `type` and `status` string-literal unions against explicit value arrays (as leave-request validates status against VALID_STATUSES), and must validate nullable fields (readAt === null || readAt instanceof Date) and Date instanceof checks for createdAt — matching the established isLeaveRequestRow / isAuditLogRow guard conventions. (see `src/modules/leave-request/leave-request.repository.ts`)
+- The unit test file must follow the audit/leave-request test conventions: jest.mock the shared db/connection pool.query before importing the repository, define makeNotificationRow/makeNotification helpers, use describe→beforeEach→nested describe-per-method structure, and assert exact SQL query strings and parameter arrays via mockQuery.mock.calls. (see `tests/unit/modules/audit/audit.repository.test.ts`)
+- The Notification entity shape and the `notifications` table column mapping (snake_case: recipient_id, related_entity_type, related_entity_id, created_at, read_at) must match the reconciled architecture's Notification domain entity and notifications conceptual table definition exactly. (see `.gestalt/architecture/reconciled.json`)
 ### Entity invariants — enforce these
-- Reuse or extend `AuditLog`: An AuditLog record is immutable once created — it can be inserted and read but never updated or deleted; the repository exposes no mutation operations other than create.
-- Reuse or extend `AuditLog`: id and createdAt are always server-generated at the repository layer (randomUUID and new Date respectively); the caller never supplies them — create accepts Omit<AuditLog, 'id' | 'createdAt'>.
-- Reuse or extend `AuditLog`: performedAt is caller-supplied and records when the audited action occurred, distinct from createdAt which records when the log row was persisted; the two timestamps are independent and must not be conflated.
+- Reuse or extend `Notification`: The status lifecycle is PENDING → SENT → READ → ARCHIVED; markAsRead transitions a notification to READ and populates readAt with the current timestamp.
+- Reuse or extend `Notification`: id and createdAt are server-generated at the repository layer (randomUUID and new Date respectively) and are never supplied by the caller — create() input omits both.
+- Reuse or extend `Notification`: readAt is nullable and is null until the notification is marked as read; it must be a Date instance (or null) in any mapped entity.
+- Reuse or extend `Notification`: relatedEntityType is constrained to 'LeaveRequest' and relatedEntityId links the notification to a specific leave request — findByRelatedEntity retrieves all notifications for a given (entityType, entityId) pair.
 ### Interface contract — expose these operations (their shape is yours)
-- IAuditLogRepository.findById(id) — Returns the matching AuditLog or null when not found / when the row fails the type guard; database errors propagate as thrown errors (no silent swallow).
-- IAuditLogRepository.findByEntity(entityType, entityId) — Returns an array (empty when no matches, never null); rows failing the type guard are filtered out; database errors propagate as thrown errors.
-- IAuditLogRepository.findByPerformedBy(performedBy, limit?) — idempotent; Returns an array (empty when no matches); applies LIMIT only when the optional limit is provided; database errors propagate as thrown errors.
-- IAuditLogRepository.create(entry) — Persists a row with server-generated id and createdAt, returns the created AuditLog; throws a typed error when the insert returns no row or a row failing the type guard; database errors propagate.
-- IAuditLogRepository.findAll(filters) — idempotent; Returns an array (empty when no matches, never null); builds a parameterized WHERE clause from provided filter fields; rows failing the type guard are filtered out; database errors propagate.
+- findById(id) — Returns the Notification entity when found and the row passes the type guard; returns null when no row exists or the row is invalid. Database errors propagate.
+- findByRecipient(recipientId, status?) — Returns an array of notifications for the recipient; when the optional status filter is provided, results are constrained to that status. Invalid rows are filtered out (never thrown). Database errors propagate.
+- create(notification) — Accepts input omitting id and createdAt, generates both server-side, persists the row, and returns the full Notification. Throws 'Failed to create notification' when the inserted row is absent or fails the type guard. Database errors propagate.
+- updateStatus(id, status) — Updates the notification's status and returns the updated Notification, or null when no row exists or the returned row fails the type guard. Database errors propagate.
+- markAsRead(id) — Sets status to READ and readAt to the current timestamp, returning the updated Notification, or null when no row exists or the returned row fails the type guard. Database errors propagate.
+- findByRelatedEntity(entityType, entityId) — Returns an array of notifications linked to the given (entityType, entityId) pair. Invalid rows are filtered out (never thrown). Database errors propagate.
 ### Integration points — connect to these
-- src/shared/base-repository.ts — PgAuditLogRepository extends BaseRepository and uses its query helper for all database access.
-- src/shared/db/connection.ts — The repository uses the shared PostgreSQL pool (transitively via BaseRepository) for all queries — no separate connection management.
-- src/modules/audit/audit.repository.interface.ts (consumed by future AuditService in Phase 10) — The IAuditLogRepository interface is the contract that the future AuditService (Phase 10) and the leave-request/balance services will depend on to write audit records for state-changing operations (GP-002).
+- src/shared/base-repository.ts — The notification repository extends BaseRepository and uses its query helper to execute SQL against the shared pool — the foundational dependency from Phase 1.
+- src/shared/db/connection.ts — The shared PostgreSQL pool is transitively used by BaseRepository.query; the unit tests mock this module's pool.query before importing the repository.
+- src/modules/notification/notification.model.ts — The repository interface and implementation both import the Notification entity type from the model file — the model is the canonical type definition consumed by this phase's repository and by the Phase 10 service layer.
+- src/modules/notification/notification.repository.interface.ts — The concrete PgNotificationRepository implements INotificationRepository; this interface is the contract that the Phase 10 NotificationService will depend on (dependency injection).
+- src/modules/leave-request/leave-request.repository.ts — The notification repository follows the same composition + type-guard + error-handling conventions established by the leave-request and audit repositories; consistency with these siblings is a binding requirement.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
