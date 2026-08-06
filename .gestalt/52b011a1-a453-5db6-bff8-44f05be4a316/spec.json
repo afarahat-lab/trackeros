@@ -1,0 +1,167 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared-types",
+      "shared-infrastructure"
+    ],
+    "affectedLayers": [
+      "shared",
+      "data-access"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The shared types module exports a LeaveType enum whose members map to exactly the six string values 'annual', 'sick', 'emergency', 'unpaid', 'maternity', 'paternity' \u2014 no more, no fewer.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The shared types module exports a LeaveRequestStatus enum whose members map to exactly the five string values 'DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED', 'CANCELLED' \u2014 no more, no fewer.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The shared types module exports a UserRole enum whose members map to exactly the three string values 'employee', 'manager', 'hr_admin' \u2014 no more, no fewer.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The base repository exposes six query-helper operations (query, findById, findAll, insert, update, delete) that execute SQL against the pg pool and return the documented result shapes: findById returns the row or null when absent; findAll returns an array (empty when none); insert returns the inserted row; update returns the updated row or null when no match; delete returns a boolean indicating whether a row was removed.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The base repository is an abstract class that cannot be instantiated directly and is designed to be extended by concrete repositories; all six methods route database access through the shared pool, satisfying the repository-pattern rule (no direct DB access outside the repository layer).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The base repository uses TypeScript generics throughout and contains no `any` types \u2014 params are typed as `unknown[]`, row data as `Record<string, unknown>`, and caught errors as `unknown`; the project compiles cleanly under strict TypeScript (tsc --noEmit).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests cover each base repository method across success, not-found/null, empty, and error-propagation paths, and the full test suite passes (npx jest --passWithNoTests exits 0).",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No `any` types anywhere in the shared types or base repository \u2014 use `unknown` with type guards and TypeScript generics instead (HARNESS.json constraint `no-any`, severity high; enforced by tsconfig strict mode).",
+    "All database access must go through the repository layer \u2014 the base repository encapsulates the pg pool; no inline SQL or direct pool usage may occur outside repository classes (HARNESS.json constraint `no-direct-db-outside-repository`, severity critical; GP-001).",
+    "The base repository must import and use the `pool` exported from `src/shared/db/connection.ts` rather than constructing its own Pool instance.",
+    "The three enums must be string-valued enums whose member values exactly match the reconciled architecture's specified string literals (LeaveType: annual|sick|emergency|unpaid|maternity|paternity; LeaveRequestStatus: DRAFT|SUBMITTED|APPROVED|REJECTED|CANCELLED; UserRole: employee|manager|hr_admin).",
+    "No hardcoded secrets, passwords, API keys, or tokens in the shared types or base repository (HARNESS.json constraint `no-hardcoded-secrets`, severity critical).",
+    "No unhandled promise rejections \u2014 all async errors in the base repository must be caught and re-thrown in a typed manner (GP-006); the catch blocks must type the error as `unknown`."
+  ],
+  "outOfScope": [
+    "The optional `client: PoolClient` transaction parameter is NOT part of this phase's base repository helpers \u2014 transactional client support is deferred to the concrete Pg*Repository classes in Phases 2\u20137 per the Transaction Contract.",
+    "Concrete domain repositories (Employee, LeavePolicy, LeaveBalance, LeaveRequest, AuditLog, Notification) and their entity models are out of scope \u2014 they are built in Phases 2\u20137 and will extend the base repository.",
+    "Service layers, controllers, Fastify routes, RBAC guards, and audit/notification wiring are out of scope \u2014 they belong to Phases 8\u201310.",
+    "Database migrations / schema creation (Knex) for the conceptual tables are out of scope for this phase \u2014 the base repository operates against tables assumed to exist.",
+    "SQL injection hardening of the dynamic table-name/column-name interpolation in the base repository's generic helpers is a known limitation of the generic pattern; concrete repositories in later phases own parameterized, validated queries for their specific tables. This phase does not add a sanitization layer."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveType",
+      "mustExistOrExtend": true,
+      "invariant": "The enum is a closed set of exactly six string values; no leave category outside annual/sick/emergency/unpaid/maternity/paternity is representable, and every LeavePolicy in later phases must reference one of these values."
+    },
+    {
+      "entity": "LeaveRequestStatus",
+      "mustExistOrExtend": true,
+      "invariant": "The enum is a closed set of exactly five string values that govern the LeaveRequest lifecycle; the valid transitions (DRAFT\u2192SUBMITTED\u2192APPROVED|REJECTED|CANCELLED; APPROVED\u2192CANCELLED; DRAFT\u2192CANCELLED) are defined by the reconciled architecture and enforced by later-phase services, but the enum itself must expose all five states."
+    },
+    {
+      "entity": "UserRole",
+      "mustExistOrExtend": true,
+      "invariant": "The enum is a closed set of exactly three string values (employee, manager, hr_admin) that drive RBAC across the entire system; the auth contract binds request.user.role to one of these values, and no other role may be introduced in this phase."
+    },
+    {
+      "entity": "BaseRepository",
+      "mustExistOrExtend": true,
+      "invariant": "BaseRepository is an abstract class that cannot be instantiated directly; it provides generic query helpers that all concrete Pg*Repository classes extend, ensuring every database access path flows through the repository layer (GP-001)."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "BaseRepository.query(text, params)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Errors from the underlying pg pool must propagate to the caller as re-thrown exceptions (caught as `unknown`, re-thrown); no silent swallowing."
+    },
+    {
+      "operation": "BaseRepository.findById(table, id)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the matching row or null when no row exists; pool errors propagate as re-thrown exceptions."
+    },
+    {
+      "operation": "BaseRepository.findAll(table)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an array of all rows (empty array when the table has none); pool errors propagate as re-thrown exceptions."
+    },
+    {
+      "operation": "BaseRepository.insert(table, data)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the inserted row (via RETURNING *); constraint-violation and other pool errors propagate as re-thrown exceptions."
+    },
+    {
+      "operation": "BaseRepository.update(table, id, data)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the updated row or null when no row matches the id (via RETURNING *); pool errors propagate as re-thrown exceptions."
+    },
+    {
+      "operation": "BaseRepository.delete(table, id)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns true when a row was removed, false when no row matched; pool errors propagate as re-thrown exceptions."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The base repository must import and use the `pool` symbol exactly as exported from the database connection module \u2014 no alternate Pool construction or connection-string handling.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "The three enums' string values must match the reconciled architecture's declared enum values exactly (LeaveType, LeaveRequestStatus, UserRole) so that every downstream module (employee, leave-policy, leave-balance, leave-request, audit, notification) can import them as the single source of truth.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "The shared-types module boundary (src/shared/types/) and its ownership of the three enums must match the reconciled module-boundaries table; no other module may redefine these enums.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "The base repository must satisfy the repository-pattern rule and the no-direct-db-outside-repository constraint as stated in the golden principles and HARNESS.json \u2014 all pool access is encapsulated inside the repository abstraction.",
+      "referencePath": "docs/GOLDEN_PRINCIPLES.md"
+    },
+    {
+      "requirement": "The UserRole enum values must match the auth contract's declared role set (employee | manager | hr_admin) so that request.user.role typing and RBAC guards in later phases are consistent.",
+      "referencePath": "docs/ARCHITECTURE.md"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/db/connection.ts (pg Pool export)",
+      "why": "The base repository depends on the shared pool for all query execution; this is the single integration surface between the repository layer and PostgreSQL."
+    },
+    {
+      "target": "Concrete Pg*Repository classes (Phases 2\u20137: Employee, LeavePolicy, LeaveBalance, LeaveRequest, AuditLog, Notification)",
+      "why": "All concrete repositories extend BaseRepository and inherit the six generic query helpers; the base class is the foundation they build upon."
+    },
+    {
+      "target": "All domain modules (employee, leave-policy, leave-balance, leave-request, audit, notification)",
+      "why": "Every domain module imports the three enums from src/shared/types/index.ts as the single source of truth for LeaveType, LeaveRequestStatus, and UserRole \u2014 the dependency map shows shared-types as the root dependency of all modules."
+    },
+    {
+      "target": "Auth/RBAC layer (Phase 10)",
+      "why": "The UserRole enum is consumed by the auth contract (request.user.role) and the requireRole RBAC guard; its values must be stable for the guard wiring in the final phase."
+    }
+  ]
+}
