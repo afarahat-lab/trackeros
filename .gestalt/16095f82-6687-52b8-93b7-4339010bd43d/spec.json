@@ -1,0 +1,178 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "audit"
+    ],
+    "affectedLayers": [
+      "domain-model",
+      "data-access"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The AuditLog entity interface is exported from the audit model file with all required fields: id, entityType, entityId, action, oldValues (Record<string, unknown> | null), newValues (Record<string, unknown> | null), performedBy (string | null), performedAt (Date), ipAddress (string | null), userAgent (string | null), createdAt (Date).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The IAuditLogRepository interface exposes exactly five operations: findById(id), findByEntity(entityType, entityId), findByPerformedBy(performedBy, limit?), create(entry), findAll(filters) \u2014 each with the correct return type (AuditLog | null for findById, AuditLog[] for collection methods, AuditLog for create).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The concrete repository class implements IAuditLogRepository and extends BaseRepository from src/shared/base-repository.ts, using the shared pool for all database access.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "create() generates the id via crypto.randomUUID() and createdAt via new Date() at the repository layer, persists the row, and returns the full AuditLog entity with all fields mapped from the returned row.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findById returns null when no row is found or when the returned row fails the type guard; findByEntity, findByPerformedBy, and findAll return an empty array (not null) when no rows match, and filter out rows that fail the type guard.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Database errors propagate to the caller without being swallowed or re-wrapped in all repository methods \u2014 the caller receives the original error.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests in tests/unit/modules/audit/audit.repository.test.ts cover every repository method including the not-found case, type-guard rejection case, and database-error propagation case, with the pool mocked.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "No `any` type appears anywhere in the audit module source \u2014 all row-to-entity mapping uses `unknown` with type guard functions, satisfying the no-any constraint.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access must go through the repository pattern (GP-001); the audit repository must not expose raw SQL to callers and must use the shared pool from src/shared/db/connection.ts.",
+    "No `any` type is permitted anywhere in the audit module \u2014 use `unknown` with type guards for row-to-entity mapping (HARNESS.json constraint no-any, severity high).",
+    "AuditLog records are immutable (GP-002): the repository must expose no update or delete operation \u2014 only create and read methods.",
+    "The repository must use parameterized queries ($1, $2, ...) for all user-supplied values; no string interpolation of user input into SQL to prevent SQL injection.",
+    "Strict TypeScript must pass (no implicit any, strict null checks) \u2014 the module must compile under tsc --noEmit without errors.",
+    "The audit module may only depend on shared-types and the shared base repository; it must not import from other domain modules (employee, leave-request, etc.) per the dependency map."
+  ],
+  "outOfScope": [
+    "AuditService and IAuditService interface (logCreate, logUpdate, logDelete, findByPerformer) \u2014 deferred to Phase 10.",
+    "Database migration / schema creation for the audit_logs table \u2014 this phase only defines the model and repository; migrations are not in scope.",
+    "Fastify routes, controllers, and RBAC wiring for audit endpoints \u2014 deferred to Phase 10.",
+    "Transaction client (PoolClient) support on repository methods \u2014 the transaction contract applies to multi-step writes orchestrated by services in later phases; this phase's repository methods acquire and release their own connection.",
+    "Update or delete operations on audit records \u2014 audit logs are immutable by design (GP-002); no such methods exist in the interface."
+  ],
+  "ambiguities": [
+    {
+      "description": "The findAll filters interface (AuditLogFilters) is not specified in the phase intent's method list \u2014 the intent only says findAll(filters). The existing implementation already defines a richer filter set (entityType, entityId, performedBy, action, performedFrom, performedTo). Should the filter shape be left to the code agent or pinned to the existing one?",
+      "options": [
+        "Leave the filter object shape to the code agent (specify only that findAll accepts filters and returns AuditLog[])",
+        "Pin the filter shape to the existing AuditLogFilters (entityType, entityId, performedBy, action, performedFrom, performedTo)"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "description": "The existing PgAuditLogRepository delegates to an internal `new AuditBaseRepository()` instance rather than extending BaseRepository directly (composition over inheritance), while the phase intent says \"extending the base repository.\" The employee repository uses the same composition pattern. Should the spec require direct extends or allow the established composition pattern?",
+      "options": [
+        "Allow either direct extends or the established composition-with-BaseRepository pattern (specify only that BaseRepository must be reused)",
+        "Require direct class extends BaseRepository"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "An AuditLog record is immutable once created: it can never be updated or deleted through the repository. The repository interface exposes no update or delete method."
+    },
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "The id and createdAt fields are server-generated at the repository layer (randomUUID and new Date respectively) and are never supplied by the caller \u2014 create() accepts an entry omitting id and createdAt."
+    },
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "performedAt is caller-supplied (records when the audited action occurred) and is distinct from createdAt (when the record was persisted); the repository must not overwrite performedAt with the current time."
+    },
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "oldValues and newValues are nullable (Record<string, unknown> | null); a CREATE action typically has null oldValues, a DELETE action typically has null newValues, but the repository must not enforce this \u2014 it persists whatever the caller provides."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IAuditLogRepository.findById(id)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns null when no row matches or the row fails the type guard; database errors propagate to the caller unwrapped."
+    },
+    {
+      "operation": "IAuditLogRepository.findByEntity(entityType, entityId)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an empty array when no rows match; filters out rows failing the type guard; database errors propagate unwrapped."
+    },
+    {
+      "operation": "IAuditLogRepository.findByPerformedBy(performedBy, limit?)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an empty array when no rows match; the optional limit caps the result set; database errors propagate unwrapped."
+    },
+    {
+      "operation": "IAuditLogRepository.create(entry)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws a typed error when the insert returns no row or a row failing the type guard; database errors propagate unwrapped. Generates id and createdAt server-side."
+    },
+    {
+      "operation": "IAuditLogRepository.findAll(filters)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an empty array when no rows match or all filters are absent; filters out rows failing the type guard; database errors propagate unwrapped."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The concrete audit repository must extend BaseRepository and reuse its query helper (or equivalent parameterized-query approach) rather than re-implementing pool access directly; the row-to-entity mapping and type-guard pattern must match the established convention in existing repositories (e.g. src/modules/employee/employee.repository.ts).",
+      "referencePath": "src/shared/base-repository.ts"
+    },
+    {
+      "requirement": "The AuditLog entity field set and the audit_logs table column set must match the reconciled architecture exactly: id, entity_type, entity_id, action, old_values, new_values, performed_by, performed_at, ip_address, user_agent, created_at \u2014 with indexes on (entity_type, entity_id), performed_by, performed_at, and action.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "The audit repository must follow the same structural pattern as the existing employee repository: private row interface with snake_case columns, a rowTo* mapping function, an is*Row type guard using unknown, and a class that implements the interface and delegates queries through BaseRepository.",
+      "referencePath": "src/modules/employee/employee.repository.ts"
+    },
+    {
+      "requirement": "The audit module's dependency on shared-types must be consistent with the dependency map (audit \u2192 shared-types only); the module must not import from other domain modules.",
+      "referencePath": "src/shared/types/index.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/base-repository.ts",
+      "why": "The concrete audit repository extends BaseRepository to inherit the query helper and the established repository pattern."
+    },
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "All database queries route through the shared pg pool exported from this file; the repository must not instantiate its own pool."
+    },
+    {
+      "target": "src/shared/types/index.ts",
+      "why": "The audit module's only declared domain dependency per the reconciled dependency map; the module may import shared enums if needed but must not depend on other domain modules."
+    },
+    {
+      "target": "Phase 10 \u2014 AuditService (IAuditService / AuditService)",
+      "why": "The IAuditLogRepository interface and PgAuditLogRepository implementation produced in this phase are the injection target for the AuditService that will be built in Phase 10; the interface contract must remain stable so the service can consume it."
+    }
+  ]
+}
