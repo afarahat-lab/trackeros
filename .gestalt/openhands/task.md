@@ -1,21 +1,27 @@
-# Implement this phase: Phase 7: Notification model + repository
+# Implement this phase: Phase 8: EmployeeService + LeavePolicyService
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/219727ae-a952-461a-b605-c6d40c0c1e42/7`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/219727ae-a952-461a-b605-c6d40c0c1e42/8`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the Notification domain model and repository.
+Create the Employee and LeavePolicy service layers.
 
 Files to create:
-- `src/modules/notification/notification.model.ts` — Define the `Notification` entity interface with exact fields: id: string, recipientId: string, type: 'LEAVE_SUBMITTED' | 'LEAVE_APPROVED' | 'LEAVE_REJECTED' | 'LEAVE_CANCELLED', title: string, message: string, relatedEntityType: 'LeaveRequest', relatedEntityId: string, status: 'PENDING' | 'SENT' | 'READ' | 'ARCHIVED', createdAt: Date, readAt: Date | null.
-- `src/modules/notification/notification.repository.interface.ts` — Define `INotificationRepository` interface with methods: findById(id), findByRecipient(recipientId, status?), create(notification), updateStatus(id, status), markAsRead(id), findByRelatedEntity(entityType, entityId).
-- `src/modules/notification/notification.repository.ts` — Implement `PgNotificationRepository` class implementing INotificationRepository, extending the base repository from `src/shared/base-repository.ts`.
+- `src/modules/employee/employee.service.interface.ts` — Define `IEmployeeService` interface with methods: findById(id), findByEmployeeNumber(employeeNumber), findByEmail(email), getDirectReports(managerId), isManagerOf(managerId, employeeId), createEmployee(data), updateEmployee(id, data), terminateEmployee(id).
+- `src/modules/employee/employee.service.ts` — Implement `EmployeeService` class implementing IEmployeeService. Inject IEmployeeRepository. Delegate to repository with input validation.
+- `src/modules/leave-policy/leave-policy.service.interface.ts` — Define `ILeavePolicyService` interface with methods: findById(id), findByLeaveType(leaveType), getAllActive(), getEntitlementDays(policyId), requiresManagerApproval(policyId), getMinimumNoticeDays(policyId), createPolicy(data), updatePolicy(id, data), deactivatePolicy(id).
+- `src/modules/leave-policy/leave-policy.service.ts` — Implement `LeavePolicyService` class implementing ILeavePolicyService. Inject ILeavePolicyRepository. Delegate to repository with validation.
 
-This phase depends on `src/shared/types/index.ts` and `src/shared/base-repository.ts` from Phase 1 — read both before generating any code.
+This phase depends on:
+- `src/modules/employee/employee.model.ts`, `src/modules/employee/employee.repository.interface.ts`, `src/modules/employee/employee.repository.ts` from Phase 2
+- `src/modules/leave-policy/leave-policy.model.ts`, `src/modules/leave-policy/leave-policy.repository.interface.ts`, `src/modules/leave-policy/leave-policy.repository.ts` from Phase 3
+- `src/shared/types/index.ts` from Phase 1
 
-Include Jest unit tests in `tests/unit/modules/notification/notification.repository.test.ts`.
+Read all dependency files before generating.
+
+Include Jest unit test in `tests/unit/modules/employee/employee.service.test.ts`.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -29,47 +35,34 @@ These are resolved, feature-wide decisions. Wherever this phase touches the conc
 10 (available balance): entitled - (used + pending) — pending requests consume balance immediately to prevent double-booking.
 Standing rules: whole days only (no partial/half days); used_days is deducted on APPROVAL and restored on reject/cancel of a previously-approved request; when an employee has no assigned manager, escalate the approval to an HR admin; enforce RBAC on every endpoint (employee acts on own requests; manager acts on direct reports; HR admin acts on all) and validate all inputs at API boundaries. [BINDING RULE — operator decision resolving: How are leave days counted from startDate and endDate? Is the range inclusive of both boundaries, exclusive of endDate, or based on calendar business days excluding weekends/holidays?; For the minimumNoticeDays check, is 'submission date' the date the request was created (createdAt) or the date it transitioned to SUBMITTED? And is the day count measured as calendar days or business days?; For the overlapping-leave check, are adjacent date ranges (e.g., request A ends Friday, request B starts Saturday) considered overlapping?; How is the fiscal year defined — calendar year (Jan 1 – Dec 31) or a custom fiscal year (e.g. Apr 1 – Mar 31)?; How should unused annual leave be handled at fiscal-year rollover — carry over fully, carry over with a cap, or expire?; Should emergency leave be drawn from the same annual/sick balance pools, or is it a separate entitlement with its own policy rules?; How are leave days counted from startDate and endDate? Is the range inclusive of both boundaries (days = endDate - startDate + 1), exclusive of endDate (days = endDate - startDate), or based on calendar business days excluding weekends/holidays?; For the minimumNoticeDays check, is "submission date" the date the request was created (createdAt) or the date it transitioned to SUBMITTED? And is the day count measured as calendar days or business days?; How are leave days counted — calendar days or business days? Are weekends and public holidays excluded from the day count?; What is the binding computation for available balance — entitled minus (used + pending), or entitled minus used only?; apply everywhere these apply, not in one place only]
 
-## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
-The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
-- `Notification` — the entity MUST have exactly these fields:
-    - id: string
-    - recipientId: string
-    - type: 'LEAVE_SUBMITTED' | 'LEAVE_APPROVED' | 'LEAVE_REJECTED' | 'LEAVE_CANCELLED'
-    - title: string
-    - message: string
-    - relatedEntityType: 'LeaveRequest'
-    - relatedEntityId: string
-    - status: 'PENDING' | 'SENT' | 'READ' | 'ARCHIVED'
-    - createdAt: Date
-    - readAt: Date | null
-
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- The notification repository must extend BaseRepository and route all queries through its generic `query<T extends Record<string, unknown>>(text, params?)` helper backed by the shared pool — matching how the audit, leave-request, leave-balance, leave-policy, and employee repositories compose a private inner class extending BaseRepository. (see `src/shared/base-repository.ts`)
-- The notification repository must mirror the audit repository's structural pattern: a private NotificationRow interface with an index signature, a rowToNotification mapper, an isNotificationRow type guard (validating string-literal unions against arrays, nullable fields, and Date instanceof checks), a private inner class extending BaseRepository, and a public class implementing the interface via composition. (see `src/modules/audit/audit.repository.ts`)
-- The create() error message must follow the audit repository's convention: throw `new Error('Failed to create notification')` when the inserted row is absent or fails the type guard — paralleling 'Failed to create audit log entry' and 'Failed to create leave request'. (see `src/modules/audit/audit.repository.ts`)
-- The type guard must validate the `type` and `status` string-literal unions against explicit value arrays (as leave-request validates status against VALID_STATUSES), and must validate nullable fields (readAt === null || readAt instanceof Date) and Date instanceof checks for createdAt — matching the established isLeaveRequestRow / isAuditLogRow guard conventions. (see `src/modules/leave-request/leave-request.repository.ts`)
-- The unit test file must follow the audit/leave-request test conventions: jest.mock the shared db/connection pool.query before importing the repository, define makeNotificationRow/makeNotification helpers, use describe→beforeEach→nested describe-per-method structure, and assert exact SQL query strings and parameter arrays via mockQuery.mock.calls. (see `tests/unit/modules/audit/audit.repository.test.ts`)
-- The Notification entity shape and the `notifications` table column mapping (snake_case: recipient_id, related_entity_type, related_entity_id, created_at, read_at) must match the reconciled architecture's Notification domain entity and notifications conceptual table definition exactly. (see `.gestalt/architecture/reconciled.json`)
+- The EmployeeService must delegate to IEmployeeRepository exactly as declared: findById→findById, findByEmployeeNumber→findByEmployeeNumber, findByEmail→findByEmail, getDirectReports→findByManagerId, createEmployee→create, updateEmployee→update, terminateEmployee→update (with TERMINATED status + terminationDate). The service must not invent repository methods or bypass the interface. (see `src/modules/employee/employee.repository.interface.ts`)
+- The LeavePolicyService must delegate to ILeavePolicyRepository exactly as declared: findById→findById, findByLeaveType→findByLeaveType, getAllActive→findAllActive, getEntitlementDays/requiresManagerApproval/getMinimumNoticeDays→findById (then read the field), createPolicy→create, updatePolicy→update, deactivatePolicy→deactivate. The service must not invent repository methods or bypass the interface. (see `src/modules/leave-policy/leave-policy.repository.interface.ts`)
+- The EmployeeService must use the Employee interface as the entity type for all return values and create/update payloads, matching the field names and the employmentStatus union ('ACTIVE' | 'INACTIVE' | 'TERMINATED') exactly. The create payload type must align with the repository's Omit<Employee,'id'|'createdAt'|'updatedAt'|'deletedAt'>. (see `src/modules/employee/employee.model.ts`)
+- The LeavePolicyService must use the LeavePolicy interface as the entity type for all return values and create/update payloads, matching the field names and the optional numeric fields (accrualRate, maxAccumulation, minimumNoticeDays as number | undefined) exactly. The create payload type must align with the repository's Omit<LeavePolicy,'id'|'createdAt'|'updatedAt'>. (see `src/modules/leave-policy/leave-policy.model.ts`)
+- The LeavePolicyService must validate leaveType against the LeaveType enum exported from src/shared/types/index.ts (ANNUAL, SICK, EMERGENCY, UNPAID, MATERNITY, PATERNITY) and reject any value not in that set. The service must import LeaveType from this shared location, not redefine it. (see `src/shared/types/index.ts`)
 ### Entity invariants — enforce these
-- Reuse or extend `Notification`: The status lifecycle is PENDING → SENT → READ → ARCHIVED; markAsRead transitions a notification to READ and populates readAt with the current timestamp.
-- Reuse or extend `Notification`: id and createdAt are server-generated at the repository layer (randomUUID and new Date respectively) and are never supplied by the caller — create() input omits both.
-- Reuse or extend `Notification`: readAt is nullable and is null until the notification is marked as read; it must be a Date instance (or null) in any mapped entity.
-- Reuse or extend `Notification`: relatedEntityType is constrained to 'LeaveRequest' and relatedEntityId links the notification to a specific leave request — findByRelatedEntity retrieves all notifications for a given (entityType, entityId) pair.
+- Reuse or extend `Employee`: An Employee's employmentStatus may only be ACTIVE, INACTIVE, or TERMINATED. terminateEmployee is the only service operation that transitions an employee to TERMINATED, and it must simultaneously set a non-null terminationDate. The service must reject any attempt to set employmentStatus to an out-of-set value.
+- Reuse or extend `Employee`: The manager-employee relationship is expressed by Employee.managerId pointing to another Employee's id (or null). isManagerOf(managerId, employeeId) must resolve to true iff the employee identified by employeeId has managerId equal to the supplied managerId; a missing employee makes the check fail with a not-found error rather than a false positive.
+- Reuse or extend `LeavePolicy`: A LeavePolicy's leaveType must be a member of the LeaveType enum (annual, sick, emergency, unpaid, maternity, paternity) and its entitlementDays must be a positive number. The service must reject createPolicy/updatePolicy payloads that violate either constraint before persisting.
+- Reuse or extend `LeavePolicy`: A LeavePolicy has an ACTIVE/INACTIVE lifecycle. deactivatePolicy transitions a policy to inactive and is the designated service operation for that transition; getEntitlementDays, requiresManagerApproval, and getMinimumNoticeDays must operate on the policy identified by id regardless of active state (the repository findById does not filter by is_active), returning the stored value or rejecting with not-found when the policy is absent.
 ### Interface contract — expose these operations (their shape is yours)
-- findById(id) — Returns the Notification entity when found and the row passes the type guard; returns null when no row exists or the row is invalid. Database errors propagate.
-- findByRecipient(recipientId, status?) — Returns an array of notifications for the recipient; when the optional status filter is provided, results are constrained to that status. Invalid rows are filtered out (never thrown). Database errors propagate.
-- create(notification) — Accepts input omitting id and createdAt, generates both server-side, persists the row, and returns the full Notification. Throws 'Failed to create notification' when the inserted row is absent or fails the type guard. Database errors propagate.
-- updateStatus(id, status) — Updates the notification's status and returns the updated Notification, or null when no row exists or the returned row fails the type guard. Database errors propagate.
-- markAsRead(id) — Sets status to READ and readAt to the current timestamp, returning the updated Notification, or null when no row exists or the returned row fails the type guard. Database errors propagate.
-- findByRelatedEntity(entityType, entityId) — Returns an array of notifications linked to the given (entityType, entityId) pair. Invalid rows are filtered out (never thrown). Database errors propagate.
+- IEmployeeService.findById — Rejects empty/whitespace id with a typed VALIDATION_ERROR before any repository call. Returns the Employee or null when not found — a missing record is a normal null result, not an error.
+- IEmployeeService.isManagerOf — Rejects empty managerId or employeeId with a typed VALIDATION_ERROR. Rejects with a typed NOT_FOUND error when the employee identified by employeeId does not exist. Returns a boolean (true only when the loaded employee's managerId equals the supplied managerId).
+- IEmployeeService.createEmployee — Validates all required fields (non-empty employeeNumber, firstName, lastName, email; valid employmentStatus) before delegating to the repository. Rejects invalid input with a typed VALIDATION_ERROR. Propagates repository errors as typed errors (GP-006). Returns the persisted Employee.
+- IEmployeeService.terminateEmployee — Rejects empty id with a typed VALIDATION_ERROR. Delegates to the repository update path setting employmentStatus=TERMINATED and a terminationDate. Returns the updated Employee or rejects with a typed NOT_FOUND when the employee does not exist.
+- ILeavePolicyService.getEntitlementDays — Rejects empty policyId with a typed VALIDATION_ERROR. Resolves the policy by id; rejects with a typed NOT_FOUND when the policy is absent. Returns the policy's entitlementDays (a positive number).
+- ILeavePolicyService.requiresManagerApproval — Rejects empty policyId with a typed VALIDATION_ERROR. Resolves the policy by id; rejects with a typed NOT_FOUND when absent. Returns the policy's requiresManagerApproval boolean.
+- ILeavePolicyService.getMinimumNoticeDays — Rejects empty policyId with a typed VALIDATION_ERROR. Resolves the policy by id; rejects with a typed NOT_FOUND when absent. Returns the policy's minimumNoticeDays (may be undefined when the policy does not specify one).
+- ILeavePolicyService.createPolicy — Validates policyName (non-empty), leaveType (valid LeaveType enum member), entitlementDays (positive) before delegating. Rejects invalid input with a typed VALIDATION_ERROR. Returns the persisted LeavePolicy.
+- ILeavePolicyService.deactivatePolicy — Rejects empty policyId with a typed VALIDATION_ERROR. Delegates to the repository deactivate method. Returns a boolean indicating whether a policy was deactivated (false when no matching policy existed is a normal result, not an error).
 ### Integration points — connect to these
-- src/shared/base-repository.ts — The notification repository extends BaseRepository and uses its query helper to execute SQL against the shared pool — the foundational dependency from Phase 1.
-- src/shared/db/connection.ts — The shared PostgreSQL pool is transitively used by BaseRepository.query; the unit tests mock this module's pool.query before importing the repository.
-- src/modules/notification/notification.model.ts — The repository interface and implementation both import the Notification entity type from the model file — the model is the canonical type definition consumed by this phase's repository and by the Phase 10 service layer.
-- src/modules/notification/notification.repository.interface.ts — The concrete PgNotificationRepository implements INotificationRepository; this interface is the contract that the Phase 10 NotificationService will depend on (dependency injection).
-- src/modules/leave-request/leave-request.repository.ts — The notification repository follows the same composition + type-guard + error-handling conventions established by the leave-request and audit repositories; consistency with these siblings is a binding requirement.
+- IEmployeeRepository (src/modules/employee/employee.repository.interface.ts) — EmployeeService is constructed with an IEmployeeRepository instance and delegates all persistence to it; this is the primary integration surface and the seam unit tests mock.
+- ILeavePolicyRepository (src/modules/leave-policy/leave-policy.repository.interface.ts) — LeavePolicyService is constructed with an ILeavePolicyRepository instance and delegates all persistence to it; this is the primary integration surface and the seam unit tests mock.
+- LeaveRequestService and LeaveBalanceService (Phase 9) — Phase 9 consumes IEmployeeService (isManagerOf, getDirectReports, findById) and ILeavePolicyService (getEntitlementDays, requiresManagerApproval, getMinimumNoticeDays, findByLeaveType) as injected dependencies. The interface contracts defined in this phase are the binding integration surface for the request/balance orchestration.
+- AuditService (Phase 10) — The state-changing operations in both services (createEmployee, updateEmployee, terminateEmployee, createPolicy, updatePolicy, deactivatePolicy) are GP-002 audit candidates; Phase 10 will retrofit audit logging around these service operations once IAuditService exists.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
