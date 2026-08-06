@@ -20,3 +20,9 @@ export class NotFoundError extends AppError {
     super(message, 'NOT_FOUND');
   }
 }
+
+export class InternalError extends AppError {
+  constructor(message: string) {
+    super(message, 'INTERNAL_ERROR');
+  }
+}

@@ -3,7 +3,7 @@ import { LeavePolicy } from './leave-policy.model';
 import { ILeavePolicyRepository } from './leave-policy.repository.interface';
 import { ILeavePolicyService } from './leave-policy.service.interface';
 import { LeaveType } from '../../shared/types';
-import { ValidationError, NotFoundError } from '../../shared/errors';
+import { ValidationError, NotFoundError, InternalError } from '../../shared/errors';
 
 const VALID_LEAVE_TYPES: ReadonlySet<string> = new Set(Object.values(LeaveType));
 
@@ -95,7 +95,7 @@ export class LeavePolicyService implements ILeavePolicyService {
         throw error;
       }
       const message = error instanceof Error ? error.message : 'Unknown error creating leave policy';
-      throw new Error(message);
+      throw new InternalError(message);
     }
   }
 
@@ -124,7 +124,7 @@ export class LeavePolicyService implements ILeavePolicyService {
         throw error;
       }
       const message = error instanceof Error ? error.message : 'Unknown error updating leave policy';
-      throw new Error(message);
+      throw new InternalError(message);
     }
   }
 

@@ -2,7 +2,7 @@
 import { Employee } from './employee.model';
 import { IEmployeeRepository } from './employee.repository.interface';
 import { IEmployeeService } from './employee.service.interface';
-import { ValidationError, NotFoundError } from '../../shared/errors';
+import { ValidationError, NotFoundError, InternalError } from '../../shared/errors';
 
 const VALID_EMPLOYMENT_STATUSES: ReadonlySet<string> = new Set(['ACTIVE', 'INACTIVE', 'TERMINATED']);
 
@@ -85,7 +85,7 @@ export class EmployeeService implements IEmployeeService {
         throw error;
       }
       const message = error instanceof Error ? error.message : 'Unknown error creating employee';
-      throw new Error(message);
+      throw new InternalError(message);
     }
   }
 
@@ -110,7 +110,7 @@ export class EmployeeService implements IEmployeeService {
         throw error;
       }
       const message = error instanceof Error ? error.message : 'Unknown error updating employee';
-      throw new Error(message);
+      throw new InternalError(message);
     }
   }
 
