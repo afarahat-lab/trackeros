@@ -175,13 +175,14 @@ Represents leave policy data managed by the `policy` module, including policy de
 |-------|------|----------|
 | id | string | true |
 | policyName | string | true |
-| leaveType | string | true |
+| leaveType | LeaveType | true |
 | entitlementDays | number | true |
-| accrualRate | number | false |
-| maxAccumulation | number | false |
-| minimumNoticeDays | number | false |
+| accrualRate | number \| null | false |
+| maxAccumulation | number \| null | false |
+| minimumNoticeDays | number | true |
 | requiresManagerApproval | boolean | true |
 | isActive | boolean | true |
+| isPaid | boolean | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
