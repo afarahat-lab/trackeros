@@ -1,0 +1,161 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "policy"
+    ],
+    "affectedLayers": [
+      "data-access",
+      "domain-model"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The LeavePolicy interface is exported from the policy module and its leaveType field is typed as the LeaveType enum imported from shared/types (not a string literal or re-declared enum), so that all six enum values (annual/sick/emergency/unpaid/maternity/paternity) are assignable.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The ILeavePolicyRepository interface declares exactly four methods with the settled signatures: findById(id): Promise<LeavePolicy | null>, findByLeaveType(leaveType: LeaveType): Promise<LeavePolicy | null>, findAllActive(): Promise<LeavePolicy[]>, create(policy: Omit<LeavePolicy,'id'|'createdAt'|'updatedAt'>): Promise<LeavePolicy>. The concrete repository class implements this interface.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findById returns a mapped LeavePolicy when a row matches the id and returns null when no row matches. findByLeaveType returns a mapped LeavePolicy when a row matches the leave type and null otherwise. findAllActive returns an array of mapped LeavePolicy rows (empty array when none).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "create persists a new leave_policies row with a system-generated id (crypto.randomUUID), system-generated createdAt/updatedAt, and the caller-supplied remaining fields, then returns the persisted entity with all system-generated fields populated (non-null id, createdAt, updatedAt).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository uses raw pg parameterized queries (pool.query with $N placeholders and a values array) \u2014 not Knex \u2014 and maps snake_case database rows to camelCase LeavePolicy objects via a row mapper, so that no Knex import appears in the policy repository.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The policy module barrel (index.ts) re-exports LeavePolicy, ILeavePolicyRepository, and the concrete repository class, so that downstream modules import policy symbols only through the module's public entry point.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The unit test suite at tests/unit/modules/policy/policy.repository.test.ts mocks the db layer (pool.query returning {rows:[...]}) and covers: findById (found/null), findByLeaveType (found/null), findAllActive (array), and create (returns entity with system-generated fields). All tests pass under the Jest runner.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The phase compiles cleanly under tsc with strict mode (no implicit any, strict null checks) and introduces no `any` types \u2014 nullable fields (accrualRate, maxAccumulation) are typed as number | null, and any untyped external data uses unknown with type guards.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access must go through the repository pattern (GP-001 / no-direct-db-outside-repository). No inline SQL or direct pool usage outside the repository class; the model file must contain no database imports.",
+    "No use of `any` (no-any constraint, severity high). Use `unknown` with type guards for untyped external data; nullable domain fields must be explicitly typed as `T | null`.",
+    "The policy repository must use raw `pg` parameterized queries against the shared pool \u2014 not Knex \u2014 to conform to the reconciled transaction contract which is written entirely in raw pg terms (PoolClient, pool, manual BEGIN/COMMIT/ROLLBACK).",
+    "Strict TypeScript must pass: strict true, no implicit any, strict null checks. The phase must compile under `npm run build` (tsc) with zero type errors.",
+    "Modules import from each other ONLY through their declared public entry point (index.ts). The policy module imports LeaveType from shared/types and pool from shared/db/connection via their module roots; downstream consumers import policy symbols only from the policy barrel.",
+    "No hardcoded secrets (no-hardcoded-secrets, severity critical). The repository must source the database connection from the shared pool (configured from DATABASE_URL) and must not embed credentials."
+  ],
+  "outOfScope": [
+    "PolicyService and ILeavePolicyService \u2014 the service layer for the policy module is Phase 7, not this phase. Only the model and repository are created here.",
+    "Policy controller and routes (HTTP/REST surface) \u2014 no Fastify route registration or input validation (GP-003) belongs to this phase; that is a later phase.",
+    "Audit record creation (GP-002) for policy create/update \u2014 audit is a later phase; the policy repository create method does not write audit logs in this phase.",
+    "RBAC enforcement (GP-005) \u2014 no role-based access guards apply to this phase since there is no API surface; the repository methods are unauthenticated data-access primitives.",
+    "Transaction support via an optional PoolClient parameter on policy repository methods \u2014 the transaction contract's transactional method set (updateStatus, deductDays, upsert, create on other repos) does not include the policy repo methods; they use the shared pool directly.",
+    "Update/delete/deactivate operations on LeavePolicy \u2014 only findById, findByLeaveType, findAllActive, and create are in scope; mutation methods beyond create are deferred.",
+    "Database migrations or schema DDL for the leave_policies table \u2014 this phase assumes the table schema exists as canonicalized; no migration files are created."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "A LeavePolicy is uniquely associated with a single LeaveType; the leave_type column is indexed and the application enforces at most one active policy per leave type (is_active = true), per the reconciled schema note \"unique active policy lookup per leave type (application-enforced unique where is_active = true)\"."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "A LeavePolicy has no soft-delete lifecycle \u2014 the leave_policies table has no deleted_at column; deactivation is expressed via the is_active flag, not row deletion. Repository read methods therefore do not filter on a deleted_at column (unlike the Employee module)."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "The id, createdAt, and updatedAt fields are system-generated at creation time and are never supplied by the caller; the create method accepts Omit<LeavePolicy,'id'|'createdAt'|'updatedAt'> and populates these internally (id via crypto.randomUUID, timestamps via new Date)."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "accrualRate and maxAccumulation are genuinely nullable (number | null): a null value denotes \"no accrual / no accumulation cap\" rather than zero, and the row mapper must preserve null rather than coercing it."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "ILeavePolicyRepository.findById",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns null when no row matches the id (not-found is a normal empty result, not a thrown error). Database/query errors propagate as rejected promises (GP-006: no unhandled rejections at the call site)."
+    },
+    {
+      "operation": "ILeavePolicyRepository.findByLeaveType",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns null when no policy exists for the given LeaveType. The leaveType parameter is typed as the LeaveType enum, so invalid string values are rejected at compile time. Database errors propagate as rejected promises."
+    },
+    {
+      "operation": "ILeavePolicyRepository.findAllActive",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns an empty array (not null) when no active policies exist. Filters on is_active = true. Database errors propagate as rejected promises."
+    },
+    {
+      "operation": "ILeavePolicyRepository.create",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Generates id/createdAt/updatedAt, inserts the row, then re-selects and returns the persisted entity. A duplicate-leave-type or constraint violation propagates as a rejected promise (GP-006). The returned entity must reflect the database's stored values, not just the in-memory input."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The LeavePolicy.leaveType field must be typed as the LeaveType enum exported from src/shared/types/index.ts (reusing the enum, not re-declaring a string-union), so that the six values (ANNUAL/SICK/EMERGENCY/UNPAID/MATERNITY/PATERNITY) remain the single source of truth across modules.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The repository must obtain its database connection by importing the `pool` (a pg.Pool) from src/shared/db/connection.ts \u2014 the same shared connection every module uses \u2014 rather than constructing its own Pool, so that connection lifecycle and DATABASE_URL configuration remain centralized.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "The LeavePolicy interface field set and the leave_policies table column set must match the canonical shapes in .gestalt/architecture/reconciled.json (domain_entities LeavePolicy attributes and sql_schemas leave_policies): 12 interface fields mapping to snake_case columns with PK id, index on leave_type, and no soft-delete column. Do not add or remove fields.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "The policy repository must follow the same structural conventions established by src/modules/employee/employee.repository.ts: a snake_case *Row interface, a rowTo* mapper function, a create method that generates id via crypto.randomUUID and timestamps via new Date then re-selects the persisted row, and a barrel index.ts re-exporting the model, interface, and concrete class. The sole intentional divergence is raw pg parameterized queries instead of Knex.",
+      "referencePath": "src/modules/employee/employee.repository.ts"
+    },
+    {
+      "requirement": "The module path and ownership must match docs/ARCHITECTURE.md's reconciled section: policy module at src/modules/policy/ owning LeavePolicy model, ILeavePolicyRepository, and LeavePolicyRepository, with dependency flow policy \u2192 shared-types only (no imports from employee/balance/leave/audit in this phase).",
+      "referencePath": "docs/ARCHITECTURE.md"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts (LeaveType enum)",
+      "why": "The policy model and repository depend on the LeaveType enum for typing the leaveType field and the findByLeaveType parameter; this is the policy module's only cross-module dependency per the reconciled dependency map (policy \u2192 shared-types)."
+    },
+    {
+      "target": "src/shared/db/connection.ts (pg.Pool)",
+      "why": "The repository executes parameterized queries through the shared pg.Pool, satisfying the no-direct-db-outside-repository constraint and centralizing connection configuration."
+    },
+    {
+      "target": "tests/unit/modules/employee/employee.repository.test.ts (test pattern)",
+      "why": "The policy repository test must mirror the employee test's structure (mocking the db layer, covering found/null/array/create cases) but adapt the mock strategy to raw pg's {rows:[...]} return shape rather than the Knex thenable query-builder chain, as settled during discovery."
+    },
+    {
+      "target": "Phase 7 (PolicyService) and Phase 4 (Balance module) \u2014 downstream consumers",
+      "why": "The ILeavePolicyRepository interface and LeavePolicy model produced here are the contract that Phase 7's PolicyService will delegate to and that Phase 4's BalanceService will consume (balance \u2192 policy dependency); the interface signatures must remain stable for those phases to build on."
+    }
+  ]
+}
