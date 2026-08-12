@@ -1,0 +1,179 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "balance"
+    ],
+    "affectedLayers": [
+      "data-access",
+      "domain-model"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The LeaveBalance interface is exported from the balance module and exposes the canonical fields (id, employeeId, policyId, fiscalYear as number, totalEntitlement, usedDays, remainingDays, status as the union 'ACTIVE' | 'EXHAUSTED' | 'CLOSED', createdAt, updatedAt) with no deletedAt field.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository interface declares all five operations (findById, findByEmployeeAndPolicy, findByEmployee, create, update) with return types that distinguish single-result-or-null (findById, findByEmployeeAndPolicy), array-result (findByEmployee), and guaranteed-result (create, update).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findById returns the matching LeaveBalance when a row exists and returns null when no row matches the id.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findByEmployeeAndPolicy returns the single matching LeaveBalance for the (employeeId, policyId, fiscalYear) composite key when it exists and null otherwise.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findByEmployee returns all LeaveBalance rows for a given employeeId and fiscalYear, and returns an empty array when none exist.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "create persists a new leave_balances row with a system-generated id and timestamps, then returns the persisted LeaveBalance (the returned id matches the generated id and createdAt/updatedAt are populated).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "update applies a partial set of mutable fields (excluding id, createdAt, updatedAt) to an existing leave_balances row and returns the updated LeaveBalance reflecting the changed values.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All repository SQL uses parameterized placeholders ($1, $2, \u2026) with values passed separately \u2014 no string-interpolated user input in any query, satisfying the SQL-injection guard.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The balance module barrel (index.ts) re-exports the LeaveBalance type and the repository interface + concrete implementation as named exports, matching the policy module's barrel shape.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The Jest unit test suite for the balance repository mocks the shared db pool directly (no Knex chain), covers all five repository methods including the null/empty-array edge cases and the create INSERT-then-SELECT two-call sequence, and passes under the project's ts-jest configuration.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The generated source compiles cleanly under the project's strict tsconfig (npm run build / tsc --noEmit) with no implicit any and no use of the any type anywhere in the balance module or its test.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access must go through the repository pattern (GP-001 / no-direct-db-outside-repository) \u2014 the balance repository is the only place in this phase that may execute SQL against the leave_balances table.",
+    "No use of the any type (no-any rule) \u2014 use unknown with type guards or proper generic typing instead; the balance test must not require the eslint-disable @typescript-eslint/no-explicit-any that the Knex-based employee test needed.",
+    "The repository must use the raw pg pool from src/shared/db/connection.ts with parameterized SQL ($1, $2, \u2026), matching the policy repository pattern \u2014 not the Knex query-builder pattern used by the employee repository.",
+    "The LeaveBalance model must be a plain exported interface with camelCase fields and no soft-delete field (no deletedAt) \u2014 balances are not soft-deleted, unlike Employee.",
+    "The repository must implement only the five specified methods (findById, findByEmployeeAndPolicy, findByEmployee, create, update) with no optional PoolClient/client transaction parameter \u2014 transaction-aware methods (deductDays, upsert) belong to the later BalanceService phase.",
+    "create must generate the id via crypto.randomUUID() and timestamps via new Date(), then re-read the inserted row via SELECT to return the persisted record \u2014 matching the policy repository's create flow.",
+    "Strict TypeScript (strict: true, no implicit any, strict null checks) applies; the module must compile under the existing tsconfig.json without errors.",
+    "The balance module must not import another module's private files \u2014 cross-module access (if any) goes through the owning module's public index.ts barrel; within this phase the model uses plain string FK references (employeeId, policyId) rather than importing the Employee/LeavePolicy interfaces."
+  ],
+  "outOfScope": [
+    "BalanceService and its interface (IBalanceService) \u2014 reserveDays, finalizeDeduction, releaseReservation, getAvailableBalance, business-day counting, and pending-days tracking are deferred to the Phase 8 BalanceService phase.",
+    "Transaction-aware repository methods (deductDays, upsert) and the optional PoolClient/client parameter on repository methods \u2014 these belong to the later service phase that owns the unit-of-work.",
+    "Audit record emission (GP-002) for balance create/update \u2014 the audit module does not yet exist and audit logging is a service-layer concern for later phases; this repository phase performs raw persistence only.",
+    "Balance controller, routes, and any HTTP/REST surface \u2014 no API endpoints are exposed in this phase.",
+    "Database migrations / DDL for the leave_balances table \u2014 the conceptual schema is defined in the reconciled architecture; this phase implements the repository against the existing table contract, not a migration file.",
+    "Auto-creation of LeaveBalance records on employee creation \u2014 that orchestration belongs to the Phase 7 EmployeeService which imports this phase's repository interface."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "A LeaveBalance is uniquely identified by the composite key (employeeId, policyId, fiscalYear) \u2014 at most one balance record exists per employee per policy per fiscal year, enforced by the unique composite index on leave_balances."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "A LeaveBalance is never soft-deleted \u2014 there is no deletedAt field and no soft-delete lifecycle; balances are persisted and updated in place for the duration of their fiscal year."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "The status field is constrained to the lifecycle union 'ACTIVE' | 'EXHAUSTED' | 'CLOSED'; a balance is ACTIVE while it has remaining entitlement, transitions toward EXHAUSTED as days are consumed, and CLOSED at fiscal-year end (status transitions are a service-layer concern, but the type union is fixed here)."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "The id, createdAt, and updatedAt fields are system-generated and immutable from the caller's perspective \u2014 create accepts Omit<LeaveBalance,'id'|'createdAt'|'updatedAt'> and update accepts Partial<Omit<LeaveBalance,'id'|'createdAt'|'updatedAt'>>, so callers can never supply or mutate identity/audit timestamps."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "findById(id) \u2014 single-row lookup by primary key",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns null when no row matches the id (not an error); propagates underlying pool errors to the caller without swallowing."
+    },
+    {
+      "operation": "findByEmployeeAndPolicy(employeeId, policyId, fiscalYear) \u2014 single-row lookup by the unique composite key",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns null when no row matches the composite key (not an error); propagates underlying pool errors to the caller without swallowing."
+    },
+    {
+      "operation": "findByEmployee(employeeId, fiscalYear) \u2014 multi-row lookup returning all balances for an employee in a fiscal year",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns an empty array when no rows match (not an error); never returns null for the collection; propagates underlying pool errors to the caller without swallowing."
+    },
+    {
+      "operation": "create(data) \u2014 persist a new leave_balances row",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Generates id + timestamps, executes INSERT then SELECT to return the persisted row; a unique-constraint violation on the (employeeId, policyId, fiscalYear) composite propagates as a pool error to the caller \u2014 the repository does not catch or translate it in this phase."
+    },
+    {
+      "operation": "update(id, data) \u2014 partial update of an existing leave_balances row",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Applies only the supplied mutable fields via a dynamic partial UPDATE then SELECT to return the updated row; behavior when no row matches the id is not prescribed at this layer (the repository returns the re-read row; a not-found condition surfaces as whatever the SELECT yields and is handled by the calling service in a later phase)."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The balance repository must follow the same raw pool.query pattern as the policy repository: import { pool } from the shared db connection, use parameterized $1/$2/\u2026 placeholders with a values array, define a snake_case *Row interface plus a rowTo* mapper function, and have the concrete class implement its interface \u2014 not the Knex query-builder pattern used by the employee repository.",
+      "referencePath": "src/modules/policy/policy.repository.ts"
+    },
+    {
+      "requirement": "The LeaveBalance model must be a plain `export interface` with camelCase field names and no imports (FK references are plain string fields), matching the style of the LeavePolicy model \u2014 not a class and not decorated.",
+      "referencePath": "src/modules/policy/policy.model.ts"
+    },
+    {
+      "requirement": "The balance barrel (src/modules/balance/index.ts) must re-export the model type and the repository interface + concrete class as named exports, matching the policy module's barrel export shape (export { Model } from './model'; export { IRepo, Repo } from './repository').",
+      "referencePath": "src/modules/policy/index.ts"
+    },
+    {
+      "requirement": "The balance repository test must mirror the policy repository test's mocking approach: jest.mock the shared db connection to expose { pool: { query: jest.fn() } }, use a mockQueryResult<T> helper returning { rows }, clear mocks and construct a fresh repo in beforeEach, and for create mock the INSERT call ({ rows: [] }) then the SELECT call ({ rows: [insertedRow] }) \u2014 avoiding the any-based Knex chain mocking the employee test requires.",
+      "referencePath": "tests/unit/modules/policy/policy.repository.test.ts"
+    },
+    {
+      "requirement": "The LeaveBalance field set and the leave_balances table columns must match the reconciled architecture exactly: model fields id, employeeId, policyId, fiscalYear (number), totalEntitlement, usedDays, remainingDays, status ('ACTIVE'|'EXHAUSTED'|'CLOSED'), createdAt, updatedAt; table columns id, employee_id (FK\u2192employees.id), policy_id (FK\u2192leave_policies.id), fiscal_year, total_entitlement, used_days, remaining_days, status, created_at, updated_at with PK id and unique composite index (employee_id, policy_id, fiscal_year).",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/db/connection.ts (pg Pool)",
+      "why": "The balance repository imports the shared pool to execute parameterized SQL against the leave_balances table \u2014 the sole data-access dependency for this phase."
+    },
+    {
+      "target": "src/modules/policy/ (repository pattern + model style)",
+      "why": "The balance repository and model are structurally modeled on the policy module (raw pool.query, snake_case Row + mapper, plain interface model, barrel shape) as the closest analog using the same data-access pattern."
+    },
+    {
+      "target": "Phase 7 EmployeeService + Phase 8 BalanceService (future consumers)",
+      "why": "The ILeaveBalanceRepository interface and LeaveBalance type exported here are the contract that the later EmployeeService (auto-create balances on employee creation) and BalanceService (reserve/finalize/release deduction logic) will depend on; this phase must expose them via the barrel so later phases import only from src/modules/balance/index.ts."
+    }
+  ]
+}
