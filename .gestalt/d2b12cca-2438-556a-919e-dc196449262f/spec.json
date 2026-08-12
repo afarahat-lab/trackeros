@@ -1,0 +1,131 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "employee"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The Employee interface is exported from the employee module's public entry point and type-checks under strict TypeScript with no implicit any \u2014 it must carry the canonical lifecycle fields (id, employeeNumber, firstName, lastName, email, role, managerId, department, hireDate, terminationDate, employmentStatus, createdAt, updatedAt, deletedAt) with role restricted to 'employee' | 'manager' | 'hr_admin' and employmentStatus restricted to 'ACTIVE' | 'INACTIVE' | 'TERMINATED'.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "IEmployeeRepository is exported and declares exactly the four operations findById(id): Promise<Employee|null>, findByManagerId(managerId): Promise<Employee[]>, findAll(): Promise<Employee[]>, and create(employee: Omit<Employee,'id'|'createdAt'|'updatedAt'|'deletedAt'>): Promise<Employee>; EmployeeRepository implements this interface and compiles without type errors.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "EmployeeRepository.create persists a new employee row to the employees table using parameterized queries and returns a fully-formed Employee (with generated id, createdAt, updatedAt, and null deletedAt) \u2014 verifiable via a unit test that mocks the db layer and asserts the returned object matches the Employee shape.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "EmployeeRepository.findById returns the matching Employee when a row exists and returns null when no row is found \u2014 the unit test at tests/unit/modules/employee/employee.repository.test.ts mocks the db layer and asserts both the Employee-present and null-absent cases.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The employee module's index.ts barrel re-exports Employee, IEmployeeRepository, and EmployeeRepository so that downstream modules import only through the public entry point; the unit test imports these symbols through the barrel and the full test suite passes (npm run build && npx jest --passWithNoTests exits 0).",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No use of the `any` type anywhere in the employee module \u2014 use `unknown` with type guards where dynamic typing is unavoidable (HARNESS.json no-any rule, severity high).",
+    "All database access in the employee module goes through EmployeeRepository; the Knex query builder instance is encapsulated inside the repository and never exposed to or invoked from outside the repository layer (GP-001 + HARNESS.json no-direct-db-outside-repository, severity critical).",
+    "All repository queries must use parameterized/bound values (Knex query builder bindings or equivalent) \u2014 no string-concatenated SQL with interpolated user input, to prevent SQL injection.",
+    "Downstream modules may import from the employee module only through its index.ts barrel; the employee module itself imports shared infrastructure (db connection, shared types) via sanctioned shared paths, never reaching into another domain module's internals (AGENTS.md architecture rule 1).",
+    "The Knex instance must be configured from the existing pg pool's connection configuration (src/shared/db/connection.ts) rather than creating a new, independent database connection \u2014 the repository must not instantiate a separate Pool or connection string that diverges from the shared infrastructure.",
+    "All new code must compile under the project's strict TypeScript configuration (strict null checks, no implicit any) \u2014 `npm run build` (tsc --noEmit) must exit 0 with the new files present."
+  ],
+  "outOfScope": [
+    "EmployeeService and IEmployeeService (service layer, balance auto-creation on employee create) are deferred to Phase 7 \u2014 this phase only creates the model, repository interface, repository implementation, barrel, and unit test.",
+    "No employee controller, routes, or HTTP/REST surface is created in this phase \u2014 the employee module exposes only the model and repository layer.",
+    "GP-002 audit-record emission on employee create is not wired in this phase \u2014 the audit module does not yet exist (Phase 6); the repository create persists the row only. Audit integration is a later-phase concern.",
+    "No Knex migration files or DDL for the employees table are created in this phase \u2014 the repository assumes the employees table schema exists; schema/migration creation is out of scope."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "Soft-delete is governed by deletedAt: a non-null deletedAt marks the employee as logically deleted, and read operations (findById, findByManagerId, findAll) must exclude rows where deletedAt is not null \u2014 a soft-deleted employee is never returned by repository reads."
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "managerId is a self-referential foreign key to employees.id; a null managerId indicates no direct manager (top of hierarchy / HR-escalation case), and a non-null managerId must reference an existing, non-deleted employee \u2014 the repository must not return manager relationships to soft-deleted employees."
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "On create, the repository generates id, createdAt, and updatedAt server-side and sets deletedAt to null; the caller-supplied payload (Omit<Employee,'id'|'createdAt'|'updatedAt'|'deletedAt'>) must never allow the caller to set these four fields \u2014 they are system-managed."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IEmployeeRepository.findById(id: string): Promise<Employee | null>",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns null when no non-deleted row matches the id (not-found is a normal result, not an error); throws on database/connection failure. Must exclude soft-deleted rows (deletedAt IS NULL)."
+    },
+    {
+      "operation": "IEmployeeRepository.findByManagerId(managerId: string): Promise<Employee[]>",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an empty array (not null) when the manager has no direct reports or the managerId matches no employee; throws on database/connection failure. Results must exclude soft-deleted employees."
+    },
+    {
+      "operation": "IEmployeeRepository.findAll(): Promise<Employee[]>",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an empty array (not null) when no employees exist; throws on database/connection failure. Results must exclude soft-deleted employees (deletedAt IS NULL)."
+    },
+    {
+      "operation": "IEmployeeRepository.create(employee: Omit<Employee,'id'|'createdAt'|'updatedAt'|'deletedAt'>): Promise<Employee>",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Persists a new row and returns the fully-formed Employee with system-generated id, createdAt, updatedAt, and null deletedAt; throws on database failure or unique-constraint violation (e.g., duplicate email). Not idempotent \u2014 repeated calls with the same payload create distinct rows."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The Employee interface field set and type unions must match the Employee entity definition in the reconciled architecture (id, employeeNumber, firstName, lastName, email, role 'employee'|'manager'|'hr_admin', managerId string|null, department string|null, hireDate Date, terminationDate Date|null, employmentStatus 'ACTIVE'|'INACTIVE'|'TERMINATED', createdAt, updatedAt, deletedAt Date|null) \u2014 do not add, remove, or rename fields.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "Repository queries must target the employees table using the snake_case column names declared in the reconciled architecture's sql_schemas (employee_number, first_name, last_name, email, role, manager_id, department, hire_date, termination_date, employment_status, created_at, updated_at, deleted_at) and map them to the camelCase Employee interface fields \u2014 the column-to-field mapping must be consistent across all four repository methods.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "The repository's database configuration must derive from the existing `pool` exported by src/shared/db/connection.ts (a pg.Pool constructed from DATABASE_URL) \u2014 the Knex config must reuse this connection's settings rather than defining a divergent connection string or instantiating a new Pool.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "The unit test must follow the existing test conventions established in tests/unit/shared/types.test.ts: Jest describe/it/expect structure, ts-jest preset, relative imports from the test file to source, and testMatch '**/tests/**/*.test.(ts|js)' \u2014 the new test file at tests/unit/modules/employee/employee.repository.test.ts must be discovered and pass under the existing jest.config.js.",
+      "referencePath": "tests/unit/shared/types.test.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/db/connection.ts (pg.Pool export)",
+      "why": "EmployeeRepository configures its Knex instance from the shared pool's connection settings \u2014 this is the sanctioned shared-infrastructure import that satisfies GP-001 while reusing the single connection source."
+    },
+    {
+      "target": "src/shared/types/index.ts (LeaveType, LeaveStatus enums)",
+      "why": "The reconciled dependency map declares employee \u2192 shared-types; while the Employee interface uses string-literal unions (not the enums directly), the module's architectural dependency on shared-types is declared and the barrel/module must not contradict this dependency edge."
+    },
+    {
+      "target": "Future leave and balance modules (Phases 4, 5, 7, 10)",
+      "why": "The employee module's public barrel (index.ts) is the sole import surface for downstream modules that need Employee lookups and manager-subordinate validation (leave service approve/reject, balance initialization) \u2014 the barrel must export Employee, IEmployeeRepository, and EmployeeRepository so later phases import only through it."
+    }
+  ]
+}
