@@ -1,20 +1,20 @@
-# Implement this phase: Phase 2: Employee module — model + repository
+# Implement this phase: Phase 3: Policy module — model + repository
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/7f3a8cc3-b777-42b1-b2e3-a0c62205ede1/2`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/7f3a8cc3-b777-42b1-b2e3-a0c62205ede1/3`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the employee module at `src/modules/employee/`. This phase depends on `src/shared/types/index.ts` from Phase 1 (read it before generating).
+Create the policy module at `src/modules/policy/`. This phase depends on `src/shared/types/index.ts` from Phase 1 — read it before generating.
 
 Files to create:
-- `src/modules/employee/employee.model.ts` — Define the `Employee` interface with the canonical fields: id, employeeNumber, firstName, lastName, email, role ('employee' | 'manager' | 'hr_admin'), managerId (string | null), department (string | null), hireDate (Date), terminationDate (Date | null), employmentStatus ('ACTIVE' | 'INACTIVE' | 'TERMINATED'), createdAt, updatedAt, deletedAt (Date | null).
-- `src/modules/employee/employee.repository.ts` — Define `IEmployeeRepository` interface with methods: `findById(id: string): Promise<Employee | null>`, `findByManagerId(managerId: string): Promise<Employee[]>`, `findAll(): Promise<Employee[]>`, `create(employee: Omit<Employee, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt'>): Promise<Employee>`. Implement `EmployeeRepository` class using the pg pool from `src/shared/db/connection.ts` via Knex (import knex from 'knex' configured with the pool). Use parameterized queries.
-- `src/modules/employee/index.ts` — Barrel export of Employee, IEmployeeRepository, EmployeeRepository.
-- `tests/unit/modules/employee/employee.repository.test.ts` — Jest unit tests mocking the db layer, testing findById returns Employee or null.
+- `src/modules/policy/policy.model.ts` — Define the `LeavePolicy` interface with canonical fields: id, policyName, leaveType (LeaveType enum imported from `src/shared/types`), entitlementDays, accrualRate (number | null), maxAccumulation (number | null), minimumNoticeDays, requiresManagerApproval, isActive, isPaid, createdAt, updatedAt.
+- `src/modules/policy/policy.repository.ts` — Define `ILeavePolicyRepository` interface with methods: `findById(id: string): Promise<LeavePolicy | null>`, `findByLeaveType(leaveType: LeaveType): Promise<LeavePolicy | null>`, `findAllActive(): Promise<LeavePolicy[]>`, `create(policy: Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeavePolicy>`. Implement `LeavePolicyRepository` using the pg pool from `src/shared/db/connection.ts` with parameterized queries.
+- `src/modules/policy/index.ts` — Barrel export.
+- `tests/unit/modules/policy/policy.repository.test.ts` — Jest unit tests mocking the db layer.
 
-Approximately 4 files.
+Approximately 4–5 files.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -32,44 +32,29 @@ Standard rules that apply throughout:
 - When an employee has no manager, approval escalates to HR.
 - Use-it-or-lose-it: no carryover of unused balance across leave years. [BINDING RULE — operator decision resolving: Should the fiscal year be calendar year (Jan 1 – Dec 31) or a configurable period (e.g., Apr 1 – Mar 31)? The current domain rule uses calendar year of startDate.; Should overlapping leave requests be prevented? E.g., an employee with an existing APPROVED or SUBMITTED request for Jan 5–10 should not be allowed to submit another for Jan 8–12.; When a leave request spans two fiscal years (e.g., Dec 28 – Jan 3), should the balance be deducted from a single fiscal year (the year of startDate) or split across both years?; How are leave balances initialized for new employees — auto-created for all leave types on employee creation, or created lazily on first leave application?; When should leave balance be deducted — on submission (reserve/hold) or on approval (finalize)? The domain rule already specifies deduction on approval, but the application architect raised this as an open question.; When should leave balance be deducted — on submission (reserve/hold) or on approval (finalize)?; apply everywhere these apply, not in one place only]
 
-## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
-The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
-- `Employee` — the entity MUST have exactly these fields:
-    - id: string
-    - employeeNumber: string
-    - firstName: string
-    - lastName: string
-    - email: string
-    - role: 'employee' | 'manager' | 'hr_admin'
-    - managerId: string | null
-    - department: string | null
-    - hireDate: Date
-    - terminationDate: Date | null
-    - employmentStatus: 'ACTIVE' | 'INACTIVE' | 'TERMINATED'
-    - createdAt: Date
-    - updatedAt: Date
-    - deletedAt: Date | null
-
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- The Employee interface field set and type unions must match the Employee entity definition in the reconciled architecture (id, employeeNumber, firstName, lastName, email, role 'employee'|'manager'|'hr_admin', managerId string|null, department string|null, hireDate Date, terminationDate Date|null, employmentStatus 'ACTIVE'|'INACTIVE'|'TERMINATED', createdAt, updatedAt, deletedAt Date|null) — do not add, remove, or rename fields. (see `.gestalt/architecture/reconciled.json`)
-- Repository queries must target the employees table using the snake_case column names declared in the reconciled architecture's sql_schemas (employee_number, first_name, last_name, email, role, manager_id, department, hire_date, termination_date, employment_status, created_at, updated_at, deleted_at) and map them to the camelCase Employee interface fields — the column-to-field mapping must be consistent across all four repository methods. (see `.gestalt/architecture/reconciled.json`)
-- The repository's database configuration must derive from the existing `pool` exported by src/shared/db/connection.ts (a pg.Pool constructed from DATABASE_URL) — the Knex config must reuse this connection's settings rather than defining a divergent connection string or instantiating a new Pool. (see `src/shared/db/connection.ts`)
-- The unit test must follow the existing test conventions established in tests/unit/shared/types.test.ts: Jest describe/it/expect structure, ts-jest preset, relative imports from the test file to source, and testMatch '**/tests/**/*.test.(ts|js)' — the new test file at tests/unit/modules/employee/employee.repository.test.ts must be discovered and pass under the existing jest.config.js. (see `tests/unit/shared/types.test.ts`)
+- The LeavePolicy.leaveType field must be typed as the LeaveType enum exported from src/shared/types/index.ts (reusing the enum, not re-declaring a string-union), so that the six values (ANNUAL/SICK/EMERGENCY/UNPAID/MATERNITY/PATERNITY) remain the single source of truth across modules. (see `src/shared/types/index.ts`)
+- The repository must obtain its database connection by importing the `pool` (a pg.Pool) from src/shared/db/connection.ts — the same shared connection every module uses — rather than constructing its own Pool, so that connection lifecycle and DATABASE_URL configuration remain centralized. (see `src/shared/db/connection.ts`)
+- The LeavePolicy interface field set and the leave_policies table column set must match the canonical shapes in .gestalt/architecture/reconciled.json (domain_entities LeavePolicy attributes and sql_schemas leave_policies): 12 interface fields mapping to snake_case columns with PK id, index on leave_type, and no soft-delete column. Do not add or remove fields. (see `.gestalt/architecture/reconciled.json`)
+- The policy repository must follow the same structural conventions established by src/modules/employee/employee.repository.ts: a snake_case *Row interface, a rowTo* mapper function, a create method that generates id via crypto.randomUUID and timestamps via new Date then re-selects the persisted row, and a barrel index.ts re-exporting the model, interface, and concrete class. The sole intentional divergence is raw pg parameterized queries instead of Knex. (see `src/modules/employee/employee.repository.ts`)
+- The module path and ownership must match docs/ARCHITECTURE.md's reconciled section: policy module at src/modules/policy/ owning LeavePolicy model, ILeavePolicyRepository, and LeavePolicyRepository, with dependency flow policy → shared-types only (no imports from employee/balance/leave/audit in this phase). (see `docs/ARCHITECTURE.md`)
 ### Entity invariants — enforce these
-- Reuse or extend `Employee`: Soft-delete is governed by deletedAt: a non-null deletedAt marks the employee as logically deleted, and read operations (findById, findByManagerId, findAll) must exclude rows where deletedAt is not null — a soft-deleted employee is never returned by repository reads.
-- Reuse or extend `Employee`: managerId is a self-referential foreign key to employees.id; a null managerId indicates no direct manager (top of hierarchy / HR-escalation case), and a non-null managerId must reference an existing, non-deleted employee — the repository must not return manager relationships to soft-deleted employees.
-- Reuse or extend `Employee`: On create, the repository generates id, createdAt, and updatedAt server-side and sets deletedAt to null; the caller-supplied payload (Omit<Employee,'id'|'createdAt'|'updatedAt'|'deletedAt'>) must never allow the caller to set these four fields — they are system-managed.
+- Reuse or extend `LeavePolicy`: A LeavePolicy is uniquely associated with a single LeaveType; the leave_type column is indexed and the application enforces at most one active policy per leave type (is_active = true), per the reconciled schema note "unique active policy lookup per leave type (application-enforced unique where is_active = true)".
+- Reuse or extend `LeavePolicy`: A LeavePolicy has no soft-delete lifecycle — the leave_policies table has no deleted_at column; deactivation is expressed via the is_active flag, not row deletion. Repository read methods therefore do not filter on a deleted_at column (unlike the Employee module).
+- Reuse or extend `LeavePolicy`: The id, createdAt, and updatedAt fields are system-generated at creation time and are never supplied by the caller; the create method accepts Omit<LeavePolicy,'id'|'createdAt'|'updatedAt'> and populates these internally (id via crypto.randomUUID, timestamps via new Date).
+- Reuse or extend `LeavePolicy`: accrualRate and maxAccumulation are genuinely nullable (number | null): a null value denotes "no accrual / no accumulation cap" rather than zero, and the row mapper must preserve null rather than coercing it.
 ### Interface contract — expose these operations (their shape is yours)
-- IEmployeeRepository.findById(id: string): Promise<Employee | null> — Returns null when no non-deleted row matches the id (not-found is a normal result, not an error); throws on database/connection failure. Must exclude soft-deleted rows (deletedAt IS NULL).
-- IEmployeeRepository.findByManagerId(managerId: string): Promise<Employee[]> — Returns an empty array (not null) when the manager has no direct reports or the managerId matches no employee; throws on database/connection failure. Results must exclude soft-deleted employees.
-- IEmployeeRepository.findAll(): Promise<Employee[]> — Returns an empty array (not null) when no employees exist; throws on database/connection failure. Results must exclude soft-deleted employees (deletedAt IS NULL).
-- IEmployeeRepository.create(employee: Omit<Employee,'id'|'createdAt'|'updatedAt'|'deletedAt'>): Promise<Employee> — Persists a new row and returns the fully-formed Employee with system-generated id, createdAt, updatedAt, and null deletedAt; throws on database failure or unique-constraint violation (e.g., duplicate email). Not idempotent — repeated calls with the same payload create distinct rows.
+- ILeavePolicyRepository.findById — idempotent; Returns null when no row matches the id (not-found is a normal empty result, not a thrown error). Database/query errors propagate as rejected promises (GP-006: no unhandled rejections at the call site).
+- ILeavePolicyRepository.findByLeaveType — idempotent; Returns null when no policy exists for the given LeaveType. The leaveType parameter is typed as the LeaveType enum, so invalid string values are rejected at compile time. Database errors propagate as rejected promises.
+- ILeavePolicyRepository.findAllActive — idempotent; Returns an empty array (not null) when no active policies exist. Filters on is_active = true. Database errors propagate as rejected promises.
+- ILeavePolicyRepository.create — Generates id/createdAt/updatedAt, inserts the row, then re-selects and returns the persisted entity. A duplicate-leave-type or constraint violation propagates as a rejected promise (GP-006). The returned entity must reflect the database's stored values, not just the in-memory input.
 ### Integration points — connect to these
-- src/shared/db/connection.ts (pg.Pool export) — EmployeeRepository configures its Knex instance from the shared pool's connection settings — this is the sanctioned shared-infrastructure import that satisfies GP-001 while reusing the single connection source.
-- src/shared/types/index.ts (LeaveType, LeaveStatus enums) — The reconciled dependency map declares employee → shared-types; while the Employee interface uses string-literal unions (not the enums directly), the module's architectural dependency on shared-types is declared and the barrel/module must not contradict this dependency edge.
-- Future leave and balance modules (Phases 4, 5, 7, 10) — The employee module's public barrel (index.ts) is the sole import surface for downstream modules that need Employee lookups and manager-subordinate validation (leave service approve/reject, balance initialization) — the barrel must export Employee, IEmployeeRepository, and EmployeeRepository so later phases import only through it.
+- src/shared/types/index.ts (LeaveType enum) — The policy model and repository depend on the LeaveType enum for typing the leaveType field and the findByLeaveType parameter; this is the policy module's only cross-module dependency per the reconciled dependency map (policy → shared-types).
+- src/shared/db/connection.ts (pg.Pool) — The repository executes parameterized queries through the shared pg.Pool, satisfying the no-direct-db-outside-repository constraint and centralizing connection configuration.
+- tests/unit/modules/employee/employee.repository.test.ts (test pattern) — The policy repository test must mirror the employee test's structure (mocking the db layer, covering found/null/array/create cases) but adapt the mock strategy to raw pg's {rows:[...]} return shape rather than the Knex thenable query-builder chain, as settled during discovery.
+- Phase 7 (PolicyService) and Phase 4 (Balance module) — downstream consumers — The ILeavePolicyRepository interface and LeavePolicy model produced here are the contract that Phase 7's PolicyService will delegate to and that Phase 4's BalanceService will consume (balance → policy dependency); the interface signatures must remain stable for those phases to build on.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
