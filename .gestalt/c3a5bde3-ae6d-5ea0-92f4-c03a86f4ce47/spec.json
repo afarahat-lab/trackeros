@@ -1,0 +1,70 @@
+{
+  "scope": {
+    "affectedDomains": [],
+    "affectedLayers": [],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The LeaveRequest interface is exported from the leave module and its status field is typed as LeaveStatus (imported from src/shared/types), with all lifecycle actor/timestamp fields (approvedBy/approvedAt, rejectedBy/rejectedAt, cancelledBy/cancelledAt) present and nullable.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository.findById returns a LeaveRequest when a matching row exists and returns null when no row matches, mapping snake_case DB rows to camelCase domain entities.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository.findByEmployee returns all leave requests for a given employeeId, returning an empty array when none exist.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository.findOverlapping returns only SUBMITTED or APPROVED requests for the same employee whose date range overlaps inclusively with the given [startDate, endDate]; adjacent non-overlapping ranges are excluded from the result, and an optional excludeId omits that request from the result.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository.create persists a new leave request with a system-generated id and timestamps, then re-reads and returns the persisted row as a LeaveRequest.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository.update applies only the supplied fields (dynamic partial update), sets updatedAt, then re-reads and returns the updated row as a LeaveRequest.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The unit test file mocks the shared db connection pool and asserts the exact SQL strings and parameter arrays passed to pool.query for each repository method, including the two-call (write then SELECT) sequence for create and update.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The leave module barrel (index.ts) re-exports the LeaveRequest, CreateLeaveRequestDto, UpdateLeaveRequestDto types and the ILeaveRequestRepository interface and LeaveRequestRepository class, matching the existing module barrel export convention.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access must go through the repository pattern using raw pool.query with parameterized placeholders ($1, $2, ...); no inline SQL or direct pool usage outside the repository (GP-001 / no-direct-db-outside-repository).",
+    "No use of `any`; use `unknown` with type guards where dynamic typing is needed (no-any, strict TypeScript).",
+    "DB rows must be mapped to domain entities via a snake_case row interface and a rowToLeaveRequest mapper that casts row.status as LeaveStatus, matching the established policy/balance repository convention.",
+    "The leave repository must use raw pool.query imported from src/shared/db/connection, not Knex (the employee module's Knex wrapper is the outlier; policy/balance raw-pool is the norm).",
+    "Modules must import from each other only through their declared public entry point (index.ts); the leave module imports LeaveStatus/LeaveType from src/shared/types and may reference the Employee type, never reaching into another module's internals.",
+    "The leave_requests table has no soft-delete column; repository queries must not filter on a deleted_at column (unlike the employees table)."
+  ],
+  "outOfScope": [
+    "LeaveService business logic (submit/approve/reject/cancel orchestration, notice-day validation, balance reservation/deduction, overlap rejection enforcement at the service layer) \u2014 deferred to Phase 10.",
+    "LeaveController, leaveRoutes, Fastify route registration, RBAC guards, and Zod input validation \u2014 deferred to Phase 10.",
+    "Audit record creation for leave state changes (GP-002) \u2014 the repository layer in this phase does not write audit logs; that is the service layer's responsibility in later phases.",
+    "Transaction/PoolClient support on repository methods \u2014 the optional client parameter for multi-step transactional writes is introduced when the service layer needs it in Phase 10; this phase's repository methods use the shared pool directly.",
+    "Balance deduction/restoration, notification fan-out, and employee-eligibility (ACTIVE-only) checks \u2014 these are service-layer concerns in later phases, not repository/model concerns."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [],
+  "integrationPoints": []
+}
