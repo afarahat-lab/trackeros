@@ -1,25 +1,35 @@
-# Implement this phase: Phase 4: LeaveBalance model + repository (leave-balance module)
+# Fix specific quality-gate violations: Phase 5: LeaveRequest model + repository (leave-request module)
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/32ad270f-dfe8-4e32-be27-804897fcc970/4`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/fix/32ad270f-dfe8-4e32-be27-804897fcc970/5/1`. Do not clone anything; work only in this directory.
 
-## What to build
-(no phase architecture provided — infer from the success criteria below)
+You are fixing SPECIFIC violations the quality gate found in EXISTING, already-committed files. Make the targeted edits listed below — do NOT refactor, regenerate, or change unrelated code.
 
-## Success criteria
-Create the LeaveBalance domain model and its repository in the leave-balance module.
+The files ALREADY EXIST. You MUST edit them in place with the `str_replace_editor` tool. Reading or viewing a file is NOT sufficient — you have NOT finished until you have edited EVERY file listed below.
 
-Files to create:
-1. `src/modules/leave-balance/leave-balance.model.ts` — Define and export the LeaveBalance interface with EXACT fields: id: string, employeeId: string, policyId: string, totalEntitlement: number, usedDays: number, pendingDays: number, remainingDays: number, fiscalYear: number, status: 'ACTIVE' | 'CLOSED', createdAt: Date, updatedAt: Date.
+## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
+The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
+- `LeaveRequest` — the entity MUST have exactly these fields:
+    - id: string
+    - employeeId: string
+    - leaveTypeId: string
+    - startDate: Date
+    - endDate: Date
+    - reason: string | undefined
+    - status: LeaveRequestStatus
+    - approvedBy: string | null
+    - approvedAt: Date | null
+    - rejectedBy: string | null
+    - rejectedAt: Date | null
+    - rejectionReason: string | undefined
+    - createdAt: Date
+    - updatedAt: Date
 
-2. `src/modules/leave-balance/leave-balance.repository.interface.ts` — Define and export ILeaveBalanceRepository interface with methods: findByEmployeeId(employeeId: string), findByEmployeeIdAndFiscalYear(employeeId: string, fiscalYear: number), findByEmployeeIdAndPolicyId(employeeId: string, policyId: string, fiscalYear: number), create(dto: CreateLeaveBalanceDto), update(id: string, dto: UpdateLeaveBalanceDto), createBatch(dtos: CreateLeaveBalanceDto[]). Also define CreateLeaveBalanceDto and UpdateLeaveBalanceDto.
-
-3. `src/modules/leave-balance/leave-balance.repository.ts` — Implement LeaveBalanceRepository class implementing ILeaveBalanceRepository. Use the existing pg Pool from `src/shared/db/connection.ts`.
-
-4. `src/modules/leave-balance/index.ts` — Barrel file re-exporting LeaveBalance, ILeaveBalanceRepository, LeaveBalanceRepository, and DTOs.
-
-Include Jest unit tests in `tests/unit/modules/leave-balance/` for the repository.
-
-This phase depends on `src/modules/leave-policy/leave-policy.model.ts` from Phase 3 (LeaveBalance references policyId) — read it before generating.
+## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
+Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
+- Use unknown with type guards instead of any (rule: `no-any`)
+- Database calls must go through repository pattern (rule: `no-direct-db-outside-repository`)
+- No hardcoded passwords, API keys, or tokens (rule: `no-hardcoded-secrets`)
+- Do not add @gestalt/* packages as project dependencies — these are Gestalt platform internals not available on npm (rule: `no-gestalt-internal-deps`)
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -41,53 +51,6 @@ Cross-cutting rules that apply throughout:
 - Balances are auto-created for all leave types on employee creation.
 - Every endpoint enforces RBAC (employees act on their own records; managers approve/reject their direct reports) plus input validation.
 - When an employee has no manager, approval escalates to HR. [BINDING RULE — operator decision resolving: How is the fiscal year boundary determined for LeaveBalance?; How does leave accrual work? LeavePolicy defines accrualRate and maxAccumulation, but the accrual mechanics (frequency, proration for mid-year hires, carryover rules) are not specified.; Does emergency leave have special rules that distinguish it from annual and sick leave?; When a leave request is approved, should the balance be deducted immediately at approval time or at the start of the leave period?; How is the fiscal year boundary determined for LeaveBalance? Is it calendar year (Jan 1 – Dec 31), the employee's hire-date anniversary, or a configurable organisation-wide fiscal year start?; Does emergency leave have special rules that distinguish it from annual and sick leave? The feature description lists all three but does not specify whether emergency leave bypasses notice periods, approval requirements, or balance checks.; How are leave days counted — calendar days or business/working days?; What are the fiscal year boundaries for balance scoping?; How does leave balance accrual work — annual lump-sum allocation at fiscal-year start vs. monthly pro-rata accrual?; What is the fiscal year boundary — calendar year (Jan 1 – Dec 31) or a configurable company fiscal year?; apply everywhere these apply, not in one place only]
-
-## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
-The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
-- `LeaveBalance` — the entity MUST have exactly these fields:
-    - id: string
-    - employeeId: string
-    - policyId: string
-    - totalEntitlement: number
-    - usedDays: number
-    - pendingDays: number
-    - remainingDays: number
-    - fiscalYear: number
-    - status: 'ACTIVE' | 'CLOSED'
-    - createdAt: Date
-    - updatedAt: Date
-
-## Constraints & consistency
-You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
-### Reuse & consistency — match these exactly
-- The LeaveBalanceRepository must mirror the established repository pattern: import Pool from 'pg' and pool from ../../shared/db/connection; define a snake_case Row interface; type Queryable = Pick<Pool,'query'>; constructor takes optional client defaulting to pool; a rowToLeaveBalance mapper; a COLUMNS constant; parameterized $N SQL; create uses NOW(),NOW() with RETURNING; update builds a dynamic SET with a paramIndex counter and appends updated_at=NOW(); list queries use ORDER BY. (see `src/modules/leave-policy/leave-policy.repository.ts`)
-- The ILeaveBalanceRepository interface and its DTOs must follow the same structural conventions as ILeavePolicyRepository: DTOs co-located in the interface file, CreateLeaveBalanceDto omits id/createdAt/updatedAt with optional fields marked ?, and UpdateLeaveBalanceDto makes all mutable fields optional. (see `src/modules/leave-policy/leave-policy.repository.interface.ts`)
-- The leave-balance barrel must use named re-exports matching the leave-policy/index.ts pattern (export { X } from './file'). (see `src/modules/leave-policy/index.ts`)
-- Unit tests must follow the established test pattern: jest.mock the shared db connection returning { pool: mockPool } with query: jest.fn(); import pool after the mock; extract mockQuery; a makeRow(overrides) helper with snake_case defaults; beforeEach resets mockQuery and constructs a fresh repository; assert exact SQL (or stringContaining) and param arrays; include a custom-client constructor test verifying pool.query is not called. (see `tests/unit/modules/leave-policy/leave-policy.repository.test.ts`)
-- The LeaveBalance entity shape and the leave_balances table schema (id, employee_id, policy_id, total_entitlement, used_days, pending_days, remaining_days, fiscal_year, status, created_at, updated_at; PK id; FKs to employees.id and leave_policies.id; unique candidate on (employee_id, policy_id, fiscal_year)) must match the reconciled architecture exactly. (see `.gestalt/architecture/reconciled.json`)
-### Entity invariants — enforce these
-- Reuse or extend `LeaveBalance`: remainingDays must always equal totalEntitlement - usedDays - pendingDays; the row-to-domain mapper must preserve this relationship for any persisted row, and pendingDays captures days tied to SUBMITTED (not-yet-decided) requests while usedDays captures APPROVED days.
-- Reuse or extend `LeaveBalance`: A LeaveBalance is uniquely identified by the tuple (employeeId, policyId, fiscalYear) — at most one balance row per employee per policy per fiscal year (unique constraint candidate on leave_balances).
-- Reuse or extend `LeaveBalance`: status lifecycle is limited to 'ACTIVE' | 'CLOSED'; the domain type must not admit other status values.
-- Reuse or extend `LeaveBalance`: policyId references an existing leave_policies.id (LeavePolicy from Phase 3); the balance cannot reference a non-existent policy.
-### Interface contract — expose these operations (their shape is yours)
-- findByEmployeeId(employeeId) — idempotent; Returns LeaveBalance[] (empty when none); never throws on missing employee — returns empty.
-- findByEmployeeIdAndFiscalYear(employeeId, fiscalYear) — idempotent; Returns LeaveBalance[] for that employee and fiscal year (empty when none).
-- findByEmployeeIdAndPolicyId(employeeId, policyId, fiscalYear) — idempotent; Returns the single matching LeaveBalance or null when no row matches the (employee, policy, fiscalYear) tuple.
-- create(dto: CreateLeaveBalanceDto) — Persists one row with created_at/updated_at set to NOW() and returns the created LeaveBalance; a duplicate (employeeId, policyId, fiscalYear) violates the unique constraint and surfaces the underlying pg error.
-- update(id, dto: UpdateLeaveBalanceDto) — idempotent; Updates only provided mutable fields, appends updated_at=NOW(), returns the updated LeaveBalance or null when no row matches id; an empty dto returns the existing row without writing.
-- createBatch(dtos: CreateLeaveBalanceDto[]) — Persists all rows in a single multi-row INSERT with RETURNING and returns the created LeaveBalance[] in order; a constraint violation on any row fails the whole batch (no partial persistence).
-### Integration points — connect to these
-- src/shared/db/connection.ts — The repository imports the shared pg Pool as its default Queryable.
-- src/modules/leave-policy/leave-policy.model.ts — LeaveBalance.policyId references LeavePolicy (leave_policies.id); the leave-balance module depends on leave-policy per the dependency map.
-- src/modules/leave-balance/index.ts — Future phases (Phase 9 LeaveBalanceService, Phase 10 LeaveRequestService) consume the leave-balance module only through its barrel.
-
-## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
-Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
-- Use unknown with type guards instead of any (rule: `no-any`)
-- Database calls must go through repository pattern (rule: `no-direct-db-outside-repository`)
-- No hardcoded passwords, API keys, or tokens (rule: `no-hardcoded-secrets`)
-- Do not add @gestalt/* packages as project dependencies — these are Gestalt platform internals not available on npm (rule: `no-gestalt-internal-deps`)
 
 ## Architecture & constraint rules the quality gate enforces (satisfy these now)
 The quality gate judges your code against the rules below and BLOCKS the phase on any violation — a violation it rates critical escalates to a human with no automatic retry. These are the same rules the gate checks, so comply up front rather than leaving them for the gate:
@@ -113,21 +76,29 @@ These are the project's non-negotiable invariants. A violation is a GOLDEN_PRINC
 - GP-006 — Error handling: No unhandled promise rejections. All async errors are caught and handled.
 
 ## Project stack & references
-Before writing code, read the referenced files below (those present in the working directory) to learn the project's language, framework, test runner, and conventions, and the cross-cutting rules your code must satisfy — then follow the existing repository conventions:
+Before making the edits below, read the referenced files (those present in the working directory) to learn the project's architecture, conventions, and the cross-cutting rules your fix must still satisfy — then keep the edits consistent with them:
 - `HARNESS.json`
 - `docs/ARCHITECTURE.md`
 - `docs/GOLDEN_PRINCIPLES.md`
 - `AGENTS.md`
 - `PLAN.md`
 
+## Required edits
+
+### Edit 1
+File: tests/unit/modules/leave-request/leave-request.repository.test.ts
+Line: 269
+Rule violated: test-failure
+Action (do this now): Edit `tests/unit/modules/leave-request/leave-request.repository.test.ts` at line 269 in place to fix the `test-failure` violation.
+What the quality gate found — apply this: Failing test: LeaveRequestRepository › updateStatus › should update status to CANCELLED without approval/rejection metadata. expect(received).not.toContain(expected) // indexOf Expected substring: not "approved_by" Received string:        "UPDATE leave_requests SET status = $2, updated_at = NOW() WHERE id = $1
+
 ## Verify before you finish (MANDATORY)
-The code you write MUST compile and its tests MUST pass — a compilation or type error must NEVER be left for CI to find. Before you declare this task done:
-- Read the project's build / type-check / test commands from `package.json` (scripts) and `HARNESS.json`.
-- Install dependencies if they are not already installed, then RUN the type-check / build (e.g. `npm run build` or `tsc --noEmit`) AND the tests (e.g. `npm test`) for the files this phase touches.
-- FIX every compilation error, type error, and failing test you introduced — including in test files — and re-run until they pass.
+After making the edits above, the code MUST still compile and its tests MUST pass — a compilation/type error, or a test your change breaks, must NEVER be left for CI or the quality gate to find. Before you declare this task done:
+- Read the project's build / type-check / test commands from `package.json` (scripts) and `HARNESS.json`, install dependencies if they are not already installed, then RUN the type-check / build (e.g. `npm run build` or `tsc --noEmit`) AND the tests (e.g. `npm test`).
+- FIX every compilation error, type error, and failing test that YOUR edits introduced — including updating a test whose expectation your change legitimately invalidated (e.g. a new required field, a new status code such as 401/403 from an added authorization check, added input validation) — and re-run until they pass.
 - Only when the build and the tests pass may you consider the task complete. If a dependency install genuinely cannot be made to work, say so explicitly in your final message rather than declaring success on unverified code.
 
 ## Constraints (mandatory)
-- Write and modify source files ONLY. Do NOT run `git commit`, `git push`, `git add`, or any other git command. The platform handles all git operations. (Running the build / type-check / tests above is expected and encouraged — that is NOT a git operation.)
-- Do not create a new repository or change the git remote.
-- Stay within the scope of this phase; do not implement deferred/later work.
+- Keep the change SURGICAL: make the required edits above and fix only what they broke (compile/type errors and the tests they invalidated). Do NOT refactor, regenerate, or change unrelated code, and do not add / delete / rename source files beyond what a required edit — or a test-fix for it — needs.
+- Do NOT run `git commit`, `git push`, `git add`, or any git command. The platform handles all git operations. (Running the build / type-check / tests above is expected and encouraged — that is NOT a git operation.)
+- When the listed edits are made and the build + tests pass, stop.
