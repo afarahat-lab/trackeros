@@ -1,0 +1,178 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "employee"
+    ],
+    "affectedLayers": [
+      "repository",
+      "test",
+      "build-config"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The employee module exposes a barrel entry point that re-exports Employee, CreateEmployeeDto, UpdateEmployeeDto from the model file and IEmployeeRepository, EmployeeRepository from the repository file, so downstream modules can import from the module root per the dependency rule.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The employee repository contains zero Knex imports or usage; all database access is performed via the raw pg Pool exported from src/shared/db/connection.ts using pool.query()/pool.connect() with parameterized SQL, satisfying the no-direct-db-outside-repository constraint and the raw-SQL rewrite requirement.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository preserves the IEmployeeRepository interface with all 7 methods (findById, findByEmployeeNumber, findByManagerId, findAll, create, update, softDelete), each accepting an optional PoolClient; when a client is provided the method uses it, when omitted it acquires a connection from the pool for that single operation and releases it.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository create method generates a UUID via crypto.randomUUID(), defaults employment_status to 'ACTIVE', maps the inserted row through snake_case\u2192camelCase conversion, and catches PostgreSQL error code 23505 to throw DuplicateEmployeeError with the correct field (employeeNumber or email).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All repository read methods that return active employees (findById, findByEmployeeNumber, findByManagerId, findAll, update) filter via WHERE deleted_at IS NULL in raw SQL, excluding soft-deleted rows.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository softDelete method sets deleted_at and updated_at on the matching row (filtered by deleted_at IS NULL) via a parameterized UPDATE, and update throws EmployeeNotFoundError when no active row exists for the given id.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository findAll method computes offset as (page-1)*limit, executes a count query and a data query with LIMIT/OFFSET, and returns a PaginationResult whose total is parseInt(total, 10) of the count result, with page and limit echoed back.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests exist under tests/unit/modules/employee/ that mock the shared db pool via jest.mock('src/shared/db/connection') and cover at minimum: create (row mapping + UUID generation), findById (soft-delete filtering via deleted_at IS NULL), findAll (pagination params mapping with offset/limit), and softDelete (sets deleted_at); the jest.config.js moduleNameMapper resolves the bare 'src/...' specifier so the mock intercepts the repository's relative import.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The full verification command (npm run build && npx jest) passes with zero TypeScript errors under strict mode and no-any, and all employee repository unit tests pass.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No `any` type anywhere in the rewritten repository or tests; use `unknown` with type guards (e.g. for QueryResult rows and caught errors) per the no-any constraint (severity high) and strict TypeScript.",
+    "All database access must go through the repository pattern (GP-001); the repository is the only place SQL is written, and it must use the shared pg Pool from src/shared/db/connection.ts \u2014 no inline SQL or direct pool usage in services or controllers.",
+    "All SQL queries must be parameterized (values passed as query parameters, never string-interpolated) to prevent SQL injection.",
+    "The repository must not import or use Knex in any form; the only Knex usage permitted in the project is for Phase 10 migrations. The repository's database access is exclusively via the raw pg Pool/PoolClient.",
+    "The service owns transaction boundaries (BEGIN/COMMIT/ROLLBACK); the repository must not issue BEGIN/COMMIT/ROLLBACK itself \u2014 it only accepts an optional PoolClient and uses it when provided, per the reconciled Transaction Contract.",
+    "The jest.mock call must use the literal specifier 'src/shared/db/connection' as required by the gate, and jest.config.js must include a moduleNameMapper entry that resolves '^src/(.*)$' to '<rootDir>/src/$1' so the bare specifier resolves to the same absolute file as the repository's relative import.",
+    "No changes to employee.model.ts \u2014 the model file is complete and must remain untouched; the rewrite is confined to the repository, the new barrel, the new tests, and jest.config.js."
+  ],
+  "outOfScope": [
+    "EmployeeService and IEmployeeService \u2014 service layers are Phase 7, not this phase.",
+    "Leave-balance, leave-policy, leave-request, and audit-log modules \u2014 this phase only touches the employee module.",
+    "Database migrations and schema creation (Phase 10) \u2014 the repository assumes the employees table already exists; no migration files are created or modified.",
+    "Fastify controllers, routes, RBAC middleware, and API endpoints \u2014 no HTTP layer work in this phase.",
+    "Integration tests that spin up a real database or Fastify app \u2014 this phase adds only Jest unit tests with a mocked db pool."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "An Employee row is considered active (visible to all read methods) only while deleted_at IS NULL; once softDelete sets deleted_at, the row is permanently excluded from findById, findByEmployeeNumber, findByManagerId, findAll, and update lookups."
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "On creation, a new Employee always receives a freshly generated UUID as its id, an employment_status of 'ACTIVE', and identical created_at/updated_at timestamps; termination_date and deleted_at start as NULL."
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "The employee_number and email columns are unique among active rows; a violation of that uniqueness (PostgreSQL error code 23505) is translated into a DuplicateEmployeeError naming the offending field, never surfaced as a raw database error."
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "Every Employee returned by the repository is the result of a snake_case\u2192camelCase row mapping (EmployeeRow\u2192Employee) so callers always receive domain-shaped objects, never raw database column names."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "EmployeeRepository.create(dto, client?)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws DuplicateEmployeeError (with field 'employeeNumber' or 'email') on PostgreSQL unique-violation code 23505; re-throws all other errors unchanged. Generates a UUID and defaults employment_status to 'ACTIVE'."
+    },
+    {
+      "operation": "EmployeeRepository.update(id, dto, client?)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws EmployeeNotFoundError(id) when no active row (deleted_at IS NULL) exists for the given id; throws DuplicateEmployeeError on unique-violation 23505 for employee_number or email; re-throws other errors unchanged."
+    },
+    {
+      "operation": "EmployeeRepository.softDelete(id, client?)",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Sets deleted_at and updated_at on the row matching id where deleted_at IS NULL; completes silently (no error) whether or not a row was affected. Does not throw EmployeeNotFoundError."
+    },
+    {
+      "operation": "EmployeeRepository.findById(id, client?)",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns the active Employee (deleted_at IS NULL) or null when no row matches; never throws for a missing row."
+    },
+    {
+      "operation": "EmployeeRepository.findAll(params, client?)",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns a PaginationResult with data (active rows only, ordered), total (parseInt of count), page, and limit; never throws for empty results."
+    },
+    {
+      "operation": "EmployeeRepository.findByEmployeeNumber / findByManagerId (client?)",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Return active employees (deleted_at IS NULL) only; findByEmployeeNumber returns Employee | null, findByManagerId returns Employee[] (possibly empty); neither throws for missing data."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The repository must import and use the exact `pool` (pg.Pool) exported from src/shared/db/connection.ts \u2014 the same singleton the rest of the system uses \u2014 rather than constructing a new Pool or a Knex instance.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "The repository must import Employee, CreateEmployeeDto, UpdateEmployeeDto, and EmploymentStatus from the existing employee.model.ts (unchanged) and the row mapping must produce objects conforming to the Employee interface shape defined there.",
+      "referencePath": "src/modules/employee/employee.model.ts"
+    },
+    {
+      "requirement": "The repository must use PaginationParams and PaginationResult<T> from src/shared/types/index.ts for the findAll signature and return type, matching the shared value types rather than redefining them.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The optional PoolClient transaction contract must match the Transaction Contract in docs/ARCHITECTURE.md: methods accept an optional PoolClient, use it when provided, acquire+release a pool connection when omitted, and never issue BEGIN/COMMIT/ROLLBACK (the service owns the unit of work).",
+      "referencePath": "docs/ARCHITECTURE.md"
+    },
+    {
+      "requirement": "The employees table column names used in SQL must match the reconciled schema (snake_case: employee_number, first_name, last_name, manager_id, hire_date, termination_date, employment_status, created_at, updated_at, deleted_at) so the row mapping aligns with the conceptual table definition.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "New employee repository tests must follow the existing test conventions: .test.ts extension, relative imports to source (../../../../src/...), and Jest describe/it structure matching the pattern established in tests/unit/shared/types/index.test.ts.",
+      "referencePath": "tests/unit/shared/types/index.test.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/db/connection.ts (pg Pool)",
+      "why": "The repository depends on the shared database pool singleton for all query execution and connection acquisition; the tests mock this module to isolate the repository from a real database."
+    },
+    {
+      "target": "jest.config.js (moduleNameMapper)",
+      "why": "The test's literal jest.mock('src/shared/db/connection') requires a moduleNameMapper entry to resolve the bare 'src/...' specifier to the same absolute file as the repository's relative import, so the mock intercepts correctly."
+    },
+    {
+      "target": "src/modules/employee/index.ts (barrel)",
+      "why": "Downstream modules (leave-balance, leave-request, leave-controller per the dependency map) must import the employee module only through its public barrel entry point per the architecture dependency rule; this phase creates that entry point."
+    }
+  ]
+}
