@@ -1,0 +1,156 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "notification"
+    ],
+    "affectedLayers": [
+      "domain-model",
+      "repository",
+      "module-barrel",
+      "unit-tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The Notification domain interface is exported from the notification module's model file with the exact field set and string-literal-union types declared in the reconciled architecture (id, recipientId, type, title, message, relatedEntityType, relatedEntityId, status, createdAt, readAt) \u2014 a reviewer can confirm the interface compiles under strict TypeScript and matches the reconciled entity shape.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The INotificationRepository interface is exported and declares all five operations (create, findByRecipient, markAsSent, markAsRead, createBatch) with the correct return types, plus the CreateNotificationDto type \u2014 a reviewer can confirm the interface is implementable and the DTO excludes the server-managed fields (id, createdAt, readAt) and defaults status to PENDING.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "NotificationRepository.create persists a row into the notifications table via a parameterized INSERT and returns the mapped Notification with camelCase fields; the repository uses the shared pg pool by default and accepts an optional Queryable client for transaction participation.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "NotificationRepository.findByRecipient queries notifications for a given recipientId and returns the mapped Notification[] (empty array when none exist), ordered consistently (e.g. by created_at DESC) so the recipient inbox is deterministic.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "NotificationRepository.markAsSent sets the notification status to SENT and returns the updated Notification (or null when no row matches); NotificationRepository.markAsRead sets status to READ and read_at to the current timestamp and returns the updated Notification (or null when no row matches).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "NotificationRepository.createBatch performs a single multi-row INSERT for a non-empty DTO array and returns the mapped Notification[]; for an empty input array it returns [] without issuing any database query.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The notification module barrel (index.ts) re-exports Notification, INotificationRepository, NotificationRepository, and CreateNotificationDto so downstream modules (leave-request) can import the notification module only through its public entry point.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests under tests/unit/modules/notification/ cover the repository: create mapping, findByRecipient (populated + empty), markAsSent (hit + null), markAsRead (hit + null), createBatch (multi-row + empty no-query), and the custom-client constructor \u2014 all passing under the project's ts-jest configuration.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "no-any: the Notification model, repository interface, DTO, and repository implementation must use `unknown` with type guards (e.g. `Record<string, unknown>`) rather than `any`; strict TypeScript with strict null checks must pass.",
+    "no-direct-db-outside-repository (GP-001): all database access for notifications goes through NotificationRepository; the repository is the only component that issues SQL against the notifications table.",
+    "All SQL must use parameterized placeholders ($1, $2, \u2026) \u2014 no string-interpolated user values \u2014 to prevent SQL injection; timestamps use NOW() server-side, not client-supplied Date values.",
+    "The repository constructor must accept an optional Queryable client (Pick<Pool,'query'>) defaulting to the shared pool, so notification writes can participate in a caller-owned transaction per the Transaction Contract.",
+    "Modules import from each other ONLY through their declared public entry point (index.ts); the notification module must not reach into another module's internals, and downstream consumers must import notification only via its barrel."
+  ],
+  "outOfScope": [
+    "NotificationService and INotificationService \u2014 the service layer that orchestrates notification fanout is not part of this phase; only the model, repository interface, repository implementation, and barrel are in scope.",
+    "Fastify routes / controllers / HTTP endpoints for notifications \u2014 no transport layer is built in this phase.",
+    "Database migration / DDL for the notifications table \u2014 the conceptual schema is defined in the reconciled architecture; this phase assumes the table exists and only implements the repository against it.",
+    "Integration tests against a real PostgreSQL instance \u2014 only Jest unit tests with a mocked pool are in scope for this phase."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "Lifecycle is strictly PENDING \u2192 SENT \u2192 READ \u2192 ARCHIVED; a newly created notification always starts in PENDING status (the create path never accepts a caller-supplied status), and readAt is null until the notification transitions to READ."
+    },
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "Every notification is anchored to exactly one related entity: relatedEntityType is constrained to 'LeaveRequest' and relatedEntityId is a non-null identifier, so a notification can always be traced back to the leave lifecycle event that produced it."
+    },
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "A notification has exactly one recipient (recipientId) and one type from the leave-transition set (LEAVE_SUBMITTED, LEAVE_APPROVED, LEAVE_REJECTED, LEAVE_CANCELLED); the type is immutable after creation and determines the notification's semantic meaning."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "INotificationRepository.create(dto: CreateNotificationDto) \u2192 Promise<Notification>",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Persists one notification row with status defaulting to PENDING and created_at set server-side (NOW()); read_at is null on creation. Rejects with a typed error if the underlying query fails. Not idempotent \u2014 each call produces a distinct row with a new id."
+    },
+    {
+      "operation": "INotificationRepository.findByRecipient(recipientId: string) \u2192 Promise<Notification[]>",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns all notifications for the given recipient, ordered deterministically (newest first); returns an empty array (never null) when the recipient has no notifications. Read-only \u2014 no state change, no audit record required."
+    },
+    {
+      "operation": "INotificationRepository.markAsSent(id: string) \u2192 Promise<Notification | null>",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Transitions the notification status to SENT and returns the updated Notification, or returns null when no row matches the given id. A state-changing write \u2014 callers that wrap this in a business operation must ensure an audit record is produced at the service layer (GP-002 is enforced outside this repository)."
+    },
+    {
+      "operation": "INotificationRepository.markAsRead(id: string) \u2192 Promise<Notification | null>",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Transitions the notification status to READ and sets read_at to the current server timestamp (NOW()); returns the updated Notification, or null when no row matches the given id. Idempotent in effect \u2014 re-marking an already-READ notification re-stamps read_at but does not error."
+    },
+    {
+      "operation": "INotificationRepository.createBatch(dtos: CreateNotificationDto[]) \u2192 Promise<Notification[]>",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Performs a single multi-row INSERT for a non-empty array and returns all created Notifications; for an empty input array returns [] without issuing any query. Each row defaults to PENDING status. Not idempotent \u2014 repeated calls with the same DTOs produce duplicate rows."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "NotificationRepository must follow the established repository shape from AuditRepository: a private `db: Queryable` where `type Queryable = Pick<Pool,'query'>`, a constructor `constructor(client?: Queryable) { this.db = client ?? pool }` importing `pool` from `../../shared/db/connection`, a snake_case row interface, a `rowToNotification` mapper converting snake_case columns to camelCase fields, and a `COLUMNS` constant joined string used in SELECT/RETURNING clauses.",
+      "referencePath": "src/modules/audit/audit-record.repository.ts"
+    },
+    {
+      "requirement": "createBatch must mirror the LeaveBalanceRepository.createBatch pattern: early-return [] for empty input without querying, build per-row value placeholders with incrementing $N parameters, issue a single multi-row INSERT \u2026 RETURNING ${COLUMNS}, and map all returned rows via the row mapper.",
+      "referencePath": "src/modules/leave-balance/leave-balance.repository.ts"
+    },
+    {
+      "requirement": "The notification barrel (index.ts) must match the audit/leave-balance barrel convention: re-export the model interface from the model file, the repository interface and DTO(s) from the repository-interface file, and the repository class from the repository file \u2014 no logic, only re-exports.",
+      "referencePath": "src/modules/audit/index.ts"
+    },
+    {
+      "requirement": "The notification repository unit test must follow the audit/leave-balance test convention: jest.mock the shared db connection module returning `{ pool: { query: jest.fn() } }` cast to Pool, a `makeRow(overrides)` helper with snake_case defaults, a duplicated COLUMNS constant for exact-SQL assertions, beforeEach resetting the mock and constructing `new NotificationRepository()`, and a custom-client constructor test asserting the provided client's query is used instead of the pool.",
+      "referencePath": "tests/unit/modules/audit/audit-record.repository.test.ts"
+    },
+    {
+      "requirement": "The Notification entity shape and the notifications table conceptual schema (columns: id, recipient_id, type, title, message, related_entity_type, related_entity_id, status, created_at, read_at; indexes on recipient_id, status, and (recipient_id, status)) must match the reconciled architecture exactly \u2014 the repository's row interface and COLUMNS constant must align with these columns, and the model interface must match the reconciled Notification attributes.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/db/connection.ts (shared pg Pool)",
+      "why": "NotificationRepository imports `pool` from the shared db connection as its default Queryable, matching every other repository; this is the only external dependency of this standalone supporting module."
+    },
+    {
+      "target": "src/modules/leave-request (Phase 10 LeaveRequestService)",
+      "why": "The leave-request service will inject INotificationRepository to create notifications on lifecycle transitions (LEAVE_SUBMITTED, LEAVE_APPROVED, LEAVE_REJECTED, LEAVE_CANCELLED); this phase establishes the contract (interface + DTO) that Phase 10 consumes via the notification barrel."
+    },
+    {
+      "target": "notifications table (recipient_id FK \u2192 employees.id)",
+      "why": "The repository writes against the notifications table whose recipient_id is a foreign key to employees.id; create/createBatch must supply a valid recipientId so the FK constraint is satisfied at the database level."
+    }
+  ]
+}
