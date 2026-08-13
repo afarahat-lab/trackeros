@@ -129,6 +129,7 @@ Represents employee data managed by the `employee` module, including employee re
 | firstName | string | true |
 | lastName | string | true |
 | email | string | true |
+| role | UserRole | true |
 | managerId | string \| null | false |
 | department | string \| null | false |
 | hireDate | Date | true |

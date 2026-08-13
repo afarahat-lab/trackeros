@@ -1,0 +1,179 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "employee"
+    ],
+    "affectedLayers": [
+      "data",
+      "domain"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The Employee entity interface is exported from the employee module and its employmentStatus field is constrained to exactly the union 'ACTIVE' | 'INACTIVE' | 'TERMINATED'; the role field is typed as the UserRole enum imported from shared/types (not a redeclared copy).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "CreateEmployeeDto and UpdateEmployeeDto are exported from the employee module; CreateEmployeeDto excludes the system-managed fields (id, createdAt, updatedAt, deletedAt) and UpdateEmployeeDto is a partial of the updatable Employee fields.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "IEmployeeRepository exposes all seven operations (findById, findByEmployeeNumber, findByManagerId, findAll, create, update, softDelete) with the exact return types specified (Employee | null, Employee[], PaginationResult<Employee>, Employee, void).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "EmployeeRepository.create persists a row to the employees table and returns an Employee whose camelCase fields are populated from the snake_case database columns (verified by a unit test that mocks the pool and asserts the row mapping).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "EmployeeRepository.softDelete sets the deleted_at column (does not physically remove the row) and resolves to void; findById/findByEmployeeNumber/findByManagerId/findAll exclude rows where deleted_at IS NOT NULL.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findAll applies PaginationParams (page, limit) and returns a PaginationResult<Employee> whose total reflects the count of non-deleted rows and whose data is the page slice.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Each repository method accepts an optional PoolClient parameter; when provided it uses that client, when omitted it acquires a connection from the shared pool \u2014 enabling callers to wrap multiple repository calls in a single transaction.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The employee module barrel (index.ts) re-exports Employee, CreateEmployeeDto, UpdateEmployeeDto, IEmployeeRepository, and EmployeeRepository so downstream modules import only through the public entry point.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests in tests/unit/modules/employee/ exercise the repository with the db pool mocked via jest.mock, covering at least create (row mapping), findById (soft-delete filtering), findAll (pagination), and softDelete (sets deleted_at) \u2014 and the suite passes under the verification command.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No `any` type anywhere in the employee module \u2014 use `unknown` with type guards where dynamic shapes appear (HARNESS.json no-any rule, severity high).",
+    "All database access must go through the IEmployeeRepository interface / EmployeeRepository implementation \u2014 no inline SQL or direct pool queries outside the repository file (GP-001 / no-direct-db-outside-repository, severity critical).",
+    "The repository must use the raw pg Pool exported from src/shared/db/connection.ts, not Knex \u2014 the Transaction Contract is defined in pg primitives (PoolClient, pool.connect(), BEGIN/COMMIT/ROLLBACK).",
+    "Strict TypeScript must pass (strict, noImplicitAny, strictNullChecks) under tsc --noEmit; the module compiles with target ES2022, module commonjs, baseUrl './src'.",
+    "Modules import from each other ONLY through their declared public entry point (index.ts); the employee module must not import another module's internals, and downstream consumers must import employee only via its barrel.",
+    "No hardcoded secrets, passwords, API keys, or tokens in the employee module (no-hardcoded-secrets, severity critical)."
+  ],
+  "outOfScope": [
+    "EmployeeService and IEmployeeService \u2014 service layer is Phase 7, including the auto-creation of leave balances on employee create.",
+    "Audit record writing for employee create/update/softDelete (GP-002) \u2014 audit logging is wired in the service/controller phases, not the repository phase.",
+    "Database migrations creating the employees table \u2014 migrations are Phase 10; this phase assumes the snake_case employees schema exists.",
+    "Fastify routes, controllers, RBAC enforcement, and input validation at API boundaries \u2014 those are Phase 9; the repository has no HTTP/auth concerns."
+  ],
+  "ambiguities": [
+    {
+      "description": "The ID generation strategy for repository.create is unspecified: whether the repository generates the primary key internally (e.g., uuid) or expects the caller to supply an id via the create DTO. Discovery flagged this as open and deferred it as an implementation detail with migrations/Phase 10 being the relevant territory. This affects the CreateEmployeeDto shape and whether create can be called without a pre-generated id.",
+      "options": [
+        "Repository generates the id internally (e.g., crypto.randomUUID) and the create DTO omits id",
+        "Caller supplies the id in the create DTO and the repository persists it as-is",
+        "Database default (e.g., gen_random_uuid) generates the id; repository omits id from the INSERT and reads it back"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "Employment status lifecycle is strictly ACTIVE \u2192 INACTIVE \u2192 TERMINATED; a TERMINATED employee must have a non-null terminationDate, and an ACTIVE employee must have a null terminationDate."
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "Soft-delete is the only deletion path: removing an employee sets deletedAt to a timestamp and never physically deletes the row; a soft-deleted employee (deletedAt non-null) is excluded from all read queries (findById, findByEmployeeNumber, findByManagerId, findAll)."
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "employeeNumber and email are unique across all non-deleted employees (enforced by unique indexes); the repository must not silently create a duplicate \u2014 a uniqueness violation surfaces as an error."
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "managerId, when non-null, must reference an existing employee's id (self-referential FK manager_id \u2192 employees.id); a null managerId means the employee has no manager (approval escalates to HR per business rules)."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IEmployeeRepository.create",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "A uniqueness violation on employee_number or email must surface as a typed/rejected error, not a silent duplicate; the returned Employee has all system-managed fields (id, createdAt, updatedAt) populated by the persistence layer."
+    },
+    {
+      "operation": "IEmployeeRepository.update",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Updating a non-existent or soft-deleted employee id must not silently succeed \u2014 it either returns a not-found error or resolves to null/throws per the implementation's chosen error contract; updatedAt is refreshed by the persistence layer on any successful update."
+    },
+    {
+      "operation": "IEmployeeRepository.softDelete",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Soft-deleting an already-soft-deleted id is idempotent (no error, resolves to void); soft-deleting a non-existent id must not create a phantom row."
+    },
+    {
+      "operation": "IEmployeeRepository.findById / findByEmployeeNumber / findByManagerId / findAll",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "All read operations exclude soft-deleted rows (deleted_at IS NOT NULL); findById and findByEmployeeNumber return null when no matching non-deleted row exists rather than throwing."
+    },
+    {
+      "operation": "IEmployeeRepository (all methods)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Every method accepts an optional PoolClient; when provided the method uses that client (participating in the caller's transaction), when omitted it acquires a connection from the shared pool for that single operation and releases it. No method leaves a connection leaked on error."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The Employee.role field must be typed as the UserRole enum imported from shared/types \u2014 not a redeclared local copy. PaginationParams and PaginationResult<T> used by findAll must be the exact generics from shared/types, not redefined locally.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The repository must obtain its database connection from the exported `pool` (pg Pool) in shared/db/connection.ts \u2014 the same singleton pool every other module uses \u2014 not instantiate a new Pool.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "The employees table column mapping (snake_case DB columns \u2194 camelCase Employee interface) and the Transaction Contract (optional PoolClient parameter on repository methods) must match the reconciled architecture's data model and transaction_contract exactly.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "The employee barrel (index.ts) must follow the established export convention used by the status and uptime modules \u2014 re-exporting the model, interface, and implementation types from their respective files via the public entry point.",
+      "referencePath": "src/modules/status/index.ts"
+    },
+    {
+      "requirement": "Repository unit tests must follow the existing test precedent: plain describe/it/expect, relative imports from the test file to src, and the db pool mocked via jest.mock \u2014 matching the pattern established in the shared/types test.",
+      "referencePath": "tests/unit/shared/types/index.test.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts (Phase 1)",
+      "why": "Employee.role depends on UserRole; findAll depends on PaginationParams and PaginationResult<T>. This is the hard dependency that makes Phase 1 a prerequisite."
+    },
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "EmployeeRepository consumes the shared pg Pool singleton for all data access and for acquiring PoolClient connections in transactional scenarios."
+    },
+    {
+      "target": "Phase 7 (EmployeeService) and Phase 4 (LeaveBalanceRepository.createForEmployee)",
+      "why": "The IEmployeeRepository interface and EmployeeRepository implementation produced here are consumed by the future EmployeeService, which will call create then auto-seed leave balances \u2014 the repository's optional-PoolClient design enables that multi-step transaction."
+    },
+    {
+      "target": "Phase 10 (Knex migrations \u2014 employees table)",
+      "why": "The repository assumes the snake_case employees table schema exists; the Phase 10 migration must create columns matching the mapping this repository implements (id, employee_number, ..., deleted_at with unique indexes on employee_number and email)."
+    }
+  ]
+}

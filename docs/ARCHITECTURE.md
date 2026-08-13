@@ -18,6 +18,7 @@ The architecture is modular, with a clear separation of concerns between models,
 ```
 src/modules/status/          — Status module (model, service interface, service)
 src/modules/uptime/          — Uptime module (model, routes, service interface, service)
+src/modules/employee/        — Employee module (model, repository)
 src/shared/db/connection.ts  — PostgreSQL connection pool (pg Pool)
 src/shared/types/index.ts    — Shared domain types (Phase 1)
 ```
@@ -25,7 +26,6 @@ src/shared/types/index.ts    — Shared domain types (Phase 1)
 ### Planned modules (not yet built)
 
 ```
-src/modules/employee/        — Employee entity, repository, service
 src/modules/leave-policy/    — LeavePolicy entity, repository, service
 src/modules/leave-balance/   — LeaveBalance entity, repository, service
 src/modules/leave-request/   — LeaveRequest entity, repository, service
