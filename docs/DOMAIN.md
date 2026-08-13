@@ -208,58 +208,34 @@ Represents notification data managed by the `notification` module, including not
 
 Represents audit data managed by the `audit` module, including audit records, change history, and activity tracking information.
 
-### Audit
-
-| Field | Type | Required |
-|-------|------|----------|
-| id | string | true |
-| entityType | string | true |
-| entityId | string | true |
-| action | 'CREATE' \| 'UPDATE' \| 'DELETE' \| 'APPROVE' \| 'REJECT' | true |
-| oldValues | Record<string, any> \| null | false |
-| newValues | Record<string, any> \| null | false |
-| performedBy | string \| null | false |
-| performedAt | Date | true |
-| createdAt | Date | true |
-| updatedAt | Date | true |
-
-### AuditLog
-
-| Field | Type | Required |
-|-------|------|----------|
-| id | string | true |
-| entityType | string | true |
-| entityId | string | true |
-| action | 'CREATE' \| 'UPDATE' \| 'DELETE' \| 'APPROVE' \| 'REJECT' | true |
-| oldValues | Record<string, any> \| null | false |
-| newValues | Record<string, any> \| null | false |
-| performedBy | string \| null | false |
-| performedAt | Date | true |
-
 ### AuditRecord
 
 | Field | Type | Required |
 |-------|------|----------|
-| entity_type | string | true |
-| entity_id | string | true |
+| id | string | true |
+| entityType | string | true |
+| entityId | string | true |
 | action | string | true |
-| changed_by | string \| null | false |
-| old_values | Record<string, any> \| null | false |
-| new_values | Record<string, any> \| null | false |
-| ip_address | string \| null | false |
-| user_agent | string \| null | false |
+| performedBy | string | true |
+| changes | Record\<string, unknown\> | true |
+| createdAt | Date | true |
 
-### AuditServiceInterface
+### CreateAuditRecordDto
 
 | Field | Type | Required |
 |-------|------|----------|
-| id | string | true |
+| entityType | string | true |
+| entityId | string | true |
 | action | string | true |
-| resourceType | string | true |
-| resourceId | string | true |
-| actorId | string | true |
-| timestamp | Date | true |
-| metadata | Record<string, unknown> \| null | false |
+| performedBy | string | true |
+| changes | Record\<string, unknown\> | true |
+
+### IAuditRepository
+
+Methods:
+- `create(dto: CreateAuditRecordDto): Promise<AuditRecord>`
+- `findByEntity(entityType: string, entityId: string): Promise<AuditRecord[]>`
+- `findByPerformer(performedBy: string, limit?: number): Promise<AuditRecord[]>`
 
 ## validation
 
