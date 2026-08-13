@@ -1,25 +1,25 @@
-# Implement this phase: Phase 2: LeaveType model + repository (leave-policy module)
+# Implement this phase: Phase 3: LeavePolicy model + repository (leave-policy module)
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/32ad270f-dfe8-4e32-be27-804897fcc970/2`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/32ad270f-dfe8-4e32-be27-804897fcc970/3`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the LeaveType domain model and its repository in the leave-policy module.
+Create the LeavePolicy domain model and its repository in the leave-policy module.
 
 Files to create:
-1. `src/modules/leave-policy/leave-type.model.ts` — Define and export the LeaveType interface with EXACT fields: id: string, code: LeaveTypeCode (import from `src/shared/types/leave-type-code.enum.ts` from Phase 1), label: string, description: string | undefined, isActive: boolean, createdAt: Date, updatedAt: Date.
+1. `src/modules/leave-policy/leave-policy.model.ts` — Define and export the LeavePolicy interface with EXACT fields: id: string, policyName: string, leaveTypeId: string, entitlementDays: number, accrualRate: number | undefined, maxAccumulation: number | undefined, minimumNoticeDays: number | undefined, requiresManagerApproval: boolean, isActive: boolean, createdAt: Date, updatedAt: Date.
 
-2. `src/modules/leave-policy/leave-type.repository.interface.ts` — Define and export ILeaveTypeRepository interface with methods: findAll(), findById(id: string), findByCode(code: LeaveTypeCode), create(dto: CreateLeaveTypeDto), update(id: string, dto: UpdateLeaveTypeDto), delete(id: string). Also define CreateLeaveTypeDto and UpdateLeaveTypeDto in this file (or a sibling DTO file).
+2. `src/modules/leave-policy/leave-policy.repository.interface.ts` — Define and export ILeavePolicyRepository interface with methods: findAll(), findById(id: string), findByLeaveTypeId(leaveTypeId: string), findActiveByLeaveTypeId(leaveTypeId: string), create(dto: CreateLeavePolicyDto), update(id: string, dto: UpdateLeavePolicyDto), delete(id: string). Also define CreateLeavePolicyDto and UpdateLeavePolicyDto.
 
-3. `src/modules/leave-policy/leave-type.repository.ts` — Implement LeaveTypeRepository class implementing ILeaveTypeRepository. Use the existing pg Pool from `src/shared/db/connection.ts`. Write parameterized SQL queries. No ORM — use the pool directly.
+3. `src/modules/leave-policy/leave-policy.repository.ts` — Implement LeavePolicyRepository class implementing ILeavePolicyRepository. Use the existing pg Pool from `src/shared/db/connection.ts`. Write parameterized SQL queries.
 
-4. `src/modules/leave-policy/index.ts` — Barrel file re-exporting LeaveType, ILeaveTypeRepository, LeaveTypeRepository, CreateLeaveTypeDto, UpdateLeaveTypeDto.
+4. Update `src/modules/leave-policy/index.ts` — Add re-exports for LeavePolicy, ILeavePolicyRepository, LeavePolicyRepository, and the DTOs alongside the Phase 2 exports.
 
-Include Jest unit tests in `tests/unit/modules/leave-policy/` for the repository (mock the pool).
+Include Jest unit tests in `tests/unit/modules/leave-policy/` for the LeavePolicy repository.
 
-This phase depends on `src/shared/types/leave-type-code.enum.ts` from Phase 1 — read it before generating any code that references LeaveTypeCode.
+This phase depends on `src/modules/leave-policy/leave-type.model.ts` and `src/modules/leave-policy/index.ts` from Phase 2 — read them before generating any code.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -44,11 +44,15 @@ Cross-cutting rules that apply throughout:
 
 ## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
 The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
-- `LeaveType` — the entity MUST have exactly these fields:
+- `LeavePolicy` — the entity MUST have exactly these fields:
     - id: string
-    - code: 'annual' | 'sick' | 'emergency' | 'unpaid' | 'maternity' | 'paternity'
-    - label: string
-    - description: string | undefined
+    - policyName: string
+    - leaveTypeId: string
+    - entitlementDays: number
+    - accrualRate: number | undefined
+    - maxAccumulation: number | undefined
+    - minimumNoticeDays: number | undefined
+    - requiresManagerApproval: boolean
     - isActive: boolean
     - createdAt: Date
     - updatedAt: Date
@@ -56,24 +60,27 @@ The entities below are shared, cross-module DATA CONTRACTS. Implement each one w
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- The LeaveType model's `code` field and the repository's create/update DTO `code` field must be typed as the LeaveTypeCode enum exported from this file (via the shared-types barrel), matching the six members annual/sick/emergency/unpaid/maternity/paternity exactly — no extra members, no string alias. (see `src/shared/types/leave-type-code.enum.ts`)
-- The leave_types table columns the repository queries must match the reconciled conceptual data model: id, code, label, description, is_active, created_at, updated_at — with `code` carrying a unique index. The row-to-domain mapping must translate snake_case DB columns to the camelCase LeaveType interface and convert null description to undefined. (see `.gestalt/architecture/reconciled.json`)
-- The repository must obtain its default database connection from the shared pg Pool exported here, and must not instantiate its own Pool; transaction participation is via the injectable client abstraction, not a second pool. (see `src/shared/db/connection.ts`)
-- The module boundary and dependency map must hold: leave-policy depends only on shared-types (and audit, reserved for later phases); the leave-policy barrel is the sole public entry point, and no internal file is imported directly by other modules. (see `docs/ARCHITECTURE.md`)
+- The LeavePolicyRepository implementation must mirror the structural conventions established by the Phase 2 LeaveTypeRepository: Queryable type (Pick<Pool, 'query'>), constructor(client?: Queryable) defaulting to the shared pool, a private snake_case *Row interface, a rowTo* mapper converting snake_case→camelCase with `?? undefined` for nullable optionals, parameterized SQL with explicit column lists (no SELECT *), INSERT … RETURNING for create, dynamic SET-clause builder with a paramIndex counter plus updated_at = NOW() and findById fallback for update, and boolean rowCount-based return for delete. (see `src/modules/leave-policy/leave-type.repository.ts`)
+- The ILeavePolicyRepository interface and its co-located CreateLeavePolicyDto/UpdateLeavePolicyDto must follow the same DTO convention as the Phase 2 leave-type interface file: Create DTO marks optional fields with `?` and required fields plain; Update DTO makes every field optional with `?`; the repository interface declares async methods returning the model, model | null, model[], or boolean as appropriate. (see `src/modules/leave-policy/leave-type.repository.interface.ts`)
+- The leave-policy barrel must be extended (not replaced) so that the existing Phase 2 re-exports (LeaveType, ILeaveTypeRepository, CreateLeaveTypeDto, UpdateLeaveTypeDto, LeaveTypeRepository) remain intact and the new Phase 3 symbols (LeavePolicy, ILeavePolicyRepository, CreateLeavePolicyDto, UpdateLeavePolicyDto, LeavePolicyRepository) are added alongside them. (see `src/modules/leave-policy/index.ts`)
+- The LeavePolicyRepository unit tests must follow the Phase 2 leave-type repository test conventions: jest.mock the shared db connection before importing pool, a makeRow(overrides) helper returning a full snake_case row with defaults, beforeEach resetting the mock and constructing the repository, assertions on exact SQL strings and exact parameter arrays via toHaveBeenCalledWith, and a custom-client constructor test verifying the injected client is used instead of the default pool. (see `tests/unit/modules/leave-policy/leave-type.repository.test.ts`)
+- The LeavePolicy model attributes and the leave_policies table column set must match the reconciled architecture exactly: model fields id, policyName, leaveTypeId, entitlementDays, accrualRate, maxAccumulation, minimumNoticeDays, requiresManagerApproval, isActive, createdAt, updatedAt; table columns id, policy_name, leave_type_id (FK→leave_types.id), entitlement_days, accrual_rate, max_accumulation, minimum_notice_days, requires_manager_approval, is_active, created_at, updated_at. (see `.gestalt/architecture/reconciled.json`)
 ### Entity invariants — enforce these
-- Reuse or extend `LeaveType`: A LeaveType's `code` must be one of the six LeaveTypeCode enum values (annual, sick, emergency, unpaid, maternity, paternity); the DB column is unique per the reconciled schema, so no two LeaveType rows may share the same code.
-- Reuse or extend `LeaveType`: LeaveType has an ACTIVE/INACTIVE lifecycle expressed via the isActive flag; deactivation (isActive=false) is reversible and does not delete the row, preserving referential integrity for historical LeavePolicy and LeaveRequest rows.
-- Reuse or extend `LeaveType`: createdAt and updatedAt are server-managed timestamps (set on insert, refreshed on every update); the repository must never accept or persist caller-supplied timestamps for these fields.
+- Reuse or extend `LeavePolicy`: A LeavePolicy is always associated with exactly one LeaveType via leaveTypeId, which must reference an existing row in leave_types (FK constraint); a policy cannot exist without a parent leave type.
+- Reuse or extend `LeavePolicy`: A LeavePolicy has an ACTIVE/INACTIVE lifecycle governed by the isActive flag; only policies with isActive = true may be used for request validation and balance initialization (binding business rule 8). The repository's findActiveByLeaveTypeId must surface only active policies.
+- Reuse or extend `LeavePolicy`: entitlementDays is a non-negative quantity representing the annual lump-sum allocation; accrualRate, maxAccumulation, and minimumNoticeDays are optional policy modifiers that, when present, constrain accrual caps and advance-notice requirements respectively. The repository must preserve optionality (undefined when the DB column is null).
 ### Interface contract — expose these operations (their shape is yours)
-- ILeaveTypeRepository.findAll — Returns LeaveType[] (empty array when none); never returns null. Throws only on DB/connection failure.
-- ILeaveTypeRepository.findById / findByCode — Returns LeaveType | null — null when no row matches the id/code, never throws for not-found. Throws only on DB/connection failure.
-- ILeaveTypeRepository.create — Returns the persisted LeaveType with server-generated id and timestamps. A duplicate code violates the unique constraint and surfaces as a DB error (caller maps to a typed error); the repository does not swallow it.
-- ILeaveTypeRepository.update — idempotent; Returns LeaveType | null — null when no row matched the id (idempotent no-op on missing entity). When the DTO carries no fields, returns the current row without issuing an UPDATE. Throws only on DB/connection failure.
-- ILeaveTypeRepository.delete — Returns boolean — true when a row was removed, false when no row matched. Throws only on DB/connection failure.
+- ILeavePolicyRepository.findAll — idempotent; Returns all LeavePolicy rows (mapped to the model); returns an empty array when none exist. Rejects on database error.
+- ILeavePolicyRepository.findById — idempotent; Returns the matching LeavePolicy or null when no row has the given id. Rejects on database error.
+- ILeavePolicyRepository.findByLeaveTypeId — idempotent; Returns all LeavePolicy rows for the given leaveTypeId (any active state); returns an empty array when none match. Rejects on database error.
+- ILeavePolicyRepository.findActiveByLeaveTypeId — idempotent; Returns only LeavePolicy rows where is_active = true for the given leaveTypeId; returns an empty array when none match. Rejects on database error.
+- ILeavePolicyRepository.create — Inserts a new leave_policies row and returns the created LeavePolicy (via INSERT … RETURNING). Applies defaults for omitted optional fields. Rejects on constraint violation (e.g. invalid leave_type_id FK).
+- ILeavePolicyRepository.update — idempotent; Updates only the provided fields (dynamic SET), sets updated_at = NOW(), and returns the updated LeavePolicy or null if no row matches the id; when no fields are provided, returns the current row (or null if absent) without mutation. Rejects on database error.
+- ILeavePolicyRepository.delete — idempotent; Deletes the row with the given id and returns true if a row was removed, false if no row matched. Rejects on database error.
 ### Integration points — connect to these
-- shared-types (LeaveTypeCode enum) — The LeaveType model and repository DTOs depend on the LeaveTypeCode type from Phase 1; this is the hard cross-module dependency and the only shared type consumed in this phase.
-- shared/db pg Pool — The repository's default query execution target; all SQL flows through this pool (or an injected transaction client sharing its query shape).
-- leave-policy module barrel (index.ts) — Downstream phases (LeavePolicy repository in Phase 3, LeavePolicyService in Phase 8, and leave-request/balance modules) consume LeaveType and ILeaveTypeRepository exclusively through this barrel.
+- src/shared/db/connection.ts (pg Pool) — The LeavePolicyRepository obtains the shared PostgreSQL pool from this module (defaulting to it when no client is injected), consistent with GP-001 and the Phase 2 repository pattern.
+- leave_types table / LeaveType model (Phase 2) — LeavePolicy.leaveTypeId is a foreign key to leave_types.id; the repository reads/writes this relationship. Phase 3 depends on the Phase 2 leave-type model and barrel being present and importable.
+- leave-balance module (Phase 4) and leave-policy service (Phase 8) — downstream consumers — LeaveBalance.policyId will reference leave_policies.id, and LeavePolicyService will consume ILeavePolicyRepository to look up active policies and compute entitlements; this phase establishes the repository contract those later phases depend on.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
