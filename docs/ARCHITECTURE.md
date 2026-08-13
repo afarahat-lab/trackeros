@@ -20,6 +20,7 @@ src/modules/status/          — SystemStatus model + service
 src/modules/uptime/          — UptimeStatus model + service + routes
 src/modules/leave-policy/    — LeaveType model + repository + barrel
                                 LeavePolicy model + repository
+src/modules/leave-balance/   — LeaveBalance model + repository + barrel
 src/shared/db/connection.ts  — PostgreSQL connection pool
 src/shared/types/            — Shared type definitions
   ├── leave-status.enum.ts   — LeaveStatus enum (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED)
@@ -126,13 +127,19 @@ src/shared/types/            — Shared type definitions
 | 1 | ✅ Complete | Shared enums: LeaveStatus, LeaveTypeCode under `src/shared/types/` |
 | 2 | ✅ Complete | LeaveType model + repository (leave-policy module) |
 | 3 | ✅ Complete | LeavePolicy model + repository (leave-policy module) |
-| 4 | Pending | LeaveBalance model + repository (leave-balance module) |
+| 4 | ✅ Complete | LeaveBalance model + repository (leave-balance module) |
 | 5 | Pending | LeaveRequest model + repository (leave-request module) |
 | 6 | Pending | AuditRecord model + repository (audit module) |
 | 7 | Pending | Notification model + repository (notification module) |
 | 8 | Pending | LeavePolicyService (leave-policy module) |
 | 9 | Pending | LeaveBalanceService (leave-balance module) |
 | 10 | Pending | LeaveRequestService + routes (leave-request module) |
+
+### Implementation Notes
+
+- **LeaveBalance.remainingDays** is a computed field: `totalEntitlement - usedDays - pendingDays`. The `rowToLeaveBalance` mapper computes it at read time regardless of the stored `remaining_days` column value, ensuring the invariant is always satisfied.
+- **LeaveBalanceRepository** constructor accepts an optional `Queryable` client (defaults to the shared pool), enabling transaction participation per the Transaction Contract.
+- **createBatch** uses a single multi-row INSERT for efficiency when initializing balances for multiple policies at once.
 
 ### Open Questions
 
