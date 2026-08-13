@@ -1,0 +1,176 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-request"
+    ],
+    "affectedLayers": [
+      "domain-model",
+      "repository",
+      "module-barrel",
+      "unit-tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The LeaveRequest domain model interface is exported and its attribute set matches the LeaveRequest entity shape declared in the reconciled architecture (id, employeeId, leaveTypeId, startDate, endDate, reason, status, approvedBy, approvedAt, rejectedBy, rejectedAt, rejectionReason, createdAt, updatedAt), with status typed as the LeaveStatus enum imported from the shared-types module \u2014 not a re-declared local enum.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository interface declares all six operations required by the phase: findById, findByEmployeeId, findOverlapping, create, updateStatus, and findByStatus \u2014 each with a typed return (single entity or null for lookups, array for list queries, the created/updated entity for writes). The CreateLeaveRequestDto, StatusUpdateMetadata, and UpdateLeaveRequestDto types are co-located with the interface and exported from the module barrel.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository implementation persists a new LeaveRequest via an INSERT \u2026 RETURNING query and returns the mapped domain object; findById and findByEmployeeId return null (or empty array for the list) when no rows match, matching the established repository convention.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findOverlapping returns only LeaveRequest rows for the given employee whose date range intersects the supplied [startDate, endDate] window and whose status is NOT in the provided excludeStatuses set \u2014 implementing binding business rule #9 (no two SUBMITTED/APPROVED requests for the same employee may overlap). The query uses parameterized SQL (no string interpolation of values).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "updateStatus transitions the status column and applies the supplied metadata (approver identity/timestamps or rejecter identity/timestamps/rejection reason) via a dynamic UPDATE \u2026 RETURNING query that always sets updated_at, returning the updated entity or null when the row does not exist.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository constructor accepts an optional Queryable client (a Pick of the pg Pool query method) and defaults to the shared pool when omitted, enabling transaction participation per the Transaction Contract \u2014 verifiable by a unit test that injects a custom client and confirms it is used instead of the shared pool.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The module barrel (index.ts) re-exports the LeaveRequest model, the repository interface, the repository class, and all DTOs, so downstream modules import only through the public entry point per the module-boundary rule.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests exist for the repository covering each operation (findById found/not-found, findByEmployeeId, findOverlapping with intersecting and non-intersecting ranges, create, updateStatus, findByStatus) plus a custom-client constructor test; tests mock the shared db connection, assert on both mapped output and the emitted SQL/params, and the suite passes under the project's verification command.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No use of the `any` type anywhere in the new module \u2014 use `unknown` with type guards where dynamic values are handled (HARNESS constraint no-any, severity high).",
+    "All database access must go through the repository class; no inline SQL or direct pool calls outside the repository implementation (GP-001 / no-direct-db-outside-repository, severity critical).",
+    "Strict TypeScript must pass: no implicit any and strict null checks enabled \u2014 nullable model fields (approvedBy, approvedAt, rejectedBy, rejectedAt as `| null`; reason, rejectionReason as `| undefined`) must be mapped faithfully from snake_case rows with `?? undefined` for nullable-optional strings and passthrough for `| null` fields.",
+    "All SQL must use parameterized placeholders ($1, $2, \u2026) for values; no string interpolation or concatenation of user-supplied values into query text.",
+    "The LeaveStatus enum must be imported from the shared-types module (src/shared/types) \u2014 it must not be re-declared or duplicated inside the leave-request module.",
+    "Cross-module imports must go through the target module's public barrel (index.ts), never reaching into a module's internal files \u2014 consistent with the module-boundary rule in AGENTS.md and ARCHITECTURE.md."
+  ],
+  "outOfScope": [
+    "LeaveRequestService, routes, controllers, and Fastify plugin \u2014 these are Phase 10; this phase delivers only the model, repository interface, repository implementation, barrel, and unit tests.",
+    "Enforcement of state-transition legality (DRAFT\u2192SUBMITTED, SUBMITTED\u2192APPROVED/REJECTED, etc.), balance sufficiency checks, minimum-notice validation, employee eligibility, and rejection-reason-required rules \u2014 these are service-layer concerns (binding rules #2, #4, #6, #7, #10) and are not the repository's responsibility in this phase.",
+    "Audit record creation (GP-002), notification emission, and RBAC enforcement (GP-005) \u2014 these belong to the service/routes phases and are not implemented by the repository in this phase.",
+    "Business-day counting (excluding weekends/holidays) and fiscal-year derivation from startDate \u2014 these are service-layer computations (binding rules #1, #7); the repository stores and retrieves raw date ranges only."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "A LeaveRequest's status is always one of the LeaveStatus enum values (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED); the repository must never persist or return a status outside this set."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "Approval metadata (approvedBy, approvedAt) and rejection metadata (rejectedBy, rejectedAt, rejectionReason) are mutually exclusive in practice \u2014 a request is either approved or rejected, never both \u2014 and the repository's updateStatus must set the metadata corresponding to the target status while leaving the opposing fields null/undefined."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "No two persisted LeaveRequests for the same employee with a status in {SUBMITTED, APPROVED} may have overlapping [startDate, endDate] ranges (binding rule #9); findOverlapping is the mechanism that lets the service detect violations before persisting a new/updated request."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "A LeaveRequest always references an existing employee (employee_id FK) and an existing leave type (leave_type_id FK); the repository relies on the database FK constraints and does not synthesize orphan rows."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "findById(id)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the LeaveRequest when exactly one row matches, null when no row matches; does not throw on missing rows."
+    },
+    {
+      "operation": "findByEmployeeId(employeeId)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an array (possibly empty) of all LeaveRequests for the employee; never null."
+    },
+    {
+      "operation": "findOverlapping(employeeId, startDate, endDate, excludeStatuses)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an array (possibly empty) of LeaveRequests for the employee whose date range intersects [startDate, endDate] and whose status is not in excludeStatuses; empty result means no overlap. The caller (service) decides whether a non-empty result blocks submission."
+    },
+    {
+      "operation": "create(dto)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Persists a new row via INSERT \u2026 RETURNING and returns the mapped LeaveRequest; relies on DB FK/NOT NULL constraints to reject invalid references \u2014 a constraint violation surfaces as a thrown pg error (not swallowed)."
+    },
+    {
+      "operation": "updateStatus(id, status, metadata)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Updates the status and applies metadata via UPDATE \u2026 RETURNING; returns the updated LeaveRequest or null when no row matches the id. Does not validate transition legality (that is the service's job)."
+    },
+    {
+      "operation": "findByStatus(status)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an array (possibly empty) of all LeaveRequests in the given status; never null."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The LeaveRequest model's status field and the repository's status parameters must use the LeaveStatus enum exported here (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED) \u2014 imported via the shared-types barrel, not re-declared.",
+      "referencePath": "src/shared/types/leave-status.enum.ts"
+    },
+    {
+      "requirement": "The LeaveRequestRepository must follow the same repository pattern this file establishes: a `Queryable = Pick<Pool,'query'>` type, a constructor accepting an optional client defaulting to the shared pool, a private snake-case row interface, a `rowToXxx` mapper (using `?? undefined` for nullable-optional strings and passthrough for `| null` fields), parameterized SQL via `this.db.query`, INSERT \u2026 RETURNING with NOW(), dynamic SET clauses with a running paramIndex plus `updated_at = NOW()`, and null returns for missing single-row lookups.",
+      "referencePath": "src/modules/leave-balance/leave-balance.repository.ts"
+    },
+    {
+      "requirement": "DTOs (CreateLeaveRequestDto, StatusUpdateMetadata, UpdateLeaveRequestDto) must be co-located in the repository interface file alongside ILeaveRequestRepository and exported together \u2014 matching how CreateLeaveBalanceDto/UpdateLeaveBalanceDto live in this interface file.",
+      "referencePath": "src/modules/leave-balance/leave-balance.repository.interface.ts"
+    },
+    {
+      "requirement": "The leave-request barrel must re-export the model interface, the repository interface + DTOs (grouped), and the repository class in the same structure this barrel uses \u2014 so the module's public surface is consistent across modules.",
+      "referencePath": "src/modules/leave-balance/index.ts"
+    },
+    {
+      "requirement": "Repository unit tests must follow this test pattern: jest.mock the shared db connection exposing pool.query, a snake-case makeRow(overrides) helper, beforeEach resetting the mock and constructing the repo, per-method describe blocks asserting both mapped output and SQL/params via expect.stringContaining, and a custom-client constructor test confirming the injected client is used instead of the shared pool.",
+      "referencePath": "tests/unit/modules/leave-balance/leave-balance.repository.test.ts"
+    },
+    {
+      "requirement": "The leave_requests table schema this repository targets must match the reconciled architecture: columns id, employee_id (FK employees), leave_type_id (FK leave_types), start_date, end_date, reason, status, approved_by (FK employees), approved_at, rejected_by (FK employees), rejected_at, rejection_reason, created_at, updated_at \u2014 the repository's row interface and column lists must align with these names.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types (LeaveStatus enum)",
+      "why": "The LeaveRequest model and repository import LeaveStatus from the shared-types barrel; this is a hard dependency from Phase 1."
+    },
+    {
+      "target": "src/shared/db/connection (pg Pool)",
+      "why": "The repository defaults to the shared pool for DB access and accepts an optional Queryable client for transaction participation per the Transaction Contract."
+    },
+    {
+      "target": "src/modules/leave-policy (LeaveType model)",
+      "why": "Phase 5 declares a dependency on the leave-type model from Phase 2; LeaveRequest.leaveTypeId references a LeaveType, and the module-boundary rule requires importing through the leave-policy barrel."
+    },
+    {
+      "target": "src/modules/leave-request (future LeaveRequestService, Phase 10)",
+      "why": "The repository interface and DTOs defined here are the contract the Phase 10 service will consume (findOverlapping for overlap prevention, updateStatus for lifecycle transitions, create for draft creation); the interface shape must remain stable for that integration."
+    }
+  ]
+}
