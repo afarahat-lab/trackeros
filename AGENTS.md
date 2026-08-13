@@ -52,16 +52,18 @@ user projects use whatever stack matches their description.
 ## Architecture rules
 
 1. Modules never import from each other's internals — only from index.ts
-2. All database access through the repository pattern
-3. Every state-changing operation produces an audit record (GP-001)
-4. RBAC enforced at middleware, never inline (GP-002)
+2. All database access through the repository pattern (GP-001)
+3. Every state-changing operation produces an audit record (GP-002)
+4. RBAC enforced at middleware, never inline (GP-005)
 
 ## What agents must never do
 
-- Violate principle GP-003 as defined in `GOLDEN_PRINCIPLES.md`.
-- Violate principle GP-004 as defined in `GOLDEN_PRINCIPLES.md`.
-- Violate principle GP-005 as defined in `GOLDEN_PRINCIPLES.md`.
-- Violate principle GP-006 as defined in `GOLDEN_PRINCIPLES.md`.
+- Violate principle GP-001 (Repository pattern) as defined in `GOLDEN_PRINCIPLES.md`.
+- Violate principle GP-002 (Audit records) as defined in `GOLDEN_PRINCIPLES.md`.
+- Violate principle GP-003 (Input validation) as defined in `GOLDEN_PRINCIPLES.md`.
+- Violate principle GP-004 (No sensitive data in logs) as defined in `GOLDEN_PRINCIPLES.md`.
+- Violate principle GP-005 (RBAC enforcement) as defined in `GOLDEN_PRINCIPLES.md`.
+- Violate principle GP-006 (Error handling) as defined in `GOLDEN_PRINCIPLES.md`.
 
 ## When context is missing
 

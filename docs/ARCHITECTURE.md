@@ -13,25 +13,16 @@ The architecture is modular, with a clear separation of concerns between models,
 - Frontend: React Native
 - Database: PostgreSQL
 
-## Module structure
+## Module structure (current)
 
 ```
-src/modules/leave/leave.{model,repository,service,controller,routes}.ts
-src/modules/balance/balance.{model,repository,service,controller,routes}.ts
-src/modules/employee/employee.{model,repository,service,controller,routes}.ts
-src/modules/policy/policy.{model,repository,service,controller,routes}.ts
-src/modules/notification/notification.{model,repository,service,controller,routes}.ts
-src/modules/LeaveStatus/    — LeaveStatus module
-src/modules/BaseEntity/    — BaseEntity module
-src/modules/LeaveRequest/    — LeaveRequest module
-src/modules/LeaveType/    — LeaveType module
-src/modules/LeavePolicy/    — LeavePolicy module
-src/modules/AuditLog/    — AuditLog module
-src/modules/AuditRecord/    — AuditRecord module
-src/modules/AuditServiceInterface/    — AuditServiceInterface module
-src/shared/db connection.ts
-src/shared/base repository.ts
-src/shared/error types.ts
+src/modules/status/          — SystemStatus model + service
+src/modules/uptime/          — UptimeStatus model + service + routes
+src/shared/db/connection.ts  — PostgreSQL connection pool
+src/shared/types/            — Shared type definitions
+  ├── leave-status.enum.ts   — LeaveStatus enum (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED)
+  ├── leave-type-code.enum.ts — LeaveTypeCode enum (annual, sick, emergency, unpaid, maternity, paternity)
+  └── index.ts               — Barrel re-exporting LeaveStatus and LeaveTypeCode
 ```
 
 ## Key patterns
@@ -126,13 +117,20 @@ src/shared/error types.ts
 - Policy violation → 400 (POLICY_VIOLATION)
 - Invalid state transition → 409 (INVALID_STATE)
 
-### Recommended Build Phases
+### Build Progress
 
-1. **Shared types + Audit foundation** — Zero-dependency leaf modules.
-2. **Leave Policy module** — Includes LeaveType catalog; defines rules consumed by balance and request modules.
-3. **Leave Balance module** — Tracks balances with pending days; required for validation and deduction.
-4. **Notification module** — Leaf module for leave lifecycle notifications.
-5. **Leave Request module** — Orchestrator; supports draft creation and submission, full lifecycle, balance integration, audit, and notifications.
+| Phase | Status | Description |
+|-------|--------|-------------|
+| 1 | ✅ Complete | Shared enums: LeaveStatus, LeaveTypeCode under `src/shared/types/` |
+| 2 | Pending | LeaveType model + repository (leave-policy module) |
+| 3 | Pending | LeavePolicy model + repository (leave-policy module) |
+| 4 | Pending | LeaveBalance model + repository (leave-balance module) |
+| 5 | Pending | LeaveRequest model + repository (leave-request module) |
+| 6 | Pending | AuditRecord model + repository (audit module) |
+| 7 | Pending | Notification model + repository (notification module) |
+| 8 | Pending | LeavePolicyService (leave-policy module) |
+| 9 | Pending | LeaveBalanceService (leave-balance module) |
+| 10 | Pending | LeaveRequestService + routes (leave-request module) |
 
 ### Open Questions
 
