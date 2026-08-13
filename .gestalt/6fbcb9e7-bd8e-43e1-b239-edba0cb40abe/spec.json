@@ -1,0 +1,90 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-policy",
+      "shared-types"
+    ],
+    "affectedLayers": [
+      "domain",
+      "infrastructure",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The three src/modules/leave-policy files (leave-type.model.ts, leave-type.repository.interface.ts, leave-type.repository.ts) import LeaveTypeCode from the shared/types barrel ('../../shared/types') and no longer import from the direct enum file path '../../shared/types/leave-type-code.enum'.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The test file tests/unit/modules/leave-policy/leave-type.repository.test.ts imports LeaveTypeCode from the shared/types barrel ('../../../../src/shared/types') and no longer imports from the direct enum file path '../../../../src/shared/types/leave-type-code.enum'.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The existing leave-type.repository.test.ts suite passes unchanged after the import-path refactor \u2014 all repository behavior assertions (findAll, findById, findByCode, create, update, delete, custom-client constructor) still hold, confirming the symbol identity and runtime behavior of LeaveTypeCode are identical via the barrel.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The project typecheck (tsc --noEmit) and the full Jest unit suite pass with no new errors after the import-path change, confirming the barrel re-export resolves LeaveTypeCode identically across all four updated files.",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "Only the import specifier for LeaveTypeCode changes in the four in-scope files; no other code (types, logic, SQL, test assertions, exports) may be modified.",
+    "The enum's own unit test (tests/unit/shared/types/leave-type-code.enum.test.ts) must remain importing directly from the enum file \u2014 it is out of scope and must not be switched to the barrel.",
+    "The barrel file src/shared/types/index.ts already re-exports LeaveTypeCode and must not be edited; no new exports are added in this phase.",
+    "The leave-policy module barrel (src/modules/leave-policy/index.ts) must continue to re-export LeaveType, ILeaveTypeRepository, CreateLeaveTypeDto, UpdateLeaveTypeDto, and LeaveTypeRepository unchanged."
+  ],
+  "outOfScope": [
+    "Adding, removing, or altering any exported symbol, field, method signature, SQL query, or test assertion in the four in-scope files.",
+    "Modifying the shared/types barrel (src/shared/types/index.ts) or the enum definition (src/shared/types/leave-type-code.enum.ts).",
+    "Switching the enum's own unit test (tests/unit/shared/types/leave-type-code.enum.test.ts) to a barrel import.",
+    "Refactoring any other module's imports of LeaveTypeCode or LeaveStatus (e.g., future leave-request/leave-balance modules) \u2014 only the four named leave-policy files are in scope."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveTypeCode",
+      "mustExistOrExtend": true,
+      "invariant": "The LeaveTypeCode enum members (annual, sick, emergency, unpaid, maternity, paternity) and their string values remain identical and are the same runtime object whether imported via the barrel or the direct enum file; the refactor must not change the enum's identity or values."
+    },
+    {
+      "entity": "LeaveType",
+      "mustExistOrExtend": true,
+      "invariant": "The LeaveType interface shape (id, code: LeaveTypeCode, label, description, isActive, createdAt, updatedAt) is unchanged after the import-path refactor; code remains typed as LeaveTypeCode resolved through the barrel."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "ILeaveTypeRepository (findAll, findById, findByCode, create, update, delete)",
+      "authRule": "N/A \u2014 repository layer, no auth boundary; refactor is import-path only.",
+      "idempotent": false,
+      "errorSemantics": "Unchanged: findById/findByCode return null on miss, delete returns boolean, create/update return the entity or null. The import-path change must not alter any method's contract or error behavior."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The barrel import path used by the four updated files must resolve to the same LeaveTypeCode symbol that src/shared/types/index.ts re-exports from './leave-type-code.enum' \u2014 the barrel is the single established convention (already used by tests/unit/shared/types/index.test.ts) and the updated files must match it rather than reaching into the enum file directly.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "After the refactor, no in-scope file may contain an import specifier ending in 'leave-type-code.enum'; all four must import LeaveTypeCode solely from the shared/types barrel, matching the dependency rule that modules consume shared-types through its public entry point (index.ts), not its internals.",
+      "referencePath": "docs/ARCHITECTURE.md"
+    },
+    {
+      "requirement": "The leave-policy module's public barrel (src/modules/leave-policy/index.ts) re-exports must remain consistent with the (unchanged) internal file exports \u2014 LeaveType, ILeaveTypeRepository, CreateLeaveTypeDto, UpdateLeaveTypeDto, LeaveTypeRepository \u2014 so downstream consumers are unaffected by the internal import-path change.",
+      "referencePath": "src/modules/leave-policy/index.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types (barrel)",
+      "why": "The four in-scope files switch their LeaveTypeCode import source to this barrel; it is the established public entry point for shared types and already re-exports LeaveTypeCode."
+    }
+  ]
+}
