@@ -1,0 +1,158 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-policy"
+    ],
+    "affectedLayers": [
+      "domain-model",
+      "repository",
+      "module-barrel",
+      "unit-tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The LeaveType domain model is exported from the leave-policy module and its `code` field is typed as the LeaveTypeCode enum imported from the shared-types barrel (annual/sick/emergency/unpaid/maternity/paternity), not a raw string.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository interface declares all six operations \u2014 findAll, findById, findByCode, create, update, delete \u2014 and the concrete repository class implements that interface (TypeScript structural/`implements` satisfaction), so the interface can be used as the injection contract.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "repository.create persists a new leave_types row via a parameterized INSERT and returns the persisted LeaveType (with server-generated id/timestamps), defaulting isActive to true when omitted and storing description as null when omitted.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "repository.update applies only the fields present in the DTO via a dynamically-built parameterized UPDATE, refreshes updated_at, returns the updated LeaveType when a row matched, and returns null when no row matched the id.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "repository.findById and findByCode return null (not throw) when no row matches; findAll returns an empty array when the table has no rows; delete returns a boolean indicating whether a row was removed.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The leave-policy barrel (index.ts) re-exports LeaveType, the repository interface, the concrete repository class, and both DTOs, so downstream modules import only through the barrel.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests in tests/unit/modules/leave-policy/ cover the repository with a mocked pg pool, asserting the SQL/parameters issued and the mapped return values for each operation including the not-found and empty cases.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No ORM \u2014 the repository must issue SQL through the pg Pool directly with parameterized queries ($1, $2, \u2026); values are passed as bind parameters, never string-interpolated into the SQL text.",
+    "No use of `any` (HARNESS no-any rule): parameter/value arrays must use `unknown[]` with type guards, and the row-to-domain mapping must cast the DB `code` string to LeaveTypeCode rather than leaving it untyped.",
+    "All database access is encapsulated inside the repository class (GP-001 / no-direct-db-outside-repository); services and other modules must not import pg or issue SQL \u2014 they consume the repository through its interface.",
+    "Modules import from each other only through their declared public barrel (index.ts); the leave-policy module imports LeaveTypeCode via the shared-types barrel, not from the enum file's internal path.",
+    "The repository must accept an injectable query-capable client (constructor-injected, defaulting to the shared pool) so a service can pass a transaction client for atomic units of work, per the Transaction Contract."
+  ],
+  "outOfScope": [
+    "LeavePolicy model, repository, service, and routes (Phase 3 and Phase 8) \u2014 this phase owns only the LeaveType catalog entity and its repository within the leave-policy module.",
+    "HTTP routes, controllers, RBAC guards, and request validation for leave-type CRUD \u2014 no API surface is built in this phase; the repository is consumed programmatically only.",
+    "Audit record writing for LeaveType create/update/delete (GP-002) \u2014 audit integration is deferred; this phase's repository does not emit audit records. (Note: GP-002 applies to state-changing operations at the service/API layer, which does not yet exist for leave-policy.)",
+    "Database migrations / schema creation for the leave_types table \u2014 the repository assumes the table exists per the reconciled schema; DDL is out of scope for this phase.",
+    "Soft-delete vs hard-delete semantics beyond the current boolean-returning delete \u2014 lifecycle deactivation via isActive is supported by update, but a separate soft-delete column or restore flow is not introduced."
+  ],
+  "ambiguities": [
+    {
+      "description": "The repository's `delete` issues a hard DELETE. The reconciled architecture describes LeaveType lifecycle as ACTIVE/INACTIVE (deactivation via isActive), and LeavePolicy/LeaveRequest hold foreign keys to leave_types. A hard delete could break referential integrity if historical rows reference the type. It is unclear whether delete should be permitted at all, or whether it is intended only for never-used catalog entries.",
+      "options": [
+        "Keep hard DELETE as-is (acceptable only for unreferenced rows; rely on DB FK constraints to reject deletes that would orphan rows)",
+        "Replace delete with a soft-deactivate (set isActive=false) and drop the hard-delete operation",
+        "Keep both: hard delete for unreferenced rows plus isActive toggle for lifecycle"
+      ],
+      "impactIfWrong": "medium"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeaveType",
+      "mustExistOrExtend": true,
+      "invariant": "A LeaveType's `code` must be one of the six LeaveTypeCode enum values (annual, sick, emergency, unpaid, maternity, paternity); the DB column is unique per the reconciled schema, so no two LeaveType rows may share the same code."
+    },
+    {
+      "entity": "LeaveType",
+      "mustExistOrExtend": true,
+      "invariant": "LeaveType has an ACTIVE/INACTIVE lifecycle expressed via the isActive flag; deactivation (isActive=false) is reversible and does not delete the row, preserving referential integrity for historical LeavePolicy and LeaveRequest rows."
+    },
+    {
+      "entity": "LeaveType",
+      "mustExistOrExtend": true,
+      "invariant": "createdAt and updatedAt are server-managed timestamps (set on insert, refreshed on every update); the repository must never accept or persist caller-supplied timestamps for these fields."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "ILeaveTypeRepository.findAll",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns LeaveType[] (empty array when none); never returns null. Throws only on DB/connection failure."
+    },
+    {
+      "operation": "ILeaveTypeRepository.findById / findByCode",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns LeaveType | null \u2014 null when no row matches the id/code, never throws for not-found. Throws only on DB/connection failure."
+    },
+    {
+      "operation": "ILeaveTypeRepository.create",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the persisted LeaveType with server-generated id and timestamps. A duplicate code violates the unique constraint and surfaces as a DB error (caller maps to a typed error); the repository does not swallow it."
+    },
+    {
+      "operation": "ILeaveTypeRepository.update",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns LeaveType | null \u2014 null when no row matched the id (idempotent no-op on missing entity). When the DTO carries no fields, returns the current row without issuing an UPDATE. Throws only on DB/connection failure."
+    },
+    {
+      "operation": "ILeaveTypeRepository.delete",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns boolean \u2014 true when a row was removed, false when no row matched. Throws only on DB/connection failure."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The LeaveType model's `code` field and the repository's create/update DTO `code` field must be typed as the LeaveTypeCode enum exported from this file (via the shared-types barrel), matching the six members annual/sick/emergency/unpaid/maternity/paternity exactly \u2014 no extra members, no string alias.",
+      "referencePath": "src/shared/types/leave-type-code.enum.ts"
+    },
+    {
+      "requirement": "The leave_types table columns the repository queries must match the reconciled conceptual data model: id, code, label, description, is_active, created_at, updated_at \u2014 with `code` carrying a unique index. The row-to-domain mapping must translate snake_case DB columns to the camelCase LeaveType interface and convert null description to undefined.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "The repository must obtain its default database connection from the shared pg Pool exported here, and must not instantiate its own Pool; transaction participation is via the injectable client abstraction, not a second pool.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "The module boundary and dependency map must hold: leave-policy depends only on shared-types (and audit, reserved for later phases); the leave-policy barrel is the sole public entry point, and no internal file is imported directly by other modules.",
+      "referencePath": "docs/ARCHITECTURE.md"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "shared-types (LeaveTypeCode enum)",
+      "why": "The LeaveType model and repository DTOs depend on the LeaveTypeCode type from Phase 1; this is the hard cross-module dependency and the only shared type consumed in this phase."
+    },
+    {
+      "target": "shared/db pg Pool",
+      "why": "The repository's default query execution target; all SQL flows through this pool (or an injected transaction client sharing its query shape)."
+    },
+    {
+      "target": "leave-policy module barrel (index.ts)",
+      "why": "Downstream phases (LeavePolicy repository in Phase 3, LeavePolicyService in Phase 8, and leave-request/balance modules) consume LeaveType and ILeaveTypeRepository exclusively through this barrel."
+    }
+  ]
+}
