@@ -1,5 +1,5 @@
 import { LeaveTypeRepository } from '../../../../src/modules/leave-policy/leave-type.repository';
-import { LeaveTypeCode } from '../../../../src/shared/types/leave-type-code.enum';
+import { LeaveTypeCode } from '../../../../src/shared/types';
 import { Pool } from 'pg';
 
 jest.mock('../../../../src/shared/db/connection', () => {

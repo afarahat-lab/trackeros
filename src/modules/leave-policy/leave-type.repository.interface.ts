@@ -1,5 +1,5 @@
 import { LeaveType } from './leave-type.model';
-import { LeaveTypeCode } from '../../shared/types/leave-type-code.enum';
+import { LeaveTypeCode } from '../../shared/types';
 
 export interface CreateLeaveTypeDto {
   code: LeaveTypeCode;

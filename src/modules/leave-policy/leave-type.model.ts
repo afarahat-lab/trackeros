@@ -1,4 +1,4 @@
-import { LeaveTypeCode } from '../../shared/types/leave-type-code.enum';
+import { LeaveTypeCode } from '../../shared/types';
 
 export interface LeaveType {
   id: string;

@@ -6,7 +6,7 @@ import {
   CreateLeaveTypeDto,
   UpdateLeaveTypeDto,
 } from './leave-type.repository.interface';
-import { LeaveTypeCode } from '../../shared/types/leave-type-code.enum';
+import { LeaveTypeCode } from '../../shared/types';
 
 interface LeaveTypeRow {
   id: string;
