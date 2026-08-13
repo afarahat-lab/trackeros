@@ -1,22 +1,25 @@
-# Implement this phase: Phase 1: Shared Enums (LeaveStatus, LeaveTypeCode)
+# Implement this phase: Phase 2: LeaveType model + repository (leave-policy module)
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/32ad270f-dfe8-4e32-be27-804897fcc970/1`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/32ad270f-dfe8-4e32-be27-804897fcc970/2`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the shared enum files under src/shared/types/:
+Create the LeaveType domain model and its repository in the leave-policy module.
 
-1. `src/shared/types/leave-status.enum.ts` — Define and export the LeaveStatus enum with members: DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED. Use a TypeScript string enum or const object with a union type.
+Files to create:
+1. `src/modules/leave-policy/leave-type.model.ts` — Define and export the LeaveType interface with EXACT fields: id: string, code: LeaveTypeCode (import from `src/shared/types/leave-type-code.enum.ts` from Phase 1), label: string, description: string | undefined, isActive: boolean, createdAt: Date, updatedAt: Date.
 
-2. `src/shared/types/leave-type-code.enum.ts` — Define and export the LeaveTypeCode enum with members: annual, sick, emergency, unpaid, maternity, paternity.
+2. `src/modules/leave-policy/leave-type.repository.interface.ts` — Define and export ILeaveTypeRepository interface with methods: findAll(), findById(id: string), findByCode(code: LeaveTypeCode), create(dto: CreateLeaveTypeDto), update(id: string, dto: UpdateLeaveTypeDto), delete(id: string). Also define CreateLeaveTypeDto and UpdateLeaveTypeDto in this file (or a sibling DTO file).
 
-3. `src/shared/types/index.ts` — Barrel file that re-exports everything from leave-status.enum.ts and leave-type-code.enum.ts.
+3. `src/modules/leave-policy/leave-type.repository.ts` — Implement LeaveTypeRepository class implementing ILeaveTypeRepository. Use the existing pg Pool from `src/shared/db/connection.ts`. Write parameterized SQL queries. No ORM — use the pool directly.
 
-Include Jest unit tests in `tests/unit/shared/types/` verifying each enum value exists and the barrel re-exports correctly.
+4. `src/modules/leave-policy/index.ts` — Barrel file re-exporting LeaveType, ILeaveTypeRepository, LeaveTypeRepository, CreateLeaveTypeDto, UpdateLeaveTypeDto.
 
-No prior phase dependencies — this is the foundation.
+Include Jest unit tests in `tests/unit/modules/leave-policy/` for the repository (mock the pool).
+
+This phase depends on `src/shared/types/leave-type-code.enum.ts` from Phase 1 — read it before generating any code that references LeaveTypeCode.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -39,22 +42,16 @@ Cross-cutting rules that apply throughout:
 - Every endpoint enforces RBAC (employees act on their own records; managers approve/reject their direct reports) plus input validation.
 - When an employee has no manager, approval escalates to HR. [BINDING RULE — operator decision resolving: How is the fiscal year boundary determined for LeaveBalance?; How does leave accrual work? LeavePolicy defines accrualRate and maxAccumulation, but the accrual mechanics (frequency, proration for mid-year hires, carryover rules) are not specified.; Does emergency leave have special rules that distinguish it from annual and sick leave?; When a leave request is approved, should the balance be deducted immediately at approval time or at the start of the leave period?; How is the fiscal year boundary determined for LeaveBalance? Is it calendar year (Jan 1 – Dec 31), the employee's hire-date anniversary, or a configurable organisation-wide fiscal year start?; Does emergency leave have special rules that distinguish it from annual and sick leave? The feature description lists all three but does not specify whether emergency leave bypasses notice periods, approval requirements, or balance checks.; How are leave days counted — calendar days or business/working days?; What are the fiscal year boundaries for balance scoping?; How does leave balance accrual work — annual lump-sum allocation at fiscal-year start vs. monthly pro-rata accrual?; What is the fiscal year boundary — calendar year (Jan 1 – Dec 31) or a configurable company fiscal year?; apply everywhere these apply, not in one place only]
 
-## Constraints & consistency
-You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
-### Reuse & consistency — match these exactly
-- The barrel's named re-export style must match the existing project convention: `export { Symbol } from './file';` statements, no default exports, no wildcard re-exports. (see `src/modules/status/index.ts`)
-- The LeaveStatus enum values must match the reconciled domain model's LeaveRequestStatus.value union exactly: 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED' (uppercase string literals), even though the export is named LeaveStatus. (see `.gestalt/architecture/reconciled.json`)
-- The LeaveTypeCode enum values must match the reconciled domain model's LeaveType.code union exactly: 'annual' | 'sick' | 'emergency' | 'unpaid' | 'maternity' | 'paternity' (lowercase string literals). (see `.gestalt/architecture/reconciled.json`)
-- The module path and ownership must match the reconciled architecture's module boundary: shared-types at src/shared/types/ owning exactly the LeaveStatus and LeaveTypeCode enums — no other artifacts in this phase. (see `docs/ARCHITECTURE.md`)
-### Entity invariants — enforce these
-- Reuse or extend `LeaveStatus`: The set of members is closed and exactly {DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED}; each member's runtime value is its own uppercase name, so LeaveStatus is both a value namespace and a type assignable to the union of those five string literals. The export name is LeaveStatus even though the reconciled domain entity is named LeaveRequestStatus.
-- Reuse or extend `LeaveTypeCode`: The set of members is closed and exactly {annual, sick, emergency, unpaid, maternity, paternity}; each member's runtime value is its own lowercase name, so LeaveTypeCode is both a value namespace and a type assignable to the union of those six string literals. These codes drive policy lookup and balance tracking downstream.
-### Interface contract — expose these operations (their shape is yours)
-- Barrel re-export of LeaveStatus and LeaveTypeCode from src/shared/types/index.ts — consumers import both symbols via the module's public entry point (index.ts), never from the internal .enum.ts files directly, per the architecture rule that modules are imported only through their declared public entry point. — idempotent; A missing or misnamed export must surface as a TypeScript compile error (cannot find name) at the consumer's import site, not a runtime failure.
-### Integration points — connect to these
-- leave-policy module (Phase 2) — imports LeaveTypeCode from src/shared/types/leave-type-code.enum.ts to type the LeaveType.code field and drive policy lookup. — LeaveType.code is typed as LeaveTypeCode; the leave-policy module is the first downstream consumer per the dependency map (leave-policy → shared-types).
-- leave-request module (Phase 5) — imports LeaveStatus from src/shared/types/leave-status.enum.ts to type the LeaveRequest.status field and govern state transitions. — LeaveRequest.status is typed as LeaveStatus and the state-transition rules (DRAFT→SUBMITTED, etc.) reference these enum members; leave-request → shared-types per the dependency map.
-- leave-balance and notification modules (Phases 4, 7) — depend on shared-types per the reconciled dependency map (leave-balance → shared-types, notification → shared-types). — Both modules transitively consume the shared enum vocabulary; this phase establishes the canonical enum surface they import through the barrel.
+## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
+The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
+- `LeaveType` — the entity MUST have exactly these fields:
+    - id: string
+    - code: 'annual' | 'sick' | 'emergency' | 'unpaid' | 'maternity' | 'paternity'
+    - label: string
+    - description: string | undefined
+    - isActive: boolean
+    - createdAt: Date
+    - updatedAt: Date
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
