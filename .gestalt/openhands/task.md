@@ -1,25 +1,25 @@
-# Implement this phase: Phase 5: LeaveRequest model + repository (leave-request module)
+# Implement this phase: Phase 6: AuditRecord model + repository (audit module)
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/32ad270f-dfe8-4e32-be27-804897fcc970/5`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/32ad270f-dfe8-4e32-be27-804897fcc970/6`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the LeaveRequest domain model and its repository in the leave-request module.
+Create the AuditRecord domain model and its repository in the audit module.
 
 Files to create:
-1. `src/modules/leave-request/leave-request.model.ts` — Define and export the LeaveRequest interface with EXACT fields: id: string, employeeId: string, leaveTypeId: string, startDate: Date, endDate: Date, reason: string | undefined, status: LeaveStatus (import from `src/shared/types/leave-status.enum.ts` from Phase 1), approvedBy: string | null, approvedAt: Date | null, rejectedBy: string | null, rejectedAt: Date | null, rejectionReason: string | undefined, createdAt: Date, updatedAt: Date.
+1. `src/modules/audit/audit-record.model.ts` — Define and export the AuditRecord interface with fields: id: string, entityType: string, entityId: string, action: string, performedBy: string, changes: Record<string, unknown>, createdAt: Date.
 
-2. `src/modules/leave-request/leave-request.repository.interface.ts` — Define and export ILeaveRequestRepository interface with methods: findById(id: string), findByEmployeeId(employeeId: string), findOverlapping(employeeId: string, startDate: Date, endDate: Date, excludeStatuses: LeaveStatus[]), create(dto: CreateLeaveRequestDto), updateStatus(id: string, status: LeaveStatus, metadata: StatusUpdateMetadata), findByStatus(status: LeaveStatus). Also define CreateLeaveRequestDto, StatusUpdateMetadata, and UpdateLeaveRequestDto.
+2. `src/modules/audit/audit-record.repository.interface.ts` — Define and export IAuditRepository interface with methods: create(dto: CreateAuditRecordDto), findByEntity(entityType: string, entityId: string), findByPerformer(performedBy: string, limit?: number). Also define CreateAuditRecordDto.
 
-3. `src/modules/leave-request/leave-request.repository.ts` — Implement LeaveRequestRepository class implementing ILeaveRequestRepository. Use the existing pg Pool. The findOverlapping method must query for SUBMITTED/APPROVED requests where date ranges intersect for the same employee.
+3. `src/modules/audit/audit-record.repository.ts` — Implement AuditRepository class implementing IAuditRepository. Use the existing pg Pool.
 
-4. `src/modules/leave-request/index.ts` — Barrel file re-exporting LeaveRequest, ILeaveRequestRepository, LeaveRequestRepository, and DTOs.
+4. `src/modules/audit/index.ts` — Barrel file re-exporting AuditRecord, IAuditRepository, AuditRepository, and DTOs.
 
-Include Jest unit tests in `tests/unit/modules/leave-request/` for the repository.
+Include Jest unit tests in `tests/unit/modules/audit/` for the repository.
 
-This phase depends on `src/shared/types/leave-status.enum.ts` from Phase 1 and `src/modules/leave-policy/leave-type.model.ts` from Phase 2 — read both before generating.
+No prior phase dependencies beyond the shared db connection — this is a standalone supporting module.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -41,51 +41,6 @@ Cross-cutting rules that apply throughout:
 - Balances are auto-created for all leave types on employee creation.
 - Every endpoint enforces RBAC (employees act on their own records; managers approve/reject their direct reports) plus input validation.
 - When an employee has no manager, approval escalates to HR. [BINDING RULE — operator decision resolving: How is the fiscal year boundary determined for LeaveBalance?; How does leave accrual work? LeavePolicy defines accrualRate and maxAccumulation, but the accrual mechanics (frequency, proration for mid-year hires, carryover rules) are not specified.; Does emergency leave have special rules that distinguish it from annual and sick leave?; When a leave request is approved, should the balance be deducted immediately at approval time or at the start of the leave period?; How is the fiscal year boundary determined for LeaveBalance? Is it calendar year (Jan 1 – Dec 31), the employee's hire-date anniversary, or a configurable organisation-wide fiscal year start?; Does emergency leave have special rules that distinguish it from annual and sick leave? The feature description lists all three but does not specify whether emergency leave bypasses notice periods, approval requirements, or balance checks.; How are leave days counted — calendar days or business/working days?; What are the fiscal year boundaries for balance scoping?; How does leave balance accrual work — annual lump-sum allocation at fiscal-year start vs. monthly pro-rata accrual?; What is the fiscal year boundary — calendar year (Jan 1 – Dec 31) or a configurable company fiscal year?; apply everywhere these apply, not in one place only]
-
-## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
-The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
-- `LeaveRequest` — the entity MUST have exactly these fields:
-    - id: string
-    - employeeId: string
-    - leaveTypeId: string
-    - startDate: Date
-    - endDate: Date
-    - reason: string | undefined
-    - status: LeaveRequestStatus
-    - approvedBy: string | null
-    - approvedAt: Date | null
-    - rejectedBy: string | null
-    - rejectedAt: Date | null
-    - rejectionReason: string | undefined
-    - createdAt: Date
-    - updatedAt: Date
-
-## Constraints & consistency
-You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
-### Reuse & consistency — match these exactly
-- The LeaveRequest model's status field and the repository's status parameters must use the LeaveStatus enum exported here (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED) — imported via the shared-types barrel, not re-declared. (see `src/shared/types/leave-status.enum.ts`)
-- The LeaveRequestRepository must follow the same repository pattern this file establishes: a `Queryable = Pick<Pool,'query'>` type, a constructor accepting an optional client defaulting to the shared pool, a private snake-case row interface, a `rowToXxx` mapper (using `?? undefined` for nullable-optional strings and passthrough for `| null` fields), parameterized SQL via `this.db.query`, INSERT … RETURNING with NOW(), dynamic SET clauses with a running paramIndex plus `updated_at = NOW()`, and null returns for missing single-row lookups. (see `src/modules/leave-balance/leave-balance.repository.ts`)
-- DTOs (CreateLeaveRequestDto, StatusUpdateMetadata, UpdateLeaveRequestDto) must be co-located in the repository interface file alongside ILeaveRequestRepository and exported together — matching how CreateLeaveBalanceDto/UpdateLeaveBalanceDto live in this interface file. (see `src/modules/leave-balance/leave-balance.repository.interface.ts`)
-- The leave-request barrel must re-export the model interface, the repository interface + DTOs (grouped), and the repository class in the same structure this barrel uses — so the module's public surface is consistent across modules. (see `src/modules/leave-balance/index.ts`)
-- Repository unit tests must follow this test pattern: jest.mock the shared db connection exposing pool.query, a snake-case makeRow(overrides) helper, beforeEach resetting the mock and constructing the repo, per-method describe blocks asserting both mapped output and SQL/params via expect.stringContaining, and a custom-client constructor test confirming the injected client is used instead of the shared pool. (see `tests/unit/modules/leave-balance/leave-balance.repository.test.ts`)
-- The leave_requests table schema this repository targets must match the reconciled architecture: columns id, employee_id (FK employees), leave_type_id (FK leave_types), start_date, end_date, reason, status, approved_by (FK employees), approved_at, rejected_by (FK employees), rejected_at, rejection_reason, created_at, updated_at — the repository's row interface and column lists must align with these names. (see `.gestalt/architecture/reconciled.json`)
-### Entity invariants — enforce these
-- Reuse or extend `LeaveRequest`: A LeaveRequest's status is always one of the LeaveStatus enum values (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED); the repository must never persist or return a status outside this set.
-- Reuse or extend `LeaveRequest`: Approval metadata (approvedBy, approvedAt) and rejection metadata (rejectedBy, rejectedAt, rejectionReason) are mutually exclusive in practice — a request is either approved or rejected, never both — and the repository's updateStatus must set the metadata corresponding to the target status while leaving the opposing fields null/undefined.
-- Reuse or extend `LeaveRequest`: No two persisted LeaveRequests for the same employee with a status in {SUBMITTED, APPROVED} may have overlapping [startDate, endDate] ranges (binding rule #9); findOverlapping is the mechanism that lets the service detect violations before persisting a new/updated request.
-- Reuse or extend `LeaveRequest`: A LeaveRequest always references an existing employee (employee_id FK) and an existing leave type (leave_type_id FK); the repository relies on the database FK constraints and does not synthesize orphan rows.
-### Interface contract — expose these operations (their shape is yours)
-- findById(id) — Returns the LeaveRequest when exactly one row matches, null when no row matches; does not throw on missing rows.
-- findByEmployeeId(employeeId) — Returns an array (possibly empty) of all LeaveRequests for the employee; never null.
-- findOverlapping(employeeId, startDate, endDate, excludeStatuses) — Returns an array (possibly empty) of LeaveRequests for the employee whose date range intersects [startDate, endDate] and whose status is not in excludeStatuses; empty result means no overlap. The caller (service) decides whether a non-empty result blocks submission.
-- create(dto) — Persists a new row via INSERT … RETURNING and returns the mapped LeaveRequest; relies on DB FK/NOT NULL constraints to reject invalid references — a constraint violation surfaces as a thrown pg error (not swallowed).
-- updateStatus(id, status, metadata) — Updates the status and applies metadata via UPDATE … RETURNING; returns the updated LeaveRequest or null when no row matches the id. Does not validate transition legality (that is the service's job).
-- findByStatus(status) — Returns an array (possibly empty) of all LeaveRequests in the given status; never null.
-### Integration points — connect to these
-- src/shared/types (LeaveStatus enum) — The LeaveRequest model and repository import LeaveStatus from the shared-types barrel; this is a hard dependency from Phase 1.
-- src/shared/db/connection (pg Pool) — The repository defaults to the shared pool for DB access and accepts an optional Queryable client for transaction participation per the Transaction Contract.
-- src/modules/leave-policy (LeaveType model) — Phase 5 declares a dependency on the leave-type model from Phase 2; LeaveRequest.leaveTypeId references a LeaveType, and the module-boundary rule requires importing through the leave-policy barrel.
-- src/modules/leave-request (future LeaveRequestService, Phase 10) — The repository interface and DTOs defined here are the contract the Phase 10 service will consume (findOverlapping for overlap prevention, updateStatus for lifecycle transitions, create for draft creation); the interface shape must remain stable for that integration.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
