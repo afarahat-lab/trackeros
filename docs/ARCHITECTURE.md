@@ -23,6 +23,7 @@ src/modules/leave-policy/    — LeaveType model + repository + barrel
 src/modules/leave-balance/   — LeaveBalance model + repository + barrel
 src/modules/leave-request/   — LeaveRequest model + repository + barrel
 src/modules/audit/           — AuditRecord model + repository + barrel
+src/modules/notification/    — Notification model + repository + barrel
 src/shared/db/connection.ts  — PostgreSQL connection pool
 src/shared/types/            — Shared type definitions
   ├── leave-status.enum.ts   — LeaveStatus enum (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED)
@@ -132,7 +133,7 @@ src/shared/types/            — Shared type definitions
 | 4 | ✅ Complete | LeaveBalance model + repository (leave-balance module) |
 | 5 | ✅ Complete | LeaveRequest model + repository (leave-request module) |
 | 6 | ✅ Complete | AuditRecord model + repository (audit module) |
-| 7 | Pending | Notification model + repository (notification module) |
+| 7 | ✅ Complete | Notification model + repository (notification module) |
 | 8 | Pending | LeavePolicyService (leave-policy module) |
 | 9 | Pending | LeaveBalanceService (leave-balance module) |
 | 10 | Pending | LeaveRequestService + routes (leave-request module) |
@@ -144,6 +145,7 @@ src/shared/types/            — Shared type definitions
 - **createBatch** uses a single multi-row INSERT for efficiency when initializing balances for multiple policies at once.
 - **LeaveRequestRepository** follows the same `Queryable` pattern: constructor accepts an optional client defaulting to the shared pool. The `updateStatus` method dynamically builds SET clauses and clears opposing metadata based on target status (APPROVED clears rejection fields, REJECTED clears approval fields, DRAFT/SUBMITTED/CANCELLED clears both). The `findOverlapping` method uses `start_date <= $3 AND end_date >= $2` for overlap detection and supports an `excludeStatuses` parameter to filter out CANCELLED/REJECTED/DRAFT requests.
 - **AuditRepository** follows the same `Queryable` pattern: constructor accepts an optional client defaulting to the shared pool, enabling transaction participation. The `changes` field is serialized via `JSON.stringify` on write and returned as a parsed `Record<string, unknown>` on read. `findByPerformer` supports an optional `limit` parameter for pagination. Results are ordered by `created_at DESC`.
+- **NotificationRepository** follows the same `Queryable` pattern: constructor accepts an optional client defaulting to the shared pool, enabling transaction participation. The `create` method always sets `status` to `'PENDING'` and `read_at` to `NULL` regardless of caller input. `markAsSent` and `markAsRead` are idempotent — re-marking an already-SENT or already-READ notification succeeds (re-stamps `read_at` on re-read). `createBatch` uses a single multi-row INSERT for efficiency when fanning out notifications (e.g., to employee + manager on submission). `findByRecipient` returns results ordered by `created_at DESC`.
 
 ### Open Questions
 
