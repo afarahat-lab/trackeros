@@ -21,6 +21,7 @@ src/modules/uptime/          — UptimeStatus model + service + routes
 src/modules/leave-policy/    — LeaveType model + repository + barrel
                                 LeavePolicy model + repository
 src/modules/leave-balance/   — LeaveBalance model + repository + barrel
+src/modules/leave-request/   — LeaveRequest model + repository + barrel
 src/shared/db/connection.ts  — PostgreSQL connection pool
 src/shared/types/            — Shared type definitions
   ├── leave-status.enum.ts   — LeaveStatus enum (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED)
@@ -128,7 +129,7 @@ src/shared/types/            — Shared type definitions
 | 2 | ✅ Complete | LeaveType model + repository (leave-policy module) |
 | 3 | ✅ Complete | LeavePolicy model + repository (leave-policy module) |
 | 4 | ✅ Complete | LeaveBalance model + repository (leave-balance module) |
-| 5 | Pending | LeaveRequest model + repository (leave-request module) |
+| 5 | ✅ Complete | LeaveRequest model + repository (leave-request module) |
 | 6 | Pending | AuditRecord model + repository (audit module) |
 | 7 | Pending | Notification model + repository (notification module) |
 | 8 | Pending | LeavePolicyService (leave-policy module) |
@@ -140,6 +141,7 @@ src/shared/types/            — Shared type definitions
 - **LeaveBalance.remainingDays** is a computed field: `totalEntitlement - usedDays - pendingDays`. The `rowToLeaveBalance` mapper computes it at read time regardless of the stored `remaining_days` column value, ensuring the invariant is always satisfied.
 - **LeaveBalanceRepository** constructor accepts an optional `Queryable` client (defaults to the shared pool), enabling transaction participation per the Transaction Contract.
 - **createBatch** uses a single multi-row INSERT for efficiency when initializing balances for multiple policies at once.
+- **LeaveRequestRepository** follows the same `Queryable` pattern: constructor accepts an optional client defaulting to the shared pool. The `updateStatus` method dynamically builds SET clauses and clears opposing metadata based on target status (APPROVED clears rejection fields, REJECTED clears approval fields, DRAFT/SUBMITTED/CANCELLED clears both). The `findOverlapping` method uses `start_date <= $3 AND end_date >= $2` for overlap detection and supports an `excludeStatuses` parameter to filter out CANCELLED/REJECTED/DRAFT requests.
 
 ### Open Questions
 
