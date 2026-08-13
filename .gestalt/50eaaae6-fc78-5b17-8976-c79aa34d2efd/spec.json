@@ -1,0 +1,106 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared-types"
+    ],
+    "affectedLayers": [
+      "unit"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The LeaveStatus enum is exported from src/shared/types/leave-status.enum.ts and exposes exactly the members DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED, each mapping to its uppercase string literal value (e.g. LeaveStatus.DRAFT === 'DRAFT'); a reviewer can assert each member exists and equals its expected string.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The LeaveTypeCode enum is exported from src/shared/types/leave-type-code.enum.ts and exposes exactly the members annual, sick, emergency, unpaid, maternity, paternity, each mapping to its lowercase string literal value (e.g. LeaveTypeCode.annual === 'annual'); a reviewer can assert each member exists and equals its expected string.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The barrel src/shared/types/index.ts re-exports both LeaveStatus and LeaveTypeCode via named re-exports, so importing { LeaveStatus, LeaveTypeCode } from 'shared/types' (or 'src/shared/types') resolves both symbols without a default export.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The new source files typecheck cleanly under the project's strict TypeScript config \u2014 `npm run build` (tsc --noEmit) exits 0 with no errors in the shared-types module.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests under tests/unit/shared/types/ (filenames ending in .test.ts) pass under `npx jest`, verifying each LeaveStatus and LeaveTypeCode member value exists and equals its expected string, and that the barrel re-exports both enums correctly.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Use TypeScript string enums (not const-object + union) for both LeaveStatus and LeaveTypeCode, so each is usable as both a value namespace and a type by downstream phases.",
+    "Named exports only \u2014 no default exports \u2014 in the enum files and the barrel, matching the existing convention in src/modules/status/index.ts and src/modules/uptime/index.ts.",
+    "The barrel must use named re-export statements (export { X } from './file';) rather than wildcard re-exports, matching the existing barrel style in src/modules/status/index.ts.",
+    "No use of `any` (HARNESS constraint no-any, severity high) \u2014 use unknown with type guards where dynamic typing is needed; pure enum files should need none.",
+    "Source must satisfy strict TypeScript (strict: true, no implicit any, strict null checks) and target ES2022 / module commonjs per tsconfig.json; tests are excluded from tsc compilation but must still typecheck under ts-jest.",
+    "Test files must live under tests/unit/shared/types/ and end in .test.ts to match jest.config.js testMatch ('**/tests/**/*.test.(ts|js)') and the task-specified subpath."
+  ],
+  "outOfScope": [
+    "The AuditRecord model/repository/service (audit module) \u2014 the reconciled architecture groups it with shared-types as a Phase 1 \"foundation\", but this phase's PLAN.md scope is only the shared-types enums; audit is a separate later phase.",
+    "Any domain model, repository, service, or route for leave-policy, leave-balance, notification, or leave-request modules \u2014 these are Phases 2\u201310 and depend on this phase's enums.",
+    "Database migrations, Knex schema, or any SQL \u2014 the shared-types module is a pure zero-dependency leaf with no persistence concerns.",
+    "Any additional enum members beyond the five LeaveStatus and six LeaveTypeCode values specified (e.g. no INACTIVE/ACTIVE lifecycle enums, no UserRole enum) \u2014 those belong to other modules/phases."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveStatus",
+      "mustExistOrExtend": true,
+      "invariant": "The set of members is closed and exactly {DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED}; each member's runtime value is its own uppercase name, so LeaveStatus is both a value namespace and a type assignable to the union of those five string literals. The export name is LeaveStatus even though the reconciled domain entity is named LeaveRequestStatus."
+    },
+    {
+      "entity": "LeaveTypeCode",
+      "mustExistOrExtend": true,
+      "invariant": "The set of members is closed and exactly {annual, sick, emergency, unpaid, maternity, paternity}; each member's runtime value is its own lowercase name, so LeaveTypeCode is both a value namespace and a type assignable to the union of those six string literals. These codes drive policy lookup and balance tracking downstream."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "Barrel re-export of LeaveStatus and LeaveTypeCode from src/shared/types/index.ts \u2014 consumers import both symbols via the module's public entry point (index.ts), never from the internal .enum.ts files directly, per the architecture rule that modules are imported only through their declared public entry point.",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "A missing or misnamed export must surface as a TypeScript compile error (cannot find name) at the consumer's import site, not a runtime failure."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The barrel's named re-export style must match the existing project convention: `export { Symbol } from './file';` statements, no default exports, no wildcard re-exports.",
+      "referencePath": "src/modules/status/index.ts"
+    },
+    {
+      "requirement": "The LeaveStatus enum values must match the reconciled domain model's LeaveRequestStatus.value union exactly: 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED' (uppercase string literals), even though the export is named LeaveStatus.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "The LeaveTypeCode enum values must match the reconciled domain model's LeaveType.code union exactly: 'annual' | 'sick' | 'emergency' | 'unpaid' | 'maternity' | 'paternity' (lowercase string literals).",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "The module path and ownership must match the reconciled architecture's module boundary: shared-types at src/shared/types/ owning exactly the LeaveStatus and LeaveTypeCode enums \u2014 no other artifacts in this phase.",
+      "referencePath": "docs/ARCHITECTURE.md"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "leave-policy module (Phase 2) \u2014 imports LeaveTypeCode from src/shared/types/leave-type-code.enum.ts to type the LeaveType.code field and drive policy lookup.",
+      "why": "LeaveType.code is typed as LeaveTypeCode; the leave-policy module is the first downstream consumer per the dependency map (leave-policy \u2192 shared-types)."
+    },
+    {
+      "target": "leave-request module (Phase 5) \u2014 imports LeaveStatus from src/shared/types/leave-status.enum.ts to type the LeaveRequest.status field and govern state transitions.",
+      "why": "LeaveRequest.status is typed as LeaveStatus and the state-transition rules (DRAFT\u2192SUBMITTED, etc.) reference these enum members; leave-request \u2192 shared-types per the dependency map."
+    },
+    {
+      "target": "leave-balance and notification modules (Phases 4, 7) \u2014 depend on shared-types per the reconciled dependency map (leave-balance \u2192 shared-types, notification \u2192 shared-types).",
+      "why": "Both modules transitively consume the shared enum vocabulary; this phase establishes the canonical enum surface they import through the barrel."
+    }
+  ]
+}
