@@ -13,25 +13,24 @@ The architecture is modular, with a clear separation of concerns between models,
 - Frontend: React Native
 - Database: PostgreSQL
 
-## Module structure
+## Module structure (as built)
 
 ```
-src/modules/leave/leave.{model,repository,service,controller,routes}.ts
-src/modules/balance/balance.{model,repository,service,controller,routes}.ts
-src/modules/employee/employee.{model,repository,service,controller,routes}.ts
-src/modules/policy/policy.{model,repository,service,controller,routes}.ts
-src/modules/notification/notification.{model,repository,service,controller,routes}.ts
-src/modules/LeaveStatus/    — LeaveStatus module
-src/modules/BaseEntity/    — BaseEntity module
-src/modules/LeaveRequest/    — LeaveRequest module
-src/modules/LeaveType/    — LeaveType module
-src/modules/LeavePolicy/    — LeavePolicy module
-src/modules/AuditLog/    — AuditLog module
-src/modules/AuditRecord/    — AuditRecord module
-src/modules/AuditServiceInterface/    — AuditServiceInterface module
-src/shared/db connection.ts
-src/shared/base repository.ts
-src/shared/error types.ts
+src/modules/status/          — Status module (model, service interface, service)
+src/modules/uptime/          — Uptime module (model, routes, service interface, service)
+src/shared/db/connection.ts  — PostgreSQL connection pool (pg Pool)
+src/shared/types/index.ts    — Shared domain types (Phase 1)
+```
+
+### Planned modules (not yet built)
+
+```
+src/modules/employee/        — Employee entity, repository, service
+src/modules/leave-policy/    — LeavePolicy entity, repository, service
+src/modules/leave-balance/   — LeaveBalance entity, repository, service
+src/modules/leave-request/   — LeaveRequest entity, repository, service
+src/modules/audit-log/       — AuditRecord entity, repository, service
+src/modules/leave-controller/— Fastify route handlers, plugin registration
 ```
 
 ## Key patterns
