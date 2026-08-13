@@ -1,0 +1,165 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-policy"
+    ],
+    "affectedLayers": [
+      "domain-model",
+      "repository",
+      "module-barrel",
+      "unit-tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The LeavePolicy domain model interface is exported from the leave-policy module and exposes exactly the reconciled LeavePolicy attributes (id, policyName, leaveTypeId, entitlementDays, accrualRate, maxAccumulation, minimumNoticeDays, requiresManagerApproval, isActive, createdAt, updatedAt), with the optional numeric fields typed as `number | undefined` and the boolean fields as `boolean`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The ILeavePolicyRepository interface is exported and declares all seven required operations: findAll, findById, findByLeaveTypeId, findActiveByLeaveTypeId, create, update, delete \u2014 with the CreateLeavePolicyDto and UpdateLeavePolicyDto types co-located in the same file (Create DTO marks optional fields with `?`, Update DTO makes all fields optional).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The LeavePolicyRepository implementation persists and retrieves LeavePolicy rows against the `leave_policies` table using parameterized SQL ($1, $2, \u2026) with explicit column lists (no SELECT *), and maps snake_case database rows to the camelCase LeavePolicy model, converting nullable optionals to `undefined`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findActiveByLeaveTypeId returns only rows where is_active = true for the given leaveTypeId, distinguishing it from findByLeaveTypeId which returns all rows regardless of active status; both return arrays (or the appropriate empty array when no rows match).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "create uses INSERT \u2026 RETURNING to persist a new LeavePolicy and returns the created entity, applying sensible defaults for omitted optional fields (e.g. isActive defaults to true, nullable numerics default to null); update dynamically builds a SET clause from only the provided fields, appends updated_at = NOW(), falls back to a findById lookup when no fields are provided, and returns null when the target row does not exist; delete returns a boolean indicating whether a row was removed.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The leave-policy barrel (index.ts) is extended \u2014 not replaced \u2014 to re-export the LeavePolicy model, ILeavePolicyRepository, LeavePolicyRepository, and both DTOs alongside the existing Phase 2 LeaveType exports, so downstream modules can import all leave-policy symbols from the single public entry point.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests in tests/unit/modules/leave-policy/ cover the LeavePolicyRepository by mocking the pg pool, asserting exact SQL strings and parameter arrays, and exercising found/not-found, empty-result, create-with-defaults, partial-update, no-fields-update, not-found-update, delete true/false, and custom-client-constructor paths \u2014 mirroring the Phase 2 leave-type repository test conventions.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "GP-001 Repository pattern: all database access for leave_policies must go through the LeavePolicyRepository; no inline SQL or direct pool calls outside the repository implementation.",
+    "no-any: the repository and model must use `unknown` with type guards (or precise row interfaces) instead of `any`; strict TypeScript (strict: true, strict null checks) must pass with no implicit any.",
+    "no-direct-db-outside-repository: only the LeavePolicyRepository implementation may issue SQL against the leave_policies table; the model, interface, DTOs, and barrel must contain no database calls.",
+    "All SQL must use parameterized placeholders ($1, $2, \u2026) with values passed separately \u2014 no string-interpolated user input \u2014 to prevent SQL injection.",
+    "Module dependency rule: the leave-policy module's internal files may import each other, but any cross-module access must go through the module's public index.ts barrel; the repository must obtain the pg Pool from src/shared/db/connection.ts (the shared connection module), not instantiate its own Pool.",
+    "The repository must accept an optional injectable queryable client (defaulting to the shared pool) so it can participate in caller-owned transactions per the Transaction Contract, mirroring the Phase 2 LeaveTypeRepository constructor pattern."
+  ],
+  "outOfScope": [
+    "LeavePolicyService, its interface, entitlement/pro-ration calculation logic, and any business-rule enforcement (Phase 8).",
+    "Fastify routes, controllers, RBAC guards, and HTTP error-response mapping for leave policies (later phases).",
+    "Database migrations or schema DDL for the leave_policies table \u2014 the table schema is defined by reconciled architecture; this phase only reads/writes it.",
+    "LeaveBalance model/repository (Phase 4), LeaveRequest (Phase 5), AuditRecord (Phase 6), and Notification (Phase 7) modules.",
+    "Audit-record creation (GP-002) for LeavePolicy create/update/delete \u2014 the repository layer does not write audit records; audit integration belongs to the service layer in a later phase."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "A LeavePolicy is always associated with exactly one LeaveType via leaveTypeId, which must reference an existing row in leave_types (FK constraint); a policy cannot exist without a parent leave type."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "A LeavePolicy has an ACTIVE/INACTIVE lifecycle governed by the isActive flag; only policies with isActive = true may be used for request validation and balance initialization (binding business rule 8). The repository's findActiveByLeaveTypeId must surface only active policies."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "entitlementDays is a non-negative quantity representing the annual lump-sum allocation; accrualRate, maxAccumulation, and minimumNoticeDays are optional policy modifiers that, when present, constrain accrual caps and advance-notice requirements respectively. The repository must preserve optionality (undefined when the DB column is null)."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "ILeavePolicyRepository.findAll",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns all LeavePolicy rows (mapped to the model); returns an empty array when none exist. Rejects on database error."
+    },
+    {
+      "operation": "ILeavePolicyRepository.findById",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns the matching LeavePolicy or null when no row has the given id. Rejects on database error."
+    },
+    {
+      "operation": "ILeavePolicyRepository.findByLeaveTypeId",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns all LeavePolicy rows for the given leaveTypeId (any active state); returns an empty array when none match. Rejects on database error."
+    },
+    {
+      "operation": "ILeavePolicyRepository.findActiveByLeaveTypeId",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns only LeavePolicy rows where is_active = true for the given leaveTypeId; returns an empty array when none match. Rejects on database error."
+    },
+    {
+      "operation": "ILeavePolicyRepository.create",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Inserts a new leave_policies row and returns the created LeavePolicy (via INSERT \u2026 RETURNING). Applies defaults for omitted optional fields. Rejects on constraint violation (e.g. invalid leave_type_id FK)."
+    },
+    {
+      "operation": "ILeavePolicyRepository.update",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Updates only the provided fields (dynamic SET), sets updated_at = NOW(), and returns the updated LeavePolicy or null if no row matches the id; when no fields are provided, returns the current row (or null if absent) without mutation. Rejects on database error."
+    },
+    {
+      "operation": "ILeavePolicyRepository.delete",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Deletes the row with the given id and returns true if a row was removed, false if no row matched. Rejects on database error."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The LeavePolicyRepository implementation must mirror the structural conventions established by the Phase 2 LeaveTypeRepository: Queryable type (Pick<Pool, 'query'>), constructor(client?: Queryable) defaulting to the shared pool, a private snake_case *Row interface, a rowTo* mapper converting snake_case\u2192camelCase with `?? undefined` for nullable optionals, parameterized SQL with explicit column lists (no SELECT *), INSERT \u2026 RETURNING for create, dynamic SET-clause builder with a paramIndex counter plus updated_at = NOW() and findById fallback for update, and boolean rowCount-based return for delete.",
+      "referencePath": "src/modules/leave-policy/leave-type.repository.ts"
+    },
+    {
+      "requirement": "The ILeavePolicyRepository interface and its co-located CreateLeavePolicyDto/UpdateLeavePolicyDto must follow the same DTO convention as the Phase 2 leave-type interface file: Create DTO marks optional fields with `?` and required fields plain; Update DTO makes every field optional with `?`; the repository interface declares async methods returning the model, model | null, model[], or boolean as appropriate.",
+      "referencePath": "src/modules/leave-policy/leave-type.repository.interface.ts"
+    },
+    {
+      "requirement": "The leave-policy barrel must be extended (not replaced) so that the existing Phase 2 re-exports (LeaveType, ILeaveTypeRepository, CreateLeaveTypeDto, UpdateLeaveTypeDto, LeaveTypeRepository) remain intact and the new Phase 3 symbols (LeavePolicy, ILeavePolicyRepository, CreateLeavePolicyDto, UpdateLeavePolicyDto, LeavePolicyRepository) are added alongside them.",
+      "referencePath": "src/modules/leave-policy/index.ts"
+    },
+    {
+      "requirement": "The LeavePolicyRepository unit tests must follow the Phase 2 leave-type repository test conventions: jest.mock the shared db connection before importing pool, a makeRow(overrides) helper returning a full snake_case row with defaults, beforeEach resetting the mock and constructing the repository, assertions on exact SQL strings and exact parameter arrays via toHaveBeenCalledWith, and a custom-client constructor test verifying the injected client is used instead of the default pool.",
+      "referencePath": "tests/unit/modules/leave-policy/leave-type.repository.test.ts"
+    },
+    {
+      "requirement": "The LeavePolicy model attributes and the leave_policies table column set must match the reconciled architecture exactly: model fields id, policyName, leaveTypeId, entitlementDays, accrualRate, maxAccumulation, minimumNoticeDays, requiresManagerApproval, isActive, createdAt, updatedAt; table columns id, policy_name, leave_type_id (FK\u2192leave_types.id), entitlement_days, accrual_rate, max_accumulation, minimum_notice_days, requires_manager_approval, is_active, created_at, updated_at.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/db/connection.ts (pg Pool)",
+      "why": "The LeavePolicyRepository obtains the shared PostgreSQL pool from this module (defaulting to it when no client is injected), consistent with GP-001 and the Phase 2 repository pattern."
+    },
+    {
+      "target": "leave_types table / LeaveType model (Phase 2)",
+      "why": "LeavePolicy.leaveTypeId is a foreign key to leave_types.id; the repository reads/writes this relationship. Phase 3 depends on the Phase 2 leave-type model and barrel being present and importable."
+    },
+    {
+      "target": "leave-balance module (Phase 4) and leave-policy service (Phase 8) \u2014 downstream consumers",
+      "why": "LeaveBalance.policyId will reference leave_policies.id, and LeavePolicyService will consume ILeavePolicyRepository to look up active policies and compute entitlements; this phase establishes the repository contract those later phases depend on."
+    }
+  ]
+}
