@@ -1,0 +1,142 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-policy"
+    ],
+    "affectedLayers": [
+      "domain-model",
+      "repository",
+      "unit-tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The LeaveType domain interface is exported from the leave-policy module and its code field is typed as the LeaveTypeCode enum imported from the shared-types module (Phase 1 dependency), not a raw string.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository interface declares all six operations (findAll, findById, findByCode, create, update, delete) with return types that distinguish collection results (LeaveType[]), single-or-null results (LeaveType | null), creation (LeaveType), and boolean deletion success \u2014 and the concrete repository class implements that interface.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "repository.create persists a new leave_types row using parameterized SQL (no string interpolation of user values) and returns the persisted LeaveType with all fields populated; repository.update applies only the supplied DTO fields and returns the updated row or null when the id does not exist.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "repository.findById and findByCode return null (not throw) when no matching row exists; repository.findAll returns an empty array (not null) when the table has no rows; repository.delete returns false (not throw) when the target id does not exist.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The leave-policy barrel (index.ts) re-exports LeaveType, the repository interface, the concrete repository class, and both DTO types so downstream modules import only through the module's public entry point.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests cover every repository method (findAll, findById, findByCode, create, update, delete) with the pg pool mocked, including the not-found/null-return paths and the custom-client constructor injection path, and the full suite passes.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No ORM \u2014 all database access in the repository uses the pg pool directly with hand-written, parameterized SQL queries ($1, $2, \u2026 placeholders); user-supplied values are never concatenated into query text.",
+    "No use of the `any` type anywhere in the module \u2014 use `unknown` with type guards or explicit interfaces for query parameter arrays and row shapes (HARNESS constraint no-any, severity high).",
+    "All database access goes through the repository layer \u2014 no inline SQL or direct pool calls outside the repository class (HARNESS constraint no-direct-db-outside-repository, severity critical; GP-001).",
+    "The repository must be able to participate in a caller-owned transaction by accepting an injectable queryable client (Pick<Pool,'query'>) that defaults to the shared pool when none is supplied \u2014 satisfying the Transaction Contract from the reconciled architecture.",
+    "Modules import from each other only through their declared public entry point (index.ts); the leave-policy module imports LeaveTypeCode from the shared-types barrel, not from the enum file's internals (AGENTS.md architecture rule 1)."
+  ],
+  "outOfScope": [
+    "LeavePolicy model, repository, and service (Phase 3 / Phase 8) \u2014 this phase covers only the LeaveType catalog entity and its repository.",
+    "HTTP routes, controllers, and RBAC enforcement for leave-type CRUD \u2014 no API surface is built in this phase; the repository is consumed by later service/route phases.",
+    "Audit record creation for leave-type mutations (GP-002) \u2014 audit wiring belongs to the service layer (Phase 8+), not the repository; the repository is a pure persistence boundary.",
+    "Database migrations / schema DDL for the leave_types table \u2014 the conceptual schema is defined in the reconciled architecture; migration creation is not part of this repository-model phase."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveType",
+      "mustExistOrExtend": true,
+      "invariant": "A LeaveType's code must be one of the six LeaveTypeCode enum members (annual, sick, emergency, unpaid, maternity, paternity); the code is the unique lookup key for policy association and balance tracking, so no two LeaveType rows may share the same code."
+    },
+    {
+      "entity": "LeaveType",
+      "mustExistOrExtend": true,
+      "invariant": "LeaveType has an ACTIVE/INACTIVE lifecycle (isActive flag); only active LeaveTypes may be referenced by new leave requests and policies (binding business rule 8), but deactivation does not delete the row \u2014 it preserves historical references."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "findAll",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns LeaveType[] (empty array when no rows); does not throw on empty result."
+    },
+    {
+      "operation": "findById",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns LeaveType | null; returns null (not an exception) when no row matches the given id."
+    },
+    {
+      "operation": "findByCode",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns LeaveType | null; returns null (not an exception) when no row matches the given LeaveTypeCode."
+    },
+    {
+      "operation": "create",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the persisted LeaveType; a unique-constraint violation on code or other DB error propagates as a thrown error (no silent swallow). isActive defaults to true when omitted."
+    },
+    {
+      "operation": "update",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns LeaveType | null; applies only the DTO-supplied fields (partial update), returns null when the id does not exist, and touches updated_at on any real change."
+    },
+    {
+      "operation": "delete",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns boolean \u2014 true when a row was deleted, false when the id did not exist; does not throw on missing target."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The LeaveType.code field and all DTO code fields must be typed as the LeaveTypeCode enum exported from this file \u2014 not a string literal union or raw string \u2014 so the catalog stays in sync with the six canonical leave codes.",
+      "referencePath": "src/shared/types/leave-type-code.enum.ts"
+    },
+    {
+      "requirement": "The repository must obtain its default database client from the shared pg pool exported here (not instantiate its own Pool), ensuring a single connection source and enabling the Transaction Contract's client-injection pattern.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "The leave_types table column names used in SQL (id, code, label, description, is_active, created_at, updated_at) must match the conceptual data model in the reconciled architecture; the row mapper must translate snake_case DB columns to the camelCase LeaveType interface fields.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "The barrel must be the sole public entry point for the leave-policy module; downstream phases (LeavePolicy in Phase 3, services in Phase 8) import LeaveType and the repository types from here, not from internal files.",
+      "referencePath": "src/modules/leave-policy/index.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "shared-types module (src/shared/types/)",
+      "why": "LeaveTypeCode enum is the Phase 1 dependency that types the LeaveType.code field and DTO code parameters; the leave-policy module imports it through the shared-types barrel."
+    },
+    {
+      "target": "shared db connection (src/shared/db/connection.ts)",
+      "why": "The repository uses the shared pg Pool as its default queryable client and supports injecting an alternative client (Pick<Pool,'query'>) for transaction participation per the Transaction Contract."
+    },
+    {
+      "target": "Future leave-policy service + routes (Phase 8) and leave-request module (Phase 5/10)",
+      "why": "The LeaveType repository and interface are consumed by the LeavePolicyService (Phase 8) for policy lookup by code, and by the LeaveRequestService (Phase 10) to validate that only active leave types are used (binding rule 8); this phase establishes the persistence contract those consumers depend on."
+    }
+  ]
+}
