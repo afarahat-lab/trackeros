@@ -18,6 +18,7 @@ The architecture is modular, with a clear separation of concerns between models,
 ```
 src/modules/status/          — SystemStatus model + service
 src/modules/uptime/          — UptimeStatus model + service + routes
+src/modules/leave-policy/    — LeaveType model + repository + barrel
 src/shared/db/connection.ts  — PostgreSQL connection pool
 src/shared/types/            — Shared type definitions
   ├── leave-status.enum.ts   — LeaveStatus enum (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED)
@@ -122,7 +123,7 @@ src/shared/types/            — Shared type definitions
 | Phase | Status | Description |
 |-------|--------|-------------|
 | 1 | ✅ Complete | Shared enums: LeaveStatus, LeaveTypeCode under `src/shared/types/` |
-| 2 | Pending | LeaveType model + repository (leave-policy module) |
+| 2 | ✅ Complete | LeaveType model + repository (leave-policy module) |
 | 3 | Pending | LeavePolicy model + repository (leave-policy module) |
 | 4 | Pending | LeaveBalance model + repository (leave-balance module) |
 | 5 | Pending | LeaveRequest model + repository (leave-request module) |
