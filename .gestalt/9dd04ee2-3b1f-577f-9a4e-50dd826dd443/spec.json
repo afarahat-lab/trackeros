@@ -1,0 +1,157 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-balance"
+    ],
+    "affectedLayers": [
+      "domain-model",
+      "repository",
+      "unit-tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The LeaveBalance domain interface is exported from the leave-balance module and exposes exactly the 11 fields (id, employeeId, policyId, totalEntitlement, usedDays, pendingDays, remainingDays, fiscalYear, status, createdAt, updatedAt) with status typed as 'ACTIVE' | 'CLOSED' and the remainingDays invariant (totalEntitlement - usedDays - pendingDays) holding for any mapped row.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The ILeaveBalanceRepository interface declares all six required operations (findByEmployeeId, findByEmployeeIdAndFiscalYear, findByEmployeeIdAndPolicyId, create, update, createBatch) and the CreateLeaveBalanceDto / UpdateLeaveBalanceDto types, with no delete operation present.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The LeaveBalanceRepository implementation persists rows via parameterized SQL against the leave_balances table using the shared pg Pool (defaulting to a constructor-injected Queryable when provided) and returns domain objects mapped from snake_case rows; create uses NOW(),NOW() with RETURNING and update builds a dynamic SET clause appending updated_at=NOW().",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "createBatch persists multiple LeaveBalance rows in a single multi-row INSERT with parameterized SQL and RETURNING, returning the created domain objects in order.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The leave-balance barrel (index.ts) re-exports LeaveBalance, ILeaveBalanceRepository, LeaveBalanceRepository, CreateLeaveBalanceDto, and UpdateLeaveBalanceDto via named exports, and the module is consumable from other modules only through that barrel.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests in tests/unit/modules/leave-balance/ mock the shared db connection, assert exact SQL/parameter arrays for each repository method (including createBatch), verify the custom-client constructor path does not call the default pool, and confirm a not-found query returns null/empty as appropriate.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access must go through the repository pattern (GP-001); the LeaveBalanceRepository must use the shared pg Pool from src/shared/db/connection and must not be bypassed by inline SQL elsewhere.",
+    "No use of `any` (HARNESS no-any rule); use `unknown` with type guards or explicit row interfaces instead.",
+    "SQL must be parameterized ($N placeholders); no string-interpolated user input in queries.",
+    "Imports must be relative (e.g. ../../shared/db/connection, ../../shared/types), not baseUrl-based bare imports, matching the existing leave-policy repository style.",
+    "The repository constructor must accept an optional Queryable (Pick<Pool,'query'>) defaulting to the shared pool, so a caller-supplied PoolClient can participate in a service-owned transaction (Transaction Contract).",
+    "No delete operation is provided on ILeaveBalanceRepository \u2014 balances are not hard-deleted in this phase."
+  ],
+  "outOfScope": [
+    "LeaveBalanceService, its interface, balance initialization, reserve/finalize/release logic, and routes \u2014 these belong to Phase 9.",
+    "Audit record creation for balance mutations (GP-002) \u2014 the repository layer does not write audit records; that is a service-layer concern for later phases.",
+    "RBAC enforcement and input validation at API boundaries (GP-003/GP-005) \u2014 no routes/controllers exist in this phase.",
+    "Database migrations / DDL for the leave_balances table \u2014 schema creation is not part of this repository-model phase."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "remainingDays must always equal totalEntitlement - usedDays - pendingDays; the row-to-domain mapper must preserve this relationship for any persisted row, and pendingDays captures days tied to SUBMITTED (not-yet-decided) requests while usedDays captures APPROVED days."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "A LeaveBalance is uniquely identified by the tuple (employeeId, policyId, fiscalYear) \u2014 at most one balance row per employee per policy per fiscal year (unique constraint candidate on leave_balances)."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "status lifecycle is limited to 'ACTIVE' | 'CLOSED'; the domain type must not admit other status values."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "policyId references an existing leave_policies.id (LeavePolicy from Phase 3); the balance cannot reference a non-existent policy."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "findByEmployeeId(employeeId)",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns LeaveBalance[] (empty when none); never throws on missing employee \u2014 returns empty."
+    },
+    {
+      "operation": "findByEmployeeIdAndFiscalYear(employeeId, fiscalYear)",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns LeaveBalance[] for that employee and fiscal year (empty when none)."
+    },
+    {
+      "operation": "findByEmployeeIdAndPolicyId(employeeId, policyId, fiscalYear)",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns the single matching LeaveBalance or null when no row matches the (employee, policy, fiscalYear) tuple."
+    },
+    {
+      "operation": "create(dto: CreateLeaveBalanceDto)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Persists one row with created_at/updated_at set to NOW() and returns the created LeaveBalance; a duplicate (employeeId, policyId, fiscalYear) violates the unique constraint and surfaces the underlying pg error."
+    },
+    {
+      "operation": "update(id, dto: UpdateLeaveBalanceDto)",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Updates only provided mutable fields, appends updated_at=NOW(), returns the updated LeaveBalance or null when no row matches id; an empty dto returns the existing row without writing."
+    },
+    {
+      "operation": "createBatch(dtos: CreateLeaveBalanceDto[])",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Persists all rows in a single multi-row INSERT with RETURNING and returns the created LeaveBalance[] in order; a constraint violation on any row fails the whole batch (no partial persistence)."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The LeaveBalanceRepository must mirror the established repository pattern: import Pool from 'pg' and pool from ../../shared/db/connection; define a snake_case Row interface; type Queryable = Pick<Pool,'query'>; constructor takes optional client defaulting to pool; a rowToLeaveBalance mapper; a COLUMNS constant; parameterized $N SQL; create uses NOW(),NOW() with RETURNING; update builds a dynamic SET with a paramIndex counter and appends updated_at=NOW(); list queries use ORDER BY.",
+      "referencePath": "src/modules/leave-policy/leave-policy.repository.ts"
+    },
+    {
+      "requirement": "The ILeaveBalanceRepository interface and its DTOs must follow the same structural conventions as ILeavePolicyRepository: DTOs co-located in the interface file, CreateLeaveBalanceDto omits id/createdAt/updatedAt with optional fields marked ?, and UpdateLeaveBalanceDto makes all mutable fields optional.",
+      "referencePath": "src/modules/leave-policy/leave-policy.repository.interface.ts"
+    },
+    {
+      "requirement": "The leave-balance barrel must use named re-exports matching the leave-policy/index.ts pattern (export { X } from './file').",
+      "referencePath": "src/modules/leave-policy/index.ts"
+    },
+    {
+      "requirement": "Unit tests must follow the established test pattern: jest.mock the shared db connection returning { pool: mockPool } with query: jest.fn(); import pool after the mock; extract mockQuery; a makeRow(overrides) helper with snake_case defaults; beforeEach resets mockQuery and constructs a fresh repository; assert exact SQL (or stringContaining) and param arrays; include a custom-client constructor test verifying pool.query is not called.",
+      "referencePath": "tests/unit/modules/leave-policy/leave-policy.repository.test.ts"
+    },
+    {
+      "requirement": "The LeaveBalance entity shape and the leave_balances table schema (id, employee_id, policy_id, total_entitlement, used_days, pending_days, remaining_days, fiscal_year, status, created_at, updated_at; PK id; FKs to employees.id and leave_policies.id; unique candidate on (employee_id, policy_id, fiscal_year)) must match the reconciled architecture exactly.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "The repository imports the shared pg Pool as its default Queryable."
+    },
+    {
+      "target": "src/modules/leave-policy/leave-policy.model.ts",
+      "why": "LeaveBalance.policyId references LeavePolicy (leave_policies.id); the leave-balance module depends on leave-policy per the dependency map."
+    },
+    {
+      "target": "src/modules/leave-balance/index.ts",
+      "why": "Future phases (Phase 9 LeaveBalanceService, Phase 10 LeaveRequestService) consume the leave-balance module only through its barrel."
+    }
+  ]
+}
