@@ -12,3 +12,5 @@ export {
   UpdateLeavePolicyDto,
 } from './leave-policy.repository.interface';
 export { LeavePolicyRepository } from './leave-policy.repository';
+export { ILeavePolicyService } from './leave-policy.service.interface';
+export { LeavePolicyService, AppError } from './leave-policy.service';

@@ -1,25 +1,23 @@
-# Implement this phase: Phase 7: Notification model + repository (notification module)
+# Implement this phase: Phase 8: LeavePolicyService (leave-policy module)
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/32ad270f-dfe8-4e32-be27-804897fcc970/7`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/32ad270f-dfe8-4e32-be27-804897fcc970/8`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the Notification domain model and its repository in the notification module.
+Create the LeavePolicyService in the leave-policy module.
 
 Files to create:
-1. `src/modules/notification/notification.model.ts` — Define and export the Notification interface with EXACT fields: id: string, recipientId: string, type: 'LEAVE_SUBMITTED' | 'LEAVE_APPROVED' | 'LEAVE_REJECTED' | 'LEAVE_CANCELLED', title: string, message: string, relatedEntityType: 'LeaveRequest', relatedEntityId: string, status: 'PENDING' | 'SENT' | 'READ' | 'ARCHIVED', createdAt: Date, readAt: Date | null.
+1. `src/modules/leave-policy/leave-policy.service.interface.ts` — Define and export ILeavePolicyService interface with methods: getPolicyForLeaveType(leaveTypeCode: LeaveTypeCode): Promise<LeavePolicy>, getActivePolicies(): Promise<LeavePolicy[]>, calculateEntitlement(policy: LeavePolicy, hireDate: Date, fiscalYear: number): number (implements the BINDING rule: annual lump-sum allocation at fiscal year start; mid-year hires pro-rated by whole months remaining, rounded down), validatePolicy(policy: LeavePolicy): boolean.
 
-2. `src/modules/notification/notification.repository.interface.ts` — Define and export INotificationRepository interface with methods: create(dto: CreateNotificationDto), findByRecipient(recipientId: string), markAsSent(id: string), markAsRead(id: string), createBatch(dtos: CreateNotificationDto[]). Also define CreateNotificationDto.
+2. `src/modules/leave-policy/leave-policy.service.ts` — Implement LeavePolicyService class implementing ILeavePolicyService. Inject ILeavePolicyRepository and ILeaveTypeRepository (from Phase 2 and Phase 3). The calculateEntitlement method must: determine fiscal year start (Jan 1), if hireDate is before Jan 1 of fiscalYear → full entitlementDays; if hireDate is within fiscalYear → pro-rate: entitlementDays * (whole months remaining / 12), rounded down. maxAccumulation caps the result.
 
-3. `src/modules/notification/notification.repository.ts` — Implement NotificationRepository class implementing INotificationRepository. Use the existing pg Pool.
+3. Update `src/modules/leave-policy/index.ts` — Add re-exports for ILeavePolicyService and LeavePolicyService.
 
-4. `src/modules/notification/index.ts` — Barrel file re-exporting Notification, INotificationRepository, NotificationRepository, and DTOs.
+Include Jest unit tests in `tests/unit/modules/leave-policy/` for the service, testing pro-ration edge cases (hire Jan 15 → 11 months, hire Dec 1 → 0 months, hire before fiscal year → full).
 
-Include Jest unit tests in `tests/unit/modules/notification/` for the repository.
-
-No prior phase dependencies beyond the shared db connection — this is a standalone supporting module.
+This phase depends on `src/modules/leave-policy/leave-type.model.ts`, `src/modules/leave-policy/leave-type.repository.interface.ts` from Phase 2, and `src/modules/leave-policy/leave-policy.model.ts`, `src/modules/leave-policy/leave-policy.repository.interface.ts` from Phase 3 — read all before generating.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -42,42 +40,28 @@ Cross-cutting rules that apply throughout:
 - Every endpoint enforces RBAC (employees act on their own records; managers approve/reject their direct reports) plus input validation.
 - When an employee has no manager, approval escalates to HR. [BINDING RULE — operator decision resolving: How is the fiscal year boundary determined for LeaveBalance?; How does leave accrual work? LeavePolicy defines accrualRate and maxAccumulation, but the accrual mechanics (frequency, proration for mid-year hires, carryover rules) are not specified.; Does emergency leave have special rules that distinguish it from annual and sick leave?; When a leave request is approved, should the balance be deducted immediately at approval time or at the start of the leave period?; How is the fiscal year boundary determined for LeaveBalance? Is it calendar year (Jan 1 – Dec 31), the employee's hire-date anniversary, or a configurable organisation-wide fiscal year start?; Does emergency leave have special rules that distinguish it from annual and sick leave? The feature description lists all three but does not specify whether emergency leave bypasses notice periods, approval requirements, or balance checks.; How are leave days counted — calendar days or business/working days?; What are the fiscal year boundaries for balance scoping?; How does leave balance accrual work — annual lump-sum allocation at fiscal-year start vs. monthly pro-rata accrual?; What is the fiscal year boundary — calendar year (Jan 1 – Dec 31) or a configurable company fiscal year?; apply everywhere these apply, not in one place only]
 
-## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
-The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
-- `Notification` — the entity MUST have exactly these fields:
-    - id: string
-    - recipientId: string
-    - type: 'LEAVE_SUBMITTED' | 'LEAVE_APPROVED' | 'LEAVE_REJECTED' | 'LEAVE_CANCELLED'
-    - title: string
-    - message: string
-    - relatedEntityType: 'LeaveRequest'
-    - relatedEntityId: string
-    - status: 'PENDING' | 'SENT' | 'READ' | 'ARCHIVED'
-    - createdAt: Date
-    - readAt: Date | null
-
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- The Notification entity shape (fields, union types, nullability) must match the authoritative definition in the reconciled architecture — type union of 4 leave-event values, status union of PENDING/SENT/READ/ARCHIVED, relatedEntityType fixed to 'LeaveRequest', readAt: Date | null. (see `.gestalt/architecture/reconciled.json`)
-- The repository must follow the Transaction Contract: constructor accepts an optional Queryable (Pick<Pool,'query'>) client defaulting to the shared pool, so repository methods can join a caller's outer transaction when a client is passed. This matches the established pattern in sibling repositories. (see `docs/ARCHITECTURE.md`)
-- The repository's row-mapping convention (private snake_case Row interface + rowToNotification mapper + shared COLUMNS constant isolating DB column names from the domain layer) must match the established convention used by the leave-balance repository. (see `src/modules/leave-balance/leave-balance.repository.ts`)
-- The createBatch empty-array short-circuit (return [] without a query) and single multi-row INSERT with dynamic $N placeholders must match the established createBatch convention in sibling repositories. (see `src/modules/leave-balance/leave-balance.repository.ts`)
-- The notifications table column layout referenced by the repository (recipient_id, type, title, message, related_entity_type, related_entity_id, status, created_at, read_at) must match the conceptual data model declared in the reconciled architecture. (see `.gestalt/architecture/reconciled.json`)
+- The service interface and implementation must consume the LeavePolicy shape exactly as defined (id, policyName, leaveTypeId, entitlementDays, accrualRate, maxAccumulation, minimumNoticeDays, requiresManagerApproval, isActive, createdAt, updatedAt) — do not redefine or alter the model; import it from this file. (see `src/modules/leave-policy/leave-policy.model.ts`)
+- The service must depend on ILeavePolicyRepository as declared here (findAll, findById, findByLeaveTypeId, findActiveByLeaveTypeId, create, update, delete) — specifically use findActiveByLeaveTypeId for getPolicyForLeaveType and findAll (filtered to active) for getActivePolicies. Do not invent new repository methods. (see `src/modules/leave-policy/leave-policy.repository.interface.ts`)
+- The service must depend on ILeaveTypeRepository as declared here (findAll, findById, findByCode, create, update, delete) — specifically use findByCode to resolve a LeaveType by its LeaveTypeCode in getPolicyForLeaveType. Do not invent new repository methods. (see `src/modules/leave-policy/leave-type.repository.interface.ts`)
+- The getPolicyForLeaveType parameter type must be the LeaveTypeCode enum from this file (annual/sick/emergency/unpaid/maternity/paternity) — import via the shared-types barrel, never redefine the enum. (see `src/shared/types/leave-type-code.enum.ts`)
+- The barrel must be extended (not replaced) to re-export ILeavePolicyService and LeavePolicyService alongside the existing Phase 2/3 exports (LeaveType, ILeaveTypeRepository, LeaveTypeRepository, DTOs, LeavePolicy, ILeavePolicyRepository, LeavePolicyRepository, DTOs) — preserving all current re-exports. (see `src/modules/leave-policy/index.ts`)
+- Error codes thrown by getPolicyForLeaveType must match the Error Response Contract in ARCHITECTURE.md: NOT_FOUND (404) for missing entity, POLICY_VIOLATION (400) for inactive type or zero/multiple active policies — consistent with the standard { error, code } shape. (see `docs/ARCHITECTURE.md`)
 ### Entity invariants — enforce these
-- Reuse or extend `Notification`: A newly created Notification always begins its lifecycle in status 'PENDING' with readAt null — these are server-set initial-state fields that the repository enforces regardless of caller input; the create DTO must not carry them.
-- Reuse or extend `Notification`: The status lifecycle is monotonic forward: PENDING → SENT → READ (ARCHIVED is a later-phase terminal state). markAsSent and markAsRead are idempotent — re-applying the same transition to an already-transitioned notification succeeds rather than failing, and re-reading re-stamps readAt to the current timestamp.
-- Reuse or extend `Notification`: Every Notification is scoped to exactly one recipient (recipientId) and references exactly one related entity whose type is fixed to 'LeaveRequest' with a relatedEntityId — a notification cannot exist without this association.
+- Reuse or extend `LeavePolicy`: Only an active LeavePolicy (isActive=true) may be returned by getPolicyForLeaveType and getActivePolicies; an inactive policy is never surfaced as a usable policy for leave operations (binding business rule 8: only active LeaveType and LeavePolicy may be used).
+- Reuse or extend `LeavePolicy`: The computed entitlement for a policy never exceeds its maxAccumulation when that field is defined: calculateEntitlement caps the pro-rated/full result at maxAccumulation, preserving the accumulation ceiling invariant.
+- Reuse or extend `LeavePolicy`: A LeavePolicy is associated with exactly one LeaveType via leaveTypeId; getPolicyForLeaveType resolves a LeaveType by code first, then locates the active policy for that type's id — the policy-to-type linkage is always traversed type-first, never policy-first.
 ### Interface contract — expose these operations (their shape is yours)
-- INotificationRepository.create(dto) — Persists one notifications row with server-set status='PENDING' and read_at=NULL; returns the persisted Notification. Rejects (throws) on DB constraint violation. Caller-supplied status/readAt are ignored.
-- INotificationRepository.findByRecipient(recipientId) — idempotent; Returns all notifications for the recipient ordered by created_at DESC; returns [] when none exist. Read-only — never throws on missing recipient.
-- INotificationRepository.markAsSent(id) — idempotent; Sets status='SENT' for the matching row and returns the updated Notification; returns null when no row matches the id (not-found is a non-throwing outcome). Re-marking an already-SENT row succeeds.
-- INotificationRepository.markAsRead(id) — idempotent; Sets status='READ' and read_at=NOW() for the matching row and returns the updated Notification; returns null when no row matches the id. Re-marking an already-READ row succeeds and re-stamps read_at.
-- INotificationRepository.createBatch(dtos) — Inserts all provided notifications in a single multi-row INSERT, each defaulted to status='PENDING' and read_at=NULL, and returns the persisted array in insertion order. An empty input array short-circuits to [] without a DB round-trip. Throws on DB constraint violation.
+- getPolicyForLeaveType(leaveTypeCode): Promise<LeavePolicy> — idempotent; Throws an error with code NOT_FOUND (404) when no LeaveType matches the code; throws an error with code POLICY_VIOLATION (400) when the LeaveType is inactive or when zero or multiple active policies exist for that type. Never returns null — the non-null Promise<LeavePolicy> signature is honored.
+- getActivePolicies(): Promise<LeavePolicy[]> — idempotent; Returns only active LeavePolicy rows; returns an empty array when none exist rather than throwing. Errors from the underlying repository propagate as thrown errors (GP-006).
+- calculateEntitlement(policy: LeavePolicy, hireDate: Date, fiscalYear: number): number — idempotent; Pure synchronous function — does not throw under normal inputs; returns a non-negative integer (floored). The result is capped at policy.maxAccumulation when defined. No I/O, no side effects.
+- validatePolicy(policy: LeavePolicy): boolean — idempotent; Returns true for a valid policy and false for an invalid one; must not throw for malformed input — invalid data yields false rather than an exception.
 ### Integration points — connect to these
-- src/shared/db/connection.ts (shared pg Pool) — The repository defaults to the shared pool for standalone queries and must import it as the fallback Queryable when no client is injected.
-- leave-request module (Phase 10 LeaveRequestService) — The notification repository is consumed by the future LeaveRequestService to fan out notifications (LEAVE_SUBMITTED/APPROVED/REJECTED/CANCELLED) to employees and managers on lifecycle transitions, including within the approval-flow transaction.
-- notification module barrel (src/modules/notification/index.ts) — Downstream modules (leave-request) must import Notification, INotificationRepository, CreateNotificationDto, and NotificationRepository only through this public entry point per the module-boundary rule.
+- ILeavePolicyRepository (Phase 3, src/modules/leave-policy/leave-policy.repository.interface.ts) — The service injects this repository to fetch active policies (findActiveByLeaveTypeId for getPolicyForLeaveType, findAll filtered to active for getActivePolicies). This is the sole data source for LeavePolicy rows — no direct DB access.
+- ILeaveTypeRepository (Phase 2, src/modules/leave-policy/leave-type.repository.interface.ts) — The service injects this repository to resolve a LeaveType by code (findByCode) before locating its active policy — getPolicyForLeaveType traverses type-first, then policy.
+- ILeavePolicyService (this phase, consumed by Phase 9 LeaveBalanceService) — Phase 9's LeaveBalanceService.initializeBalancesForEmployee depends on getActivePolicies and calculateEntitlement from this interface to auto-create LeaveBalance rows with pro-rated entitlements. The interface contract established here is the integration seam for Phase 9.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
