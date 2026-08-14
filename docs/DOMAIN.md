@@ -195,33 +195,20 @@ Represents notification data managed by the `notification` module, including not
 |-------|------|----------|
 | id | string | true |
 | recipientId | string | true |
-| type | string | true |
+| type | NotificationType | true |
 | title | string | true |
 | message | string | true |
-| relatedEntityType | string \| null | false |
+| relatedEntityType | 'LeaveRequest' \| 'LeaveBalance' \| null | false |
 | relatedEntityId | string \| null | false |
-| status | 'PENDING' \| 'SENT' \| 'READ' \| 'ARCHIVED' | true |
+| status | NotificationStatus | true |
 | createdAt | Date | true |
 | readAt | Date \| null | false |
 
+**Repository**: `INotificationRepository` — `create`, `findByRecipientId`, `markAsSent`, `markAsRead`. All methods accept an optional `PoolClient` for caller-controlled transactions. `markAsSent` sets status to SENT; `markAsRead` sets status to READ and stamps `read_at` via `NOW()`. Both return `null` when no row matches the given id.
+
 ## audit
 
-Represents audit data managed by the `audit` module, including audit records, change history, and activity tracking information.
-
-### Audit
-
-| Field | Type | Required |
-|-------|------|----------|
-| id | string | true |
-| entityType | string | true |
-| entityId | string | true |
-| action | 'CREATE' \| 'UPDATE' \| 'DELETE' \| 'APPROVE' \| 'REJECT' | true |
-| oldValues | Record<string, any> \| null | false |
-| newValues | Record<string, any> \| null | false |
-| performedBy | string \| null | false |
-| performedAt | Date | true |
-| createdAt | Date | true |
-| updatedAt | Date | true |
+Represents audit data managed by the `audit-log` module, including audit records, change history, and activity tracking information.
 
 ### AuditLog
 
@@ -230,36 +217,16 @@ Represents audit data managed by the `audit` module, including audit records, ch
 | id | string | true |
 | entityType | string | true |
 | entityId | string | true |
-| action | 'CREATE' \| 'UPDATE' \| 'DELETE' \| 'APPROVE' \| 'REJECT' | true |
-| oldValues | Record<string, any> \| null | false |
-| newValues | Record<string, any> \| null | false |
-| performedBy | string \| null | false |
+| action | AuditAction | true |
+| oldValues | Record<string, unknown> \| null | false |
+| newValues | Record<string, unknown> \| null | false |
+| performedBy | string | true |
 | performedAt | Date | true |
+| ipAddress | string \| null | false |
+| userAgent | string \| null | false |
+| createdAt | Date | true |
 
-### AuditRecord
-
-| Field | Type | Required |
-|-------|------|----------|
-| entity_type | string | true |
-| entity_id | string | true |
-| action | string | true |
-| changed_by | string \| null | false |
-| old_values | Record<string, any> \| null | false |
-| new_values | Record<string, any> \| null | false |
-| ip_address | string \| null | false |
-| user_agent | string \| null | false |
-
-### AuditServiceInterface
-
-| Field | Type | Required |
-|-------|------|----------|
-| id | string | true |
-| action | string | true |
-| resourceType | string | true |
-| resourceId | string | true |
-| actorId | string | true |
-| timestamp | Date | true |
-| metadata | Record<string, unknown> \| null | false |
+**Repository**: `IAuditLogRepository` — `create`, `findByEntity`, `findByPerformedBy`. All methods accept an optional `PoolClient` for caller-controlled transactions. `oldValues`/`newValues` are serialized to JSON strings on write and parsed back to objects on read. Results ordered by `created_at DESC`.
 
 ## validation
 

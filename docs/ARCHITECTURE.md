@@ -16,23 +16,16 @@ The architecture is modular, with a clear separation of concerns between models,
 ## Module structure
 
 ```
-src/modules/leave/leave.{model,repository,service,controller,routes}.ts
-src/modules/balance/balance.{model,repository,service,controller,routes}.ts
-src/modules/employee/employee.{model,repository,service,controller,routes}.ts
-src/modules/policy/policy.{model,repository,service,controller,routes}.ts
-src/modules/notification/notification.{model,repository,service,controller,routes}.ts
-src/modules/LeaveStatus/    — LeaveStatus module
-src/modules/BaseEntity/    — BaseEntity module
-src/modules/LeaveRequest/    — LeaveRequest module
-src/modules/LeaveType/    — LeaveType module
-src/modules/LeavePolicy/    — LeavePolicy module
-src/modules/AuditLog/    — AuditLog module
-src/modules/AuditRecord/    — AuditRecord module
-src/modules/AuditServiceInterface/    — AuditServiceInterface module
-src/shared/db connection.ts
-src/shared/base repository.ts
-src/shared/error types.ts
-src/shared/types/    — shared TypeScript enums (LeaveType, LeaveRequestStatus, AuditAction, NotificationType, NotificationStatus, EmploymentStatus, BalanceStatus)
+src/modules/audit-log/audit-log.{model,repository}.ts
+src/modules/employee/employee.{model,repository}.ts
+src/modules/leave-balance/leave-balance.{model,repository}.ts
+src/modules/leave-policy/leave-policy.{model,repository}.ts
+src/modules/leave-request/leave-request.{model,repository}.ts
+src/modules/notification/notification.{model,repository}.ts
+src/modules/status/    — system status module (health-check)
+src/modules/uptime/    — uptime module
+src/shared/db/connection.ts
+src/shared/types/leave.types.ts    — shared TypeScript enums (LeaveType, LeaveRequestStatus, AuditAction, NotificationType, NotificationStatus, EmploymentStatus, BalanceStatus)
 ```
 
 ## Key patterns
@@ -138,7 +131,7 @@ Standard error shape: `{ error: string; code: string; details?: unknown }`.
 - **Phase 3: LeavePolicy model + repository** — ✅ Complete. `src/modules/leave-policy/leave-policy.model.ts` defines the LeavePolicy interface with all fields (id, policyName, leaveType, entitlementDays, accrualRate, maxAccumulation, minimumNoticeDays, requiresManagerApproval, isActive, createdAt, updatedAt). `src/modules/leave-policy/leave-policy.repository.ts` delivers `ILeavePolicyRepository` (findById, findByLeaveType, findAllActive) and `PgLeavePolicyRepository` backed by the shared pg pool. All repository methods accept an optional `PoolClient` for caller-controlled transactions. Read-only phase — no create/update/delete operations. Tests in `tests/unit/modules/leave-policy/leave-policy.repository.test.ts`.
 - **Phase 4: LeaveBalance model + repository** — ✅ Complete. `src/modules/leave-balance/leave-balance.model.ts` defines the LeaveBalance interface with all fields (id, employeeId, policyId, totalEntitlement, usedDays, remainingDays, fiscalYear, status, createdAt, updatedAt). `src/modules/leave-balance/leave-balance.repository.ts` delivers `ILeaveBalanceRepository` (findByEmployeeAndPolicy, findByEmployeeAndFiscalYear, findByEmployeeId, create, update, deductDays, restoreDays) and `PgLeaveBalanceRepository` backed by the shared pg pool. All repository methods accept an optional `PoolClient` for caller-controlled transactions. `deductDays` atomically increments usedDays/decrements remainingDays and auto-transitions to EXHAUSTED when remaining reaches 0. `restoreDays` atomically decrements usedDays/increments remainingDays and auto-transitions from EXHAUSTED to ACTIVE when remaining becomes positive. `create` throws `UniqueConstraintViolationError` on duplicate (employee_id, policy_id, fiscal_year). `update` accepts partial updates on `totalEntitlement`, `fiscalYear`, and `status` only — day-count mutations go through `deductDays`/`restoreDays`. Tests in `tests/unit/modules/leave-balance/leave-balance.repository.test.ts`.
 - **Phase 5: LeaveRequest model + repository** — ✅ Complete. `src/modules/leave-request/leave-request.model.ts` defines the LeaveRequest interface with all fields (id, employeeId, leaveType, startDate, endDate, reason, status, approvedBy, approvedAt, createdAt, updatedAt). `src/modules/leave-request/leave-request.repository.ts` delivers `ILeaveRequestRepository` (findById, findByEmployeeId, findOverlapping, create, updateStatus, findAllPendingByManagerId) and `PgLeaveRequestRepository` backed by the shared pg pool. All repository methods accept an optional `PoolClient` for caller-controlled transactions. `findOverlapping` filters to SUBMITTED/APPROVED statuses and uses the standard overlap predicate (`start_date <= $endDate AND end_date >= $startDate`). `findAllPendingByManagerId` JOINs the employees table on `manager_id` to resolve direct reports with SUBMITTED requests. `create` maps `undefined` reason to SQL NULL and throws `UniqueConstraintViolationError` on code 23505. `updateStatus` updates only `status` and `updated_at` — it does NOT set `approved_by` or `approved_at` (those are left to the service layer to manage separately). Tests in `tests/unit/modules/leave-request/leave-request.repository.test.ts`.
-- **Phase 6: Notification + AuditLog models and repositories** — pending
+- **Phase 6: Notification + AuditLog models and repositories** — ✅ Complete. `src/modules/notification/notification.model.ts` defines the Notification interface (id, recipientId, type, title, message, relatedEntityType, relatedEntityId, status, createdAt, readAt). `src/modules/notification/notification.repository.ts` delivers `INotificationRepository` (create, findByRecipientId, markAsSent, markAsRead) and `PgNotificationRepository` backed by the shared pg pool. All repository methods accept an optional `PoolClient` for caller-controlled transactions. `markAsSent` sets status to SENT; `markAsRead` sets status to READ and stamps `read_at` via `NOW()`. Both return `null` when no row matches. `src/modules/audit-log/audit-log.model.ts` defines the AuditLog interface (id, entityType, entityId, action, oldValues, newValues, performedBy, performedAt, ipAddress, userAgent, createdAt). `src/modules/audit-log/audit-log.repository.ts` delivers `IAuditLogRepository` (create, findByEntity, findByPerformedBy) and `PgAuditLogRepository` backed by the shared pg pool. All repository methods accept an optional `PoolClient` for caller-controlled transactions. `oldValues`/`newValues` are serialized to JSON strings on write and parsed back on read. Tests in `tests/unit/modules/notification/notification.repository.test.ts` and `tests/unit/modules/audit-log/audit-log.repository.test.ts`.
 - **Phase 7: EmployeeService + LeavePolicyService** — pending
 - **Phase 8: LeaveBalanceService** — pending
 - **Phase 9: LeaveRequestService** — pending
