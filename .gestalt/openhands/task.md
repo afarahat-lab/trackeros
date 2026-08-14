@@ -1,12 +1,12 @@
-# Implement this phase: Phase 8: LeaveBalanceService
+# Implement this phase: Phase 9: LeaveRequestService
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/73542714-9897-4d99-9509-1a7bb9190c33/8`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/73542714-9897-4d99-9509-1a7bb9190c33/9`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create src/modules/leave-balance/leave-balance.service.interface.ts with ILeaveBalanceService interface (getBalance, initializeBalancesForEmployee, deductOnApproval, releaseOnRejectionOrCancellation, getRemainingDays). Create src/modules/leave-balance/leave-balance.service.ts with LeaveBalanceService implementing ILeaveBalanceService. Business rules: full entitlement granted upfront at fiscal year start; mid-year hires pro-rated by whole months remaining; fiscal year = calendar year of startDate; deduct on APPROVAL, release on REJECT/CANCEL; use-it-or-lose-it (no carryover). Inject ILeaveBalanceRepository and ILeavePolicyRepository. This phase depends on leave-balance.model.ts and leave-balance.repository.ts from Phase 4, leave-policy.model.ts from Phase 3, and employee.model.ts from Phase 2 — read them before generating. Include Jest unit tests in tests/unit/modules/leave-balance/leave-balance.service.test.ts.
+Create src/modules/leave-request/leave-request.service.interface.ts with ILeaveRequestService interface (submit, approve, reject, cancel, findById, findByEmployeeId, findPendingByManagerId). Create src/modules/leave-request/leave-request.service.ts with LeaveRequestService implementing ILeaveRequestService. Business rules: only ACTIVE employees may submit; overlapping SUBMITTED/APPROVED requests rejected; emergency leave bypasses minimumNoticeDays; manager resolved via IEmployeeRepository (managerId from employee record; if null escalate to HR); managers act only on direct reports; day counting is business days only (exclude Sat/Sun and public holidays), startDate and endDate inclusive, whole days only; cross-fiscal-year requests deduct from fiscal year of startDate; balance deducted on APPROVAL, released on REJECT/CANCEL; audit log entries on every state transition; notifications sent on SUBMIT/APPROVE/REJECT/CANCEL. Inject ILeaveRequestRepository, IEmployeeRepository, ILeavePolicyRepository, ILeaveBalanceService, IAuditLogRepository, INotificationRepository. This phase depends on all model, repository, and service interface files from Phases 1-8 — read them before generating. Include Jest unit tests in tests/unit/modules/leave-request/leave-request.service.test.ts.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:

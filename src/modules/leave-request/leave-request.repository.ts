@@ -30,6 +30,12 @@ export interface ILeaveRequestRepository {
     client?: PoolClient,
   ): Promise<LeaveRequest | null>;
 
+  approveRequest(
+    id: string,
+    approvedBy: string,
+    client?: PoolClient,
+  ): Promise<LeaveRequest | null>;
+
   findAllPendingByManagerId(
     managerId: string,
     client?: PoolClient,
@@ -135,6 +141,25 @@ export class PgLeaveRequestRepository implements ILeaveRequestRepository {
        WHERE id = $2
        RETURNING *`,
       [status, id],
+    );
+    if (result.rows.length === 0) {
+      return null;
+    }
+    return this.rowToLeaveRequest(result.rows[0]);
+  }
+
+  async approveRequest(
+    id: string,
+    approvedBy: string,
+    client?: PoolClient,
+  ): Promise<LeaveRequest | null> {
+    const db = client ?? pool;
+    const result = await db.query(
+      `UPDATE leave_requests
+       SET status = $1, approved_by = $2, approved_at = NOW(), updated_at = NOW()
+       WHERE id = $3
+       RETURNING *`,
+      [LeaveRequestStatus.APPROVED, approvedBy, id],
     );
     if (result.rows.length === 0) {
       return null;
