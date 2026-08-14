@@ -1,0 +1,85 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "notification"
+    ],
+    "affectedLayers": [
+      "repository"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The createBatch method generates a multi-row INSERT where each row's VALUES tuple has 9 entries matching the 9 columns in the INSERT column list \u2014 6 parameterized placeholders plus 3 inline SQL literals for status, created_at, and read_at \u2014 eliminating the column/value count mismatch that would cause a PostgreSQL runtime error.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The values array passed to the query call contains exactly 6 values per input DTO (recipientId, type, title, message, relatedEntityType, relatedEntityId) and no additional values for status/created_at/read_at \u2014 those three columns are supplied as inline SQL literals, not as bound parameters.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "createBatch returns an empty array without issuing any database query when called with an empty input array, preserving the existing early-return behavior.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "createBatch returns one Notification per input DTO, each mapped from the RETURNING rows, with status reflecting the persisted 'PENDING' value and readAt reflecting the persisted NULL value \u2014 matching the single-row create method's output contract.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The fix must mirror the single-row create method's literal pattern: status='PENDING', created_at=NOW(), read_at=NULL supplied as inline SQL literals in the VALUES clause, NOT as bound parameters. The leave-balance createBatch all-parameterized pattern must NOT be applied here.",
+    "The values.push(...) block must remain unchanged \u2014 still pushing exactly 6 values per row (recipientId, type, title, message, relatedEntityType, relatedEntityId). No values for status, created_at, or read_at may be added to the values array.",
+    "The fix is confined to the createBatch method's placeholder construction in src/modules/notification/notification.repository.ts. The create method, findByRecipient, markAsSent, markAsRead, the COLUMNS constant, rowToNotification mapper, and the repository interface must not be modified.",
+    "No test files may be modified. The existing tests in tests/unit/modules/notification/notification.repository.test.ts mock pool.query and assert on the values array and a generic INSERT INTO notifications string; they must continue to pass unchanged."
+  ],
+  "outOfScope": [
+    "Strengthening the existing tests to assert the presence of the 'PENDING', NOW(), NULL literals in the generated SQL string. The settled decision is that no test changes are required for this phase.",
+    "Refactoring createBatch to follow the leave-balance repository's all-parameterized createBatch pattern. The notification module must keep its literal-based pattern matching the single-row create method.",
+    "Changes to the Notification model, the INotificationRepository interface, the CreateNotificationDto, the rowToNotification mapper, or any other method in the notification repository."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "A Notification created via createBatch always begins its lifecycle in the PENDING state with a NULL read_at and a server-generated created_at, regardless of caller input \u2014 identical to the lifecycle entry point established by the single-row create method. The status/read_at/created_at are not caller-supplied; they are fixed by the repository at insert time."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "INotificationRepository.createBatch(dtos: CreateNotificationDto[]): Promise<Notification[]>",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "An empty input array short-circuits to an empty result with no database call. A non-empty input issues a single multi-row INSERT with a RETURNING clause; a column/value count mismatch in the generated SQL would surface as a PostgreSQL error from the query call and must not occur. The method must not throw for valid non-empty input."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The createBatch VALUES placeholder per row must include the same three inline SQL literals ('PENDING', NOW(), NULL) for the status, created_at, and read_at columns that the single-row create method uses in its VALUES clause \u2014 so both insert paths enforce the identical status/read_at/created_at defaults and the column-to-value count is balanced (9 columns = 6 parameters + 3 literals).",
+      "referencePath": "src/modules/notification/notification.repository.ts"
+    },
+    {
+      "requirement": "The createBatch fix must satisfy the ARCHITECTURE.md invariant for NotificationRepository: \"The create method always sets status to 'PENDING' and read_at to NULL regardless of caller input.\" createBatch must honor the same invariant \u2014 status defaults to 'PENDING' and read_at to NULL on creation \u2014 since both are documented creation entry points for the Notification entity.",
+      "referencePath": "docs/ARCHITECTURE.md"
+    },
+    {
+      "requirement": "The createBatch INSERT column list (recipient_id, type, title, message, related_entity_type, related_entity_id, status, created_at, read_at) and the COLUMNS constant used in the RETURNING clause must remain identical to those used by the single-row create method, so both paths write and read the same 10 columns (id is DB-generated and returned, not inserted).",
+      "referencePath": "src/modules/notification/notification.repository.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/leave-request (LeaveRequestService \u2014 Phase 10)",
+      "why": "createBatch is the fan-out path used when a leave request is submitted/approved/rejected/cancelled to notify both employee and manager in a single query. The fix ensures this integration point executes without a runtime SQL error when the service calls createBatch with multiple DTOs."
+    },
+    {
+      "target": "tests/unit/modules/notification/notification.repository.test.ts",
+      "why": "The existing createBatch unit tests mock pool.query and assert the values array (12 items for 2 rows) plus a generic INSERT INTO notifications string. The fix must keep these assertions passing without test modification \u2014 the values array stays 6-per-row and the SQL still contains INSERT INTO notifications."
+    }
+  ]
+}
