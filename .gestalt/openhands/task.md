@@ -1,12 +1,12 @@
-# Implement this phase: Phase 5: LeaveRequest model + repository
+# Implement this phase: Phase 6: Notification + AuditLog models and repositories
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/73542714-9897-4d99-9509-1a7bb9190c33/5`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/73542714-9897-4d99-9509-1a7bb9190c33/6`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create src/modules/leave-request/leave-request.model.ts with the LeaveRequest interface (id: string, employeeId: string, leaveType: LeaveType, startDate: Date, endDate: Date, reason: string | undefined, status: LeaveRequestStatus, approvedBy: string | null, approvedAt: Date | null, createdAt: Date, updatedAt: Date). Import LeaveType and LeaveRequestStatus from src/shared/types/leave.types.ts. Create src/modules/leave-request/leave-request.repository.ts with ILeaveRequestRepository interface (findById, findByEmployeeId, findOverlapping, create, updateStatus, findAllPendingByManagerId) and PgLeaveRequestRepository implementation using src/shared/db/connection.ts. Include Jest unit tests in tests/unit/modules/leave-request/leave-request.repository.test.ts.
+Create src/modules/notification/notification.model.ts with the Notification interface (id: string, recipientId: string, type: NotificationType, title: string, message: string, relatedEntityType: 'LeaveRequest' | 'LeaveBalance' | null, relatedEntityId: string | null, status: NotificationStatus, createdAt: Date, readAt: Date | null). Import NotificationType and NotificationStatus from src/shared/types/leave.types.ts. Create src/modules/notification/notification.repository.ts with INotificationRepository interface (create, findByRecipientId, markAsSent, markAsRead) and PgNotificationRepository. Create src/modules/audit-log/audit-log.model.ts with the AuditLog interface (id: string, entityType: string, entityId: string, action: AuditAction, oldValues: Record<string, unknown> | null, newValues: Record<string, unknown> | null, performedBy: string, performedAt: Date, ipAddress: string | null, userAgent: string | null, createdAt: Date). Import AuditAction from src/shared/types/leave.types.ts. Create src/modules/audit-log/audit-log.repository.ts with IAuditLogRepository interface (create, findByEntity, findByPerformedBy) and PgAuditLogRepository. Include Jest unit tests in tests/unit/modules/notification/notification.repository.test.ts and tests/unit/modules/audit-log/audit-log.repository.test.ts.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -33,46 +33,57 @@ Cross-cutting rules throughout:
 
 ## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
 The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
-- `LeaveRequest` — the entity MUST have exactly these fields:
+- `Notification` — the entity MUST have exactly these fields:
     - id: string
-    - employeeId: string
-    - leaveType: LeaveType
-    - startDate: Date
-    - endDate: Date
-    - reason: string | undefined
-    - status: LeaveRequestStatus
-    - approvedBy: string | null
-    - approvedAt: Date | null
+    - recipientId: string
+    - type: 'LEAVE_SUBMITTED' | 'LEAVE_APPROVED' | 'LEAVE_REJECTED' | 'LEAVE_CANCELLED' | 'BALANCE_EXHAUSTED'
+    - title: string
+    - message: string
+    - relatedEntityType: 'LeaveRequest' | 'LeaveBalance' | null
+    - relatedEntityId: string | null
+    - status: 'PENDING' | 'SENT' | 'READ' | 'ARCHIVED'
     - createdAt: Date
-    - updatedAt: Date
+    - readAt: Date | null
+- `AuditLog` — the entity MUST have exactly these fields:
+    - id: string
+    - entityType: string
+    - entityId: string
+    - action: AuditAction
+    - oldValues: Record<string, unknown> | null
+    - newValues: Record<string, unknown> | null
+    - performedBy: string
+    - performedAt: Date
+    - ipAddress: string | null
+    - userAgent: string | null
+    - createdAt: Date
 
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- The leave-request repository must reuse (import) the existing UniqueConstraintViolationError class and replicate the isUniqueViolation(error) guard (pg error code === '23505') rather than defining a parallel error type. (see `src/modules/employee/employee.repository.ts`)
-- The repository structure must match the sibling pattern: an ILeaveRequestRepository interface paired with a PgLeaveRequestRepository class, `const db = client ?? pool;` per method, optional PoolClient as the last parameter, INSERT ... RETURNING * for create, and a private rowToLeaveRequest mapper converting snake_case columns to camelCase fields with new Date() wrapping on date columns. (see `src/modules/leave-balance/leave-balance.repository.ts`)
-- The model must import LeaveType and LeaveRequestStatus from this file and type leaveType/status against those enums; the enum values must not be redeclared inline in the model or repository. (see `src/shared/types/leave.types.ts`)
-- The repository must obtain the pg pool by importing the existing `pool` export from this file; it must not instantiate a new Pool. (see `src/shared/db/connection.ts`)
-- The unit test must follow the established sibling test pattern: jest.mock on the connection module before importing pool, makeRow()/makeLeaveRequest() helpers with Partial overrides, mockReset + fresh repo instance in beforeEach, and per-method coverage including PoolClient delegation and the 23505 unique-violation case. (see `tests/unit/modules/leave-balance/leave-balance.repository.test.ts`)
-- The Transaction Contract section names updateStatus on ILeaveRequestRepository as a transaction-joining method accepting an optional PoolClient; the implementation must honor this so the future LeaveRequestService can pass a caller-owned client during the approve flow (update leave_requests.status + leave_balances deduction in one unit of work). (see `docs/ARCHITECTURE.md`)
+- Reuse the existing UniqueConstraintViolationError class (and the isUniqueViolation code-23505 detection pattern) from the employee repository rather than redefining it; the new repositories must import it from there. (see `src/modules/employee/employee.repository.ts`)
+- The markAsSent/markAsRead status-update pattern must mirror the existing updateStatus approach (UPDATE ... SET status=..., updated_at=NOW() ... RETURNING *, null on no match), with markAsRead additionally setting read_at = NOW(). (see `src/modules/leave-request/leave-request.repository.ts`)
+- The NotificationType, NotificationStatus, and AuditAction enums must be imported from the existing shared types file; their member values must not be redefined or diverged. (see `src/shared/types/leave.types.ts`)
+- Repository classes must obtain the pg pool from the existing shared db connection module (pool) and use the `client ?? pool` delegation pattern, matching the established repositories. (see `src/shared/db/connection.ts`)
+- The new repository tests must follow the established test conventions: jest.mock the shared db connection before importing pool, mockQuery.mockReset() in beforeEach, makeRow/makeXxx helpers, per-method describe blocks, and PoolClient-delegation assertions. (see `tests/unit/modules/employee/employee.repository.test.ts`)
+- The Notification and AuditLog entity shapes and the notifications/audit_logs conceptual table column sets must match the reconciled architecture (snake_case DB columns mapped to the camelCase model fields); the module paths src/modules/notification/ and src/modules/audit-log/ must match the declared module boundaries. (see `.gestalt/architecture/reconciled.json`)
 ### Entity invariants — enforce these
-- Reuse or extend `LeaveRequest`: Lifecycle is DRAFT → SUBMITTED → (APPROVED | REJECTED); any non-terminal status may transition to CANCELLED. The repository's updateStatus must accept any LeaveRequestStatus value but never silently coerce an invalid transition — it persists exactly the status supplied by the caller.
-- Reuse or extend `LeaveRequest`: approvedBy and approvedAt are null until a request is APPROVED; the row mapper must preserve null for these columns rather than defaulting them to empty strings or the current time.
-- Reuse or extend `LeaveRequest`: reason is optional (string | undefined); a persisted null/missing reason column must surface as undefined on the entity, and create must accept an input where reason is omitted without inserting a NOT NULL violation semantics mismatch.
-- Reuse or extend `LeaveRequest`: startDate and endDate are inclusive calendar dates; the repository does not reorder or validate startDate <= endDate (that is a service/validation concern) — it persists and returns them as given.
+- Reuse or extend `Notification`: Lifecycle is PENDING → SENT → READ (with ARCHIVED as a terminal side-state); create always inserts with a caller-supplied initial status, markAsSent transitions to SENT, and markAsRead transitions to READ while stamping readAt — the repository never silently drops a status transition.
+- Reuse or extend `Notification`: id and createdAt are server-generated (omitted from the create input and populated from the RETURNING row); readAt starts null and is only set by markAsRead.
+- Reuse or extend `AuditLog`: Append-only / immutable: once created, an AuditLog row is never updated or deleted — the repository exposes no mutation operations beyond create.
+- Reuse or extend `AuditLog`: performedAt is caller-supplied (included in the create input) and persisted as-is; id and createdAt are server-generated and omitted from the create input.
 ### Interface contract — expose these operations (their shape is yours)
-- ILeaveRequestRepository.findById — idempotent; Returns the LeaveRequest when a row matches the id, null when no row matches; never throws on a missing row.
-- ILeaveRequestRepository.findByEmployeeId — idempotent; Returns an array (possibly empty) of all leave requests for the employee; never throws on no matches.
-- ILeaveRequestRepository.findOverlapping — idempotent; Returns an array (possibly empty) of SUBMITTED/APPROVED requests whose date range overlaps the supplied range for the given employee; never throws on no matches.
-- ILeaveRequestRepository.create — Throws UniqueConstraintViolationError on pg code 23505; re-throws all other errors unchanged. Returns the persisted LeaveRequest with server-generated id/createdAt/updatedAt.
-- ILeaveRequestRepository.updateStatus — Returns the refreshed LeaveRequest or null when no row matches the id; advances updatedAt. This is the transaction-joining method per the Transaction Contract — it must accept an optional PoolClient to participate in a caller-owned unit of work.
-- ILeaveRequestRepository.findAllPendingByManagerId — idempotent; Returns an array (possibly empty) of SUBMITTED leave requests for the manager's direct reports (employees whose manager_id matches); never throws on no matches.
+- INotificationRepository.create — Persists a notification row and returns the entity with server-generated id/createdAt; a pg unique-constraint violation (code 23505) is thrown as UniqueConstraintViolationError; all other errors are re-thrown unchanged.
+- INotificationRepository.findByRecipientId — Returns notifications for the recipient ordered by created_at DESC; returns an empty array (not null) when no rows match.
+- INotificationRepository.markAsSent — Updates status to SENT and returns the refreshed entity, or null when no row matches the id.
+- INotificationRepository.markAsRead — Updates status to READ and stamps read_at to NOW(), returning the refreshed entity, or null when no row matches the id.
+- IAuditLogRepository.create — Persists an append-only audit row using the caller-supplied performedAt and returns the entity with server-generated id/createdAt; a pg unique-constraint violation (code 23505) is thrown as UniqueConstraintViolationError; all other errors are re-thrown unchanged.
+- IAuditLogRepository.findByEntity — Returns audit entries for the given (entityType, entityId) ordered by created_at DESC; returns an empty array when no rows match.
+- IAuditLogRepository.findByPerformedBy — Returns audit entries for the given actor ordered by created_at DESC; returns an empty array when no rows match.
 ### Integration points — connect to these
-- src/shared/types/leave.types.ts — Provides the LeaveType and LeaveRequestStatus enums that type the model's leaveType and status fields.
-- src/shared/db/connection.ts — Provides the shared pg.Pool instance the repository falls back to when no PoolClient is supplied.
-- src/modules/employee/employee.repository.ts — Exports UniqueConstraintViolationError, which the leave-request repository imports and reuses for 23505 wrapping; also the future source of the employee/manager relationship used by findAllPendingByManagerId's join.
-- src/modules/leave-balance/leave-balance.repository.ts — Sibling repository whose interface/impl pattern, PoolClient contract, and row-mapping conventions the leave-request repository must mirror for architectural consistency.
-- employees table (manager_id column) — findAllPendingByManagerId joins leave_requests to employees on employee_id and filters by employees.manager_id = $1 to return a manager's direct reports' pending requests.
+- src/shared/types/leave.types.ts — Source of the NotificationType, NotificationStatus, and AuditAction enums imported by both new models.
+- src/modules/employee/employee.repository.ts — Source of UniqueConstraintViolationError reused by both new repositories for code-23505 handling.
+- src/shared/db/connection.ts — Provides the shared pg pool that backs PgNotificationRepository and PgAuditLogRepository.
+- Phase 9 — LeaveRequestService — Future consumer: will inject INotificationRepository and IAuditLogRepository to fire notifications and write audit records on leave state transitions; this phase only establishes the repository contracts it will depend on.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
