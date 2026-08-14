@@ -116,7 +116,7 @@ export class NotificationRepository implements INotificationRepository {
 
     for (const dto of dtos) {
       valuePlaceholders.push(
-        `($${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++})`,
+        `($${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, 'PENDING', NOW(), NULL)`,
       );
       values.push(
         dto.recipientId,
