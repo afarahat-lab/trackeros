@@ -1,0 +1,159 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-policy"
+    ],
+    "affectedLayers": [
+      "service",
+      "unit-tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The service interface exposes exactly four methods \u2014 getPolicyForLeaveType, getActivePolicies, calculateEntitlement, and validatePolicy \u2014 with the signatures specified in PLAN.md Phase 8 (getPolicyForLeaveType returns Promise<LeavePolicy>, getActivePolicies returns Promise<LeavePolicy[]>, calculateEntitlement returns number, validatePolicy returns boolean).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "calculateEntitlement returns full entitlementDays when hireDate is on or before Jan 1 of the fiscalYear (e.g. hire July 2024, fiscalYear 2025 \u2192 20; hire Jan 1 2025, fiscalYear 2025 \u2192 20).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "calculateEntitlement pro-rates mid-year hires by whole months remaining (11 - hireMonth), floored: hire Jan 15 \u2192 11 months \u2192 floor(20*11/12)=18; hire Feb 1 \u2192 10 months \u2192 16; hire Jun 15 \u2192 6 months \u2192 10; hire Nov 30 \u2192 1 month \u2192 1; hire Dec 1 \u2192 0 months \u2192 0.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "calculateEntitlement applies maxAccumulation as a cap after pro-ration when maxAccumulation is defined (entitlement 30, cap 25, pre-fiscal-year hire \u2192 25; entitlement 60, cap 40, Jan 15 hire \u2192 40), and does not cap when maxAccumulation is undefined or when the result is already below the cap.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "calculateEntitlement always returns a non-negative integer (never a fraction, never negative).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "getPolicyForLeaveType resolves the leave type by code, rejects with NOT_FOUND when the type does not exist, rejects with POLICY_VIOLATION when the type is inactive, and rejects with POLICY_VIOLATION when zero or multiple active policies exist for that type; returns the single active policy otherwise.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "getActivePolicies fetches all policies and returns only those with isActive === true; returns an empty array when no policies exist or all are inactive; propagates repository errors without swallowing them.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "validatePolicy returns true for a structurally valid policy (non-empty policyName/leaveTypeId, positive integer entitlementDays, non-negative optional accrualRate/maxAccumulation/minimumNoticeDays, boolean requiresManagerApproval and isActive) and false for any violation including null/undefined/non-object input, empty/whitespace strings, zero/negative/non-integer entitlementDays, negative optional numerics, and non-boolean flags.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The leave-policy barrel (index.ts) re-exports ILeavePolicyService and LeavePolicyService (and AppError) so downstream modules import the service only through the module's public entry point.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests exist under tests/unit/modules/leave-policy/ covering the pro-ration edge cases (Jan 15 \u2192 18, Dec 1 \u2192 0, pre-fiscal-year \u2192 full), maxAccumulation capping, validatePolicy accept/reject paths, and getPolicyForLeaveType/getActivePolicies behavior including error cases \u2014 and all tests pass.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The service must inject ILeavePolicyRepository and ILeaveTypeRepository (from Phase 2 and Phase 3) \u2014 no direct database access inside the service (GP-001).",
+    "All cross-module imports must go through the leave-policy module's public barrel (index.ts), never from internal files directly (ARCHITECTURE.md dependency rule).",
+    "Strict TypeScript must pass with no implicit any and strict null checks; the optional fields (accrualRate, maxAccumulation, minimumNoticeDays) must be checked for undefined/null before use.",
+    "Domain errors must use the AppError class carrying a code string matching the error response contract (NOT_FOUND for missing leave type, POLICY_VIOLATION for inactive type / zero or multiple active policies) \u2014 no raw Error throws for domain failures.",
+    "No unhandled promise rejections (GP-006): async methods must either resolve with a value or reject with a typed AppError; repository errors must propagate, not be swallowed."
+  ],
+  "outOfScope": [
+    "LeaveBalanceService and balance initialization (Phase 9) \u2014 this phase only provides calculateEntitlement as a pure function; it does not create balance records.",
+    "LeaveRequestService, routes, overlap detection, and the full leave lifecycle (Phase 10).",
+    "HTTP routes/controllers for leave-policy \u2014 this phase is service-layer only; no Fastify route definitions.",
+    "Audit record creation for policy reads \u2014 getPolicyForLeaveType and getActivePolicies are read-only operations and do not require audit records (GP-002 applies to state-changing operations only).",
+    "Accrual scheduling, carryover rules, and year-end rollover jobs \u2014 the binding rule specifies annual lump-sum allocation; ongoing accrual mechanics are not part of this service."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "A leave type may have at most one active policy at any time; getPolicyForLeaveType enforces this by rejecting with POLICY_VIOLATION when zero or multiple active policies are found for a given leave type."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "The calculated entitlement is always a non-negative integer bounded above by maxAccumulation when that field is defined; pro-ration never produces a fractional or negative result."
+    },
+    {
+      "entity": "LeaveType",
+      "mustExistOrExtend": true,
+      "invariant": "Only active leave types may be used for policy resolution; an inactive leave type causes getPolicyForLeaveType to reject with POLICY_VIOLATION regardless of whether policies exist."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "getPolicyForLeaveType(leaveTypeCode)",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Rejects with AppError code NOT_FOUND when the leave type code does not resolve to a row; rejects with AppError code POLICY_VIOLATION when the leave type is inactive or when zero or multiple active policies exist for that type. Returns the single active LeavePolicy on success."
+    },
+    {
+      "operation": "getActivePolicies()",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Resolves with an array of LeavePolicy objects filtered to isActive === true (possibly empty); propagates repository-level errors without transformation. Never rejects for \"no results\" \u2014 an empty array is a valid response."
+    },
+    {
+      "operation": "calculateEntitlement(policy, hireDate, fiscalYear)",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Pure synchronous function \u2014 never throws under normal input; returns a non-negative integer. Fiscal year start is Jan 1 of fiscalYear. Hires on or before that date receive full entitlementDays; later hires are pro-rated by (11 - hireMonth) whole months, floored, then capped at maxAccumulation if defined."
+    },
+    {
+      "operation": "validatePolicy(policy)",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Pure synchronous function \u2014 never throws; returns false for null/undefined/non-object input or any structural violation rather than throwing. Returns true only when all required and optional fields satisfy their type and range constraints."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The service must operate on the LeavePolicy interface as defined in leave-policy.model.ts \u2014 entitlementDays (number), maxAccumulation (number | undefined), accrualRate (number | undefined), minimumNoticeDays (number | undefined), requiresManagerApproval (boolean), isActive (boolean). The pro-ration and validation logic must reference these exact field names.",
+      "referencePath": "src/modules/leave-policy/leave-policy.model.ts"
+    },
+    {
+      "requirement": "The service must call ILeavePolicyRepository.findAll() for getActivePolicies and ILeavePolicyRepository.findActiveByLeaveTypeId(leaveTypeId) for getPolicyForLeaveType \u2014 matching the repository interface method names and signatures declared in Phase 3.",
+      "referencePath": "src/modules/leave-policy/leave-policy.repository.interface.ts"
+    },
+    {
+      "requirement": "The service must call ILeaveTypeRepository.findByCode(code) to resolve a leave type by its LeaveTypeCode \u2014 matching the repository interface method declared in Phase 2. The returned LeaveType.isActive field drives the active-type check.",
+      "referencePath": "src/modules/leave-policy/leave-type.repository.interface.ts"
+    },
+    {
+      "requirement": "The pro-ration algorithm must match the BINDING business rule in reconciled.json: annual lump-sum allocation at fiscal year start (Jan 1); mid-year hires pro-rated by whole months remaining (11 - hireMonth), rounded down; maxAccumulation caps the result. The fiscal year boundary is calendar year (Jan 1 \u2013 Dec 31), organisation-wide.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "The error codes used by the service (NOT_FOUND, POLICY_VIOLATION) must match the Error Response Contract section of ARCHITECTURE.md: not found \u2192 404 (NOT_FOUND), policy violation \u2192 400 (POLICY_VIOLATION).",
+      "referencePath": "docs/ARCHITECTURE.md"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "leave-balance module (Phase 9 \u2014 LeaveBalanceService)",
+      "why": "LeaveBalanceService.initializeBalancesForEmployee will call LeavePolicyService.getActivePolicies and calculateEntitlement to compute per-policy entitlements when creating balance records for a new employee."
+    },
+    {
+      "target": "leave-request module (Phase 10 \u2014 LeaveRequestService)",
+      "why": "LeaveRequestService will call getPolicyForLeaveType to resolve the policy governing a leave type (for notice-period checks, approval-flag checks, and entitlement validation) during request submission and approval."
+    },
+    {
+      "target": "shared-types module (LeaveTypeCode enum)",
+      "why": "The service interface and getPolicyForLeaveType parameter depend on the LeaveTypeCode enum from src/shared/types for type-safe leave type identification."
+    }
+  ]
+}
