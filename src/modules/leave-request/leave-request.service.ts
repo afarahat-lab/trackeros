@@ -1,5 +1,3 @@
-import { PoolClient } from 'pg';
-import { pool } from '../../shared/db/connection';
 import { ILeaveRequestService } from './leave-request.service.interface';
 import { ILeaveRequestRepository } from './leave-request.repository';
 import { IEmployeeRepository } from '../employee/employee.repository';
@@ -68,13 +66,12 @@ export class LeaveRequestService implements ILeaveRequestService {
     if (leaveType !== LeaveType.EMERGENCY) {
       const policies = await this.leavePolicyRepository.findByLeaveType(leaveType);
       const activePolicy = policies.find((p) => p.isActive);
-      if (activePolicy && activePolicy.minimumNoticeDays !== null) {
+      if (activePolicy && activePolicy.minimumNoticeDays !== null && activePolicy.minimumNoticeDays > 0) {
         const today = this.todayUtc();
-        const noticeMs = startDate.getTime() - today.getTime();
-        const noticeDays = Math.floor(noticeMs / (1000 * 60 * 60 * 24));
-        if (noticeDays < activePolicy.minimumNoticeDays) {
+        const noticeBusinessDays = this.countBusinessDays(today, startDate);
+        if (noticeBusinessDays < activePolicy.minimumNoticeDays) {
           throw new Error(
-            `Leave request does not meet minimum notice of ${activePolicy.minimumNoticeDays} day(s)`,
+            `Leave request does not meet minimum notice of ${activePolicy.minimumNoticeDays} business day(s)`,
           );
         }
       }

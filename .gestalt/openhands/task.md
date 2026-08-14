@@ -1,12 +1,17 @@
-# Implement this phase: Phase 9: LeaveRequestService
+# Fix specific quality-gate violations: Phase 9: LeaveRequestService
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/73542714-9897-4d99-9509-1a7bb9190c33/9`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/fix/73542714-9897-4d99-9509-1a7bb9190c33/9/2`. Do not clone anything; work only in this directory.
 
-## What to build
-(no phase architecture provided — infer from the success criteria below)
+You are fixing SPECIFIC violations the quality gate found in EXISTING, already-committed files. Make the targeted edits listed below — do NOT refactor, regenerate, or change unrelated code.
 
-## Success criteria
-Create src/modules/leave-request/leave-request.service.interface.ts with ILeaveRequestService interface (submit, approve, reject, cancel, findById, findByEmployeeId, findPendingByManagerId). Create src/modules/leave-request/leave-request.service.ts with LeaveRequestService implementing ILeaveRequestService. Business rules: only ACTIVE employees may submit; overlapping SUBMITTED/APPROVED requests rejected; emergency leave bypasses minimumNoticeDays; manager resolved via IEmployeeRepository (managerId from employee record; if null escalate to HR); managers act only on direct reports; day counting is business days only (exclude Sat/Sun and public holidays), startDate and endDate inclusive, whole days only; cross-fiscal-year requests deduct from fiscal year of startDate; balance deducted on APPROVAL, released on REJECT/CANCEL; audit log entries on every state transition; notifications sent on SUBMIT/APPROVE/REJECT/CANCEL. Inject ILeaveRequestRepository, IEmployeeRepository, ILeavePolicyRepository, ILeaveBalanceService, IAuditLogRepository, INotificationRepository. This phase depends on all model, repository, and service interface files from Phases 1-8 — read them before generating. Include Jest unit tests in tests/unit/modules/leave-request/leave-request.service.test.ts.
+The files ALREADY EXIST. You MUST edit them in place with the `str_replace_editor` tool. Reading or viewing a file is NOT sufficient — you have NOT finished until you have edited EVERY file listed below.
+
+## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
+Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
+- Use unknown with type guards instead of any (rule: `no-any`)
+- Database calls must go through repository pattern (rule: `no-direct-db-outside-repository`)
+- No hardcoded passwords, API keys, or tokens (rule: `no-hardcoded-secrets`)
+- Do not add @gestalt/* packages as project dependencies — these are Gestalt platform internals not available on npm (rule: `no-gestalt-internal-deps`)
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -30,13 +35,6 @@ Cross-cutting rules throughout:
 - Emergency leave is a SEPARATE pool (distinct from annual/sick) and bypasses the advance-notice requirement, but still requires approval and deducts from its own balance.
 - Every endpoint enforces RBAC (employees on their own records; managers approve/reject direct reports) plus input validation.
 - Only ACTIVE employees may submit leave. [BINDING RULE — operator decision resolving: How is the fiscal year determined for LeaveBalance assignment? Is it calendar year (Jan 1 – Dec 31), a company-specific fiscal year (e.g., Apr 1 – Mar 31), or configurable per policy?; What happens when a LeaveRequest spans two fiscal years (e.g., startDate in December, endDate in January)?; How does accrual work for annual leave? Is the full entitlement granted upfront at the start of the fiscal year, or does it accrue over time?; Do unused leave days carry over to the next fiscal year, and if so, up to what limit?; How is an employee's manager resolved for routing approvals and notifications?; How are leave days counted for balance deduction — calendar days (inclusive start..end) or working/business days? Does a half-day leave consume 0.5 or 1 day?; What defines the fiscal_year boundary for leave balances — calendar year, a configurable fiscal year (e.g. Apr–Mar), or employee hire-date anniversary?; How is leave balance computed — simple remaining = allocated - used, or does it involve accrual rules (e.g. pro-rata monthly accrual, carry-over from prior year)?; How is an employee's manager resolved? The LeaveRequest service needs a managerId for routing approvals and notifications.; apply everywhere these apply, not in one place only]
-
-## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
-Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
-- Use unknown with type guards instead of any (rule: `no-any`)
-- Database calls must go through repository pattern (rule: `no-direct-db-outside-repository`)
-- No hardcoded passwords, API keys, or tokens (rule: `no-hardcoded-secrets`)
-- Do not add @gestalt/* packages as project dependencies — these are Gestalt platform internals not available on npm (rule: `no-gestalt-internal-deps`)
 
 ## Architecture & constraint rules the quality gate enforces (satisfy these now)
 The quality gate judges your code against the rules below and BLOCKS the phase on any violation — a violation it rates critical escalates to a human with no automatic retry. These are the same rules the gate checks, so comply up front rather than leaving them for the gate:
@@ -62,21 +60,51 @@ These are the project's non-negotiable invariants. A violation is a GOLDEN_PRINC
 - GP-006 — Error handling: No unhandled promise rejections. All async errors are caught and handled.
 
 ## Project stack & references
-Before writing code, read the referenced files below (those present in the working directory) to learn the project's language, framework, test runner, and conventions, and the cross-cutting rules your code must satisfy — then follow the existing repository conventions:
+Before making the edits below, read the referenced files (those present in the working directory) to learn the project's architecture, conventions, and the cross-cutting rules your fix must still satisfy — then keep the edits consistent with them:
 - `HARNESS.json`
 - `docs/ARCHITECTURE.md`
 - `docs/GOLDEN_PRINCIPLES.md`
 - `AGENTS.md`
 - `PLAN.md`
 
+## Required edits
+
+### Coherent change 1 — apply as ONE atomic edit across ALL sites below
+
+Unifying change (do this now): Remove all direct pg Pool/PoolClient usage from approve() and cancel(); perform state transitions, balance deduction/release, audit logging, and notifications exclusively through the injected ILeaveRequestRepository, ILeaveBalanceService, IAuditLogRepository, and INotificationRepository so the service is fully unit-testable without a database connection.
+
+The sites below are the SAME underlying issue. Fixing some but not others leaves the code incoherent and the quality gate WILL re-flag it — apply the one change above consistently to EVERY site:
+
+- Site 1
+File: src/modules/leave-request/leave-request.service.ts
+Line: 161
+Rule violated: test-failure
+Action (do this now): Edit `src/modules/leave-request/leave-request.service.ts` at line 161 in place to fix the `test-failure` violation.
+What the quality gate found — apply this: Failing test: LeaveRequestService › approve › approves a submitted leave request.
+
+- Site 2
+File: src/modules/leave-request/leave-request.service.ts
+Line: 291
+Rule violated: test-failure
+Action (do this now): Edit `src/modules/leave-request/leave-request.service.ts` at line 291 in place to fix the `test-failure` violation.
+What the quality gate found — apply this: Failing test: LeaveRequestService › cancel › cancels an approved leave request and releases balance.
+
+Then check the rest of these files (and the surrounding module) for ANY OTHER occurrence of the same pattern beyond the specific lines listed above, and apply the same change there too — do NOT limit the fix to only the enumerated sites.
+
+### Edit 1
+File: src/modules/leave-request/leave-request.service.ts
+Line: 76
+Rule violated: test-failure
+Action (do this now): Edit `src/modules/leave-request/leave-request.service.ts` at line 76 in place to fix the `test-failure` violation.
+What the quality gate found — apply this: Failing test: LeaveRequestService › business day counting › counts business days excluding weekends.
+
 ## Verify before you finish (MANDATORY)
-The code you write MUST compile and its tests MUST pass — a compilation or type error must NEVER be left for CI to find. Before you declare this task done:
-- Read the project's build / type-check / test commands from `package.json` (scripts) and `HARNESS.json`.
-- Install dependencies if they are not already installed, then RUN the type-check / build (e.g. `npm run build` or `tsc --noEmit`) AND the tests (e.g. `npm test`) for the files this phase touches.
-- FIX every compilation error, type error, and failing test you introduced — including in test files — and re-run until they pass.
+After making the edits above, the code MUST still compile and its tests MUST pass — a compilation/type error, or a test your change breaks, must NEVER be left for CI or the quality gate to find. Before you declare this task done:
+- Read the project's build / type-check / test commands from `package.json` (scripts) and `HARNESS.json`, install dependencies if they are not already installed, then RUN the type-check / build (e.g. `npm run build` or `tsc --noEmit`) AND the tests (e.g. `npm test`).
+- FIX every compilation error, type error, and failing test that YOUR edits introduced — including updating a test whose expectation your change legitimately invalidated (e.g. a new required field, a new status code such as 401/403 from an added authorization check, added input validation) — and re-run until they pass.
 - Only when the build and the tests pass may you consider the task complete. If a dependency install genuinely cannot be made to work, say so explicitly in your final message rather than declaring success on unverified code.
 
 ## Constraints (mandatory)
-- Write and modify source files ONLY. Do NOT run `git commit`, `git push`, `git add`, or any other git command. The platform handles all git operations. (Running the build / type-check / tests above is expected and encouraged — that is NOT a git operation.)
-- Do not create a new repository or change the git remote.
-- Stay within the scope of this phase; do not implement deferred/later work.
+- Keep the change SURGICAL: make the required edits above and fix only what they broke (compile/type errors and the tests they invalidated). Do NOT refactor, regenerate, or change unrelated code, and do not add / delete / rename source files beyond what a required edit — or a test-fix for it — needs.
+- Do NOT run `git commit`, `git push`, `git add`, or any git command. The platform handles all git operations. (Running the build / type-check / tests above is expected and encouraged — that is NOT a git operation.)
+- When the listed edits are made and the build + tests pass, stop.
