@@ -1,8 +1,7 @@
 import { LeaveBalanceService } from '../../../../src/modules/leave-balance/leave-balance.service';
 import { ILeaveBalanceRepository } from '../../../../src/modules/leave-balance/leave-balance.repository.interface';
-import { ILeavePolicyService, AppError } from '../../../../src/modules/leave-policy';
+import { ILeavePolicyService, AppError, LeavePolicy } from '../../../../src/modules/leave-policy';
 import { LeaveBalance } from '../../../../src/modules/leave-balance/leave-balance.model';
-import { LeavePolicy } from '../../../../src/modules/leave-policy/leave-policy.model';
 
 function makeLeaveBalance(overrides: Partial<LeaveBalance> = {}): LeaveBalance {
   return {

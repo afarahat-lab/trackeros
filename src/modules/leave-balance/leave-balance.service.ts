@@ -124,8 +124,10 @@ export class LeaveBalanceService implements ILeaveBalanceService {
       );
     }
 
+    const newPendingDays = Math.max(0, balance.pendingDays - days);
+
     await this.balanceRepo.update(balance.id, {
-      pendingDays: balance.pendingDays - days,
+      pendingDays: newPendingDays,
       usedDays: balance.usedDays + days,
     });
   }

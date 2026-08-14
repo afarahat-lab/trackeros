@@ -1,23 +1,33 @@
-# Implement this phase: Phase 9: LeaveBalanceService (leave-balance module)
+# Fix specific quality-gate violations: Phase 9: LeaveBalanceService (leave-balance module)
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/32ad270f-dfe8-4e32-be27-804897fcc970/9`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/fix/32ad270f-dfe8-4e32-be27-804897fcc970/9/1`. Do not clone anything; work only in this directory.
 
-## What to build
-(no phase architecture provided — infer from the success criteria below)
+You are fixing SPECIFIC violations the quality gate found in EXISTING, already-committed files. Make the targeted edits listed below — do NOT refactor, regenerate, or change unrelated code.
 
-## Success criteria
-Create the LeaveBalanceService in the leave-balance module.
+The files ALREADY EXIST. You MUST edit them in place with the `str_replace_editor` tool. Reading or viewing a file is NOT sufficient — you have NOT finished until you have edited EVERY file listed below.
 
-Files to create:
-1. `src/modules/leave-balance/leave-balance.service.interface.ts` — Define and export ILeaveBalanceService interface with methods: getBalancesForEmployee(employeeId: string, fiscalYear?: number): Promise<LeaveBalance[]>, initializeBalancesForEmployee(employeeId: string, hireDate: Date): Promise<LeaveBalance[]> (auto-creates balances for all active leave types using LeavePolicyService.calculateEntitlement), getAvailableBalance(employeeId: string, policyId: string, fiscalYear: number): number (returns remainingDays - pendingDays), reserveDays(employeeId: string, policyId: string, days: number, fiscalYear: number): Promise<void> (increments pendingDays), finalizeDeduction(employeeId: string, policyId: string, days: number, fiscalYear: number): Promise<void> (moves pendingDays to usedDays), releaseReservation(employeeId: string, policyId: string, days: number, fiscalYear: number): Promise<void> (decrements pendingDays).
+## Constraints & consistency
+You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
+### Reuse & consistency — match these exactly
+- The pendingDays floor in finalizeDeduction must reuse the exact defensive pattern already established in releaseReservation within the same service file: compute the new pendingDays via Math.max(0, balance.pendingDays - days) before calling the repository update, rather than inlining the raw subtraction. (see `src/modules/leave-balance/leave-balance.service.ts (releaseReservation method)`)
+- The consolidated LeavePolicy import in the test file must resolve to the same type exported by the leave-policy barrel, which re-exports LeavePolicy from the internal model — ensuring type-equivalence and no behavioral change. (see `src/modules/leave-policy/index.ts`)
+- The test file's barrel import must remain consistent with the source service file's existing barrel import pattern: both import ILeavePolicyService and AppError (and now LeavePolicy) from the leave-policy public entry point, never from internal module files. (see `src/modules/leave-balance/leave-balance.service.ts (line 4 import statement)`)
+### Entity invariants — enforce these
+- Reuse or extend `LeaveBalance`: pendingDays must never be driven below zero by any balance-mutating operation. The finalizeDeduction operation (which moves pendingDays to usedDays on approval) must enforce this floor just as releaseReservation already does, so that an over-deduction (days > pendingDays) clamps pendingDays to 0 rather than producing a negative value.
+- Reuse or extend `LeaveBalance`: remainingDays is a computed field equal to totalEntitlement - usedDays - pendingDays; the pendingDays floor in finalizeDeduction preserves the consistency of this computation by preventing negative pendingDays from inflating remainingDays beyond totalEntitlement - usedDays.
+### Interface contract — expose these operations (their shape is yours)
+- LeaveBalanceService.finalizeDeduction(employeeId, policyId, days, fiscalYear) — Throws AppError with code NOT_FOUND when no balance record exists for the given employee/policy/fiscal-year triple. On success, atomically updates the balance in a single repository update call: pendingDays is set to Math.max(0, balance.pendingDays - days) and usedDays is set to balance.usedDays + days. The pendingDays result must never be negative.
+- LeaveBalanceService.releaseReservation(employeeId, policyId, days, fiscalYear) — Throws AppError with code NOT_FOUND when no balance record exists. On success, sets pendingDays to Math.max(0, balance.pendingDays - days) and does not alter usedDays. This is the reference defensive pattern that finalizeDeduction must match.
+### Integration points — connect to these
+- leave-policy module public barrel (src/modules/leave-policy/index.ts) — The test file consumes the LeavePolicy type via this barrel; the barrel must re-export LeavePolicy (it already does) so the consolidated import resolves correctly.
+- leave-balance repository update interface (ILeaveBalanceRepository.update) — finalizeDeduction persists the floored pendingDays and incremented usedDays through a single update call; the repository contract for atomic field updates must be respected.
 
-2. `src/modules/leave-balance/leave-balance.service.ts` — Implement LeaveBalanceService class implementing ILeaveBalanceService. Inject ILeaveBalanceRepository (Phase 4) and ILeavePolicyService (Phase 8). The initializeBalancesForEmployee method must: fetch all active policies via LeavePolicyService, for each policy call calculateEntitlement with the employee's hireDate and current fiscal year, then create a LeaveBalance record. The reserveDays method must check that (remainingDays - pendingDays) >= days before reserving. The finalizeDeduction method must decrement pendingDays AND increment usedDays atomically.
-
-3. Update `src/modules/leave-balance/index.ts` — Add re-exports for ILeaveBalanceService and LeaveBalanceService.
-
-Include Jest unit tests in `tests/unit/modules/leave-balance/` for the service, testing reservation, deduction, release, and insufficient-balance rejection.
-
-This phase depends on `src/modules/leave-balance/leave-balance.model.ts` and `src/modules/leave-balance/leave-balance.repository.interface.ts` from Phase 4, and `src/modules/leave-policy/leave-policy.service.interface.ts` from Phase 8 — read all before generating.
+## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
+Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
+- Use unknown with type guards instead of any (rule: `no-any`)
+- Database calls must go through repository pattern (rule: `no-direct-db-outside-repository`)
+- No hardcoded passwords, API keys, or tokens (rule: `no-hardcoded-secrets`)
+- Do not add @gestalt/* packages as project dependencies — these are Gestalt platform internals not available on npm (rule: `no-gestalt-internal-deps`)
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -39,39 +49,6 @@ Cross-cutting rules that apply throughout:
 - Balances are auto-created for all leave types on employee creation.
 - Every endpoint enforces RBAC (employees act on their own records; managers approve/reject their direct reports) plus input validation.
 - When an employee has no manager, approval escalates to HR. [BINDING RULE — operator decision resolving: How is the fiscal year boundary determined for LeaveBalance?; How does leave accrual work? LeavePolicy defines accrualRate and maxAccumulation, but the accrual mechanics (frequency, proration for mid-year hires, carryover rules) are not specified.; Does emergency leave have special rules that distinguish it from annual and sick leave?; When a leave request is approved, should the balance be deducted immediately at approval time or at the start of the leave period?; How is the fiscal year boundary determined for LeaveBalance? Is it calendar year (Jan 1 – Dec 31), the employee's hire-date anniversary, or a configurable organisation-wide fiscal year start?; Does emergency leave have special rules that distinguish it from annual and sick leave? The feature description lists all three but does not specify whether emergency leave bypasses notice periods, approval requirements, or balance checks.; How are leave days counted — calendar days or business/working days?; What are the fiscal year boundaries for balance scoping?; How does leave balance accrual work — annual lump-sum allocation at fiscal-year start vs. monthly pro-rata accrual?; What is the fiscal year boundary — calendar year (Jan 1 – Dec 31) or a configurable company fiscal year?; apply everywhere these apply, not in one place only]
-
-## Constraints & consistency
-You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
-### Reuse & consistency — match these exactly
-- The service must call only the methods declared on ILeaveBalanceRepository (findByEmployeeId, findByEmployeeIdAndFiscalYear, findByEmployeeIdAndPolicyId, create, update, createBatch) with the existing CreateLeaveBalanceDto/UpdateLeaveBalanceDto shapes; it must not assume any repository method or DTO field that does not exist there. (see `src/modules/leave-balance/leave-balance.repository.interface.ts`)
-- The service must consume LeavePolicyService only via the ILeavePolicyService contract — getActivePolicies() and calculateEntitlement(policy, hireDate, fiscalYear) — using the exact LeavePolicy model shape from leave-policy.model.ts; it must not duplicate or re-implement the pro-ration/cap logic. (see `src/modules/leave-policy/leave-policy.service.interface.ts`)
-- Domain errors must be thrown as the AppError class exported from leave-policy.service.ts (and re-exported via the leave-policy barrel), carrying a code string; error codes must match the Error Response Contract (INSUFFICIENT_BALANCE, NOT_FOUND) rather than inventing new error types. (see `src/modules/leave-policy/leave-policy.service.ts`)
-- The service must respect that remainingDays is recomputed by rowToLeaveBalance as totalEntitlement - usedDays - pendingDays at read time; when persisting updates it must not store a remainingDays that contradicts this computation, and must rely on the repository's multi-field update() for atomic pendingDays+usedDays changes. (see `src/modules/leave-balance/leave-balance.repository.ts`)
-- The barrel must continue to re-export the existing Phase 4 symbols (LeaveBalance, ILeaveBalanceRepository, CreateLeaveBalanceDto, UpdateLeaveBalanceDto, LeaveBalanceRepository) and additionally re-export the new service interface and implementation; no existing export may be removed or renamed. (see `src/modules/leave-balance/index.ts`)
-- New service tests must mirror the established test conventions visible in leave-policy.service.test.ts: jest.Mocked<Interface> mocks constructed in beforeEach, factory helper functions for fixtures, rejects.toMatchObject({ code, message }) for AppError assertions, and relative imports from ../../../../src/modules/...; mock the injected interfaces, not the pg pool. (see `tests/unit/modules/leave-policy/leave-policy.service.test.ts`)
-### Entity invariants — enforce these
-- Reuse or extend `LeaveBalance`: remainingDays == totalEntitlement - usedDays - pendingDays at all times; any service mutation of usedDays or pendingDays must keep this equality true (the repository mapper recomputes it at read time, so the service must not persist a violating remainingDays).
-- Reuse or extend `LeaveBalance`: pendingDays >= 0 and usedDays >= 0 after any service operation; reserveDays, finalizeDeduction, and releaseReservation must never drive either counter below zero.
-- Reuse or extend `LeaveBalance`: A balance row is uniquely scoped by (employeeId, policyId, fiscalYear); initializeBalancesForEmployee creates at most one balance per active policy for the hire-date calendar year, and reserve/finalize/release/getAvailable operate on that single matching row.
-- Reuse or extend `LeaveBalance`: On initialization, usedDays and pendingDays start at 0 and totalEntitlement equals the pro-rated entitlement from LeavePolicyService.calculateEntitlement(policy, hireDate, hireDate.getFullYear()), capped by maxAccumulation.
-### Interface contract — expose these operations (their shape is yours)
-- getBalancesForEmployee(employeeId, fiscalYear?) — Returns balances for the employee, optionally filtered to a fiscal year; when fiscalYear is omitted returns all years. No domain error for empty results (returns []).
-- initializeBalancesForEmployee(employeeId, hireDate) — Fetches active policies via LeavePolicyService, computes entitlement per policy using hireDate.getFullYear() as the fiscal year, and creates balance rows. Returns the created balances (empty array when no active policies). Propagates repository/policy-service errors.
-- getAvailableBalance(employeeId, policyId, fiscalYear) — Resolves to remainingDays - pendingDays for the matching balance; throws AppError code NOT_FOUND when no balance row exists for the (employeeId, policyId, fiscalYear) triple.
-- reserveDays(employeeId, policyId, days, fiscalYear) — Throws AppError code NOT_FOUND when the balance row is missing; throws AppError code INSUFFICIENT_BALANCE when (remainingDays - pendingDays) < days, leaving the row unmutated; otherwise increments pendingDays by days.
-- finalizeDeduction(employeeId, policyId, days, fiscalYear) — Throws AppError code NOT_FOUND when the balance row is missing; otherwise decrements pendingDays by days and increments usedDays by days in a single atomic update, preserving the remainingDays invariant.
-- releaseReservation(employeeId, policyId, days, fiscalYear) — Throws AppError code NOT_FOUND when the balance row is missing; otherwise decrements pendingDays by days without altering usedDays, never driving pendingDays below zero.
-### Integration points — connect to these
-- ILeaveBalanceRepository (Phase 4, leave-balance module) — The service depends on the repository for all balance persistence and lookups (findByEmployeeIdAndPolicyId for reads, create/createBatch for initialization, update for reservation/deduction/release mutations).
-- ILeavePolicyService (Phase 8, leave-policy module, via its index.ts barrel) — initializeBalancesForEmployee calls getActivePolicies() to enumerate policies and calculateEntitlement(policy, hireDate, fiscalYear) to compute each balance's totalEntitlement; AppError is also sourced from this barrel.
-- LeaveRequestService (Phase 10, leave-request module) — This service is the downstream consumer: submit calls reserveDays, approve calls finalizeDeduction, reject/cancel call releaseReservation, and the sufficiency check uses getAvailableBalance. The interface contract established here (signatures, error codes, atomicity) is what Phase 10 will depend on.
-
-## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
-Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
-- Use unknown with type guards instead of any (rule: `no-any`)
-- Database calls must go through repository pattern (rule: `no-direct-db-outside-repository`)
-- No hardcoded passwords, API keys, or tokens (rule: `no-hardcoded-secrets`)
-- Do not add @gestalt/* packages as project dependencies — these are Gestalt platform internals not available on npm (rule: `no-gestalt-internal-deps`)
 
 ## Architecture & constraint rules the quality gate enforces (satisfy these now)
 The quality gate judges your code against the rules below and BLOCKS the phase on any violation — a violation it rates critical escalates to a human with no automatic retry. These are the same rules the gate checks, so comply up front rather than leaving them for the gate:
@@ -97,21 +74,38 @@ These are the project's non-negotiable invariants. A violation is a GOLDEN_PRINC
 - GP-006 — Error handling: No unhandled promise rejections. All async errors are caught and handled.
 
 ## Project stack & references
-Before writing code, read the referenced files below (those present in the working directory) to learn the project's language, framework, test runner, and conventions, and the cross-cutting rules your code must satisfy — then follow the existing repository conventions:
+Before making the edits below, read the referenced files (those present in the working directory) to learn the project's architecture, conventions, and the cross-cutting rules your fix must still satisfy — then keep the edits consistent with them:
 - `HARNESS.json`
 - `docs/ARCHITECTURE.md`
 - `docs/GOLDEN_PRINCIPLES.md`
 - `AGENTS.md`
 - `PLAN.md`
 
+## Required edits
+
+### Edit 1
+File: tests/unit/modules/leave-balance/leave-balance.service.test.ts
+Line: 5
+Offending code: `import { LeavePolicy } from '../../../../src/modules/leave-policy/leave-policy.model';`
+Rule violated: barrel-import-constraint
+Action (do this now): Edit `tests/unit/modules/leave-balance/leave-balance.service.test.ts` at line 5 in place to fix the `barrel-import-constraint` violation.
+What the quality gate found — apply this: [barrel-import-constraint] The spec constraint states: "The leave-policy module is imported only through its index.ts barrel (where ILeavePolicyService and AppError are re-exported); never import leave-policy internals directly." The LeavePolicy type IS re-exported from the leave-policy barrel at src/modules/leave-policy/index.ts line 8 (`export { LeavePolicy } from './leave-policy.model';`), so this direct import of the internal model file bypasses the public barrel entry point. The fix is to import LeavePolicy from the barrel: `import { ILeavePolicyService, AppError, LeavePolicy } from '../../../../src/modules/leave-policy';`
+
+### Edit 2
+File: src/modules/leave-balance/leave-balance.service.ts
+Line: 119
+Offending code: `pendingDays: balance.pendingDays - days,`
+Rule violated: review/correctness
+Action (do this now): Edit `src/modules/leave-balance/leave-balance.service.ts` at line 119 in place to fix the `review/correctness` violation.
+What the quality gate found — apply this: [review/correctness] finalizeDeduction does not guard against driving pendingDays below zero: it computes `pendingDays: balance.pendingDays - days` without a Math.max(0, ...) floor. The entityInvariants in the phase spec state "pendingDays >= 0 and usedDays >= 0 after any service operation; reserveDays, finalizeDeduction, and releaseReservation must never drive either counter below zero." If called with days > pendingDays (e.g. a bug in the Phase 10 orchestrator), this would violate the invariant. releaseReservation already applies Math.max(0, ...) for the same reason.
+
 ## Verify before you finish (MANDATORY)
-The code you write MUST compile and its tests MUST pass — a compilation or type error must NEVER be left for CI to find. Before you declare this task done:
-- Read the project's build / type-check / test commands from `package.json` (scripts) and `HARNESS.json`.
-- Install dependencies if they are not already installed, then RUN the type-check / build (e.g. `npm run build` or `tsc --noEmit`) AND the tests (e.g. `npm test`) for the files this phase touches.
-- FIX every compilation error, type error, and failing test you introduced — including in test files — and re-run until they pass.
+After making the edits above, the code MUST still compile and its tests MUST pass — a compilation/type error, or a test your change breaks, must NEVER be left for CI or the quality gate to find. Before you declare this task done:
+- Read the project's build / type-check / test commands from `package.json` (scripts) and `HARNESS.json`, install dependencies if they are not already installed, then RUN the type-check / build (e.g. `npm run build` or `tsc --noEmit`) AND the tests (e.g. `npm test`).
+- FIX every compilation error, type error, and failing test that YOUR edits introduced — including updating a test whose expectation your change legitimately invalidated (e.g. a new required field, a new status code such as 401/403 from an added authorization check, added input validation) — and re-run until they pass.
 - Only when the build and the tests pass may you consider the task complete. If a dependency install genuinely cannot be made to work, say so explicitly in your final message rather than declaring success on unverified code.
 
 ## Constraints (mandatory)
-- Write and modify source files ONLY. Do NOT run `git commit`, `git push`, `git add`, or any other git command. The platform handles all git operations. (Running the build / type-check / tests above is expected and encouraged — that is NOT a git operation.)
-- Do not create a new repository or change the git remote.
-- Stay within the scope of this phase; do not implement deferred/later work.
+- Keep the change SURGICAL: make the required edits above and fix only what they broke (compile/type errors and the tests they invalidated). Do NOT refactor, regenerate, or change unrelated code, and do not add / delete / rename source files beyond what a required edit — or a test-fix for it — needs.
+- Do NOT run `git commit`, `git push`, `git add`, or any git command. The platform handles all git operations. (Running the build / type-check / tests above is expected and encouraged — that is NOT a git operation.)
+- When the listed edits are made and the build + tests pass, stop.
