@@ -1,0 +1,190 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-balance"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository",
+      "unit-tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The LeaveBalance model interface is exported from the leave-balance module and imports BalanceStatus from the shared types file; the interface is usable as a typed value throughout the module without compilation errors.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository interface declares all seven operations (findByEmployeeAndPolicy, findByEmployeeAndFiscalYear, findByEmployeeId, create, update, deductDays, restoreDays) and the concrete Pg implementation satisfies the interface so it can be assigned to the interface type without error.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "create persists a new leave_balances row from the input (excluding server-generated fields) and returns the fully-mapped LeaveBalance entity including server-generated id, createdAt, and updatedAt.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A duplicate insert that violates the (employee_id, policy_id, fiscal_year) uniqueness constraint is caught and re-thrown as a typed UniqueConstraintViolationError rather than propagating the raw pg error.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "deductDays increases usedDays by the given amount, decreases remainingDays by the same amount, and transitions status to EXHAUSTED when remainingDays reaches zero; the updated entity is persisted and returned.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "restoreDays decreases usedDays by the given amount, increases remainingDays by the same amount, and transitions status from EXHAUSTED back to ACTIVE when the balance was previously exhausted; the updated entity is persisted and returned.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Every repository method accepts an optional PoolClient as its last parameter; when a client is supplied the method executes against that client, and when omitted it falls back to the shared pool \u2014 verified by asserting the client's query is called and the pool's query is not.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Single-row lookup methods (findByEmployeeAndPolicy, findByEmployeeAndFiscalYear) return null when no row matches; list methods (findByEmployeeId) return an empty array when no rows match.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The row-to-entity mapper casts created_at and updated_at column values to Date objects and maps the status column to the BalanceStatus enum type.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "update applies only the supplied fields via a dynamic SET clause, advances updated_at to NOW(), and returns the refreshed entity or null when the target row does not exist.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access must go through the repository pattern (GP-001 / HARNESS no-direct-db-outside-repository); the leave-balance repository must use the shared pg pool from src/shared/db/connection.ts and must not issue SQL outside the repository layer.",
+    "Strict TypeScript with no implicit any and strict null checks (HARNESS no-any); use unknown with type guards instead of any for untyped row data.",
+    "The repository must follow the established convention of accepting an optional PoolClient as the last parameter on every method and resolving the connection via `const db = client ?? pool`, so balance-mutating methods can participate in caller-controlled approve/cancel transactions per the architecture's Transaction Contract.",
+    "The row-to-entity mapper must follow the existing convention: map snake_case DB columns to camelCase entity fields, cast date columns to Date objects, and preserve null for nullable fields using the `?? null` pattern.",
+    "create must accept an input shaped as the entity minus server-generated fields (id, createdAt, updatedAt) and use an INSERT ... RETURNING * statement; update must build a dynamic SET clause from a field map and append updated_at = NOW().",
+    "Unit tests must mock the shared db connection module before importing the pool, reset the mock query in beforeEach, and assert exact SQL/params, null and empty-array cases, PoolClient delegation, Date casting, and UniqueConstraintViolationError handling \u2014 mirroring the existing employee and leave-policy repository test patterns."
+  ],
+  "outOfScope": [
+    "LeaveBalanceService and its business logic (initializeBalancesForEmployee, pro-rated accrual, fiscal-year rollover to CLOSED, use-it-or-lose-it carryover) \u2014 deferred to Phase 8.",
+    "LeaveBalance controller, routes, and any HTTP/REST API surface \u2014 the leave-balance module exposes no API endpoints in this phase; only GET /leave-balances (hr_admin) is mentioned in the architecture and belongs to a later wiring phase.",
+    "Audit record emission for balance mutations (GP-002) \u2014 the repository layer does not write audit logs; audit logging is orchestrated by the service layer in later phases.",
+    "Database migrations or schema creation for the leave_balances table \u2014 the conceptual table schema is already defined in the reconciled architecture; this phase assumes the table exists."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "The balance invariant must always hold: remainingDays = totalEntitlement - usedDays. deductDays and restoreDays must preserve this relationship by adjusting usedDays and remainingDays by equal and opposite amounts."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "Lifecycle: ACTIVE \u2192 EXHAUSTED (when remainingDays reaches 0); EXHAUSTED \u2192 ACTIVE (when days are restored and remainingDays becomes positive again); ACTIVE/EXHAUSTED \u2192 CLOSED (fiscal-year rollover, deferred to Phase 8). The repository's deductDays and restoreDays must enforce the ACTIVE\u2194EXHAUSTED transitions per business rules 5 and 6."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "Uniqueness: at most one balance row exists per (employeeId, policyId, fiscalYear) combination, enforced by the DB uniqueness index; create must surface a violation of this constraint as a typed UniqueConstraintViolationError."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "findByEmployeeAndPolicy(employeeId, policyId, fiscalYear?, client?) \u2014 returns the single LeaveBalance matching the employee+policy (and fiscal year when provided) or null.",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns null when no row matches; never throws on not-found."
+    },
+    {
+      "operation": "findByEmployeeAndFiscalYear(employeeId, fiscalYear, client?) \u2014 returns the single balance or list of balances for an employee in a given fiscal year, or null/empty when none exist.",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns null (single-row) or empty array (list) when no rows match; never throws on not-found."
+    },
+    {
+      "operation": "findByEmployeeId(employeeId, client?) \u2014 returns all LeaveBalance rows for an employee across all fiscal years as an array (empty when none).",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns an empty array when no rows match; never throws on not-found."
+    },
+    {
+      "operation": "create(input, client?) \u2014 persists a new leave_balances row from the input (excluding id/createdAt/updatedAt) and returns the fully-mapped entity.",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws UniqueConstraintViolationError (pg code 23505) when the (employee_id, policy_id, fiscal_year) uniqueness constraint is violated; re-throws all other errors unchanged."
+    },
+    {
+      "operation": "update(id, updates, client?) \u2014 applies a dynamic subset of mutable fields, advances updated_at, and returns the refreshed entity or null when the row does not exist.",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns null when the target row does not exist; never throws on not-found."
+    },
+    {
+      "operation": "deductDays(id, days, client?) \u2014 atomically increments usedDays and decrements remainingDays by `days`, transitioning status to EXHAUSTED when remainingDays reaches 0; returns the updated entity or null when not found.",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns null when the target balance row does not exist; the usedDays/remainingDays adjustment and status transition must be persisted in a single UPDATE so they are atomic within the caller's transaction when a client is supplied."
+    },
+    {
+      "operation": "restoreDays(id, days, client?) \u2014 atomically decrements usedDays and increments remainingDays by `days`, transitioning status from EXHAUSTED to ACTIVE when the balance was previously exhausted; returns the updated entity or null when not found.",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns null when the target balance row does not exist; the usedDays/remainingDays adjustment and status transition must be persisted in a single UPDATE so they are atomic within the caller's transaction when a client is supplied."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The LeaveBalance model must be a plain exported interface importing BalanceStatus from the shared types file, matching the pattern established by employee.model.ts and leave-policy.model.ts (plain interface, enum imported from shared types, no class or runtime logic).",
+      "referencePath": "src/modules/employee/employee.model.ts"
+    },
+    {
+      "requirement": "The BalanceStatus enum (ACTIVE, EXHAUSTED, CLOSED) must be imported from the shared types file; the model and repository must not redefine or re-declare this enum locally.",
+      "referencePath": "src/shared/types/leave.types.ts"
+    },
+    {
+      "requirement": "The repository must import the shared pg pool from the db connection module and use the `const db = client ?? pool` pattern with an optional PoolClient last parameter, matching the convention in employee.repository.ts and leave-policy.repository.ts.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "The create method's input type must be Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt'> and use INSERT ... RETURNING *, and the update method must build a dynamic SET clause from a camelCase-to-snake_case field map with updated_at = NOW() appended \u2014 matching the exact pattern in employee.repository.ts.",
+      "referencePath": "src/modules/employee/employee.repository.ts"
+    },
+    {
+      "requirement": "UniqueConstraintViolationError must be defined and thrown on pg code 23505 with the same class shape (name property set, cause field preserved) as established in employee.repository.ts; if the employee repository exports it, the leave-balance repository may import it rather than redefining it.",
+      "referencePath": "src/modules/employee/employee.repository.ts"
+    },
+    {
+      "requirement": "The row-to-entity mapper must follow the private rowTo* method convention: snake_case column keys mapped to camelCase entity fields, date columns cast via new Date(), and the `?? null` pattern for nullable fields \u2014 matching rowToEmployee and rowToLeavePolicy.",
+      "referencePath": "src/modules/leave-policy/leave-policy.repository.ts"
+    },
+    {
+      "requirement": "The unit test file must follow the established test structure: jest.mock the db connection module before importing pool, makeRow/makeEntity helpers with snake_case row overrides, describe/it per method, beforeEach mockReset, and assertions for exact SQL+params, null/empty cases, PoolClient delegation, Date casting, and UniqueConstraintViolationError \u2014 matching employee.repository.test.ts and leave-policy.repository.test.ts.",
+      "referencePath": "tests/unit/modules/employee/employee.repository.test.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/leave.types.ts (BalanceStatus enum)",
+      "why": "The LeaveBalance model imports BalanceStatus from the shared types module; this is the sole external type dependency for the model."
+    },
+    {
+      "target": "src/shared/db/connection.ts (pg pool)",
+      "why": "The PgLeaveBalanceRepository resolves its database connection from the shared pool (or a caller-supplied PoolClient), matching all other repository implementations."
+    },
+    {
+      "target": "src/modules/leave-policy/leave-policy.repository.ts (ILeavePolicyRepository)",
+      "why": "Per the reconciled architecture dependency map, LeaveBalance depends on LeavePolicy; the repository itself does not call the policy repository in this phase, but the module boundary declares this dependency for the downstream LeaveBalanceService (Phase 8) which will initialize balances from policy entitlements."
+    },
+    {
+      "target": "Future LeaveRequestService approve/cancel transaction (Phase 9)",
+      "why": "deductDays and restoreDays are the transaction-contract methods that the LeaveRequestService will invoke within a caller-controlled BEGIN/COMMIT unit of work when approving or cancelling a leave request; the optional PoolClient parameter exists to support this delegation."
+    }
+  ]
+}
