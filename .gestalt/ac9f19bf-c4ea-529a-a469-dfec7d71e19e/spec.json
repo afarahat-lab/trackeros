@@ -1,0 +1,191 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-request"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository",
+      "unit-tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The LeaveRequest model interface is exported and its leaveType and status fields are typed to the LeaveType and LeaveRequestStatus enums imported from src/shared/types/leave.types.ts (no inline string-literal duplicates of the enum values).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository interface declares all six operations: findById, findByEmployeeId, findOverlapping, create, updateStatus, findAllPendingByManagerId, and a concrete implementation backed by the shared pg pool exists.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "create persists a new leave request via INSERT ... RETURNING * and returns the full LeaveRequest entity with server-generated id/createdAt/updatedAt populated from the returned row.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "create wraps a pg error with code 23505 into the existing UniqueConstraintViolationError (imported from the employee module) and re-throws non-23505 errors unchanged.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findOverlapping returns only SUBMITTED or APPROVED requests for the given employee whose date ranges overlap the supplied range (start_date <= endDate AND end_date >= startDate), excluding DRAFT/REJECTED/CANCELLED requests.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findAllPendingByManagerId returns only SUBMITTED leave requests belonging to employees whose manager_id equals the supplied manager id (joining employees on manager_id).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "updateStatus updates the status (and approvedBy/approvedAt when supplied) of an existing leave request, advances updatedAt, returns the refreshed entity, and returns null when no row matches the id.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Every repository method accepts an optional PoolClient as its last parameter and uses it when provided (delegating the query to the client) instead of the shared pool; when omitted, the method uses the shared pool.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Row-to-entity mapping converts snake_case DB columns to camelCase entity fields, wraps date columns (start_date, end_date, approved_at, created_at, updated_at) in Date instances, and preserves null for approvedBy/approvedAt and undefined for a missing reason.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests exist at tests/unit/modules/leave-request/leave-request.repository.test.ts covering each of the six methods (found/not-found/empty, return mapping, null handling) plus PoolClient delegation and the 23505 unique-violation wrapping, and the suite passes under the ts-jest node config.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No barrel/index.ts file is created in the leave-request module; imports target specific files directly, matching the existing employee/leave-policy/leave-balance modules.",
+    "No direct database access outside the repository layer (GP-001 / no-direct-db-outside-repository); the repository is the sole SQL boundary for leave_requests.",
+    "Use unknown with type guards instead of any (no-any rule); the row mapper and error inspection must type the pg row/error as Record<string, unknown>/unknown rather than any.",
+    "Strict TypeScript must pass (no implicit any, strict null checks); the new files must compile under the existing tsconfig (commonjs, rootDir ./src, baseUrl ./src) with tsc --noEmit.",
+    "Reuse the existing UniqueConstraintViolationError class exported from src/modules/employee/employee.repository.ts rather than redefining a duplicate error class in the leave-request module.",
+    "This phase produces only the model, repository interface + implementation, and unit tests; no service, controller, routes, audit-log writes, notification side effects, or balance deduction logic are introduced (those are later phases)."
+  ],
+  "outOfScope": [
+    "LeaveRequestService, controller, and Fastify routes (Phase 9\u201310) \u2014 no submit/approve/reject/cancel orchestration, RBAC enforcement, or app wiring in this phase.",
+    "Business-rule enforcement at the repository layer \u2014 overlap prevention is exposed as a query (findOverlapping) but the repository does NOT reject submissions, validate minimum notice, check employee ACTIVE status, or deduct balances; those decisions belong to the service layer.",
+    "Audit-log record creation on create/updateStatus (GP-002) \u2014 the repository performs persistence only; audit emission is the service's responsibility in a later phase, so the repository must not write audit_logs rows.",
+    "Notification side effects on status transitions \u2014 the repository does not create notifications; that is deferred to the service phase.",
+    "LeaveBalance deduction/restoration \u2014 updateStatus changes leave_requests only; coupling to leave_balances.used_days/remaining_days is the service's transactional concern in a later phase.",
+    "Database migrations or schema DDL for the leave_requests table \u2014 the table schema is already documented in reconciled.json; this phase assumes it exists and does not ship migration files."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "Lifecycle is DRAFT \u2192 SUBMITTED \u2192 (APPROVED | REJECTED); any non-terminal status may transition to CANCELLED. The repository's updateStatus must accept any LeaveRequestStatus value but never silently coerce an invalid transition \u2014 it persists exactly the status supplied by the caller."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "approvedBy and approvedAt are null until a request is APPROVED; the row mapper must preserve null for these columns rather than defaulting them to empty strings or the current time."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "reason is optional (string | undefined); a persisted null/missing reason column must surface as undefined on the entity, and create must accept an input where reason is omitted without inserting a NOT NULL violation semantics mismatch."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "startDate and endDate are inclusive calendar dates; the repository does not reorder or validate startDate <= endDate (that is a service/validation concern) \u2014 it persists and returns them as given."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "ILeaveRequestRepository.findById",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns the LeaveRequest when a row matches the id, null when no row matches; never throws on a missing row."
+    },
+    {
+      "operation": "ILeaveRequestRepository.findByEmployeeId",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns an array (possibly empty) of all leave requests for the employee; never throws on no matches."
+    },
+    {
+      "operation": "ILeaveRequestRepository.findOverlapping",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns an array (possibly empty) of SUBMITTED/APPROVED requests whose date range overlaps the supplied range for the given employee; never throws on no matches."
+    },
+    {
+      "operation": "ILeaveRequestRepository.create",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws UniqueConstraintViolationError on pg code 23505; re-throws all other errors unchanged. Returns the persisted LeaveRequest with server-generated id/createdAt/updatedAt."
+    },
+    {
+      "operation": "ILeaveRequestRepository.updateStatus",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the refreshed LeaveRequest or null when no row matches the id; advances updatedAt. This is the transaction-joining method per the Transaction Contract \u2014 it must accept an optional PoolClient to participate in a caller-owned unit of work."
+    },
+    {
+      "operation": "ILeaveRequestRepository.findAllPendingByManagerId",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns an array (possibly empty) of SUBMITTED leave requests for the manager's direct reports (employees whose manager_id matches); never throws on no matches."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The leave-request repository must reuse (import) the existing UniqueConstraintViolationError class and replicate the isUniqueViolation(error) guard (pg error code === '23505') rather than defining a parallel error type.",
+      "referencePath": "src/modules/employee/employee.repository.ts"
+    },
+    {
+      "requirement": "The repository structure must match the sibling pattern: an ILeaveRequestRepository interface paired with a PgLeaveRequestRepository class, `const db = client ?? pool;` per method, optional PoolClient as the last parameter, INSERT ... RETURNING * for create, and a private rowToLeaveRequest mapper converting snake_case columns to camelCase fields with new Date() wrapping on date columns.",
+      "referencePath": "src/modules/leave-balance/leave-balance.repository.ts"
+    },
+    {
+      "requirement": "The model must import LeaveType and LeaveRequestStatus from this file and type leaveType/status against those enums; the enum values must not be redeclared inline in the model or repository.",
+      "referencePath": "src/shared/types/leave.types.ts"
+    },
+    {
+      "requirement": "The repository must obtain the pg pool by importing the existing `pool` export from this file; it must not instantiate a new Pool.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "The unit test must follow the established sibling test pattern: jest.mock on the connection module before importing pool, makeRow()/makeLeaveRequest() helpers with Partial overrides, mockReset + fresh repo instance in beforeEach, and per-method coverage including PoolClient delegation and the 23505 unique-violation case.",
+      "referencePath": "tests/unit/modules/leave-balance/leave-balance.repository.test.ts"
+    },
+    {
+      "requirement": "The Transaction Contract section names updateStatus on ILeaveRequestRepository as a transaction-joining method accepting an optional PoolClient; the implementation must honor this so the future LeaveRequestService can pass a caller-owned client during the approve flow (update leave_requests.status + leave_balances deduction in one unit of work).",
+      "referencePath": "docs/ARCHITECTURE.md"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/leave.types.ts",
+      "why": "Provides the LeaveType and LeaveRequestStatus enums that type the model's leaveType and status fields."
+    },
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "Provides the shared pg.Pool instance the repository falls back to when no PoolClient is supplied."
+    },
+    {
+      "target": "src/modules/employee/employee.repository.ts",
+      "why": "Exports UniqueConstraintViolationError, which the leave-request repository imports and reuses for 23505 wrapping; also the future source of the employee/manager relationship used by findAllPendingByManagerId's join."
+    },
+    {
+      "target": "src/modules/leave-balance/leave-balance.repository.ts",
+      "why": "Sibling repository whose interface/impl pattern, PoolClient contract, and row-mapping conventions the leave-request repository must mirror for architectural consistency."
+    },
+    {
+      "target": "employees table (manager_id column)",
+      "why": "findAllPendingByManagerId joins leave_requests to employees on employee_id and filters by employees.manager_id = $1 to return a manager's direct reports' pending requests."
+    }
+  ]
+}
