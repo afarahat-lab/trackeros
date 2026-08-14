@@ -1,0 +1,137 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-policy"
+    ],
+    "affectedLayers": [
+      "service",
+      "unit-tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The leave-policy module exports a service interface declaring four operations: getPolicyForLeaveType (returns a non-null LeavePolicy by leave type code), getActivePolicies (returns all active LeavePolicy rows), calculateEntitlement (synchronous, returns a number), and validatePolicy (returns a boolean). The concrete service class implements this interface and is re-exported from the module barrel.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "calculateEntitlement implements the binding fiscal-year rule: fiscal year is calendar year (Jan 1\u2013Dec 31); a hire date on or before Jan 1 of the fiscalYear yields the full entitlementDays; a hire date within the fiscalYear is pro-rated by whole months remaining in the year (floored) divided by 12, multiplied by entitlementDays, then floored; the result is capped by maxAccumulation when that field is defined. Edge cases verified: hire Jan 15 \u2192 11 months remaining, hire Dec 1 \u2192 0 months remaining, hire before Jan 1 of fiscalYear \u2192 full entitlementDays.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "getPolicyForLeaveType resolves the LeaveType by code, then the active LeavePolicy for that type, and returns the single active policy. It throws an error carrying code NOT_FOUND when the leave type does not exist, and throws an error carrying code POLICY_VIOLATION when the leave type is inactive or when zero or multiple active policies exist for that type. The thrown errors are never swallowed (GP-006).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "validatePolicy returns true only for a structurally valid, active LeavePolicy (e.g., entitlementDays is a non-negative finite number, isActive is true, required numeric fields are non-negative where present) and returns false otherwise without throwing. getActivePolicies delegates to the injected policy repository and returns only active LeavePolicy rows.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests exist under tests/unit/modules/leave-policy/ for the service, with all injected repositories mocked (jest.mock / jest.fn, mockReset in beforeEach). Tests cover: getPolicyForLeaveType success path, not-found (NOT_FOUND), inactive type (POLICY_VIOLATION), zero active policies (POLICY_VIOLATION), multiple active policies (POLICY_VIOLATION); getActivePolicies returns active rows; calculateEntitlement edge cases (hire Jan 15 \u2192 11 months, hire Dec 1 \u2192 0 months, hire before fiscal year \u2192 full, maxAccumulation cap applied); validatePolicy true/false cases.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No `any` type anywhere in the service or interface (HARNESS no-any, severity high): use `unknown` with type guards where dynamic values appear.",
+    "The service must not import or touch the pg Pool / shared db connection directly (GP-001 + HARNESS no-direct-db-outside-repository, severity critical): all data access goes through the injected ILeavePolicyRepository and ILeaveTypeRepository.",
+    "No unhandled promise rejections (GP-006): every async operation in the service must surface errors via the thrown-error contract rather than leaking unhandled rejections.",
+    "Strict TypeScript must pass (tsc --noEmit): no implicit any, strict null checks \u2014 the service and interface must compile cleanly under the project's strict config.",
+    "Modules import from each other only through the declared public entry point (index.ts barrel) per ARCHITECTURE.md dependency rules; the service interface and class must be added to the leave-policy barrel re-exports."
+  ],
+  "outOfScope": [
+    "HTTP routes / Fastify plugin / controller layer for leave-policy \u2014 those are not part of this phase (the reconciled architecture lists leave-policy routes as a separate concern; no route file is created in Phase 8).",
+    "LeaveBalanceService and any balance initialization / reservation / deduction logic (Phase 9) \u2014 calculateEntitlement only computes the number; it does not create or update LeaveBalance rows.",
+    "Audit record creation for policy reads (GP-002 applies to state-changing operations; getPolicyForLeaveType / getActivePolicies / calculateEntitlement / validatePolicy are read-only or pure and do not mutate state, so no audit record is required this phase).",
+    "LeaveRequestService, overlap detection, day-counting, emergency-leave bypass, and manager-routing logic (Phase 10)."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "Only an active LeavePolicy (isActive=true) may be returned by getPolicyForLeaveType and getActivePolicies; an inactive policy is never surfaced as a usable policy for leave operations (binding business rule 8: only active LeaveType and LeavePolicy may be used)."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "The computed entitlement for a policy never exceeds its maxAccumulation when that field is defined: calculateEntitlement caps the pro-rated/full result at maxAccumulation, preserving the accumulation ceiling invariant."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "A LeavePolicy is associated with exactly one LeaveType via leaveTypeId; getPolicyForLeaveType resolves a LeaveType by code first, then locates the active policy for that type's id \u2014 the policy-to-type linkage is always traversed type-first, never policy-first."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "getPolicyForLeaveType(leaveTypeCode): Promise<LeavePolicy>",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Throws an error with code NOT_FOUND (404) when no LeaveType matches the code; throws an error with code POLICY_VIOLATION (400) when the LeaveType is inactive or when zero or multiple active policies exist for that type. Never returns null \u2014 the non-null Promise<LeavePolicy> signature is honored."
+    },
+    {
+      "operation": "getActivePolicies(): Promise<LeavePolicy[]>",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns only active LeavePolicy rows; returns an empty array when none exist rather than throwing. Errors from the underlying repository propagate as thrown errors (GP-006)."
+    },
+    {
+      "operation": "calculateEntitlement(policy: LeavePolicy, hireDate: Date, fiscalYear: number): number",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Pure synchronous function \u2014 does not throw under normal inputs; returns a non-negative integer (floored). The result is capped at policy.maxAccumulation when defined. No I/O, no side effects."
+    },
+    {
+      "operation": "validatePolicy(policy: LeavePolicy): boolean",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns true for a valid policy and false for an invalid one; must not throw for malformed input \u2014 invalid data yields false rather than an exception."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The service interface and implementation must consume the LeavePolicy shape exactly as defined (id, policyName, leaveTypeId, entitlementDays, accrualRate, maxAccumulation, minimumNoticeDays, requiresManagerApproval, isActive, createdAt, updatedAt) \u2014 do not redefine or alter the model; import it from this file.",
+      "referencePath": "src/modules/leave-policy/leave-policy.model.ts"
+    },
+    {
+      "requirement": "The service must depend on ILeavePolicyRepository as declared here (findAll, findById, findByLeaveTypeId, findActiveByLeaveTypeId, create, update, delete) \u2014 specifically use findActiveByLeaveTypeId for getPolicyForLeaveType and findAll (filtered to active) for getActivePolicies. Do not invent new repository methods.",
+      "referencePath": "src/modules/leave-policy/leave-policy.repository.interface.ts"
+    },
+    {
+      "requirement": "The service must depend on ILeaveTypeRepository as declared here (findAll, findById, findByCode, create, update, delete) \u2014 specifically use findByCode to resolve a LeaveType by its LeaveTypeCode in getPolicyForLeaveType. Do not invent new repository methods.",
+      "referencePath": "src/modules/leave-policy/leave-type.repository.interface.ts"
+    },
+    {
+      "requirement": "The getPolicyForLeaveType parameter type must be the LeaveTypeCode enum from this file (annual/sick/emergency/unpaid/maternity/paternity) \u2014 import via the shared-types barrel, never redefine the enum.",
+      "referencePath": "src/shared/types/leave-type-code.enum.ts"
+    },
+    {
+      "requirement": "The barrel must be extended (not replaced) to re-export ILeavePolicyService and LeavePolicyService alongside the existing Phase 2/3 exports (LeaveType, ILeaveTypeRepository, LeaveTypeRepository, DTOs, LeavePolicy, ILeavePolicyRepository, LeavePolicyRepository, DTOs) \u2014 preserving all current re-exports.",
+      "referencePath": "src/modules/leave-policy/index.ts"
+    },
+    {
+      "requirement": "Error codes thrown by getPolicyForLeaveType must match the Error Response Contract in ARCHITECTURE.md: NOT_FOUND (404) for missing entity, POLICY_VIOLATION (400) for inactive type or zero/multiple active policies \u2014 consistent with the standard { error, code } shape.",
+      "referencePath": "docs/ARCHITECTURE.md"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "ILeavePolicyRepository (Phase 3, src/modules/leave-policy/leave-policy.repository.interface.ts)",
+      "why": "The service injects this repository to fetch active policies (findActiveByLeaveTypeId for getPolicyForLeaveType, findAll filtered to active for getActivePolicies). This is the sole data source for LeavePolicy rows \u2014 no direct DB access."
+    },
+    {
+      "target": "ILeaveTypeRepository (Phase 2, src/modules/leave-policy/leave-type.repository.interface.ts)",
+      "why": "The service injects this repository to resolve a LeaveType by code (findByCode) before locating its active policy \u2014 getPolicyForLeaveType traverses type-first, then policy."
+    },
+    {
+      "target": "ILeavePolicyService (this phase, consumed by Phase 9 LeaveBalanceService)",
+      "why": "Phase 9's LeaveBalanceService.initializeBalancesForEmployee depends on getActivePolicies and calculateEntitlement from this interface to auto-create LeaveBalance rows with pro-rated entitlements. The interface contract established here is the integration seam for Phase 9."
+    }
+  ]
+}
