@@ -1,12 +1,12 @@
-# Implement this phase: Phase 3: LeavePolicy model + repository
+# Implement this phase: Phase 4: LeaveBalance model + repository
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/73542714-9897-4d99-9509-1a7bb9190c33/3`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/73542714-9897-4d99-9509-1a7bb9190c33/4`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create src/modules/leave-policy/leave-policy.model.ts with the LeavePolicy interface (id: string, policyName: string, leaveType: LeaveType, entitlementDays: number, accrualRate: number | null, maxAccumulation: number | null, minimumNoticeDays: number | null, requiresManagerApproval: boolean, isActive: boolean, createdAt: Date, updatedAt: Date). Import LeaveType from src/shared/types/leave.types.ts. Create src/modules/leave-policy/leave-policy.repository.ts with ILeavePolicyRepository interface (findById, findByLeaveType, findAllActive) and PgLeavePolicyRepository implementation using src/shared/db/connection.ts. Include Jest unit tests in tests/unit/modules/leave-policy/leave-policy.repository.test.ts.
+Create src/modules/leave-balance/leave-balance.model.ts with the LeaveBalance interface (id: string, employeeId: string, policyId: string, totalEntitlement: number, usedDays: number, remainingDays: number, fiscalYear: number, status: BalanceStatus, createdAt: Date, updatedAt: Date). Import BalanceStatus from src/shared/types/leave.types.ts. Create src/modules/leave-balance/leave-balance.repository.ts with ILeaveBalanceRepository interface (findByEmployeeAndPolicy, findByEmployeeAndFiscalYear, findByEmployeeId, create, update, deductDays, restoreDays) and PgLeaveBalanceRepository implementation using src/shared/db/connection.ts. Include Jest unit tests in tests/unit/modules/leave-balance/leave-balance.repository.test.ts.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -33,39 +33,45 @@ Cross-cutting rules throughout:
 
 ## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
 The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
-- `LeavePolicy` — the entity MUST have exactly these fields:
+- `LeaveBalance` — the entity MUST have exactly these fields:
     - id: string
-    - policyName: string
-    - leaveType: LeaveType
-    - entitlementDays: number
-    - accrualRate: number | null
-    - maxAccumulation: number | null
-    - minimumNoticeDays: number | null
-    - requiresManagerApproval: boolean
-    - isActive: boolean
+    - employeeId: string
+    - policyId: string
+    - totalEntitlement: number
+    - usedDays: number
+    - remainingDays: number
+    - fiscalYear: number
+    - status: 'ACTIVE' | 'EXHAUSTED' | 'CLOSED'
     - createdAt: Date
     - updatedAt: Date
 
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- The LeavePolicy model must follow the same structural convention as the Employee model: a bare `export interface` with no class, no runtime code, no default exports, importing its enum (LeaveType) from the shared types module via the same relative-path import style (`../../shared/types/leave.types`). (see `src/modules/employee/employee.model.ts`)
-- The leave-policy repository must match the employee repository's transaction-participation pattern: every method accepts an optional `client?: PoolClient`, resolves the connection via `const db = client ?? pool;`, imports `PoolClient` from `pg` and `pool` from `../../shared/db/connection`, and uses a private `rowToLeavePolicy` mapper that casts `Record<string, unknown>` row fields to the entity (snake_case→camelCase, enum cast for leaveType, `new Date()` for date fields, null preserved for nullable fields). (see `src/modules/employee/employee.repository.ts`)
-- The leave-policy repository test must mirror the employee repository test structure: `jest.mock` of the shared db connection before importing `pool`, `mockQuery.mockReset()` in `beforeEach`, `makeRow()`/`makeLeavePolicy()` factory helpers accepting `Partial` overrides, per-method `describe`/`it` blocks asserting both returned entity and exact SQL/args, and a test verifying a provided PoolClient is used instead of the pool. (see `tests/unit/modules/employee/employee.repository.test.ts`)
-- The LeavePolicy model must import LeaveType from the existing shared types module (Phase 1) rather than redefining it; the leaveType field must be typed as the imported LeaveType enum, and the row mapper must cast the database `leave_type` column value to LeaveType. (see `src/shared/types/leave.types.ts`)
-- The leave_policies table column names and indexes must match the reconciled architecture: snake_case columns (id, policy_name, leave_type, entitlement_days, accrual_rate, max_accumulation, minimum_notice_days, requires_manager_approval, is_active, created_at, updated_at) with indexes on leave_type and is_active; the repository queries must target this table and column naming. (see `.gestalt/architecture/reconciled.json`)
+- The LeaveBalance model must be a plain exported interface importing BalanceStatus from the shared types file, matching the pattern established by employee.model.ts and leave-policy.model.ts (plain interface, enum imported from shared types, no class or runtime logic). (see `src/modules/employee/employee.model.ts`)
+- The BalanceStatus enum (ACTIVE, EXHAUSTED, CLOSED) must be imported from the shared types file; the model and repository must not redefine or re-declare this enum locally. (see `src/shared/types/leave.types.ts`)
+- The repository must import the shared pg pool from the db connection module and use the `const db = client ?? pool` pattern with an optional PoolClient last parameter, matching the convention in employee.repository.ts and leave-policy.repository.ts. (see `src/shared/db/connection.ts`)
+- The create method's input type must be Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt'> and use INSERT ... RETURNING *, and the update method must build a dynamic SET clause from a camelCase-to-snake_case field map with updated_at = NOW() appended — matching the exact pattern in employee.repository.ts. (see `src/modules/employee/employee.repository.ts`)
+- UniqueConstraintViolationError must be defined and thrown on pg code 23505 with the same class shape (name property set, cause field preserved) as established in employee.repository.ts; if the employee repository exports it, the leave-balance repository may import it rather than redefining it. (see `src/modules/employee/employee.repository.ts`)
+- The row-to-entity mapper must follow the private rowTo* method convention: snake_case column keys mapped to camelCase entity fields, date columns cast via new Date(), and the `?? null` pattern for nullable fields — matching rowToEmployee and rowToLeavePolicy. (see `src/modules/leave-policy/leave-policy.repository.ts`)
+- The unit test file must follow the established test structure: jest.mock the db connection module before importing pool, makeRow/makeEntity helpers with snake_case row overrides, describe/it per method, beforeEach mockReset, and assertions for exact SQL+params, null/empty cases, PoolClient delegation, Date casting, and UniqueConstraintViolationError — matching employee.repository.test.ts and leave-policy.repository.test.ts. (see `tests/unit/modules/employee/employee.repository.test.ts`)
 ### Entity invariants — enforce these
-- Reuse or extend `LeavePolicy`: A LeavePolicy is associated with exactly one LeaveType; the leaveType field must be a valid member of the LeaveType enum (annual, sick, emergency, unpaid, maternity, paternity) and is never null.
-- Reuse or extend `LeavePolicy`: A LeavePolicy's lifecycle is ACTIVE ↔ INACTIVE governed by the isActive boolean flag; the repository's findAllActive operation returns only policies where isActive is true, and findById/findByLeaveType return policies regardless of active state.
-- Reuse or extend `LeavePolicy`: The optional policy constraints accrualRate, maxAccumulation, and minimumNoticeDays are genuinely nullable — a null value means "no constraint configured" and must be preserved as null through the row mapper rather than defaulted to zero or undefined.
+- Reuse or extend `LeaveBalance`: The balance invariant must always hold: remainingDays = totalEntitlement - usedDays. deductDays and restoreDays must preserve this relationship by adjusting usedDays and remainingDays by equal and opposite amounts.
+- Reuse or extend `LeaveBalance`: Lifecycle: ACTIVE → EXHAUSTED (when remainingDays reaches 0); EXHAUSTED → ACTIVE (when days are restored and remainingDays becomes positive again); ACTIVE/EXHAUSTED → CLOSED (fiscal-year rollover, deferred to Phase 8). The repository's deductDays and restoreDays must enforce the ACTIVE↔EXHAUSTED transitions per business rules 5 and 6.
+- Reuse or extend `LeaveBalance`: Uniqueness: at most one balance row exists per (employeeId, policyId, fiscalYear) combination, enforced by the DB uniqueness index; create must surface a violation of this constraint as a typed UniqueConstraintViolationError.
 ### Interface contract — expose these operations (their shape is yours)
-- ILeavePolicyRepository.findById(id, client?) — idempotent; Returns the LeavePolicy entity when a row matches the given id, or null when no row is found (result.rows.length === 0). Read-only: no state change, no audit record required. Database errors propagate as thrown errors (no swallowing).
-- ILeavePolicyRepository.findByLeaveType(leaveType, client?) — idempotent; Returns an array of LeavePolicy entities matching the given LeaveType (empty array when none match). Read-only: no state change, no audit record required. Database errors propagate as thrown errors.
-- ILeavePolicyRepository.findAllActive(client?) — idempotent; Returns an array of only active LeavePolicy entities (isActive = true), empty array when none exist. Read-only: no state change, no audit record required. Database errors propagate as thrown errors.
+- findByEmployeeAndPolicy(employeeId, policyId, fiscalYear?, client?) — returns the single LeaveBalance matching the employee+policy (and fiscal year when provided) or null. — idempotent; Returns null when no row matches; never throws on not-found.
+- findByEmployeeAndFiscalYear(employeeId, fiscalYear, client?) — returns the single balance or list of balances for an employee in a given fiscal year, or null/empty when none exist. — idempotent; Returns null (single-row) or empty array (list) when no rows match; never throws on not-found.
+- findByEmployeeId(employeeId, client?) — returns all LeaveBalance rows for an employee across all fiscal years as an array (empty when none). — idempotent; Returns an empty array when no rows match; never throws on not-found.
+- create(input, client?) — persists a new leave_balances row from the input (excluding id/createdAt/updatedAt) and returns the fully-mapped entity. — Throws UniqueConstraintViolationError (pg code 23505) when the (employee_id, policy_id, fiscal_year) uniqueness constraint is violated; re-throws all other errors unchanged.
+- update(id, updates, client?) — applies a dynamic subset of mutable fields, advances updated_at, and returns the refreshed entity or null when the row does not exist. — idempotent; Returns null when the target row does not exist; never throws on not-found.
+- deductDays(id, days, client?) — atomically increments usedDays and decrements remainingDays by `days`, transitioning status to EXHAUSTED when remainingDays reaches 0; returns the updated entity or null when not found. — Returns null when the target balance row does not exist; the usedDays/remainingDays adjustment and status transition must be persisted in a single UPDATE so they are atomic within the caller's transaction when a client is supplied.
+- restoreDays(id, days, client?) — atomically decrements usedDays and increments remainingDays by `days`, transitioning status from EXHAUSTED to ACTIVE when the balance was previously exhausted; returns the updated entity or null when not found. — Returns null when the target balance row does not exist; the usedDays/remainingDays adjustment and status transition must be persisted in a single UPDATE so they are atomic within the caller's transaction when a client is supplied.
 ### Integration points — connect to these
-- src/shared/types/leave.types.ts (LeaveType enum) — The LeavePolicy model imports LeaveType to type its leaveType field; the repository row mapper casts the DB leave_type column to this enum. This is the sole external dependency of the leave-policy module this phase (LeavePolicy → SharedTypes per the dependency map).
-- src/shared/db/connection.ts (pool) — The PgLeavePolicyRepository imports the shared pg Pool to execute queries against the leave_policies table when no caller-supplied PoolClient is provided, matching the repository-pattern requirement that all DB access flows through repositories backed by the shared pool.
-- src/modules/leave-balance/ (Phase 4) and src/modules/leave-request/ (Phase 5) — Downstream consumers: LeaveBalance depends on LeavePolicy (to know entitlement per leave type when initializing balances), and LeaveRequest depends on LeavePolicy (for minimumNoticeDays, requiresManagerApproval, entitlement validation). The read-only repository surface established this phase is the contract those later phases will inject and call.
+- src/shared/types/leave.types.ts (BalanceStatus enum) — The LeaveBalance model imports BalanceStatus from the shared types module; this is the sole external type dependency for the model.
+- src/shared/db/connection.ts (pg pool) — The PgLeaveBalanceRepository resolves its database connection from the shared pool (or a caller-supplied PoolClient), matching all other repository implementations.
+- src/modules/leave-policy/leave-policy.repository.ts (ILeavePolicyRepository) — Per the reconciled architecture dependency map, LeaveBalance depends on LeavePolicy; the repository itself does not call the policy repository in this phase, but the module boundary declares this dependency for the downstream LeaveBalanceService (Phase 8) which will initialize balances from policy entitlements.
+- Future LeaveRequestService approve/cancel transaction (Phase 9) — deductDays and restoreDays are the transaction-contract methods that the LeaveRequestService will invoke within a caller-controlled BEGIN/COMMIT unit of work when approving or cancelling a leave request; the optional PoolClient parameter exists to support this delegation.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
