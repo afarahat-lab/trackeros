@@ -1,0 +1,188 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "employee"
+    ],
+    "affectedLayers": [
+      "data-access",
+      "domain-model"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The Employee model type is exported from the employee module and its employmentStatus field is typed with the EmploymentStatus enum imported from the shared types module \u2014 not a locally redefined copy of the enum.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The employee repository interface declares the six operations named in the phase scope (findById, findByManagerId, findAll, create, update, softDelete), and a concrete PostgreSQL-backed implementation of that interface is exported from the same module.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The PostgreSQL repository implementation obtains its database connection from the shared pg Pool exported by src/shared/db/connection.ts \u2014 it does not instantiate its own Pool or read DATABASE_URL directly.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "softDelete sets the deletedAt timestamp on the persisted row rather than physically deleting it, and subsequent findById/findAll/findByManagerId reads exclude rows whose deletedAt is set (soft-deleted employees are not returned by reads).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "create persists a new employee row and returns the persisted Employee (including server-generated id and timestamps); update persists changed fields and returns the updated Employee with a refreshed updatedAt; findById returns null when no non-deleted row matches the id.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests exist under tests/unit/modules/employee/ and exercise each repository operation against a mocked pg pool (no live database dependency), asserting the expected SQL is issued and the returned Employee shape matches the model \u2014 the test file is discovered by the configured testMatch glob.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The phase's TypeScript compiles cleanly under the project's strict tsconfig (npm run build / tsc --noEmit) with no implicit any and no unresolvable imports, and the Jest unit tests pass.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No use of `any` \u2014 use `unknown` with type guards instead (HARNESS.json constraint no-any, severity high); strict TypeScript with strict null checks is enforced by tsconfig.json.",
+    "All database access goes through the repository pattern (GP-001 / HARNESS.json no-direct-db-outside-repository, severity critical) \u2014 the repository is the only place that issues SQL or touches the pg Pool; no inline SQL in services or routes.",
+    "No hardcoded secrets (HARNESS.json no-hardcoded-secrets, severity critical) \u2014 the repository must not read DATABASE_URL or embed connection strings; it consumes the already-configured shared Pool.",
+    "No unhandled promise rejections (GP-006) \u2014 every async repository method must surface errors to its caller rather than swallowing them; the repository must not let pg query errors propagate as unhandled rejections.",
+    "The Employee module may depend only on the SharedTypes module (src/shared/types/leave.types.ts) and the shared db connection (src/shared/db/connection.ts) \u2014 per the reconciled dependency map Employee \u2192 SharedTypes; no dependency on leave, balance, policy, notification, or audit modules.",
+    "Unit tests must not require a live PostgreSQL instance \u2014 the pg Pool must be mocked/stubbed so the tests run under the configured Jest node environment without DATABASE_URL.",
+    "The phase ships no SQL migration, no service, no controller, and no routes \u2014 only the model type, the repository interface + PostgreSQL implementation, and unit tests (per PLAN.md Phase 2 scope and the reconciled module ownership for Employee)."
+  ],
+  "outOfScope": [
+    "EmployeeService, IEmployeeService, and the getManager business logic \u2014 deferred to Phase 7 (EmployeeService + LeavePolicyService).",
+    "Audit record emission for create/update/softDelete (GP-002) \u2014 the repository is a data-access primitive; audit logging is a service-layer cross-cutting concern wired in later phases, not a repository responsibility.",
+    "Input validation (GP-003) and RBAC enforcement (GP-005) \u2014 these are API-boundary concerns; the repository has no API surface and trusts its caller.",
+    "The employees table migration/DDL \u2014 the reconciled architecture specifies a conceptual table schema only; migrations are generated separately and are not part of this phase's file set.",
+    "An employee module index.ts public entry point and cross-module wiring \u2014 not in the Phase 2 file list; later phases that consume Employee will add/depend on the public surface."
+  ],
+  "ambiguities": [
+    {
+      "description": "The reconciled transaction contract names updateStatus (ILeaveRequestRepository) and updateUsedDays (ILeaveBalanceRepository) as the methods that accept an optional PoolClient to join a caller's transaction, but does not name any IEmployeeRepository method. Phase 9's LeaveRequestService resolves the manager via the employee repository inside its approve unit-of-work. It is undecided whether Employee repository read methods (findById/findByManagerId) and/or write methods (update/softDelete) must accept an optional PoolClient so they can participate in a caller-controlled transaction.",
+      "options": [
+        "No Employee method takes a PoolClient \u2014 reads/writes always acquire their own connection from the shared pool (simplest; Phase 9 manager lookups run outside the approve transaction)",
+        "Only read methods (findById, findByManagerId, findAll) accept an optional PoolClient so manager resolution can run inside the caller's transaction",
+        "All Employee repository methods accept an optional PoolClient, defaulting to the shared pool when omitted (fullest alignment with the stated contract pattern)"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "The employees conceptual table lists unique-looking indexes on employee_number and email, but the reconciled schema marks them only as 'indexes' not explicitly UNIQUE constraints. It is undecided whether employee_number and email must be enforced unique at the repository/persistence layer (and therefore whether create/update must reject duplicates with a typed error) or whether uniqueness is a later migration/service concern outside this phase.",
+      "options": [
+        "Uniqueness is a migration/service concern \u2014 this phase's repository does not enforce or test duplicate employee_number/email rejection",
+        "The repository must surface duplicate-key errors as a typed error distinct from generic persistence failures"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "description": "The Employee lifecycle is ACTIVE \u2192 INACTIVE \u2192 TERMINATED, but this phase ships only the model type and repository with no service to enforce transitions. It is undecided whether the repository's create/update must restrict employmentStatus to valid lifecycle values/transitions, or whether that enforcement is purely a service-layer (Phase 7) responsibility and the repository accepts any EmploymentStatus enum value.",
+      "options": [
+        "Repository accepts any EmploymentStatus enum value; lifecycle transition enforcement is deferred to the EmployeeService in Phase 7",
+        "Repository validates allowed transitions on update (e.g. TERMINATED cannot return to ACTIVE)"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "Employment status follows the lifecycle ACTIVE \u2192 INACTIVE \u2192 TERMINATED (forward-only); an Employee record is never physically destroyed \u2014 termination/removal is represented by setting deletedAt (soft delete), so a deleted Employee's row persists and is excluded from read results."
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "managerId is either null (no manager / top of hierarchy) or references another Employee's id (self-referential hierarchy per the employees.manager_id\u2192employees.id foreign key); the repository must not create a cycle-free guarantee at this layer but must preserve the managerId value as given."
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "createdAt is set once at creation and never modified by update; updatedAt advances on every successful update; deletedAt is null until softDelete and set exactly once (soft delete is not reversible through this repository)."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "findById",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the non-deleted Employee matching the id, or null when no such non-deleted row exists; must not return soft-deleted employees. No auth rule at the repository layer (caller is trusted)."
+    },
+    {
+      "operation": "findByManagerId",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the set of non-deleted Employees whose managerId equals the given manager id; returns an empty collection when the manager has no direct reports. Excludes soft-deleted employees."
+    },
+    {
+      "operation": "findAll",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the collection of non-deleted Employees; excludes soft-deleted rows."
+    },
+    {
+      "operation": "create",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Persists a new Employee row and returns the persisted entity with server-generated id and timestamps; persistence failures (including any unique-constraint violation on employee_number/email if enforced) must surface to the caller as a typed/rejected error, never an unhandled rejection."
+    },
+    {
+      "operation": "update",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Persists the supplied field changes for an existing non-deleted Employee and returns the refreshed entity with an advanced updatedAt; must not resurrect a soft-deleted employee. A no-match (unknown or deleted id) must surface as a not-found/empty result rather than silently succeeding."
+    },
+    {
+      "operation": "softDelete",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Sets deletedAt on the target Employee row (does not physically delete); idempotent in the sense that soft-deleting an already-soft-deleted row leaves it deleted. Must not affect any other row. A no-match (unknown id) must surface as a not-found/empty result."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The Employee model's employmentStatus field must reuse the EmploymentStatus enum exported from src/shared/types/leave.types.ts (ACTIVE/INACTIVE/TERMINATED) \u2014 do not redefine a local EmploymentStatus type; this matches the reconciled dependency Employee \u2192 SharedTypes and the Phase 1 deliverable.",
+      "referencePath": "src/shared/types/leave.types.ts"
+    },
+    {
+      "requirement": "The PostgreSQL repository implementation must obtain its database connection by importing the `pool` (pg Pool) exported from src/shared/db/connection.ts \u2014 the single shared connection source \u2014 rather than constructing its own Pool or reading DATABASE_URL, matching the existing connection module and the agents.yaml-cited import convention.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "The Employee entity shape and the employees conceptual table (id, employee_number, first_name, last_name, email, manager_id self-FK, department, hire_date, termination_date, employment_status, created_at, updated_at, deleted_at) must match the reconciled architecture's domain entity and sql_schemas entries for Employee/employees \u2014 the repository's row\u2194entity mapping must align column names to the model's camelCase fields consistently with that schema.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "Unit test files must be placed under tests/unit/modules/employee/ and named *.test.ts so they are discovered by the configured testMatch glob (**/tests/**/*.test.(ts|js)) and transformed by the ts-jest preset; the test path must not be added to tsconfig's include (tests are excluded from the build).",
+      "referencePath": "jest.config.js"
+    },
+    {
+      "requirement": "The repository interface and its PostgreSQL implementation must follow the module structure and naming convention declared in docs/ARCHITECTURE.md (src/modules/employee/employee.{model,repository}.ts; interface IEmployeeRepository; concrete PgEmployeeRepository) and the Transaction Contract's caller-controlled-transaction pattern where applicable, extending rather than contradicting the documented architecture.",
+      "referencePath": "docs/ARCHITECTURE.md"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/leave.types.ts (SharedTypes module)",
+      "why": "The Employee model imports EmploymentStatus from the shared types module \u2014 the sole domain dependency declared for the Employee module in the reconciled dependency map."
+    },
+    {
+      "target": "src/shared/db/connection.ts (shared pg Pool)",
+      "why": "The PostgreSQL repository implementation consumes the shared pg Pool as its database connection \u2014 the single sanctioned connection source per the existing connection module and the no-direct-db-outside-repository constraint."
+    },
+    {
+      "target": "Phase 9 LeaveRequestService (future)",
+      "why": "The LeaveRequestService will resolve an employee's managerId and employmentStatus via this IEmployeeRepository (per the reconciled business rules: manager resolution via IEmployeeRepository, only ACTIVE employees may submit) \u2014 the interface contract established here is the integration surface later phases depend on, which is why the optional-PoolClient ambiguity matters."
+    },
+    {
+      "target": "Phase 7 EmployeeService (future)",
+      "why": "The EmployeeService will be built on top of this IEmployeeRepository (per PLAN.md Phase 7 and the reconciled module ownership: Employee module owns model, repository, and service) \u2014 the repository interface and soft-delete/read semantics defined here are the foundation the service layer will wrap."
+    }
+  ]
+}
