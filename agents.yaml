@@ -68,7 +68,11 @@ agents:
     role: "Senior software architect"
     goal: "Specify the phase's success criteria, constraints, and the consistency + interface invariants the implementation must satisfy — leaving implementation shape to the code agent"
     llm:
-      model: ~
+      # Pin to Deepseek-v4-pro like every other project agent. Was `model: ~` (null), which
+      # silently inherited the platform default LLM_MODEL (now glm-5p2) — a leftover from the
+      # intent+design consolidation (context-agent got pinned then; this one was missed), so this
+      # high-impact spec agent was running on a weaker/different model than the rest of the pipeline.
+      model: fireworks/Deepseek-v4-pro
       temperature: 0.15
     tools:
       builtin: [readFile, listDirectory, searchFiles]
