@@ -1,0 +1,171 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-balance"
+    ],
+    "affectedLayers": [
+      "service",
+      "unit-tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The leave-balance service interface declares all six operations: getBalancesForEmployee (with optional fiscalYear filter), initializeBalancesForEmployee, getAvailableBalance (async, returning Promise<number>), reserveDays, finalizeDeduction, and releaseReservation \u2014 each with the parameter shape (employeeId, policyId, days, fiscalYear) for the balance-mutating methods.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "initializeBalancesForEmployee fetches all active policies via the policy service, calls calculateEntitlement per policy using hireDate.getFullYear() as the fiscal year, and persists one LeaveBalance per policy with zeroed usedDays/pendingDays and ACTIVE status in a single batch; it returns an empty array (and performs no persistence) when zero active policies exist.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "reserveDays rejects with a typed INSUFFICIENT_BALANCE error when (remainingDays - pendingDays) < requested days, and performs no balance mutation (no update call) on that failure path; it increments pendingDays only when availability is sufficient, including the exact-fit boundary case.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "finalizeDeduction atomically decrements pendingDays and increments usedDays in a single repository update call (pending floored at zero), so the two counters never diverge across separate writes.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "releaseReservation decrements pendingDays and never drives pendingDays below zero (floors at 0); it does not alter usedDays.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "getAvailableBalance returns remainingDays - pendingDays and throws a typed NOT_FOUND error when no balance record exists for the given employee/policy/fiscal-year triple; every balance-mutating method likewise throws NOT_FOUND when the balance is absent.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The leave-balance barrel re-exports the service interface and the service implementation alongside the Phase 4 model/repository exports, so downstream modules import only through the barrel.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests cover reservation success, deduction atomicity, release with floor-at-zero, insufficient-balance rejection with no-mutation-on-failure, NOT_FOUND on missing balance, exact-fit reservation, and error propagation from injected dependencies \u2014 all passing under the project's Jest runner.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access goes through the injected ILeaveBalanceRepository; the service never issues SQL or touches the pg pool directly (GP-001 / no-direct-db-outside-repository).",
+    "Cross-module imports go only through the leave-policy barrel ('../leave-policy'); the service imports ILeavePolicyService and AppError from that barrel rather than reaching into leave-policy internals (ARCHITECTURE.md dependency rules).",
+    "The service reuses the AppError class exported from the leave-policy module for all domain errors (NOT_FOUND, INSUFFICIENT_BALANCE); it does not redefine a parallel error class.",
+    "Strict TypeScript: no implicit any, strict null checks; the balance lookup result (LeaveBalance | null) must be null-checked before field access.",
+    "remainingDays is a derived field computed at read time by the repository mapper (totalEntitlement - usedDays - pendingDays); the service must not manually recompute or persist remainingDays on updates \u2014 it updates only usedDays and/or pendingDays.",
+    "No unhandled promise rejections (GP-006): async methods either resolve or throw a typed AppError; repository/policy-service errors propagate rather than being swallowed."
+  ],
+  "outOfScope": [
+    "HTTP routes/controllers for leave-balance (the leave-balance routes are a later concern; this phase is the service layer only).",
+    "RBAC enforcement and request.user extraction \u2014 no API boundary exists in this phase; RBAC is applied at the route layer in a later phase (GP-005 is satisfied downstream).",
+    "Audit record creation for balance mutations \u2014 the LeaveBalanceService itself does not write audit records; audit is owned by the orchestrating LeaveRequestService in Phase 10 per the Transaction Contract.",
+    "Transaction/client ownership \u2014 the service does not acquire a PoolClient or BEGIN/COMMIT; it relies on repository methods that accept an optional client. Unit-of-work orchestration belongs to the Phase 10 leave-request approval flow.",
+    "LeaveRequestService and the full leave lifecycle (submit/approve/reject/cancel) \u2014 Phase 10 scope."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "remainingDays is always equal to totalEntitlement - usedDays - pendingDays; the service never writes remainingDays directly \u2014 it mutates only usedDays and/or pendingDays and trusts the repository mapper to recompute the derived field at read time."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "pendingDays is never negative: reserveDays only increments, and both finalizeDeduction and releaseReservation floor the new pendingDays at Math.max(0, pendingDays - days)."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "usedDays is never decremented by this service's operations \u2014 reserveDays and releaseReservation leave usedDays untouched; only finalizeDeduction increments it. (Reversal of an approved deduction is a Phase 10 concern, not this service's contract.)"
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "A balance record is uniquely identified by the (employeeId, policyId, fiscalYear) triple; initializeBalancesForEmployee creates exactly one balance per active policy for the hireDate's fiscal year, and all balance-mutating operations resolve the single record via that triple before mutating."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "getBalancesForEmployee(employeeId, fiscalYear?)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "When fiscalYear is omitted, delegates to the all-fiscal-years lookup; when provided, delegates to the fiscal-year-filtered lookup. Returns an empty array (not an error) when no balances exist. Propagates repository errors."
+    },
+    {
+      "operation": "initializeBalancesForEmployee(employeeId, hireDate)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns [] without persistence when zero active policies exist. Uses hireDate.getFullYear() as the fiscal year and ACTIVE status with zeroed used/pending. Propagates policy-service and repository errors."
+    },
+    {
+      "operation": "getAvailableBalance(employeeId, policyId, fiscalYear)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Async (Promise<number>) because it performs a repository lookup. Throws AppError code NOT_FOUND when no balance record exists; otherwise returns remainingDays - pendingDays (may be negative)."
+    },
+    {
+      "operation": "reserveDays(employeeId, policyId, days, fiscalYear)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws AppError NOT_FOUND when the balance is absent. Throws AppError INSUFFICIENT_BALANCE when (remainingDays - pendingDays) < days, with no mutation performed (no update call). Only increments pendingDays when availability is sufficient, including the exact-fit boundary."
+    },
+    {
+      "operation": "finalizeDeduction(employeeId, policyId, days, fiscalYear)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws AppError NOT_FOUND when the balance is absent. Atomically decrements pendingDays (floored at 0) and increments usedDays in a single repository update call so the two counters cannot diverge."
+    },
+    {
+      "operation": "releaseReservation(employeeId, policyId, days, fiscalYear)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws AppError NOT_FOUND when the balance is absent. Decrements pendingDays floored at 0 and does not alter usedDays."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The service must call only repository operations declared on ILeaveBalanceRepository \u2014 findByEmployeeId, findByEmployeeIdAndFiscalYear, findByEmployeeIdAndPolicyId, update, and createBatch \u2014 and must not rely on the private findById helper that exists only on the concrete repository.",
+      "referencePath": "src/modules/leave-balance/leave-balance.repository.interface.ts"
+    },
+    {
+      "requirement": "Balance DTOs built by initializeBalancesForEmployee must conform to CreateLeaveBalanceDto (employeeId, policyId, totalEntitlement, usedDays, pendingDays, fiscalYear, status) and the returned/updated records must conform to the LeaveBalance interface shape.",
+      "referencePath": "src/modules/leave-balance/leave-balance.model.ts"
+    },
+    {
+      "requirement": "The service must consume ILeavePolicyService exactly as declared \u2014 getActivePolicies(): Promise<LeavePolicy[]> and calculateEntitlement(policy, hireDate, fiscalYear): number (synchronous) \u2014 using the returned LeavePolicy.id as policyId and the returned entitlement as totalEntitlement.",
+      "referencePath": "src/modules/leave-policy/leave-policy.service.interface.ts"
+    },
+    {
+      "requirement": "Domain errors must be thrown as the AppError class exported from the leave-policy module (constructor (message, code)), using the codes NOT_FOUND and INSUFFICIENT_BALANCE defined in the Error Response Contract \u2014 not a redefined error class.",
+      "referencePath": "src/modules/leave-policy/leave-policy.service.ts"
+    },
+    {
+      "requirement": "Because rowToLeaveBalance recomputes remainingDays as totalEntitlement - usedDays - pendingDays at read time, the service must not pass remainingDays in its update DTOs; doing so would be redundant and could conflict with the mapper's derived value.",
+      "referencePath": "src/modules/leave-balance/leave-balance.repository.ts"
+    },
+    {
+      "requirement": "The barrel must re-export ILeaveBalanceService and LeaveBalanceService alongside the Phase 4 exports (LeaveBalance, ILeaveBalanceRepository, CreateLeaveBalanceDto, UpdateLeaveBalanceDto, LeaveBalanceRepository) so downstream modules import only through this barrel.",
+      "referencePath": "src/modules/leave-balance/index.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "leave-policy module (ILeavePolicyService via barrel)",
+      "why": "initializeBalancesForEmployee depends on getActivePolicies() to enumerate policies and calculateEntitlement() to compute each balance's totalEntitlement; this is the declared leave-balance \u2192 leave-policy dependency in the reconciled dependency map."
+    },
+    {
+      "target": "leave-balance repository (ILeaveBalanceRepository)",
+      "why": "All persistence and balance lookups flow through the injected repository; the service is the business-rule layer over the Phase 4 repository, per GP-001."
+    },
+    {
+      "target": "leave-request module (Phase 10 LeaveRequestService)",
+      "why": "This service is the balance-mutation seam consumed by the future leave-request orchestrator: reserveDays on submit, finalizeDeduction on approve, releaseReservation on reject/cancel \u2014 all within the Phase 10 transactional unit of work."
+    }
+  ]
+}
