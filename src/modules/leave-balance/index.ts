@@ -5,3 +5,5 @@ export {
   UpdateLeaveBalanceDto,
 } from './leave-balance.repository.interface';
 export { LeaveBalanceRepository } from './leave-balance.repository';
+export { ILeaveBalanceService } from './leave-balance.service.interface';
+export { LeaveBalanceService } from './leave-balance.service';
