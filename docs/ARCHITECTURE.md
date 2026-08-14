@@ -134,7 +134,7 @@ Standard error shape: `{ error: string; code: string; details?: unknown }`.
 ## Build Progress
 
 - **Phase 1: Shared types** — ✅ Complete. `src/shared/types/leave.types.ts` delivers all 7 enums (LeaveType, LeaveRequestStatus, AuditAction, NotificationType, NotificationStatus, EmploymentStatus, BalanceStatus).
-- **Phase 2: Employee model + repository** — pending
+- **Phase 2: Employee model + repository** — ✅ Complete. `src/modules/employee/employee.model.ts` defines the Employee interface with all fields (id, employeeNumber, firstName, lastName, email, managerId, department, hireDate, terminationDate, employmentStatus, createdAt, updatedAt, deletedAt). `src/modules/employee/employee.repository.ts` delivers `IEmployeeRepository` (findById, findByManagerId, findAll, create, update, softDelete) and `PgEmployeeRepository` backed by the shared pg pool. All repository methods accept an optional `PoolClient` for caller-controlled transactions. `UniqueConstraintViolationError` (code 23505) is surfaced as a typed error on create. Tests in `tests/unit/modules/employee/employee.repository.test.ts`.
 - **Phase 3: LeavePolicy model + repository** — pending
 - **Phase 4: LeaveBalance model + repository** — pending
 - **Phase 5: LeaveRequest model + repository** — pending
