@@ -1,0 +1,189 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "notification",
+      "audit-log"
+    ],
+    "affectedLayers": [
+      "repository",
+      "model",
+      "unit-test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The Notification model interface is exported from src/modules/notification/notification.model.ts and imports NotificationType and NotificationStatus from src/shared/types/leave.types.ts (no new enum definitions are added).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The AuditLog model interface is exported from src/modules/audit-log/audit-log.model.ts and imports AuditAction from src/shared/types/leave.types.ts (no new enum definitions are added).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "INotificationRepository exposes create, findByRecipientId, markAsSent, and markAsRead operations, and PgNotificationRepository implements that interface backed by the shared pg pool.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "IAuditLogRepository exposes create, findByEntity, and findByPerformedBy operations, and PgAuditLogRepository implements that interface backed by the shared pg pool; no update or delete operations exist on the audit-log repository.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "notification.repository.create persists a row and returns the Notification entity with server-generated fields (id, createdAt) populated; markAsSent and markAsRead update the status (and readAt for markAsRead) and return the refreshed entity or null when no row matches.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "audit-log.repository.create persists a row using the caller-supplied performedAt and returns the AuditLog entity with server-generated fields (id, createdAt) populated; findByEntity and findByPerformedBy return arrays ordered by created_at DESC and an empty array when no rows match.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A unique-constraint violation (pg error code 23505) thrown during notification create is surfaced as a UniqueConstraintViolationError imported from the employee repository; all other errors are re-thrown unchanged.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Every repository method accepts an optional PoolClient and delegates to it when provided, otherwise falls back to the shared pool \u2014 verified by unit tests asserting the client's query is called and the pool is not.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Unit tests exist at tests/unit/modules/notification/notification.repository.test.ts and tests/unit/modules/audit-log/audit-log.repository.test.ts covering happy path, not-found/empty returns, unique-violation (create only), error re-throw (create only), and PoolClient delegation, and the full suite passes under Jest.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No new enum definitions: NotificationType, NotificationStatus, and AuditAction must be imported from the existing src/shared/types/leave.types.ts.",
+    "No `any` type \u2014 use `unknown` with type guards / casts, consistent with the no-any rule and the existing repository row mappers.",
+    "All database access must go through the repository layer (GP-001 / no-direct-db-outside-repository); the new modules must not expose raw pool/SQL outside their repository classes.",
+    "AuditLog is immutable \u2014 the audit-log repository must expose only create and read operations; no update or delete methods.",
+    "UniqueConstraintViolationError must be reused from the existing employee repository (src/modules/employee/employee.repository.ts), not redefined in the new modules.",
+    "Repository methods must accept an optional PoolClient and use `client ?? pool` so they can join a caller-controlled transaction per the architecture's Transaction Contract.",
+    "This phase produces only models, repositories, and unit tests for notification and audit-log \u2014 no services, controllers, routes, or migrations."
+  ],
+  "outOfScope": [
+    "Notification and AuditLog services (INotificationService/NotificationService, IAuditLogService/AuditLogService) \u2014 deferred to later phases.",
+    "Controllers, Fastify routes, and app wiring for notification/audit-log \u2014 no HTTP surface in this phase.",
+    "Database migrations / schema DDL for the notifications and audit_logs tables \u2014 this phase assumes the conceptual table schemas already exist.",
+    "Integration tests against a real PostgreSQL instance \u2014 only Jest unit tests with mocked db connection are in scope.",
+    "Wiring of notification fanout or audit emission into the LeaveRequest lifecycle \u2014 that orchestration belongs to Phase 9 (LeaveRequestService)."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "Lifecycle is PENDING \u2192 SENT \u2192 READ (with ARCHIVED as a terminal side-state); create always inserts with a caller-supplied initial status, markAsSent transitions to SENT, and markAsRead transitions to READ while stamping readAt \u2014 the repository never silently drops a status transition."
+    },
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "id and createdAt are server-generated (omitted from the create input and populated from the RETURNING row); readAt starts null and is only set by markAsRead."
+    },
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "Append-only / immutable: once created, an AuditLog row is never updated or deleted \u2014 the repository exposes no mutation operations beyond create."
+    },
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "performedAt is caller-supplied (included in the create input) and persisted as-is; id and createdAt are server-generated and omitted from the create input."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "INotificationRepository.create",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Persists a notification row and returns the entity with server-generated id/createdAt; a pg unique-constraint violation (code 23505) is thrown as UniqueConstraintViolationError; all other errors are re-thrown unchanged."
+    },
+    {
+      "operation": "INotificationRepository.findByRecipientId",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns notifications for the recipient ordered by created_at DESC; returns an empty array (not null) when no rows match."
+    },
+    {
+      "operation": "INotificationRepository.markAsSent",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Updates status to SENT and returns the refreshed entity, or null when no row matches the id."
+    },
+    {
+      "operation": "INotificationRepository.markAsRead",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Updates status to READ and stamps read_at to NOW(), returning the refreshed entity, or null when no row matches the id."
+    },
+    {
+      "operation": "IAuditLogRepository.create",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Persists an append-only audit row using the caller-supplied performedAt and returns the entity with server-generated id/createdAt; a pg unique-constraint violation (code 23505) is thrown as UniqueConstraintViolationError; all other errors are re-thrown unchanged."
+    },
+    {
+      "operation": "IAuditLogRepository.findByEntity",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns audit entries for the given (entityType, entityId) ordered by created_at DESC; returns an empty array when no rows match."
+    },
+    {
+      "operation": "IAuditLogRepository.findByPerformedBy",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns audit entries for the given actor ordered by created_at DESC; returns an empty array when no rows match."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Reuse the existing UniqueConstraintViolationError class (and the isUniqueViolation code-23505 detection pattern) from the employee repository rather than redefining it; the new repositories must import it from there.",
+      "referencePath": "src/modules/employee/employee.repository.ts"
+    },
+    {
+      "requirement": "The markAsSent/markAsRead status-update pattern must mirror the existing updateStatus approach (UPDATE ... SET status=..., updated_at=NOW() ... RETURNING *, null on no match), with markAsRead additionally setting read_at = NOW().",
+      "referencePath": "src/modules/leave-request/leave-request.repository.ts"
+    },
+    {
+      "requirement": "The NotificationType, NotificationStatus, and AuditAction enums must be imported from the existing shared types file; their member values must not be redefined or diverged.",
+      "referencePath": "src/shared/types/leave.types.ts"
+    },
+    {
+      "requirement": "Repository classes must obtain the pg pool from the existing shared db connection module (pool) and use the `client ?? pool` delegation pattern, matching the established repositories.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "The new repository tests must follow the established test conventions: jest.mock the shared db connection before importing pool, mockQuery.mockReset() in beforeEach, makeRow/makeXxx helpers, per-method describe blocks, and PoolClient-delegation assertions.",
+      "referencePath": "tests/unit/modules/employee/employee.repository.test.ts"
+    },
+    {
+      "requirement": "The Notification and AuditLog entity shapes and the notifications/audit_logs conceptual table column sets must match the reconciled architecture (snake_case DB columns mapped to the camelCase model fields); the module paths src/modules/notification/ and src/modules/audit-log/ must match the declared module boundaries.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/leave.types.ts",
+      "why": "Source of the NotificationType, NotificationStatus, and AuditAction enums imported by both new models."
+    },
+    {
+      "target": "src/modules/employee/employee.repository.ts",
+      "why": "Source of UniqueConstraintViolationError reused by both new repositories for code-23505 handling."
+    },
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "Provides the shared pg pool that backs PgNotificationRepository and PgAuditLogRepository."
+    },
+    {
+      "target": "Phase 9 \u2014 LeaveRequestService",
+      "why": "Future consumer: will inject INotificationRepository and IAuditLogRepository to fire notifications and write audit records on leave state transitions; this phase only establishes the repository contracts it will depend on."
+    }
+  ]
+}
