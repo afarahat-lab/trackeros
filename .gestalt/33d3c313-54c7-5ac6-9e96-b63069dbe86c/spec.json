@@ -1,0 +1,156 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "notification"
+    ],
+    "affectedLayers": [
+      "domain-model",
+      "repository",
+      "module-barrel",
+      "unit-tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The Notification domain interface is exported from the notification module and exposes the exact lifecycle union types: type \u2208 {LEAVE_SUBMITTED, LEAVE_APPROVED, LEAVE_REJECTED, LEAVE_CANCELLED}, status \u2208 {PENDING, SENT, READ, ARCHIVED}, relatedEntityType fixed to 'LeaveRequest', and readAt as Date | null.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository create operation persists a notifications row and returns a Notification whose status is 'PENDING' and readAt is null, regardless of any caller-supplied values for those fields.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findByRecipient returns all notifications for the given recipientId ordered newest-first (created_at DESC), and returns an empty array when the recipient has no notifications.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "markAsSent transitions a notification's status to 'SENT' and markAsRead transitions status to 'READ' with readAt set to the current timestamp; both return null when no matching row exists and both are idempotent (re-marking an already-transitioned notification succeeds and re-stamps read_at on re-read).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "createBatch inserts all provided notifications in a single multi-row INSERT and returns the persisted Notification array with every row defaulted to status 'PENDING' and readAt null; an empty input array returns [] without issuing any database query.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The notification module barrel re-exports the Notification model, the INotificationRepository interface, the CreateNotificationDto, and the NotificationRepository implementation class, so downstream modules import only through the module's public entry point.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository constructor accepts an optional Queryable client and defaults to the shared pg pool when none is provided, enabling the repository to participate in an outer transaction when a client is injected.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests in tests/unit/modules/notification/ cover create (PENDING forced, read_at null), findByRecipient (ordering, empty), markAsSent/markAsRead (transitions, null on missing, idempotency), createBatch (multi-row, empty array, PENDING default), and custom-client constructor injection \u2014 and the full suite passes.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No use of `any` \u2014 use `unknown` with type guards instead (HARNESS.json no-any, severity high). Strict TypeScript with strict null checks throughout the notification module.",
+    "All database access must go through the repository pattern (GP-001 / no-direct-db-outside-repository, severity critical) \u2014 no inline SQL or direct pool calls outside NotificationRepository.",
+    "Modules import from each other ONLY through their declared public entry point (index.ts barrel) \u2014 no imports of sibling module internals (AGENTS.md architecture rule 1).",
+    "SQL queries must use parameterized placeholders ($N) \u2014 no string-interpolated user input \u2014 to prevent SQL injection.",
+    "No unhandled promise rejections \u2014 all async repository errors must be caught and handled (GP-006)."
+  ],
+  "outOfScope": [
+    "NotificationService and its business logic (fanout orchestration, delivery scheduling) \u2014 owned by a later phase per the reconciled architecture module ownership.",
+    "Notification routes / API endpoints and RBAC enforcement on notification operations \u2014 no HTTP surface is part of this phase.",
+    "Database migrations / Knex schema definitions for the notifications table \u2014 this phase assumes the notifications table exists per the conceptual data model.",
+    "ARCHIVED status transition and any notification archiving/expiry logic \u2014 only PENDING\u2192SENT and PENDING/SENT\u2192READ transitions are exercised in this phase."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "A newly created Notification always begins its lifecycle in status 'PENDING' with readAt null \u2014 these are server-set initial-state fields that the repository enforces regardless of caller input; the create DTO must not carry them."
+    },
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "The status lifecycle is monotonic forward: PENDING \u2192 SENT \u2192 READ (ARCHIVED is a later-phase terminal state). markAsSent and markAsRead are idempotent \u2014 re-applying the same transition to an already-transitioned notification succeeds rather than failing, and re-reading re-stamps readAt to the current timestamp."
+    },
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "Every Notification is scoped to exactly one recipient (recipientId) and references exactly one related entity whose type is fixed to 'LeaveRequest' with a relatedEntityId \u2014 a notification cannot exist without this association."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "INotificationRepository.create(dto)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Persists one notifications row with server-set status='PENDING' and read_at=NULL; returns the persisted Notification. Rejects (throws) on DB constraint violation. Caller-supplied status/readAt are ignored."
+    },
+    {
+      "operation": "INotificationRepository.findByRecipient(recipientId)",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns all notifications for the recipient ordered by created_at DESC; returns [] when none exist. Read-only \u2014 never throws on missing recipient."
+    },
+    {
+      "operation": "INotificationRepository.markAsSent(id)",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Sets status='SENT' for the matching row and returns the updated Notification; returns null when no row matches the id (not-found is a non-throwing outcome). Re-marking an already-SENT row succeeds."
+    },
+    {
+      "operation": "INotificationRepository.markAsRead(id)",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Sets status='READ' and read_at=NOW() for the matching row and returns the updated Notification; returns null when no row matches the id. Re-marking an already-READ row succeeds and re-stamps read_at."
+    },
+    {
+      "operation": "INotificationRepository.createBatch(dtos)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Inserts all provided notifications in a single multi-row INSERT, each defaulted to status='PENDING' and read_at=NULL, and returns the persisted array in insertion order. An empty input array short-circuits to [] without a DB round-trip. Throws on DB constraint violation."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The Notification entity shape (fields, union types, nullability) must match the authoritative definition in the reconciled architecture \u2014 type union of 4 leave-event values, status union of PENDING/SENT/READ/ARCHIVED, relatedEntityType fixed to 'LeaveRequest', readAt: Date | null.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "The repository must follow the Transaction Contract: constructor accepts an optional Queryable (Pick<Pool,'query'>) client defaulting to the shared pool, so repository methods can join a caller's outer transaction when a client is passed. This matches the established pattern in sibling repositories.",
+      "referencePath": "docs/ARCHITECTURE.md"
+    },
+    {
+      "requirement": "The repository's row-mapping convention (private snake_case Row interface + rowToNotification mapper + shared COLUMNS constant isolating DB column names from the domain layer) must match the established convention used by the leave-balance repository.",
+      "referencePath": "src/modules/leave-balance/leave-balance.repository.ts"
+    },
+    {
+      "requirement": "The createBatch empty-array short-circuit (return [] without a query) and single multi-row INSERT with dynamic $N placeholders must match the established createBatch convention in sibling repositories.",
+      "referencePath": "src/modules/leave-balance/leave-balance.repository.ts"
+    },
+    {
+      "requirement": "The notifications table column layout referenced by the repository (recipient_id, type, title, message, related_entity_type, related_entity_id, status, created_at, read_at) must match the conceptual data model declared in the reconciled architecture.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/db/connection.ts (shared pg Pool)",
+      "why": "The repository defaults to the shared pool for standalone queries and must import it as the fallback Queryable when no client is injected."
+    },
+    {
+      "target": "leave-request module (Phase 10 LeaveRequestService)",
+      "why": "The notification repository is consumed by the future LeaveRequestService to fan out notifications (LEAVE_SUBMITTED/APPROVED/REJECTED/CANCELLED) to employees and managers on lifecycle transitions, including within the approval-flow transaction."
+    },
+    {
+      "target": "notification module barrel (src/modules/notification/index.ts)",
+      "why": "Downstream modules (leave-request) must import Notification, INotificationRepository, CreateNotificationDto, and NotificationRepository only through this public entry point per the module-boundary rule."
+    }
+  ]
+}
