@@ -32,6 +32,7 @@ src/modules/AuditServiceInterface/    — AuditServiceInterface module
 src/shared/db connection.ts
 src/shared/base repository.ts
 src/shared/error types.ts
+src/shared/types/    — shared TypeScript enums (LeaveType, LeaveRequestStatus, AuditAction, NotificationType, NotificationStatus, EmploymentStatus, BalanceStatus)
 ```
 
 ## Key patterns
@@ -130,12 +131,18 @@ Standard error shape: `{ error: string; code: string; details?: unknown }`.
 - Not found → 404 `{ error: "Leave request not found", code: "NOT_FOUND" }`
 - Business rule violation (insufficient balance, overlapping dates, policy max exceeded) → 409 `{ error: "...", code: "BUSINESS_RULE_VIOLATION" }`
 
-## Recommended Build Phases
+## Build Progress
 
-1. **Phase 1: Shared types + AuditLog foundation** (8 files) — enums and audit trail, no domain dependencies.
-2. **Phase 2: Employee + LeavePolicy + Notification** (14 files) — foundational domain modules, can be built in parallel.
-3. **Phase 3: LeaveBalance** (8 files) — depends on LeavePolicy; prerequisite for LeaveRequest.
-4. **Phase 4: LeaveRequest (service + controller + routes)** (12 files) — orchestrates all modules, exposes REST API.
+- **Phase 1: Shared types** — ✅ Complete. `src/shared/types/leave.types.ts` delivers all 7 enums (LeaveType, LeaveRequestStatus, AuditAction, NotificationType, NotificationStatus, EmploymentStatus, BalanceStatus).
+- **Phase 2: Employee model + repository** — pending
+- **Phase 3: LeavePolicy model + repository** — pending
+- **Phase 4: LeaveBalance model + repository** — pending
+- **Phase 5: LeaveRequest model + repository** — pending
+- **Phase 6: Notification + AuditLog models and repositories** — pending
+- **Phase 7: EmployeeService + LeavePolicyService** — pending
+- **Phase 8: LeaveBalanceService** — pending
+- **Phase 9: LeaveRequestService** — pending
+- **Phase 10: LeaveRequestController, routes, and app wiring** — pending
 
 ## Open Questions
 
