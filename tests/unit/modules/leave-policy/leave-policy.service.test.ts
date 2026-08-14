@@ -220,6 +220,12 @@ describe('LeavePolicyService', () => {
       expect(result).toBe(20);
     });
 
+    it('should return full entitlement when hire date is exactly Jan 1 of the fiscal year', () => {
+      const hireDate = new Date(2025, 0, 1); // Jan 1, 2025
+      const result = service.calculateEntitlement(policy, hireDate, 2025);
+      expect(result).toBe(20);
+    });
+
     it('should pro-rate: hire Jan 15 → 11 months remaining', () => {
       const hireDate = new Date(2025, 0, 15); // Jan 15, 2025
       const result = service.calculateEntitlement(policy, hireDate, 2025);

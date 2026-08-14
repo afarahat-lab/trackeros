@@ -70,7 +70,7 @@ export class LeavePolicyService implements ILeavePolicyService {
 
     let entitlement: number;
 
-    if (hireDate < fiscalYearStart) {
+    if (hireDate <= fiscalYearStart) {
       entitlement = policy.entitlementDays;
     } else {
       const hireMonth = hireDate.getMonth();
