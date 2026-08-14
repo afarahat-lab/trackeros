@@ -1,0 +1,97 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-balance",
+      "leave-policy"
+    ],
+    "affectedLayers": [
+      "service",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The test file tests/unit/modules/leave-balance/leave-balance.service.test.ts imports LeavePolicy from the leave-policy module's public barrel (index.ts) rather than from the internal model file, and no direct import of any leave-policy internal file remains in that test file.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The finalizeDeduction method in src/modules/leave-balance/leave-balance.service.ts computes the new pendingDays value with a Math.max(0, balance.pendingDays - days) floor so that pendingDays can never become negative, matching the defensive pattern already present in releaseReservation.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All existing unit tests in tests/unit/modules/leave-balance/leave-balance.service.test.ts continue to pass after both edits, including the two finalizeDeduction tests (3\u21920 and 20\u219220) whose expected results are unchanged by the Math.max floor.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The project type-checks cleanly (tsc --noEmit) after the import consolidation, confirming LeavePolicy is type-equivalent whether imported from the barrel or the internal model file.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Modules (and their tests) must import from each other ONLY through the declared public entry point (index.ts barrel), never from internal files \u2014 per AGENTS.md architecture rule 1 and ARCHITECTURE.md dependency rules. The LeavePolicy import in the test file must come from the leave-policy barrel, not from leave-policy.model.ts.",
+    "The pendingDays floor must be applied at the single occurrence of the pendingDays decrement inside finalizeDeduction (the line computing balance.pendingDays - days), not at any other location; the usedDays increment (balance.usedDays + days) is unchanged.",
+    "No new test cases are required for this phase \u2014 the edits must not break existing tests. Adding a test for the days > pendingDays negative case is permitted but not mandated by this phase's scope."
+  ],
+  "outOfScope": [
+    "Refactoring or altering any other method in LeaveBalanceService (reserveDays, releaseReservation, getAvailableBalance, initializeBalancesForEmployee, getBalancesForEmployee) beyond the targeted finalizeDeduction pendingDays floor.",
+    "Changing the LeaveBalanceService source-file imports (src/modules/leave-balance/leave-balance.service.ts already imports correctly from the leave-policy barrel); only the test file's import is consolidated.",
+    "Modifying the leave-policy barrel (index.ts) or the LeavePolicy model \u2014 the barrel already re-exports LeavePolicy; no change is needed there."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "pendingDays must never be driven below zero by any balance-mutating operation. The finalizeDeduction operation (which moves pendingDays to usedDays on approval) must enforce this floor just as releaseReservation already does, so that an over-deduction (days > pendingDays) clamps pendingDays to 0 rather than producing a negative value."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "remainingDays is a computed field equal to totalEntitlement - usedDays - pendingDays; the pendingDays floor in finalizeDeduction preserves the consistency of this computation by preventing negative pendingDays from inflating remainingDays beyond totalEntitlement - usedDays."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "LeaveBalanceService.finalizeDeduction(employeeId, policyId, days, fiscalYear)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws AppError with code NOT_FOUND when no balance record exists for the given employee/policy/fiscal-year triple. On success, atomically updates the balance in a single repository update call: pendingDays is set to Math.max(0, balance.pendingDays - days) and usedDays is set to balance.usedDays + days. The pendingDays result must never be negative."
+    },
+    {
+      "operation": "LeaveBalanceService.releaseReservation(employeeId, policyId, days, fiscalYear)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws AppError with code NOT_FOUND when no balance record exists. On success, sets pendingDays to Math.max(0, balance.pendingDays - days) and does not alter usedDays. This is the reference defensive pattern that finalizeDeduction must match."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The pendingDays floor in finalizeDeduction must reuse the exact defensive pattern already established in releaseReservation within the same service file: compute the new pendingDays via Math.max(0, balance.pendingDays - days) before calling the repository update, rather than inlining the raw subtraction.",
+      "referencePath": "src/modules/leave-balance/leave-balance.service.ts (releaseReservation method)"
+    },
+    {
+      "requirement": "The consolidated LeavePolicy import in the test file must resolve to the same type exported by the leave-policy barrel, which re-exports LeavePolicy from the internal model \u2014 ensuring type-equivalence and no behavioral change.",
+      "referencePath": "src/modules/leave-policy/index.ts"
+    },
+    {
+      "requirement": "The test file's barrel import must remain consistent with the source service file's existing barrel import pattern: both import ILeavePolicyService and AppError (and now LeavePolicy) from the leave-policy public entry point, never from internal module files.",
+      "referencePath": "src/modules/leave-balance/leave-balance.service.ts (line 4 import statement)"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "leave-policy module public barrel (src/modules/leave-policy/index.ts)",
+      "why": "The test file consumes the LeavePolicy type via this barrel; the barrel must re-export LeavePolicy (it already does) so the consolidated import resolves correctly."
+    },
+    {
+      "target": "leave-balance repository update interface (ILeaveBalanceRepository.update)",
+      "why": "finalizeDeduction persists the floored pendingDays and incremented usedDays through a single update call; the repository contract for atomic field updates must be respected."
+    }
+  ]
+}
