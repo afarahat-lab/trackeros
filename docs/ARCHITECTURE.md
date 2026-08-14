@@ -22,6 +22,7 @@ src/modules/leave-policy/    — LeaveType model + repository + barrel
                                 LeavePolicy model + repository
                                 LeavePolicyService
 src/modules/leave-balance/   — LeaveBalance model + repository + barrel
+                                LeaveBalanceService
 src/modules/leave-request/   — LeaveRequest model + repository + barrel
 src/modules/audit/           — AuditRecord model + repository + barrel
 src/modules/notification/    — Notification model + repository + barrel
@@ -136,7 +137,7 @@ src/shared/types/            — Shared type definitions
 | 6 | ✅ Complete | AuditRecord model + repository (audit module) |
 | 7 | ✅ Complete | Notification model + repository (notification module) |
 | 8 | ✅ Complete | LeavePolicyService (leave-policy module) |
-| 9 | Pending | LeaveBalanceService (leave-balance module) |
+| 9 | ✅ Complete | LeaveBalanceService (leave-balance module) |
 | 10 | Pending | LeaveRequestService + routes (leave-request module) |
 
 ### Implementation Notes
@@ -148,6 +149,7 @@ src/shared/types/            — Shared type definitions
 - **AuditRepository** follows the same `Queryable` pattern: constructor accepts an optional client defaulting to the shared pool, enabling transaction participation. The `changes` field is serialized via `JSON.stringify` on write and returned as a parsed `Record<string, unknown>` on read. `findByPerformer` supports an optional `limit` parameter for pagination. Results are ordered by `created_at DESC`.
 - **NotificationRepository** follows the same `Queryable` pattern: constructor accepts an optional client defaulting to the shared pool, enabling transaction participation. The `create` method always sets `status` to `'PENDING'` and `read_at` to `NULL` regardless of caller input. `markAsSent` and `markAsRead` are idempotent — re-marking an already-SENT or already-READ notification succeeds (re-stamps `read_at` on re-read). `createBatch` uses a single multi-row INSERT for efficiency when fanning out notifications (e.g., to employee + manager on submission). `findByRecipient` returns results ordered by `created_at DESC`.
 - **LeavePolicyService** injects `ILeavePolicyRepository` and `ILeaveTypeRepository`. `getPolicyForLeaveType` resolves a leave type by code, validates it is active, then fetches active policies for that type — throwing `POLICY_VIOLATION` if zero or multiple active policies exist. `getActivePolicies` fetches all policies and filters to `isActive === true` in application code. `calculateEntitlement` implements fiscal-year pro-ration: fiscal year starts Jan 1; if `hireDate <= fiscalYearStart` → full `entitlementDays`; otherwise pro-rated by whole months remaining (`11 - hireMonth`), floored, with an optional `maxAccumulation` cap applied after pro-ration. `validatePolicy` performs structural validation of all required and optional fields (positive integer entitlement, non-negative accrual/max/minimumNotice, boolean flags). The service also exports an `AppError` class (extends `Error`, carries a `code` string) used for domain-level error responses.
+- **LeaveBalanceService** injects `ILeaveBalanceRepository` and `ILeavePolicyService`. `getBalancesForEmployee` delegates to `findByEmployeeId` (all fiscal years) or `findByEmployeeIdAndFiscalYear` when a fiscal year filter is provided. `initializeBalancesForEmployee` fetches all active policies via `ILeavePolicyService.getActivePolicies`, calls `calculateEntitlement` for each using `hireDate.getFullYear()` as the fiscal year, then creates balances in a single `createBatch` call — returns an empty array when no active policies exist. `getAvailableBalance` returns `remainingDays - pendingDays` (throws `NOT_FOUND` if no balance record exists). `reserveDays` checks `remainingDays - pendingDays >= days` before incrementing `pendingDays`; throws `INSUFFICIENT_BALANCE` on failure and does not mutate the balance. `finalizeDeduction` atomically decrements `pendingDays` and increments `usedDays` in a single `update` call. `releaseReservation` decrements `pendingDays` with a `Math.max(0, pendingDays - days)` floor to prevent negative values. All methods that require a balance lookup throw `AppError` with code `NOT_FOUND` when the balance does not exist. The service reuses the `AppError` class exported from the `leave-policy` module.
 
 ### Open Questions
 
