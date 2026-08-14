@@ -1,30 +1,23 @@
-# Fix specific quality-gate violations: Phase 8: LeavePolicyService (leave-policy module)
+# Implement this phase: Phase 8: LeavePolicyService (leave-policy module)
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/fix/32ad270f-dfe8-4e32-be27-804897fcc970/8/1`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/32ad270f-dfe8-4e32-be27-804897fcc970/8`. Do not clone anything; work only in this directory.
 
-You are fixing SPECIFIC violations the quality gate found in EXISTING, already-committed files. Make the targeted edits listed below — do NOT refactor, regenerate, or change unrelated code.
+## What to build
+(no phase architecture provided — infer from the success criteria below)
 
-The files ALREADY EXIST. You MUST edit them in place with the `str_replace_editor` tool. Reading or viewing a file is NOT sufficient — you have NOT finished until you have edited EVERY file listed below.
+## Success criteria
+Create the LeavePolicyService in the leave-policy module.
 
-## Constraints & consistency
-You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
-### Reuse & consistency — match these exactly
-- The calculateEntitlement operation signature and return type must match the ILeavePolicyService interface declaration (policy: LeavePolicy, hireDate: Date, fiscalYear: number) → number; the implementation must continue to satisfy this interface after the comparison-operator change. (see `src/modules/leave-policy/leave-policy.service.interface.ts`)
-- The new Jan 1 edge-case test must be added inside the existing describe('calculateEntitlement') block and reuse the existing makeLeavePolicy test helper (entitlementDays defaults to 20) so full entitlement is asserted as 20, consistent with the other pro-ration tests in that block. (see `tests/unit/modules/leave-policy/leave-policy.service.test.ts`)
-- The inclusive boundary must align with the reconciled architecture's binding business rule: 'ANNUAL LUMP-SUM allocation at the start of the fiscal year (Jan 1) … Mid-year hires: pro-rate the first year by the number of whole months remaining in the year from the hire date (rounded down).' A Jan 1 hire is a fiscal-year-start hire, not a mid-year hire, and therefore receives the full lump-sum entitlement. (see `.gestalt/architecture/reconciled.json`)
-### Entity invariants — enforce these
-- Reuse or extend `LeavePolicy`: calculateEntitlement's fiscal-year boundary rule: an employee hired on or before Jan 1 of the fiscal year receives the full policy.entitlementDays; an employee hired after Jan 1 receives a pro-rated amount (entitlementDays × wholeMonthsRemaining ÷ 12, floored), optionally capped by maxAccumulation. The boundary is inclusive of Jan 1.
-### Interface contract — expose these operations (their shape is yours)
-- LeavePolicyService.calculateEntitlement(policy, hireDate, fiscalYear) → number — No auth — pure synchronous domain computation; not an API endpoint.; Returns a non-negative integer; never throws for valid LeavePolicy inputs. The hireDate-vs-fiscalYearStart comparison must be inclusive (<=) so an exact Jan 1 hire yields full entitlementDays.
-### Integration points — connect to these
-- LeaveBalanceService.initializeBalancesForEmployee (Phase 9, Pending) — calculateEntitlement is the entitlement source for balance initialization; the inclusive-boundary fix ensures future Jan 1 hires receive full totalEntitlement in their LeaveBalance rows. No wiring change is needed in this phase, but the corrected behaviour must be correct for that downstream consumer.
+Files to create:
+1. `src/modules/leave-policy/leave-policy.service.interface.ts` — Define and export ILeavePolicyService interface with methods: getPolicyForLeaveType(leaveTypeCode: LeaveTypeCode): Promise<LeavePolicy>, getActivePolicies(): Promise<LeavePolicy[]>, calculateEntitlement(policy: LeavePolicy, hireDate: Date, fiscalYear: number): number (implements the BINDING rule: annual lump-sum allocation at fiscal year start; mid-year hires pro-rated by whole months remaining, rounded down), validatePolicy(policy: LeavePolicy): boolean.
 
-## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
-Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
-- Use unknown with type guards instead of any (rule: `no-any`)
-- Database calls must go through repository pattern (rule: `no-direct-db-outside-repository`)
-- No hardcoded passwords, API keys, or tokens (rule: `no-hardcoded-secrets`)
-- Do not add @gestalt/* packages as project dependencies — these are Gestalt platform internals not available on npm (rule: `no-gestalt-internal-deps`)
+2. `src/modules/leave-policy/leave-policy.service.ts` — Implement LeavePolicyService class implementing ILeavePolicyService. Inject ILeavePolicyRepository and ILeaveTypeRepository (from Phase 2 and Phase 3). The calculateEntitlement method must: determine fiscal year start (Jan 1), if hireDate is before Jan 1 of fiscalYear → full entitlementDays; if hireDate is within fiscalYear → pro-rate: entitlementDays * (whole months remaining / 12), rounded down. maxAccumulation caps the result.
+
+3. Update `src/modules/leave-policy/index.ts` — Add re-exports for ILeavePolicyService and LeavePolicyService.
+
+Include Jest unit tests in `tests/unit/modules/leave-policy/` for the service, testing pro-ration edge cases (hire Jan 15 → 11 months, hire Dec 1 → 0 months, hire before fiscal year → full).
+
+This phase depends on `src/modules/leave-policy/leave-type.model.ts`, `src/modules/leave-policy/leave-type.repository.interface.ts` from Phase 2, and `src/modules/leave-policy/leave-policy.model.ts`, `src/modules/leave-policy/leave-policy.repository.interface.ts` from Phase 3 — read all before generating.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -46,6 +39,35 @@ Cross-cutting rules that apply throughout:
 - Balances are auto-created for all leave types on employee creation.
 - Every endpoint enforces RBAC (employees act on their own records; managers approve/reject their direct reports) plus input validation.
 - When an employee has no manager, approval escalates to HR. [BINDING RULE — operator decision resolving: How is the fiscal year boundary determined for LeaveBalance?; How does leave accrual work? LeavePolicy defines accrualRate and maxAccumulation, but the accrual mechanics (frequency, proration for mid-year hires, carryover rules) are not specified.; Does emergency leave have special rules that distinguish it from annual and sick leave?; When a leave request is approved, should the balance be deducted immediately at approval time or at the start of the leave period?; How is the fiscal year boundary determined for LeaveBalance? Is it calendar year (Jan 1 – Dec 31), the employee's hire-date anniversary, or a configurable organisation-wide fiscal year start?; Does emergency leave have special rules that distinguish it from annual and sick leave? The feature description lists all three but does not specify whether emergency leave bypasses notice periods, approval requirements, or balance checks.; How are leave days counted — calendar days or business/working days?; What are the fiscal year boundaries for balance scoping?; How does leave balance accrual work — annual lump-sum allocation at fiscal-year start vs. monthly pro-rata accrual?; What is the fiscal year boundary — calendar year (Jan 1 – Dec 31) or a configurable company fiscal year?; apply everywhere these apply, not in one place only]
+
+## Constraints & consistency
+You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
+### Reuse & consistency — match these exactly
+- The service must operate on the LeavePolicy interface as defined in leave-policy.model.ts — entitlementDays (number), maxAccumulation (number | undefined), accrualRate (number | undefined), minimumNoticeDays (number | undefined), requiresManagerApproval (boolean), isActive (boolean). The pro-ration and validation logic must reference these exact field names. (see `src/modules/leave-policy/leave-policy.model.ts`)
+- The service must call ILeavePolicyRepository.findAll() for getActivePolicies and ILeavePolicyRepository.findActiveByLeaveTypeId(leaveTypeId) for getPolicyForLeaveType — matching the repository interface method names and signatures declared in Phase 3. (see `src/modules/leave-policy/leave-policy.repository.interface.ts`)
+- The service must call ILeaveTypeRepository.findByCode(code) to resolve a leave type by its LeaveTypeCode — matching the repository interface method declared in Phase 2. The returned LeaveType.isActive field drives the active-type check. (see `src/modules/leave-policy/leave-type.repository.interface.ts`)
+- The pro-ration algorithm must match the BINDING business rule in reconciled.json: annual lump-sum allocation at fiscal year start (Jan 1); mid-year hires pro-rated by whole months remaining (11 - hireMonth), rounded down; maxAccumulation caps the result. The fiscal year boundary is calendar year (Jan 1 – Dec 31), organisation-wide. (see `.gestalt/architecture/reconciled.json`)
+- The error codes used by the service (NOT_FOUND, POLICY_VIOLATION) must match the Error Response Contract section of ARCHITECTURE.md: not found → 404 (NOT_FOUND), policy violation → 400 (POLICY_VIOLATION). (see `docs/ARCHITECTURE.md`)
+### Entity invariants — enforce these
+- Reuse or extend `LeavePolicy`: A leave type may have at most one active policy at any time; getPolicyForLeaveType enforces this by rejecting with POLICY_VIOLATION when zero or multiple active policies are found for a given leave type.
+- Reuse or extend `LeavePolicy`: The calculated entitlement is always a non-negative integer bounded above by maxAccumulation when that field is defined; pro-ration never produces a fractional or negative result.
+- Reuse or extend `LeaveType`: Only active leave types may be used for policy resolution; an inactive leave type causes getPolicyForLeaveType to reject with POLICY_VIOLATION regardless of whether policies exist.
+### Interface contract — expose these operations (their shape is yours)
+- getPolicyForLeaveType(leaveTypeCode) — idempotent; Rejects with AppError code NOT_FOUND when the leave type code does not resolve to a row; rejects with AppError code POLICY_VIOLATION when the leave type is inactive or when zero or multiple active policies exist for that type. Returns the single active LeavePolicy on success.
+- getActivePolicies() — idempotent; Resolves with an array of LeavePolicy objects filtered to isActive === true (possibly empty); propagates repository-level errors without transformation. Never rejects for "no results" — an empty array is a valid response.
+- calculateEntitlement(policy, hireDate, fiscalYear) — idempotent; Pure synchronous function — never throws under normal input; returns a non-negative integer. Fiscal year start is Jan 1 of fiscalYear. Hires on or before that date receive full entitlementDays; later hires are pro-rated by (11 - hireMonth) whole months, floored, then capped at maxAccumulation if defined.
+- validatePolicy(policy) — idempotent; Pure synchronous function — never throws; returns false for null/undefined/non-object input or any structural violation rather than throwing. Returns true only when all required and optional fields satisfy their type and range constraints.
+### Integration points — connect to these
+- leave-balance module (Phase 9 — LeaveBalanceService) — LeaveBalanceService.initializeBalancesForEmployee will call LeavePolicyService.getActivePolicies and calculateEntitlement to compute per-policy entitlements when creating balance records for a new employee.
+- leave-request module (Phase 10 — LeaveRequestService) — LeaveRequestService will call getPolicyForLeaveType to resolve the policy governing a leave type (for notice-period checks, approval-flag checks, and entitlement validation) during request submission and approval.
+- shared-types module (LeaveTypeCode enum) — The service interface and getPolicyForLeaveType parameter depend on the LeaveTypeCode enum from src/shared/types for type-safe leave type identification.
+
+## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
+Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
+- Use unknown with type guards instead of any (rule: `no-any`)
+- Database calls must go through repository pattern (rule: `no-direct-db-outside-repository`)
+- No hardcoded passwords, API keys, or tokens (rule: `no-hardcoded-secrets`)
+- Do not add @gestalt/* packages as project dependencies — these are Gestalt platform internals not available on npm (rule: `no-gestalt-internal-deps`)
 
 ## Architecture & constraint rules the quality gate enforces (satisfy these now)
 The quality gate judges your code against the rules below and BLOCKS the phase on any violation — a violation it rates critical escalates to a human with no automatic retry. These are the same rules the gate checks, so comply up front rather than leaving them for the gate:
@@ -71,30 +93,21 @@ These are the project's non-negotiable invariants. A violation is a GOLDEN_PRINC
 - GP-006 — Error handling: No unhandled promise rejections. All async errors are caught and handled.
 
 ## Project stack & references
-Before making the edits below, read the referenced files (those present in the working directory) to learn the project's architecture, conventions, and the cross-cutting rules your fix must still satisfy — then keep the edits consistent with them:
+Before writing code, read the referenced files below (those present in the working directory) to learn the project's language, framework, test runner, and conventions, and the cross-cutting rules your code must satisfy — then follow the existing repository conventions:
 - `HARNESS.json`
 - `docs/ARCHITECTURE.md`
 - `docs/GOLDEN_PRINCIPLES.md`
 - `AGENTS.md`
 - `PLAN.md`
 
-## Required edits
-
-### Edit 1
-File: src/modules/leave-policy/leave-policy.service.ts
-Line: 73
-Offending code: `if (hireDate < fiscalYearStart) {`
-Rule violated: review/correctness
-Action (do this now): Edit `src/modules/leave-policy/leave-policy.service.ts` at line 73 in place to fix the `review/correctness` violation.
-What the quality gate found — apply this: [review/correctness] calculateEntitlement uses strict less-than (`<`) to compare hireDate against fiscalYearStart, but the spec requires "on or before Jan 1" to yield full entitlement. A hire date exactly on Jan 1 of the fiscal year (e.g. `new Date(2025, 0, 1)` with `fiscalYear=2025`) evaluates `false` and falls into the pro-rating branch instead of returning full `entitlementDays`. The comparison should be `<=`.
-
 ## Verify before you finish (MANDATORY)
-After making the edits above, the code MUST still compile and its tests MUST pass — a compilation/type error, or a test your change breaks, must NEVER be left for CI or the quality gate to find. Before you declare this task done:
-- Read the project's build / type-check / test commands from `package.json` (scripts) and `HARNESS.json`, install dependencies if they are not already installed, then RUN the type-check / build (e.g. `npm run build` or `tsc --noEmit`) AND the tests (e.g. `npm test`).
-- FIX every compilation error, type error, and failing test that YOUR edits introduced — including updating a test whose expectation your change legitimately invalidated (e.g. a new required field, a new status code such as 401/403 from an added authorization check, added input validation) — and re-run until they pass.
+The code you write MUST compile and its tests MUST pass — a compilation or type error must NEVER be left for CI to find. Before you declare this task done:
+- Read the project's build / type-check / test commands from `package.json` (scripts) and `HARNESS.json`.
+- Install dependencies if they are not already installed, then RUN the type-check / build (e.g. `npm run build` or `tsc --noEmit`) AND the tests (e.g. `npm test`) for the files this phase touches.
+- FIX every compilation error, type error, and failing test you introduced — including in test files — and re-run until they pass.
 - Only when the build and the tests pass may you consider the task complete. If a dependency install genuinely cannot be made to work, say so explicitly in your final message rather than declaring success on unverified code.
 
 ## Constraints (mandatory)
-- Keep the change SURGICAL: make the required edits above and fix only what they broke (compile/type errors and the tests they invalidated). Do NOT refactor, regenerate, or change unrelated code, and do not add / delete / rename source files beyond what a required edit — or a test-fix for it — needs.
-- Do NOT run `git commit`, `git push`, `git add`, or any git command. The platform handles all git operations. (Running the build / type-check / tests above is expected and encouraged — that is NOT a git operation.)
-- When the listed edits are made and the build + tests pass, stop.
+- Write and modify source files ONLY. Do NOT run `git commit`, `git push`, `git add`, or any other git command. The platform handles all git operations. (Running the build / type-check / tests above is expected and encouraged — that is NOT a git operation.)
+- Do not create a new repository or change the git remote.
+- Stay within the scope of this phase; do not implement deferred/later work.
