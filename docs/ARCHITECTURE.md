@@ -24,6 +24,7 @@ src/modules/leave-policy/    — LeaveType model + repository + barrel
 src/modules/leave-balance/   — LeaveBalance model + repository + barrel
                                 LeaveBalanceService
 src/modules/leave-request/   — LeaveRequest model + repository + barrel
+                                LeaveRequestService + routes
 src/modules/audit/           — AuditRecord model + repository + barrel
 src/modules/notification/    — Notification model + repository + barrel
 src/shared/db/connection.ts  — PostgreSQL connection pool
@@ -63,17 +64,17 @@ src/shared/types/            — Shared type definitions
 
 ### Key Business Rules (Binding)
 
-1. **Inclusive day counting**: `requestedDays = (endDate - startDate) + 1` (calendar days).
+1. **Business day counting**: Days are counted as business days (Mon–Fri excluding US public holidays). Weekends and hardcoded public holidays (2025–2026) are excluded. A request with zero business days is rejected at submission.
 2. **State transitions**: Only DRAFT→SUBMITTED, DRAFT→CANCELLED, SUBMITTED→APPROVED, SUBMITTED→REJECTED, SUBMITTED→CANCELLED, APPROVED→CANCELLED. REJECTED is terminal.
-3. **Balance impact**: SUBMITTED increments pendingDays; APPROVED decrements pendingDays and increments usedDays; REJECTED decrements pendingDays; CANCELLED (from APPROVED) decrements usedDays (restores balance). DRAFT has no impact.
-4. **Sufficiency check**: Before DRAFT→SUBMITTED, `remainingDays - pendingDays >= requestedDays`.
-5. **Manager routing**: Request routed to employee.managerId; if null, auto-escalated to ADMIN. If LeavePolicy.requiresManagerApproval is false, auto-approve on submission.
-6. **Minimum notice**: If LeavePolicy.minimumNoticeDays > 0, `startDate - submissionDate >= minimumNoticeDays`.
-7. **Employee eligibility**: Only ACTIVE employees may create/submit requests.
-8. **Active leave type/policy**: Only active LeaveType and LeavePolicy may be used.
-9. **Overlap prevention**: No two SUBMITTED or APPROVED requests for same employee may have overlapping date ranges.
+3. **Balance impact**: SUBMITTED increments pendingDays; APPROVED decrements pendingDays and increments usedDays; REJECTED decrements pendingDays; CANCELLED (from SUBMITTED) decrements pendingDays; CANCELLED (from APPROVED) decrements usedDays directly via balanceRepo (restores balance). DRAFT has no impact.
+4. **Sufficiency check**: Before DRAFT→SUBMITTED, `remainingDays - pendingDays >= businessDays`. On failure the reservation is released (best-effort rollback).
+5. **Manager routing**: Approve/reject restricted to `manager` and `hr_admin` roles. Self-approval and self-rejection are blocked (approver cannot be the request's employee). **No direct-manager hierarchy check is implemented** — any manager or hr_admin can approve/reject any SUBMITTED request. No auto-escalation for null managerId. No auto-approve when `requiresManagerApproval` is false.
+6. **Minimum notice**: If LeavePolicy.minimumNoticeDays > 0, `startDate - now >= minimumNoticeDays` (calendar days). Emergency leave (`code='emergency'`) skips this check.
+7. **Employee eligibility**: **Not enforced** — employment status is not checked at submission time.
+8. **Active leave type/policy**: Only active LeaveType and LeavePolicy may be used. Validated at draft creation and submission.
+9. **Overlap prevention**: No two SUBMITTED or APPROVED requests for same employee may have overlapping date ranges (excludes CANCELLED, REJECTED, DRAFT).
 10. **Rejection reason**: Required when transitioning to REJECTED.
-11. **Date validity**: `endDate >= startDate`.
+11. **Date validity**: `endDate >= startDate`. Validated at draft creation.
 
 ### Module Boundaries
 
@@ -114,6 +115,7 @@ src/shared/types/            — Shared type definitions
 - Repository methods accept optional `PoolClient` parameter (defaults to shared pool).
 - Service owns unit of work: acquires client, `BEGIN`, passes client to all participating repositories, `COMMIT` or `ROLLBACK`.
 - Required for leave-approval flow: updating leave_requests.status, leave_balances.used_days/pending_days/remaining_days, and inserting audit_logs row must be atomic.
+- **Note**: Phase 10 does not yet implement transaction wrapping — operations are executed on the shared pool without explicit BEGIN/COMMIT boundaries.
 
 **Error Response Contract**
 - Standard shape: `{ error: string; code: string }`
@@ -138,7 +140,7 @@ src/shared/types/            — Shared type definitions
 | 7 | ✅ Complete | Notification model + repository (notification module) |
 | 8 | ✅ Complete | LeavePolicyService (leave-policy module) |
 | 9 | ✅ Complete | LeaveBalanceService (leave-balance module) |
-| 10 | Pending | LeaveRequestService + routes (leave-request module) |
+| 10 | ✅ Complete | LeaveRequestService + routes (leave-request module) |
 
 ### Implementation Notes
 
@@ -150,6 +152,36 @@ src/shared/types/            — Shared type definitions
 - **NotificationRepository** follows the same `Queryable` pattern: constructor accepts an optional client defaulting to the shared pool, enabling transaction participation. The `create` method always sets `status` to `'PENDING'` and `read_at` to `NULL` regardless of caller input. `markAsSent` and `markAsRead` are idempotent — re-marking an already-SENT or already-READ notification succeeds (re-stamps `read_at` on re-read). `createBatch` uses a single multi-row INSERT for efficiency when fanning out notifications (e.g., to employee + manager on submission). `findByRecipient` returns results ordered by `created_at DESC`.
 - **LeavePolicyService** injects `ILeavePolicyRepository` and `ILeaveTypeRepository`. `getPolicyForLeaveType` resolves a leave type by code, validates it is active, then fetches active policies for that type — throwing `POLICY_VIOLATION` if zero or multiple active policies exist. `getActivePolicies` fetches all policies and filters to `isActive === true` in application code. `calculateEntitlement` implements fiscal-year pro-ration: fiscal year starts Jan 1; if `hireDate <= fiscalYearStart` → full `entitlementDays`; otherwise pro-rated by whole months remaining (`11 - hireMonth`), floored, with an optional `maxAccumulation` cap applied after pro-ration. `validatePolicy` performs structural validation of all required and optional fields (positive integer entitlement, non-negative accrual/max/minimumNotice, boolean flags). The service also exports an `AppError` class (extends `Error`, carries a `code` string) used for domain-level error responses.
 - **LeaveBalanceService** injects `ILeaveBalanceRepository` and `ILeavePolicyService`. `getBalancesForEmployee` delegates to `findByEmployeeId` (all fiscal years) or `findByEmployeeIdAndFiscalYear` when a fiscal year filter is provided. `initializeBalancesForEmployee` fetches all active policies via `ILeavePolicyService.getActivePolicies`, calls `calculateEntitlement` for each using `hireDate.getFullYear()` as the fiscal year, then creates balances in a single `createBatch` call — returns an empty array when no active policies exist. `getAvailableBalance` returns `remainingDays - pendingDays` (throws `NOT_FOUND` if no balance record exists). `reserveDays` checks `remainingDays - pendingDays >= days` before incrementing `pendingDays`; throws `INSUFFICIENT_BALANCE` on failure and does not mutate the balance. `finalizeDeduction` atomically decrements `pendingDays` and increments `usedDays` in a single `update` call. `releaseReservation` decrements `pendingDays` with a `Math.max(0, pendingDays - days)` floor to prevent negative values. All methods that require a balance lookup throw `AppError` with code `NOT_FOUND` when the balance does not exist. The service reuses the `AppError` class exported from the `leave-policy` module.
+- **LeaveRequestService** injects `ILeaveRequestRepository`, `ILeaveBalanceService`, `ILeaveBalanceRepository`, `IAuditRepository`, `INotificationRepository`, `ILeavePolicyService`, and `ILeaveTypeRepository`. Key behaviors:
+  - `createDraft`: validates `endDate >= startDate`, resolves leave type by code (validates exists + active), resolves policy, creates with DRAFT status.
+  - `submit`: validates ownership (employeeId match), DRAFT→SUBMITTED transition only, leave type still active, minimum notice (skipped for emergency), overlap detection (excludes CANCELLED/REJECTED/DRAFT), counts business days (Mon–Fri excluding hardcoded US holidays 2025–2026), reserves days via `balanceService.reserveDays`, then updates status + writes audit + creates notification. On any failure after reservation, releases reservation as best-effort rollback.
+  - `approve`: validates SUBMITTED status, blocks self-approval, finalizes deduction via `balanceService.finalizeDeduction`, updates status to APPROVED with `approvedBy`/`approvedAt` metadata, writes audit + notification.
+  - `reject`: validates SUBMITTED status, blocks self-rejection, requires non-empty reason, releases reservation via `balanceService.releaseReservation`, updates status to REJECTED with `rejectedBy`/`rejectedAt`/`rejectionReason` metadata, writes audit + notification.
+  - `cancel`: validates ownership, allows DRAFT/SUBMITTED/APPROVED states. SUBMITTED→releases reservation. APPROVED→directly decrements `usedDays` on the balance via `balanceRepo.update` (bypasses the balance service). DRAFT→no balance impact. Writes audit + notification.
+  - `getById`: returns request or throws NOT_FOUND.
+  - `getByEmployee`: delegates to `findByEmployeeId`.
+- **LeaveRequest routes** (`leave-request.routes.ts`) — Fastify plugin registering seven endpoints:
+  - `POST /api/leave-requests` — create draft (roles: employee, manager, hr_admin). Validates body fields (leaveTypeId, startDate, endDate, optional reason).
+  - `GET /api/leave-requests` — list own requests (roles: employee, manager, hr_admin).
+  - `GET /api/leave-requests/:id` — get by ID. RBAC: employees can only view their own; managers/hr_admin can view all.
+  - `PATCH /api/leave-requests/:id/submit` — submit (roles: employee, manager, hr_admin).
+  - `PATCH /api/leave-requests/:id/approve` — approve (roles: manager, hr_admin only).
+  - `PATCH /api/leave-requests/:id/reject` — reject (roles: manager, hr_admin only). Body requires `reason` string.
+  - `PATCH /api/leave-requests/:id/cancel` — cancel (roles: employee, manager, hr_admin).
+  - All routes extract user identity from `request.user` (JWT auth assumed), map `AppError` codes to HTTP status codes, and return `{ error, code }` on failure.
+  - Dependencies are wired manually in the route plugin (no DI container): repositories and services are instantiated directly.
+
+### Known Gaps (vs. Planned Architecture)
+
+The following items from the architectural plan are not yet implemented in Phase 10:
+
+1. **No `IEmployeeRepository`** — Employee data (managerId, employmentStatus, hireDate) is not looked up from the database. The service has no dependency on an employee repository.
+2. **No direct-manager authority check** — Any user with `manager` or `hr_admin` role can approve/reject any SUBMITTED request. The only restriction is that a user cannot approve/reject their own request.
+3. **No HR escalation for null managerId** — When an employee has no manager, there is no automatic escalation to HR.
+4. **No `requiresManagerApproval` auto-approve** — The policy flag is not checked; all requests require explicit approval regardless of the policy setting.
+5. **No employee eligibility check** — Employment status (ACTIVE/INACTIVE/TERMINATED) is not verified before allowing submission.
+6. **No transaction wrapping** — State mutations across multiple tables (leave_requests, leave_balances, audit_logs, notifications) are not wrapped in a database transaction. The submit method uses a best-effort compensation (release reservation on failure) rather than ROLLBACK.
+7. **Business days instead of calendar days** — The architecture originally specified inclusive calendar day counting `(endDate - startDate) + 1`. The implementation counts business days (Mon–Fri, excluding hardcoded US public holidays for 2025–2026).
 
 ### Open Questions
 
@@ -157,4 +189,6 @@ src/shared/types/            — Shared type definitions
 - Accrual mechanics (lump-sum, monthly, per-pay-period, tenure-based)
 - Emergency leave special rules (bypass notice/approval, separate pool)
 - Balance deduction timing (immediate on approval vs. start of leave period)
+- Calendar days vs. business days — current implementation uses business days; may need to be configurable per policy
+- Manager hierarchy enforcement — currently any manager can approve; direct-report restriction planned but not implemented
 <!-- gestalt:architecture feature=32ad270f-dfe8-4e32-be27-804897fcc970 END -->
