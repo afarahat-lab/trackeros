@@ -1,12 +1,12 @@
-# Implement this phase: Phase 1: Shared enums
+# Implement this phase: Phase 2: Employee model + repository
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/73542714-9897-4d99-9509-1a7bb9190c33/1`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/73542714-9897-4d99-9509-1a7bb9190c33/2`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create src/shared/types/leave.types.ts with all shared enums: LeaveType ('annual' | 'sick' | 'emergency' | 'unpaid' | 'maternity' | 'paternity'), LeaveRequestStatus ('DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED'), AuditAction ('CREATED' | 'UPDATED' | 'DELETED' | 'APPROVED' | 'REJECTED' | 'CANCELLED'), NotificationType ('LEAVE_SUBMITTED' | 'LEAVE_APPROVED' | 'LEAVE_REJECTED' | 'LEAVE_CANCELLED' | 'BALANCE_EXHAUSTED'), NotificationStatus ('PENDING' | 'SENT' | 'READ' | 'ARCHIVED'), EmploymentStatus ('ACTIVE' | 'INACTIVE' | 'TERMINATED'), BalanceStatus ('ACTIVE' | 'EXHAUSTED' | 'CLOSED'). Use TypeScript string enums. This file has no dependencies on other project files.
+Create src/modules/employee/employee.model.ts with the Employee interface (id: string, employeeNumber: string, firstName: string, lastName: string, email: string, managerId: string | null, department: string | null, hireDate: Date, terminationDate: Date | null, employmentStatus: EmploymentStatus, createdAt: Date, updatedAt: Date, deletedAt: Date | null). Import EmploymentStatus from src/shared/types/leave.types.ts. Create src/modules/employee/employee.repository.ts with IEmployeeRepository interface (findById, findByManagerId, findAll, create, update, softDelete) and PgEmployeeRepository implementation using the pg pool from src/shared/db/connection.ts. Include Jest unit tests in tests/unit/modules/employee/employee.repository.test.ts.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -30,6 +30,48 @@ Cross-cutting rules throughout:
 - Emergency leave is a SEPARATE pool (distinct from annual/sick) and bypasses the advance-notice requirement, but still requires approval and deducts from its own balance.
 - Every endpoint enforces RBAC (employees on their own records; managers approve/reject direct reports) plus input validation.
 - Only ACTIVE employees may submit leave. [BINDING RULE — operator decision resolving: How is the fiscal year determined for LeaveBalance assignment? Is it calendar year (Jan 1 – Dec 31), a company-specific fiscal year (e.g., Apr 1 – Mar 31), or configurable per policy?; What happens when a LeaveRequest spans two fiscal years (e.g., startDate in December, endDate in January)?; How does accrual work for annual leave? Is the full entitlement granted upfront at the start of the fiscal year, or does it accrue over time?; Do unused leave days carry over to the next fiscal year, and if so, up to what limit?; How is an employee's manager resolved for routing approvals and notifications?; How are leave days counted for balance deduction — calendar days (inclusive start..end) or working/business days? Does a half-day leave consume 0.5 or 1 day?; What defines the fiscal_year boundary for leave balances — calendar year, a configurable fiscal year (e.g. Apr–Mar), or employee hire-date anniversary?; How is leave balance computed — simple remaining = allocated - used, or does it involve accrual rules (e.g. pro-rata monthly accrual, carry-over from prior year)?; How is an employee's manager resolved? The LeaveRequest service needs a managerId for routing approvals and notifications.; apply everywhere these apply, not in one place only]
+
+## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
+The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
+- `Employee` — the entity MUST have exactly these fields:
+    - id: string
+    - employeeNumber: string
+    - firstName: string
+    - lastName: string
+    - email: string
+    - managerId: string | null
+    - department: string | null
+    - hireDate: Date
+    - terminationDate: Date | null
+    - employmentStatus: 'ACTIVE' | 'INACTIVE' | 'TERMINATED'
+    - createdAt: Date
+    - updatedAt: Date
+    - deletedAt: Date | null
+
+## Constraints & consistency
+You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
+### Reuse & consistency — match these exactly
+- The Employee model's employmentStatus field must reuse the EmploymentStatus enum exported from src/shared/types/leave.types.ts (ACTIVE/INACTIVE/TERMINATED) — do not redefine a local EmploymentStatus type; this matches the reconciled dependency Employee → SharedTypes and the Phase 1 deliverable. (see `src/shared/types/leave.types.ts`)
+- The PostgreSQL repository implementation must obtain its database connection by importing the `pool` (pg Pool) exported from src/shared/db/connection.ts — the single shared connection source — rather than constructing its own Pool or reading DATABASE_URL, matching the existing connection module and the agents.yaml-cited import convention. (see `src/shared/db/connection.ts`)
+- The Employee entity shape and the employees conceptual table (id, employee_number, first_name, last_name, email, manager_id self-FK, department, hire_date, termination_date, employment_status, created_at, updated_at, deleted_at) must match the reconciled architecture's domain entity and sql_schemas entries for Employee/employees — the repository's row↔entity mapping must align column names to the model's camelCase fields consistently with that schema. (see `.gestalt/architecture/reconciled.json`)
+- Unit test files must be placed under tests/unit/modules/employee/ and named *.test.ts so they are discovered by the configured testMatch glob (**/tests/**/*.test.(ts|js)) and transformed by the ts-jest preset; the test path must not be added to tsconfig's include (tests are excluded from the build). (see `jest.config.js`)
+- The repository interface and its PostgreSQL implementation must follow the module structure and naming convention declared in docs/ARCHITECTURE.md (src/modules/employee/employee.{model,repository}.ts; interface IEmployeeRepository; concrete PgEmployeeRepository) and the Transaction Contract's caller-controlled-transaction pattern where applicable, extending rather than contradicting the documented architecture. (see `docs/ARCHITECTURE.md`)
+### Entity invariants — enforce these
+- Reuse or extend `Employee`: Employment status follows the lifecycle ACTIVE → INACTIVE → TERMINATED (forward-only); an Employee record is never physically destroyed — termination/removal is represented by setting deletedAt (soft delete), so a deleted Employee's row persists and is excluded from read results.
+- Reuse or extend `Employee`: managerId is either null (no manager / top of hierarchy) or references another Employee's id (self-referential hierarchy per the employees.manager_id→employees.id foreign key); the repository must not create a cycle-free guarantee at this layer but must preserve the managerId value as given.
+- Reuse or extend `Employee`: createdAt is set once at creation and never modified by update; updatedAt advances on every successful update; deletedAt is null until softDelete and set exactly once (soft delete is not reversible through this repository).
+### Interface contract — expose these operations (their shape is yours)
+- findById — Returns the non-deleted Employee matching the id, or null when no such non-deleted row exists; must not return soft-deleted employees. No auth rule at the repository layer (caller is trusted).
+- findByManagerId — Returns the set of non-deleted Employees whose managerId equals the given manager id; returns an empty collection when the manager has no direct reports. Excludes soft-deleted employees.
+- findAll — Returns the collection of non-deleted Employees; excludes soft-deleted rows.
+- create — Persists a new Employee row and returns the persisted entity with server-generated id and timestamps; persistence failures (including any unique-constraint violation on employee_number/email if enforced) must surface to the caller as a typed/rejected error, never an unhandled rejection.
+- update — Persists the supplied field changes for an existing non-deleted Employee and returns the refreshed entity with an advanced updatedAt; must not resurrect a soft-deleted employee. A no-match (unknown or deleted id) must surface as a not-found/empty result rather than silently succeeding.
+- softDelete — idempotent; Sets deletedAt on the target Employee row (does not physically delete); idempotent in the sense that soft-deleting an already-soft-deleted row leaves it deleted. Must not affect any other row. A no-match (unknown id) must surface as a not-found/empty result.
+### Integration points — connect to these
+- src/shared/types/leave.types.ts (SharedTypes module) — The Employee model imports EmploymentStatus from the shared types module — the sole domain dependency declared for the Employee module in the reconciled dependency map.
+- src/shared/db/connection.ts (shared pg Pool) — The PostgreSQL repository implementation consumes the shared pg Pool as its database connection — the single sanctioned connection source per the existing connection module and the no-direct-db-outside-repository constraint.
+- Phase 9 LeaveRequestService (future) — The LeaveRequestService will resolve an employee's managerId and employmentStatus via this IEmployeeRepository (per the reconciled business rules: manager resolution via IEmployeeRepository, only ACTIVE employees may submit) — the interface contract established here is the integration surface later phases depend on, which is why the optional-PoolClient ambiguity matters.
+- Phase 7 EmployeeService (future) — The EmployeeService will be built on top of this IEmployeeRepository (per PLAN.md Phase 7 and the reconciled module ownership: Employee module owns model, repository, and service) — the repository interface and soft-delete/read semantics defined here are the foundation the service layer will wrap.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
