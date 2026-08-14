@@ -1,0 +1,191 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "employee",
+      "leave-policy"
+    ],
+    "affectedLayers": [
+      "service",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "IEmployeeService interface declares exactly the operations findById, findByManagerId, isActive, and getManagerId, and EmployeeService implements that interface.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "EmployeeService delegates all data access to an injected IEmployeeRepository (findById / findByManagerId) and never imports or touches the pg pool or shared/db/connection directly.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "isActive returns true if and only if the resolved employee's employmentStatus equals EmploymentStatus.ACTIVE; it returns false for a non-existent employee id.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "getManagerId returns the managerId field of the resolved Employee (string | null), including null for a top-level employee and null when the employee id is not found.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "ILeavePolicyService interface declares exactly findByLeaveType, getEntitlement, requiresManagerApproval, and getMinimumNoticeDays, and LeavePolicyService implements that interface.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "LeavePolicyService delegates all data access to an injected ILeavePolicyRepository and never imports or touches the pg pool or shared/db/connection directly.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "getEntitlement, requiresManagerApproval, and getMinimumNoticeDays resolve the policy by filtering findByLeaveType results to isActive === true and taking the first match; when no active policy exists they return a typed null/absent result without throwing.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Unit tests mock the injected repository interface via jest.fn() and cover the found, not-found, active-policy-filtering, and null-manager cases; `npm run build` (tsc --noEmit) and jest both pass.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Strict TypeScript: no implicit any, strict null checks, and the no-any rule (use unknown with type guards instead of any) \u2014 must pass `npm run build` (tsc --noEmit).",
+    "GP-001 Repository pattern: services must inject repository interfaces (IEmployeeRepository, ILeavePolicyRepository) and never query the database or import the pg pool / shared/db/connection directly.",
+    "Service interface methods must omit PoolClient parameters \u2014 these services are thin read-only lookup wrappers, not transaction orchestrators; the repository methods retain PoolClient for higher-level callers.",
+    "New files must follow the module convention: src/modules/<name>/<name>.service.interface.ts for the interface and <name>.service.ts for the implementation; tests mirror tests/unit/modules/<name>/<name>.service.test.ts.",
+    "No circular dependencies: Employee and LeavePolicy services depend only on their own module's model/repository and SharedTypes, matching the reconciled dependency map (Employee \u2192 SharedTypes, LeavePolicy \u2192 SharedTypes)."
+  ],
+  "outOfScope": [
+    "LeaveBalanceService, LeaveRequestService, controller, routes, and app wiring (Phases 8\u201310) \u2014 not created in this phase.",
+    "Module index.ts barrel files for employee and leave-policy \u2014 not in the 6-file scope of this phase (only status/uptime have barrels today).",
+    "Any write/mutation operations (create/update/delete) on employees or leave policies \u2014 these services are read-only lookups; no audit records are required (GP-002 applies only to state-changing operations).",
+    "RBAC enforcement / auth middleware (GP-005) \u2014 these services have no API surface; RBAC is enforced at the route layer in Phase 10.",
+    "HR escalation logic for null managerId (business rule 3 escalation to hr_admin) \u2014 that orchestration belongs to the LeaveRequestService in Phase 9; getManagerId only returns the raw managerId."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "An employee's active eligibility is determined solely by employmentStatus === EmploymentStatus.ACTIVE; INACTIVE and TERMINATED employees are not active. The service must not infer active status from any other field (e.g. terminationDate, deletedAt)."
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "managerId is the authoritative approval-routing reference: it is either a string referencing another employee's id or null (top-level / no manager). The service exposes it verbatim without defaulting or synthesizing a value."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "Only policies with isActive === true are considered the governing policy for a leave type; inactive policies returned by the repository must be filtered out before resolving entitlement, approval requirement, or notice days."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "minimumNoticeDays is nullable (number | null); a null value means no advance-notice constraint applies. The service must preserve null rather than coercing it to 0 or throwing."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IEmployeeService.findById",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the Employee or null when not found; must not throw on a missing id. Delegates to IEmployeeRepository.findById without a PoolClient."
+    },
+    {
+      "operation": "IEmployeeService.findByManagerId",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the array of direct-report Employees (possibly empty) for the given manager id; delegates to IEmployeeRepository.findByManagerId without a PoolClient."
+    },
+    {
+      "operation": "IEmployeeService.isActive",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns a boolean: true iff the resolved employee's employmentStatus === EmploymentStatus.ACTIVE; false when the employee is not found or is INACTIVE/TERMINATED. Must not throw on a missing id."
+    },
+    {
+      "operation": "IEmployeeService.getManagerId",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the managerId (string | null) of the resolved employee, or null when the employee is not found. Must not throw on a missing id."
+    },
+    {
+      "operation": "ILeavePolicyService.findByLeaveType",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the array of LeavePolicy entries for the given LeaveType (delegates to ILeavePolicyRepository.findByLeaveType without a PoolClient); may be empty."
+    },
+    {
+      "operation": "ILeavePolicyService.getEntitlement",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Resolves the active policy for the leave type and returns its entitlementDays, or a typed null/absent result when no active policy exists; must not throw on missing policy."
+    },
+    {
+      "operation": "ILeavePolicyService.requiresManagerApproval",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Resolves the active policy for the leave type and returns its requiresManagerApproval boolean, or a typed null/absent result when no active policy exists; must not throw on missing policy."
+    },
+    {
+      "operation": "ILeavePolicyService.getMinimumNoticeDays",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Resolves the active policy for the leave type and returns its minimumNoticeDays (number | null), or a typed null/absent result when no active policy exists; must not throw on missing policy and must preserve a null minimumNoticeDays."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "EmployeeService must consume the Employee entity shape exactly as defined (employmentStatus: EmploymentStatus, managerId: string | null) \u2014 do not redefine or widen the Employee type.",
+      "referencePath": "src/modules/employee/employee.model.ts"
+    },
+    {
+      "requirement": "EmployeeService must call only the findById and findByManagerId signatures declared on IEmployeeRepository (with optional PoolClient omitted); it must not depend on findAll/create/update/softDelete.",
+      "referencePath": "src/modules/employee/employee.repository.ts"
+    },
+    {
+      "requirement": "LeavePolicyService must consume the LeavePolicy entity shape exactly as defined (entitlementDays: number, requiresManagerApproval: boolean, minimumNoticeDays: number | null, isActive: boolean) \u2014 do not redefine or widen the LeavePolicy type.",
+      "referencePath": "src/modules/leave-policy/leave-policy.model.ts"
+    },
+    {
+      "requirement": "LeavePolicyService must call only the findByLeaveType signature declared on ILeavePolicyRepository (with optional PoolClient omitted); it must not depend on findById or findAllActive.",
+      "referencePath": "src/modules/leave-policy/leave-policy.repository.ts"
+    },
+    {
+      "requirement": "isActive must compare against EmploymentStatus.ACTIVE from the shared enum, not a hardcoded string literal, to stay aligned with the canonical enum values.",
+      "referencePath": "src/shared/types/leave.types.ts"
+    },
+    {
+      "requirement": "Service interface + implementation file naming and the `implements` pattern must match the established convention in the status and uptime modules.",
+      "referencePath": "src/modules/status/status.service.interface.ts"
+    },
+    {
+      "requirement": "Service unit tests must follow the existing repository test conventions: jest.mock of the dependency, jest.fn() mocks reset in beforeEach, makeX(overrides) factory helpers, describe/it structure, and relative import paths.",
+      "referencePath": "tests/unit/modules/employee/employee.repository.test.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "IEmployeeRepository (src/modules/employee/employee.repository.ts)",
+      "why": "EmployeeService injects this repository interface to resolve employees by id and by manager id; it is the sole data-access dependency for the employee service."
+    },
+    {
+      "target": "ILeavePolicyRepository (src/modules/leave-policy/leave-policy.repository.ts)",
+      "why": "LeavePolicyService injects this repository interface to look up policies by leave type; it is the sole data-access dependency for the leave-policy service."
+    },
+    {
+      "target": "SharedTypes \u2014 EmploymentStatus, LeaveType (src/shared/types/leave.types.ts)",
+      "why": "isActive compares against EmploymentStatus.ACTIVE; findByLeaveType/getEntitlement/etc. accept a LeaveType argument; both enums are imported from the shared types module."
+    },
+    {
+      "target": "LeaveRequestService (Phase 9, not yet built)",
+      "why": "IEmployeeService (manager resolution, active-status gate) and ILeavePolicyService (entitlement, approval requirement, minimum notice) are consumed by the future LeaveRequestService orchestrator per the reconciled dependency map (LeaveRequest \u2192 Employee, LeavePolicy)."
+    }
+  ]
+}
