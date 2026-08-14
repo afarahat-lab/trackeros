@@ -1,0 +1,133 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-policy"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The LeavePolicy model is a bare `export interface` (no class/runtime code) importing LeaveType from the shared types module, exposing the full LeavePolicy shape with all fields including nullable ones (accrualRate, maxAccumulation, minimumNoticeDays) typed as `number | null` and date fields typed as `Date`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository exposes an ILeavePolicyRepository interface with exactly the three read-only operations findById, findByLeaveType, and findAllActive \u2014 no create/update/delete methods exist in this phase.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findById returns the matching LeavePolicy entity when a row exists and returns null when no row matches (result.rows.length === 0); the returned entity is a fully-mapped camelCase object with leaveType cast to the LeaveType enum and date fields wrapped in Date instances.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findByLeaveType returns an array of LeavePolicy entities matching the given leave type (empty array when none match), and findAllActive returns an array of only active policies (empty array when none exist).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Every repository method accepts an optional PoolClient parameter and uses `const db = client ?? pool;` so a caller-supplied transaction client is used in preference to the shared pool; when no client is passed the shared pool from src/shared/db/connection is used.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The Jest unit test suite mocks the shared db connection pool, resets the mock between tests, and asserts for each repository method both the returned entity shape AND the exact SQL string and parameter array passed to query \u2014 including a test verifying a provided PoolClient is used instead of the pool.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No `any` type anywhere (HARNESS constraint `no-any`): use `unknown` with type guards/casts instead, mirroring the employee repository's `rowToEmployee` mapper which casts `Record<string, unknown>` row fields.",
+    "All database access must go through the repository pattern (HARNESS constraint `no-direct-db-outside-repository`, GP-001): the repository is the sole component that issues SQL against the leave_policies table; the model file contains no SQL or db imports.",
+    "Strict TypeScript must pass (no implicit any, strict null checks): nullable LeavePolicy fields (accrualRate, maxAccumulation, minimumNoticeDays) must be `number | null`, not optional `?`, and the row mapper must preserve null rather than coerce to undefined.",
+    "The LeavePolicy model and repository must mirror the Phase 2 employee module conventions exactly: bare `export interface` model with no runtime code; repository with interface + class implementation; private snake_case\u2192camelCase row mapper; `RETURNING *` on writes (none this phase); single-row reads return null on empty result set.",
+    "No UniqueConstraintViolationError or other write-path error types are exported from the leave-policy repository this phase \u2014 the repository is read-only and has no write operations that could trigger a 23505 violation."
+  ],
+  "outOfScope": [
+    "LeavePolicy service (ILeavePolicyService, LeavePolicyService) \u2014 deferred to Phase 7 (EmployeeService + LeavePolicyService).",
+    "LeavePolicy create/update/delete repository operations and any write path to the leave_policies table \u2014 the repository is read-only this phase (findById, findByLeaveType, findAllActive only).",
+    "LeavePolicy controller, routes, and any HTTP/REST surface \u2014 deferred to later phases; this phase produces only model + repository + unit tests.",
+    "Database migration creating the leave_policies table \u2014 table schema is defined in the reconciled architecture but migrations are not part of this phase's deliverables."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "A LeavePolicy is associated with exactly one LeaveType; the leaveType field must be a valid member of the LeaveType enum (annual, sick, emergency, unpaid, maternity, paternity) and is never null."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "A LeavePolicy's lifecycle is ACTIVE \u2194 INACTIVE governed by the isActive boolean flag; the repository's findAllActive operation returns only policies where isActive is true, and findById/findByLeaveType return policies regardless of active state."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "The optional policy constraints accrualRate, maxAccumulation, and minimumNoticeDays are genuinely nullable \u2014 a null value means \"no constraint configured\" and must be preserved as null through the row mapper rather than defaulted to zero or undefined."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "ILeavePolicyRepository.findById(id, client?)",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns the LeavePolicy entity when a row matches the given id, or null when no row is found (result.rows.length === 0). Read-only: no state change, no audit record required. Database errors propagate as thrown errors (no swallowing)."
+    },
+    {
+      "operation": "ILeavePolicyRepository.findByLeaveType(leaveType, client?)",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns an array of LeavePolicy entities matching the given LeaveType (empty array when none match). Read-only: no state change, no audit record required. Database errors propagate as thrown errors."
+    },
+    {
+      "operation": "ILeavePolicyRepository.findAllActive(client?)",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns an array of only active LeavePolicy entities (isActive = true), empty array when none exist. Read-only: no state change, no audit record required. Database errors propagate as thrown errors."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The LeavePolicy model must follow the same structural convention as the Employee model: a bare `export interface` with no class, no runtime code, no default exports, importing its enum (LeaveType) from the shared types module via the same relative-path import style (`../../shared/types/leave.types`).",
+      "referencePath": "src/modules/employee/employee.model.ts"
+    },
+    {
+      "requirement": "The leave-policy repository must match the employee repository's transaction-participation pattern: every method accepts an optional `client?: PoolClient`, resolves the connection via `const db = client ?? pool;`, imports `PoolClient` from `pg` and `pool` from `../../shared/db/connection`, and uses a private `rowToLeavePolicy` mapper that casts `Record<string, unknown>` row fields to the entity (snake_case\u2192camelCase, enum cast for leaveType, `new Date()` for date fields, null preserved for nullable fields).",
+      "referencePath": "src/modules/employee/employee.repository.ts"
+    },
+    {
+      "requirement": "The leave-policy repository test must mirror the employee repository test structure: `jest.mock` of the shared db connection before importing `pool`, `mockQuery.mockReset()` in `beforeEach`, `makeRow()`/`makeLeavePolicy()` factory helpers accepting `Partial` overrides, per-method `describe`/`it` blocks asserting both returned entity and exact SQL/args, and a test verifying a provided PoolClient is used instead of the pool.",
+      "referencePath": "tests/unit/modules/employee/employee.repository.test.ts"
+    },
+    {
+      "requirement": "The LeavePolicy model must import LeaveType from the existing shared types module (Phase 1) rather than redefining it; the leaveType field must be typed as the imported LeaveType enum, and the row mapper must cast the database `leave_type` column value to LeaveType.",
+      "referencePath": "src/shared/types/leave.types.ts"
+    },
+    {
+      "requirement": "The leave_policies table column names and indexes must match the reconciled architecture: snake_case columns (id, policy_name, leave_type, entitlement_days, accrual_rate, max_accumulation, minimum_notice_days, requires_manager_approval, is_active, created_at, updated_at) with indexes on leave_type and is_active; the repository queries must target this table and column naming.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/leave.types.ts (LeaveType enum)",
+      "why": "The LeavePolicy model imports LeaveType to type its leaveType field; the repository row mapper casts the DB leave_type column to this enum. This is the sole external dependency of the leave-policy module this phase (LeavePolicy \u2192 SharedTypes per the dependency map)."
+    },
+    {
+      "target": "src/shared/db/connection.ts (pool)",
+      "why": "The PgLeavePolicyRepository imports the shared pg Pool to execute queries against the leave_policies table when no caller-supplied PoolClient is provided, matching the repository-pattern requirement that all DB access flows through repositories backed by the shared pool."
+    },
+    {
+      "target": "src/modules/leave-balance/ (Phase 4) and src/modules/leave-request/ (Phase 5)",
+      "why": "Downstream consumers: LeaveBalance depends on LeavePolicy (to know entitlement per leave type when initializing balances), and LeaveRequest depends on LeavePolicy (for minimumNoticeDays, requiresManagerApproval, entitlement validation). The read-only repository surface established this phase is the contract those later phases will inject and call."
+    }
+  ]
+}
