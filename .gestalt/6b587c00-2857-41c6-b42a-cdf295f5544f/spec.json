@@ -1,0 +1,81 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-policy"
+    ],
+    "affectedLayers": [
+      "domain",
+      "unit-test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "calculateEntitlement returns the full entitlementDays value (not a pro-rated value) when hireDate is exactly equal to Jan 1 of the given fiscalYear \u2014 e.g., hireDate = Jan 1 2025, fiscalYear = 2025, entitlementDays = 20 \u2192 result is 20.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A unit test exists inside the existing calculateEntitlement describe block that asserts a Jan 1 same-fiscal-year hire date yields full entitlementDays (20), directly validating the inclusive boundary.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All previously passing calculateEntitlement tests continue to pass unchanged \u2014 the inclusive-boundary change does not alter results for hire dates strictly before or strictly after Jan 1 of the fiscal year (prior-year hires still get full entitlement; mid-year hires still get pro-rated, floored values).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The maxAccumulation cap continues to be applied after entitlement computation and is unaffected by the boundary change \u2014 a Jan 1 hire whose full entitlement exceeds maxAccumulation is still capped at maxAccumulation.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The fix is isolated to the hireDate comparison in calculateEntitlement only; the method signature (policy, hireDate, fiscalYear) \u2192 number must remain unchanged so the ILeavePolicyService interface contract is not broken.",
+    "No new dependencies, no new modules, no changes to other service methods, repositories, routes, or the LeavePolicy model \u2014 the change is a single comparison-operator correction plus one added test case.",
+    "The task's 'on or before Jan 1' rule overrides PLAN.md Phase 8's 'before Jan 1' wording; the boundary must be inclusive (<=), not strict (<)."
+  ],
+  "outOfScope": [
+    "LeaveBalanceService.initializeBalancesForEmployee (Phase 9, still Pending) \u2014 no caller of calculateEntitlement exists yet; wiring the entitlement result into balance initialization is a later phase.",
+    "Changing the fiscal-year boundary model (calendar vs anniversary vs configurable) \u2014 the reconciled architecture settles calendar year Jan 1\u2013Dec 31; this phase only corrects the inclusivity of that fixed boundary.",
+    "Modifying the maxAccumulation cap logic, the pro-ration formula, or the floor rounding behaviour \u2014 those are correct and unchanged by this fix."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "calculateEntitlement's fiscal-year boundary rule: an employee hired on or before Jan 1 of the fiscal year receives the full policy.entitlementDays; an employee hired after Jan 1 receives a pro-rated amount (entitlementDays \u00d7 wholeMonthsRemaining \u00f7 12, floored), optionally capped by maxAccumulation. The boundary is inclusive of Jan 1."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "LeavePolicyService.calculateEntitlement(policy, hireDate, fiscalYear) \u2192 number",
+      "authRule": "No auth \u2014 pure synchronous domain computation; not an API endpoint.",
+      "idempotent": false,
+      "errorSemantics": "Returns a non-negative integer; never throws for valid LeavePolicy inputs. The hireDate-vs-fiscalYearStart comparison must be inclusive (<=) so an exact Jan 1 hire yields full entitlementDays."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The calculateEntitlement operation signature and return type must match the ILeavePolicyService interface declaration (policy: LeavePolicy, hireDate: Date, fiscalYear: number) \u2192 number; the implementation must continue to satisfy this interface after the comparison-operator change.",
+      "referencePath": "src/modules/leave-policy/leave-policy.service.interface.ts"
+    },
+    {
+      "requirement": "The new Jan 1 edge-case test must be added inside the existing describe('calculateEntitlement') block and reuse the existing makeLeavePolicy test helper (entitlementDays defaults to 20) so full entitlement is asserted as 20, consistent with the other pro-ration tests in that block.",
+      "referencePath": "tests/unit/modules/leave-policy/leave-policy.service.test.ts"
+    },
+    {
+      "requirement": "The inclusive boundary must align with the reconciled architecture's binding business rule: 'ANNUAL LUMP-SUM allocation at the start of the fiscal year (Jan 1) \u2026 Mid-year hires: pro-rate the first year by the number of whole months remaining in the year from the hire date (rounded down).' A Jan 1 hire is a fiscal-year-start hire, not a mid-year hire, and therefore receives the full lump-sum entitlement.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "LeaveBalanceService.initializeBalancesForEmployee (Phase 9, Pending)",
+      "why": "calculateEntitlement is the entitlement source for balance initialization; the inclusive-boundary fix ensures future Jan 1 hires receive full totalEntitlement in their LeaveBalance rows. No wiring change is needed in this phase, but the corrected behaviour must be correct for that downstream consumer."
+    }
+  ]
+}
