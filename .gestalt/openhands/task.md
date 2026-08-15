@@ -1,19 +1,19 @@
-# Implement this phase: Phase 2: Employee model + repository
+# Implement this phase: Phase 3: LeavePolicy model + repository
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/e3db0103-c684-4a1d-bb0c-c812564d6aa7/2`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/e3db0103-c684-4a1d-bb0c-c812564d6aa7/3`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the employee module at `src/modules/employee/`. This phase depends on `src/shared/types/index.ts` from Phase 1 — read it before generating.
+Create the leave-policy module at `src/modules/leave-policy/`. This phase depends on `src/shared/types/index.ts` from Phase 1 — read it before generating.
 
 Files:
-- `src/modules/employee/employee.model.ts` — Define the Employee interface with exact canonical fields: id: string, employeeNumber: string, firstName: string, lastName: string, email: string, managerId: string | null, department: string | null, hireDate: Date, terminationDate: Date | null, employmentStatus: EmploymentStatus (import from src/shared/types), createdAt: Date, updatedAt: Date, deletedAt: Date | null.
-- `src/modules/employee/employee.repository.ts` — Define IEmployeeRepository interface with methods: findById(id: string): Promise<Employee | null>, findByEmployeeNumber(employeeNumber: string): Promise<Employee | null>, findAll(): Promise<Employee[]>, create(employee: Omit<Employee, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt'>): Promise<Employee>, update(id: string, data: Partial<Employee>): Promise<Employee | null>, softDelete(id: string): Promise<void>. Implement EmployeeRepository class using the shared db pool from `src/shared/db/connection.ts` and Knex. The repository must use parameterized queries.
-- `src/modules/employee/index.ts` — barrel export of model and repository.
+- `src/modules/leave-policy/leave-policy.model.ts` — Define the LeavePolicy interface with exact canonical fields: id: string, policyName: string, leaveType: LeaveType (import from src/shared/types), entitlementDays: number, accrualRate: number | null, maxAccumulation: number | null, minimumNoticeDays: number | null, requiresManagerApproval: boolean, isActive: boolean, createdAt: Date, updatedAt: Date.
+- `src/modules/leave-policy/leave-policy.repository.ts` — Define ILeavePolicyRepository interface with methods: findById(id: string): Promise<LeavePolicy | null>, findByLeaveType(leaveType: LeaveType): Promise<LeavePolicy | null>, findAllActive(): Promise<LeavePolicy[]>, findAll(): Promise<LeavePolicy[]>, create(policy: Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeavePolicy>, update(id: string, data: Partial<LeavePolicy>): Promise<LeavePolicy | null>. Implement LeavePolicyRepository using the shared db pool and Knex with parameterized queries.
+- `src/modules/leave-policy/index.ts` — barrel export.
 
-Include Jest unit tests at `tests/unit/modules/employee/employee.repository.spec.ts`.
+Include Jest unit tests at `tests/unit/modules/leave-policy/leave-policy.repository.spec.ts`.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -37,34 +37,18 @@ Employee/manager data: the LeaveRequest service obtains employee data (managerId
 
 ## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
 The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
-- `Employee` — the entity MUST have exactly these fields:
+- `LeavePolicy` — the entity MUST have exactly these fields:
     - id: string
-    - employeeNumber: string
-    - firstName: string
-    - lastName: string
-    - email: string
-    - managerId: string | null
-    - department: string | null
-    - hireDate: Date
-    - terminationDate: Date | null
-    - employmentStatus: 'ACTIVE' | 'INACTIVE' | 'TERMINATED'
+    - policyName: string
+    - leaveType: LeaveType
+    - entitlementDays: number
+    - accrualRate: number | null
+    - maxAccumulation: number | null
+    - minimumNoticeDays: number | null
+    - requiresManagerApproval: boolean
+    - isActive: boolean
     - createdAt: Date
     - updatedAt: Date
-    - deletedAt: Date | null
-
-## Constraints & consistency
-You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
-### Reuse & consistency — match these exactly
-- Employee.employmentStatus must use the EmploymentStatus enum imported from `src/shared/types/index.ts` — the model must not redefine or duplicate the enum (see `src/shared/types/index.ts`)
-### Entity invariants — enforce these
-- Reuse or extend `Employee`: Every Employee has a unique employeeNumber; employmentStatus must be one of the EmploymentStatus enum values; deletedAt is null for active records and non-null for soft-deleted records; managerId is either null (no manager) or references another Employee's id
-### Interface contract — expose these operations (their shape is yours)
-- findById — idempotent; Returns null when the employee does not exist or is soft-deleted; never throws for missing records
-- findByEmployeeNumber — idempotent; Returns null when no employee matches the given employeeNumber or the matched employee is soft-deleted
-- update — idempotent; Returns null when the employee does not exist or is soft-deleted; returns the existing employee unchanged when the data payload contains no updatable fields
-### Integration points — connect to these
-- src/shared/types/index.ts — Employee model imports EmploymentStatus enum; all downstream consumers of the employee module depend on this enum being canonical
-- src/shared/db/connection.ts — EmployeeRepository uses the shared pg.Pool instance for all database operations
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:

@@ -16,22 +16,34 @@ The architecture is modular, with a clear separation of concerns between models,
 ## Module structure
 
 ```
-src/modules/leave/leave.{model,repository,service,controller,routes}.ts
-src/modules/balance/balance.{model,repository,service,controller,routes}.ts
-src/modules/employee/employee.{model,repository,service,controller,routes}.ts
-src/modules/policy/policy.{model,repository,service,controller,routes}.ts
-src/modules/notification/notification.{model,repository,service,controller,routes}.ts
-src/modules/LeaveStatus/    — LeaveStatus module
-src/modules/BaseEntity/    — BaseEntity module
-src/modules/LeaveRequest/    — LeaveRequest module
-src/modules/LeaveType/    — LeaveType module
-src/modules/LeavePolicy/    — LeavePolicy module
-src/modules/AuditLog/    — AuditLog module
-src/modules/AuditRecord/    — AuditRecord module
-src/modules/AuditServiceInterface/    — AuditServiceInterface module
-src/shared/db connection.ts
-src/shared/base repository.ts
-src/shared/error types.ts
+src/modules/employee/
+  employee.model.ts          — Employee interface + EmploymentStatus enum import
+  employee.repository.ts     — IEmployeeRepository + EmployeeRepository (Knex/raw SQL)
+  index.ts                   — barrel export
+
+src/modules/leave-policy/
+  leave-policy.model.ts      — LeavePolicy interface + LeaveType enum import
+  leave-policy.repository.ts — ILeavePolicyRepository + LeavePolicyRepository (Knex/raw SQL)
+  index.ts                   — barrel export
+
+src/modules/status/
+  status.model.ts            — SystemStatus interface
+  status.service.ts          — StatusService
+  status.service.interface.ts
+  index.ts
+
+src/modules/uptime/
+  uptime.model.ts            — UptimeStatus interface
+  uptime.service.ts          — UptimeService
+  uptime.service.interface.ts
+  uptime.routes.ts           — Fastify route plugin
+  index.ts
+
+src/shared/
+  types/index.ts             — canonical enums (LeaveType, LeaveRequestStatus,
+                                BalanceStatus, AuditAction, EmploymentStatus)
+  db/connection.ts           — pg Pool (DATABASE_URL)
+  index.ts                   — barrel export
 ```
 
 ## Key patterns
