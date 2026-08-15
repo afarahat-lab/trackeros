@@ -1,0 +1,59 @@
+{
+  "scope": {
+    "affectedDomains": [],
+    "affectedLayers": [],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The Employee interface is defined in `src/modules/employee/employee.model.ts` with all canonical fields (id, employeeNumber, firstName, lastName, email, managerId, department, hireDate, terminationDate, employmentStatus, createdAt, updatedAt, deletedAt) and imports EmploymentStatus from `src/shared/types`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The IEmployeeRepository interface is defined in `src/modules/employee/employee.repository.ts` with all six methods: findById, findByEmployeeNumber, findAll, create, update, softDelete \u2014 each with the exact signatures specified in the phase scope.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "EmployeeRepository implements IEmployeeRepository using Knex wired to the shared pg Pool from `src/shared/db/connection.ts`, and all queries use Knex's parameterized query builder (no raw string interpolation).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`create()` accepts an Employee without id/createdAt/updatedAt/deletedAt, persists a row in the employees table, and returns the full Employee with generated id and timestamps.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`softDelete(id)` sets deletedAt to the current timestamp on the matching row and does not physically remove the row.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`update(id, data)` applies only the provided partial fields to the matching row, sets updatedAt to the current timestamp, and returns the updated Employee or null if not found.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`src/modules/employee/index.ts` barrel-exports the Employee interface, IEmployeeRepository interface, and EmployeeRepository class.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests at `tests/unit/modules/employee/employee.repository.spec.ts` cover all six repository methods with a mocked Knex instance, verifying correct query construction, parameter passing, and return values.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The repository must use Knex's query builder for all database operations \u2014 no raw SQL strings, no string interpolation for values. Knex parameterizes by default."
+  ],
+  "outOfScope": [],
+  "ambiguities": [],
+  "entityInvariants": [],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [],
+  "integrationPoints": []
+}
