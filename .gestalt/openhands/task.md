@@ -71,32 +71,47 @@ Before making the edits below, read the referenced files (those present in the w
 
 ### Coherent change 1 — apply as ONE atomic edit across ALL sites below
 
-Unifying change (do this now): Remove all direct pg Pool/PoolClient usage from approve() and cancel(); perform state transitions, balance deduction/release, audit logging, and notifications exclusively through the injected ILeaveRequestRepository, ILeaveBalanceService, IAuditLogRepository, and INotificationRepository so the service is fully unit-testable without a database connection.
+Unifying change (do this now): Remove direct usage of pg Pool/PoolClient (pool.connect, client.query BEGIN/COMMIT/ROLLBACK) from LeaveRequestService.approve and .cancel; perform all persistence and transactional state transitions through the injected ILeaveRequestRepository (and other injected repositories) so unit tests with mocked dependencies pass without a real database connection.
 
 The sites below are the SAME underlying issue. Fixing some but not others leaves the code incoherent and the quality gate WILL re-flag it — apply the one change above consistently to EVERY site:
 
 - Site 1
 File: src/modules/leave-request/leave-request.service.ts
-Line: 161
+Line: 149
 Rule violated: test-failure
-Action (do this now): Edit `src/modules/leave-request/leave-request.service.ts` at line 161 in place to fix the `test-failure` violation.
-What the quality gate found — apply this: Failing test: LeaveRequestService › approve › approves a submitted leave request.
+Action (do this now): Edit `src/modules/leave-request/leave-request.service.ts` at line 149 in place to fix the `test-failure` violation.
+What the quality gate found — apply this: Failing test: LeaveRequestService › approve › allows approval when managerId is null (HR escalation).
 
 - Site 2
 File: src/modules/leave-request/leave-request.service.ts
-Line: 291
+Line: 280
 Rule violated: test-failure
-Action (do this now): Edit `src/modules/leave-request/leave-request.service.ts` at line 291 in place to fix the `test-failure` violation.
+Action (do this now): Edit `src/modules/leave-request/leave-request.service.ts` at line 280 in place to fix the `test-failure` violation.
 What the quality gate found — apply this: Failing test: LeaveRequestService › cancel › cancels an approved leave request and releases balance.
 
 Then check the rest of these files (and the surrounding module) for ANY OTHER occurrence of the same pattern beyond the specific lines listed above, and apply the same change there too — do NOT limit the fix to only the enumerated sites.
 
-### Edit 1
+### Coherent change 2 — apply as ONE atomic edit across ALL sites below
+
+Unifying change (do this now): Fix the minimum-notice validation in LeaveRequestService.submit so it aligns with the business-day rule and the unit-test fixtures: compute notice using the same day-counting basis the tests expect (and ensure emergency leave bypasses it), so submit proceeds to the balance/business-day logic instead of throwing for the business-day-counting, cross-fiscal-year, and audit-resilience test cases.
+
+The sites below are the SAME underlying issue. Fixing some but not others leaves the code incoherent and the quality gate WILL re-flag it — apply the one change above consistently to EVERY site:
+
+- Site 1
 File: src/modules/leave-request/leave-request.service.ts
 Line: 76
 Rule violated: test-failure
 Action (do this now): Edit `src/modules/leave-request/leave-request.service.ts` at line 76 in place to fix the `test-failure` violation.
 What the quality gate found — apply this: Failing test: LeaveRequestService › business day counting › counts business days excluding weekends.
+
+- Site 2
+File: tests/unit/modules/leave-request/leave-request.service.test.ts
+Line: 625
+Rule violated: test-failure
+Action (do this now): Edit `tests/unit/modules/leave-request/leave-request.service.test.ts` at line 625 in place to fix the `test-failure` violation.
+What the quality gate found — apply this: Failing test: LeaveRequestService › cross-fiscal-year requests › uses fiscal year of startDate for balance deduction. expect(jest.fn()).toHaveBeenCalledWith(...expected) Expected: "emp-001", "annual", 2026
+
+Then check the rest of these files (and the surrounding module) for ANY OTHER occurrence of the same pattern beyond the specific lines listed above, and apply the same change there too — do NOT limit the fix to only the enumerated sites.
 
 ## Verify before you finish (MANDATORY)
 After making the edits above, the code MUST still compile and its tests MUST pass — a compilation/type error, or a test your change breaks, must NEVER be left for CI or the quality gate to find. Before you declare this task done:

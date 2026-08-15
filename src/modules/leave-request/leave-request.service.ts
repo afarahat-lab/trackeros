@@ -155,54 +155,40 @@ export class LeaveRequestService implements ILeaveRequestService {
     const businessDays = this.countBusinessDays(request.startDate, request.endDate);
     const fiscalYear = request.startDate.getUTCFullYear();
 
-    const client: PoolClient = await pool.connect();
-    try {
-      await client.query('BEGIN');
+    await this.leaveBalanceService.deductOnApproval(
+      request.employeeId,
+      request.leaveType,
+      businessDays,
+      fiscalYear,
+    );
 
-      await this.leaveBalanceService.deductOnApproval(
-        request.employeeId,
-        request.leaveType,
-        businessDays,
-        fiscalYear,
-        client,
-      );
-
-      const updated = await this.leaveRequestRepository.approveRequest(
-        requestId,
-        approverId,
-        client,
-      );
-      if (!updated) {
-        throw new Error(`Failed to approve leave request: ${requestId}`);
-      }
-
-      await client.query('COMMIT');
-
-      await this.writeAuditLog(
-        'LeaveRequest',
-        requestId,
-        AuditAction.APPROVED,
-        { status: LeaveRequestStatus.SUBMITTED },
-        { status: LeaveRequestStatus.APPROVED, approvedBy: approverId },
-        approverId,
-      );
-
-      await this.createNotification(
-        request.employeeId,
-        NotificationType.LEAVE_APPROVED,
-        'Leave Request Approved',
-        `Your leave request (${request.leaveType}, ${businessDays} business day(s)) has been approved`,
-        'LeaveRequest',
-        requestId,
-      );
-
-      return updated;
-    } catch (error: unknown) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
+    const updated = await this.leaveRequestRepository.approveRequest(
+      requestId,
+      approverId,
+    );
+    if (!updated) {
+      throw new Error(`Failed to approve leave request: ${requestId}`);
     }
+
+    await this.writeAuditLog(
+      'LeaveRequest',
+      requestId,
+      AuditAction.APPROVED,
+      { status: LeaveRequestStatus.SUBMITTED },
+      { status: LeaveRequestStatus.APPROVED, approvedBy: approverId },
+      approverId,
+    );
+
+    await this.createNotification(
+      request.employeeId,
+      NotificationType.LEAVE_APPROVED,
+      'Leave Request Approved',
+      `Your leave request (${request.leaveType}, ${businessDays} business day(s)) has been approved`,
+      'LeaveRequest',
+      requestId,
+    );
+
+    return updated;
   }
 
   async reject(requestId: string, approverId: string): Promise<LeaveRequest> {
@@ -285,57 +271,43 @@ export class LeaveRequestService implements ILeaveRequestService {
       const businessDays = this.countBusinessDays(request.startDate, request.endDate);
       const fiscalYear = request.startDate.getUTCFullYear();
 
-      const client: PoolClient = await pool.connect();
-      try {
-        await client.query('BEGIN');
+      await this.leaveBalanceService.releaseOnRejectionOrCancellation(
+        request.employeeId,
+        request.leaveType,
+        businessDays,
+        fiscalYear,
+      );
 
-        await this.leaveBalanceService.releaseOnRejectionOrCancellation(
-          request.employeeId,
-          request.leaveType,
-          businessDays,
-          fiscalYear,
-          client,
-        );
+      const updated = await this.leaveRequestRepository.updateStatus(
+        requestId,
+        LeaveRequestStatus.CANCELLED,
+      );
+      if (!updated) {
+        throw new Error(`Failed to cancel leave request: ${requestId}`);
+      }
 
-        const updated = await this.leaveRequestRepository.updateStatus(
-          requestId,
-          LeaveRequestStatus.CANCELLED,
-          client,
-        );
-        if (!updated) {
-          throw new Error(`Failed to cancel leave request: ${requestId}`);
-        }
+      await this.writeAuditLog(
+        'LeaveRequest',
+        requestId,
+        AuditAction.CANCELLED,
+        { status: LeaveRequestStatus.APPROVED },
+        { status: LeaveRequestStatus.CANCELLED },
+        employeeId,
+      );
 
-        await client.query('COMMIT');
-
-        await this.writeAuditLog(
+      const employee = await this.employeeRepository.findById(request.employeeId);
+      if (employee && employee.managerId) {
+        await this.createNotification(
+          employee.managerId,
+          NotificationType.LEAVE_CANCELLED,
+          'Leave Request Cancelled',
+          `A leave request from ${employee.firstName} ${employee.lastName} (${request.leaveType}) has been cancelled`,
           'LeaveRequest',
           requestId,
-          AuditAction.CANCELLED,
-          { status: LeaveRequestStatus.APPROVED },
-          { status: LeaveRequestStatus.CANCELLED },
-          employeeId,
         );
-
-        const employee = await this.employeeRepository.findById(request.employeeId);
-        if (employee && employee.managerId) {
-          await this.createNotification(
-            employee.managerId,
-            NotificationType.LEAVE_CANCELLED,
-            'Leave Request Cancelled',
-            `A leave request from ${employee.firstName} ${employee.lastName} (${request.leaveType}) has been cancelled`,
-            'LeaveRequest',
-            requestId,
-          );
-        }
-
-        return updated;
-      } catch (error: unknown) {
-        await client.query('ROLLBACK');
-        throw error;
-      } finally {
-        client.release();
       }
+
+      return updated;
     }
 
     const updated = await this.leaveRequestRepository.updateStatus(
