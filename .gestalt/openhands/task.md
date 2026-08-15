@@ -1,21 +1,21 @@
-# Implement this phase: Phase 2: Employee model and repository
+# Implement this phase: Phase 3: LeavePolicy model and repository
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/cb89b522-6bc0-439f-8a0d-f905145254ee/2`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/cb89b522-6bc0-439f-8a0d-f905145254ee/3`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the Employee domain model and repository at the exact paths declared by the architecture's Module Boundaries for the employee module (`src/modules/employee/`).
+Create the LeavePolicy domain model and repository at the exact paths declared by the architecture's Module Boundaries for the policy module (`src/modules/policy/`).
 
 Files to create:
-- `src/modules/employee/employee.model.ts` — Define the `Employee` interface with the canonical fields: `id: string`, `employeeNumber: string`, `firstName: string`, `lastName: string`, `email: string`, `managerId: string | null`, `department: string | null`, `hireDate: Date`, `terminationDate: Date | null`, `employmentStatus: 'ACTIVE' | 'INACTIVE' | 'TERMINATED'`, `createdAt: Date`, `updatedAt: Date`, `deletedAt: Date | null`.
-- `src/modules/employee/employee.repository.ts` — Define `IEmployeeRepository` interface with methods: `findById(id: string): Promise<Employee | null>`, `findByEmployeeNumber(employeeNumber: string): Promise<Employee | null>`, `findAll(): Promise<Employee[]>`, `create(employee: Omit<Employee, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt'>): Promise<Employee>`, `update(id: string, data: Partial<Employee>): Promise<Employee | null>`, `softDelete(id: string): Promise<void>`. Implement `EmployeeRepository` class using the existing `pool` from `src/shared/db/connection.ts` with parameterized SQL queries via `pg`. The repository must implement `IEmployeeRepository`.
-- `src/modules/employee/index.ts` — Barrel export.
+- `src/modules/policy/policy.model.ts` — Define the `LeavePolicy` interface with the canonical fields: `id: string`, `policyName: string`, `leaveType: LeaveType`, `entitlementDays: number`, `accrualRate: number | null`, `maxAccumulation: number | null`, `minimumNoticeDays: number | null`, `requiresManagerApproval: boolean`, `isActive: boolean`, `createdAt: Date`, `updatedAt: Date`. Import `LeaveType` from `src/shared/types/leave-type.enum.ts`.
+- `src/modules/policy/policy.repository.ts` — Define `IPolicyRepository` interface with methods: `findById(id: string): Promise<LeavePolicy | null>`, `findByLeaveType(leaveType: LeaveType): Promise<LeavePolicy | null>`, `findAllActive(): Promise<LeavePolicy[]>`, `create(policy: Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeavePolicy>`, `update(id: string, data: Partial<LeavePolicy>): Promise<LeavePolicy | null>`. Implement `PolicyRepository` class using the existing `pool` from `src/shared/db/connection.ts`.
+- `src/modules/policy/index.ts` — Barrel export.
 
 This phase depends on `src/shared/types/index.ts` from Phase 1 (read it before generating). Also depends on `src/shared/db/connection.ts` (existing).
 
-Include Jest unit tests in `tests/unit/modules/employee/`.
+Include Jest unit tests in `tests/unit/modules/policy/`.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -40,20 +40,39 @@ Cross-cutting rules:
 
 ## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
 The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
-- `Employee` — the entity MUST have exactly these fields:
+- `LeavePolicy` — the entity MUST have exactly these fields:
     - id: string
-    - employeeNumber: string
-    - firstName: string
-    - lastName: string
-    - email: string
-    - managerId: string | null
-    - department: string | null
-    - hireDate: Date
-    - terminationDate: Date | null
-    - employmentStatus: 'ACTIVE' | 'INACTIVE' | 'TERMINATED'
+    - policyName: string
+    - leaveType: LeaveType
+    - entitlementDays: number
+    - accrualRate: number | null
+    - maxAccumulation: number | null
+    - minimumNoticeDays: number | null
+    - requiresManagerApproval: boolean
+    - isActive: boolean
     - createdAt: Date
     - updatedAt: Date
-    - deletedAt: Date | null
+
+## Constraints & consistency
+You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
+### Reuse & consistency — match these exactly
+- The `LeavePolicy` model must import `LeaveType` from `src/shared/types/leave-type.enum.ts` — the same const-object + union-type pattern used by all other modules. Do not redefine or duplicate the LeaveType type. (see `src/shared/types/leave-type.enum.ts`)
+- The `PolicyRepository` constructor must accept an optional `Pool | PoolClient` parameter defaulting to the shared `pool` from `src/shared/db/connection.ts`, matching the `EmployeeRepository` pattern exactly. This is the transaction contract: services pass a `PoolClient` when the repository must join an existing transaction. (see `src/modules/employee/employee.repository.ts`)
+- The repository must use a private `rowToPolicy(row: Record<string, unknown>): LeavePolicy` mapping function that converts snake_case DB columns to camelCase model fields, matching the `rowToEmployee` pattern in the Employee repository. (see `src/modules/employee/employee.repository.ts`)
+- The barrel export `src/modules/policy/index.ts` must follow the same structure as `src/modules/employee/index.ts`: re-export the model interface, the repository interface, and the repository class. (see `src/modules/employee/index.ts`)
+### Entity invariants — enforce these
+- Reuse or extend `LeavePolicy`: A LeavePolicy has exactly one `leaveType` value drawn from the `LeaveType` union (`'annual' | 'sick' | 'emergency' | 'unpaid' | 'maternity' | 'paternity'`). The `leaveType` is immutable after creation — it cannot be changed via `update`.
+- Reuse or extend `LeavePolicy`: `isActive` is a boolean flag that governs whether the policy is returned by `findAllActive`. Only policies with `isActive = true` are considered active. The lifecycle is: ACTIVE (isActive=true) ↔ INACTIVE (isActive=false). There is no soft-delete; inactivation is done by setting `isActive` to false.
+- Reuse or extend `LeavePolicy`: `entitlementDays` must be a positive integer. `accrualRate`, `maxAccumulation`, and `minimumNoticeDays` are nullable — when null they mean "not applicable" (e.g., no accrual cap, no notice requirement). When non-null, they must be non-negative numbers.
+### Interface contract — expose these operations (their shape is yours)
+- IPolicyRepository.findById — idempotent; Returns `null` when no policy exists with the given id — no error thrown for missing rows.
+- IPolicyRepository.findByLeaveType — idempotent; Returns `null` when no policy exists for the given leave type — no error thrown.
+- IPolicyRepository.findAllActive — idempotent; Returns an empty array when no active policies exist — never returns null.
+- IPolicyRepository.create — Accepts `Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>`. The database generates `id` via `RETURNING *`. `createdAt` and `updatedAt` are set to the current timestamp by the repository. Must return the fully-hydrated `LeavePolicy`.
+- IPolicyRepository.update — Accepts `Partial<LeavePolicy>`. Returns the updated `LeavePolicy` or `null` if no row with the given id exists. `updatedAt` is always set to the current timestamp. An empty partial returns the existing row unchanged (no-op).
+### Integration points — connect to these
+- src/shared/types/leave-type.enum.ts — The `LeavePolicy` model's `leaveType` field must be typed as `LeaveType` from this module. This is the only external type dependency for the policy module.
+- src/shared/db/connection.ts — The `PolicyRepository` imports the shared `pool` as its default database connection, matching the pattern used by `EmployeeRepository`.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
