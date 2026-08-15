@@ -52,6 +52,20 @@ The entities below are shared, cross-module DATA CONTRACTS. Implement each one w
     - updatedAt: Date
     - deletedAt: Date | null
 
+## Constraints & consistency
+You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
+### Reuse & consistency — match these exactly
+- Employee.employmentStatus must use the EmploymentStatus enum imported from `src/shared/types/index.ts` — the model must not redefine or duplicate the enum (see `src/shared/types/index.ts`)
+### Entity invariants — enforce these
+- Reuse or extend `Employee`: Every Employee has a unique employeeNumber; employmentStatus must be one of the EmploymentStatus enum values; deletedAt is null for active records and non-null for soft-deleted records; managerId is either null (no manager) or references another Employee's id
+### Interface contract — expose these operations (their shape is yours)
+- findById — idempotent; Returns null when the employee does not exist or is soft-deleted; never throws for missing records
+- findByEmployeeNumber — idempotent; Returns null when no employee matches the given employeeNumber or the matched employee is soft-deleted
+- update — idempotent; Returns null when the employee does not exist or is soft-deleted; returns the existing employee unchanged when the data payload contains no updatable fields
+### Integration points — connect to these
+- src/shared/types/index.ts — Employee model imports EmploymentStatus enum; all downstream consumers of the employee module depend on this enum being canonical
+- src/shared/db/connection.ts — EmployeeRepository uses the shared pg.Pool instance for all database operations
+
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
 - Use unknown with type guards instead of any (rule: `no-any`)
