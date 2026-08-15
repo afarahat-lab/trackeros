@@ -1,0 +1,49 @@
+{
+  "scope": {
+    "affectedDomains": [],
+    "affectedLayers": [],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The `LeavePolicy` interface is defined in `src/modules/policy/policy.model.ts` with all canonical fields: `id`, `policyName`, `leaveType` (imported from `src/shared/types/leave-type.enum.ts`), `entitlementDays`, `accrualRate`, `maxAccumulation`, `minimumNoticeDays`, `requiresManagerApproval`, `isActive`, `createdAt`, `updatedAt` \u2014 and is re-exported from `src/modules/policy/index.ts`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `IPolicyRepository` interface is defined in `src/modules/policy/policy.repository.ts` with methods: `findById(id)`, `findByLeaveType(leaveType)`, `findAllActive()`, `create(policy)`, `update(id, data)` \u2014 each returning the documented Promise types \u2014 and is re-exported from `src/modules/policy/index.ts`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`PolicyRepository` implements `IPolicyRepository` using the shared `pool` from `src/shared/db/connection.ts`, accepts an optional `Pool | PoolClient` in its constructor for transaction support, and maps `snake_case` DB columns to `camelCase` TypeScript properties via a private row-mapping helper.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`PolicyRepository.create` persists a new row in the `leave_policies` table and returns the created `LeavePolicy` with server-generated `id`, `createdAt`, and `updatedAt` populated. `PolicyRepository.update` returns `null` when the policy does not exist, returns the existing record unchanged when no updatable fields are provided, and does not allow changing `leaveType` (the field is excluded from the update field map).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`PolicyRepository.findByLeaveType` filters to only active policies (`is_active = true`). `PolicyRepository.findAllActive` returns only policies where `is_active = true`, ordered by `policy_name`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests exist in `tests/unit/modules/policy/` covering: findById (found and not-found), findByLeaveType (found and not-found), findAllActive (multiple rows and empty), create (full fields and null-able fields), update (success, not-found, no-op empty data, leaveType immutability, isActive toggle), and constructor with custom PoolClient.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access must go through the repository pattern (GP-001). The `PolicyRepository` class is the sole point of SQL execution for the `leave_policies` table \u2014 no inline queries in services, controllers, or routes."
+  ],
+  "outOfScope": [],
+  "ambiguities": [],
+  "entityInvariants": [],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [],
+  "integrationPoints": []
+}
