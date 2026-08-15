@@ -1,0 +1,76 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-policy"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The `LeavePolicy` interface is defined in `src/modules/leave-policy/leave-policy.model.ts` with all canonical fields (id, policyName, leaveType, entitlementDays, accrualRate, maxAccumulation, minimumNoticeDays, requiresManagerApproval, isActive, createdAt, updatedAt) using exact types \u2014 `leaveType` imports `LeaveType` from `src/shared/types`, nullable fields are `number | null`, and date fields are `Date`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `ILeavePolicyRepository` interface is defined in `src/modules/leave-policy/leave-policy.repository.ts` with all six methods: `findById`, `findByLeaveType`, `findAllActive`, `findAll`, `create`, and `update` \u2014 each with the exact signatures from PLAN.md (parameter types, return types including `Promise<LeavePolicy | null>` and `Promise<LeavePolicy[]>`).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`LeavePolicyRepository` implements `ILeavePolicyRepository` using the shared `pg.Pool` from `src/shared/db/connection.ts` and Knex with parameterized queries (`db.raw()` with `?` placeholders) \u2014 no string interpolation of user values into SQL.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A snake_case row interface (`LeavePolicyRow`) and a mapper function (`toLeavePolicy`) convert between the database's snake_case columns and the application's camelCase `LeavePolicy` model, mirroring the pattern in `src/modules/employee/employee.repository.ts`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`create` accepts `Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>`, generates `id` (UUID), sets `createdAt` and `updatedAt` to the current timestamp, inserts a row into `leave_policies`, and returns the fully-hydrated `LeavePolicy`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`update` accepts an `id` and `Partial<LeavePolicy>`, applies only the provided fields (excluding `id`, `createdAt`, `updatedAt`), sets `updatedAt` to the current timestamp, and returns the updated `LeavePolicy` or `null` if the id does not exist.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`findByLeaveType` queries `leave_policies` by `leave_type` column and returns a single `LeavePolicy` or `null` \u2014 the query uses a parameterized `?` placeholder for the leave type value.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`findAllActive` returns only policies where `is_active = true`, and `findAll` returns all policies regardless of active status.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The barrel export at `src/modules/leave-policy/index.ts` re-exports the `LeavePolicy` type, `ILeavePolicyRepository` interface, and `LeavePolicyRepository` class.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests at `tests/unit/modules/leave-policy/leave-policy.repository.spec.ts` cover all six repository methods with mocked knex and the shared pool, following the exact test structure from `tests/unit/modules/employee/employee.repository.spec.ts` (mock knex default export, mock pool, helper row factory, per-method describe blocks).",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No `any` type \u2014 use `unknown` with type guards where necessary (HARNESS.json constraint `no-any`).",
+    "All database access goes through the repository \u2014 no inline SQL or direct pool usage outside `LeavePolicyRepository` (GP-001, HARNESS constraint `no-direct-db-outside-repository`).",
+    "Strict TypeScript: `strict: true` in tsconfig \u2014 no implicit any, strict null checks enforced at compile time."
+  ],
+  "outOfScope": [],
+  "ambiguities": [],
+  "entityInvariants": [],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [],
+  "integrationPoints": []
+}
