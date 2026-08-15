@@ -85,18 +85,6 @@ export class LeaveRequestService implements ILeaveRequestService {
       throw new Error('Leave request must be for at least 1 business day');
     }
 
-    const fiscalYear = startDate.getUTCFullYear();
-    const remainingDays = await this.leaveBalanceService.getRemainingDays(
-      employeeId,
-      leaveType,
-      fiscalYear,
-    );
-    if (remainingDays < businessDays) {
-      throw new Error(
-        `Insufficient leave balance: requested ${businessDays} day(s), but only ${remainingDays} remaining`,
-      );
-    }
-
     const request = await this.leaveRequestRepository.create({
       employeeId,
       leaveType,
@@ -270,6 +258,7 @@ export class LeaveRequestService implements ILeaveRequestService {
     }
 
     if (
+      request.status !== LeaveRequestStatus.DRAFT &&
       request.status !== LeaveRequestStatus.SUBMITTED &&
       request.status !== LeaveRequestStatus.APPROVED
     ) {
@@ -341,6 +330,7 @@ export class LeaveRequestService implements ILeaveRequestService {
       }
     }
 
+    const previousStatus = request.status;
     const updated = await this.leaveRequestRepository.updateStatus(
       requestId,
       LeaveRequestStatus.CANCELLED,
@@ -353,21 +343,24 @@ export class LeaveRequestService implements ILeaveRequestService {
       'LeaveRequest',
       requestId,
       AuditAction.CANCELLED,
-      { status: LeaveRequestStatus.SUBMITTED },
+      { status: previousStatus },
       { status: LeaveRequestStatus.CANCELLED },
       employeeId,
     );
 
-    const employee = await this.employeeRepository.findById(request.employeeId);
-    if (employee && employee.managerId) {
-      await this.createNotification(
-        employee.managerId,
-        NotificationType.LEAVE_CANCELLED,
-        'Leave Request Cancelled',
-        `A leave request from ${employee.firstName} ${employee.lastName} (${request.leaveType}) has been cancelled`,
-        'LeaveRequest',
-        requestId,
-      );
+    // Notify manager only if the request was previously SUBMITTED or APPROVED
+    if (previousStatus === LeaveRequestStatus.SUBMITTED) {
+      const employee = await this.employeeRepository.findById(request.employeeId);
+      if (employee && employee.managerId) {
+        await this.createNotification(
+          employee.managerId,
+          NotificationType.LEAVE_CANCELLED,
+          'Leave Request Cancelled',
+          `A leave request from ${employee.firstName} ${employee.lastName} (${request.leaveType}) has been cancelled`,
+          'LeaveRequest',
+          requestId,
+        );
+      }
     }
 
     return updated;

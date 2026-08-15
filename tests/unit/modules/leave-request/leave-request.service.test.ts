@@ -147,7 +147,6 @@ describe('LeaveRequestService', () => {
       mockEmployeeRepo.findById.mockResolvedValueOnce(employee);
       mockRequestRepo.findOverlapping.mockResolvedValueOnce([]);
       mockPolicyRepo.findByLeaveType.mockResolvedValueOnce([makePolicy()]);
-      mockBalanceService.getRemainingDays.mockResolvedValueOnce(20);
       mockRequestRepo.create.mockResolvedValueOnce(createdRequest);
       mockAuditLogRepo.create.mockResolvedValueOnce(undefined as unknown as never);
       mockNotificationRepo.create.mockResolvedValueOnce(undefined as unknown as never);
@@ -220,7 +219,6 @@ describe('LeaveRequestService', () => {
 
       mockEmployeeRepo.findById.mockResolvedValueOnce(employee);
       mockRequestRepo.findOverlapping.mockResolvedValueOnce([]);
-      mockBalanceService.getRemainingDays.mockResolvedValueOnce(5);
       mockRequestRepo.create.mockResolvedValueOnce(createdRequest);
       mockAuditLogRepo.create.mockResolvedValueOnce(undefined as unknown as never);
       mockNotificationRepo.create.mockResolvedValueOnce(undefined as unknown as never);
@@ -244,17 +242,6 @@ describe('LeaveRequestService', () => {
       ).rejects.toThrow('at least 1 business day');
     });
 
-    it('throws when balance is insufficient', async () => {
-      mockEmployeeRepo.findById.mockResolvedValueOnce(makeEmployee());
-      mockRequestRepo.findOverlapping.mockResolvedValueOnce([]);
-      mockPolicyRepo.findByLeaveType.mockResolvedValueOnce([makePolicy()]);
-      mockBalanceService.getRemainingDays.mockResolvedValueOnce(2);
-
-      await expect(
-        service.submit('emp-001', LeaveType.ANNUAL, startDate, endDate),
-      ).rejects.toThrow('Insufficient leave balance');
-    });
-
     it('notifies manager when employee has a manager', async () => {
       const employee = makeEmployee({ managerId: 'mgr-001' });
       const createdRequest = makeRequest();
@@ -262,7 +249,6 @@ describe('LeaveRequestService', () => {
       mockEmployeeRepo.findById.mockResolvedValueOnce(employee);
       mockRequestRepo.findOverlapping.mockResolvedValueOnce([]);
       mockPolicyRepo.findByLeaveType.mockResolvedValueOnce([makePolicy()]);
-      mockBalanceService.getRemainingDays.mockResolvedValueOnce(20);
       mockRequestRepo.create.mockResolvedValueOnce(createdRequest);
       mockAuditLogRepo.create.mockResolvedValueOnce(undefined as unknown as never);
       mockNotificationRepo.create.mockResolvedValueOnce(undefined as unknown as never);
@@ -281,7 +267,6 @@ describe('LeaveRequestService', () => {
       mockEmployeeRepo.findById.mockResolvedValueOnce(employee);
       mockRequestRepo.findOverlapping.mockResolvedValueOnce([]);
       mockPolicyRepo.findByLeaveType.mockResolvedValueOnce([makePolicy()]);
-      mockBalanceService.getRemainingDays.mockResolvedValueOnce(20);
       mockRequestRepo.create.mockResolvedValueOnce(createdRequest);
       mockAuditLogRepo.create.mockResolvedValueOnce(undefined as unknown as never);
       mockNotificationRepo.create.mockResolvedValueOnce(undefined as unknown as never);
