@@ -1,0 +1,114 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "employee"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository",
+      "tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The Employee interface is defined in `src/modules/employee/employee.model.ts` with all canonical fields (id, employeeNumber, firstName, lastName, email, managerId, department, hireDate, terminationDate, employmentStatus, createdAt, updatedAt, deletedAt) and imports EmploymentStatus from `src/shared/types`",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "IEmployeeRepository interface declares all six methods: findById, findByEmployeeNumber, findAll, create, update, softDelete \u2014 with exact signatures matching the spec (create accepts Omit<Employee, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt'>, update accepts id + Partial<Employee>, softDelete returns Promise<void>)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "EmployeeRepository class implements IEmployeeRepository using the shared db pool from `src/shared/db/connection.ts` and Knex, with all queries using parameterized placeholders (no string interpolation of values)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All read queries (findById, findByEmployeeNumber, findAll) filter out soft-deleted rows with `deleted_at IS NULL`",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "softDelete sets deleted_at and updated_at to the current timestamp without removing the row; subsequent reads exclude the row",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "create returns the persisted Employee with server-generated id, createdAt, updatedAt populated; deletedAt is null",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "update returns null when the employee does not exist or is soft-deleted; returns the updated Employee with updatedAt refreshed when successful",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Barrel export at `src/modules/employee/index.ts` re-exports the Employee type, IEmployeeRepository type, and EmployeeRepository class",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests at `tests/unit/modules/employee/employee.repository.spec.ts` cover all six repository methods with mocked Knex/pool, verifying parameterized queries and correct row-to-model mapping",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access must go through the repository layer \u2014 no inline SQL/Knex calls in models, services, or controllers (GP-001)",
+    "The employee module must only import from `src/shared/types` and `src/shared/db/connection`; no cross-module imports to other domain modules (employee is a leaf module in the DAG)",
+    "No `any` type \u2014 use `unknown` with type guards where needed (HARNESS constraint no-any)",
+    "All SQL queries must use parameterized placeholders (`?` with value arrays); no string concatenation or template-literal injection of user-supplied values"
+  ],
+  "outOfScope": [
+    "Employee service layer (IEmployeeService, EmployeeService) \u2014 deferred to Phase 8"
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "Every Employee has a unique employeeNumber; employmentStatus must be one of the EmploymentStatus enum values; deletedAt is null for active records and non-null for soft-deleted records; managerId is either null (no manager) or references another Employee's id"
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "findById",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns null when the employee does not exist or is soft-deleted; never throws for missing records"
+    },
+    {
+      "operation": "findByEmployeeNumber",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns null when no employee matches the given employeeNumber or the matched employee is soft-deleted"
+    },
+    {
+      "operation": "update",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns null when the employee does not exist or is soft-deleted; returns the existing employee unchanged when the data payload contains no updatable fields"
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Employee.employmentStatus must use the EmploymentStatus enum imported from `src/shared/types/index.ts` \u2014 the model must not redefine or duplicate the enum",
+      "referencePath": "src/shared/types/index.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts",
+      "why": "Employee model imports EmploymentStatus enum; all downstream consumers of the employee module depend on this enum being canonical"
+    },
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "EmployeeRepository uses the shared pg.Pool instance for all database operations"
+    }
+  ]
+}
