@@ -1,0 +1,60 @@
+{
+  "scope": {
+    "affectedDomains": [],
+    "affectedLayers": [],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "All 6 methods in EmployeeRepository (findById, findByEmployeeNumber, findAll, create, update, softDelete) use only Knex chainable query builder API \u2014 zero `this.db.raw()` calls remain in the file.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findById returns Employee | null: uses `.select('*').where('id', id).whereNull('deleted_at').first()`, maps row via toEmployee, returns null (not undefined) when no row found.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findByEmployeeNumber returns Employee | null: uses `.select('*').where('employee_number', employeeNumber).whereNull('deleted_at').first()`, maps via toEmployee, returns null when no row found.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findAll returns Employee[]: uses `.select('*').whereNull('deleted_at')`, maps all rows via toEmployee, returns empty array when no rows.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "create returns Employee: builds an insert object with snake_case keys from domain fields + createdAt/updatedAt set to `new Date()`, calls `.insert(row).returning('*')`, extracts first row, maps via toEmployee.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "update returns Employee | null: first checks existence via findById (returning null if absent), builds a dynamic update object from the column map filtering out undefined values and always adding updated_at, calls `.update(obj).where('id', id).whereNull('deleted_at').returning('*')`, extracts first row, maps via toEmployee. Returns existing employee unchanged when no fields to update.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "softDelete returns void: calls `.update({ deleted_at: new Date(), updated_at: new Date() }).where('id', id).whereNull('deleted_at')`, does not return rows.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All existing Jest tests pass with semantically identical assertions \u2014 mock infrastructure may change to support chainable API, but every test's expected return values, null/empty cases, and parameter assertions remain equivalent.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The IEmployeeRepository interface must not change \u2014 method signatures, parameter types, and return types remain exactly as declared.",
+    "The Employee model interface must not change \u2014 all field names, types, and optionality remain exactly as declared."
+  ],
+  "outOfScope": [],
+  "ambiguities": [],
+  "entityInvariants": [],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [],
+  "integrationPoints": []
+}
