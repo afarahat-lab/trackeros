@@ -1,0 +1,46 @@
+{
+  "scope": {
+    "affectedDomains": [],
+    "affectedLayers": [],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The `Employee` interface is exported from `src/modules/employee/employee.model.ts` with all canonical fields: `id: string`, `employeeNumber: string`, `firstName: string`, `lastName: string`, `email: string`, `managerId: string | null`, `department: string | null`, `hireDate: Date`, `terminationDate: Date | null`, `employmentStatus: 'ACTIVE' | 'INACTIVE' | 'TERMINATED'`, `createdAt: Date`, `updatedAt: Date`, `deletedAt: Date | null`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `IEmployeeRepository` interface is exported from `src/modules/employee/employee.repository.ts` with methods: `findById(id: string): Promise<Employee | null>`, `findByEmployeeNumber(employeeNumber: string): Promise<Employee | null>`, `findAll(): Promise<Employee[]>`, `create(employee: Omit<Employee, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt'>): Promise<Employee>`, `update(id: string, data: Partial<Employee>): Promise<Employee | null>`, `softDelete(id: string): Promise<void>`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `EmployeeRepository` class implements `IEmployeeRepository` and uses the `pool` from `src/shared/db/connection.ts` with parameterized SQL queries (no string concatenation of user input into SQL).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`src/modules/employee/index.ts` barrel-export re-exports `Employee`, `IEmployeeRepository`, and `EmployeeRepository`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests exist in `tests/unit/modules/employee/` covering: (a) `EmployeeRepository.create` persists a row and returns it with generated `id`, `createdAt`, `updatedAt`; (b) `findById` returns the employee or null; (c) `findByEmployeeNumber` returns the employee or null; (d) `findAll` returns all non-soft-deleted employees; (e) `update` modifies fields and returns the updated employee or null; (f) `softDelete` sets `deletedAt` and the employee is excluded from `findAll`/`findById` thereafter.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access must go through the repository pattern \u2014 no inline SQL in models, services, or barrel exports (GP-001).",
+    "The `EmployeeRepository` must use parameterized queries (`$1`, `$2`, \u2026) via the `pg` `pool` \u2014 never string interpolation of user-supplied values into SQL.",
+    "The `Employee` interface must match the reconciled architecture entity shape exactly: `id: string`, `employeeNumber: string`, `firstName: string`, `lastName: string`, `email: string`, `managerId: string | null`, `department: string | null`, `hireDate: Date`, `terminationDate: Date | null`, `employmentStatus: 'ACTIVE' | 'INACTIVE' | 'TERMINATED'`, `createdAt: Date`, `updatedAt: Date`, `deletedAt: Date | null`."
+  ],
+  "outOfScope": [],
+  "ambiguities": [],
+  "entityInvariants": [],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [],
+  "integrationPoints": []
+}
