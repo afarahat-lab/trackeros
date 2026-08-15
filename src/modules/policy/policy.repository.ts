@@ -47,7 +47,7 @@ export class PolicyRepository implements IPolicyRepository {
 
   async findByLeaveType(leaveType: LeaveType): Promise<LeavePolicy | null> {
     const result = await this.db.query(
-      'SELECT * FROM leave_policies WHERE leave_type = $1',
+      'SELECT * FROM leave_policies WHERE leave_type = $1 AND is_active = true',
       [leaveType],
     );
     if (result.rows.length === 0) {

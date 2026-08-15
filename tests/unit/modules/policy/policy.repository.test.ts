@@ -85,7 +85,7 @@ describe('PolicyRepository', () => {
 
       expect(result).toEqual(expectedPolicy({ leaveType: 'sick' }));
       expect(pool.query).toHaveBeenCalledWith(
-        'SELECT * FROM leave_policies WHERE leave_type = $1',
+        'SELECT * FROM leave_policies WHERE leave_type = $1 AND is_active = true',
         ['sick'],
       );
     });

@@ -1,21 +1,41 @@
-# Implement this phase: Phase 3: LeavePolicy model and repository
+# Fix specific quality-gate violations: Phase 3: LeavePolicy model and repository
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/cb89b522-6bc0-439f-8a0d-f905145254ee/3`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/fix/cb89b522-6bc0-439f-8a0d-f905145254ee/3/1`. Do not clone anything; work only in this directory.
 
-## What to build
-(no phase architecture provided — infer from the success criteria below)
+You are fixing SPECIFIC violations the quality gate found in EXISTING, already-committed files. Make the targeted edits listed below — do NOT refactor, regenerate, or change unrelated code.
 
-## Success criteria
-Create the LeavePolicy domain model and repository at the exact paths declared by the architecture's Module Boundaries for the policy module (`src/modules/policy/`).
+The files ALREADY EXIST. You MUST edit them in place with the `str_replace_editor` tool. Reading or viewing a file is NOT sufficient — you have NOT finished until you have edited EVERY file listed below.
 
-Files to create:
-- `src/modules/policy/policy.model.ts` — Define the `LeavePolicy` interface with the canonical fields: `id: string`, `policyName: string`, `leaveType: LeaveType`, `entitlementDays: number`, `accrualRate: number | null`, `maxAccumulation: number | null`, `minimumNoticeDays: number | null`, `requiresManagerApproval: boolean`, `isActive: boolean`, `createdAt: Date`, `updatedAt: Date`. Import `LeaveType` from `src/shared/types/leave-type.enum.ts`.
-- `src/modules/policy/policy.repository.ts` — Define `IPolicyRepository` interface with methods: `findById(id: string): Promise<LeavePolicy | null>`, `findByLeaveType(leaveType: LeaveType): Promise<LeavePolicy | null>`, `findAllActive(): Promise<LeavePolicy[]>`, `create(policy: Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeavePolicy>`, `update(id: string, data: Partial<LeavePolicy>): Promise<LeavePolicy | null>`. Implement `PolicyRepository` class using the existing `pool` from `src/shared/db/connection.ts`.
-- `src/modules/policy/index.ts` — Barrel export.
+## Constraints & consistency
+You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
+### Reuse & consistency — match these exactly
+- The `findByLeaveType` SQL query must use the same `is_active = true` filter pattern already established by `findAllActive` in the same file. (see `src/modules/policy/policy.repository.ts (findAllActive method, line ~61)`)
+### Entity invariants — enforce these
+- Reuse or extend `LeavePolicy`: Repository query methods that return a single policy by lookup criteria (`findByLeaveType`) must only return policies whose `isActive` is `true` — inactive policies are excluded at the query level, not filtered in application code.
+### Interface contract — expose these operations (their shape is yours)
+- IPolicyRepository.findByLeaveType — N/A — repository layer; no auth rule applies; idempotent; Returns null when no active policy matches the leave type (including when only an inactive policy exists). No thrown errors for missing rows.
 
-This phase depends on `src/shared/types/index.ts` from Phase 1 (read it before generating). Also depends on `src/shared/db/connection.ts` (existing).
+## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
+The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
+- `LeavePolicy` — the entity MUST have exactly these fields:
+    - id: string
+    - policyName: string
+    - leaveType: LeaveType
+    - entitlementDays: number
+    - accrualRate: number | null
+    - maxAccumulation: number | null
+    - minimumNoticeDays: number | null
+    - requiresManagerApproval: boolean
+    - isActive: boolean
+    - createdAt: Date
+    - updatedAt: Date
 
-Include Jest unit tests in `tests/unit/modules/policy/`.
+## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
+Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
+- Use unknown with type guards instead of any (rule: `no-any`)
+- Database calls must go through repository pattern (rule: `no-direct-db-outside-repository`)
+- No hardcoded passwords, API keys, or tokens (rule: `no-hardcoded-secrets`)
+- Do not add @gestalt/* packages as project dependencies — these are Gestalt platform internals not available on npm (rule: `no-gestalt-internal-deps`)
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -37,49 +57,6 @@ Cross-cutting rules:
 - Emergency leave is a SEPARATE pool (distinct from annual/sick), bypasses the advance-notice requirement but still requires approval and deducts from its own balance.
 - Employee data (managerId, employmentStatus, hireDate) comes from an injected IEmployeeRepository (same repository-interface pattern as other modules); the JWT provides ONLY the caller identity + role for RBAC. Approvals route to the target employee managerId; if null, escalate to HR (role hr_admin). Managers act only on direct reports.
 - Every endpoint enforces RBAC + input validation. Balances auto-created for all leave types on employee creation. Only ACTIVE employees may submit. [BINDING RULE — operator decision resolving: What is the fiscal year start date? The LeaveBalance.fiscalYear field needs a concrete definition — e.g. does the fiscal year start on January 1, April 1, or a configurable date per organisation?; How does leave entitlement accrue over the fiscal year? The LeavePolicy.accrualRate field exists but its semantics are undefined — is it a monthly rate, a daily rate, or a lump sum at the start of the year?; What is the carry-over rule for unused leave at fiscal year end? LeavePolicy.maxAccumulation exists but its exact semantics (cap on carry-over? cap on total balance?) are not defined.; How are leave days counted from start_date and end_date? Are both dates inclusive? Are weekends and/or public holidays excluded from the count?; What defines the fiscal_year boundary for leave balances? Is it a calendar year, a company-configured fiscal year, or an employee-specific anniversary year?; Should leave balance be allowed to go negative when an employee submits a request exceeding their remaining balance?; How are leave balances accrued — annual lump-sum reset, monthly pro-rata, or continuous accrual?; apply everywhere these apply, not in one place only]
-
-## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
-The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
-- `LeavePolicy` — the entity MUST have exactly these fields:
-    - id: string
-    - policyName: string
-    - leaveType: LeaveType
-    - entitlementDays: number
-    - accrualRate: number | null
-    - maxAccumulation: number | null
-    - minimumNoticeDays: number | null
-    - requiresManagerApproval: boolean
-    - isActive: boolean
-    - createdAt: Date
-    - updatedAt: Date
-
-## Constraints & consistency
-You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
-### Reuse & consistency — match these exactly
-- The `LeavePolicy` model must import `LeaveType` from `src/shared/types/leave-type.enum.ts` — the same const-object + union-type pattern used by all other modules. Do not redefine or duplicate the LeaveType type. (see `src/shared/types/leave-type.enum.ts`)
-- The `PolicyRepository` constructor must accept an optional `Pool | PoolClient` parameter defaulting to the shared `pool` from `src/shared/db/connection.ts`, matching the `EmployeeRepository` pattern exactly. This is the transaction contract: services pass a `PoolClient` when the repository must join an existing transaction. (see `src/modules/employee/employee.repository.ts`)
-- The repository must use a private `rowToPolicy(row: Record<string, unknown>): LeavePolicy` mapping function that converts snake_case DB columns to camelCase model fields, matching the `rowToEmployee` pattern in the Employee repository. (see `src/modules/employee/employee.repository.ts`)
-- The barrel export `src/modules/policy/index.ts` must follow the same structure as `src/modules/employee/index.ts`: re-export the model interface, the repository interface, and the repository class. (see `src/modules/employee/index.ts`)
-### Entity invariants — enforce these
-- Reuse or extend `LeavePolicy`: A LeavePolicy has exactly one `leaveType` value drawn from the `LeaveType` union (`'annual' | 'sick' | 'emergency' | 'unpaid' | 'maternity' | 'paternity'`). The `leaveType` is immutable after creation — it cannot be changed via `update`.
-- Reuse or extend `LeavePolicy`: `isActive` is a boolean flag that governs whether the policy is returned by `findAllActive`. Only policies with `isActive = true` are considered active. The lifecycle is: ACTIVE (isActive=true) ↔ INACTIVE (isActive=false). There is no soft-delete; inactivation is done by setting `isActive` to false.
-- Reuse or extend `LeavePolicy`: `entitlementDays` must be a positive integer. `accrualRate`, `maxAccumulation`, and `minimumNoticeDays` are nullable — when null they mean "not applicable" (e.g., no accrual cap, no notice requirement). When non-null, they must be non-negative numbers.
-### Interface contract — expose these operations (their shape is yours)
-- IPolicyRepository.findById — idempotent; Returns `null` when no policy exists with the given id — no error thrown for missing rows.
-- IPolicyRepository.findByLeaveType — idempotent; Returns `null` when no policy exists for the given leave type — no error thrown.
-- IPolicyRepository.findAllActive — idempotent; Returns an empty array when no active policies exist — never returns null.
-- IPolicyRepository.create — Accepts `Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>`. The database generates `id` via `RETURNING *`. `createdAt` and `updatedAt` are set to the current timestamp by the repository. Must return the fully-hydrated `LeavePolicy`.
-- IPolicyRepository.update — Accepts `Partial<LeavePolicy>`. Returns the updated `LeavePolicy` or `null` if no row with the given id exists. `updatedAt` is always set to the current timestamp. An empty partial returns the existing row unchanged (no-op).
-### Integration points — connect to these
-- src/shared/types/leave-type.enum.ts — The `LeavePolicy` model's `leaveType` field must be typed as `LeaveType` from this module. This is the only external type dependency for the policy module.
-- src/shared/db/connection.ts — The `PolicyRepository` imports the shared `pool` as its default database connection, matching the pattern used by `EmployeeRepository`.
-
-## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
-Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
-- Use unknown with type guards instead of any (rule: `no-any`)
-- Database calls must go through repository pattern (rule: `no-direct-db-outside-repository`)
-- No hardcoded passwords, API keys, or tokens (rule: `no-hardcoded-secrets`)
-- Do not add @gestalt/* packages as project dependencies — these are Gestalt platform internals not available on npm (rule: `no-gestalt-internal-deps`)
 
 ## Architecture & constraint rules the quality gate enforces (satisfy these now)
 The quality gate judges your code against the rules below and BLOCKS the phase on any violation — a violation it rates critical escalates to a human with no automatic retry. These are the same rules the gate checks, so comply up front rather than leaving them for the gate:
@@ -105,21 +82,46 @@ These are the project's non-negotiable invariants. A violation is a GOLDEN_PRINC
 - GP-006 — Error handling: No unhandled promise rejections. All async errors are caught and handled.
 
 ## Project stack & references
-Before writing code, read the referenced files below (those present in the working directory) to learn the project's language, framework, test runner, and conventions, and the cross-cutting rules your code must satisfy — then follow the existing repository conventions:
+Before making the edits below, read the referenced files (those present in the working directory) to learn the project's architecture, conventions, and the cross-cutting rules your fix must still satisfy — then keep the edits consistent with them:
 - `HARNESS.json`
 - `docs/ARCHITECTURE.md`
 - `docs/GOLDEN_PRINCIPLES.md`
 - `AGENTS.md`
 - `PLAN.md`
 
+## Required edits
+
+### Coherent change 1 — apply as ONE atomic edit across ALL sites below
+
+Unifying change (do this now): Update the `findByLeaveType` SQL query in `src/modules/policy/policy.repository.ts` to filter active policies only: change `'SELECT * FROM leave_policies WHERE leave_type = $1'` to `'SELECT * FROM leave_policies WHERE leave_type = $1 AND is_active = true'`.
+
+The sites below are the SAME underlying issue. Fixing some but not others leaves the code incoherent and the quality gate WILL re-flag it — apply the one change above consistently to EVERY site:
+
+- Site 1
+File: src/modules/policy/policy.repository.ts
+Line: 50
+Offending code: `'SELECT * FROM leave_policies WHERE leave_type = $1',`
+Rule violated: success-criteria-findByLeaveType-active
+Action (do this now): Edit `src/modules/policy/policy.repository.ts` at line 50 in place to fix the `success-criteria-findByLeaveType-active` violation.
+What the quality gate found — apply this: [success-criteria-findByLeaveType-active] The success criteria state: "PolicyRepository.findByLeaveType returns at most one LeavePolicy per leave type (the active policy for that type), or null if none exists." The current query does not include `AND is_active = true`, so it could return an inactive policy. The query should be: `SELECT * FROM leave_policies WHERE leave_type = $1 AND is_active = true`.
+
+- Site 2
+File: src/modules/policy/policy.repository.ts
+Line: 50
+Offending code: `'SELECT * FROM leave_policies WHERE leave_type = $1',`
+Rule violated: review/correctness
+Action (do this now): Edit `src/modules/policy/policy.repository.ts` at line 50 in place to fix the `review/correctness` violation.
+What the quality gate found — apply this: [review/correctness] findByLeaveType must return "the active policy for that type" per the spec, but the query does not filter by `is_active = true`. If both an active and an inactive policy exist for the same leave type, the query could return the inactive one.
+
+Then check the rest of these files (and the surrounding module) for ANY OTHER occurrence of the same pattern beyond the specific lines listed above, and apply the same change there too — do NOT limit the fix to only the enumerated sites.
+
 ## Verify before you finish (MANDATORY)
-The code you write MUST compile and its tests MUST pass — a compilation or type error must NEVER be left for CI to find. Before you declare this task done:
-- Read the project's build / type-check / test commands from `package.json` (scripts) and `HARNESS.json`.
-- Install dependencies if they are not already installed, then RUN the type-check / build (e.g. `npm run build` or `tsc --noEmit`) AND the tests (e.g. `npm test`) for the files this phase touches.
-- FIX every compilation error, type error, and failing test you introduced — including in test files — and re-run until they pass.
+After making the edits above, the code MUST still compile and its tests MUST pass — a compilation/type error, or a test your change breaks, must NEVER be left for CI or the quality gate to find. Before you declare this task done:
+- Read the project's build / type-check / test commands from `package.json` (scripts) and `HARNESS.json`, install dependencies if they are not already installed, then RUN the type-check / build (e.g. `npm run build` or `tsc --noEmit`) AND the tests (e.g. `npm test`).
+- FIX every compilation error, type error, and failing test that YOUR edits introduced — including updating a test whose expectation your change legitimately invalidated (e.g. a new required field, a new status code such as 401/403 from an added authorization check, added input validation) — and re-run until they pass.
 - Only when the build and the tests pass may you consider the task complete. If a dependency install genuinely cannot be made to work, say so explicitly in your final message rather than declaring success on unverified code.
 
 ## Constraints (mandatory)
-- Write and modify source files ONLY. Do NOT run `git commit`, `git push`, `git add`, or any other git command. The platform handles all git operations. (Running the build / type-check / tests above is expected and encouraged — that is NOT a git operation.)
-- Do not create a new repository or change the git remote.
-- Stay within the scope of this phase; do not implement deferred/later work.
+- Keep the change SURGICAL: make the required edits above and fix only what they broke (compile/type errors and the tests they invalidated). Do NOT refactor, regenerate, or change unrelated code, and do not add / delete / rename source files beyond what a required edit — or a test-fix for it — needs.
+- Do NOT run `git commit`, `git push`, `git add`, or any git command. The platform handles all git operations. (Running the build / type-check / tests above is expected and encouraged — that is NOT a git operation.)
+- When the listed edits are made and the build + tests pass, stop.
