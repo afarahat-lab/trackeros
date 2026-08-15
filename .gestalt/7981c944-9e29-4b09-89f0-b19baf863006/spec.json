@@ -1,0 +1,66 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "policy"
+    ],
+    "affectedLayers": [
+      "repository",
+      "tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The `findByLeaveType` SQL query includes `AND is_active = true` so that only active policies are returned. The WHERE clause must be `WHERE leave_type = $1 AND is_active = true`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "When the database returns a row with `is_active = false` for the requested leave type, `findByLeaveType` returns `null` (the inactive row is excluded by the query filter).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "When both an active and an inactive row exist for the same leave type, `findByLeaveType` returns only the active policy (the inactive row is excluded by the query filter).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The existing unit test in `tests/unit/modules/policy/policy.repository.test.ts` for `findByLeaveType` is updated to assert the new SQL string containing `AND is_active = true`.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The `findByLeaveType` method signature on `IPolicyRepository` must NOT change \u2014 it still accepts `LeaveType` and returns `Promise<LeavePolicy | null>`. Only the SQL WHERE clause changes.",
+    "The `findAllActive` method must remain unchanged \u2014 it already filters by `is_active = true` and serves as the reference pattern for this change."
+  ],
+  "outOfScope": [
+    "No changes to `findAllActive`, `findById`, `create`, or `update` methods \u2014 they already behave correctly.",
+    "No changes to the `LeavePolicy` model or `IPolicyRepository` interface signatures."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "Repository query methods that return a single policy by lookup criteria (`findByLeaveType`) must only return policies whose `isActive` is `true` \u2014 inactive policies are excluded at the query level, not filtered in application code."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IPolicyRepository.findByLeaveType",
+      "authRule": "N/A \u2014 repository layer; no auth rule applies",
+      "idempotent": true,
+      "errorSemantics": "Returns null when no active policy matches the leave type (including when only an inactive policy exists). No thrown errors for missing rows."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The `findByLeaveType` SQL query must use the same `is_active = true` filter pattern already established by `findAllActive` in the same file.",
+      "referencePath": "src/modules/policy/policy.repository.ts (findAllActive method, line ~61)"
+    }
+  ],
+  "integrationPoints": []
+}
