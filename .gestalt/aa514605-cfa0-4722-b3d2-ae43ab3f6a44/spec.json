@@ -1,0 +1,231 @@
+{
+  "scope": {
+    "affectedDomains": [],
+    "affectedLayers": [],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The ILeaveRequestService interface declares all six operations from the phase scope: submit, approve, reject, cancel, findById, findByEmployeeId, findPendingByManagerId \u2014 each with a typed signature that accepts the inputs the business rules require (employee identity, leave type, date range, approver identity, request id) and returns LeaveRequest or LeaveRequest[] as appropriate.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "submit rejects with a typed error when the employee's employmentStatus is not ACTIVE (INACTIVE or TERMINATED), and accepts when ACTIVE \u2014 verified by mocking IEmployeeRepository.findById to return an employee with the given status.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "submit rejects with a typed error when ILeaveRequestRepository.findOverlapping returns one or more existing SUBMITTED/APPROVED requests for the same employee with overlapping date ranges, and proceeds when findOverlapping returns an empty array.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "submit bypasses the minimumNoticeDays check when the leave type is EMERGENCY, and enforces the notice check (rejecting when startDate is too close to today) for non-emergency leave types that have a non-null minimumNoticeDays on their active policy.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "submit persists a new LeaveRequest with status SUBMITTED via ILeaveRequestRepository.create and returns the persisted record; the create input includes the employeeId, leaveType, startDate, endDate, reason, and initial status.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "approve resolves the request's employee via IEmployeeRepository, confirms the approver is the employee's direct manager (employee.managerId === approverId), and rejects with a typed error when the approver is not the direct manager or attempts self-approval. When employee.managerId is null, the approval escalates to HR (an hr_admin role actor) rather than failing.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "approve calls ILeaveBalanceService.deductOnApproval with the business-day count and the fiscal year derived from startDate's calendar year, and only transitions the request to APPROVED (via approveRequest) after the balance deduction succeeds; if the balance service throws (insufficient balance), the request is not approved.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "reject transitions the request to REJECTED via updateStatus and does NOT call any balance deduction or release method \u2014 rejection has no balance impact.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "cancel is allowed from DRAFT, SUBMITTED, and APPROVED states; when cancelling a previously APPROVED request, the service calls ILeaveBalanceService.releaseOnRejectionOrCancellation to restore the deducted days; when cancelling from DRAFT or SUBMITTED, no balance release occurs.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The business-day count function counts inclusive days between startDate and endDate, excluding Saturdays and Sundays, and excluding public holidays \u2014 verified by testing a date range that spans a weekend (e.g., a Mon\u2013Fri range yields 5, a Mon\u2013next-Mon range yields 6 excluding the weekend) and a range containing a known holiday.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Cross-fiscal-year requests (startDate in one calendar year, endDate in the next) deduct the entire request's business-day count from the fiscal year of startDate \u2014 verified by calling approve with a Dec-to-Jan range and confirming deductOnApproval receives the startDate's calendar year as the fiscalYear argument.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Every state transition (submit, approve, reject, cancel) writes an audit record via IAuditLogRepository.create with entityType 'LeaveRequest', the request's entityId, the matching AuditAction, oldValues/newValues capturing the status change, and the actor's performedBy identity.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Notifications are sent via INotificationRepository.create on each transition: LEAVE_SUBMITTED to the manager on submit, LEAVE_APPROVED to the employee on approve, LEAVE_REJECTED to the employee on reject, and LEAVE_CANCELLED on cancel (to the manager if the request was previously SUBMITTED or APPROVED).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findPendingByManagerId delegates to ILeaveRequestRepository.findAllPendingByManagerId and returns the result unchanged \u2014 verified by mocking the repository to return a known list and asserting the service returns it.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findById and findByEmployeeId delegate to the corresponding ILeaveRequestRepository methods and return their results (LeaveRequest | null and LeaveRequest[] respectively) without mutation.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The Jest unit test suite at tests/unit/modules/leave-request/leave-request.service.test.ts covers all six service operations, all business-rule branches (active-employee check, overlap rejection, emergency bypass, notice enforcement, manager authorization, self-approval prevention, HR escalation, insufficient balance, cancellation-from-each-state, cross-fiscal-year deduction), and passes under `npx jest --passWithNoTests`.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The service must inject all six dependencies via their declared interfaces (ILeaveRequestRepository, IEmployeeRepository, ILeavePolicyRepository, ILeaveBalanceService, IAuditLogRepository, INotificationRepository) \u2014 never import or instantiate the Pg* concrete classes directly. This satisfies GP-001 (repository pattern) and the module-boundary rule that modules import only through declared public interfaces.",
+    "The service must never touch the pg pool or acquire PoolClient connections directly for single-step reads (findById, findByEmployeeId, findOverlapping, findAllPendingByManagerId, employee lookups, policy lookups) \u2014 those repository methods manage their own connections when no client is passed. Only multi-step write flows (approve: status update + balance deduction + audit + notification; cancel-from-approved: status update + balance release + audit + notification) may use caller-controlled transactions per the Transaction Contract in ARCHITECTURE.md.",
+    "Strict TypeScript: no implicit any, strict null checks. Use `unknown` with type guards instead of `any` (HARNESS.json constraint no-any, severity high). The service must compile under `tsc --noEmit` without errors.",
+    "Every state-changing operation (submit, approve, reject, cancel) must write an audit record \u2014 GP-002 (audit records) is a non-negotiable golden principle. No transition may skip the audit write.",
+    "No unhandled promise rejections \u2014 all async errors must be caught and re-thrown as typed errors or propagated via the standard error contract (GP-006). The service must not swallow errors silently.",
+    "The service must not read managerId, employmentStatus, or hireDate from JWT claims or request context \u2014 these are resolved exclusively via IEmployeeRepository.findById per the reconciled architecture's manager-resolution strategy. The caller identity (employeeId, role) is the only context-provided input.",
+    "RBAC enforcement (employee acts on own records, manager acts on direct reports only, self-approval prohibited) is a service-layer business rule that must be enforced in the service methods \u2014 the controller/route-level guards (Phase 10) are a second layer, not a replacement. The service must reject operations where the actor is not authorized regardless of caller."
+  ],
+  "outOfScope": [
+    "HTTP routes, controller methods, Fastify wiring, Zod request-body validation, and JWT extraction \u2014 these are Phase 10 deliverables. The service interface and implementation in Phase 9 must be transport-agnostic and not import Fastify types.",
+    "Database migrations, schema changes, or new table creation \u2014 all tables (leave_requests, employees, leave_policies, leave_balances, audit_logs, notifications) already exist from Phases 1-6.",
+    "Modifying any existing repository, model, or service file from Phases 1-8 \u2014 Phase 9 only creates new files (leave-request.service.interface.ts, leave-request.service.ts, and the test file). Existing interfaces are consumed as-is.",
+    "Public-holiday calendar data source or configuration \u2014 the service must exclude public holidays from the business-day count, but the mechanism for obtaining the holiday list (hardcoded set, config file, or external API) is an implementation choice left to the code agent; this phase does not prescribe a holiday provider.",
+    "Leave types unpaid, maternity, and paternity \u2014 the feature scope per the reconciled architecture covers only annual, sick, and emergency. The service should not special-case or exclude the other enum values (they remain valid LeaveType values), but no business rules are defined for them beyond the generic flow."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "Lifecycle: DRAFT \u2192 SUBMITTED \u2192 (APPROVED | REJECTED); any non-terminal state \u2192 CANCELLED. The service must only transition a request from SUBMITTED to APPROVED or REJECTED, and may transition from DRAFT, SUBMITTED, or APPROVED to CANCELLED. A request already in a terminal state (APPROVED, REJECTED, CANCELLED) must not be re-transitioned by approve/reject/cancel."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "On APPROVED, approvedBy must be set to the approver's employee id and approvedAt must be stamped \u2014 this is achieved via ILeaveRequestRepository.approveRequest (which sets status + approved_by + approved_at), NOT via updateStatus (which only sets status + updated_at). The service must use approveRequest for the approve flow and updateStatus for reject/cancel."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "Balance is deducted only on APPROVAL (via ILeaveBalanceService.deductOnApproval) and released only on CANCEL of a previously-APPROVED request (via ILeaveBalanceService.releaseOnRejectionOrCancellation). Rejection has no balance impact. Cancellation from DRAFT or SUBMITTED has no balance impact (no deduction was made). The fiscal year for deduction is always the calendar year of the request's startDate, even for cross-fiscal-year ranges."
+    },
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "Every state transition on a LeaveRequest produces exactly one immutable audit record with entityType='LeaveRequest', the request's id as entityId, the AuditAction matching the transition (CREATED for submit, APPROVED for approve, REJECTED for reject, CANCELLED for cancel), oldValues capturing the prior state, newValues capturing the new state, and performedBy set to the actor's identity."
+    },
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "Notifications are created (not just queued) via INotificationRepository.create on each transition with the correct NotificationType and recipient: LEAVE_SUBMITTED \u2192 manager (or HR if managerId is null), LEAVE_APPROVED \u2192 requesting employee, LEAVE_REJECTED \u2192 requesting employee, LEAVE_CANCELLED \u2192 manager if the request was previously SUBMITTED or APPROVED. Each notification references the LeaveRequest via relatedEntityType='LeaveRequest' and relatedEntityId=request.id."
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "Only employees with employmentStatus === ACTIVE may submit leave requests. The service must look up the employee via IEmployeeRepository.findById and reject submission for INACTIVE or TERMINATED employees, and for a null (not-found) employee. The manager relationship for approval routing is read from employee.managerId via the same repository \u2014 never from JWT claims."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "submit",
+      "authRule": "The caller must be the employee submitting their own leave (employeeId from caller identity). The target employee must have employmentStatus === ACTIVE, verified via IEmployeeRepository.findById.",
+      "idempotent": false,
+      "errorSemantics": "Reject with a typed error when: employee not found or not ACTIVE; date range invalid (endDate before startDate); overlapping SUBMITTED/APPROVED request exists for the same employee; minimum notice not met for non-emergency leave with a non-null policy.minimumNoticeDays. No balance mutation occurs on submit."
+    },
+    {
+      "operation": "approve",
+      "authRule": "The approver must be the request employee's direct manager (employee.managerId === approverId), verified via IEmployeeRepository.findById on the request's employeeId. Self-approval is prohibited (approverId !== request.employeeId). When employee.managerId is null, the operation escalates to an HR admin actor. The request must be in SUBMITTED status.",
+      "idempotent": false,
+      "errorSemantics": "Reject with a typed error when: request not found; request not in SUBMITTED status; approver is not the direct manager and not an HR-admin escalator; approver is the requesting employee (self-approval); insufficient balance (ILeaveBalanceService.deductOnApproval throws). On success, the request transitions to APPROVED via approveRequest, balance is deducted, an audit record is written, and a notification is sent to the employee."
+    },
+    {
+      "operation": "reject",
+      "authRule": "The rejector must be the request employee's direct manager (same authorization as approve) or an HR-admin escalator when managerId is null. The request must be in SUBMITTED status.",
+      "idempotent": false,
+      "errorSemantics": "Reject with a typed error when: request not found; request not in SUBMITTED status; rejector is not authorized. No balance mutation occurs. On success, the request transitions to REJECTED via updateStatus, an audit record is written, and a notification is sent to the employee."
+    },
+    {
+      "operation": "cancel",
+      "authRule": "The canceller must be the requesting employee (request.employeeId === cancellerId). Cancellation is allowed from DRAFT, SUBMITTED, or APPROVED states. A manager or other actor may not cancel another employee's request.",
+      "idempotent": false,
+      "errorSemantics": "Reject with a typed error when: request not found; request is already in a terminal state (REJECTED or CANCELLED); canceller is not the requesting employee. When cancelling from APPROVED, balance is released via ILeaveBalanceService.releaseOnRejectionOrCancellation. An audit record is written and a notification is sent (to the manager if the request was previously SUBMITTED or APPROVED)."
+    },
+    {
+      "operation": "findById",
+      "authRule": "Read-only operation; authorization (own record or manager of direct report) is enforced at the controller layer in Phase 10. The service returns the LeaveRequest or null without authorization checks.",
+      "idempotent": true,
+      "errorSemantics": "Returns null when the request is not found. Does not throw on missing records."
+    },
+    {
+      "operation": "findByEmployeeId",
+      "authRule": "Read-only operation; authorization enforced at the controller layer. The service returns the list without authorization checks.",
+      "idempotent": true,
+      "errorSemantics": "Returns an empty array when no requests exist for the employee. Does not throw."
+    },
+    {
+      "operation": "findPendingByManagerId",
+      "authRule": "Read-only operation intended for managers; the managerId parameter identifies whose direct reports' pending requests to return. Authorization (caller is a manager) is enforced at the controller layer. The service delegates to ILeaveRequestRepository.findAllPendingByManagerId which JOINs employees on manager_id and filters to SUBMITTED status.",
+      "idempotent": true,
+      "errorSemantics": "Returns an empty array when no pending requests exist for the manager's direct reports. Does not throw."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The ILeaveRequestService interface must be consumed by Phase 10's controller, so its method names and return types must match the operations declared in PLAN.md Phase 9: submit, approve, reject, cancel, findById, findByEmployeeId, findPendingByManagerId. The interface file path must be src/modules/leave-request/leave-request.service.interface.ts.",
+      "referencePath": "PLAN.md"
+    },
+    {
+      "requirement": "The service's approve flow must call ILeaveRequestRepository.approveRequest (7th method, sets status=APPROVED + approved_by + approved_at) rather than updateStatus (which only sets status + updated_at). The repository interface at src/modules/leave-request/leave-request.repository.ts declares both methods; the service must use the correct one per the transition semantics.",
+      "referencePath": "src/modules/leave-request/leave-request.repository.ts"
+    },
+    {
+      "requirement": "The service must call ILeaveBalanceService.deductOnApproval and releaseOnRejectionOrCancellation with the exact parameter shapes declared in src/modules/leave-balance/leave-balance.service.interface.ts: (employeeId: string, leaveType: LeaveType, days: number, fiscalYear: number, client?: PoolClient). The fiscalYear must be the calendar year of the request's startDate.",
+      "referencePath": "src/modules/leave-balance/leave-balance.service.interface.ts"
+    },
+    {
+      "requirement": "The service must resolve employee data (managerId, employmentStatus) via IEmployeeRepository.findById as declared in src/modules/employee/employee.repository.ts \u2014 not via IEmployeeService. The PLAN.md Phase 9 spec explicitly names IEmployeeRepository as the injected dependency for manager resolution, and the reconciled architecture confirms managerId is read from the employee record.",
+      "referencePath": "src/modules/employee/employee.repository.ts"
+    },
+    {
+      "requirement": "The service must write audit records via IAuditLogRepository.create with the input shape declared in src/modules/audit-log/audit-log.repository.ts: Omit<AuditLog, 'id' | 'createdAt'>, which requires entityType, entityId, action (AuditAction enum), oldValues, newValues, performedBy, performedAt, ipAddress, userAgent. The action must use the AuditAction enum values from src/shared/types/leave.types.ts (CREATED, APPROVED, REJECTED, CANCELLED).",
+      "referencePath": "src/modules/audit-log/audit-log.repository.ts"
+    },
+    {
+      "requirement": "The service must create notifications via INotificationRepository.create with the input shape declared in src/modules/notification/notification.repository.ts: Omit<Notification, 'id' | 'createdAt' | 'readAt'>, which requires recipientId, type (NotificationType enum), title, message, relatedEntityType ('LeaveRequest' | 'LeaveBalance' | null), relatedEntityId, status (NotificationStatus). The type must use NotificationType enum values from src/shared/types/leave.types.ts.",
+      "referencePath": "src/modules/notification/notification.repository.ts"
+    },
+    {
+      "requirement": "The service must use the LeaveType, LeaveRequestStatus, AuditAction, and NotificationType enums from src/shared/types/leave.types.ts \u2014 not string literals. The LeaveRequestStatus values (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED) govern state transitions; LeaveType.EMERGENCY triggers the notice bypass; AuditAction and NotificationType values must match the enum definitions exactly.",
+      "referencePath": "src/shared/types/leave.types.ts"
+    },
+    {
+      "requirement": "The service's LeaveRequest type usage must match the interface declared in src/modules/leave-request/leave-request.model.ts (id, employeeId, leaveType, startDate, endDate, reason, status, approvedBy, approvedAt, createdAt, updatedAt). The create input omits id/createdAt/updatedAt per ILeaveRequestRepository.create's Omit type.",
+      "referencePath": "src/modules/leave-request/leave-request.model.ts"
+    },
+    {
+      "requirement": "The service must resolve the active leave policy via ILeavePolicyRepository (injected per PLAN.md Phase 9), filtering to isActive === true to obtain minimumNoticeDays for the notice check. The repository interface at src/modules/leave-policy/leave-policy.repository.ts declares findByLeaveType(leaveType, client?) which returns LeavePolicy[]; the service must filter to the active policy, consistent with how LeaveBalanceService.findActivePolicy operates.",
+      "referencePath": "src/modules/leave-policy/leave-policy.repository.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "ILeaveRequestRepository (src/modules/leave-request/leave-request.repository.ts)",
+      "why": "Primary data access for leave requests: findById, findByEmployeeId, findOverlapping (overlap detection on submit), create (persist new request), approveRequest (approve transition with approved_by/approved_at), updateStatus (reject/cancel transition), findAllPendingByManagerId (manager's pending queue). All methods accept optional PoolClient for transaction participation."
+    },
+    {
+      "target": "IEmployeeRepository (src/modules/employee/employee.repository.ts)",
+      "why": "Resolves the submitting employee's employmentStatus (ACTIVE check on submit) and managerId (approval authorization and notification routing). findById is the key method. When managerId is null, the service escalates to HR."
+    }
+  ]
+}
