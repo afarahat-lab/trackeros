@@ -1,39 +1,10 @@
-# Implement this phase: Phase 2: Employee model + repository
+# Fix specific quality-gate violations: Phase 2: Employee model + repository
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/e3db0103-c684-4a1d-bb0c-c812564d6aa7/2`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/fix/e3db0103-c684-4a1d-bb0c-c812564d6aa7/2/1`. Do not clone anything; work only in this directory.
 
-## What to build
-(no phase architecture provided — infer from the success criteria below)
+You are fixing SPECIFIC violations the quality gate found in EXISTING, already-committed files. Make the targeted edits listed below — do NOT refactor, regenerate, or change unrelated code.
 
-## Success criteria
-Create the employee module at `src/modules/employee/`. This phase depends on `src/shared/types/index.ts` from Phase 1 — read it before generating.
-
-Files:
-- `src/modules/employee/employee.model.ts` — Define the Employee interface with exact canonical fields: id: string, employeeNumber: string, firstName: string, lastName: string, email: string, managerId: string | null, department: string | null, hireDate: Date, terminationDate: Date | null, employmentStatus: EmploymentStatus (import from src/shared/types), createdAt: Date, updatedAt: Date, deletedAt: Date | null.
-- `src/modules/employee/employee.repository.ts` — Define IEmployeeRepository interface with methods: findById(id: string): Promise<Employee | null>, findByEmployeeNumber(employeeNumber: string): Promise<Employee | null>, findAll(): Promise<Employee[]>, create(employee: Omit<Employee, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt'>): Promise<Employee>, update(id: string, data: Partial<Employee>): Promise<Employee | null>, softDelete(id: string): Promise<void>. Implement EmployeeRepository class using the shared db pool from `src/shared/db/connection.ts` and Knex. The repository must use parameterized queries.
-- `src/modules/employee/index.ts` — barrel export of model and repository.
-
-Include Jest unit tests at `tests/unit/modules/employee/employee.repository.spec.ts`.
-
-## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
-These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
-- Business policy answers (scoped to what the codebase provisions — do NOT introduce new unplanned data sources):
-
-1. Fiscal (leave) year: CALENDAR YEAR (Jan 1 to Dec 31), organisation-wide, keyed off leave startDate.
-
-2. Cross-fiscal-year request: deduct the WHOLE request entirely from the fiscal year of startDate. Do NOT split across two LeaveBalance records.
-
-3. Sick leave notice: NO minimum notice period for sick leave (like emergency — it is unplanned). Do not enforce any advance-notice rule for sick or emergency leave. If a LeavePolicy defines minimumNoticeDays, apply it ONLY to annual leave; sick and emergency are exempt.
-
-4. Day counting: WEEKDAYS ONLY — count Monday–Friday, exclude Saturday and Sunday. Do NOT exclude public holidays: there is NO holiday table, repository, or provider in scope, and you must NOT introduce one. Both startDate and endDate inclusive. Keep the counting as a self-contained pure date helper with no external dependency.
-
-5. Rounding / fractional days: WHOLE DAYS ONLY — there is no fractional accrual. Annual entitlement is a whole-number lump sum granted at fiscal-year start, and day counts are whole business days, so remaining_days is always an integer and NO rounding is needed. (If a fractional value ever arises, floor it for enforcement — but the design should not produce fractions.)
-
-6. Deduction timing: deduct on APPROVAL. On submission the days are held as PENDING (a reservation); on approval move pending to used; on reject or cancel release the reservation. available = entitled - (used + pending). Not on the leave start date.
-
-7. Overlap: YES — prevent overlapping leave requests. Reject a new SUBMITTED/APPROVED request whose date range overlaps (inclusive) an existing SUBMITTED/APPROVED request for the same employee.
-
-Employee/manager data: the LeaveRequest service obtains employee data (managerId, employmentStatus, hireDate) via an injected IEmployeeRepository backed by an employees table (same repository-interface pattern as other modules). The JWT provides ONLY the caller identity (employeeId) and role for RBAC; manager relationship, hire date, and employment status come from IEmployeeRepository. Approvals route to the target employee managerId; if null, escalate to HR (role hr_admin). Managers act only on direct reports. Every endpoint enforces RBAC + input validation. Balances auto-created for all leave types on employee creation. Emergency leave is a separate pool. Only ACTIVE employees may submit. [BINDING RULE — operator decision resolving: What is the fiscal year definition for leave balances? Calendar year (Jan 1 – Dec 31) or a custom period (e.g., Apr 1 – Mar 31)?; When a LeaveRequest spans two fiscal years (e.g., Dec 28 – Jan 3), should the day count be split across two LeaveBalance records or deducted entirely from the startDate's fiscal year?; Should sick leave require a minimum notice period? Currently the rule says emergency bypasses notice, but sick leave is ambiguous.; How are leave days counted — calendar days or business days (Mon–Fri excluding holidays)?; When leave balance remaining_days is fractional (e.g. from accrual), what rounding direction applies when displaying or enforcing the balance?; When should leave balance be deducted — at approval time or on the leave start date?; Should the system prevent overlapping leave requests for the same employee?; apply everywhere these apply, not in one place only]
+The files ALREADY EXIST. You MUST edit them in place with the `str_replace_editor` tool. Reading or viewing a file is NOT sufficient — you have NOT finished until you have edited EVERY file listed below.
 
 ## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
 The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
@@ -59,6 +30,26 @@ Your code MUST obey every rule below. These are not style preferences — the qu
 - No hardcoded passwords, API keys, or tokens (rule: `no-hardcoded-secrets`)
 - Do not add @gestalt/* packages as project dependencies — these are Gestalt platform internals not available on npm (rule: `no-gestalt-internal-deps`)
 
+## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
+These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
+- Business policy answers (scoped to what the codebase provisions — do NOT introduce new unplanned data sources):
+
+1. Fiscal (leave) year: CALENDAR YEAR (Jan 1 to Dec 31), organisation-wide, keyed off leave startDate.
+
+2. Cross-fiscal-year request: deduct the WHOLE request entirely from the fiscal year of startDate. Do NOT split across two LeaveBalance records.
+
+3. Sick leave notice: NO minimum notice period for sick leave (like emergency — it is unplanned). Do not enforce any advance-notice rule for sick or emergency leave. If a LeavePolicy defines minimumNoticeDays, apply it ONLY to annual leave; sick and emergency are exempt.
+
+4. Day counting: WEEKDAYS ONLY — count Monday–Friday, exclude Saturday and Sunday. Do NOT exclude public holidays: there is NO holiday table, repository, or provider in scope, and you must NOT introduce one. Both startDate and endDate inclusive. Keep the counting as a self-contained pure date helper with no external dependency.
+
+5. Rounding / fractional days: WHOLE DAYS ONLY — there is no fractional accrual. Annual entitlement is a whole-number lump sum granted at fiscal-year start, and day counts are whole business days, so remaining_days is always an integer and NO rounding is needed. (If a fractional value ever arises, floor it for enforcement — but the design should not produce fractions.)
+
+6. Deduction timing: deduct on APPROVAL. On submission the days are held as PENDING (a reservation); on approval move pending to used; on reject or cancel release the reservation. available = entitled - (used + pending). Not on the leave start date.
+
+7. Overlap: YES — prevent overlapping leave requests. Reject a new SUBMITTED/APPROVED request whose date range overlaps (inclusive) an existing SUBMITTED/APPROVED request for the same employee.
+
+Employee/manager data: the LeaveRequest service obtains employee data (managerId, employmentStatus, hireDate) via an injected IEmployeeRepository backed by an employees table (same repository-interface pattern as other modules). The JWT provides ONLY the caller identity (employeeId) and role for RBAC; manager relationship, hire date, and employment status come from IEmployeeRepository. Approvals route to the target employee managerId; if null, escalate to HR (role hr_admin). Managers act only on direct reports. Every endpoint enforces RBAC + input validation. Balances auto-created for all leave types on employee creation. Emergency leave is a separate pool. Only ACTIVE employees may submit. [BINDING RULE — operator decision resolving: What is the fiscal year definition for leave balances? Calendar year (Jan 1 – Dec 31) or a custom period (e.g., Apr 1 – Mar 31)?; When a LeaveRequest spans two fiscal years (e.g., Dec 28 – Jan 3), should the day count be split across two LeaveBalance records or deducted entirely from the startDate's fiscal year?; Should sick leave require a minimum notice period? Currently the rule says emergency bypasses notice, but sick leave is ambiguous.; How are leave days counted — calendar days or business days (Mon–Fri excluding holidays)?; When leave balance remaining_days is fractional (e.g. from accrual), what rounding direction applies when displaying or enforcing the balance?; When should leave balance be deducted — at approval time or on the leave start date?; Should the system prevent overlapping leave requests for the same employee?; apply everywhere these apply, not in one place only]
+
 ## Architecture & constraint rules the quality gate enforces (satisfy these now)
 The quality gate judges your code against the rules below and BLOCKS the phase on any violation — a violation it rates critical escalates to a human with no automatic retry. These are the same rules the gate checks, so comply up front rather than leaving them for the gate:
 - Data access is only permitted in the designated data access layer of this project. Code in business logic, presentation, or routing layers must delegate all data operations to the data access layer.
@@ -83,21 +74,30 @@ These are the project's non-negotiable invariants. A violation is a GOLDEN_PRINC
 - GP-006 — Error handling: No unhandled promise rejections. All async errors are caught and handled.
 
 ## Project stack & references
-Before writing code, read the referenced files below (those present in the working directory) to learn the project's language, framework, test runner, and conventions, and the cross-cutting rules your code must satisfy — then follow the existing repository conventions:
+Before making the edits below, read the referenced files (those present in the working directory) to learn the project's architecture, conventions, and the cross-cutting rules your fix must still satisfy — then keep the edits consistent with them:
 - `HARNESS.json`
 - `docs/ARCHITECTURE.md`
 - `docs/GOLDEN_PRINCIPLES.md`
 - `AGENTS.md`
 - `PLAN.md`
 
+## Required edits
+
+### Edit 1
+File: src/modules/employee/employee.repository.ts
+Line: 56
+Offending code: `const result = await this.db.raw<{ rows: EmployeeRow[] }>(`
+Rule violated: review/constraint
+Action (do this now): Edit `src/modules/employee/employee.repository.ts` at line 56 in place to fix the `review/constraint` violation.
+What the quality gate found — apply this: [review/constraint] Repository uses `this.db.raw()` with raw SQL strings throughout all six methods (findById, findByEmployeeNumber, findAll, create, update, softDelete). The spec constraint requires: "The repository must use Knex's query builder for all database operations — no raw SQL strings." The Knex query builder chainable API (e.g., `this.db('employees').select('*').where('id', id).whereNull('deleted_at')`) should be used instead of `.raw()` with hand-written SQL.
+
 ## Verify before you finish (MANDATORY)
-The code you write MUST compile and its tests MUST pass — a compilation or type error must NEVER be left for CI to find. Before you declare this task done:
-- Read the project's build / type-check / test commands from `package.json` (scripts) and `HARNESS.json`.
-- Install dependencies if they are not already installed, then RUN the type-check / build (e.g. `npm run build` or `tsc --noEmit`) AND the tests (e.g. `npm test`) for the files this phase touches.
-- FIX every compilation error, type error, and failing test you introduced — including in test files — and re-run until they pass.
+After making the edits above, the code MUST still compile and its tests MUST pass — a compilation/type error, or a test your change breaks, must NEVER be left for CI or the quality gate to find. Before you declare this task done:
+- Read the project's build / type-check / test commands from `package.json` (scripts) and `HARNESS.json`, install dependencies if they are not already installed, then RUN the type-check / build (e.g. `npm run build` or `tsc --noEmit`) AND the tests (e.g. `npm test`).
+- FIX every compilation error, type error, and failing test that YOUR edits introduced — including updating a test whose expectation your change legitimately invalidated (e.g. a new required field, a new status code such as 401/403 from an added authorization check, added input validation) — and re-run until they pass.
 - Only when the build and the tests pass may you consider the task complete. If a dependency install genuinely cannot be made to work, say so explicitly in your final message rather than declaring success on unverified code.
 
 ## Constraints (mandatory)
-- Write and modify source files ONLY. Do NOT run `git commit`, `git push`, `git add`, or any other git command. The platform handles all git operations. (Running the build / type-check / tests above is expected and encouraged — that is NOT a git operation.)
-- Do not create a new repository or change the git remote.
-- Stay within the scope of this phase; do not implement deferred/later work.
+- Keep the change SURGICAL: make the required edits above and fix only what they broke (compile/type errors and the tests they invalidated). Do NOT refactor, regenerate, or change unrelated code, and do not add / delete / rename source files beyond what a required edit — or a test-fix for it — needs.
+- Do NOT run `git commit`, `git push`, `git add`, or any git command. The platform handles all git operations. (Running the build / type-check / tests above is expected and encouraged — that is NOT a git operation.)
+- When the listed edits are made and the build + tests pass, stop.

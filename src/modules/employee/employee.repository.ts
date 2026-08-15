@@ -53,54 +53,50 @@ export class EmployeeRepository implements IEmployeeRepository {
   }
 
   async findById(id: string): Promise<Employee | null> {
-    const result = await this.db.raw<{ rows: EmployeeRow[] }>(
-      'SELECT * FROM employees WHERE id = ? AND deleted_at IS NULL',
-      [id],
-    );
-    return result.rows[0] ? toEmployee(result.rows[0]) : null;
+    const row = await this.db('employees')
+      .select('*')
+      .where('id', id)
+      .whereNull('deleted_at')
+      .first<EmployeeRow>();
+    return row ? toEmployee(row) : null;
   }
 
   async findByEmployeeNumber(employeeNumber: string): Promise<Employee | null> {
-    const result = await this.db.raw<{ rows: EmployeeRow[] }>(
-      'SELECT * FROM employees WHERE employee_number = ? AND deleted_at IS NULL',
-      [employeeNumber],
-    );
-    return result.rows[0] ? toEmployee(result.rows[0]) : null;
+    const row = await this.db('employees')
+      .select('*')
+      .where('employee_number', employeeNumber)
+      .whereNull('deleted_at')
+      .first<EmployeeRow>();
+    return row ? toEmployee(row) : null;
   }
 
   async findAll(): Promise<Employee[]> {
-    const result = await this.db.raw<{ rows: EmployeeRow[] }>(
-      'SELECT * FROM employees WHERE deleted_at IS NULL',
-    );
-    return result.rows.map(toEmployee);
+    const rows = await this.db('employees')
+      .select('*')
+      .whereNull('deleted_at');
+    return rows.map(toEmployee);
   }
 
   async create(
     employee: Omit<Employee, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt'>,
   ): Promise<Employee> {
     const now = new Date();
-    const result = await this.db.raw<{ rows: EmployeeRow[] }>(
-      `INSERT INTO employees (
-        employee_number, first_name, last_name, email, manager_id,
-        department, hire_date, termination_date, employment_status,
-        created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      RETURNING *`,
-      [
-        employee.employeeNumber,
-        employee.firstName,
-        employee.lastName,
-        employee.email,
-        employee.managerId,
-        employee.department,
-        employee.hireDate,
-        employee.terminationDate,
-        employee.employmentStatus,
-        now,
-        now,
-      ],
-    );
-    return toEmployee(result.rows[0]);
+    const [row] = await this.db('employees')
+      .insert({
+        employee_number: employee.employeeNumber,
+        first_name: employee.firstName,
+        last_name: employee.lastName,
+        email: employee.email,
+        manager_id: employee.managerId,
+        department: employee.department,
+        hire_date: employee.hireDate,
+        termination_date: employee.terminationDate,
+        employment_status: employee.employmentStatus,
+        created_at: now,
+        updated_at: now,
+      })
+      .returning('*');
+    return toEmployee(row);
   }
 
   async update(id: string, data: Partial<Employee>): Promise<Employee | null> {
@@ -110,8 +106,7 @@ export class EmployeeRepository implements IEmployeeRepository {
     }
 
     const now = new Date();
-    const fields: string[] = [];
-    const values: (string | number | boolean | Date | null)[] = [];
+    const fields: Record<string, unknown> = {};
 
     const columnMap: Record<string, string> = {
       employeeNumber: 'employee_number',
@@ -127,33 +122,31 @@ export class EmployeeRepository implements IEmployeeRepository {
 
     for (const [key, col] of Object.entries(columnMap)) {
       if (key in data) {
-        fields.push(`${col} = ?`);
         const val = (data as Record<string, unknown>)[key];
         if (val !== undefined) {
-          values.push(val as string | number | boolean | Date | null);
+          fields[col] = val;
         }
       }
     }
 
-    if (fields.length === 0) {
+    if (Object.keys(fields).length === 0) {
       return existing;
     }
 
-    fields.push('updated_at = ?');
-    values.push(now);
-    values.push(id);
+    fields['updated_at'] = now;
 
-    const result = await this.db.raw<{ rows: EmployeeRow[] }>(
-      `UPDATE employees SET ${fields.join(', ')} WHERE id = ? AND deleted_at IS NULL RETURNING *`,
-      values,
-    );
-    return result.rows[0] ? toEmployee(result.rows[0]) : null;
+    const [row] = await this.db('employees')
+      .where('id', id)
+      .whereNull('deleted_at')
+      .update(fields)
+      .returning('*');
+    return row ? toEmployee(row) : null;
   }
 
   async softDelete(id: string): Promise<void> {
-    await this.db.raw(
-      'UPDATE employees SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL',
-      [new Date(), new Date(), id],
-    );
+    await this.db('employees')
+      .where('id', id)
+      .whereNull('deleted_at')
+      .update({ deleted_at: new Date(), updated_at: new Date() });
   }
 }

@@ -6,12 +6,40 @@ jest.mock('../../../../src/shared/db/connection', () => ({
   pool: {},
 }));
 
+// Build a chainable query builder mock that is thenable
+interface QueryBuilderMock {
+  select: jest.Mock;
+  where: jest.Mock;
+  whereNull: jest.Mock;
+  first: jest.Mock;
+  insert: jest.Mock;
+  update: jest.Mock;
+  returning: jest.Mock;
+  then: (resolve: (value: unknown) => void, reject?: (reason: unknown) => void) => Promise<void>;
+}
+
+function createQueryBuilderMock(resolvedValue: unknown): QueryBuilderMock {
+  const thenable: Partial<QueryBuilderMock> = {};
+
+  const methods = ['select', 'where', 'whereNull', 'first', 'insert', 'update', 'returning'] as const;
+
+  for (const key of methods) {
+    const mockFn = jest.fn<unknown, unknown[]>().mockReturnValue(thenable);
+    (thenable as Record<string, unknown>)[key] = mockFn;
+  }
+
+  thenable.then = function (resolve: (value: unknown) => void) {
+    resolve(resolvedValue);
+    return Promise.resolve(undefined);
+  };
+
+  return thenable as QueryBuilderMock;
+}
+
 // Mock knex
-const mockRaw = jest.fn();
+const mockKnexFn = jest.fn();
 jest.mock('knex', () => {
-  return jest.fn(() => ({
-    raw: mockRaw,
-  }));
+  return jest.fn(() => mockKnexFn);
 });
 
 function makeEmployeeRow(overrides: Partial<Record<string, unknown>> = {}): Record<string, unknown> {
@@ -62,19 +90,22 @@ describe('EmployeeRepository', () => {
   describe('findById', () => {
     it('should return an employee when found', async () => {
       const row = makeEmployeeRow();
-      mockRaw.mockResolvedValueOnce({ rows: [row] });
+      const qb = createQueryBuilderMock(row);
+      mockKnexFn.mockReturnValue(qb);
 
       const result = await repo.findById('emp-1');
 
-      expect(mockRaw).toHaveBeenCalledWith(
-        'SELECT * FROM employees WHERE id = ? AND deleted_at IS NULL',
-        ['emp-1'],
-      );
+      expect(mockKnexFn).toHaveBeenCalledWith('employees');
+      expect(qb.select).toHaveBeenCalledWith('*');
+      expect(qb.where).toHaveBeenCalledWith('id', 'emp-1');
+      expect(qb.whereNull).toHaveBeenCalledWith('deleted_at');
+      expect(qb.first).toHaveBeenCalled();
       expectEmployee(result, row);
     });
 
     it('should return null when not found', async () => {
-      mockRaw.mockResolvedValueOnce({ rows: [] });
+      const qb = createQueryBuilderMock(undefined);
+      mockKnexFn.mockReturnValue(qb);
 
       const result = await repo.findById('nonexistent');
 
@@ -85,19 +116,22 @@ describe('EmployeeRepository', () => {
   describe('findByEmployeeNumber', () => {
     it('should return an employee when found', async () => {
       const row = makeEmployeeRow();
-      mockRaw.mockResolvedValueOnce({ rows: [row] });
+      const qb = createQueryBuilderMock(row);
+      mockKnexFn.mockReturnValue(qb);
 
       const result = await repo.findByEmployeeNumber('EMP001');
 
-      expect(mockRaw).toHaveBeenCalledWith(
-        'SELECT * FROM employees WHERE employee_number = ? AND deleted_at IS NULL',
-        ['EMP001'],
-      );
+      expect(mockKnexFn).toHaveBeenCalledWith('employees');
+      expect(qb.select).toHaveBeenCalledWith('*');
+      expect(qb.where).toHaveBeenCalledWith('employee_number', 'EMP001');
+      expect(qb.whereNull).toHaveBeenCalledWith('deleted_at');
+      expect(qb.first).toHaveBeenCalled();
       expectEmployee(result, row);
     });
 
     it('should return null when not found', async () => {
-      mockRaw.mockResolvedValueOnce({ rows: [] });
+      const qb = createQueryBuilderMock(undefined);
+      mockKnexFn.mockReturnValue(qb);
 
       const result = await repo.findByEmployeeNumber('NONEXISTENT');
 
@@ -109,20 +143,22 @@ describe('EmployeeRepository', () => {
     it('should return all non-deleted employees', async () => {
       const row1 = makeEmployeeRow();
       const row2 = makeEmployeeRow({ id: 'emp-2', employee_number: 'EMP002' });
-      mockRaw.mockResolvedValueOnce({ rows: [row1, row2] });
+      const qb = createQueryBuilderMock([row1, row2]);
+      mockKnexFn.mockReturnValue(qb);
 
       const results = await repo.findAll();
 
-      expect(mockRaw).toHaveBeenCalledWith(
-        'SELECT * FROM employees WHERE deleted_at IS NULL',
-      );
+      expect(mockKnexFn).toHaveBeenCalledWith('employees');
+      expect(qb.select).toHaveBeenCalledWith('*');
+      expect(qb.whereNull).toHaveBeenCalledWith('deleted_at');
       expect(results).toHaveLength(2);
       expectEmployee(results[0], row1);
       expectEmployee(results[1], row2);
     });
 
     it('should return empty array when no employees', async () => {
-      mockRaw.mockResolvedValueOnce({ rows: [] });
+      const qb = createQueryBuilderMock([]);
+      mockKnexFn.mockReturnValue(qb);
 
       const results = await repo.findAll();
 
@@ -145,22 +181,26 @@ describe('EmployeeRepository', () => {
       };
 
       const row = makeEmployeeRow();
-      mockRaw.mockResolvedValueOnce({ rows: [row] });
+      const qb = createQueryBuilderMock([row]);
+      mockKnexFn.mockReturnValue(qb);
 
       const result = await repo.create(input);
 
-      expect(mockRaw).toHaveBeenCalledTimes(1);
-      const [sql, params] = mockRaw.mock.calls[0];
-      expect(sql).toContain('INSERT INTO employees');
-      expect(params[0]).toBe('EMP001');
-      expect(params[1]).toBe('John');
-      expect(params[2]).toBe('Doe');
-      expect(params[3]).toBe('john@example.com');
-      expect(params[4]).toBe('mgr-1');
-      expect(params[5]).toBe('Engineering');
-      expect(params[6]).toEqual(new Date('2020-01-15'));
-      expect(params[7]).toBeNull();
-      expect(params[8]).toBe('ACTIVE');
+      expect(mockKnexFn).toHaveBeenCalledWith('employees');
+      expect(qb.insert).toHaveBeenCalledWith({
+        employee_number: 'EMP001',
+        first_name: 'John',
+        last_name: 'Doe',
+        email: 'john@example.com',
+        manager_id: 'mgr-1',
+        department: 'Engineering',
+        hire_date: expect.any(Date),
+        termination_date: null,
+        employment_status: 'ACTIVE',
+        created_at: expect.any(Date),
+        updated_at: expect.any(Date),
+      });
+      expect(qb.returning).toHaveBeenCalledWith('*');
       expectEmployee(result, row);
     });
   });
@@ -168,47 +208,63 @@ describe('EmployeeRepository', () => {
   describe('update', () => {
     it('should update and return the employee', async () => {
       const existingRow = makeEmployeeRow();
-      mockRaw.mockResolvedValueOnce({ rows: [existingRow] }); // findById
+      // First call: findById
+      const qb1 = createQueryBuilderMock(existingRow);
+      mockKnexFn.mockReturnValueOnce(qb1);
 
+      // Second call: the db('employees') for update
       const updatedRow = makeEmployeeRow({ first_name: 'Jane', updated_at: new Date() });
-      mockRaw.mockResolvedValueOnce({ rows: [updatedRow] }); // update
+      const qb2 = createQueryBuilderMock([updatedRow]);
+      mockKnexFn.mockReturnValueOnce(qb2);
 
       const result = await repo.update('emp-1', { firstName: 'Jane' });
 
-      expect(mockRaw).toHaveBeenCalledTimes(2);
+      expect(mockKnexFn).toHaveBeenCalledTimes(2);
+      expect(qb2.where).toHaveBeenCalledWith('id', 'emp-1');
+      expect(qb2.whereNull).toHaveBeenCalledWith('deleted_at');
+      expect(qb2.update).toHaveBeenCalledWith(
+        expect.objectContaining({ first_name: 'Jane', updated_at: expect.any(Date) }),
+      );
+      expect(qb2.returning).toHaveBeenCalledWith('*');
       expectEmployee(result, updatedRow);
     });
 
     it('should return null when employee does not exist', async () => {
-      mockRaw.mockResolvedValueOnce({ rows: [] }); // findById returns null
+      const qb = createQueryBuilderMock(undefined);
+      mockKnexFn.mockReturnValue(qb);
 
       const result = await repo.update('nonexistent', { firstName: 'Jane' });
 
       expect(result).toBeNull();
-      expect(mockRaw).toHaveBeenCalledTimes(1);
+      expect(mockKnexFn).toHaveBeenCalledTimes(1);
     });
 
     it('should return existing employee when no fields to update', async () => {
       const existingRow = makeEmployeeRow();
-      mockRaw.mockResolvedValueOnce({ rows: [existingRow] }); // findById
+      const qb = createQueryBuilderMock(existingRow);
+      mockKnexFn.mockReturnValue(qb);
 
       const result = await repo.update('emp-1', {});
 
-      expect(mockRaw).toHaveBeenCalledTimes(1);
+      expect(mockKnexFn).toHaveBeenCalledTimes(1);
       expectEmployee(result, existingRow);
     });
   });
 
   describe('softDelete', () => {
     it('should set deleted_at and updated_at', async () => {
-      mockRaw.mockResolvedValueOnce({ rows: [] });
+      const qb = createQueryBuilderMock(undefined);
+      mockKnexFn.mockReturnValue(qb);
 
       await repo.softDelete('emp-1');
 
-      expect(mockRaw).toHaveBeenCalledWith(
-        'UPDATE employees SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL',
-        [expect.any(Date), expect.any(Date), 'emp-1'],
-      );
+      expect(mockKnexFn).toHaveBeenCalledWith('employees');
+      expect(qb.where).toHaveBeenCalledWith('id', 'emp-1');
+      expect(qb.whereNull).toHaveBeenCalledWith('deleted_at');
+      expect(qb.update).toHaveBeenCalledWith({
+        deleted_at: expect.any(Date),
+        updated_at: expect.any(Date),
+      });
     });
   });
 });
