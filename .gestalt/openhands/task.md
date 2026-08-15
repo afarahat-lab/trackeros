@@ -1,12 +1,19 @@
-# Implement this phase: Phase 1: Shared enums
+# Implement this phase: Phase 2: Employee model + repository
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/e3db0103-c684-4a1d-bb0c-c812564d6aa7/1`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/e3db0103-c684-4a1d-bb0c-c812564d6aa7/2`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create `src/shared/types/index.ts` with all five canonical enums: LeaveType ('annual' | 'sick' | 'emergency' | 'unpaid' | 'maternity' | 'paternity'), LeaveRequestStatus ('DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED'), BalanceStatus ('ACTIVE' | 'EXHAUSTED' | 'FROZEN' | 'CLOSED'), AuditAction ('CREATED' | 'UPDATED' | 'DELETED' | 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED'), EmploymentStatus ('ACTIVE' | 'INACTIVE' | 'TERMINATED'). Export all from the barrel. Include a Jest unit test at `tests/unit/shared/types/index.spec.ts` verifying each enum has its canonical members.
+Create the employee module at `src/modules/employee/`. This phase depends on `src/shared/types/index.ts` from Phase 1 — read it before generating.
+
+Files:
+- `src/modules/employee/employee.model.ts` — Define the Employee interface with exact canonical fields: id: string, employeeNumber: string, firstName: string, lastName: string, email: string, managerId: string | null, department: string | null, hireDate: Date, terminationDate: Date | null, employmentStatus: EmploymentStatus (import from src/shared/types), createdAt: Date, updatedAt: Date, deletedAt: Date | null.
+- `src/modules/employee/employee.repository.ts` — Define IEmployeeRepository interface with methods: findById(id: string): Promise<Employee | null>, findByEmployeeNumber(employeeNumber: string): Promise<Employee | null>, findAll(): Promise<Employee[]>, create(employee: Omit<Employee, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt'>): Promise<Employee>, update(id: string, data: Partial<Employee>): Promise<Employee | null>, softDelete(id: string): Promise<void>. Implement EmployeeRepository class using the shared db pool from `src/shared/db/connection.ts` and Knex. The repository must use parameterized queries.
+- `src/modules/employee/index.ts` — barrel export of model and repository.
+
+Include Jest unit tests at `tests/unit/modules/employee/employee.repository.spec.ts`.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -27,6 +34,23 @@ These are resolved, feature-wide decisions. Wherever this phase touches the conc
 7. Overlap: YES — prevent overlapping leave requests. Reject a new SUBMITTED/APPROVED request whose date range overlaps (inclusive) an existing SUBMITTED/APPROVED request for the same employee.
 
 Employee/manager data: the LeaveRequest service obtains employee data (managerId, employmentStatus, hireDate) via an injected IEmployeeRepository backed by an employees table (same repository-interface pattern as other modules). The JWT provides ONLY the caller identity (employeeId) and role for RBAC; manager relationship, hire date, and employment status come from IEmployeeRepository. Approvals route to the target employee managerId; if null, escalate to HR (role hr_admin). Managers act only on direct reports. Every endpoint enforces RBAC + input validation. Balances auto-created for all leave types on employee creation. Emergency leave is a separate pool. Only ACTIVE employees may submit. [BINDING RULE — operator decision resolving: What is the fiscal year definition for leave balances? Calendar year (Jan 1 – Dec 31) or a custom period (e.g., Apr 1 – Mar 31)?; When a LeaveRequest spans two fiscal years (e.g., Dec 28 – Jan 3), should the day count be split across two LeaveBalance records or deducted entirely from the startDate's fiscal year?; Should sick leave require a minimum notice period? Currently the rule says emergency bypasses notice, but sick leave is ambiguous.; How are leave days counted — calendar days or business days (Mon–Fri excluding holidays)?; When leave balance remaining_days is fractional (e.g. from accrual), what rounding direction applies when displaying or enforcing the balance?; When should leave balance be deducted — at approval time or on the leave start date?; Should the system prevent overlapping leave requests for the same employee?; apply everywhere these apply, not in one place only]
+
+## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
+The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
+- `Employee` — the entity MUST have exactly these fields:
+    - id: string
+    - employeeNumber: string
+    - firstName: string
+    - lastName: string
+    - email: string
+    - managerId: string | null
+    - department: string | null
+    - hireDate: Date
+    - terminationDate: Date | null
+    - employmentStatus: 'ACTIVE' | 'INACTIVE' | 'TERMINATED'
+    - createdAt: Date
+    - updatedAt: Date
+    - deletedAt: Date | null
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
