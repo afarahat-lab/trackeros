@@ -32,6 +32,10 @@ src/modules/
     policy.model.ts             — LeavePolicy interface
     policy.repository.ts        — IPolicyRepository + PolicyRepository
     index.ts                    — barrel export
+  balance/
+    balance.model.ts            — LeaveBalance interface
+    balance.repository.ts       — IBalanceRepository + BalanceRepository
+    index.ts                    — barrel export
   status/                       — pre-existing status module
   uptime/                       — pre-existing uptime module (health-check routes)
 ```
@@ -40,7 +44,6 @@ src/modules/
 
 ```
 src/modules/leave/leave.{model,repository,service,controller,routes}.ts
-src/modules/balance/balance.{model,repository,service,controller,routes}.ts
 src/modules/notification/notification.{model,repository,service,controller,routes}.ts
 src/modules/audit/              — AuditLog model, repository, service
 ```
@@ -81,6 +84,23 @@ transaction-agnostic.
 Repositories use `snake_case` column names in SQL and map to `camelCase`
 TypeScript properties via private `rowTo*` helper functions. This is the
 convention for all database-backed modules.
+
+### Balance module
+
+`LeaveBalance` tracks per-employee, per-policy, per-fiscal-year entitlement
+and usage. The `IBalanceRepository` interface provides:
+
+- `findById`, `findByEmployeeAndPolicy`, `findByEmployeeAndFiscalYear` — lookups
+- `create` — insert a new balance row
+- `update` — partial update of mutable fields (totalEntitlement, usedDays,
+  remainingDays, fiscalYear, status); `employeeId` and `policyId` are
+  immutable after creation
+- `updateUsedDays` — targeted atomic update of `usedDays` and `remainingDays`
+  for transaction-safe deduction/restoration
+
+The `BalanceRepository` maps the `leave_balances` table columns:
+`employee_id`, `leave_policy_id`, `total_entitlement`, `used_days`,
+`remaining_days`, `fiscal_year`, `status`.
 
 <!-- gestalt:architecture feature=cb89b522-6bc0-439f-8a0d-f905145254ee START -->
 ## Leave Management Module — Reconciled Architecture
@@ -157,7 +177,7 @@ Employees apply for annual, sick, and emergency leave. Managers approve or rejec
 2. Audit module
 3. Employee module ✅ (model + repository)
 4. Policy module ✅ (model + repository)
-5. Balance module
+5. Balance module ✅ (model + repository)
 6. Notification module
 7. Leave module — model & contracts
 8. Leave module — repository & service implementation
