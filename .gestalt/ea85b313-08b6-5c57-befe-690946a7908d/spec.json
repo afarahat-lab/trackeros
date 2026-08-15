@@ -1,0 +1,78 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared-types"
+    ],
+    "affectedLayers": [
+      "types"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The `LeaveType` type exposes exactly six values \u2014 `annual`, `sick`, `emergency`, `unpaid`, `maternity`, `paternity` \u2014 all lowercase, and no other values are assignable to the type.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `LeaveRequestStatus` type exposes exactly five values \u2014 `DRAFT`, `SUBMITTED`, `APPROVED`, `REJECTED`, `CANCELLED` \u2014 all UPPERCASE, and no other values are assignable to the type.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`src/shared/types/index.ts` re-exports both `LeaveType` and `LeaveRequestStatus` (the type and the value) so that downstream consumers can `import { LeaveType, LeaveRequestStatus } from 'src/shared/types'`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`tsc --noEmit` passes with zero errors when the shared-types module is the only new code present (no type errors from the enum definitions or barrel export).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests in `tests/unit/shared/types/` verify every enum value is present and correctly typed, and `npx jest --passWithNoTests` exits zero.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The enum implementation must use the const-object + union-type pattern (`const X = { ... } as const; type X = (typeof X)[keyof typeof X]`), not TypeScript `enum` keyword \u2014 this aligns with the project's preference for simple constructs and avoids numeric-enum pitfalls.",
+    "Files must reside at the exact paths declared by the reconciled architecture: `src/shared/types/leave-type.enum.ts`, `src/shared/types/leave-request-status.enum.ts`, `src/shared/types/index.ts`.",
+    "No `any` type \u2014 use `unknown` with type guards if needed (HARNESS.json constraint `no-any`).",
+    "Tests must live under `tests/unit/shared/types/` matching the Jest `testMatch` pattern `**/tests/**/*.test.(ts|js)`."
+  ],
+  "outOfScope": [
+    "Database tables, migrations, or any persistence concern \u2014 this phase is pure TypeScript types with zero runtime dependencies.",
+    "Any domain logic, validation, or business rules involving these enums (e.g., lifecycle state-machine enforcement, balance deduction rules) \u2014 those belong to later phases (leave service, balance service)."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveType",
+      "mustExistOrExtend": true,
+      "invariant": "LeaveType is an immutable, closed set of six string literal values: `annual`, `sick`, `emergency`, `unpaid`, `maternity`, `paternity`. No value may be added, removed, or renamed without a migration plan for all downstream consumers (policy, balance, leave modules)."
+    },
+    {
+      "entity": "LeaveRequestStatus",
+      "mustExistOrExtend": true,
+      "invariant": "LeaveRequestStatus is an immutable, closed set of five string literal values: `DRAFT`, `SUBMITTED`, `APPROVED`, `REJECTED`, `CANCELLED`. The lifecycle is: DRAFT \u2192 SUBMITTED \u2192 (APPROVED | REJECTED); any non-terminal state \u2192 CANCELLED. No value may be added, removed, or renamed without a migration plan for all downstream consumers."
+    }
+  ],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [
+    {
+      "requirement": "The `LeaveType` values must match the reconciled architecture's domain entity definition exactly: `'annual' | 'sick' | 'emergency' | 'unpaid' | 'maternity' | 'paternity'`.",
+      "referencePath": ".gestalt/architecture/reconciled.json \u2192 domain_entities[4].attributes[0]"
+    },
+    {
+      "requirement": "The `LeaveRequestStatus` values must match the reconciled architecture's domain entity definition exactly: `'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED'`.",
+      "referencePath": ".gestalt/architecture/reconciled.json \u2192 domain_entities[1].attributes[0]"
+    },
+    {
+      "requirement": "The barrel export at `src/shared/types/index.ts` must re-export both the runtime const object and the derived type for each enum, matching the pattern used by existing module barrel exports in the project.",
+      "referencePath": "docs/ARCHITECTURE.md \u2192 Module Structure table: shared-types module owns LeaveType and LeaveRequestStatus enums"
+    }
+  ],
+  "integrationPoints": []
+}
