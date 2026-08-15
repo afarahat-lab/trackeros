@@ -1,21 +1,21 @@
-# Implement this phase: Phase 1: Shared enums — LeaveType and LeaveRequestStatus
+# Implement this phase: Phase 2: Employee model and repository
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/cb89b522-6bc0-439f-8a0d-f905145254ee/1`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/cb89b522-6bc0-439f-8a0d-f905145254ee/2`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the foundational shared enums at the exact paths declared by the architecture's Module Boundaries for the shared-types module (`src/shared/types/`).
+Create the Employee domain model and repository at the exact paths declared by the architecture's Module Boundaries for the employee module (`src/modules/employee/`).
 
 Files to create:
-- `src/shared/types/leave-type.enum.ts` — Define the `LeaveType` enum with values: `annual`, `sick`, `emergency`, `unpaid`, `maternity`, `paternity`. Use a TypeScript string enum or const object with a union type.
-- `src/shared/types/leave-request-status.enum.ts` — Define the `LeaveRequestStatus` enum with values: `DRAFT`, `SUBMITTED`, `APPROVED`, `REJECTED`, `CANCELLED`.
-- `src/shared/types/index.ts` — Barrel export re-exporting both enums.
+- `src/modules/employee/employee.model.ts` — Define the `Employee` interface with the canonical fields: `id: string`, `employeeNumber: string`, `firstName: string`, `lastName: string`, `email: string`, `managerId: string | null`, `department: string | null`, `hireDate: Date`, `terminationDate: Date | null`, `employmentStatus: 'ACTIVE' | 'INACTIVE' | 'TERMINATED'`, `createdAt: Date`, `updatedAt: Date`, `deletedAt: Date | null`.
+- `src/modules/employee/employee.repository.ts` — Define `IEmployeeRepository` interface with methods: `findById(id: string): Promise<Employee | null>`, `findByEmployeeNumber(employeeNumber: string): Promise<Employee | null>`, `findAll(): Promise<Employee[]>`, `create(employee: Omit<Employee, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt'>): Promise<Employee>`, `update(id: string, data: Partial<Employee>): Promise<Employee | null>`, `softDelete(id: string): Promise<void>`. Implement `EmployeeRepository` class using the existing `pool` from `src/shared/db/connection.ts` with parameterized SQL queries via `pg`. The repository must implement `IEmployeeRepository`.
+- `src/modules/employee/index.ts` — Barrel export.
 
-Include Jest unit tests in `tests/unit/shared/types/` verifying each enum value is present and correctly typed.
+This phase depends on `src/shared/types/index.ts` from Phase 1 (read it before generating). Also depends on `src/shared/db/connection.ts` (existing).
 
-This phase has no dependencies on any other phase — it is the root of the dependency graph.
+Include Jest unit tests in `tests/unit/modules/employee/`.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -40,20 +40,20 @@ Cross-cutting rules:
 
 ## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
 The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
-- `LeaveRequestStatus` — the entity MUST have exactly these fields:
-    - value: 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED'
-- `LeaveType` — the entity MUST have exactly these fields:
-    - value: 'annual' | 'sick' | 'emergency' | 'unpaid' | 'maternity' | 'paternity'
-
-## Constraints & consistency
-You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
-### Reuse & consistency — match these exactly
-- The `LeaveType` values must match the reconciled architecture's domain entity definition exactly: `'annual' | 'sick' | 'emergency' | 'unpaid' | 'maternity' | 'paternity'`. (see `.gestalt/architecture/reconciled.json → domain_entities[4].attributes[0]`)
-- The `LeaveRequestStatus` values must match the reconciled architecture's domain entity definition exactly: `'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED'`. (see `.gestalt/architecture/reconciled.json → domain_entities[1].attributes[0]`)
-- The barrel export at `src/shared/types/index.ts` must re-export both the runtime const object and the derived type for each enum, matching the pattern used by existing module barrel exports in the project. (see `docs/ARCHITECTURE.md → Module Structure table: shared-types module owns LeaveType and LeaveRequestStatus enums`)
-### Entity invariants — enforce these
-- Reuse or extend `LeaveType`: LeaveType is an immutable, closed set of six string literal values: `annual`, `sick`, `emergency`, `unpaid`, `maternity`, `paternity`. No value may be added, removed, or renamed without a migration plan for all downstream consumers (policy, balance, leave modules).
-- Reuse or extend `LeaveRequestStatus`: LeaveRequestStatus is an immutable, closed set of five string literal values: `DRAFT`, `SUBMITTED`, `APPROVED`, `REJECTED`, `CANCELLED`. The lifecycle is: DRAFT → SUBMITTED → (APPROVED | REJECTED); any non-terminal state → CANCELLED. No value may be added, removed, or renamed without a migration plan for all downstream consumers.
+- `Employee` — the entity MUST have exactly these fields:
+    - id: string
+    - employeeNumber: string
+    - firstName: string
+    - lastName: string
+    - email: string
+    - managerId: string | null
+    - department: string | null
+    - hireDate: Date
+    - terminationDate: Date | null
+    - employmentStatus: 'ACTIVE' | 'INACTIVE' | 'TERMINATED'
+    - createdAt: Date
+    - updatedAt: Date
+    - deletedAt: Date | null
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
