@@ -13,25 +13,36 @@ The architecture is modular, with a clear separation of concerns between models,
 - Frontend: React Native
 - Database: PostgreSQL
 
-## Module structure
+## Module structure (implemented)
+
+```
+src/shared/
+  db/connection.ts              — PostgreSQL connection pool (pg Pool)
+  types/
+    leave-type.enum.ts          — LeaveType const object + union type
+    leave-request-status.enum.ts — LeaveRequestStatus const object + union type
+    index.ts                    — barrel export
+
+src/modules/
+  employee/
+    employee.model.ts           — Employee interface
+    employee.repository.ts      — IEmployeeRepository + EmployeeRepository
+    index.ts                    — barrel export
+  policy/
+    policy.model.ts             — LeavePolicy interface
+    policy.repository.ts        — IPolicyRepository + PolicyRepository
+    index.ts                    — barrel export
+  status/                       — pre-existing status module
+  uptime/                       — pre-existing uptime module (health-check routes)
+```
+
+## Module structure (planned — not yet built)
 
 ```
 src/modules/leave/leave.{model,repository,service,controller,routes}.ts
 src/modules/balance/balance.{model,repository,service,controller,routes}.ts
-src/modules/employee/employee.{model,repository,service,controller,routes}.ts
-src/modules/policy/policy.{model,repository,service,controller,routes}.ts
 src/modules/notification/notification.{model,repository,service,controller,routes}.ts
-src/modules/LeaveStatus/    — LeaveStatus module
-src/modules/BaseEntity/    — BaseEntity module
-src/modules/LeaveRequest/    — LeaveRequest module
-src/modules/LeaveType/    — LeaveType module
-src/modules/LeavePolicy/    — LeavePolicy module
-src/modules/AuditLog/    — AuditLog module
-src/modules/AuditRecord/    — AuditRecord module
-src/modules/AuditServiceInterface/    — AuditServiceInterface module
-src/shared/db connection.ts
-src/shared/base repository.ts
-src/shared/error types.ts
+src/modules/audit/              — AuditLog model, repository, service
 ```
 
 ## Key patterns
@@ -43,11 +54,33 @@ src/shared/error types.ts
 ## Dependency rules
 
 - Modules import from each other ONLY through their declared public
-  entry point (`index.ts`, `__init__.py`, package root — whatever the
-  stack uses)
+  entry point (`index.ts`)
 - All database access goes through a repository layer — no inline SQL
   / ORM calls in route handlers or business logic
 - No circular dependencies between modules
+
+## Implemented details
+
+### Shared types
+
+`LeaveType` and `LeaveRequestStatus` are implemented as `const` objects with
+derived union types (not TypeScript `enum`), following the project's strict
+TypeScript conventions. Each also exports a `*_VALUES` array for runtime
+iteration and validation.
+
+### Repository pattern
+
+All repositories accept an optional `Pool | PoolClient` in their constructor,
+defaulting to the shared pool. This enables services to pass a transaction
+`PoolClient` for atomic multi-repository operations — the service owns the
+unit of work (`BEGIN`/`COMMIT`/`ROLLBACK`), and repositories remain
+transaction-agnostic.
+
+### Column mapping
+
+Repositories use `snake_case` column names in SQL and map to `camelCase`
+TypeScript properties via private `rowTo*` helper functions. This is the
+convention for all database-backed modules.
 
 <!-- gestalt:architecture feature=cb89b522-6bc0-439f-8a0d-f905145254ee START -->
 ## Leave Management Module — Reconciled Architecture
@@ -120,10 +153,10 @@ Employees apply for annual, sick, and emergency leave. Managers approve or rejec
 3. Carry-over rule (capped, use-it-or-lose-it, unlimited).
 
 ### Recommended Implementation Phases
-1. Shared types (LeaveType, LeaveRequestStatus)
+1. Shared types (LeaveType, LeaveRequestStatus) ✅
 2. Audit module
-3. Employee module
-4. Policy module
+3. Employee module ✅ (model + repository)
+4. Policy module ✅ (model + repository)
 5. Balance module
 6. Notification module
 7. Leave module — model & contracts
