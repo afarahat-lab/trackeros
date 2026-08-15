@@ -1,0 +1,144 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "policy"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The `LeavePolicy` interface is defined in `src/modules/policy/policy.model.ts` with all canonical fields (`id`, `policyName`, `leaveType`, `entitlementDays`, `accrualRate`, `maxAccumulation`, `minimumNoticeDays`, `requiresManagerApproval`, `isActive`, `createdAt`, `updatedAt`) and imports `LeaveType` from `src/shared/types/leave-type.enum.ts`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `IPolicyRepository` interface declares all five methods: `findById`, `findByLeaveType`, `findAllActive`, `create`, and `update` \u2014 each with the correct parameter and return types matching the phase scope.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`PolicyRepository` implements `IPolicyRepository` and uses the shared `pool` from `src/shared/db/connection.ts` with parameterized SQL queries against the `leave_policies` table. All five repository methods are functional.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`PolicyRepository.create` persists a new row in `leave_policies` and returns the created `LeavePolicy` with `id`, `createdAt`, and `updatedAt` populated by the database.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`PolicyRepository.update` returns `null` when the target policy does not exist, returns the unchanged policy when no updatable fields are provided, and correctly updates only the fields present in the `data` argument \u2014 including toggling `isActive`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`PolicyRepository` accepts an optional `Pool | PoolClient` in its constructor and delegates to it when provided, enabling transaction participation. When no client is passed, it defaults to the shared pool.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`src/modules/policy/index.ts` barrel-exports `LeavePolicy`, `IPolicyRepository`, and `PolicyRepository`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests exist in `tests/unit/modules/policy/` covering all five repository methods: `findById` (found + not-found), `findByLeaveType` (found + not-found), `findAllActive` (multiple + empty), `create` (with all fields + with nullable fields null), `update` (success + not-found + no-op + leaveType immutability + isActive toggle), and the transaction-client constructor path.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access must go through the repository layer \u2014 no inline SQL or direct `pool.query` calls outside `PolicyRepository` (GP-001).",
+    "The `LeavePolicy` model must import `LeaveType` from `src/shared/types/leave-type.enum.ts` \u2014 not redefine it, not import from a different path.",
+    "Repository must use `snake_case` column names in SQL and map to `camelCase` TypeScript properties via a private `rowToPolicy` helper, matching the convention established by `EmployeeRepository`.",
+    "No `any` type \u2014 use `unknown` with type guards (HARNESS constraint `no-any`)."
+  ],
+  "outOfScope": [
+    "PolicyService / IPolicyService \u2014 business logic services are deferred to Phase 7."
+  ],
+  "ambiguities": [
+    {
+      "description": "`findByLeaveType` returns a single `LeavePolicy | null`, but the schema does not enforce a unique constraint on `(leave_type, is_active)`. If multiple active policies exist for the same leave type, only the first row is returned \u2014 the caller has no way to detect this ambiguity.",
+      "options": [
+        "Add a UNIQUE constraint on (leave_type, is_active) to guarantee at most one active policy per leave type",
+        "Change return type to LeavePolicy[] and let the caller decide",
+        "Keep as-is and document that callers must ensure uniqueness at the application layer"
+      ],
+      "impactIfWrong": "medium"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "A `LeavePolicy` has exactly one `leaveType` from the `LeaveType` union. The `leaveType` field is immutable after creation \u2014 it cannot be changed via `update`."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "`entitlementDays` must be a positive integer. `accrualRate`, `maxAccumulation`, and `minimumNoticeDays` are nullable but when non-null must be non-negative numbers."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "`isActive` governs whether the policy is available for new leave requests. Inactive policies (`isActive: false`) are excluded from `findAllActive` and `findByLeaveType` results."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IPolicyRepository.findById",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns `null` when no row matches \u2014 does not throw."
+    },
+    {
+      "operation": "IPolicyRepository.findByLeaveType",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns the single active policy for the given `LeaveType`, or `null` if none exists. Filters to `is_active = true`."
+    },
+    {
+      "operation": "IPolicyRepository.findAllActive",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns all policies where `is_active = true`, ordered by `policy_name`. Returns empty array when none exist \u2014 never null."
+    },
+    {
+      "operation": "IPolicyRepository.create",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Accepts `Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>`. The database assigns `id` (UUID), `created_at`, and `updated_at`. Returns the fully populated `LeavePolicy`. Throws on constraint violations (e.g., duplicate `leave_type` + `is_active`)."
+    },
+    {
+      "operation": "IPolicyRepository.update",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Accepts `id` and `Partial<LeavePolicy>`. Returns the updated `LeavePolicy` on success, `null` if the policy does not exist. The `leaveType` field is excluded from the updatable field map \u2014 it is immutable after creation. Returns the existing policy unchanged when `data` contains no updatable fields."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The `LeavePolicy` model must import `LeaveType` from the exact path `../../shared/types/leave-type.enum` (or the equivalent barrel path `../../shared/types`), matching the import style used by the reconciled architecture's dependency map: `policy \u2192 shared-types`.",
+      "referencePath": "src/shared/types/leave-type.enum.ts"
+    },
+    {
+      "requirement": "The `update` method must follow the same dynamic-field-build pattern as `EmployeeRepository.update`: iterate a `fieldMap` of `{ key, column }` pairs, build `SET` clauses only for keys present in `data`, append `updated_at = NOW()`, and return the existing record unchanged when no updatable fields are present.",
+      "referencePath": "src/modules/employee/employee.repository.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/leave-type.enum.ts",
+      "why": "`LeavePolicy.leaveType` is typed as `LeaveType` from this module. The policy module depends on shared-types per the reconciled architecture dependency map."
+    },
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "`PolicyRepository` imports the shared `pool` as its default database connection, matching the pattern in `EmployeeRepository`."
+    }
+  ]
+}
