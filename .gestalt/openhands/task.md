@@ -1,51 +1,55 @@
-# Implement this phase: Phase 8: LeaveRequestService — core orchestration
+# Implement this phase: Phase 9: LeaveRequest routes and controller
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/76d847b2-5905-40af-b702-36710232b1e4/8`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/76d847b2-5905-40af-b702-36710232b1e4/9`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the LeaveRequestService at `src/modules/leave-request/`. This phase depends on all prior model and repository files — read them before generating any code.
+Create the Fastify routes and controller for leave requests at `src/modules/leave-request/`. This phase depends on `src/modules/leave-request/leave-request.service.ts` and `src/modules/leave-request/leave-request.service.interface.ts` from Phase 8, plus `src/modules/leave-request/leave-request.model.ts` from Phase 5 and `src/shared/types/index.ts` from Phase 1 — read all before generating.
 
-Files to create (approximately 3):
-- `src/modules/leave-request/leave-request.service.interface.ts` — Define `ILeaveRequestService` interface with methods: createDraft(dto: CreateLeaveRequestDto): Promise<LeaveRequest>, submit(id: string): Promise<LeaveRequest>, approve(id: string, approverId: string): Promise<LeaveRequest>, reject(id: string, approverId: string): Promise<LeaveRequest>, cancel(id: string): Promise<LeaveRequest>, findById(id: string): Promise<LeaveRequest | null>, findByEmployeeId(employeeId: string): Promise<LeaveRequest[]>, query(params: LeaveRequestQueryParams): Promise<LeaveRequest[]>.
-- `src/modules/leave-request/leave-request.service.ts` — Implement `LeaveRequestService` class. Constructor takes: ILeaveRequestRepository, ILeaveBalanceRepository, ILeavePolicyRepository, IEmployeeRepository. Key logic:
-  - `createDraft`: validate employee exists, validate policy exists and isActive, validate startDate <= endDate, create with status DRAFT.
-  - `submit`: validate request is in DRAFT state, validate policy minimumNoticeDays (if set, startDate must be >= now + minimumNoticeDays), check balance has sufficient remainingDays using the BINDING formula `daysRequested = (endDate - startDate) + 1` (calendar days inclusive), transition to SUBMITTED.
-  - `approve`: validate request is SUBMITTED, validate approver is the employee's manager (employee.managerId === approverId), deduct `daysRequested` from LeaveBalance.usedDays and recalculate remainingDays, set status APPROVED, approvedBy, approvedAt.
-  - `reject`: validate request is SUBMITTED, validate approver is manager, set status REJECTED.
-  - `cancel`: validate request is APPROVED or SUBMITTED, if APPROVED restore usedDays on balance, set status CANCELLED, cancelledAt.
-- `tests/unit/modules/leave-request/leave-request.service.test.ts` — Jest unit tests with mocked repositories covering all state transitions and the BINDING day-counting formula.
+Files to create (approximately 2-3):
+- `src/modules/leave-request/leave-request.controller.ts` — Controller class that takes ILeaveRequestService in its constructor. Methods map 1:1 to service methods, handling HTTP concerns (extracting params from request, formatting responses, catching errors). Each method returns a plain object suitable for JSON serialization (Date fields serialized as ISO strings).
+- `src/modules/leave-request/leave-request.routes.ts` — Fastify plugin registering routes:
+  - POST /leave-requests (createDraft) — body: CreateLeaveRequestDto
+  - POST /leave-requests/:id/submit
+  - POST /leave-requests/:id/approve — body: { approverId: string }
+  - POST /leave-requests/:id/reject — body: { approverId: string }
+  - POST /leave-requests/:id/cancel
+  - GET /leave-requests/:id
+  - GET /leave-requests (query by employeeId, status, etc.)
+  - GET /leave-requests/employee/:employeeId
+- `tests/unit/modules/leave-request/leave-request.routes.test.ts` — Jest tests using Fastify's inject() method with a mocked service.
 
-Use the exact BINDING formula everywhere: `daysRequested = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24) + 1`. All dates are full-day granularity — no time-of-day considerations.
+Register the routes in `src/app.ts` by importing and calling `app.register(leaveRequestRoutes)`.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
 - Consolidated decision for all questions: (1) Fiscal year = calendar year (Jan 1 to Dec 31), hardcoded — no configurable fiscalYearStart field. (2) Leave duration counts calendar days inclusive — weekends and public holidays ARE counted as leave days; do NOT introduce a holiday calendar entity. (3) Minimum granularity = full-day increments only — leave balances are integers, no half-days, no hours, no time-of-day on startDate/endDate. (4) Day counting from start_date to end_date is calendar days inclusive of both ends: daysRequested = (end_date - start_date) + 1. This single formula is BINDING at every call site (used_days deduction, overlap detection, remaining_days) — no weekend or holiday exclusion anywhere. [BINDING RULE — operator decision resolving: How is the fiscal year boundary defined — calendar year (Jan 1 – Dec 31) or a configurable start month/day? This determines when LeaveBalance transitions from ACTIVE/EXHAUSTED to CLOSED and when new balance records are created.; Should leave duration count weekends and public holidays as leave days, or only business days? The current rule uses calendar days inclusive, but this may not match all organisational policies.; What is the minimum granularity of a leave request — full days, half days, or hours? This affects the daysRequested calculation and balance precision.; How are leave days counted from start_date to end_date — calendar days (inclusive of both ends, e.g. Mon–Fri = 5 days) or business/working days only? This is BINDING across all balance-deduction and overlap-detection call sites.; apply everywhere these apply, not in one place only]
 
+## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
+The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
+- `LeaveRequest` — the entity MUST have exactly these fields:
+    - id: string
+    - employeeId: string
+    - leavePolicyId: string
+    - startDate: Date
+    - endDate: Date
+    - reason: string | undefined
+    - status: LeaveRequestStatus
+    - approvedBy: string | null
+    - approvedAt: Date | null
+    - cancelledAt: Date | null
+    - createdAt: Date
+    - updatedAt: Date
+
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
-### Reuse & consistency — match these exactly
-- The service must use the LeaveStatus enum values (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED) exactly as defined in the shared types module — no string literals for status values. (see `src/shared/types/index.ts`)
-- The service must use the LeaveRequest entity interface exactly as defined in the leave-request model — no additional or missing fields in create/update calls. (see `src/modules/leave-request/leave-request.model.ts`)
-- The service must use the CreateLeaveRequestDto and LeaveRequestQueryParams interfaces exactly as defined in shared types — no deviation in field names or types. (see `src/shared/types/index.ts`)
-- The service must use the ILeaveRequestRepository, ILeaveBalanceRepository, ILeavePolicyRepository, and IEmployeeRepository interfaces exactly as defined in their respective modules — no additional methods assumed beyond the declared interface. (see `src/modules/leave-request/leave-request.repository.ts`)
 ### Entity invariants — enforce these
-- Reuse or extend `LeaveRequest`: Lifecycle state machine: DRAFT → SUBMITTED → (APPROVED | REJECTED). CANCELLED is reachable from SUBMITTED or APPROVED. No other transitions are valid. The service must reject any attempt to transition outside this graph with INVALID_STATE_TRANSITION.
-- Reuse or extend `LeaveRequest`: When status is APPROVED, approvedBy and approvedAt must both be non-null. When status is not APPROVED, both must be null. When status is CANCELLED, cancelledAt must be non-null. When status is not CANCELLED, cancelledAt must be null.
-- Reuse or extend `LeaveBalance`: remainingDays = totalEntitlement - usedDays must hold after every mutation (approve deduction, cancel restoration). The service must compute both usedDays and remainingDays together and pass both to the repository update.
+- Reuse or extend `LeaveRequestController`: The controller MUST NOT contain any business logic, state-machine enforcement, or direct repository access. It delegates all operations to ILeaveRequestService and only handles HTTP concerns: parameter extraction, response formatting, and error-to-HTTP-status mapping.
+- Introduce `LeaveRequest (response shape)`: All Date fields (startDate, endDate, approvedAt, cancelledAt, createdAt, updatedAt) in HTTP responses MUST be serialized as ISO 8601 strings. The controller is responsible for this transformation; the service returns Date objects.
 ### Interface contract — expose these operations (their shape is yours)
-- createDraft — Caller must be authenticated (JWT). RBAC enforcement (employee role) is deferred to the controller/route layer — the service itself is role-agnostic.; Throws { error, code } on validation failure: EMPLOYEE_NOT_FOUND, POLICY_NOT_FOUND, POLICY_INACTIVE, INVALID_DATE_RANGE. Returns the created LeaveRequest on success.
-- submit — Caller must be authenticated. RBAC enforcement deferred to controller.; Throws { error, code } on failure: REQUEST_NOT_FOUND, INVALID_STATE_TRANSITION, POLICY_NOT_FOUND, MINIMUM_NOTICE_VIOLATION, BALANCE_NOT_FOUND, BALANCE_CLOSED, INSUFFICIENT_BALANCE. Returns the updated LeaveRequest on success.
-- approve — Caller must be authenticated. The service enforces that approverId === employee.managerId (NOT_MANAGER error). HR admin override is deferred to controller/route layer.; Throws { error, code } on failure: REQUEST_NOT_FOUND, INVALID_STATE_TRANSITION, EMPLOYEE_NOT_FOUND, NOT_MANAGER, BALANCE_NOT_FOUND, BALANCE_CLOSED. Returns the updated LeaveRequest on success.
-- reject — Caller must be authenticated. The service enforces that approverId === employee.managerId (NOT_MANAGER error). HR admin override deferred to controller.; Throws { error, code } on failure: REQUEST_NOT_FOUND, INVALID_STATE_TRANSITION, EMPLOYEE_NOT_FOUND, NOT_MANAGER. Returns the updated LeaveRequest on success. Must not touch balance.
-- cancel — Caller must be authenticated. RBAC enforcement deferred to controller.; Throws { error, code } on failure: REQUEST_NOT_FOUND, INVALID_STATE_TRANSITION, BALANCE_NOT_FOUND, BALANCE_CLOSED. Returns the updated LeaveRequest on success. Restores balance only when cancelling an APPROVED request.
-### Integration points — connect to these
-- ILeaveRequestRepository (src/modules/leave-request/) — All CRUD operations on LeaveRequest entities — findById, findByEmployeeId, query, create, update — are delegated to this repository. The service never accesses the database directly.
-- ILeaveBalanceRepository (src/modules/leave-balance/) — Balance lookups (findByEmployeeAndPolicy) and mutations (update usedDays/remainingDays) during submit, approve, and cancel flows.
-- ILeavePolicyRepository (src/modules/leave-policy/) — Policy lookups (findById) during createDraft (validate policy exists and isActive) and submit (validate minimumNoticeDays).
-- IEmployeeRepository (src/modules/employee/) — Employee lookups (findById) during createDraft (validate employee exists), approve (validate managerId match), and reject (validate managerId match).
+- createDraft — Deferred — no auth enforcement in this phase; Service errors EMPLOYEE_NOT_FOUND, POLICY_NOT_FOUND → 404; POLICY_INACTIVE, INVALID_DATE_RANGE → 400; unexpected → 500
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
