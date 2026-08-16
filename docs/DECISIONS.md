@@ -88,3 +88,38 @@ Tests:
   partial updates, and verifies interface contract has all 5 methods.
 
 Dependencies: `src/shared/types/index.ts` (LeaveType enum) from Phase 1.
+
+## ADR-004 — LeaveRequest model and repository (Phase 5)
+
+Date: 2026-06-10
+Status: Accepted
+
+Decision: Created the leave-request module at `src/modules/leave-request/` with
+model, repository interface, stub implementation, and barrel export.
+
+Files created:
+- `src/modules/leave-request/leave-request.model.ts` — `LeaveRequest` entity interface
+  with fields: id, employeeId, leavePolicyId, startDate, endDate, reason (string | undefined),
+  status (LeaveStatus enum), approvedBy (string | null), approvedAt (Date | null),
+  cancelledAt (Date | null), createdAt, updatedAt. Documents invariants: lifecycle
+  DRAFT → SUBMITTED → (APPROVED | REJECTED), cancellable from SUBMITTED or APPROVED;
+  approvedBy/approvedAt must both be null unless APPROVED; cancelledAt must be null
+  unless CANCELLED; startDate ≤ endDate.
+- `src/modules/leave-request/leave-request.repository.ts` — `ILeaveRequestRepository`
+  interface with methods: findById, findByEmployeeId, findByStatus, query (accepts
+  LeaveRequestQueryParams), create, update. `LeaveRequestRepository` stub class
+  throws "not implemented" for all methods.
+- `src/modules/leave-request/index.ts` — Barrel export of model and repository.
+
+Tests:
+- `tests/unit/modules/leave-request/leave-request.model.test.ts` — Validates
+  LeaveRequest shape, reason optionality, approvedBy/approvedAt nullability
+  invariants per status, cancelledAt nullability invariants, single-day leave
+  (startDate === endDate), all LeaveStatus enum values, and exact field count (12).
+- `tests/unit/modules/leave-request/leave-request.repository.test.ts` — Validates
+  all 6 stub methods throw "not implemented", accepts valid create input (without
+  id/createdAt/updatedAt), accepts partial and empty updates, and verifies
+  interface contract has all required methods.
+
+Dependencies: `src/shared/types/index.ts` (LeaveStatus enum, LeaveRequestQueryParams)
+from Phase 1.
