@@ -1,0 +1,116 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "notification"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository",
+      "barrel-export",
+      "unit-tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The `LeaveNotification` entity interface is exported from `src/modules/notification/notification.model.ts` with exactly 9 fields: `id` (string), `recipientId` (string), `type` (string literal union of 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'BALANCE_LOW' | 'BALANCE_EXHAUSTED'), `title` (string), `message` (string), `leaveRequestId` (string), `status` (NotificationStatus enum imported from `src/shared/types`), `createdAt` (Date), `readAt` (Date | null).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `INotificationRepository` interface is exported from `src/modules/notification/notification.repository.ts` with exactly 5 methods: `findById(id: string): Promise<LeaveNotification | null>`, `findByRecipientId(recipientId: string): Promise<LeaveNotification[]>`, `findByLeaveRequestId(leaveRequestId: string): Promise<LeaveNotification[]>`, `create(notification: Omit<LeaveNotification, 'id' | 'createdAt'>): Promise<LeaveNotification>`, `updateStatus(id: string, status: NotificationStatus): Promise<LeaveNotification | null>`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A stub `NotificationRepository` class is exported that implements `INotificationRepository`; every method throws `new Error('not implemented')` when called.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A barrel export `src/modules/notification/index.ts` re-exports the `LeaveNotification` interface, the `INotificationRepository` interface, and the `NotificationRepository` stub class.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Unit tests in `tests/unit/modules/notification/notification.model.test.ts` verify: all 9 fields exist with correct types, the `type` field accepts all 6 string literal values, the `status` field accepts all 4 NotificationStatus enum values, `readAt` accepts both Date and null, and the interface has exactly the expected field count.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Unit tests in `tests/unit/modules/notification/notification.repository.test.ts` verify: the stub can be instantiated, all 5 methods exist as functions, and each method rejects with `'not implemented'` when called.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No `any` type \u2014 use `unknown` with type guards if needed (HARNESS.json constraint `no-any`).",
+    "No direct database access outside the repository layer \u2014 the stub `NotificationRepository` is the only place database calls will eventually live (GP-001, HARNESS constraint `no-direct-db-outside-repository`).",
+    "No hardcoded secrets, API keys, or tokens (HARNESS constraint `no-hardcoded-secrets`).",
+    "No `@gestalt/*` packages as project dependencies (HARNESS constraint `no-gestalt-internal-deps`).",
+    "Strict TypeScript: `strict: true`, `noImplicitAny: true`, `strictNullChecks: true` \u2014 the code must compile under `tsc --noEmit` with no errors."
+  ],
+  "outOfScope": [
+    "NotificationService (interface and implementation) \u2014 deferred to Phase 10 per PLAN.md.",
+    "Database-backed repository implementation (Knex/PostgreSQL queries) \u2014 this phase delivers only the stub.",
+    "HTTP routes, controllers, or any Fastify plugin registration for notifications.",
+    "Audit logging integration \u2014 the notification module does not produce audit records in this phase (audit is Phase 7)."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveNotification",
+      "mustExistOrExtend": true,
+      "invariant": "Lifecycle: PENDING \u2192 SENT \u2192 READ \u2192 ARCHIVED. The `status` field must always hold a valid `NotificationStatus` enum value. The `readAt` field must be `null` when status is PENDING or SENT; it must be a non-null `Date` when status is READ or ARCHIVED. The `type` field must be one of the 6 string literals: 'SUBMITTED', 'APPROVED', 'REJECTED', 'CANCELLED', 'BALANCE_LOW', 'BALANCE_EXHAUSTED'. The `leaveRequestId` is a string reference to a LeaveRequest.id \u2014 referential integrity is enforced at the service/DB layer in later phases."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "INotificationRepository.findById",
+      "authRule": "No auth rule at the repository layer \u2014 auth is enforced at the service/controller layer in later phases.",
+      "idempotent": true,
+      "errorSemantics": "Returns `null` when no notification exists with the given id; never throws for a missing entity."
+    },
+    {
+      "operation": "INotificationRepository.create",
+      "authRule": "No auth rule at the repository layer.",
+      "idempotent": false,
+      "errorSemantics": "Accepts `Omit<LeaveNotification, 'id' | 'createdAt'>` \u2014 the caller must NOT supply `id` or `createdAt`; the repository assigns them. Returns the created `LeaveNotification` with all fields populated."
+    },
+    {
+      "operation": "INotificationRepository.updateStatus",
+      "authRule": "No auth rule at the repository layer.",
+      "idempotent": true,
+      "errorSemantics": "Only mutates the `status` field (and implicitly `readAt` when transitioning to READ). Returns the updated `LeaveNotification` or `null` if no notification exists with the given id."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The `NotificationStatus` enum must be imported from `src/shared/types/index.ts` \u2014 do NOT redefine or duplicate it in the notification module.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The `LeaveNotification` entity's `leaveRequestId` field is a string reference to `LeaveRequest.id`. The notification module must NOT import from `src/modules/leave-request/` \u2014 the dependency map in reconciled.json shows `notification \u2192 shared-types` only.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "The model file must follow the established pattern: export the interface with a JSDoc comment describing the entity and its invariants, import shared types from `../../shared/types` (relative path matching sibling modules like employee, leave-policy, leave-request).",
+      "referencePath": "src/modules/employee/employee.model.ts"
+    },
+    {
+      "requirement": "The repository file must follow the established pattern: export both the interface (prefixed with `I`) and a stub class, with each stub method accepting prefixed-underscore parameters and throwing `new Error('not implemented')`. The interface JSDoc must reference GP-001.",
+      "referencePath": "src/modules/employee/employee.repository.ts"
+    },
+    {
+      "requirement": "The barrel export `index.ts` must re-export the model interface and both the repository interface and stub class, matching the pattern used by employee, leave-policy, leave-balance, and leave-request modules.",
+      "referencePath": "src/modules/employee/index.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts",
+      "why": "Imports `NotificationStatus` enum (PENDING, SENT, READ, ARCHIVED) for the `status` field on `LeaveNotification`."
+    }
+  ]
+}
