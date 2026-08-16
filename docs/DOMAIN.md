@@ -204,6 +204,26 @@ Represents notification data managed by the `notification` module, including not
 | createdAt | Date | true |
 | readAt | Date \| null | false |
 
+### LeaveNotification
+
+| Field | Type | Required |
+|-------|------|----------|
+| id | string | true |
+| recipientId | string | true |
+| type | 'SUBMITTED' \| 'APPROVED' \| 'REJECTED' \| 'CANCELLED' \| 'BALANCE_LOW' \| 'BALANCE_EXHAUSTED' | true |
+| title | string | true |
+| message | string | true |
+| leaveRequestId | string | true |
+| status | NotificationStatus | true |
+| createdAt | Date | true |
+| readAt | Date \| null | false |
+
+**Invariants**
+- Lifecycle: PENDING → SENT → READ → ARCHIVED.
+- `readAt` must be `null` when status is PENDING or SENT.
+- `readAt` must be a non-null `Date` when status is READ or ARCHIVED.
+- `leaveRequestId` references a LeaveRequest.id (referential integrity enforced at service/DB layer).
+
 ## audit
 
 Represents audit data managed by the `audit` module, including audit records, change history, and activity tracking information.

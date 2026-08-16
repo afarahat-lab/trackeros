@@ -123,3 +123,38 @@ Tests:
 
 Dependencies: `src/shared/types/index.ts` (LeaveStatus enum, LeaveRequestQueryParams)
 from Phase 1.
+
+## ADR-005 — Notification model and repository (Phase 6)
+
+Date: 2026-06-10
+Status: Accepted
+
+Decision: Created the notification module at `src/modules/notification/` with
+model, repository interface, stub implementation, and barrel export.
+
+Files created:
+- `src/modules/notification/notification.model.ts` — `LeaveNotification` entity
+  interface with fields: id, recipientId, type (union of 6 string literals:
+  'SUBMITTED', 'APPROVED', 'REJECTED', 'CANCELLED', 'BALANCE_LOW',
+  'BALANCE_EXHAUSTED'), title, message, leaveRequestId, status (NotificationStatus
+  enum), createdAt, readAt (Date | null). Documents invariants: lifecycle
+  PENDING → SENT → READ → ARCHIVED; readAt must be null when status is PENDING
+  or SENT; readAt must be a non-null Date when status is READ or ARCHIVED.
+- `src/modules/notification/notification.repository.ts` — `INotificationRepository`
+  interface with methods: findById, findByRecipientId, findByLeaveRequestId,
+  create, updateStatus. `NotificationRepository` stub class throws
+  "not implemented" for all methods.
+- `src/modules/notification/index.ts` — Barrel export of model and repository.
+
+Tests:
+- `tests/unit/modules/notification/notification.model.test.ts` — Validates
+  LeaveNotification shape, all 6 notification type literals, all 4
+  NotificationStatus enum values, readAt nullability invariants per status,
+  and exact field count (9).
+- `tests/unit/modules/notification/notification.repository.test.ts` — Validates
+  all 5 stub methods throw "not implemented", accepts valid create input
+  (without id/createdAt), accepts input with readAt set for READ status,
+  accepts all valid NotificationStatus transitions, and verifies interface
+  contract has all required methods.
+
+Dependencies: `src/shared/types/index.ts` (NotificationStatus enum) from Phase 1.
