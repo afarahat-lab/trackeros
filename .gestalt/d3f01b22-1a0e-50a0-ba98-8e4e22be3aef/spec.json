@@ -1,0 +1,162 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-request",
+      "leave-balance",
+      "leave-policy",
+      "employee"
+    ],
+    "affectedLayers": [
+      "service",
+      "interface"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The ILeaveRequestService interface declares all 8 required methods: createDraft(CreateLeaveRequestDto): Promise<LeaveRequest>, submit(id: string): Promise<LeaveRequest>, approve(id: string, approverId: string): Promise<LeaveRequest>, reject(id: string, approverId: string): Promise<LeaveRequest>, cancel(id: string): Promise<LeaveRequest>, findById(id: string): Promise<LeaveRequest | null>, findByEmployeeId(employeeId: string): Promise<LeaveRequest[]>, query(params: LeaveRequestQueryParams): Promise<LeaveRequest[]>.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "createDraft validates: employee exists (EMPLOYEE_NOT_FOUND), policy exists (POLICY_NOT_FOUND), policy isActive (POLICY_INACTIVE), startDate <= endDate (INVALID_DATE_RANGE), then creates a LeaveRequest with status DRAFT.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "submit validates: request exists (REQUEST_NOT_FOUND), status is DRAFT (INVALID_STATE_TRANSITION), policy minimumNoticeDays is satisfied if set (MINIMUM_NOTICE_VIOLATION), balance exists (BALANCE_NOT_FOUND), balance is not CLOSED (BALANCE_CLOSED), remainingDays >= daysRequested using the BINDING formula (INSUFFICIENT_BALANCE), then transitions to SUBMITTED.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "approve validates: request exists, status is SUBMITTED, approverId matches employee.managerId (NOT_MANAGER), balance exists and is not CLOSED, then deducts daysRequested from balance (usedDays += daysRequested, remainingDays = totalEntitlement - usedDays) and sets status APPROVED with approvedBy and approvedAt.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "reject validates: request exists, status is SUBMITTED, approverId matches employee.managerId (NOT_MANAGER), then sets status REJECTED without touching balance.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "cancel validates: request exists, status is SUBMITTED or APPROVED (INVALID_STATE_TRANSITION otherwise). If APPROVED, restores usedDays on balance (usedDays -= daysRequested, remainingDays = totalEntitlement - usedDays). Sets status CANCELLED with cancelledAt. If SUBMITTED, does not touch balance.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The BINDING day-counting formula `daysRequested = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24) + 1` is used at every call site that computes days (submit balance check, approve deduction, cancel restoration). A single-day leave (startDate === endDate) yields 1 day. A Mon-Fri range yields 5 days.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All state-changing operations reject invalid state transitions with error code INVALID_STATE_TRANSITION: DRAFT cannot be approved/rejected, SUBMITTED cannot be submitted, APPROVED/REJECTED/CANCELLED cannot be submitted/approved/rejected, DRAFT/REJECTED/CANCELLED cannot be cancelled.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Read-only methods (findById, findByEmployeeId, query) delegate directly to the corresponding ILeaveRequestRepository methods without additional business logic.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All errors thrown by the service must use the shape `{ error: string; code: string }` matching the reconciled architecture's error response contract.",
+    "The service constructor must accept exactly four dependencies: ILeaveRequestRepository, ILeaveBalanceRepository, ILeavePolicyRepository, IEmployeeRepository \u2014 all injected via constructor, no direct instantiation.",
+    "All imports from other modules must go through their barrel exports (index.ts) only \u2014 no deep imports from internal files (GP-001 / AGENTS.md rule 1).",
+    "The BINDING formula `(endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24) + 1` must be used identically at every call site \u2014 no variation, no weekend/holiday exclusion, no time-of-day consideration. All dates are full-day granularity.",
+    "Fiscal year is derived from `request.startDate.getFullYear()` \u2014 calendar year Jan 1 to Dec 31, hardcoded per the BINDING business rule.",
+    "The service must not directly access the database \u2014 all persistence goes through the injected repository interfaces (GP-001)."
+  ],
+  "outOfScope": [
+    "HTTP routes, controllers, request/response serialization, and Fastify plugin registration \u2014 these belong to Phase 9 (LeaveRequest routes and controller).",
+    "RBAC enforcement at the API boundary (requireRole guards, JWT verification) \u2014 the service is role-agnostic; authorization middleware is a Phase 9 concern.",
+    "Audit logging (GP-002) \u2014 the service does not write audit records. Audit integration is deferred to a later phase or cross-cutting concern."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "Lifecycle state machine: DRAFT \u2192 SUBMITTED \u2192 (APPROVED | REJECTED). CANCELLED is reachable from SUBMITTED or APPROVED. No other transitions are valid. The service must reject any attempt to transition outside this graph with INVALID_STATE_TRANSITION."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "When status is APPROVED, approvedBy and approvedAt must both be non-null. When status is not APPROVED, both must be null. When status is CANCELLED, cancelledAt must be non-null. When status is not CANCELLED, cancelledAt must be null."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "remainingDays = totalEntitlement - usedDays must hold after every mutation (approve deduction, cancel restoration). The service must compute both usedDays and remainingDays together and pass both to the repository update."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "createDraft",
+      "authRule": "Caller must be authenticated (JWT). RBAC enforcement (employee role) is deferred to the controller/route layer \u2014 the service itself is role-agnostic.",
+      "idempotent": false,
+      "errorSemantics": "Throws { error, code } on validation failure: EMPLOYEE_NOT_FOUND, POLICY_NOT_FOUND, POLICY_INACTIVE, INVALID_DATE_RANGE. Returns the created LeaveRequest on success."
+    },
+    {
+      "operation": "submit",
+      "authRule": "Caller must be authenticated. RBAC enforcement deferred to controller.",
+      "idempotent": false,
+      "errorSemantics": "Throws { error, code } on failure: REQUEST_NOT_FOUND, INVALID_STATE_TRANSITION, POLICY_NOT_FOUND, MINIMUM_NOTICE_VIOLATION, BALANCE_NOT_FOUND, BALANCE_CLOSED, INSUFFICIENT_BALANCE. Returns the updated LeaveRequest on success."
+    },
+    {
+      "operation": "approve",
+      "authRule": "Caller must be authenticated. The service enforces that approverId === employee.managerId (NOT_MANAGER error). HR admin override is deferred to controller/route layer.",
+      "idempotent": false,
+      "errorSemantics": "Throws { error, code } on failure: REQUEST_NOT_FOUND, INVALID_STATE_TRANSITION, EMPLOYEE_NOT_FOUND, NOT_MANAGER, BALANCE_NOT_FOUND, BALANCE_CLOSED. Returns the updated LeaveRequest on success."
+    },
+    {
+      "operation": "reject",
+      "authRule": "Caller must be authenticated. The service enforces that approverId === employee.managerId (NOT_MANAGER error). HR admin override deferred to controller.",
+      "idempotent": false,
+      "errorSemantics": "Throws { error, code } on failure: REQUEST_NOT_FOUND, INVALID_STATE_TRANSITION, EMPLOYEE_NOT_FOUND, NOT_MANAGER. Returns the updated LeaveRequest on success. Must not touch balance."
+    },
+    {
+      "operation": "cancel",
+      "authRule": "Caller must be authenticated. RBAC enforcement deferred to controller.",
+      "idempotent": false,
+      "errorSemantics": "Throws { error, code } on failure: REQUEST_NOT_FOUND, INVALID_STATE_TRANSITION, BALANCE_NOT_FOUND, BALANCE_CLOSED. Returns the updated LeaveRequest on success. Restores balance only when cancelling an APPROVED request."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The service must use the LeaveStatus enum values (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED) exactly as defined in the shared types module \u2014 no string literals for status values.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The service must use the LeaveRequest entity interface exactly as defined in the leave-request model \u2014 no additional or missing fields in create/update calls.",
+      "referencePath": "src/modules/leave-request/leave-request.model.ts"
+    },
+    {
+      "requirement": "The service must use the CreateLeaveRequestDto and LeaveRequestQueryParams interfaces exactly as defined in shared types \u2014 no deviation in field names or types.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The service must use the ILeaveRequestRepository, ILeaveBalanceRepository, ILeavePolicyRepository, and IEmployeeRepository interfaces exactly as defined in their respective modules \u2014 no additional methods assumed beyond the declared interface.",
+      "referencePath": "src/modules/leave-request/leave-request.repository.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "ILeaveRequestRepository (src/modules/leave-request/)",
+      "why": "All CRUD operations on LeaveRequest entities \u2014 findById, findByEmployeeId, query, create, update \u2014 are delegated to this repository. The service never accesses the database directly."
+    },
+    {
+      "target": "ILeaveBalanceRepository (src/modules/leave-balance/)",
+      "why": "Balance lookups (findByEmployeeAndPolicy) and mutations (update usedDays/remainingDays) during submit, approve, and cancel flows."
+    },
+    {
+      "target": "ILeavePolicyRepository (src/modules/leave-policy/)",
+      "why": "Policy lookups (findById) during createDraft (validate policy exists and isActive) and submit (validate minimumNoticeDays)."
+    },
+    {
+      "target": "IEmployeeRepository (src/modules/employee/)",
+      "why": "Employee lookups (findById) during createDraft (validate employee exists), approve (validate managerId match), and reject (validate managerId match)."
+    }
+  ]
+}
