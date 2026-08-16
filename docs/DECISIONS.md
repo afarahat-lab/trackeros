@@ -59,3 +59,32 @@ DTOs defined:
 
 Tests: `tests/unit/shared/types/index.test.ts` — Jest unit tests verifying enum
 values, member counts, and DTO shape acceptance.
+
+## ADR-003 — LeavePolicy model and repository (Phase 3)
+
+Date: 2026-06-10
+Status: Accepted
+
+Decision: Created the leave-policy module at `src/modules/leave-policy/` with
+model, repository interface, stub implementation, and barrel export.
+
+Files created:
+- `src/modules/leave-policy/leave-policy.model.ts` — `LeavePolicy` entity interface
+  with fields: id, policyName, leaveType (LeaveType enum), entitlementDays,
+  accrualRate (number | null), maxAccumulation (number | null),
+  minimumNoticeDays (number | null), requiresManagerApproval (boolean),
+  isActive (boolean), createdAt, updatedAt.
+- `src/modules/leave-policy/leave-policy.repository.ts` — `ILeavePolicyRepository`
+  interface with methods: findById, findByLeaveType, findAllActive, create, update.
+  `LeavePolicyRepository` stub class throws "not implemented" for all methods.
+- `src/modules/leave-policy/index.ts` — Barrel export of model and repository.
+
+Tests:
+- `tests/unit/modules/leave-policy/leave-policy.model.test.ts` — Validates
+  LeavePolicy shape, nullable fields, all LeaveType enum values, isActive and
+  requiresManagerApproval booleans, and exact field count (11).
+- `tests/unit/modules/leave-policy/leave-policy.repository.test.ts` — Validates
+  all stub methods throw "not implemented", accepts valid create input and
+  partial updates, and verifies interface contract has all 5 methods.
+
+Dependencies: `src/shared/types/index.ts` (LeaveType enum) from Phase 1.

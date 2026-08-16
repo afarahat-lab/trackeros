@@ -19,6 +19,7 @@ The architecture is modular, with a clear separation of concerns between models,
 src/modules/status/         — System status module (health-check, version)
 src/modules/uptime/         — Uptime monitoring module
 src/modules/employee/       — Employee module (model, repository, barrel export)
+src/modules/leave-policy/   — LeavePolicy module (model, repository, barrel export)
 src/shared/types/           — Shared enums and DTOs (LeaveStatus, LeaveType, AuditAction,
                               NotificationStatus, EmploymentStatus, CreateLeaveRequestDto,
                               UpdateLeaveRequestDto, LeaveRequestQueryParams, ValidationResult)
@@ -85,7 +86,7 @@ src/shared/db/              — Database connection utilities
 
 1. **Shared types foundation** — Enums and DTOs. ✅ **COMPLETE**
 2. **Employee module** — Foundational entity. ✅ **COMPLETE**
-3. **Leave policy module** — Policy rules.
+3. **Leave policy module** — Policy rules. ✅ **COMPLETE**
 4. **Leave balance module** — Balance tracking.
 5. **Notification module** — Event notifications.
 6. **Audit module** — Audit logging.
