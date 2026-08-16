@@ -1,56 +1,39 @@
-# Implement this phase: Phase 5: LeaveRequest model and repository
+# Implement this phase: Phase 6: Notification model and repository
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/76d847b2-5905-40af-b702-36710232b1e4/5`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/76d847b2-5905-40af-b702-36710232b1e4/6`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the leave-request module at `src/modules/leave-request/`. This phase depends on `src/shared/types/index.ts` from Phase 1, `src/modules/employee/employee.model.ts` from Phase 2, and `src/modules/leave-policy/leave-policy.model.ts` from Phase 3 — read all three before generating any code.
+Create the notification module at `src/modules/notification/`. This phase depends on `src/shared/types/index.ts` from Phase 1 and `src/modules/leave-request/leave-request.model.ts` from Phase 5 — read both before generating any code.
 
 Files to create:
-- `src/modules/leave-request/leave-request.model.ts` — Define the `LeaveRequest` entity interface with exact fields: id (string), employeeId (string), leavePolicyId (string), startDate (Date), endDate (Date), reason (string | undefined), status (LeaveStatus — import from `src/shared/types`), approvedBy (string | null), approvedAt (Date | null), cancelledAt (Date | null), createdAt (Date), updatedAt (Date).
-- `src/modules/leave-request/leave-request.repository.ts` — Define `ILeaveRequestRepository` interface with methods: findById(id: string): Promise<LeaveRequest | null>, findByEmployeeId(employeeId: string): Promise<LeaveRequest[]>, findByStatus(status: LeaveStatus): Promise<LeaveRequest[]>, query(params: LeaveRequestQueryParams): Promise<LeaveRequest[]>, create(request: Omit<LeaveRequest, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeaveRequest>, update(id: string, data: Partial<LeaveRequest>): Promise<LeaveRequest | null>. Provide a stub `LeaveRequestRepository` class.
+- `src/modules/notification/notification.model.ts` — Define the `LeaveNotification` entity interface with exact fields: id (string), recipientId (string), type ('SUBMITTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'BALANCE_LOW' | 'BALANCE_EXHAUSTED'), title (string), message (string), leaveRequestId (string), status (NotificationStatus — import from `src/shared/types`), createdAt (Date), readAt (Date | null).
+- `src/modules/notification/notification.repository.ts` — Define `INotificationRepository` interface with methods: findById(id: string): Promise<LeaveNotification | null>, findByRecipientId(recipientId: string): Promise<LeaveNotification[]>, findByLeaveRequestId(leaveRequestId: string): Promise<LeaveNotification[]>, create(notification: Omit<LeaveNotification, 'id' | 'createdAt'>): Promise<LeaveNotification>, updateStatus(id: string, status: NotificationStatus): Promise<LeaveNotification | null>. Provide a stub `NotificationRepository` class.
 
-Include Jest unit tests in `tests/unit/modules/leave-request/leave-request.model.test.ts` and `tests/unit/modules/leave-request/leave-request.repository.test.ts`.
+Include Jest unit tests in `tests/unit/modules/notification/notification.model.test.ts` and `tests/unit/modules/notification/notification.repository.test.ts`.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
 - Consolidated decision for all questions: (1) Fiscal year = calendar year (Jan 1 to Dec 31), hardcoded — no configurable fiscalYearStart field. (2) Leave duration counts calendar days inclusive — weekends and public holidays ARE counted as leave days; do NOT introduce a holiday calendar entity. (3) Minimum granularity = full-day increments only — leave balances are integers, no half-days, no hours, no time-of-day on startDate/endDate. (4) Day counting from start_date to end_date is calendar days inclusive of both ends: daysRequested = (end_date - start_date) + 1. This single formula is BINDING at every call site (used_days deduction, overlap detection, remaining_days) — no weekend or holiday exclusion anywhere. [BINDING RULE — operator decision resolving: How is the fiscal year boundary defined — calendar year (Jan 1 – Dec 31) or a configurable start month/day? This determines when LeaveBalance transitions from ACTIVE/EXHAUSTED to CLOSED and when new balance records are created.; Should leave duration count weekends and public holidays as leave days, or only business days? The current rule uses calendar days inclusive, but this may not match all organisational policies.; What is the minimum granularity of a leave request — full days, half days, or hours? This affects the daysRequested calculation and balance precision.; How are leave days counted from start_date to end_date — calendar days (inclusive of both ends, e.g. Mon–Fri = 5 days) or business/working days only? This is BINDING across all balance-deduction and overlap-detection call sites.; apply everywhere these apply, not in one place only]
 
-## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
-The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
-- `LeaveRequest` — the entity MUST have exactly these fields:
-    - id: string
-    - employeeId: string
-    - leavePolicyId: string
-    - startDate: Date
-    - endDate: Date
-    - reason: string | undefined
-    - status: LeaveRequestStatus
-    - approvedBy: string | null
-    - approvedAt: Date | null
-    - cancelledAt: Date | null
-    - createdAt: Date
-    - updatedAt: Date
-
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- The `LeaveStatus` enum used by `LeaveRequest.status` must be imported from `src/shared/types/index.ts` — the authoritative definition from Phase 1. No local redefinition. (see `src/shared/types/index.ts`)
-- The `LeaveRequestQueryParams` type used by `ILeaveRequestRepository.query` must be imported from `src/shared/types/index.ts` — the authoritative DTO from Phase 1. Its shape (employeeId, status, leavePolicyId, startDateFrom, startDateTo — all optional) is binding. (see `src/shared/types/index.ts`)
-- The `LeaveRequest.employeeId` field must reference a valid `Employee.id`. The `Employee` entity shape (id: string, managerId: string | null, employmentStatus: EmploymentStatus) is authoritative from Phase 2. The repository stub does not enforce this FK — enforcement is a service-layer concern — but the field name and type must match. (see `src/modules/employee/employee.model.ts`)
-- The `LeaveRequest.leavePolicyId` field must reference a valid `LeavePolicy.id`. The `LeavePolicy` entity shape (id: string, leaveType: LeaveType, isActive: boolean, minimumNoticeDays: number | null, requiresManagerApproval: boolean) is authoritative from Phase 3. The field name and type must match. (see `src/modules/leave-policy/leave-policy.model.ts`)
+- The `NotificationStatus` enum must be imported from `src/shared/types/index.ts` — do NOT redefine or duplicate it in the notification module. (see `src/shared/types/index.ts`)
+- The `LeaveNotification` entity's `leaveRequestId` field is a string reference to `LeaveRequest.id`. The notification module must NOT import from `src/modules/leave-request/` — the dependency map in reconciled.json shows `notification → shared-types` only. (see `.gestalt/architecture/reconciled.json`)
+- The model file must follow the established pattern: export the interface with a JSDoc comment describing the entity and its invariants, import shared types from `../../shared/types` (relative path matching sibling modules like employee, leave-policy, leave-request). (see `src/modules/employee/employee.model.ts`)
+- The repository file must follow the established pattern: export both the interface (prefixed with `I`) and a stub class, with each stub method accepting prefixed-underscore parameters and throwing `new Error('not implemented')`. The interface JSDoc must reference GP-001. (see `src/modules/employee/employee.repository.ts`)
+- The barrel export `index.ts` must re-export the model interface and both the repository interface and stub class, matching the pattern used by employee, leave-policy, leave-balance, and leave-request modules. (see `src/modules/employee/index.ts`)
 ### Entity invariants — enforce these
-- Reuse or extend `LeaveRequest`: Lifecycle: a LeaveRequest transitions through states DRAFT → SUBMITTED → (APPROVED | REJECTED) and may be CANCELLED from SUBMITTED or APPROVED. The status field must always be a valid LeaveStatus enum member. approvedBy and approvedAt must both be null when status is not APPROVED; both must be non-null when status is APPROVED. cancelledAt must be null unless status is CANCELLED.
-- Reuse or extend `LeaveRequest`: Date ordering: startDate must be on or before endDate. Both are full-day granularity (no time-of-day component matters). The BINDING day-count formula `daysRequested = (endDate - startDate) + 1` (calendar days inclusive) applies everywhere this count is needed — though the actual calculation is a service-layer concern (Phase 8), the entity shape must support it by storing both dates as Date.
+- Reuse or extend `LeaveNotification`: Lifecycle: PENDING → SENT → READ → ARCHIVED. The `status` field must always hold a valid `NotificationStatus` enum value. The `readAt` field must be `null` when status is PENDING or SENT; it must be a non-null `Date` when status is READ or ARCHIVED. The `type` field must be one of the 6 string literals: 'SUBMITTED', 'APPROVED', 'REJECTED', 'CANCELLED', 'BALANCE_LOW', 'BALANCE_EXHAUSTED'. The `leaveRequestId` is a string reference to a LeaveRequest.id — referential integrity is enforced at the service/DB layer in later phases.
 ### Interface contract — expose these operations (their shape is yours)
-- ILeaveRequestRepository.create — No auth rule at the repository layer — auth is enforced at the controller/route layer (Phase 9).; Must return the created LeaveRequest with id, createdAt, and updatedAt populated. The stub throws "not implemented"; the real implementation must reject if required fields (employeeId, leavePolicyId, startDate, endDate, status) are missing.
-- ILeaveRequestRepository.update — No auth rule at the repository layer.; Returns the updated LeaveRequest or null if no entity with the given id exists. The stub throws "not implemented".
-- ILeaveRequestRepository.query — No auth rule at the repository layer.; idempotent; Accepts a LeaveRequestQueryParams with all-optional fields; returns an array (empty if no matches). The stub throws "not implemented".
+- INotificationRepository.findById — No auth rule at the repository layer — auth is enforced at the service/controller layer in later phases.; idempotent; Returns `null` when no notification exists with the given id; never throws for a missing entity.
+- INotificationRepository.create — No auth rule at the repository layer.; Accepts `Omit<LeaveNotification, 'id' | 'createdAt'>` — the caller must NOT supply `id` or `createdAt`; the repository assigns them. Returns the created `LeaveNotification` with all fields populated.
+- INotificationRepository.updateStatus — No auth rule at the repository layer.; idempotent; Only mutates the `status` field (and implicitly `readAt` when transitioning to READ). Returns the updated `LeaveNotification` or `null` if no notification exists with the given id.
 ### Integration points — connect to these
-- src/shared/types/index.ts (Phase 1) — LeaveRequest entity imports LeaveStatus enum; repository imports LeaveRequestQueryParams DTO.
-- src/modules/employee/employee.model.ts (Phase 2) — LeaveRequest.employeeId references Employee.id; the Employee entity shape is the authoritative source for the employee domain.
+- src/shared/types/index.ts — Imports `NotificationStatus` enum (PENDING, SENT, READ, ARCHIVED) for the `status` field on `LeaveNotification`.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
