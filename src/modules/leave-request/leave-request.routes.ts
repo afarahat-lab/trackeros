@@ -14,13 +14,14 @@ function mapErrorToHttpStatus(code: string): number {
     case 'REQUEST_NOT_FOUND':
     case 'BALANCE_NOT_FOUND':
       return 404;
-    case 'POLICY_INACTIVE':
     case 'INVALID_DATE_RANGE':
-    case 'INVALID_STATE_TRANSITION':
     case 'MINIMUM_NOTICE_VIOLATION':
-    case 'BALANCE_CLOSED':
-    case 'INSUFFICIENT_BALANCE':
       return 400;
+    case 'INVALID_STATE_TRANSITION':
+    case 'INSUFFICIENT_BALANCE':
+    case 'BALANCE_CLOSED':
+    case 'POLICY_INACTIVE':
+      return 409;
     case 'NOT_MANAGER':
       return 403;
     default:
@@ -120,6 +121,22 @@ export async function leaveRequestRoutes(fastify: FastifyInstance): Promise<void
     }
   });
 
+  fastify.get<{ Params: { employeeId: string } }>(
+    '/leave-requests/employee/:employeeId',
+    async (request, reply) => {
+      try {
+        const results = await controller.findByEmployeeId(request.params.employeeId);
+        return reply.status(200).send(results);
+      } catch (error: unknown) {
+        request.log.error(error);
+        if (isServiceError(error)) {
+          return reply.status(mapErrorToHttpStatus(error.code)).send({ error: error.error, code: error.code });
+        }
+        return reply.status(500).send({ error: 'Internal Server Error' });
+      }
+    },
+  );
+
   fastify.get<{ Params: { id: string } }>('/leave-requests/:id', async (request, reply) => {
     try {
       const result = await controller.findById(request.params.id);
@@ -155,20 +172,4 @@ export async function leaveRequestRoutes(fastify: FastifyInstance): Promise<void
       return reply.status(500).send({ error: 'Internal Server Error' });
     }
   });
-
-  fastify.get<{ Params: { employeeId: string } }>(
-    '/leave-requests/employee/:employeeId',
-    async (request, reply) => {
-      try {
-        const results = await controller.findByEmployeeId(request.params.employeeId);
-        return reply.status(200).send(results);
-      } catch (error: unknown) {
-        request.log.error(error);
-        if (isServiceError(error)) {
-          return reply.status(mapErrorToHttpStatus(error.code)).send({ error: error.error, code: error.code });
-        }
-        return reply.status(500).send({ error: 'Internal Server Error' });
-      }
-    },
-  );
 }

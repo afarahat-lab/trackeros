@@ -153,7 +153,7 @@ describe('leaveRequestRoutes', () => {
       expect(response.statusCode).toBe(404);
     });
 
-    it('should return 400 for POLICY_INACTIVE', async () => {
+    it('should return 409 for POLICY_INACTIVE', async () => {
       mockService.createDraft.mockRejectedValue({
         error: 'Leave policy is not active',
         code: 'POLICY_INACTIVE',
@@ -171,7 +171,7 @@ describe('leaveRequestRoutes', () => {
         },
       });
 
-      expect(response.statusCode).toBe(400);
+      expect(response.statusCode).toBe(409);
     });
 
     it('should return 400 for INVALID_DATE_RANGE', async () => {
@@ -245,7 +245,7 @@ describe('leaveRequestRoutes', () => {
       expect(response.statusCode).toBe(404);
     });
 
-    it('should return 400 for INVALID_STATE_TRANSITION', async () => {
+    it('should return 409 for INVALID_STATE_TRANSITION', async () => {
       mockService.submit.mockRejectedValue({
         error: 'Only DRAFT requests can be submitted',
         code: 'INVALID_STATE_TRANSITION',
@@ -256,7 +256,7 @@ describe('leaveRequestRoutes', () => {
         url: '/leave-requests/lr-001/submit',
       });
 
-      expect(response.statusCode).toBe(400);
+      expect(response.statusCode).toBe(409);
     });
   });
 
@@ -299,7 +299,7 @@ describe('leaveRequestRoutes', () => {
       expect(response.statusCode).toBe(403);
     });
 
-    it('should return 400 for INVALID_STATE_TRANSITION', async () => {
+    it('should return 409 for INVALID_STATE_TRANSITION', async () => {
       mockService.approve.mockRejectedValue({
         error: 'Only SUBMITTED requests can be approved',
         code: 'INVALID_STATE_TRANSITION',
@@ -311,7 +311,7 @@ describe('leaveRequestRoutes', () => {
         payload: { approverId: 'mgr-001' },
       });
 
-      expect(response.statusCode).toBe(400);
+      expect(response.statusCode).toBe(409);
     });
   });
 
@@ -369,7 +369,7 @@ describe('leaveRequestRoutes', () => {
       expect(body.cancelledAt).toBe('2026-08-16T12:00:00.000Z');
     });
 
-    it('should return 400 for INVALID_STATE_TRANSITION', async () => {
+    it('should return 409 for INVALID_STATE_TRANSITION', async () => {
       mockService.cancel.mockRejectedValue({
         error: 'Only SUBMITTED or APPROVED requests can be cancelled',
         code: 'INVALID_STATE_TRANSITION',
@@ -380,7 +380,7 @@ describe('leaveRequestRoutes', () => {
         url: '/leave-requests/lr-001/cancel',
       });
 
-      expect(response.statusCode).toBe(400);
+      expect(response.statusCode).toBe(409);
     });
   });
 
