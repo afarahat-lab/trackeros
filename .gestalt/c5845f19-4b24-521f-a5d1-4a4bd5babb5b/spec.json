@@ -1,0 +1,170 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-request",
+      "leave-balance",
+      "leave-policy",
+      "employee"
+    ],
+    "affectedLayers": [
+      "service",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The `ILeaveRequestService` interface is defined in `src/modules/leave-request/leave-request.service.interface.ts` and exposes exactly 8 methods: `createDraft(dto: CreateLeaveRequestDto): Promise<LeaveRequest>`, `submit(id: string): Promise<LeaveRequest>`, `approve(id: string, approverId: string): Promise<LeaveRequest>`, `reject(id: string, approverId: string): Promise<LeaveRequest>`, `cancel(id: string): Promise<LeaveRequest>`, `findById(id: string): Promise<LeaveRequest | null>`, `findByEmployeeId(employeeId: string): Promise<LeaveRequest[]>`, `query(params: LeaveRequestQueryParams): Promise<LeaveRequest[]>`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`createDraft` validates that the employee exists (via `IEmployeeRepository.findById`), the policy exists and `isActive` is true (via `ILeavePolicyRepository.findById`), and `startDate <= endDate`; it then creates a `LeaveRequest` with `status = DRAFT` via `ILeaveRequestRepository.create` and returns it.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`submit` validates the request is in `DRAFT` status, checks `minimumNoticeDays` from the associated policy (if set, `startDate` must be >= `now + minimumNoticeDays` calendar days), computes `daysRequested` using the BINDING formula `(endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24) + 1`, looks up the balance via `ILeaveBalanceRepository.findByEmployeeAndPolicy` for the fiscal year `startDate.getFullYear()`, verifies `remainingDays >= daysRequested`, and transitions the request to `SUBMITTED`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`approve` validates the request is `SUBMITTED`, validates `approverId === employee.managerId` (obtained via `IEmployeeRepository.findById`), deducts `daysRequested` from `LeaveBalance.usedDays` and recalculates `remainingDays = totalEntitlement - usedDays`, sets `status = APPROVED`, `approvedBy = approverId`, `approvedAt = now`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`reject` validates the request is `SUBMITTED`, validates `approverId === employee.managerId`, sets `status = REJECTED` without modifying any balance.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`cancel` validates the request is `APPROVED` or `SUBMITTED`; if `APPROVED`, restores `usedDays` on the balance by subtracting `daysRequested` and recalculating `remainingDays`; sets `status = CANCELLED`, `cancelledAt = now`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`findById`, `findByEmployeeId`, and `query` delegate directly to the corresponding `ILeaveRequestRepository` methods and return their results unchanged.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Every state-changing method (`createDraft`, `submit`, `approve`, `reject`, `cancel`) throws a typed error (with `{ error: string; code: string }` shape) when its preconditions are violated \u2014 not-found (404 semantics), validation (400 semantics), or business-rule conflict (409 semantics) \u2014 and no partial state mutation persists on failure.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests in `tests/unit/modules/leave-request/leave-request.service.test.ts` cover all valid state transitions (DRAFT\u2192SUBMITTED\u2192APPROVED, DRAFT\u2192SUBMITTED\u2192REJECTED, SUBMITTED\u2192CANCELLED, APPROVED\u2192CANCELLED), all error paths (missing employee, inactive policy, invalid dates, insufficient notice, insufficient balance, wrong approver, invalid state transitions), and the BINDING day-counting formula with at least 3 distinct date ranges.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The BINDING day-counting formula `daysRequested = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24) + 1` must be used at every call site that computes leave duration \u2014 submit balance check, approve deduction, cancel restoration. No alternative formula, no weekend/holiday exclusion, no time-of-day adjustment.",
+    "Fiscal year is determined as `startDate.getFullYear()` (calendar year Jan 1 \u2013 Dec 31). The balance lookup in `submit`, `approve`, and `cancel` must use this fiscal year when calling `ILeaveBalanceRepository.findByEmployeeAndPolicy`.",
+    "All dates are full-day granularity \u2014 no half-days, no hours, no time-of-day considerations. `startDate` and `endDate` are treated as date-only values. The `daysRequested` result is always a positive integer."
+  ],
+  "outOfScope": [
+    "HTTP routes, controllers, and Fastify plugin registration \u2014 these belong to Phase 9.",
+    "Notification creation on lifecycle transitions (notify manager on submit, notify employee on approve/reject/cancel) \u2014 the `INotificationService` is not a constructor dependency in this phase; notification integration is deferred to Phase 10.",
+    "Audit log creation for state-changing operations \u2014 `IAuditLogRepository` is not a constructor dependency of `LeaveRequestService` in this phase. Audit integration is deferred to a later phase or handled by a separate cross-cutting mechanism."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "Lifecycle state machine: DRAFT \u2192 SUBMITTED \u2192 (APPROVED | REJECTED). From SUBMITTED or APPROVED, may transition to CANCELLED. No other transitions are valid. The service must reject any attempt to transition outside this graph (e.g., DRAFT\u2192APPROVED, REJECTED\u2192CANCELLED, APPROVED\u2192SUBMITTED)."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "When `status === APPROVED`, both `approvedBy` and `approvedAt` must be non-null. When `status !== APPROVED`, both must be null. `cancelledAt` must be null unless `status === CANCELLED`, in which case it must be non-null."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "`remainingDays` MUST equal `totalEntitlement - usedDays` at all times. Every mutation to `usedDays` (deduction on approve, restoration on cancel) MUST recalculate `remainingDays` accordingly before persisting."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "A balance with `status === 'CLOSED'` must not be mutated. The service must check the balance status before deducting or restoring `usedDays` and reject the operation if the balance is CLOSED."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "createDraft",
+      "authRule": "Caller identity is not validated by the service itself (RBAC is enforced at the controller/route layer in Phase 9). The service accepts the `employeeId` from the DTO and trusts the caller.",
+      "idempotent": false,
+      "errorSemantics": "Throws if employee not found, policy not found or inactive, or startDate > endDate. Error shape: `{ error: string; code: string }`."
+    },
+    {
+      "operation": "submit",
+      "authRule": "RBAC deferred to controller layer (Phase 9).",
+      "idempotent": false,
+      "errorSemantics": "Throws if request not found, request not in DRAFT status, minimumNoticeDays violated, balance not found, insufficient remainingDays, or balance is CLOSED. Error shape: `{ error: string; code: string }`."
+    },
+    {
+      "operation": "approve",
+      "authRule": "RBAC deferred to controller layer (Phase 9). The service validates that `approverId === employee.managerId` as a business rule, not as an auth concern.",
+      "idempotent": false,
+      "errorSemantics": "Throws if request not found, request not in SUBMITTED status, approverId does not match employee.managerId, balance not found, or balance is CLOSED. Error shape: `{ error: string; code: string }`."
+    },
+    {
+      "operation": "reject",
+      "authRule": "RBAC deferred to controller layer (Phase 9). The service validates that `approverId === employee.managerId` as a business rule.",
+      "idempotent": false,
+      "errorSemantics": "Throws if request not found, request not in SUBMITTED status, or approverId does not match employee.managerId. Error shape: `{ error: string; code: string }`."
+    },
+    {
+      "operation": "cancel",
+      "authRule": "RBAC deferred to controller layer (Phase 9).",
+      "idempotent": false,
+      "errorSemantics": "Throws if request not found, request not in SUBMITTED or APPROVED status, or (if APPROVED) balance not found or balance is CLOSED. Error shape: `{ error: string; code: string }`."
+    },
+    {
+      "operation": "findById / findByEmployeeId / query",
+      "authRule": "RBAC deferred to controller layer (Phase 9).",
+      "idempotent": true,
+      "errorSemantics": "Read-only; no business-rule errors. Return null or empty array on no results."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The `LeaveRequest` entity returned by all service methods must conform to the `LeaveRequest` interface defined in `src/modules/leave-request/leave-request.model.ts` \u2014 same fields, same types, same nullability.",
+      "referencePath": "src/modules/leave-request/leave-request.model.ts"
+    },
+    {
+      "requirement": "The `LeaveRequestQueryParams` parameter of `query` must match the interface defined in `src/shared/types/index.ts` \u2014 fields `employeeId`, `status`, `leavePolicyId`, `startDateFrom`, `startDateTo` with the same types and optionality.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The `CreateLeaveRequestDto` parameter of `createDraft` must match the interface defined in `src/shared/types/index.ts` \u2014 fields `employeeId`, `leavePolicyId`, `startDate`, `endDate`, `reason` with the same types and optionality.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The `LeaveBalance.remainingDays` invariant (`remainingDays = totalEntitlement - usedDays`) defined in `src/modules/leave-balance/leave-balance.model.ts` must be preserved by every balance mutation in `approve` and `cancel`.",
+      "referencePath": "src/modules/leave-balance/leave-balance.model.ts"
+    },
+    {
+      "requirement": "The `LeaveRequest` lifecycle invariant documented in `src/modules/leave-request/leave-request.model.ts` (DRAFT \u2192 SUBMITTED \u2192 APPROVED | REJECTED; cancellable from SUBMITTED or APPROVED) must be enforced by every state-transitioning method.",
+      "referencePath": "src/modules/leave-request/leave-request.model.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/leave-request/leave-request.repository.ts (ILeaveRequestRepository)",
+      "why": "Service calls `findById`, `create`, and `update` on this repository for all leave request persistence operations."
+    },
+    {
+      "target": "src/modules/leave-policy/leave-policy.repository.ts (ILeavePolicyRepository)",
+      "why": "Service calls `findById` on this repository during `createDraft` (to validate policy exists and isActive) and during `submit` (to read `minimumNoticeDays`)."
+    },
+    {
+      "target": "src/modules/employee/employee.repository.ts (IEmployeeRepository)",
+      "why": "Service calls `findById` on this repository during `createDraft` (to validate employee exists) and during `approve`/`reject` (to retrieve `managerId` for approver validation)."
+    }
+  ]
+}
