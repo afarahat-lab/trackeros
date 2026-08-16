@@ -1,0 +1,42 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared-types"
+    ],
+    "affectedLayers": [
+      "types",
+      "tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The `LeaveStatus` enum is exported from `src/shared/types/index.ts` and exposes exactly five members: DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED \u2014 no more, no fewer.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `LeaveType` enum is exported from `src/shared/types/index.ts` and exposes exactly six members: annual, sick, emergency, unpaid, maternity, paternity.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `AuditAction` enum is exported from `src/shared/types/index.ts` and exposes exactly five members: CREATE, UPDATE, DELETE, APPROVE, REJECT.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `NotificationStatus` enum is exported from `src/shared/types/index.ts` and exposes exactly four members: PENDING, SENT, READ, ARCHIVED.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [],
+  "outOfScope": [],
+  "ambiguities": [],
+  "entityInvariants": [],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [],
+  "integrationPoints": []
+}
