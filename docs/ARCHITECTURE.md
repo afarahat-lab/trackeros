@@ -36,6 +36,10 @@ src/modules/
     balance.model.ts            — LeaveBalance interface
     balance.repository.ts       — IBalanceRepository + BalanceRepository
     index.ts                    — barrel export
+  leave/
+    leave.model.ts              — LeaveRequest interface
+    leave.repository.ts         — ILeaveRepository + LeaveRepository
+    index.ts                    — barrel export
   status/                       — pre-existing status module
   uptime/                       — pre-existing uptime module (health-check routes)
 ```
@@ -43,7 +47,7 @@ src/modules/
 ## Module structure (planned — not yet built)
 
 ```
-src/modules/leave/leave.{model,repository,service,controller,routes}.ts
+src/modules/leave/leave.{service,controller,routes}.ts
 src/modules/notification/notification.{model,repository,service,controller,routes}.ts
 src/modules/audit/              — AuditLog model, repository, service
 ```
@@ -101,6 +105,27 @@ and usage. The `IBalanceRepository` interface provides:
 The `BalanceRepository` maps the `leave_balances` table columns:
 `employee_id`, `leave_policy_id`, `total_entitlement`, `used_days`,
 `remaining_days`, `fiscal_year`, `status`.
+
+### Leave module
+
+`LeaveRequest` models an employee's leave application with lifecycle states
+`DRAFT → SUBMITTED → APPROVED | REJECTED` (any non-terminal → `CANCELLED`).
+The `ILeaveRepository` interface provides:
+
+- `findById` — single lookup by primary key
+- `findByEmployee` — all requests for an employee, ordered by `start_date DESC`
+- `findByEmployeeAndStatus` — requests filtered by employee + status
+- `findOverlapping` — overlapping `SUBMITTED`/`APPROVED` requests for the same
+  employee in a date range, with optional `excludeId` for update scenarios
+- `create` — insert a new leave request row
+- `update` — partial update of mutable fields (`startDate`, `endDate`,
+  `reason`, `status`, `approvedBy`, `approvedAt`); `employeeId` and
+  `leavePolicyId` are immutable after creation
+- `findPendingByEmployee` — convenience lookup for `SUBMITTED` requests
+
+The `LeaveRepository` maps the `leave_requests` table columns:
+`employee_id`, `leave_policy_id`, `start_date`, `end_date`, `reason`,
+`status`, `approved_by`, `approved_at`, `created_at`, `updated_at`.
 
 <!-- gestalt:architecture feature=cb89b522-6bc0-439f-8a0d-f905145254ee START -->
 ## Leave Management Module — Reconciled Architecture
@@ -179,8 +204,8 @@ Employees apply for annual, sick, and emergency leave. Managers approve or rejec
 4. Policy module ✅ (model + repository)
 5. Balance module ✅ (model + repository)
 6. Notification module
-7. Leave module — model & contracts
-8. Leave module — repository & service implementation
+7. Leave module — model & contracts ✅
+8. Leave module — repository & service implementation (repository ✅)
 9. Leave module — controller & routes
 10. Module index files
 <!-- gestalt:architecture feature=cb89b522-6bc0-439f-8a0d-f905145254ee END -->
