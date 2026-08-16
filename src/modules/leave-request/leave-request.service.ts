@@ -1,8 +1,8 @@
 import { LeaveRequest } from './leave-request.model';
 import { ILeaveRequestRepository } from './leave-request.repository';
-import { ILeaveBalanceRepository } from '../leave-balance/leave-balance.repository';
-import { ILeavePolicyRepository } from '../leave-policy/leave-policy.repository';
-import { IEmployeeRepository } from '../employee/employee.repository';
+import { ILeaveBalanceRepository } from '../leave-balance';
+import { ILeavePolicyRepository } from '../leave-policy';
+import { IEmployeeRepository } from '../employee';
 import { ILeaveRequestService } from './leave-request.service.interface';
 import {
   CreateLeaveRequestDto,

@@ -1,53 +1,17 @@
-# Implement this phase: Phase 8: LeaveRequestService — core orchestration
+# Fix specific quality-gate violations: Phase 8: LeaveRequestService — core orchestration
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/76d847b2-5905-40af-b702-36710232b1e4/8`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/fix/76d847b2-5905-40af-b702-36710232b1e4/8/1`. Do not clone anything; work only in this directory.
 
-## What to build
-(no phase architecture provided — infer from the success criteria below)
+You are fixing SPECIFIC violations the quality gate found in EXISTING, already-committed files. Make the targeted edits listed below — do NOT refactor, regenerate, or change unrelated code.
 
-## Success criteria
-Create the LeaveRequestService at `src/modules/leave-request/`. This phase depends on all prior model and repository files — read them before generating any code.
-
-Files to create (approximately 3):
-- `src/modules/leave-request/leave-request.service.interface.ts` — Define `ILeaveRequestService` interface with methods: createDraft(dto: CreateLeaveRequestDto): Promise<LeaveRequest>, submit(id: string): Promise<LeaveRequest>, approve(id: string, approverId: string): Promise<LeaveRequest>, reject(id: string, approverId: string): Promise<LeaveRequest>, cancel(id: string): Promise<LeaveRequest>, findById(id: string): Promise<LeaveRequest | null>, findByEmployeeId(employeeId: string): Promise<LeaveRequest[]>, query(params: LeaveRequestQueryParams): Promise<LeaveRequest[]>.
-- `src/modules/leave-request/leave-request.service.ts` — Implement `LeaveRequestService` class. Constructor takes: ILeaveRequestRepository, ILeaveBalanceRepository, ILeavePolicyRepository, IEmployeeRepository. Key logic:
-  - `createDraft`: validate employee exists, validate policy exists and isActive, validate startDate <= endDate, create with status DRAFT.
-  - `submit`: validate request is in DRAFT state, validate policy minimumNoticeDays (if set, startDate must be >= now + minimumNoticeDays), check balance has sufficient remainingDays using the BINDING formula `daysRequested = (endDate - startDate) + 1` (calendar days inclusive), transition to SUBMITTED.
-  - `approve`: validate request is SUBMITTED, validate approver is the employee's manager (employee.managerId === approverId), deduct `daysRequested` from LeaveBalance.usedDays and recalculate remainingDays, set status APPROVED, approvedBy, approvedAt.
-  - `reject`: validate request is SUBMITTED, validate approver is manager, set status REJECTED.
-  - `cancel`: validate request is APPROVED or SUBMITTED, if APPROVED restore usedDays on balance, set status CANCELLED, cancelledAt.
-- `tests/unit/modules/leave-request/leave-request.service.test.ts` — Jest unit tests with mocked repositories covering all state transitions and the BINDING day-counting formula.
-
-Use the exact BINDING formula everywhere: `daysRequested = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24) + 1`. All dates are full-day granularity — no time-of-day considerations.
-
-## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
-These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
-- Consolidated decision for all questions: (1) Fiscal year = calendar year (Jan 1 to Dec 31), hardcoded — no configurable fiscalYearStart field. (2) Leave duration counts calendar days inclusive — weekends and public holidays ARE counted as leave days; do NOT introduce a holiday calendar entity. (3) Minimum granularity = full-day increments only — leave balances are integers, no half-days, no hours, no time-of-day on startDate/endDate. (4) Day counting from start_date to end_date is calendar days inclusive of both ends: daysRequested = (end_date - start_date) + 1. This single formula is BINDING at every call site (used_days deduction, overlap detection, remaining_days) — no weekend or holiday exclusion anywhere. [BINDING RULE — operator decision resolving: How is the fiscal year boundary defined — calendar year (Jan 1 – Dec 31) or a configurable start month/day? This determines when LeaveBalance transitions from ACTIVE/EXHAUSTED to CLOSED and when new balance records are created.; Should leave duration count weekends and public holidays as leave days, or only business days? The current rule uses calendar days inclusive, but this may not match all organisational policies.; What is the minimum granularity of a leave request — full days, half days, or hours? This affects the daysRequested calculation and balance precision.; How are leave days counted from start_date to end_date — calendar days (inclusive of both ends, e.g. Mon–Fri = 5 days) or business/working days only? This is BINDING across all balance-deduction and overlap-detection call sites.; apply everywhere these apply, not in one place only]
+The files ALREADY EXIST. You MUST edit them in place with the `str_replace_editor` tool. Reading or viewing a file is NOT sufficient — you have NOT finished until you have edited EVERY file listed below.
 
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- The `LeaveRequest` entity returned by all service methods must conform to the `LeaveRequest` interface defined in `src/modules/leave-request/leave-request.model.ts` — same fields, same types, same nullability. (see `src/modules/leave-request/leave-request.model.ts`)
-- The `LeaveRequestQueryParams` parameter of `query` must match the interface defined in `src/shared/types/index.ts` — fields `employeeId`, `status`, `leavePolicyId`, `startDateFrom`, `startDateTo` with the same types and optionality. (see `src/shared/types/index.ts`)
-- The `CreateLeaveRequestDto` parameter of `createDraft` must match the interface defined in `src/shared/types/index.ts` — fields `employeeId`, `leavePolicyId`, `startDate`, `endDate`, `reason` with the same types and optionality. (see `src/shared/types/index.ts`)
-- The `LeaveBalance.remainingDays` invariant (`remainingDays = totalEntitlement - usedDays`) defined in `src/modules/leave-balance/leave-balance.model.ts` must be preserved by every balance mutation in `approve` and `cancel`. (see `src/modules/leave-balance/leave-balance.model.ts`)
-- The `LeaveRequest` lifecycle invariant documented in `src/modules/leave-request/leave-request.model.ts` (DRAFT → SUBMITTED → APPROVED | REJECTED; cancellable from SUBMITTED or APPROVED) must be enforced by every state-transitioning method. (see `src/modules/leave-request/leave-request.model.ts`)
-### Entity invariants — enforce these
-- Reuse or extend `LeaveRequest`: Lifecycle state machine: DRAFT → SUBMITTED → (APPROVED | REJECTED). From SUBMITTED or APPROVED, may transition to CANCELLED. No other transitions are valid. The service must reject any attempt to transition outside this graph (e.g., DRAFT→APPROVED, REJECTED→CANCELLED, APPROVED→SUBMITTED).
-- Reuse or extend `LeaveRequest`: When `status === APPROVED`, both `approvedBy` and `approvedAt` must be non-null. When `status !== APPROVED`, both must be null. `cancelledAt` must be null unless `status === CANCELLED`, in which case it must be non-null.
-- Reuse or extend `LeaveBalance`: `remainingDays` MUST equal `totalEntitlement - usedDays` at all times. Every mutation to `usedDays` (deduction on approve, restoration on cancel) MUST recalculate `remainingDays` accordingly before persisting.
-- Reuse or extend `LeaveBalance`: A balance with `status === 'CLOSED'` must not be mutated. The service must check the balance status before deducting or restoring `usedDays` and reject the operation if the balance is CLOSED.
-### Interface contract — expose these operations (their shape is yours)
-- createDraft — Caller identity is not validated by the service itself (RBAC is enforced at the controller/route layer in Phase 9). The service accepts the `employeeId` from the DTO and trusts the caller.; Throws if employee not found, policy not found or inactive, or startDate > endDate. Error shape: `{ error: string; code: string }`.
-- submit — RBAC deferred to controller layer (Phase 9).; Throws if request not found, request not in DRAFT status, minimumNoticeDays violated, balance not found, insufficient remainingDays, or balance is CLOSED. Error shape: `{ error: string; code: string }`.
-- approve — RBAC deferred to controller layer (Phase 9). The service validates that `approverId === employee.managerId` as a business rule, not as an auth concern.; Throws if request not found, request not in SUBMITTED status, approverId does not match employee.managerId, balance not found, or balance is CLOSED. Error shape: `{ error: string; code: string }`.
-- reject — RBAC deferred to controller layer (Phase 9). The service validates that `approverId === employee.managerId` as a business rule.; Throws if request not found, request not in SUBMITTED status, or approverId does not match employee.managerId. Error shape: `{ error: string; code: string }`.
-- cancel — RBAC deferred to controller layer (Phase 9).; Throws if request not found, request not in SUBMITTED or APPROVED status, or (if APPROVED) balance not found or balance is CLOSED. Error shape: `{ error: string; code: string }`.
-- findById / findByEmployeeId / query — RBAC deferred to controller layer (Phase 9).; idempotent; Read-only; no business-rule errors. Return null or empty array on no results.
-### Integration points — connect to these
-- src/modules/leave-request/leave-request.repository.ts (ILeaveRequestRepository) — Service calls `findById`, `create`, and `update` on this repository for all leave request persistence operations.
-- src/modules/leave-policy/leave-policy.repository.ts (ILeavePolicyRepository) — Service calls `findById` on this repository during `createDraft` (to validate policy exists and isActive) and during `submit` (to read `minimumNoticeDays`).
-- src/modules/employee/employee.repository.ts (IEmployeeRepository) — Service calls `findById` on this repository during `createDraft` (to validate employee exists) and during `approve`/`reject` (to retrieve `managerId` for approver validation).
+- The `ILeaveBalanceRepository` symbol imported into `leave-request.service.ts` must be the identical TypeScript type exported from `src/modules/leave-balance/index.ts` (which re-exports from `leave-balance.repository.ts`). (see `src/modules/leave-balance/index.ts`)
+- The `ILeavePolicyRepository` symbol imported into `leave-request.service.ts` must be the identical TypeScript type exported from `src/modules/leave-policy/index.ts` (which re-exports from `leave-policy.repository.ts`). (see `src/modules/leave-policy/index.ts`)
+- The `IEmployeeRepository` symbol imported into `leave-request.service.ts` must be the identical TypeScript type exported from `src/modules/employee/index.ts` (which re-exports from `employee.repository.ts`). (see `src/modules/employee/index.ts`)
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
@@ -55,6 +19,10 @@ Your code MUST obey every rule below. These are not style preferences — the qu
 - Database calls must go through repository pattern (rule: `no-direct-db-outside-repository`)
 - No hardcoded passwords, API keys, or tokens (rule: `no-hardcoded-secrets`)
 - Do not add @gestalt/* packages as project dependencies — these are Gestalt platform internals not available on npm (rule: `no-gestalt-internal-deps`)
+
+## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
+These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
+- Consolidated decision for all questions: (1) Fiscal year = calendar year (Jan 1 to Dec 31), hardcoded — no configurable fiscalYearStart field. (2) Leave duration counts calendar days inclusive — weekends and public holidays ARE counted as leave days; do NOT introduce a holiday calendar entity. (3) Minimum granularity = full-day increments only — leave balances are integers, no half-days, no hours, no time-of-day on startDate/endDate. (4) Day counting from start_date to end_date is calendar days inclusive of both ends: daysRequested = (end_date - start_date) + 1. This single formula is BINDING at every call site (used_days deduction, overlap detection, remaining_days) — no weekend or holiday exclusion anywhere. [BINDING RULE — operator decision resolving: How is the fiscal year boundary defined — calendar year (Jan 1 – Dec 31) or a configurable start month/day? This determines when LeaveBalance transitions from ACTIVE/EXHAUSTED to CLOSED and when new balance records are created.; Should leave duration count weekends and public holidays as leave days, or only business days? The current rule uses calendar days inclusive, but this may not match all organisational policies.; What is the minimum granularity of a leave request — full days, half days, or hours? This affects the daysRequested calculation and balance precision.; How are leave days counted from start_date to end_date — calendar days (inclusive of both ends, e.g. Mon–Fri = 5 days) or business/working days only? This is BINDING across all balance-deduction and overlap-detection call sites.; apply everywhere these apply, not in one place only]
 
 ## Architecture & constraint rules the quality gate enforces (satisfy these now)
 The quality gate judges your code against the rules below and BLOCKS the phase on any violation — a violation it rates critical escalates to a human with no automatic retry. These are the same rules the gate checks, so comply up front rather than leaving them for the gate:
@@ -80,21 +48,54 @@ These are the project's non-negotiable invariants. A violation is a GOLDEN_PRINC
 - GP-006 — Error handling: No unhandled promise rejections. All async errors are caught and handled.
 
 ## Project stack & references
-Before writing code, read the referenced files below (those present in the working directory) to learn the project's language, framework, test runner, and conventions, and the cross-cutting rules your code must satisfy — then follow the existing repository conventions:
+Before making the edits below, read the referenced files (those present in the working directory) to learn the project's architecture, conventions, and the cross-cutting rules your fix must still satisfy — then keep the edits consistent with them:
 - `HARNESS.json`
 - `docs/ARCHITECTURE.md`
 - `docs/GOLDEN_PRINCIPLES.md`
 - `AGENTS.md`
 - `PLAN.md`
 
+## Required edits
+
+### Coherent change 1 — apply as ONE atomic edit across ALL sites below
+
+Unifying change (do this now): Replace all three direct internal-file imports in src/modules/leave-request/leave-request.service.ts with barrel imports through each module's public entry point: change `import { ILeaveBalanceRepository } from '../leave-balance/leave-balance.repository'` to `import { ILeaveBalanceRepository } from '../leave-balance'`, `import { ILeavePolicyRepository } from '../leave-policy/leave-policy.repository'` to `import { ILeavePolicyRepository } from '../leave-policy'`, and `import { IEmployeeRepository } from '../employee/employee.repository'` to `import { IEmployeeRepository } from '../employee'`.
+
+The sites below are the SAME underlying issue. Fixing some but not others leaves the code incoherent and the quality gate WILL re-flag it — apply the one change above consistently to EVERY site:
+
+- Site 1
+File: src/modules/leave-request/leave-request.service.ts
+Line: 3
+Offending code: `import { ILeaveBalanceRepository } from '../leave-balance/leave-balance.repository';`
+Rule violated: dependency-rule-barrel-imports
+Action (do this now): Edit `src/modules/leave-request/leave-request.service.ts` at line 3 in place to fix the `dependency-rule-barrel-imports` violation.
+What the quality gate found — apply this: [dependency-rule-barrel-imports] ARCHITECTURE.md states: "Modules import from each other ONLY through their declared public entry point (index.ts)." The leave-balance module's public entry point is `src/modules/leave-balance/index.ts`, which exports `ILeaveBalanceRepository`. This import bypasses the barrel export and reaches directly into the internal `leave-balance.repository.ts` file. Should be: `import { ILeaveBalanceRepository } from '../leave-balance';`
+
+- Site 2
+File: src/modules/leave-request/leave-request.service.ts
+Line: 4
+Offending code: `import { ILeavePolicyRepository } from '../leave-policy/leave-policy.repository';`
+Rule violated: dependency-rule-barrel-imports
+Action (do this now): Edit `src/modules/leave-request/leave-request.service.ts` at line 4 in place to fix the `dependency-rule-barrel-imports` violation.
+What the quality gate found — apply this: [dependency-rule-barrel-imports] ARCHITECTURE.md states: "Modules import from each other ONLY through their declared public entry point (index.ts)." The leave-policy module's public entry point is `src/modules/leave-policy/index.ts`, which exports `ILeavePolicyRepository`. This import bypasses the barrel export and reaches directly into the internal `leave-policy.repository.ts` file. Should be: `import { ILeavePolicyRepository } from '../leave-policy';`
+
+- Site 3
+File: src/modules/leave-request/leave-request.service.ts
+Line: 5
+Offending code: `import { IEmployeeRepository } from '../employee/employee.repository';`
+Rule violated: dependency-rule-barrel-imports
+Action (do this now): Edit `src/modules/leave-request/leave-request.service.ts` at line 5 in place to fix the `dependency-rule-barrel-imports` violation.
+What the quality gate found — apply this: [dependency-rule-barrel-imports] ARCHITECTURE.md states: "Modules import from each other ONLY through their declared public entry point (index.ts)." The employee module's public entry point is `src/modules/employee/index.ts`, which exports `IEmployeeRepository`. This import bypasses the barrel export and reaches directly into the internal `employee.repository.ts` file. Should be: `import { IEmployeeRepository } from '../employee';`
+
+Then check the rest of these files (and the surrounding module) for ANY OTHER occurrence of the same pattern beyond the specific lines listed above, and apply the same change there too — do NOT limit the fix to only the enumerated sites.
+
 ## Verify before you finish (MANDATORY)
-The code you write MUST compile and its tests MUST pass — a compilation or type error must NEVER be left for CI to find. Before you declare this task done:
-- Read the project's build / type-check / test commands from `package.json` (scripts) and `HARNESS.json`.
-- Install dependencies if they are not already installed, then RUN the type-check / build (e.g. `npm run build` or `tsc --noEmit`) AND the tests (e.g. `npm test`) for the files this phase touches.
-- FIX every compilation error, type error, and failing test you introduced — including in test files — and re-run until they pass.
+After making the edits above, the code MUST still compile and its tests MUST pass — a compilation/type error, or a test your change breaks, must NEVER be left for CI or the quality gate to find. Before you declare this task done:
+- Read the project's build / type-check / test commands from `package.json` (scripts) and `HARNESS.json`, install dependencies if they are not already installed, then RUN the type-check / build (e.g. `npm run build` or `tsc --noEmit`) AND the tests (e.g. `npm test`).
+- FIX every compilation error, type error, and failing test that YOUR edits introduced — including updating a test whose expectation your change legitimately invalidated (e.g. a new required field, a new status code such as 401/403 from an added authorization check, added input validation) — and re-run until they pass.
 - Only when the build and the tests pass may you consider the task complete. If a dependency install genuinely cannot be made to work, say so explicitly in your final message rather than declaring success on unverified code.
 
 ## Constraints (mandatory)
-- Write and modify source files ONLY. Do NOT run `git commit`, `git push`, `git add`, or any other git command. The platform handles all git operations. (Running the build / type-check / tests above is expected and encouraged — that is NOT a git operation.)
-- Do not create a new repository or change the git remote.
-- Stay within the scope of this phase; do not implement deferred/later work.
+- Keep the change SURGICAL: make the required edits above and fix only what they broke (compile/type errors and the tests they invalidated). Do NOT refactor, regenerate, or change unrelated code, and do not add / delete / rename source files beyond what a required edit — or a test-fix for it — needs.
+- Do NOT run `git commit`, `git push`, `git add`, or any git command. The platform handles all git operations. (Running the build / type-check / tests above is expected and encouraged — that is NOT a git operation.)
+- When the listed edits are made and the build + tests pass, stop.
