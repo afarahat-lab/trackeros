@@ -21,7 +21,8 @@ src/modules/uptime/         — Uptime monitoring module
 src/modules/employee/       — Employee module (model, repository, barrel export)
 src/modules/leave-policy/   — LeavePolicy module (model, repository, barrel export)
 src/modules/leave-balance/  — LeaveBalance module (model, repository, barrel export)
-src/modules/leave-request/  — LeaveRequest module (model, repository, service, barrel export)
+src/modules/leave-request/  — LeaveRequest module (model, repository, service, service interface,
+                              controller, routes, barrel export)
 src/modules/notification/   — Notification module (model, repository, barrel export)
 src/modules/audit/          — Audit module (model, repository, barrel export)
 src/shared/types/           — Shared enums and DTOs (LeaveStatus, LeaveType, AuditAction,
@@ -96,8 +97,29 @@ src/shared/db/              — Database connection utilities
 6. **Notification module** — Event notifications. ✅ **COMPLETE**
 7. **Audit module** — Audit logging. ✅ **COMPLETE**
 8. **Leave request service** — Core orchestration. ✅ **COMPLETE**
-9. **Leave request routes and controller** — API endpoints.
+9. **Leave request routes and controller** — API endpoints. ✅ **COMPLETE**
 10. **Supporting services** — Balance, Notification, Audit, Policy, Employee services.
+
+### API Endpoints (Phase 9)
+
+All routes registered under the Fastify app in `src/app.ts` via `app.register(leaveRequestRoutes)`.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/leave-requests` | Create a draft leave request (body: CreateLeaveRequestDto) |
+| POST | `/leave-requests/:id/submit` | Submit a draft for approval |
+| POST | `/leave-requests/:id/approve` | Approve a submitted request (body: `{ approverId }`) |
+| POST | `/leave-requests/:id/reject` | Reject a submitted request (body: `{ approverId }`) |
+| POST | `/leave-requests/:id/cancel` | Cancel a submitted or approved request |
+| GET | `/leave-requests/:id` | Get a single leave request by ID |
+| GET | `/leave-requests` | Query leave requests (query params: employeeId, status, leavePolicyId, startDateFrom, startDateTo) |
+| GET | `/leave-requests/employee/:employeeId` | Get all leave requests for an employee |
+
+**Error response shape**: `{ error: string; code: string }`. Error codes map to HTTP statuses: 400 (INVALID_DATE_RANGE, INVALID_STATE_TRANSITION, MINIMUM_NOTICE_VIOLATION, BALANCE_CLOSED, INSUFFICIENT_BALANCE, POLICY_INACTIVE), 403 (NOT_MANAGER), 404 (EMPLOYEE_NOT_FOUND, POLICY_NOT_FOUND, REQUEST_NOT_FOUND, BALANCE_NOT_FOUND), 500 (unexpected errors).
+
+**Date serialization**: All Date fields are serialized as ISO 8601 strings. Nullable date fields (`approvedAt`, `cancelledAt`) serialize as `null` when absent.
+
+**Note**: RBAC middleware (GP-005) is not yet wired at the HTTP layer — the routes currently accept all requests without auth guards. The service layer enforces manager checks for approve/reject operations.
 
 ### Cross-Cutting Contracts
 
