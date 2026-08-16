@@ -1,18 +1,18 @@
-# Implement this phase: Phase 2: Employee model and repository
+# Implement this phase: Phase 3: LeavePolicy model and repository
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/76d847b2-5905-40af-b702-36710232b1e4/2`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/76d847b2-5905-40af-b702-36710232b1e4/3`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the employee module at `src/modules/employee/`. This phase depends on `src/shared/types/index.ts` from Phase 1 — read it before generating any code.
+Create the leave-policy module at `src/modules/leave-policy/`. This phase depends on `src/shared/types/index.ts` from Phase 1 — read it before generating any code.
 
 Files to create:
-- `src/modules/employee/employee.model.ts` — Define the `Employee` entity interface with exact fields: id (string), employeeNumber (string), firstName (string), lastName (string), email (string), managerId (string | null), department (string), hireDate (Date), terminationDate (Date | null), employmentStatus (EmploymentStatus — import from `src/shared/types`), createdAt (Date), updatedAt (Date).
-- `src/modules/employee/employee.repository.ts` — Define `IEmployeeRepository` interface with methods: findById(id: string): Promise<Employee | null>, findByEmployeeNumber(employeeNumber: string): Promise<Employee | null>, findByManagerId(managerId: string): Promise<Employee[]>, findAll(): Promise<Employee[]>, create(employee: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'>): Promise<Employee>, update(id: string, data: Partial<Employee>): Promise<Employee | null>. Also provide a stub/empty implementation class `EmployeeRepository` that throws "not implemented" — the real DB-backed implementation comes in a later phase.
+- `src/modules/leave-policy/leave-policy.model.ts` — Define the `LeavePolicy` entity interface with exact fields: id (string), policyName (string), leaveType (LeaveType — import from `src/shared/types`), entitlementDays (number), accrualRate (number | null), maxAccumulation (number | null), minimumNoticeDays (number | null), requiresManagerApproval (boolean), isActive (boolean), createdAt (Date), updatedAt (Date).
+- `src/modules/leave-policy/leave-policy.repository.ts` — Define `ILeavePolicyRepository` interface with methods: findById(id: string): Promise<LeavePolicy | null>, findByLeaveType(leaveType: LeaveType): Promise<LeavePolicy | null>, findAllActive(): Promise<LeavePolicy[]>, create(policy: Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeavePolicy>, update(id: string, data: Partial<LeavePolicy>): Promise<LeavePolicy | null>. Provide a stub `LeavePolicyRepository` class that throws "not implemented".
 
-Include Jest unit tests in `tests/unit/modules/employee/employee.model.test.ts` and `tests/unit/modules/employee/employee.repository.test.ts`.
+Include Jest unit tests in `tests/unit/modules/leave-policy/leave-policy.model.test.ts` and `tests/unit/modules/leave-policy/leave-policy.repository.test.ts`.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -20,37 +20,34 @@ These are resolved, feature-wide decisions. Wherever this phase touches the conc
 
 ## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
 The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
-- `Employee` — the entity MUST have exactly these fields:
+- `LeavePolicy` — the entity MUST have exactly these fields:
     - id: string
-    - employeeNumber: string
-    - firstName: string
-    - lastName: string
-    - email: string
-    - managerId: string | null
-    - department: string
-    - hireDate: Date
-    - terminationDate: Date | null
-    - employmentStatus: 'ACTIVE' | 'INACTIVE' | 'TERMINATED'
+    - policyName: string
+    - leaveType: LeaveType
+    - entitlementDays: number
+    - accrualRate: number | null
+    - maxAccumulation: number | null
+    - minimumNoticeDays: number | null
+    - requiresManagerApproval: boolean
+    - isActive: boolean
     - createdAt: Date
     - updatedAt: Date
 
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- The `EmploymentStatus` enum used in `Employee.employmentStatus` must be the exact same enum exported from `src/shared/types/index.ts` — no local redefinition, no string literal union. (see `src/shared/types/index.ts`)
-- The `Employee` entity field names and types must match the reconciled architecture in `.gestalt/architecture/reconciled.json` — specifically the `domain_entities[].attributes` for the Employee entity: id (string), employeeNumber (string), firstName (string), lastName (string), email (string), managerId (string | null), department (string), hireDate (Date), terminationDate (Date | null), employmentStatus (EmploymentStatus), createdAt (Date), updatedAt (Date). (see `.gestalt/architecture/reconciled.json`)
-- The `IEmployeeRepository` method signatures must match the interface declared in the reconciled architecture's module boundaries: the `employee` module owns the `EmployeeRepository interface`. (see `.gestalt/architecture/reconciled.json`)
+- The `LeavePolicy` interface field names, types, and nullability must match the authoritative entity definition in `.gestalt/architecture/reconciled.json` domain_entities: `id: string`, `policyName: string`, `leaveType: LeaveType`, `entitlementDays: number`, `accrualRate: number | null`, `maxAccumulation: number | null`, `minimumNoticeDays: number | null`, `requiresManagerApproval: boolean`, `isActive: boolean`, `createdAt: Date`, `updatedAt: Date`. (see `.gestalt/architecture/reconciled.json`)
+- The barrel export `src/modules/leave-policy/index.ts` must follow the same structure as `src/modules/employee/index.ts`: re-export the model interface and the repository interface + class. (see `src/modules/employee/index.ts`)
 ### Entity invariants — enforce these
-- Reuse or extend `Employee`: Every Employee must have a unique `employeeNumber` and a unique `email`. The repository interface exposes `findByEmployeeNumber` to enforce this lookup contract; the uniqueness constraint itself is enforced at the database layer in a later phase.
-- Reuse or extend `Employee`: `managerId` is a self-referencing foreign key: it must be either `null` (top-level employee) or a valid `id` of another Employee. The repository does not enforce this in the stub phase, but the interface must accept `string | null` to support the manager hierarchy.
-- Reuse or extend `Employee`: `employmentStatus` must be one of the `EmploymentStatus` enum values: ACTIVE, INACTIVE, or TERMINATED. The type system enforces this via the import from `src/shared/types`.
-- Reuse or extend `Employee`: `terminationDate` must be `null` when `employmentStatus` is ACTIVE, and must be set when `employmentStatus` is TERMINATED. This invariant is documented in the entity interface (via comments or type narrowing) but enforced at the service layer in a later phase.
+- Reuse or extend `LeavePolicy`: A LeavePolicy has exactly one `leaveType` from the `LeaveType` enum; no two active policies may share the same `leaveType` (uniqueness enforced at the service/repository layer in later phases, but the interface must support the lookup `findByLeaveType` that returns a single policy or null).
+- Reuse or extend `LeavePolicy`: A LeavePolicy has a lifecycle: it is either ACTIVE (`isActive: true`) or INACTIVE (`isActive: false`). Only active policies are returned by `findAllActive()` and are eligible for use in leave requests.
+- Reuse or extend `LeavePolicy`: `entitlementDays` must be a positive integer. `accrualRate`, `maxAccumulation`, and `minimumNoticeDays` are nullable: when non-null they must be non-negative numbers. These constraints are validated at the service layer in later phases; the model interface itself does not enforce them at the type level.
 ### Interface contract — expose these operations (their shape is yours)
-- IEmployeeRepository.findById — No auth rule at the repository layer — auth is enforced at the service/controller layer in later phases.; idempotent; Returns `null` when no employee exists with the given id — does not throw.
-- IEmployeeRepository.create — No auth rule at the repository layer.; Must return the created Employee with `id`, `createdAt`, and `updatedAt` populated. The stub throws "not implemented"; the real implementation will throw on unique constraint violations (duplicate employeeNumber or email).
-- IEmployeeRepository.update — No auth rule at the repository layer.; Returns the updated Employee on success, `null` if no employee with the given id exists. The `data` parameter is `Partial<Employee>` — only supplied fields are updated; `id`, `createdAt` are never overwritten.
+- ILeavePolicyRepository.findById — No auth rule at the repository layer — auth is enforced at the controller/route layer per GP-005.; idempotent; Returns `null` when no policy exists with the given id; never throws for a missing record.
+- ILeavePolicyRepository.findByLeaveType — No auth rule at the repository layer.; idempotent; Returns `null` when no policy exists for the given `LeaveType`; never throws for a missing record.
+- ILeavePolicyRepository.findAllActive — No auth rule at the repository layer.; idempotent; Returns an empty array when no active policies exist; never returns null.
 ### Integration points — connect to these
-- src/shared/types/index.ts — The Employee entity imports `EmploymentStatus` enum. This is the only external dependency for this phase.
+- src/shared/types/index.ts — The `LeavePolicy` entity depends on `LeaveType` enum from shared types. This is the only external dependency of the leave-policy module in this phase.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
