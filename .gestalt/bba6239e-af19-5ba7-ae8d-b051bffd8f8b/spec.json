@@ -1,0 +1,152 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-balance",
+      "notification",
+      "audit",
+      "leave-policy",
+      "employee"
+    ],
+    "affectedLayers": [
+      "service",
+      "interface",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "`IBalanceService` interface is declared at `src/modules/leave-balance/leave-balance.service.interface.ts` with exactly three methods: `getBalance(employeeId: string, leavePolicyId: string, fiscalYear: number): Promise<LeaveBalance | null>`, `getBalancesForEmployee(employeeId: string, fiscalYear: number): Promise<LeaveBalance[]>`, and `initializeBalance(employeeId: string, leavePolicyId: string, fiscalYear: number): Promise<LeaveBalance>`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`BalanceService` class at `src/modules/leave-balance/leave-balance.service.ts` implements `IBalanceService`. Its constructor accepts `ILeaveBalanceRepository` and `ILeavePolicyRepository`. `initializeBalance` reads the policy via `findById`, extracts `entitlementDays`, and calls `repository.create` with `totalEntitlement=entitlementDays`, `usedDays=0`, `remainingDays=entitlementDays`, `status='ACTIVE'`, and the given `fiscalYear`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`INotificationService` interface is declared at `src/modules/notification/notification.service.interface.ts` with exactly six methods: `notifyLeaveSubmitted`, `notifyLeaveApproved`, `notifyLeaveRejected`, `notifyLeaveCancelled` (each taking `leaveRequest: LeaveRequest` and returning `Promise<LeaveNotification>`), `getNotificationsForUser(recipientId: string): Promise<LeaveNotification[]>`, and `markAsRead(id: string): Promise<void>`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`NotificationService` class at `src/modules/notification/notification.service.ts` implements `INotificationService`. Its constructor accepts `INotificationRepository` and `IEmployeeRepository`. Each `notify*` method: for SUBMITTED/CANCELLED, resolves the employee's manager via `employeeRepo.findById(leaveRequest.employeeId)` and targets `recipientId = employee.managerId`; for APPROVED/REJECTED, targets `recipientId = leaveRequest.employeeId`. Each creates a `LeaveNotification` with the correct `type` matching the method, a descriptive `title` and `message`, `leaveRequestId`, and `status = NotificationStatus.PENDING`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`markAsRead` in `NotificationService` updates the notification's `status` to `NotificationStatus.READ` and sets `readAt` to the current timestamp. If the notification is not found, it throws a typed error with code `NOTIFICATION_NOT_FOUND`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Stub service interface files exist: `src/modules/audit/audit.service.interface.ts` declares `IAuditService` with `logAction(entityType: string, entityId: string, action: string, oldValues: Record<string, unknown> | null, newValues: Record<string, unknown> | null, performedBy: string): Promise<AuditLog>`; `src/modules/leave-policy/leave-policy.service.interface.ts` declares `ILeavePolicyService` with `getPolicy(id: string): Promise<LeavePolicy | null>`, `getPolicyByType(leaveType: LeaveType): Promise<LeavePolicy | null>`, `isActive(id: string): Promise<boolean>`; `src/modules/employee/employee.service.interface.ts` declares `IEmployeeService` with `getEmployee(id: string): Promise<Employee | null>`, `getManager(employeeId: string): Promise<Employee | null>`, `isActive(id: string): Promise<boolean>`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests at `tests/unit/modules/leave-balance/leave-balance.service.test.ts` cover: `initializeBalance` creates a balance from policy entitlement, `getBalance` delegates to repository, `getBalancesForEmployee` delegates to repository, and `initializeBalance` throws when policy is not found.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests at `tests/unit/modules/notification/notification.service.test.ts` cover: each `notify*` method creates a notification with correct type/title/message/recipient, `getNotificationsForUser` delegates to repository, `markAsRead` updates status to READ and sets readAt, and `markAsRead` throws when notification is not found.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Fiscal year is hardcoded as calendar year (Jan 1 \u2013 Dec 31). The `initializeBalance` method uses the `fiscalYear` parameter as-is; the caller is responsible for passing the correct calendar year. No configurable fiscal-year-start logic is introduced in this phase.",
+    "All service implementations must follow GP-001: database access goes exclusively through the repository interfaces injected via the constructor. No direct Knex/DB calls in service code.",
+    "Error semantics must match the existing pattern established in `LeaveRequestService`: thrown errors are plain objects with `{ error: string; code: string }` shape. Error codes for this phase: `POLICY_NOT_FOUND`, `BALANCE_ALREADY_EXISTS`, `NOTIFICATION_NOT_FOUND`, `EMPLOYEE_NOT_FOUND`.",
+    "The `initializeBalance` method must check for an existing balance for the same `(employeeId, leavePolicyId, fiscalYear)` tuple before creating. If one already exists, it must throw with code `BALANCE_ALREADY_EXISTS` \u2014 the composite uniqueness invariant from the LeaveBalance model must be enforced at the service layer.",
+    "Notification `notify*` methods must resolve the employee entity to determine the correct recipient. For SUBMITTED and CANCELLED notifications, if the employee has no manager (`managerId === null`), the method must throw with code `NO_MANAGER_ASSIGNED`.",
+    "All new service and interface files must be re-exported from their module's `index.ts` barrel file so they are importable by other modules via the module's public entry point (e.g., `import { BalanceService } from '../leave-balance'`)."
+  ],
+  "outOfScope": [
+    "Full implementations of `AuditService`, `LeavePolicyService`, and `EmployeeService` \u2014 only their interface declarations are created in this phase. The concrete classes with business logic are deferred to later phases.",
+    "Integration of `NotificationService` and `AuditService` into `LeaveRequestService` \u2014 the leave-request service currently does not call notification or audit modules. Wiring these cross-cutting concerns is deferred to a later phase.",
+    "DB-backed repository implementations \u2014 all repositories remain stubs that throw \"not implemented\". The real PostgreSQL/Knex implementations are deferred."
+  ],
+  "ambiguities": [
+    {
+      "description": "The PLAN.md specifies `getBalance` returns `Promise<LeaveBalance>` (non-nullable), but the underlying repository method `findByEmployeeAndPolicy` returns `Promise<LeaveBalance | null>`. If no balance exists for the given tuple, should the service return `null` or throw a typed error?",
+      "options": [
+        "Return null when no balance exists (match repository signature)",
+        "Throw typed error with code BALANCE_NOT_FOUND when no balance exists"
+      ],
+      "impactIfWrong": "medium"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "At all times, `remainingDays === totalEntitlement - usedDays`. Any mutation to `usedDays` must recalculate `remainingDays` accordingly. The `initializeBalance` method establishes this invariant at creation time by setting `remainingDays = totalEntitlement` when `usedDays = 0`."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "Composite uniqueness: at most one `LeaveBalance` row may exist for a given `(employeeId, leavePolicyId, fiscalYear)` tuple. The `initializeBalance` method must enforce this by checking for an existing balance before creating and throwing `BALANCE_ALREADY_EXISTS` if one is found."
+    },
+    {
+      "entity": "LeaveNotification",
+      "mustExistOrExtend": true,
+      "invariant": "When `status` is `PENDING` or `SENT`, `readAt` must be `null`. When `status` is `READ` or `ARCHIVED`, `readAt` must be a non-null `Date`. The `markAsRead` method transitions from `PENDING`/`SENT` to `READ` and sets `readAt` to the current timestamp."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IBalanceService.initializeBalance",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws `{ error: string, code: 'POLICY_NOT_FOUND' }` when the leavePolicyId does not resolve to an existing policy. Throws `{ error: string, code: 'BALANCE_ALREADY_EXISTS' }` when a balance already exists for the same (employeeId, leavePolicyId, fiscalYear) tuple."
+    },
+    {
+      "operation": "INotificationService.notifyLeaveSubmitted",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws `{ error: string, code: 'EMPLOYEE_NOT_FOUND' }` when the leaveRequest's employeeId does not resolve. Throws `{ error: string, code: 'NO_MANAGER_ASSIGNED' }` when the employee has no managerId."
+    },
+    {
+      "operation": "INotificationService.markAsRead",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Throws `{ error: string, code: 'NOTIFICATION_NOT_FOUND' }` when the id does not resolve. Idempotent: calling markAsRead on an already-READ notification is a no-op (no error)."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The `BalanceService` must use the same `ILeaveBalanceRepository` interface declared in `src/modules/leave-balance/leave-balance.repository.ts` \u2014 specifically `findByEmployeeAndPolicy`, `findByEmployeeId`, `create`, and `update` with their exact signatures.",
+      "referencePath": "src/modules/leave-balance/leave-balance.repository.ts"
+    },
+    {
+      "requirement": "The `BalanceService` must use the same `ILeavePolicyRepository` interface declared in `src/modules/leave-policy/leave-policy.repository.ts` \u2014 specifically `findById` with its exact signature, to read `entitlementDays` from the policy.",
+      "referencePath": "src/modules/leave-policy/leave-policy.repository.ts"
+    },
+    {
+      "requirement": "The `NotificationService` must use the same `INotificationRepository` interface declared in `src/modules/notification/notification.repository.ts` \u2014 specifically `create` and `updateStatus` with their exact signatures.",
+      "referencePath": "src/modules/notification/notification.repository.ts"
+    },
+    {
+      "requirement": "The `NotificationService` must use the same `IEmployeeRepository` interface declared in `src/modules/employee/employee.repository.ts` \u2014 specifically `findById` with its exact signature, to resolve the employee and their managerId.",
+      "referencePath": "src/modules/employee/employee.repository.ts"
+    },
+    {
+      "requirement": "The `NotificationService.notify*` methods accept a `LeaveRequest` parameter whose shape must match the `LeaveRequest` interface declared in `src/modules/leave-request/leave-request.model.ts` \u2014 specifically the fields `id`, `employeeId`, `leavePolicyId`, `startDate`, `endDate`, `status`.",
+      "referencePath": "src/modules/leave-request/leave-request.model.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/leave-balance/index.ts",
+      "why": "Must re-export `IBalanceService` and `BalanceService` so the leave-request module (and future modules) can import them via the public barrel."
+    },
+    {
+      "target": "src/modules/notification/index.ts",
+      "why": "Must re-export `INotificationService` and `NotificationService` so the leave-request module (and future modules) can import them via the public barrel."
+    }
+  ]
+}
