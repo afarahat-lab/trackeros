@@ -1,39 +1,55 @@
-# Implement this phase: Phase 6: Notification model and repository
+# Implement this phase: Phase 7: AuditLog model and repository
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/76d847b2-5905-40af-b702-36710232b1e4/6`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/76d847b2-5905-40af-b702-36710232b1e4/7`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the notification module at `src/modules/notification/`. This phase depends on `src/shared/types/index.ts` from Phase 1 and `src/modules/leave-request/leave-request.model.ts` from Phase 5 — read both before generating any code.
+Create the audit module at `src/modules/audit/`. This phase depends on `src/shared/types/index.ts` from Phase 1 — read it before generating any code.
 
 Files to create:
-- `src/modules/notification/notification.model.ts` — Define the `LeaveNotification` entity interface with exact fields: id (string), recipientId (string), type ('SUBMITTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'BALANCE_LOW' | 'BALANCE_EXHAUSTED'), title (string), message (string), leaveRequestId (string), status (NotificationStatus — import from `src/shared/types`), createdAt (Date), readAt (Date | null).
-- `src/modules/notification/notification.repository.ts` — Define `INotificationRepository` interface with methods: findById(id: string): Promise<LeaveNotification | null>, findByRecipientId(recipientId: string): Promise<LeaveNotification[]>, findByLeaveRequestId(leaveRequestId: string): Promise<LeaveNotification[]>, create(notification: Omit<LeaveNotification, 'id' | 'createdAt'>): Promise<LeaveNotification>, updateStatus(id: string, status: NotificationStatus): Promise<LeaveNotification | null>. Provide a stub `NotificationRepository` class.
+- `src/modules/audit/audit.model.ts` — Define the `AuditLog` entity interface with exact fields: id (string), entityType (string), entityId (string), action (string), oldValues (Record<string, any> | null), newValues (Record<string, any> | null), performedBy (string | null), performedAt (Date), ipAddress (string | null), userAgent (string | null), createdAt (Date).
+- `src/modules/audit/audit.repository.ts` — Define `IAuditLogRepository` interface with methods: findById(id: string): Promise<AuditLog | null>, findByEntity(entityType: string, entityId: string): Promise<AuditLog[]>, findByPerformedBy(performedBy: string): Promise<AuditLog[]>, create(log: Omit<AuditLog, 'id' | 'createdAt'>): Promise<AuditLog>. Provide a stub `AuditLogRepository` class.
 
-Include Jest unit tests in `tests/unit/modules/notification/notification.model.test.ts` and `tests/unit/modules/notification/notification.repository.test.ts`.
+Include Jest unit tests in `tests/unit/modules/audit/audit.model.test.ts` and `tests/unit/modules/audit/audit.repository.test.ts`.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
 - Consolidated decision for all questions: (1) Fiscal year = calendar year (Jan 1 to Dec 31), hardcoded — no configurable fiscalYearStart field. (2) Leave duration counts calendar days inclusive — weekends and public holidays ARE counted as leave days; do NOT introduce a holiday calendar entity. (3) Minimum granularity = full-day increments only — leave balances are integers, no half-days, no hours, no time-of-day on startDate/endDate. (4) Day counting from start_date to end_date is calendar days inclusive of both ends: daysRequested = (end_date - start_date) + 1. This single formula is BINDING at every call site (used_days deduction, overlap detection, remaining_days) — no weekend or holiday exclusion anywhere. [BINDING RULE — operator decision resolving: How is the fiscal year boundary defined — calendar year (Jan 1 – Dec 31) or a configurable start month/day? This determines when LeaveBalance transitions from ACTIVE/EXHAUSTED to CLOSED and when new balance records are created.; Should leave duration count weekends and public holidays as leave days, or only business days? The current rule uses calendar days inclusive, but this may not match all organisational policies.; What is the minimum granularity of a leave request — full days, half days, or hours? This affects the daysRequested calculation and balance precision.; How are leave days counted from start_date to end_date — calendar days (inclusive of both ends, e.g. Mon–Fri = 5 days) or business/working days only? This is BINDING across all balance-deduction and overlap-detection call sites.; apply everywhere these apply, not in one place only]
 
+## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
+The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
+- `AuditLog` — the entity MUST have exactly these fields:
+    - id: string
+    - entityType: string
+    - entityId: string
+    - action: string
+    - oldValues: Record<string, any> | null
+    - newValues: Record<string, any> | null
+    - performedBy: string | null
+    - performedAt: Date
+    - ipAddress: string | null
+    - userAgent: string | null
+    - createdAt: Date
+
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- The `NotificationStatus` enum must be imported from `src/shared/types/index.ts` — do NOT redefine or duplicate it in the notification module. (see `src/shared/types/index.ts`)
-- The `LeaveNotification` entity's `leaveRequestId` field is a string reference to `LeaveRequest.id`. The notification module must NOT import from `src/modules/leave-request/` — the dependency map in reconciled.json shows `notification → shared-types` only. (see `.gestalt/architecture/reconciled.json`)
-- The model file must follow the established pattern: export the interface with a JSDoc comment describing the entity and its invariants, import shared types from `../../shared/types` (relative path matching sibling modules like employee, leave-policy, leave-request). (see `src/modules/employee/employee.model.ts`)
-- The repository file must follow the established pattern: export both the interface (prefixed with `I`) and a stub class, with each stub method accepting prefixed-underscore parameters and throwing `new Error('not implemented')`. The interface JSDoc must reference GP-001. (see `src/modules/employee/employee.repository.ts`)
-- The barrel export `index.ts` must re-export the model interface and both the repository interface and stub class, matching the pattern used by employee, leave-policy, leave-balance, and leave-request modules. (see `src/modules/employee/index.ts`)
+- The `AuditLog` model file must follow the same JSDoc + interface export pattern as `src/modules/employee/employee.model.ts` and `src/modules/notification/notification.model.ts`: a JSDoc block describing the entity's purpose and invariants, followed by the exported interface. (see `src/modules/employee/employee.model.ts`)
+- The `AuditLogRepository` stub class must follow the same pattern as `EmployeeRepository` and `NotificationRepository`: each method uses underscore-prefixed unused parameters, throws `new Error('not implemented')`, and the class explicitly `implements IAuditLogRepository`. (see `src/modules/employee/employee.repository.ts`)
+- The barrel export `src/modules/audit/index.ts` must follow the same re-export pattern as `src/modules/employee/index.ts` and `src/modules/notification/index.ts`: re-export the model interface and the repository interface + stub class. (see `src/modules/employee/index.ts`)
+- The model test must import `AuditLog` from the barrel `../../../../src/modules/audit` (not from the model file directly), matching the import pattern in `tests/unit/modules/employee/employee.model.test.ts`. (see `tests/unit/modules/employee/employee.model.test.ts`)
+- The repository test must import `AuditLogRepository`, `IAuditLogRepository`, and `AuditLog` from the barrel `../../../../src/modules/audit`, matching the import pattern in `tests/unit/modules/notification/notification.repository.test.ts`. (see `tests/unit/modules/notification/notification.repository.test.ts`)
 ### Entity invariants — enforce these
-- Reuse or extend `LeaveNotification`: Lifecycle: PENDING → SENT → READ → ARCHIVED. The `status` field must always hold a valid `NotificationStatus` enum value. The `readAt` field must be `null` when status is PENDING or SENT; it must be a non-null `Date` when status is READ or ARCHIVED. The `type` field must be one of the 6 string literals: 'SUBMITTED', 'APPROVED', 'REJECTED', 'CANCELLED', 'BALANCE_LOW', 'BALANCE_EXHAUSTED'. The `leaveRequestId` is a string reference to a LeaveRequest.id — referential integrity is enforced at the service/DB layer in later phases.
+- Reuse or extend `AuditLog`: Every AuditLog record is immutable — it has no update or delete lifecycle. Once created, its fields are permanent. The repository exposes only `create` and read methods; there is no mutation path.
+- Reuse or extend `AuditLog`: Every AuditLog record must reference a valid domain entity via the composite `(entityType, entityId)` pair. The `entityType` is a string identifying the domain aggregate (e.g. 'LeaveRequest', 'LeaveBalance', 'LeavePolicy'), and `entityId` is the primary key of that entity. Referential integrity is enforced at the service/DB layer in later phases.
+- Reuse or extend `AuditLog`: `oldValues` and `newValues` are independently nullable. When `action` is `CREATE`, `oldValues` must be `null` and `newValues` must be non-null. When `action` is `DELETE`, `oldValues` must be non-null and `newValues` must be `null`. When `action` is `UPDATE`, both must be non-null. This invariant is enforced at the service layer in a later phase.
 ### Interface contract — expose these operations (their shape is yours)
-- INotificationRepository.findById — No auth rule at the repository layer — auth is enforced at the service/controller layer in later phases.; idempotent; Returns `null` when no notification exists with the given id; never throws for a missing entity.
-- INotificationRepository.create — No auth rule at the repository layer.; Accepts `Omit<LeaveNotification, 'id' | 'createdAt'>` — the caller must NOT supply `id` or `createdAt`; the repository assigns them. Returns the created `LeaveNotification` with all fields populated.
-- INotificationRepository.updateStatus — No auth rule at the repository layer.; idempotent; Only mutates the `status` field (and implicitly `readAt` when transitioning to READ). Returns the updated `LeaveNotification` or `null` if no notification exists with the given id.
+- IAuditLogRepository.create — No auth rule at the repository layer — auth is enforced at the service/controller layer in later phases.; Returns the created `AuditLog` with `id` and `createdAt` populated. The stub throws `'not implemented'`.
+- IAuditLogRepository.findByEntity — No auth rule at the repository layer.; idempotent; Returns an array (empty if no matching logs). The stub throws `'not implemented'`.
 ### Integration points — connect to these
-- src/shared/types/index.ts — Imports `NotificationStatus` enum (PENDING, SENT, READ, ARCHIVED) for the `status` field on `LeaveNotification`.
+- src/shared/types/index.ts — The audit module is the sole dependency of this phase. The `AuditLog` entity does not reference any shared enum directly (action is a free-form string), but the module must be able to import shared types if needed in later phases.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
