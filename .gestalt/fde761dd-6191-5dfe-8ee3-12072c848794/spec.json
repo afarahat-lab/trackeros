@@ -1,0 +1,157 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-balance",
+      "notification",
+      "audit",
+      "leave-policy",
+      "employee"
+    ],
+    "affectedLayers": [
+      "service",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "`BalanceService.initializeBalance(employeeId, leavePolicyId, fiscalYear)` reads the policy's `entitlementDays` via `ILeavePolicyRepository.findById` and creates a `LeaveBalance` via `ILeaveBalanceRepository.create` with `totalEntitlement=entitlementDays`, `usedDays=0`, `remainingDays=entitlementDays`, `status='ACTIVE'`, and the given `fiscalYear`. If the policy is not found, it throws a typed error `{ error: string; code: 'POLICY_NOT_FOUND' }`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`BalanceService.getBalance(employeeId, leavePolicyId, fiscalYear)` delegates to `ILeaveBalanceRepository.findByEmployeeAndPolicy` and returns the result. If no balance exists, it returns `null`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`BalanceService.getBalancesForEmployee(employeeId, fiscalYear)` delegates to `ILeaveBalanceRepository.findByEmployeeId` and returns the array of balances.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`NotificationService.notifyLeaveSubmitted(leaveRequest)` creates a `LeaveNotification` with `type='SUBMITTED'`, `status='PENDING'`, `leaveRequestId=leaveRequest.id`, and `recipientId` set to the employee's manager (resolved via `IEmployeeRepository.findById(leaveRequest.employeeId)` then `IEmployeeRepository.findById(employee.managerId)`). If the employee has no manager, the notification is still created with `recipientId` set to a sentinel or the employee themselves \u2014 the implementation must not throw.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`NotificationService.notifyLeaveApproved(leaveRequest)` and `notifyLeaveRejected(leaveRequest)` each create a `LeaveNotification` with `type='APPROVED'` or `type='REJECTED'`, `status='PENDING'`, `leaveRequestId=leaveRequest.id`, and `recipientId=leaveRequest.employeeId` (the employee who submitted the request).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`NotificationService.notifyLeaveCancelled(leaveRequest)` creates a `LeaveNotification` with `type='CANCELLED'`, `status='PENDING'`, `leaveRequestId=leaveRequest.id`, and `recipientId` set to the employee's manager (same manager-resolution logic as `notifyLeaveSubmitted`).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`NotificationService.getNotificationsForUser(recipientId)` delegates to `INotificationRepository.findByRecipientId` and returns the array. `NotificationService.markAsRead(id)` delegates to `INotificationRepository.updateStatus(id, NotificationStatus.READ)`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Stub interface files exist at `src/modules/audit/audit.service.interface.ts` (exporting `IAuditService` with `logAction(entityType, entityId, action, oldValues, newValues, performedBy): Promise<AuditLog>`), `src/modules/leave-policy/leave-policy.service.interface.ts` (exporting `ILeavePolicyService` with `getPolicy(id)`, `getPolicyByType(leaveType)`, `isActive(id)`), and `src/modules/employee/employee.service.interface.ts` (exporting `IEmployeeService` with `getEmployee(id)`, `getManager(employeeId)`, `isActive(id)`). Each file compiles cleanly and imports only from its own module's model or shared types.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests exist at `tests/unit/modules/leave-balance/leave-balance.service.test.ts` and `tests/unit/modules/notification/notification.service.test.ts`. Each test file mocks the repository dependencies and verifies all service methods: correct delegation, correct parameter passing, correct error propagation, and correct notification recipient targeting (manager vs employee).",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Fiscal year is calendar year (Jan 1 \u2013 Dec 31), hardcoded. The `initializeBalance` method uses the `fiscalYear` parameter as-is; no configurable fiscal-year-start logic is introduced in this phase. [BINDING RULE from reconciled.json business_rules]",
+    "All database access goes through repository interfaces (GP-001). `BalanceService` must depend on `ILeaveBalanceRepository` and `ILeavePolicyRepository`; `NotificationService` must depend on `INotificationRepository` and `IEmployeeRepository`. No direct DB calls.",
+    "Services must not import from other modules' internals \u2014 only from their barrel `index.ts` (or the module's public entry point). `BalanceService` imports from `../leave-balance` and `../leave-policy`; `NotificationService` imports from `../notification` and `../employee`.",
+    "Error semantics must match the existing contract: thrown errors are plain objects `{ error: string; code: string }`. `BalanceService.initializeBalance` must throw `{ error: 'Leave policy not found', code: 'POLICY_NOT_FOUND' }` when the policy does not exist. `NotificationService` notify methods must not throw on missing employee/manager \u2014 they should handle gracefully (e.g., skip notification or use a fallback).",
+    "The `daysRequested` BINDING formula `(endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24) + 1` is NOT used in this phase \u2014 balance initialization does not compute days. The formula is already implemented in `LeaveRequestService` (Phase 8). This phase must not duplicate or redefine it."
+  ],
+  "outOfScope": [
+    "Full implementations of `AuditService`, `LeavePolicyService`, and `EmployeeService` \u2014 only stub interface files are created in this phase.",
+    "DB-backed repository implementations \u2014 all repositories remain stubs that throw \"not implemented\".",
+    "Integration of `BalanceService` and `NotificationService` into `LeaveRequestService` \u2014 the existing `LeaveRequestService` does not call audit or notification modules; that wiring is deferred.",
+    "RBAC enforcement at the HTTP layer (GP-005) \u2014 routes accept all requests without auth guards. Manager checks remain at the service layer only."
+  ],
+  "ambiguities": [
+    {
+      "description": "The `initializeBalance` interface signature accepts `fiscalYear: number` as a parameter, but the PLAN.md description says \"fiscalYear=current calendar year (hardcoded Jan 1 \u2013 Dec 31 per BINDING rule).\" Should the implementation derive the fiscal year from `new Date().getFullYear()` (ignoring the parameter), or use the parameter as-is?",
+      "options": [
+        "Use the fiscalYear parameter as-is \u2014 the caller decides the fiscal year",
+        "Ignore the parameter and always derive fiscalYear from new Date().getFullYear()",
+        "Use the parameter but validate it matches the current calendar year"
+      ],
+      "impactIfWrong": "medium"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "`remainingDays` MUST equal `totalEntitlement - usedDays` at all times. `BalanceService.initializeBalance` sets `usedDays=0` and `remainingDays=totalEntitlement`, satisfying this invariant at creation. Any future mutation to `usedDays` (in other services) must recalculate `remainingDays` accordingly."
+    },
+    {
+      "entity": "LeaveNotification",
+      "mustExistOrExtend": true,
+      "invariant": "Every `LeaveNotification` created by `NotificationService` must have `status='PENDING'` and `readAt=null` at creation time. The `type` must match the lifecycle event that triggered it (SUBMITTED, APPROVED, REJECTED, or CANCELLED). The `leaveRequestId` must reference the `LeaveRequest.id` that triggered the notification."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "A `LeaveBalance` initialized via `BalanceService.initializeBalance` must have `status='ACTIVE'`. The composite uniqueness constraint `(employeeId, leavePolicyId, fiscalYear)` is enforced by the repository layer \u2014 the service must not create a duplicate balance for the same tuple."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IBalanceService.initializeBalance(employeeId, leavePolicyId, fiscalYear)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws `{ error: 'Leave policy not found', code: 'POLICY_NOT_FOUND' }` when `ILeavePolicyRepository.findById` returns null. Throws repository-level errors unwrapped if the underlying create fails (e.g., duplicate key)."
+    },
+    {
+      "operation": "INotificationService.notifyLeaveSubmitted(leaveRequest)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Must not throw if the employee or manager cannot be resolved. If `employee.managerId` is null, the notification should target the employee themselves or use a defined fallback \u2014 the implementation chooses the shape but must not throw."
+    },
+    {
+      "operation": "INotificationService.markAsRead(id)",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Delegates to `INotificationRepository.updateStatus(id, NotificationStatus.READ)`. If the notification does not exist, the repository returns null \u2014 the service should propagate this as a no-op (void return) rather than throwing."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "`BalanceService` must use the same `LeaveBalance` entity shape defined in `src/modules/leave-balance/leave-balance.model.ts` \u2014 specifically the fields `totalEntitlement`, `usedDays`, `remainingDays`, `fiscalYear`, `status` with the union type `'ACTIVE' | 'EXHAUSTED' | 'CLOSED'`.",
+      "referencePath": "src/modules/leave-balance/leave-balance.model.ts"
+    },
+    {
+      "requirement": "`NotificationService` must use the same `LeaveNotification` entity shape defined in `src/modules/notification/notification.model.ts` \u2014 specifically the fields `recipientId`, `type` (union of 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'BALANCE_LOW' | 'BALANCE_EXHAUSTED'), `title`, `message`, `leaveRequestId`, `status` (NotificationStatus enum), `readAt`.",
+      "referencePath": "src/modules/notification/notification.model.ts"
+    },
+    {
+      "requirement": "`NotificationService` must use `IEmployeeRepository.findById` (not `IEmployeeRepository.findByManagerId`) to resolve the employee and their manager. This matches the existing pattern in `LeaveRequestService` (Phase 8) which uses `employeeRepo.findById` for manager checks.",
+      "referencePath": "src/modules/leave-request/leave-request.service.ts"
+    },
+    {
+      "requirement": "Error objects thrown by services must match the shape `{ error: string; code: string }` used throughout `LeaveRequestService` (Phase 8). No `new Error()` throws for business-logic failures \u2014 only for truly unexpected internal errors.",
+      "referencePath": "src/modules/leave-request/leave-request.service.ts"
+    },
+    {
+      "requirement": "The stub interface files (`IAuditService`, `ILeavePolicyService`, `IEmployeeService`) must import entity types from their respective module models: `AuditLog` from `src/modules/audit/audit.model.ts`, `LeavePolicy` from `src/modules/leave-policy/leave-policy.model.ts`, `Employee` from `src/modules/employee/employee.model.ts`. The `LeaveType` enum used in `ILeavePolicyService.getPolicyByType` must come from `src/shared/types/index.ts`.",
+      "referencePath": "src/shared/types/index.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/leave-balance/index.ts",
+      "why": "`BalanceService` and `IBalanceService` must be exported from the leave-balance barrel so that `LeaveRequestService` (and future modules) can import them."
+    },
+    {
+      "target": "src/modules/notification/index.ts",
+      "why": "`NotificationService` and `INotificationService` must be exported from the notification barrel so that `LeaveRequestService` (and future modules) can import them."
+    }
+  ]
+}

@@ -20,11 +20,13 @@ src/modules/status/         — System status module (health-check, version)
 src/modules/uptime/         — Uptime monitoring module
 src/modules/employee/       — Employee module (model, repository, barrel export)
 src/modules/leave-policy/   — LeavePolicy module (model, repository, barrel export)
-src/modules/leave-balance/  — LeaveBalance module (model, repository, barrel export)
+src/modules/leave-balance/  — LeaveBalance module (model, repository, service, service interface,
+                              barrel export)
 src/modules/leave-request/  — LeaveRequest module (model, repository, service, service interface,
                               controller, routes, barrel export)
-src/modules/notification/   — Notification module (model, repository, barrel export)
-src/modules/audit/          — Audit module (model, repository, barrel export)
+src/modules/notification/   — Notification module (model, repository, service, service interface,
+                              barrel export)
+src/modules/audit/          — Audit module (model, repository, service interface, barrel export)
 src/shared/types/           — Shared enums and DTOs (LeaveStatus, LeaveType, AuditAction,
                               NotificationStatus, EmploymentStatus, CreateLeaveRequestDto,
                               UpdateLeaveRequestDto, LeaveRequestQueryParams, ValidationResult)
@@ -71,11 +73,11 @@ src/shared/db/              — Database connection utilities
 ### Module Boundaries
 
 - **shared-types** (`src/shared/types/`) — Enums and DTOs used across all modules. **Implemented Phase 1.**
-- **employee** (`src/modules/employee/`) — Employee entity, repository, and service.
-- **leave-policy** (`src/modules/leave-policy/`) — LeavePolicy entity, repository, and service.
-- **leave-balance** (`src/modules/leave-balance/`) — LeaveBalance entity, repository, and BalanceService.
-- **notification** (`src/modules/notification/`) — LeaveNotification entity, repository, and NotificationService.
-- **audit** (`src/modules/audit/`) — AuditLog entity, repository, and AuditService.
+- **employee** (`src/modules/employee/`) — Employee entity and repository. Service interface deferred.
+- **leave-policy** (`src/modules/leave-policy/`) — LeavePolicy entity and repository. Service interface deferred.
+- **leave-balance** (`src/modules/leave-balance/`) — LeaveBalance entity, repository, and BalanceService (full implementation). **Note:** barrel export (`index.ts`) does not yet export the service or its interface.
+- **notification** (`src/modules/notification/`) — LeaveNotification entity, repository, and NotificationService (full implementation). **Note:** barrel export (`index.ts`) does not yet export the service or its interface.
+- **audit** (`src/modules/audit/`) — AuditLog entity, repository, and IAuditService (stub interface only — no implementation). **Note:** barrel export (`index.ts`) does not yet export the service interface.
 - **leave-request** (`src/modules/leave-request/`) — LeaveRequest entity, repository, and LeaveRequestService. Orchestrates the leave lifecycle, depending on all other modules.
 
 ### Dependency Map
@@ -98,7 +100,7 @@ src/shared/db/              — Database connection utilities
 7. **Audit module** — Audit logging. ✅ **COMPLETE**
 8. **Leave request service** — Core orchestration. ✅ **COMPLETE**
 9. **Leave request routes and controller** — API endpoints. ✅ **COMPLETE**
-10. **Supporting services** — Balance, Notification, Audit, Policy, Employee services.
+10. **Supporting services** — BalanceService ✅, NotificationService ✅, IAuditService (stub) ✅. Deferred: LeavePolicyService interface, EmployeeService interface, service unit tests, barrel export updates for new services.
 
 ### API Endpoints (Phase 9)
 
@@ -130,7 +132,7 @@ All routes registered under the Fastify app in `src/app.ts` via `app.register(le
 
 - **Auth**: JWT bearer token → `request.user: { id: string; role: UserRole }`. Roles: `employee`, `manager`, `hr_admin`. RBAC enforced via `requireRole(...)` guard. **Not yet implemented** — routes accept all requests without auth. Manager checks are enforced at the service layer for approve/reject.
 - **Transaction**: Repository methods that participate in multi-step writes accept an optional `PoolClient`. The service owns the unit of work: acquires client, BEGIN, passes client to repositories, COMMIT/ROLLBACK. **Not yet implemented** — deferred to the DB-backed repository implementation phase.
-- **Audit**: All state-changing operations should produce an audit record (GP-002). **Not yet integrated** — the LeaveRequestService does not call audit or notification modules; these cross-cutting concerns are deferred to Phase 10.
+- **Audit**: All state-changing operations should produce an audit record (GP-002). **Not yet integrated** — the LeaveRequestService does not call audit or notification modules; these cross-cutting concerns are deferred to a future phase.
 - **Error Response**: Standard shape `{ error: string; code: string }`. HTTP 400 for validation, 403 for authorization, 404 for not found, 409 for business rule conflicts (state transitions, insufficient balance, closed balance, inactive policy), 500 for internal errors.
 
 ### Open Questions
