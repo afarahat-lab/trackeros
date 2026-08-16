@@ -115,7 +115,12 @@ All routes registered under the Fastify app in `src/app.ts` via `app.register(le
 | GET | `/leave-requests` | Query leave requests (query params: employeeId, status, leavePolicyId, startDateFrom, startDateTo) |
 | GET | `/leave-requests/employee/:employeeId` | Get all leave requests for an employee |
 
-**Error response shape**: `{ error: string; code: string }`. Error codes map to HTTP statuses: 400 (INVALID_DATE_RANGE, INVALID_STATE_TRANSITION, MINIMUM_NOTICE_VIOLATION, BALANCE_CLOSED, INSUFFICIENT_BALANCE, POLICY_INACTIVE), 403 (NOT_MANAGER), 404 (EMPLOYEE_NOT_FOUND, POLICY_NOT_FOUND, REQUEST_NOT_FOUND, BALANCE_NOT_FOUND), 500 (unexpected errors).
+**Error response shape**: `{ error: string; code: string }`. Error codes map to HTTP statuses:
+- **400**: INVALID_DATE_RANGE, MINIMUM_NOTICE_VIOLATION
+- **403**: NOT_MANAGER
+- **404**: EMPLOYEE_NOT_FOUND, POLICY_NOT_FOUND, REQUEST_NOT_FOUND, BALANCE_NOT_FOUND
+- **409**: INVALID_STATE_TRANSITION, INSUFFICIENT_BALANCE, BALANCE_CLOSED, POLICY_INACTIVE
+- **500**: unrecognized errors (generic `{ error: 'Internal Server Error' }`, no code field)
 
 **Date serialization**: All Date fields are serialized as ISO 8601 strings. Nullable date fields (`approvedAt`, `cancelledAt`) serialize as `null` when absent.
 
@@ -123,9 +128,10 @@ All routes registered under the Fastify app in `src/app.ts` via `app.register(le
 
 ### Cross-Cutting Contracts
 
-- **Auth**: JWT bearer token → `request.user: { id: string; role: UserRole }`. Roles: `employee`, `manager`, `hr_admin`. RBAC enforced via `requireRole(...)` guard. Employee-only actions: submit, withdraw, cancelApproved. Manager/HR admin actions: approve, reject.
-- **Transaction**: Repository methods that participate in multi-step writes accept an optional `PoolClient`. The service owns the unit of work: acquires client, BEGIN, passes client to repositories, COMMIT/ROLLBACK. Applies to submission, approval/rejection, and cancellation flows.
-- **Error Response**: Standard shape `{ error: string; code: string }`. HTTP 400 for validation, 401 for unauthenticated, 403 for unauthorized, 404 for not found, 409 for business rule conflicts (overlap, insufficient balance), 500 for internal errors.
+- **Auth**: JWT bearer token → `request.user: { id: string; role: UserRole }`. Roles: `employee`, `manager`, `hr_admin`. RBAC enforced via `requireRole(...)` guard. **Not yet implemented** — routes accept all requests without auth. Manager checks are enforced at the service layer for approve/reject.
+- **Transaction**: Repository methods that participate in multi-step writes accept an optional `PoolClient`. The service owns the unit of work: acquires client, BEGIN, passes client to repositories, COMMIT/ROLLBACK. **Not yet implemented** — deferred to the DB-backed repository implementation phase.
+- **Audit**: All state-changing operations should produce an audit record (GP-002). **Not yet integrated** — the LeaveRequestService does not call audit or notification modules; these cross-cutting concerns are deferred to Phase 10.
+- **Error Response**: Standard shape `{ error: string; code: string }`. HTTP 400 for validation, 403 for authorization, 404 for not found, 409 for business rule conflicts (state transitions, insufficient balance, closed balance, inactive policy), 500 for internal errors.
 
 ### Open Questions
 

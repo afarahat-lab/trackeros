@@ -334,3 +334,69 @@ audit modules — those cross-cutting concerns are deferred to Phase 10
 (supporting services). The service also does not use database transactions
 (PoolClient / BEGIN/COMMIT) — transaction wrapping is deferred to the DB-backed
 repository implementation phase.
+
+## ADR-010 — LeaveRequest routes and controller (Phase 9)
+
+Date: 2026-06-10
+Status: Accepted
+
+Decision: Created the Fastify routes and controller for the leave request API,
+wiring the LeaveRequestService to HTTP endpoints and registering them on the
+Fastify app.
+
+Files created:
+- `src/modules/leave-request/leave-request.controller.ts` — `LeaveRequestController`
+  class that takes `ILeaveRequestService` in its constructor. Each method maps
+  1:1 to a service method and serializes the `LeaveRequest` entity to a plain
+  JSON-safe object (Date fields → ISO 8601 strings, nullable date fields → `null`).
+  The `serializeLeaveRequest` helper handles all Date serialization.
+- `src/modules/leave-request/leave-request.routes.ts` — Fastify plugin
+  (`leaveRequestRoutes`) that instantiates the full dependency chain
+  (controller → service → stub repositories) and registers 8 routes:
+  - `POST /leave-requests` — createDraft (returns 201)
+  - `POST /leave-requests/:id/submit`
+  - `POST /leave-requests/:id/approve` — body: `{ approverId }`
+  - `POST /leave-requests/:id/reject` — body: `{ approverId }`
+  - `POST /leave-requests/:id/cancel`
+  - `GET /leave-requests/employee/:employeeId`
+  - `GET /leave-requests/:id`
+  - `GET /leave-requests` — query by employeeId, status, leavePolicyId,
+    startDateFrom, startDateTo
+- `src/app.ts` — Updated to register `leaveRequestRoutes` via
+  `app.register(leaveRequestRoutes)`.
+- `src/modules/leave-request/index.ts` — Updated barrel export to include
+  controller and routes.
+
+Error handling: Each route handler catches errors and maps known service error
+codes to HTTP statuses via `mapErrorToHttpStatus`:
+- **404**: EMPLOYEE_NOT_FOUND, POLICY_NOT_FOUND, REQUEST_NOT_FOUND, BALANCE_NOT_FOUND
+- **400**: INVALID_DATE_RANGE, MINIMUM_NOTICE_VIOLATION
+- **409**: INVALID_STATE_TRANSITION, INSUFFICIENT_BALANCE, BALANCE_CLOSED, POLICY_INACTIVE
+- **403**: NOT_MANAGER
+- **500**: all unrecognized errors
+
+Unknown errors are logged via `request.log.error(error)` and return a generic
+`{ error: 'Internal Server Error' }` response (no code field, no error details
+leaked — GP-004).
+
+The `isServiceError` type guard discriminates service-thrown error objects
+(`{ error: string; code: string }`) from unexpected exceptions.
+
+**Divergence from plan**: The plan specified 400 for INVALID_STATE_TRANSITION,
+BALANCE_CLOSED, INSUFFICIENT_BALANCE, and POLICY_INACTIVE. The implementation
+uses 409 (Conflict) for these business-rule violations, which is more
+semantically appropriate — the request is syntactically valid but conflicts
+with the current resource state. The plan also specified 400 for
+MINIMUM_NOTICE_VIOLATION; the implementation keeps this at 400.
+
+**RBAC note**: No auth middleware is wired — routes accept all requests without
+auth guards (GP-005 not yet enforced at HTTP layer). The service layer enforces
+manager checks for approve/reject operations via `employee.managerId === approverId`.
+
+Tests: `tests/unit/modules/leave-request/leave-request.routes.test.ts` — Jest
+tests using Fastify's `inject()` method with a mocked `LeaveRequestService`,
+covering all 8 endpoints for success and error paths.
+
+Dependencies: `src/modules/leave-request/leave-request.service.ts` (Phase 8),
+`src/modules/leave-request/leave-request.model.ts` (Phase 5),
+`src/shared/types/index.ts` (Phase 1).
