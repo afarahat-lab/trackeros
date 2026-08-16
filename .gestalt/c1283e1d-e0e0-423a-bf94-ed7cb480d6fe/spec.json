@@ -1,0 +1,43 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "notification"
+    ],
+    "affectedLayers": [
+      "service"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The `markAsRead` method in `NotificationService` calls `notificationRepo.updateStatus` with exactly two arguments: the notification `id` and `NotificationStatus.READ` \u2014 no third `readAt` argument is passed.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All existing unit tests in `tests/unit/modules/notification/notification.service.test.ts` pass without modification \u2014 specifically the `markAsRead` tests that assert `updateStatus` is called with exactly `('notif-001', NotificationStatus.READ)`.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The fix must not change the `INotificationRepository.updateStatus` interface signature \u2014 it already declares `readAt` as optional (`readAt?: Date | null`) and that signature is correct.",
+    "The fix must not change the `INotificationService.markAsRead` interface signature \u2014 it already declares `markAsRead(id: string): Promise<void>` and that signature is correct.",
+    "The fix must not alter any other method in `NotificationService` \u2014 only the `markAsRead` method's call to `updateStatus` is in scope."
+  ],
+  "outOfScope": [
+    "Changing the `INotificationRepository.updateStatus` interface signature \u2014 it already correctly declares `readAt` as optional.",
+    "Adding or modifying any test files \u2014 the existing tests already encode the correct expected behavior."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [
+    {
+      "requirement": "The `markAsRead` implementation must call `notificationRepo.updateStatus(id, NotificationStatus.READ)` with exactly two arguments, matching the test expectations in `tests/unit/modules/notification/notification.service.test.ts` lines 259 and 277 which assert `toHaveBeenCalledWith('notif-001', NotificationStatus.READ)`.",
+      "referencePath": "tests/unit/modules/notification/notification.service.test.ts"
+    }
+  ],
+  "integrationPoints": []
+}
