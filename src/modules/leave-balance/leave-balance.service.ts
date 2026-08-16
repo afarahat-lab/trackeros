@@ -13,15 +13,12 @@ export class BalanceService implements IBalanceService {
     employeeId: string,
     leavePolicyId: string,
     fiscalYear: number,
-  ): Promise<LeaveBalance> {
+  ): Promise<LeaveBalance | null> {
     const balance = await this.balanceRepo.findByEmployeeAndPolicy(
       employeeId,
       leavePolicyId,
       fiscalYear,
     );
-    if (!balance) {
-      throw { error: 'Leave balance not found', code: 'BALANCE_NOT_FOUND' };
-    }
     return balance;
   }
 

@@ -11,7 +11,7 @@ export interface INotificationRepository {
   findByRecipientId(recipientId: string): Promise<LeaveNotification[]>;
   findByLeaveRequestId(leaveRequestId: string): Promise<LeaveNotification[]>;
   create(notification: Omit<LeaveNotification, 'id' | 'createdAt'>): Promise<LeaveNotification>;
-  updateStatus(id: string, status: NotificationStatus): Promise<LeaveNotification | null>;
+  updateStatus(id: string, status: NotificationStatus, readAt?: Date | null): Promise<LeaveNotification | null>;
 }
 
 /**
@@ -36,7 +36,7 @@ export class NotificationRepository implements INotificationRepository {
     throw new Error('not implemented');
   }
 
-  async updateStatus(_id: string, _status: NotificationStatus): Promise<LeaveNotification | null> {
+  async updateStatus(_id: string, _status: NotificationStatus, _readAt?: Date | null): Promise<LeaveNotification | null> {
     throw new Error('not implemented');
   }
 }

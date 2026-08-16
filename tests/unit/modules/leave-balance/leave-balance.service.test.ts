@@ -65,13 +65,12 @@ describe('BalanceService', () => {
       expect(balanceRepo.findByEmployeeAndPolicy).toHaveBeenCalledWith('emp-001', 'lp-001', 2026);
     });
 
-    it('should throw BALANCE_NOT_FOUND when no balance exists', async () => {
+    it('should return null when no balance exists', async () => {
       balanceRepo.findByEmployeeAndPolicy.mockResolvedValue(null);
 
-      await expect(service.getBalance('emp-001', 'lp-001', 2026)).rejects.toEqual({
-        error: 'Leave balance not found',
-        code: 'BALANCE_NOT_FOUND',
-      });
+      const result = await service.getBalance('emp-001', 'lp-001', 2026);
+
+      expect(result).toBeNull();
     });
   });
 
