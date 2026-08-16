@@ -1,0 +1,170 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "service",
+      "tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "large"
+  },
+  "successCriteria": [
+    {
+      "description": "`LeaveService` class exists at `src/modules/leave/leave.service.ts`, implements `ILeaveService`, and accepts `ILeaveRepository`, `IEmployeeService`, `IPolicyService`, `IBalanceService`, and `IAuditService` via constructor injection.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`createDraft(dto)` persists a new `LeaveRequest` with status `DRAFT` via `ILeaveRepository.create` and returns it. No business validations beyond field presence are applied.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`submitDraft(requestId, employeeId)` transitions a DRAFT to SUBMITTED only after passing all gates in order: (1) employee is ACTIVE via `IEmployeeService.isActive`, (2) no overlapping SUBMITTED/APPROVED requests via `ILeaveRepository.findOverlapping`, (3) minimum notice satisfied (unless emergency leave type), (4) sufficient balance via `IBalanceService.getAvailableDays`. On success, reserves days via `IBalanceService.reserveDays` and audits the transition via `IAuditService.log`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`submitDraft` auto-approves when the policy's `requiresManagerApproval` is `false`: transitions directly to APPROVED with `approvedBy=null` and `approvedAt=null`, calls `IBalanceService.deductDays`, and audits the transition.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`approve(requestId, approverId, approverRole)` transitions SUBMITTED \u2192 APPROVED only when the approver is the employee's manager (via `IEmployeeService.getManagerId`) or has role `hr_admin`. Self-approval is rejected. On success, calls `IBalanceService.deductDays`, sets `approvedBy` and `approvedAt`, and audits the transition.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`reject(requestId, approverId, approverRole)` transitions SUBMITTED \u2192 REJECTED with the same authorization rules as approve. On success, calls `IBalanceService.releaseReservation` and audits the transition. REJECTED is terminal.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`cancel(requestId, employeeId)` transitions any non-terminal state (DRAFT, SUBMITTED, APPROVED) to CANCELLED. If the prior state was SUBMITTED, calls `IBalanceService.releaseReservation`. Audits the transition. Does NOT restore usedDays for APPROVED requests.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A pure `countBusinessDays(startDate, endDate)` helper function exists in `leave.service.ts`, counting Monday\u2013Friday inclusive of both dates, with no external dependencies (no holiday table). Used by `submitDraft` to compute the requested day count.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`getById(requestId)` and `getByEmployee(employeeId)` delegate to `ILeaveRepository.findById` and `ILeaveRepository.findByEmployee` respectively, with no additional business logic.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`src/modules/leave/index.ts` re-exports `ILeaveService`, `LeaveService`, `CreateLeaveRequestDto`, `UserRole`, and all five error classes (`InsufficientBalanceError`, `OverlappingRequestError`, `EmployeeNotActiveError`, `MinimumNoticeError`, `NotManagerError`) alongside the existing model and repository exports.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests in `tests/unit/modules/leave/leave.service.test.ts` cover: all lifecycle transitions (DRAFT\u2192SUBMITTED, SUBMITTED\u2192APPROVED, SUBMITTED\u2192REJECTED, DRAFT/SUBMITTED/APPROVED\u2192CANCELLED), auto-approval path, balance check rejection, overlap rejection, employee-not-active rejection, minimum-notice rejection, unauthorized-approver rejection, self-approval rejection, and the `countBusinessDays` helper with various date ranges.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The `LeaveService` implementation MUST NOT modify the existing `ILeaveService` interface, `CreateLeaveRequestDto`, `UserRole` type, or any of the five error classes \u2014 these are already defined and correct. The implementation must conform to the existing signatures exactly.",
+    "All database access MUST go through the injected repository interfaces (`ILeaveRepository`, `IBalanceRepository` via `IBalanceService`). No direct SQL or pool access in `LeaveService` \u2014 per GP-001.",
+    "Every state-changing operation (createDraft, submitDraft, approve, reject, cancel) MUST call `IAuditService.log` with the entity type `'LeaveRequest'`, the request ID, the action name, old/new status values, and the acting user ID \u2014 per GP-002."
+  ],
+  "outOfScope": [
+    "HTTP controller, route definitions, and Fastify plugin registration \u2014 these belong to Phase 10.",
+    "Notification integration (`INotificationService`) \u2014 the `LeaveService` does not call notification methods. Notifications are triggered by the controller layer in Phase 10.",
+    "Cross-fiscal-year request splitting \u2014 the reconciled architecture mentions splitting consumed days proportionally across affected years, but this is not part of the current phase's business rules and is deferred."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "Lifecycle: DRAFT \u2192 SUBMITTED \u2192 (APPROVED | REJECTED). Any non-terminal state (DRAFT, SUBMITTED, APPROVED) \u2192 CANCELLED. REJECTED and CANCELLED are terminal \u2014 no further transitions allowed. A request in DRAFT status cannot be approved or rejected; only SUBMITTED requests can be approved or rejected."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "No two LeaveRequests for the same employee may overlap in date ranges when both have status SUBMITTED or APPROVED. Overlap is defined as `existing.startDate <= new.endDate AND existing.endDate >= new.startDate`."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "`approvedBy` and `approvedAt` MUST be set (non-null) when status transitions to APPROVED via explicit manager/HR approval. When auto-approved (`requiresManagerApproval=false`), both MUST remain null."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "submitDraft(requestId, employeeId)",
+      "authRule": "Caller identity (`employeeId`) must match the request's `employeeId`. Only the owning employee may submit their own draft.",
+      "idempotent": false,
+      "errorSemantics": "Throws `EmployeeNotActiveError` if employee is not ACTIVE. Throws `OverlappingRequestError` if an overlapping SUBMITTED/APPROVED request exists. Throws `MinimumNoticeError` if notice period is insufficient (unless emergency leave). Throws `InsufficientBalanceError` if available balance < requested days. Throws a generic error if the request is not in DRAFT status."
+    },
+    {
+      "operation": "approve(requestId, approverId, approverRole)",
+      "authRule": "`approverId` must match the employee's `managerId` OR `approverRole` must be `'hr_admin'`. `approverId` must not equal the request's `employeeId` (no self-approval).",
+      "idempotent": false,
+      "errorSemantics": "Throws `NotManagerError` if the approver is unauthorized. Throws a generic error if the request is not in SUBMITTED status."
+    },
+    {
+      "operation": "reject(requestId, approverId, approverRole)",
+      "authRule": "Same authorization as `approve`: `approverId` must match the employee's `managerId` OR `approverRole` must be `'hr_admin'`. Self-rejection is forbidden.",
+      "idempotent": false,
+      "errorSemantics": "Throws `NotManagerError` if the approver is unauthorized. Throws a generic error if the request is not in SUBMITTED status."
+    },
+    {
+      "operation": "cancel(requestId, employeeId)",
+      "authRule": "`employeeId` must match the request's `employeeId`. Only the owning employee may cancel their own request.",
+      "idempotent": false,
+      "errorSemantics": "Throws a generic error if the request is already in a terminal state (REJECTED or CANCELLED)."
+    },
+    {
+      "operation": "getById(requestId), getByEmployee(employeeId)",
+      "authRule": "No authorization enforced at the service layer \u2014 these are pure read operations. Authorization (if any) is enforced at the controller/route layer.",
+      "idempotent": true,
+      "errorSemantics": "Returns `null` or empty array when no results found; never throws for missing data."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "`LeaveService` must call `IBalanceService.reserveDays`, `IBalanceService.deductDays`, and `IBalanceService.releaseReservation` with the exact signatures defined in `src/modules/balance/balance.service.interface.ts`. The reservation model (remainingDays decremented on reserve, usedDays incremented on deduct) is owned by BalanceService \u2014 LeaveService must not duplicate or bypass it.",
+      "referencePath": "src/modules/balance/balance.service.interface.ts"
+    },
+    {
+      "requirement": "`LeaveService` must call `IAuditService.log` with the parameter shape defined in `src/modules/audit/audit.service.interface.ts`: `{ entityType, entityId, action, oldValues, newValues, performedBy }`. The `entityType` must be `'LeaveRequest'`, `action` must reflect the operation name (e.g. `'submitDraft'`, `'approve'`, `'reject'`, `'cancel'`), `oldValues`/`newValues` must capture at minimum the status before and after.",
+      "referencePath": "src/modules/audit/audit.service.interface.ts"
+    },
+    {
+      "requirement": "`LeaveService` must use `IEmployeeService.isActive` and `IEmployeeService.getManagerId` as defined in `src/modules/employee/employee.service.interface.ts`. The `isActive` check requires both `employmentStatus === 'ACTIVE'` AND `terminationDate === null` \u2014 LeaveService must not reimplement this logic.",
+      "referencePath": "src/modules/employee/employee.service.interface.ts"
+    },
+    {
+      "requirement": "`LeaveService` must use the `LeaveRequest` interface exactly as defined in `src/modules/leave/leave.model.ts`. All state transitions must produce `LeaveRequest` objects conforming to this shape, with `status` values from `LeaveRequestStatus` and dates as `Date` objects.",
+      "referencePath": "src/modules/leave/leave.model.ts"
+    },
+    {
+      "requirement": "`LeaveService` must use `ILeaveRepository.findOverlapping` with its exact signature `(employeeId, startDate, endDate, excludeId?)`. The overlap query in the repository already filters for SUBMITTED/APPROVED statuses \u2014 LeaveService must not add its own status filtering on top.",
+      "referencePath": "src/modules/leave/leave.repository.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/employee/employee.service.interface.ts \u2014 IEmployeeService.isActive, IEmployeeService.getManagerId",
+      "why": "Employee active gate on submit; manager lookup for approval authorization"
+    },
+    {
+      "target": "src/modules/policy/policy.service.interface.ts \u2014 IPolicyService.getById",
+      "why": "Look up the LeavePolicy to check minimumNoticeDays, requiresManagerApproval, and leaveType (for emergency bypass)"
+    },
+    {
+      "target": "src/modules/balance/balance.service.interface.ts \u2014 IBalanceService.getAvailableDays, reserveDays, deductDays, releaseReservation",
+      "why": "Balance check on submit; reservation on submit; deduction on approve; release on reject/cancel"
+    },
+    {
+      "target": "src/modules/audit/audit.service.interface.ts \u2014 IAuditService.log",
+      "why": "Audit every state transition per GP-002"
+    }
+  ]
+}
