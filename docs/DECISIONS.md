@@ -400,3 +400,94 @@ covering all 8 endpoints for success and error paths.
 Dependencies: `src/modules/leave-request/leave-request.service.ts` (Phase 8),
 `src/modules/leave-request/leave-request.model.ts` (Phase 5),
 `src/shared/types/index.ts` (Phase 1).
+
+## ADR-011 — Supporting services: Balance, Notification, Audit, Policy, Employee (Phase 10)
+
+Date: 2026-06-10
+Status: Accepted
+
+Decision: Created the remaining service interfaces and implementations for all
+supporting modules. Two services received full implementations (BalanceService,
+NotificationService); three received stub interfaces only (AuditService,
+LeavePolicyService, EmployeeService).
+
+### BalanceService (full implementation)
+
+Files created:
+- `src/modules/leave-balance/leave-balance.service.interface.ts` — `IBalanceService`
+  interface with methods: getBalance, getBalancesForEmployee, initializeBalance.
+- `src/modules/leave-balance/leave-balance.service.ts` — `BalanceService` class
+  depending on ILeaveBalanceRepository and ILeavePolicyRepository:
+  - **getBalance**: delegates to `balanceRepo.findByEmployeeAndPolicy`, returns
+    the balance or null.
+  - **getBalancesForEmployee**: delegates to `balanceRepo.findByEmployeeId`.
+  - **initializeBalance**: validates policy exists, checks no existing balance
+    for the same (employeeId, leavePolicyId, fiscalYear) composite, creates a
+    balance with totalEntitlement = policy.entitlementDays, usedDays = 0,
+    remainingDays = entitlementDays, status = 'ACTIVE'. Throws
+    POLICY_NOT_FOUND or BALANCE_ALREADY_EXISTS on conflict.
+- `src/modules/leave-balance/index.ts` — Updated barrel export to include
+  service interface and implementation.
+
+Tests: `tests/unit/modules/leave-balance/leave-balance.service.test.ts` — Jest
+unit tests with mocked repositories covering getBalance (found, null),
+getBalancesForEmployee (found, empty), initializeBalance (success, policy not
+found, balance already exists, remainingDays = totalEntitlement invariant).
+
+### NotificationService (full implementation)
+
+Files created:
+- `src/modules/notification/notification.service.interface.ts` —
+  `INotificationService` interface with methods: notifyLeaveSubmitted,
+  notifyLeaveApproved, notifyLeaveRejected, notifyLeaveCancelled,
+  getNotificationsForUser, markAsRead.
+- `src/modules/notification/notification.service.ts` — `NotificationService`
+  class depending on INotificationRepository and IEmployeeRepository:
+  - **notifyLeaveSubmitted**: looks up employee, validates managerId exists,
+    creates PENDING notification with type 'SUBMITTED' targeting the manager.
+    Throws EMPLOYEE_NOT_FOUND or NO_MANAGER_ASSIGNED.
+  - **notifyLeaveApproved**: creates PENDING notification with type 'APPROVED'
+    targeting the employee.
+  - **notifyLeaveRejected**: creates PENDING notification with type 'REJECTED'
+    targeting the employee.
+  - **notifyLeaveCancelled**: looks up employee, validates managerId exists,
+    creates PENDING notification with type 'CANCELLED' targeting the manager.
+    Throws EMPLOYEE_NOT_FOUND or NO_MANAGER_ASSIGNED.
+  - **getNotificationsForUser**: delegates to `notificationRepo.findByRecipientId`.
+  - **markAsRead**: validates notification exists, skips if already READ or
+    ARCHIVED (idempotent), otherwise updates status to READ. Throws
+    NOTIFICATION_NOT_FOUND.
+- `src/modules/notification/index.ts` — Updated barrel export to include
+  service interface and implementation.
+
+Tests: `tests/unit/modules/notification/notification.service.test.ts` — Jest
+unit tests with mocked repositories covering all notify methods (success,
+employee not found, no manager assigned), getNotificationsForUser (found,
+empty), markAsRead (PENDING→READ, SENT→READ, idempotent for READ/ARCHIVED,
+notification not found).
+
+### Stub service interfaces only
+
+Three service interfaces were declared per the architecture but their full
+implementations are deferred:
+
+- `src/modules/audit/audit.service.interface.ts` — `IAuditService` with
+  `logAction(entityType, entityId, action, oldValues, newValues, performedBy)`.
+- `src/modules/leave-policy/leave-policy.service.interface.ts` —
+  `ILeavePolicyService` with `getPolicy`, `getPolicyByType`, `isActive`.
+- `src/modules/employee/employee.service.interface.ts` — `IEmployeeService`
+  with `getEmployee`, `getManager`, `isActive`.
+
+These interfaces are exported from their respective barrel files but have no
+concrete implementation classes yet.
+
+### Cross-cutting integration status
+
+The LeaveRequestService (Phase 8) does NOT yet call NotificationService or
+IAuditService — these cross-cutting concerns remain deferred to a future
+integration phase. The services are implemented and tested independently but
+are not wired into the leave request lifecycle.
+
+Dependencies: All prior phases (1–9) for model and repository interfaces.
+NotificationService additionally depends on IEmployeeRepository (Phase 2).
+BalanceService additionally depends on ILeavePolicyRepository (Phase 3).
