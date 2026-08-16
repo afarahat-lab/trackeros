@@ -1,21 +1,21 @@
-# Implement this phase: Phase 4: LeaveBalance model and repository
+# Implement this phase: Phase 5: LeaveRequest model and repository
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/cb89b522-6bc0-439f-8a0d-f905145254ee/4`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/cb89b522-6bc0-439f-8a0d-f905145254ee/5`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the LeaveBalance domain model and repository at the exact paths declared by the architecture's Module Boundaries for the balance module (`src/modules/balance/`).
+Create the LeaveRequest domain model and repository at the exact paths declared by the architecture's Module Boundaries for the leave module (`src/modules/leave/`).
 
 Files to create:
-- `src/modules/balance/balance.model.ts` — Define the `LeaveBalance` interface with the canonical fields: `id: string`, `employeeId: string`, `policyId: string`, `totalEntitlement: number`, `usedDays: number`, `remainingDays: number`, `fiscalYear: number`, `status: 'ACTIVE' | 'EXHAUSTED' | 'FROZEN'`, `createdAt: Date`, `updatedAt: Date`.
-- `src/modules/balance/balance.repository.ts` — Define `IBalanceRepository` interface with methods: `findById(id: string): Promise<LeaveBalance | null>`, `findByEmployeeAndPolicy(employeeId: string, policyId: string): Promise<LeaveBalance | null>`, `findByEmployeeAndFiscalYear(employeeId: string, fiscalYear: number): Promise<LeaveBalance[]>`, `create(balance: Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeaveBalance>`, `update(id: string, data: Partial<LeaveBalance>): Promise<LeaveBalance | null>`, `updateUsedDays(id: string, usedDays: number, remainingDays: number): Promise<LeaveBalance | null>`. Implement `BalanceRepository` class using the existing `pool` from `src/shared/db/connection.ts`.
-- `src/modules/balance/index.ts` — Barrel export.
+- `src/modules/leave/leave.model.ts` — Define the `LeaveRequest` interface with the canonical fields: `id: string`, `employeeId: string`, `leavePolicyId: string`, `startDate: Date`, `endDate: Date`, `reason: string | undefined`, `status: LeaveRequestStatus`, `approvedBy: string | null`, `approvedAt: Date | null`, `createdAt: Date`, `updatedAt: Date`. Import `LeaveRequestStatus` from `src/shared/types/leave-request-status.enum.ts`.
+- `src/modules/leave/leave.repository.ts` — Define `ILeaveRepository` interface with methods: `findById(id: string): Promise<LeaveRequest | null>`, `findByEmployee(employeeId: string): Promise<LeaveRequest[]>`, `findByEmployeeAndStatus(employeeId: string, status: LeaveRequestStatus): Promise<LeaveRequest[]>`, `findOverlapping(employeeId: string, startDate: Date, endDate: Date, excludeId?: string): Promise<LeaveRequest[]>`, `create(request: Omit<LeaveRequest, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeaveRequest>`, `update(id: string, data: Partial<LeaveRequest>): Promise<LeaveRequest | null>`, `findPendingByEmployee(employeeId: string): Promise<LeaveRequest[]>`. Implement `LeaveRepository` class using the existing `pool` from `src/shared/db/connection.ts`.
+- `src/modules/leave/index.ts` — Barrel export.
 
-This phase depends on `src/shared/types/index.ts` from Phase 1 (read it before generating). Also depends on `src/shared/db/connection.ts` (existing).
+This phase depends on `src/shared/types/index.ts` from Phase 1, `src/modules/employee/employee.model.ts` from Phase 2, and `src/modules/policy/policy.model.ts` from Phase 3 — read all three before generating. Also depends on `src/shared/db/connection.ts` (existing).
 
-Include Jest unit tests in `tests/unit/modules/balance/`.
+Include Jest unit tests in `tests/unit/modules/leave/`.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -40,27 +40,29 @@ Cross-cutting rules:
 
 ## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
 The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
-- `LeaveBalance` — the entity MUST have exactly these fields:
+- `LeaveRequest` — the entity MUST have exactly these fields:
     - id: string
     - employeeId: string
-    - policyId: string
-    - totalEntitlement: number
-    - usedDays: number
-    - remainingDays: number
-    - fiscalYear: number
-    - status: 'ACTIVE' | 'EXHAUSTED' | 'FROZEN'
+    - leavePolicyId: string
+    - startDate: Date
+    - endDate: Date
+    - reason: string | undefined
+    - status: LeaveRequestStatus
+    - approvedBy: string | null
+    - approvedAt: Date | null
     - createdAt: Date
     - updatedAt: Date
 
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Entity invariants — enforce these
-- Reuse or extend `LeaveBalance`: `remainingDays` must always equal `totalEntitlement - usedDays` — the repository is not required to enforce this arithmetically (the service layer owns that), but any persisted row must satisfy this invariant.
-- Reuse or extend `LeaveBalance`: `status` must be one of `'ACTIVE'`, `'EXHAUSTED'`, or `'FROZEN'`. `EXHAUSTED` is reached when `remainingDays === 0`. The repository does not enforce the transition — the service layer owns lifecycle — but the type system must restrict the field to these three literals.
-- Reuse or extend `LeaveBalance`: The tuple `(employeeId, policyId, fiscalYear)` is unique — at most one balance row may exist for a given employee, policy, and fiscal year. The database enforces this via a unique constraint on `(employee_id, leave_policy_id, fiscal_year)`.
+- Reuse or extend `LeaveRequest`: Lifecycle: DRAFT → SUBMITTED → APPROVED | REJECTED; any non-terminal status → CANCELLED. The `status` field must always be one of the five `LeaveRequestStatus` values. The repository does not enforce transitions (that is the service's responsibility), but it must store and retrieve the status faithfully.
+- Reuse or extend `LeaveRequest`: `approvedBy` and `approvedAt` are both `null` when the request has not been acted upon (DRAFT, SUBMITTED, CANCELLED). When status transitions to APPROVED or REJECTED, both fields must be set together — but this invariant is enforced by the service layer, not the repository.
 ### Interface contract — expose these operations (their shape is yours)
-- IBalanceRepository.findById — idempotent; Returns `null` when no row matches the given `id` — never throws for a missing row.
-- IBalanceRepository.findByEmployeeAndPolicy — idempotent; Returns `null` when no balance exists for the given employee-policy pair — never throws for a missing row.
+- ILeaveRepository.findOverlapping — No auth rule at the repository layer — repositories are data-access only. Auth is enforced at the controller/route layer.; idempotent; Returns empty array (not null, not error) when no overlapping requests exist.
+- ILeaveRepository.findById — idempotent; Returns `null` when no row matches the given `id` — never throws.
+- ILeaveRepository.create — Generates `id` (via DB default), sets `createdAt` and `updatedAt` to the current timestamp. Returns the fully-hydrated `LeaveRequest`. Fails with a DB error if FK constraints are violated (e.g., invalid `employeeId` or `leavePolicyId`).
+- ILeaveRepository.update — Returns `null` when the target row does not exist. Returns the existing row unchanged when the `data` argument is empty (no-op). Always bumps `updated_at` when fields are changed.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
