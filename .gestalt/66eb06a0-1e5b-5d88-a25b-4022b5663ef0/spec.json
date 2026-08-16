@@ -1,0 +1,130 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-balance"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository",
+      "tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The `LeaveBalance` interface is exported from `src/modules/leave-balance/` with exactly these fields: `id` (string), `employeeId` (string), `leavePolicyId` (string), `totalEntitlement` (number), `usedDays` (number), `remainingDays` (number), `fiscalYear` (number), `status` (`'ACTIVE' | 'EXHAUSTED' | 'CLOSED'`), `createdAt` (Date), `updatedAt` (Date) \u2014 and no other fields.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `ILeaveBalanceRepository` interface exposes exactly five methods: `findById(id: string): Promise<LeaveBalance | null>`, `findByEmployeeAndPolicy(employeeId: string, leavePolicyId: string, fiscalYear: number): Promise<LeaveBalance | null>`, `findByEmployeeId(employeeId: string, fiscalYear: number): Promise<LeaveBalance[]>`, `create(balance: Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeaveBalance>`, and `update(id: string, data: Partial<LeaveBalance>): Promise<LeaveBalance | null>`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `LeaveBalanceRepository` stub class implements `ILeaveBalanceRepository` and every method throws `new Error('not implemented')` with unused parameters prefixed by underscore.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The barrel export `src/modules/leave-balance/index.ts` re-exports `LeaveBalance` from the model file and `ILeaveBalanceRepository` + `LeaveBalanceRepository` from the repository file.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Unit tests in `tests/unit/modules/leave-balance/leave-balance.model.test.ts` verify: all field values on a valid shape, the three status values (`'ACTIVE'`, `'EXHAUSTED'`, `'CLOSED'`), exact field names (sorted comparison), and field count (10).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Unit tests in `tests/unit/modules/leave-balance/leave-balance.repository.test.ts` verify: each of the five repository methods throws `'not implemented'`, `create` accepts input without `id`/`createdAt`/`updatedAt`, `update` accepts partial and empty updates, and the interface contract exposes all five methods as functions.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The `LeaveBalance.status` type is a string union `'ACTIVE' | 'EXHAUSTED' | 'CLOSED'` \u2014 it must NOT reuse the shared `LeaveStatus` enum from `src/shared/types/index.ts`, which serves a different domain (leave request lifecycle).",
+    "The `LeaveBalance` entity does NOT import from `src/modules/employee/` or `src/modules/leave-policy/` \u2014 `employeeId` and `leavePolicyId` are plain string foreign-key references, not typed entity references. This matches the existing pattern in Phase 2 and Phase 3 where entities reference each other by string IDs.",
+    "All numeric fields (`totalEntitlement`, `usedDays`, `remainingDays`, `fiscalYear`) are integers \u2014 full-day granularity per the BINDING rule in the reconciled architecture. No half-days, no fractional values."
+  ],
+  "outOfScope": [
+    "Service layer (`BalanceService` / `IBalanceService`) \u2014 deferred to Phase 10 per PLAN.md.",
+    "Database migrations, Knex schema definitions, and the real DB-backed repository implementation \u2014 deferred to later phases.",
+    "Balance accrual logic, fiscal-year rollover, and the `initializeBalance` operation \u2014 these belong to the service layer (Phase 10)."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "Lifecycle: ACTIVE \u2192 EXHAUSTED \u2192 CLOSED. A balance starts ACTIVE when initialized. It transitions to EXHAUSTED when `remainingDays` reaches 0. It transitions to CLOSED at the end of the fiscal year (calendar year: Jan 1 \u2013 Dec 31). Once CLOSED, no further mutations to `usedDays` or `remainingDays` are permitted."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "Composite uniqueness: at most one `LeaveBalance` row may exist for a given `(employeeId, leavePolicyId, fiscalYear)` tuple. This is enforced by a unique composite index on the conceptual table."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "Derived-field consistency: `remainingDays` MUST equal `totalEntitlement - usedDays` at all times. Any mutation to `usedDays` MUST recalculate `remainingDays` accordingly."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "ILeaveBalanceRepository.findByEmployeeAndPolicy",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns null when no balance exists for the given (employeeId, leavePolicyId, fiscalYear) tuple \u2014 this is not an error condition."
+    },
+    {
+      "operation": "ILeaveBalanceRepository.create",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Accepts `Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt'>` \u2014 the repository (or database) is responsible for generating `id`, `createdAt`, and `updatedAt`. The caller must supply `employeeId`, `leavePolicyId`, `totalEntitlement`, `usedDays`, `remainingDays`, `fiscalYear`, and `status`."
+    },
+    {
+      "operation": "ILeaveBalanceRepository.update",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Accepts `Partial<LeaveBalance>` \u2014 any subset of fields may be provided. Returns the updated `LeaveBalance` or `null` if no balance with the given `id` exists."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The stub `LeaveBalanceRepository` class MUST follow the same pattern as `EmployeeRepository` (Phase 2) and `LeavePolicyRepository` (Phase 3): every method body is `throw new Error('not implemented')`, and all unused parameters are prefixed with underscore to suppress TypeScript/ESLint warnings.",
+      "referencePath": "src/modules/employee/employee.repository.ts"
+    },
+    {
+      "requirement": "The barrel export `src/modules/leave-balance/index.ts` MUST follow the same pattern as `src/modules/employee/index.ts` and `src/modules/leave-policy/index.ts`: re-export the model interface and the repository interface + stub class.",
+      "referencePath": "src/modules/employee/index.ts"
+    },
+    {
+      "requirement": "The model test file MUST follow the same pattern as `tests/unit/modules/employee/employee.model.test.ts` and `tests/unit/modules/leave-policy/leave-policy.model.test.ts`: verify field values, nullable/union values, exact field names (sorted comparison), and field count.",
+      "referencePath": "tests/unit/modules/employee/employee.model.test.ts"
+    },
+    {
+      "requirement": "The repository test file MUST follow the same pattern as `tests/unit/modules/employee/employee.repository.test.ts` and `tests/unit/modules/leave-policy/leave-policy.repository.test.ts`: verify each method throws `'not implemented'`, verify `create` accepts correct input shape, verify `update` accepts partial and empty updates, verify interface contract has all required methods as functions.",
+      "referencePath": "tests/unit/modules/employee/employee.repository.test.ts"
+    },
+    {
+      "requirement": "Tests MUST import from the barrel path (e.g., `../../../../src/modules/leave-balance`) \u2014 matching the pattern used by existing tests which resolve via Jest's `moduleDirectories: ['node_modules', 'src']` configuration.",
+      "referencePath": "tests/unit/modules/employee/employee.model.test.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts (Phase 1)",
+      "why": "The LeaveBalance entity does not directly import shared types (its status is a local string union, not the shared LeaveStatus enum), but the module exists within the same codebase and future phases (Phase 8, Phase 10) will wire LeaveBalance to shared types via the service layer."
+    },
+    {
+      "target": "src/modules/employee/employee.model.ts (Phase 2)",
+      "why": "LeaveBalance.employeeId references an Employee by string ID. The service layer (Phase 10) will validate this reference against the Employee repository."
+    },
+    {
+      "target": "src/modules/leave-policy/leave-policy.model.ts (Phase 3)",
+      "why": "LeaveBalance.leavePolicyId references a LeavePolicy by string ID. The service layer (Phase 10) will use the policy's entitlementDays to initialize balances."
+    }
+  ]
+}
