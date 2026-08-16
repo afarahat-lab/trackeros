@@ -1,0 +1,145 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave",
+      "balance",
+      "employee",
+      "policy",
+      "audit"
+    ],
+    "affectedLayers": [
+      "service",
+      "interface",
+      "domain-errors"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "large"
+  },
+  "successCriteria": [
+    {
+      "description": "`createDraft(dto)` persists a new LeaveRequest with status DRAFT and returns it. The method performs no business validations beyond ensuring the DTO fields are present \u2014 it is a pure creation endpoint.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`submitDraft(requestId, employeeId)` transitions a DRAFT request to SUBMITTED only after passing all gates: employee is ACTIVE, no overlapping SUBMITTED/APPROVED requests, minimum notice satisfied (unless emergency), sufficient available balance, and business-day count > 0. On success it calls `IBalanceService.reserveDays` and `IAuditService.log`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`submitDraft` auto-approves when the policy's `requiresManagerApproval` is false: status goes directly to APPROVED, `approvedBy` and `approvedAt` are set to null, and `IBalanceService.deductDays` is called instead of `reserveDays`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`approve(requestId, approverId, approverRole)` transitions SUBMITTED \u2192 APPROVED. It rejects self-approval, enforces that the approver is the employee's manager (or has `hr_admin` role if no manager), calls `IBalanceService.deductDays`, sets `approvedBy`/`approvedAt`, and audits the transition.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`reject(requestId, approverId)` transitions SUBMITTED \u2192 REJECTED, calls `IBalanceService.releaseReservation`, audits the transition, and the request enters a terminal state \u2014 no further transitions are allowed.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`cancel(requestId, employeeId)` transitions any non-terminal request (DRAFT, SUBMITTED, APPROVED) to CANCELLED. If the request was SUBMITTED, it calls `IBalanceService.releaseReservation`. If APPROVED, it does NOT restore balance (cancellation after approval does not reverse the deduction). Audits the transition.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`cancel(requestId, employeeId)` transitions any non-terminal request (DRAFT, SUBMITTED, APPROVED) to CANCELLED. Calls `IBalanceService.releaseReservation` and `IAuditService.log`. Only the owning employee may cancel their own request.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The business-day counting helper (pure function, no external dependencies) correctly counts weekdays (Mon\u2013Fri) inclusive of both start and end dates. It excludes Saturdays and Sundays, does not account for public holidays, and handles same-day requests (returns 1 if a weekday, 0 if a weekend).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Every state-changing operation (createDraft, submitDraft, approve, reject, cancel) produces exactly one audit log entry via `IAuditService.log` with `entityType='LeaveRequest'`, the correct `entityId`, `action` matching the transition, `oldValues`/`newValues` capturing the status change, and `performedBy` set to the acting user ID.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Domain-specific error classes (`InsufficientBalanceError`, `OverlappingRequestError`, `EmployeeNotActiveError`, `MinimumNoticeError`, `NotManagerError`) are thrown for their respective violation scenarios and are distinguishable in tests (e.g., via `instanceof` checks).",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The LeaveService must inject its dependencies through the constructor: `ILeaveRepository`, `IEmployeeService`, `IPolicyService`, `IBalanceService`, `IAuditService`. No direct database access \u2014 all persistence goes through the injected repository interfaces (GP-001).",
+    "The business-day counting function must be a pure, self-contained helper with no external dependencies (no database calls, no service calls, no holiday tables). It accepts two Date parameters and returns an integer.",
+    "The `approve` method must accept an `approverRole` parameter (of type `UserRole` where `UserRole = 'employee' | 'manager' | 'hr_admin'`) to enforce entity-conditional business rules. RBAC enforcement (which roles may call approve at all) is handled at the route/controller layer, not in the service.",
+    "The `UserRole` type (`'employee' | 'manager' | 'hr_admin'`) must be defined or imported by the leave module. If no shared definition exists yet, the leave module may define it locally; it must not be duplicated inconsistently across modules."
+  ],
+  "outOfScope": [
+    "HTTP routes, controllers, request/response serialization, Zod validation schemas, and Fastify plugin registration \u2014 these belong to Phase 10 (LeaveController + LeaveRoutes).",
+    "Notification fan-out on state transitions \u2014 `INotificationService` calls belong to Phase 9 (Notification service) and Phase 10 (controller orchestration), not to the LeaveService itself.",
+    "Cross-fiscal-year request splitting \u2014 the reconciled architecture mentions proportional day splitting across fiscal years, but this is deferred to a later phase and must not be implemented now.",
+    "Balance initialization for new employees (`initializeBalancesForEmployee`) \u2014 this is owned by the BalanceService (Phase 7) and is not called by LeaveService in this phase."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "Lifecycle: DRAFT \u2192 SUBMITTED \u2192 (APPROVED | REJECTED). Any non-terminal state (DRAFT, SUBMITTED, APPROVED) \u2192 CANCELLED. REJECTED and CANCELLED are terminal \u2014 no further transitions allowed. A request in DRAFT may only be submitted by its owning employee. A SUBMITTED request may only be approved/rejected by a manager or HR admin who is not the employee. Only the owning employee may cancel."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "createDraft(dto: CreateLeaveRequestDto): Promise<LeaveRequest>",
+      "authRule": "No authorization at the service layer \u2014 the caller identity is accepted in the DTO. RBAC is enforced at the route layer.",
+      "idempotent": false,
+      "errorSemantics": "Throws if employeeId or leavePolicyId is missing/invalid. Does not validate employee activity or balance at this stage."
+    },
+    {
+      "operation": "submitDraft(requestId: string, employeeId: string): Promise<LeaveRequest>",
+      "authRule": "Only the owning employee (employeeId must match the request's employeeId) may submit. The request must be in DRAFT status.",
+      "idempotent": false,
+      "errorSemantics": "Throws EmployeeNotActiveError, OverlappingRequestError, MinimumNoticeError, InsufficientBalanceError, or a generic error if the request is not found or not in DRAFT status."
+    },
+    {
+      "operation": "approve(requestId: string, approverId: string, approverRole: UserRole): Promise<LeaveRequest>",
+      "authRule": "Rejects self-approval (approverId === employeeId). If the employee has a managerId, approverId must equal that managerId. If managerId is null, approverRole must be 'hr_admin'. The request must be in SUBMITTED status.",
+      "idempotent": false,
+      "errorSemantics": "Throws NotManagerError if the approver is not authorized. Throws if the request is not found or not in SUBMITTED status."
+    },
+    {
+      "operation": "reject(requestId: string, approverId: string, approverRole: UserRole): Promise<LeaveRequest>",
+      "authRule": "Same authorization as approve: rejects self-rejection, must be the employee's manager or HR admin if no manager. The request must be in SUBMITTED status.",
+      "idempotent": false,
+      "errorSemantics": "Throws NotManagerError if the approver is not authorized. Throws if the request is not found or not in SUBMITTED status."
+    },
+    {
+      "operation": "cancel(requestId: string, employeeId: string): Promise<LeaveRequest>",
+      "authRule": "Only the owning employee (employeeId must match the request's employeeId) may cancel. The request must be in a non-terminal state (DRAFT, SUBMITTED, or APPROVED).",
+      "idempotent": false,
+      "errorSemantics": "Throws if the request is not found, is in a terminal state (REJECTED, CANCELLED), or the employeeId does not match the request's employeeId."
+    },
+    {
+      "operation": "getById(requestId: string): Promise<LeaveRequest | null>",
+      "authRule": "No authorization at the service layer \u2014 returns the request or null. Access control is enforced at the route layer.",
+      "idempotent": true,
+      "errorSemantics": "Returns null if not found; never throws."
+    },
+    {
+      "operation": "getByEmployee(employeeId: string): Promise<LeaveRequest[]>",
+      "authRule": "No authorization at the service layer \u2014 returns all requests for the employee. Access control is enforced at the route layer.",
+      "idempotent": true,
+      "errorSemantics": "Returns empty array if no requests exist; never throws."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The `LeaveRequest` type used in all service method signatures and return types must match the interface defined in `src/modules/leave/leave.model.ts` \u2014 same fields, same types, same optionality.",
+      "referencePath": "src/modules/leave/leave.model.ts"
+    },
+    {
+      "requirement": "The `IEmployeeService.isActive(id)` contract must be used for the employee-activity gate: it returns `true` only when `employmentStatus === 'ACTIVE'` AND `terminationDate === null`. LeaveService must not duplicate this logic or query the employee repository directly.",
+      "referencePath": "src/modules/employee/employee.service.interface.ts"
+    }
+  ],
+  "integrationPoints": []
+}

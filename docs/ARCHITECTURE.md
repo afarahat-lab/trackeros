@@ -45,6 +45,8 @@ src/modules/
   leave/
     leave.model.ts              — LeaveRequest interface
     leave.repository.ts         — ILeaveRepository + LeaveRepository
+    leave.errors.ts             — domain-specific error classes
+    leave.service.interface.ts  — ILeaveService interface + CreateLeaveRequestDto + UserRole type
     index.ts                    — barrel export
   audit/
     audit.model.ts              — AuditLog interface
@@ -59,7 +61,9 @@ src/modules/
 ## Module structure (planned — not yet built)
 
 ```
-src/modules/leave/leave.{service,controller,routes}.ts
+src/modules/leave/leave.service.ts          — LeaveService implementation
+src/modules/leave/leave.controller.ts       — LeaveController
+src/modules/leave/leave.routes.ts           — Fastify route plugin
 src/modules/notification/notification.{model,repository,service,controller,routes}.ts
 ```
 
@@ -213,6 +217,54 @@ The `LeaveRepository` maps the `leave_requests` table columns:
 `employee_id`, `leave_policy_id`, `start_date`, `end_date`, `reason`,
 `status`, `approved_by`, `approved_at`, `created_at`, `updated_at`.
 
+#### Leave domain errors (`leave.errors.ts`)
+
+Five domain-specific error classes, each extending `Error`:
+
+- `InsufficientBalanceError(employeeId, requested, available)` — thrown when
+  the requested days exceed the available balance
+- `OverlappingRequestError(employeeId, startDate, endDate)` — thrown when a
+  new request overlaps an existing SUBMITTED/APPROVED request
+- `EmployeeNotActiveError(employeeId)` — thrown when a non-active employee
+  attempts to submit
+- `MinimumNoticeError(requiredDays, actualDays)` — thrown when the notice
+  period is shorter than the policy's `minimumNoticeDays`
+- `NotManagerError(approverId)` — thrown when an unauthorized approver
+  attempts to approve or reject
+
+All error classes set `this.name` to their class name for reliable
+`instanceof` checks in tests and error-handling middleware.
+
+#### Leave service interface (`leave.service.interface.ts`)
+
+`ILeaveService` defines the leave-request lifecycle contract:
+
+- `createDraft(dto: CreateLeaveRequestDto): Promise<LeaveRequest>` — pure
+  creation; no business validations beyond field presence
+- `submitDraft(requestId, employeeId): Promise<LeaveRequest>` — transitions
+  DRAFT → SUBMITTED after passing all gates (employee active, no overlaps,
+  minimum notice, sufficient balance); reserves days on success
+- `approve(requestId, approverId, approverRole): Promise<LeaveRequest>` —
+  transitions SUBMITTED → APPROVED; enforces manager/HR authorization,
+  deducts days
+- `reject(requestId, approverId, approverRole): Promise<LeaveRequest>` —
+  transitions SUBMITTED → REJECTED; releases reservation
+- `cancel(requestId, employeeId): Promise<LeaveRequest>` — transitions any
+  non-terminal state → CANCELLED; releases reservation if SUBMITTED
+- `getById(requestId): Promise<LeaveRequest | null>` — idempotent lookup
+- `getByEmployee(employeeId): Promise<LeaveRequest[]>` — idempotent lookup
+
+`CreateLeaveRequestDto` carries: `employeeId`, `leavePolicyId`, `startDate`,
+`endDate`, `reason?`.
+
+`UserRole` is defined locally as `'employee' | 'manager' | 'hr_admin'` and
+used in the `approve`/`reject` signatures for entity-conditional
+authorization (e.g., HR admin may approve when the employee has no manager).
+
+**Note:** The `LeaveService` implementation (`leave.service.ts`) is not yet
+built — only the interface and error classes exist. The implementation is
+planned for a subsequent phase.
+
 ### Audit module
 
 `AuditLog` is an immutable record of state changes, supporting GP-002
@@ -272,7 +324,7 @@ Employees apply for annual, sick, and emergency leave. Managers approve or rejec
 | policy | src/modules/policy/ | LeavePolicy model, IPolicyRepository/Service, implementations |
 | balance | src/modules/balance/ | LeaveBalance model, IBalanceRepository/Service, implementations |
 | notification | src/modules/notification/ | INotificationService, NotificationService |
-| leave | src/modules/leave/ | LeaveRequest model, ILeaveRepository/Service, LeaveController, LeaveRoutes |
+| leave | src/modules/leave/ | LeaveRequest model, ILeaveRepository, LeaveRepository, ILeaveService (interface), domain errors, LeaveController, LeaveRoutes |
 
 ### Dependencies
 - leave → shared-types, audit, employee, policy, balance, notification
@@ -314,7 +366,7 @@ Employees apply for annual, sick, and emergency leave. Managers approve or rejec
 5. Balance module ✅ (model + repository)
 6. Notification module
 7. Leave module — model & contracts ✅
-8. Leave module — repository & service implementation (repository ✅)
+8. Leave module — repository & service implementation (repository ✅; service interface + errors ✅; service implementation pending)
 9. Leave module — controller & routes
 10. Module index files
 <!-- gestalt:architecture feature=cb89b522-6bc0-439f-8a0d-f905145254ee END -->
