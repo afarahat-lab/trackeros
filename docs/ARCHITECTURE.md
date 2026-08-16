@@ -23,6 +23,7 @@ src/modules/leave-policy/   — LeavePolicy module (model, repository, barrel ex
 src/modules/leave-balance/  — LeaveBalance module (model, repository, barrel export)
 src/modules/leave-request/  — LeaveRequest module (model, repository, barrel export)
 src/modules/notification/   — Notification module (model, repository, barrel export)
+src/modules/audit/          — Audit module (model, repository, barrel export)
 src/shared/types/           — Shared enums and DTOs (LeaveStatus, LeaveType, AuditAction,
                               NotificationStatus, EmploymentStatus, CreateLeaveRequestDto,
                               UpdateLeaveRequestDto, LeaveRequestQueryParams, ValidationResult)
@@ -93,7 +94,7 @@ src/shared/db/              — Database connection utilities
 4. **Leave balance module** — Balance tracking. ✅ **COMPLETE**
 5. **Leave request model and repository** — Model interface and stub repository. ✅ **COMPLETE**
 6. **Notification module** — Event notifications. ✅ **COMPLETE**
-7. **Audit module** — Audit logging.
+7. **Audit module** — Audit logging. ✅ **COMPLETE**
 8. **Leave request service** — Core orchestration.
 9. **Leave request routes and controller** — API endpoints.
 10. **Supporting services** — Balance, Notification, Audit, Policy, Employee services.
