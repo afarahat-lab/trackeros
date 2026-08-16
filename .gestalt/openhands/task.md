@@ -1,26 +1,33 @@
-# Implement this phase: Phase 7: Business logic services — EmployeeService, PolicyService, BalanceService
+# Implement this phase: Phase 8: LeaveService — core leave request business logic
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/cb89b522-6bc0-439f-8a0d-f905145254ee/7`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/cb89b522-6bc0-439f-8a0d-f905145254ee/8`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the business logic service layer for employee, policy, and balance modules. These services encapsulate business rules and coordinate between repositories.
+Create the LeaveService with all leave-request lifecycle business logic at the exact path declared by the architecture's Module Boundaries for the leave module (`src/modules/leave/`).
 
 Files to create:
-- `src/modules/employee/employee.service.interface.ts` — Define `IEmployeeService` with methods: `getById(id: string): Promise<Employee | null>`, `getByEmployeeNumber(employeeNumber: string): Promise<Employee | null>`, `isActive(id: string): Promise<boolean>`, `getManagerId(id: string): Promise<string | null>`.
-- `src/modules/employee/employee.service.ts` — Implement `EmployeeService` implementing `IEmployeeService`. Inject `IEmployeeRepository`. `isActive` returns true only when `employmentStatus === 'ACTIVE'` and `terminationDate` is null.
-- `src/modules/policy/policy.service.interface.ts` — Define `IPolicyService` with methods: `getById(id: string): Promise<LeavePolicy | null>`, `getByLeaveType(leaveType: LeaveType): Promise<LeavePolicy | null>`, `getAllActive(): Promise<LeavePolicy[]>`.
-- `src/modules/policy/policy.service.ts` — Implement `PolicyService` implementing `IPolicyService`. Inject `IPolicyRepository`.
-- `src/modules/balance/balance.service.interface.ts` — Define `IBalanceService` with methods: `getBalance(employeeId: string, policyId: string): Promise<LeaveBalance | null>`, `getAvailableDays(employeeId: string, policyId: string): Promise<number>`, `reserveDays(employeeId: string, policyId: string, days: number): Promise<void>`, `releaseReservation(employeeId: string, policyId: string, days: number): Promise<void>`, `deductDays(employeeId: string, policyId: string, days: number): Promise<void>`, `initializeBalancesForEmployee(employeeId: string): Promise<void>`.
-- `src/modules/balance/balance.service.ts` — Implement `BalanceService` implementing `IBalanceService`. Inject `IBalanceRepository` and `IPolicyRepository`. `getAvailableDays` computes `remainingDays` minus any pending reservations. `reserveDays` holds days as pending (must not allow negative). `deductDays` moves pending to used on approval. `releaseReservation` releases on reject/cancel. `initializeBalancesForEmployee` creates a balance for every active policy for the current calendar year. Apply the BINDING business rules: fiscal year = calendar year, annual lump-sum upfront on Jan 1, mid-year hire pro-rating (whole months remaining rounded down), no carry-over, no negative balance.
+- `src/modules/leave/leave.service.interface.ts` — Define `ILeaveService` with methods: `submitDraft(requestId: string, employeeId: string): Promise<LeaveRequest>`, `createDraft(dto: CreateLeaveRequestDto): Promise<LeaveRequest>`, `approve(requestId: string, approverId: string): Promise<LeaveRequest>`, `reject(requestId: string, approverId: string): Promise<LeaveRequest>`, `cancel(requestId: string, employeeId: string): Promise<LeaveRequest>`, `getById(requestId: string): Promise<LeaveRequest | null>`, `getByEmployee(employeeId: string): Promise<LeaveRequest[]>`. Also define `CreateLeaveRequestDto` with fields: `employeeId: string`, `leavePolicyId: string`, `startDate: Date`, `endDate: Date`, `reason?: string`.
+- `src/modules/leave/leave.service.ts` — Implement `LeaveService` implementing `ILeaveService`. Inject `ILeaveRepository`, `IEmployeeService`, `IPolicyService`, `IBalanceService`, `IAuditService`. Apply ALL BINDING business rules:
+  - Only ACTIVE employees may submit (call `IEmployeeService.isActive`).
+  - On submit: validate no overlapping SUBMITTED/APPROVED requests for same employee (call `ILeaveRepository.findOverlapping`).
+  - Count business days (weekdays only, Mon-Fri, inclusive start/end, no half-days, no public holidays) using a pure date helper function defined in this file.
+  - Check minimum notice days from policy (if `minimumNoticeDays` is set, reject if `startDate - now < minimumNoticeDays`). Emergency leave bypasses this.
+  - Check available balance: `IBalanceService.getAvailableDays` must be >= requested days. Reject with validation error if insufficient.
+  - On submit: reserve days via `IBalanceService.reserveDays`.
+  - On approve: verify approver is the employee's manager (via `IEmployeeService.getManagerId`) or has HR role; deduct days via `IBalanceService.deductDays`; set `approvedBy`, `approvedAt`.
+  - On reject: release reservation via `IBalanceService.releaseReservation`.
+  - On cancel: release reservation via `IBalanceService.releaseReservation`.
+  - Audit every state transition via `IAuditService.log`.
+- `src/modules/leave/leave.errors.ts` — Define domain-specific error classes: `InsufficientBalanceError`, `OverlappingRequestError`, `EmployeeNotActiveError`, `MinimumNoticeError`, `NotManagerError`.
 
-Update `src/modules/employee/index.ts`, `src/modules/policy/index.ts`, `src/modules/balance/index.ts` to export the new service interfaces and implementations.
+Update `src/modules/leave/index.ts` to export the new service interface, implementation, DTO, and errors.
 
-This phase depends on all prior phases — read `src/modules/employee/employee.model.ts` and `employee.repository.ts` from Phase 2, `src/modules/policy/policy.model.ts` and `policy.repository.ts` from Phase 3, `src/modules/balance/balance.model.ts` and `balance.repository.ts` from Phase 4, and `src/shared/types/index.ts` from Phase 1 before generating.
+This phase depends on all prior phases. Read before generating: `src/modules/leave/leave.model.ts` and `leave.repository.ts` from Phase 5, `src/modules/employee/employee.service.interface.ts` from Phase 7, `src/modules/policy/policy.service.interface.ts` from Phase 7, `src/modules/balance/balance.service.interface.ts` from Phase 7, `src/modules/audit/audit.service.interface.ts` from Phase 6, `src/shared/types/index.ts` from Phase 1.
 
-Include Jest unit tests in `tests/unit/modules/employee/`, `tests/unit/modules/policy/`, and `tests/unit/modules/balance/`.
+Include Jest unit tests in `tests/unit/modules/leave/` covering all lifecycle transitions, balance checks, overlap detection, and the weekday-counting helper.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -42,6 +49,22 @@ Cross-cutting rules:
 - Emergency leave is a SEPARATE pool (distinct from annual/sick), bypasses the advance-notice requirement but still requires approval and deducts from its own balance.
 - Employee data (managerId, employmentStatus, hireDate) comes from an injected IEmployeeRepository (same repository-interface pattern as other modules); the JWT provides ONLY the caller identity + role for RBAC. Approvals route to the target employee managerId; if null, escalate to HR (role hr_admin). Managers act only on direct reports.
 - Every endpoint enforces RBAC + input validation. Balances auto-created for all leave types on employee creation. Only ACTIVE employees may submit. [BINDING RULE — operator decision resolving: What is the fiscal year start date? The LeaveBalance.fiscalYear field needs a concrete definition — e.g. does the fiscal year start on January 1, April 1, or a configurable date per organisation?; How does leave entitlement accrue over the fiscal year? The LeavePolicy.accrualRate field exists but its semantics are undefined — is it a monthly rate, a daily rate, or a lump sum at the start of the year?; What is the carry-over rule for unused leave at fiscal year end? LeavePolicy.maxAccumulation exists but its exact semantics (cap on carry-over? cap on total balance?) are not defined.; How are leave days counted from start_date and end_date? Are both dates inclusive? Are weekends and/or public holidays excluded from the count?; What defines the fiscal_year boundary for leave balances? Is it a calendar year, a company-configured fiscal year, or an employee-specific anniversary year?; Should leave balance be allowed to go negative when an employee submits a request exceeding their remaining balance?; How are leave balances accrued — annual lump-sum reset, monthly pro-rata, or continuous accrual?; apply everywhere these apply, not in one place only]
+
+## Constraints & consistency
+You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
+### Reuse & consistency — match these exactly
+- The `LeaveRequest` type used in all service method signatures and return types must match the interface defined in `src/modules/leave/leave.model.ts` — same fields, same types, same optionality. (see `src/modules/leave/leave.model.ts`)
+- The `IEmployeeService.isActive(id)` contract must be used for the employee-activity gate: it returns `true` only when `employmentStatus === 'ACTIVE'` AND `terminationDate === null`. LeaveService must not duplicate this logic or query the employee repository directly. (see `src/modules/employee/employee.service.interface.ts`)
+### Entity invariants — enforce these
+- Reuse or extend `LeaveRequest`: Lifecycle: DRAFT → SUBMITTED → (APPROVED | REJECTED). Any non-terminal state (DRAFT, SUBMITTED, APPROVED) → CANCELLED. REJECTED and CANCELLED are terminal — no further transitions allowed. A request in DRAFT may only be submitted by its owning employee. A SUBMITTED request may only be approved/rejected by a manager or HR admin who is not the employee. Only the owning employee may cancel.
+### Interface contract — expose these operations (their shape is yours)
+- createDraft(dto: CreateLeaveRequestDto): Promise<LeaveRequest> — No authorization at the service layer — the caller identity is accepted in the DTO. RBAC is enforced at the route layer.; Throws if employeeId or leavePolicyId is missing/invalid. Does not validate employee activity or balance at this stage.
+- submitDraft(requestId: string, employeeId: string): Promise<LeaveRequest> — Only the owning employee (employeeId must match the request's employeeId) may submit. The request must be in DRAFT status.; Throws EmployeeNotActiveError, OverlappingRequestError, MinimumNoticeError, InsufficientBalanceError, or a generic error if the request is not found or not in DRAFT status.
+- approve(requestId: string, approverId: string, approverRole: UserRole): Promise<LeaveRequest> — Rejects self-approval (approverId === employeeId). If the employee has a managerId, approverId must equal that managerId. If managerId is null, approverRole must be 'hr_admin'. The request must be in SUBMITTED status.; Throws NotManagerError if the approver is not authorized. Throws if the request is not found or not in SUBMITTED status.
+- reject(requestId: string, approverId: string, approverRole: UserRole): Promise<LeaveRequest> — Same authorization as approve: rejects self-rejection, must be the employee's manager or HR admin if no manager. The request must be in SUBMITTED status.; Throws NotManagerError if the approver is not authorized. Throws if the request is not found or not in SUBMITTED status.
+- cancel(requestId: string, employeeId: string): Promise<LeaveRequest> — Only the owning employee (employeeId must match the request's employeeId) may cancel. The request must be in a non-terminal state (DRAFT, SUBMITTED, or APPROVED).; Throws if the request is not found, is in a terminal state (REJECTED, CANCELLED), or the employeeId does not match the request's employeeId.
+- getById(requestId: string): Promise<LeaveRequest | null> — No authorization at the service layer — returns the request or null. Access control is enforced at the route layer.; idempotent; Returns null if not found; never throws.
+- getByEmployee(employeeId: string): Promise<LeaveRequest[]> — No authorization at the service layer — returns all requests for the employee. Access control is enforced at the route layer.; idempotent; Returns empty array if no requests exist; never throws.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
