@@ -1,18 +1,18 @@
-# Implement this phase: Phase 4: LeaveBalance model and repository
+# Implement this phase: Phase 5: LeaveRequest model and repository
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/76d847b2-5905-40af-b702-36710232b1e4/4`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/76d847b2-5905-40af-b702-36710232b1e4/5`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the leave-balance module at `src/modules/leave-balance/`. This phase depends on `src/shared/types/index.ts` from Phase 1, `src/modules/employee/employee.model.ts` from Phase 2, and `src/modules/leave-policy/leave-policy.model.ts` from Phase 3 — read all three before generating any code.
+Create the leave-request module at `src/modules/leave-request/`. This phase depends on `src/shared/types/index.ts` from Phase 1, `src/modules/employee/employee.model.ts` from Phase 2, and `src/modules/leave-policy/leave-policy.model.ts` from Phase 3 — read all three before generating any code.
 
 Files to create:
-- `src/modules/leave-balance/leave-balance.model.ts` — Define the `LeaveBalance` entity interface with exact fields: id (string), employeeId (string), leavePolicyId (string), totalEntitlement (number), usedDays (number), remainingDays (number), fiscalYear (number), status ('ACTIVE' | 'EXHAUSTED' | 'CLOSED'), createdAt (Date), updatedAt (Date).
-- `src/modules/leave-balance/leave-balance.repository.ts` — Define `ILeaveBalanceRepository` interface with methods: findById(id: string): Promise<LeaveBalance | null>, findByEmployeeAndPolicy(employeeId: string, leavePolicyId: string, fiscalYear: number): Promise<LeaveBalance | null>, findByEmployeeId(employeeId: string, fiscalYear: number): Promise<LeaveBalance[]>, create(balance: Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeaveBalance>, update(id: string, data: Partial<LeaveBalance>): Promise<LeaveBalance | null>. Provide a stub `LeaveBalanceRepository` class.
+- `src/modules/leave-request/leave-request.model.ts` — Define the `LeaveRequest` entity interface with exact fields: id (string), employeeId (string), leavePolicyId (string), startDate (Date), endDate (Date), reason (string | undefined), status (LeaveStatus — import from `src/shared/types`), approvedBy (string | null), approvedAt (Date | null), cancelledAt (Date | null), createdAt (Date), updatedAt (Date).
+- `src/modules/leave-request/leave-request.repository.ts` — Define `ILeaveRequestRepository` interface with methods: findById(id: string): Promise<LeaveRequest | null>, findByEmployeeId(employeeId: string): Promise<LeaveRequest[]>, findByStatus(status: LeaveStatus): Promise<LeaveRequest[]>, query(params: LeaveRequestQueryParams): Promise<LeaveRequest[]>, create(request: Omit<LeaveRequest, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeaveRequest>, update(id: string, data: Partial<LeaveRequest>): Promise<LeaveRequest | null>. Provide a stub `LeaveRequestRepository` class.
 
-Include Jest unit tests in `tests/unit/modules/leave-balance/leave-balance.model.test.ts` and `tests/unit/modules/leave-balance/leave-balance.repository.test.ts`.
+Include Jest unit tests in `tests/unit/modules/leave-request/leave-request.model.test.ts` and `tests/unit/modules/leave-request/leave-request.repository.test.ts`.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -20,38 +20,37 @@ These are resolved, feature-wide decisions. Wherever this phase touches the conc
 
 ## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
 The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
-- `LeaveBalance` — the entity MUST have exactly these fields:
+- `LeaveRequest` — the entity MUST have exactly these fields:
     - id: string
     - employeeId: string
     - leavePolicyId: string
-    - totalEntitlement: number
-    - usedDays: number
-    - remainingDays: number
-    - fiscalYear: number
-    - status: 'ACTIVE' | 'EXHAUSTED' | 'CLOSED'
+    - startDate: Date
+    - endDate: Date
+    - reason: string | undefined
+    - status: LeaveRequestStatus
+    - approvedBy: string | null
+    - approvedAt: Date | null
+    - cancelledAt: Date | null
     - createdAt: Date
     - updatedAt: Date
 
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- The stub `LeaveBalanceRepository` class MUST follow the same pattern as `EmployeeRepository` (Phase 2) and `LeavePolicyRepository` (Phase 3): every method body is `throw new Error('not implemented')`, and all unused parameters are prefixed with underscore to suppress TypeScript/ESLint warnings. (see `src/modules/employee/employee.repository.ts`)
-- The barrel export `src/modules/leave-balance/index.ts` MUST follow the same pattern as `src/modules/employee/index.ts` and `src/modules/leave-policy/index.ts`: re-export the model interface and the repository interface + stub class. (see `src/modules/employee/index.ts`)
-- The model test file MUST follow the same pattern as `tests/unit/modules/employee/employee.model.test.ts` and `tests/unit/modules/leave-policy/leave-policy.model.test.ts`: verify field values, nullable/union values, exact field names (sorted comparison), and field count. (see `tests/unit/modules/employee/employee.model.test.ts`)
-- The repository test file MUST follow the same pattern as `tests/unit/modules/employee/employee.repository.test.ts` and `tests/unit/modules/leave-policy/leave-policy.repository.test.ts`: verify each method throws `'not implemented'`, verify `create` accepts correct input shape, verify `update` accepts partial and empty updates, verify interface contract has all required methods as functions. (see `tests/unit/modules/employee/employee.repository.test.ts`)
-- Tests MUST import from the barrel path (e.g., `../../../../src/modules/leave-balance`) — matching the pattern used by existing tests which resolve via Jest's `moduleDirectories: ['node_modules', 'src']` configuration. (see `tests/unit/modules/employee/employee.model.test.ts`)
+- The `LeaveStatus` enum used by `LeaveRequest.status` must be imported from `src/shared/types/index.ts` — the authoritative definition from Phase 1. No local redefinition. (see `src/shared/types/index.ts`)
+- The `LeaveRequestQueryParams` type used by `ILeaveRequestRepository.query` must be imported from `src/shared/types/index.ts` — the authoritative DTO from Phase 1. Its shape (employeeId, status, leavePolicyId, startDateFrom, startDateTo — all optional) is binding. (see `src/shared/types/index.ts`)
+- The `LeaveRequest.employeeId` field must reference a valid `Employee.id`. The `Employee` entity shape (id: string, managerId: string | null, employmentStatus: EmploymentStatus) is authoritative from Phase 2. The repository stub does not enforce this FK — enforcement is a service-layer concern — but the field name and type must match. (see `src/modules/employee/employee.model.ts`)
+- The `LeaveRequest.leavePolicyId` field must reference a valid `LeavePolicy.id`. The `LeavePolicy` entity shape (id: string, leaveType: LeaveType, isActive: boolean, minimumNoticeDays: number | null, requiresManagerApproval: boolean) is authoritative from Phase 3. The field name and type must match. (see `src/modules/leave-policy/leave-policy.model.ts`)
 ### Entity invariants — enforce these
-- Reuse or extend `LeaveBalance`: Lifecycle: ACTIVE → EXHAUSTED → CLOSED. A balance starts ACTIVE when initialized. It transitions to EXHAUSTED when `remainingDays` reaches 0. It transitions to CLOSED at the end of the fiscal year (calendar year: Jan 1 – Dec 31). Once CLOSED, no further mutations to `usedDays` or `remainingDays` are permitted.
-- Reuse or extend `LeaveBalance`: Composite uniqueness: at most one `LeaveBalance` row may exist for a given `(employeeId, leavePolicyId, fiscalYear)` tuple. This is enforced by a unique composite index on the conceptual table.
-- Reuse or extend `LeaveBalance`: Derived-field consistency: `remainingDays` MUST equal `totalEntitlement - usedDays` at all times. Any mutation to `usedDays` MUST recalculate `remainingDays` accordingly.
+- Reuse or extend `LeaveRequest`: Lifecycle: a LeaveRequest transitions through states DRAFT → SUBMITTED → (APPROVED | REJECTED) and may be CANCELLED from SUBMITTED or APPROVED. The status field must always be a valid LeaveStatus enum member. approvedBy and approvedAt must both be null when status is not APPROVED; both must be non-null when status is APPROVED. cancelledAt must be null unless status is CANCELLED.
+- Reuse or extend `LeaveRequest`: Date ordering: startDate must be on or before endDate. Both are full-day granularity (no time-of-day component matters). The BINDING day-count formula `daysRequested = (endDate - startDate) + 1` (calendar days inclusive) applies everywhere this count is needed — though the actual calculation is a service-layer concern (Phase 8), the entity shape must support it by storing both dates as Date.
 ### Interface contract — expose these operations (their shape is yours)
-- ILeaveBalanceRepository.findByEmployeeAndPolicy — idempotent; Returns null when no balance exists for the given (employeeId, leavePolicyId, fiscalYear) tuple — this is not an error condition.
-- ILeaveBalanceRepository.create — Accepts `Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt'>` — the repository (or database) is responsible for generating `id`, `createdAt`, and `updatedAt`. The caller must supply `employeeId`, `leavePolicyId`, `totalEntitlement`, `usedDays`, `remainingDays`, `fiscalYear`, and `status`.
-- ILeaveBalanceRepository.update — Accepts `Partial<LeaveBalance>` — any subset of fields may be provided. Returns the updated `LeaveBalance` or `null` if no balance with the given `id` exists.
+- ILeaveRequestRepository.create — No auth rule at the repository layer — auth is enforced at the controller/route layer (Phase 9).; Must return the created LeaveRequest with id, createdAt, and updatedAt populated. The stub throws "not implemented"; the real implementation must reject if required fields (employeeId, leavePolicyId, startDate, endDate, status) are missing.
+- ILeaveRequestRepository.update — No auth rule at the repository layer.; Returns the updated LeaveRequest or null if no entity with the given id exists. The stub throws "not implemented".
+- ILeaveRequestRepository.query — No auth rule at the repository layer.; idempotent; Accepts a LeaveRequestQueryParams with all-optional fields; returns an array (empty if no matches). The stub throws "not implemented".
 ### Integration points — connect to these
-- src/shared/types/index.ts (Phase 1) — The LeaveBalance entity does not directly import shared types (its status is a local string union, not the shared LeaveStatus enum), but the module exists within the same codebase and future phases (Phase 8, Phase 10) will wire LeaveBalance to shared types via the service layer.
-- src/modules/employee/employee.model.ts (Phase 2) — LeaveBalance.employeeId references an Employee by string ID. The service layer (Phase 10) will validate this reference against the Employee repository.
-- src/modules/leave-policy/leave-policy.model.ts (Phase 3) — LeaveBalance.leavePolicyId references a LeavePolicy by string ID. The service layer (Phase 10) will use the policy's entitlementDays to initialize balances.
+- src/shared/types/index.ts (Phase 1) — LeaveRequest entity imports LeaveStatus enum; repository imports LeaveRequestQueryParams DTO.
+- src/modules/employee/employee.model.ts (Phase 2) — LeaveRequest.employeeId references Employee.id; the Employee entity shape is the authoritative source for the employee domain.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
