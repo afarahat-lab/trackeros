@@ -1,0 +1,138 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-balance",
+      "notification"
+    ],
+    "affectedLayers": [
+      "service-interface",
+      "service-implementation",
+      "unit-tests"
+    ],
+    "isBreakingChange": true,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "`IBalanceService.getBalance` signature returns `Promise<LeaveBalance | null>` \u2014 the interface declares that null is returned when no balance exists for the given (employeeId, leavePolicyId, fiscalYear) tuple, rather than throwing.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`BalanceService.getBalance` returns `null` when `balanceRepo.findByEmployeeAndPolicy` returns null \u2014 no error is thrown, and the caller receives `null`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`NotificationService.markAsRead` sets `readAt` to the current timestamp when transitioning a notification to READ status \u2014 the `updateStatus` call or equivalent persistence operation includes a `readAt` value set to `new Date()`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`NotificationService.markAsRead` throws `NOTIFICATION_NOT_FOUND` when `notificationRepo.findById` returns null \u2014 the error shape is `{ error: string; code: 'NOTIFICATION_NOT_FOUND' }`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`NotificationService.markAsRead` is idempotent for notifications already in READ or ARCHIVED status \u2014 calling it on an already-READ or ARCHIVED notification does not call `updateStatus` and does not throw.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All four `notify*` methods (`notifyLeaveSubmitted`, `notifyLeaveApproved`, `notifyLeaveRejected`, `notifyLeaveCancelled`) throw `EMPLOYEE_NOT_FOUND` when `employeeRepo.findById` returns null \u2014 error shape `{ error: string; code: 'EMPLOYEE_NOT_FOUND' }`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`notifyLeaveSubmitted` and `notifyLeaveCancelled` throw `NO_MANAGER_ASSIGNED` when the employee's `managerId` is null \u2014 error shape `{ error: string; code: 'NO_MANAGER_ASSIGNED' }`.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access must go through repository interfaces (GP-001). The `getBalance` null-return and `markAsRead` readAt-timestamp changes must not bypass the repository layer.",
+    "Error responses must use the standard shape `{ error: string; code: string }` as defined in the reconciled architecture's error_response_contract. No new error shapes or formats may be introduced.",
+    "The `getBalance` signature change from `Promise<LeaveBalance>` to `Promise<LeaveBalance | null>` is a breaking change to the `IBalanceService` interface. All callers of `getBalance` (including `LeaveRequestService.submit`, `approve`, `cancel`) must be updated to handle the null case \u2014 they must check for null and throw `BALANCE_NOT_FOUND` themselves, preserving existing error semantics for those call sites."
+  ],
+  "outOfScope": [
+    "Creating new files \u2014 all four files listed in the intent (leave-policy.service.interface.ts, employee.service.interface.ts, leave-balance.service.test.ts, notification.service.test.ts) already exist in the codebase.",
+    "Adding barrel exports \u2014 IBalanceService/BalanceService, INotificationService/NotificationService, and IAuditService are already exported from their respective index.ts files.",
+    "The duplicate-balance guard in `initializeBalance` \u2014 it already calls `findByEmployeeAndPolicy` and throws `BALANCE_ALREADY_EXISTS` when a balance exists.",
+    "The `EMPLOYEE_NOT_FOUND` and `NO_MANAGER_ASSIGNED` error semantics in notify* methods \u2014 all four methods already throw these errors with the correct codes."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "Absence of a LeaveBalance for a given (employeeId, leavePolicyId, fiscalYear) tuple is a valid domain state \u2014 it is not an error at the service-interface level. The `IBalanceService.getBalance` contract reflects this by returning `null` rather than throwing."
+    },
+    {
+      "entity": "LeaveNotification",
+      "mustExistOrExtend": true,
+      "invariant": "When a LeaveNotification transitions to READ status, `readAt` must be set to the timestamp of the transition. A READ notification without a `readAt` timestamp is an invalid state."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IBalanceService.getBalance(employeeId, leavePolicyId, fiscalYear)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns `LeaveBalance | null`. Does NOT throw. Null means no balance exists for the given tuple \u2014 callers decide whether that is an error in their context."
+    },
+    {
+      "operation": "INotificationService.markAsRead(id)",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Throws `NOTIFICATION_NOT_FOUND` when the notification does not exist. Idempotent for notifications already in READ or ARCHIVED status \u2014 no state change, no error. When transitioning to READ, sets `readAt` to the current timestamp."
+    },
+    {
+      "operation": "INotificationService.notifyLeaveSubmitted(leaveRequest)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws `EMPLOYEE_NOT_FOUND` when employee does not exist. Throws `NO_MANAGER_ASSIGNED` when employee.managerId is null. No silent fallback \u2014 both conditions are hard errors."
+    },
+    {
+      "operation": "INotificationService.notifyLeaveCancelled(leaveRequest)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws `EMPLOYEE_NOT_FOUND` when employee does not exist. Throws `NO_MANAGER_ASSIGNED` when employee.managerId is null. No silent fallback."
+    },
+    {
+      "operation": "INotificationService.notifyLeaveApproved(leaveRequest)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws `EMPLOYEE_NOT_FOUND` when employee does not exist. Does NOT check managerId (notification goes to the employee, not the manager)."
+    },
+    {
+      "operation": "INotificationService.notifyLeaveRejected(leaveRequest)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws `EMPLOYEE_NOT_FOUND` when employee does not exist. Does NOT check managerId (notification goes to the employee, not the manager)."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "`LeaveRequestService.submit`, `approve`, and `cancel` methods call `IBalanceService.getBalance` (or `ILeaveBalanceRepository.findByEmployeeAndPolicy` directly). After the `getBalance` signature changes to return `null`, these call sites must check for null and throw `BALANCE_NOT_FOUND` themselves \u2014 preserving the existing error semantics that callers of `submit`/`approve`/`cancel` already rely on.",
+      "referencePath": "src/modules/leave-request/leave-request.service.ts"
+    },
+    {
+      "requirement": "The `markAsRead` implementation must call `updateStatus` with `NotificationStatus.READ` AND set `readAt` to the current timestamp. The `INotificationRepository.updateStatus` signature currently accepts `(id, status)` \u2014 the implementation must ensure `readAt` is persisted. If the repository interface needs to accept `readAt`, that change must be consistent with the existing stub and any future DB-backed implementation.",
+      "referencePath": "src/modules/notification/notification.repository.ts"
+    },
+    {
+      "requirement": "The `IBalanceService.getBalance` return type must be consistent with `ILeaveBalanceRepository.findByEmployeeAndPolicy` \u2014 both return `T | null`. The service method delegates to the repository and must not add throwing semantics that the repository does not have. The `LeaveRequestService` already calls the repository directly (not the service) and already handles null by throwing `BALANCE_NOT_FOUND` \u2014 no change needed there.",
+      "referencePath": "src/modules/leave-balance/leave-balance.repository.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/leave-request/leave-request.service.ts \u2192 ILeaveBalanceRepository.findByEmployeeAndPolicy",
+      "why": "LeaveRequestService already calls the repository directly (not IBalanceService) and already handles null by throwing BALANCE_NOT_FOUND. The IBalanceService.getBalance signature change does not affect LeaveRequestService \u2014 no caller update needed there."
+    },
+    {
+      "target": "src/modules/notification/notification.repository.ts \u2192 INotificationRepository.updateStatus",
+      "why": "markAsRead must persist readAt. The current updateStatus signature only accepts (id, status). Either updateStatus must be extended to accept readAt, or a separate mechanism must set readAt. The repository interface is the integration boundary."
+    }
+  ]
+}
