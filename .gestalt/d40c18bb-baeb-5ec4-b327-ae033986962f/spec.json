@@ -1,0 +1,125 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "employee"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository-interface",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The `Employee` entity interface is defined in `src/modules/employee/employee.model.ts` with all required fields: id (string), employeeNumber (string), firstName (string), lastName (string), email (string), managerId (string | null), department (string), hireDate (Date), terminationDate (Date | null), employmentStatus (EmploymentStatus \u2014 imported from `src/shared/types`), createdAt (Date), updatedAt (Date).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `IEmployeeRepository` interface is defined in `src/modules/employee/employee.repository.ts` with all required methods: `findById(id: string): Promise<Employee | null>`, `findByEmployeeNumber(employeeNumber: string): Promise<Employee | null>`, `findByManagerId(managerId: string): Promise<Employee[]>`, `findAll(): Promise<Employee[]>`, `create(employee: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'>): Promise<Employee>`, `update(id: string, data: Partial<Employee>): Promise<Employee | null>`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A stub `EmployeeRepository` class is provided that implements `IEmployeeRepository` and throws \"not implemented\" (or an equivalent descriptive error) from every method \u2014 no real database access in this phase.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests exist at `tests/unit/modules/employee/employee.model.test.ts` verifying that the `Employee` interface shape is structurally correct (all fields present with correct types, EmploymentStatus imported from shared types).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests exist at `tests/unit/modules/employee/employee.repository.test.ts` verifying that the stub `EmployeeRepository` throws on every method call, and that the `IEmployeeRepository` interface contract is structurally correct.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The `Employee` entity interface must import `EmploymentStatus` from `src/shared/types/index.ts` \u2014 do not redefine or duplicate the enum locally.",
+    "The `IEmployeeRepository` interface must use `Omit<Employee, 'id' | 'createdAt' | 'updatedAt'>` as the input type for `create` \u2014 the repository (not the caller) is responsible for generating `id`, `createdAt`, and `updatedAt`.",
+    "The `update` method must accept `Partial<Employee>` and return `Promise<Employee | null>` \u2014 `null` signals the entity was not found; the caller decides whether that is an error.",
+    "No database access, no Knex imports, no SQL in this phase. The stub `EmployeeRepository` must be a pure TypeScript class with no external dependencies beyond the model interface."
+  ],
+  "outOfScope": [
+    "Real database-backed `EmployeeRepository` implementation (Knex/PostgreSQL) \u2014 deferred to a later phase. This phase provides only the stub.",
+    "`IEmployeeService` / `EmployeeService` \u2014 the service interface and implementation are deferred to Phase 10 per PLAN.md.",
+    "Fastify routes, controllers, or HTTP handlers for the employee module \u2014 no API surface in this phase.",
+    "Database migrations (Knex) for the `employees` table \u2014 deferred to the phase that delivers the real repository implementation."
+  ],
+  "ambiguities": [
+    {
+      "description": "Should `Partial<Employee>` in the `update` method allow callers to pass `id`, `createdAt`, or `updatedAt`? The repository must ignore or reject attempts to overwrite `id` and `createdAt`, and should set `updatedAt` itself. The code agent should decide whether to use a stricter type (e.g., `Partial<Omit<Employee, 'id' | 'createdAt' | 'updatedAt'>>`) or document the behaviour.",
+      "options": [
+        "Use Partial<Employee> as-is and document that id/createdAt are ignored",
+        "Use a stricter Omit type to prevent callers from passing those fields"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "Every Employee must have a unique `employeeNumber` and a unique `email`. The repository interface exposes `findByEmployeeNumber` to enforce this lookup contract; the uniqueness constraint itself is enforced at the database layer in a later phase."
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "`managerId` is a self-referencing foreign key: it must be either `null` (top-level employee) or a valid `id` of another Employee. The repository does not enforce this in the stub phase, but the interface must accept `string | null` to support the manager hierarchy."
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "`employmentStatus` must be one of the `EmploymentStatus` enum values: ACTIVE, INACTIVE, or TERMINATED. The type system enforces this via the import from `src/shared/types`."
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "`terminationDate` must be `null` when `employmentStatus` is ACTIVE, and must be set when `employmentStatus` is TERMINATED. This invariant is documented in the entity interface (via comments or type narrowing) but enforced at the service layer in a later phase."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IEmployeeRepository.findById",
+      "authRule": "No auth rule at the repository layer \u2014 auth is enforced at the service/controller layer in later phases.",
+      "idempotent": true,
+      "errorSemantics": "Returns `null` when no employee exists with the given id \u2014 does not throw."
+    },
+    {
+      "operation": "IEmployeeRepository.create",
+      "authRule": "No auth rule at the repository layer.",
+      "idempotent": false,
+      "errorSemantics": "Must return the created Employee with `id`, `createdAt`, and `updatedAt` populated. The stub throws \"not implemented\"; the real implementation will throw on unique constraint violations (duplicate employeeNumber or email)."
+    },
+    {
+      "operation": "IEmployeeRepository.update",
+      "authRule": "No auth rule at the repository layer.",
+      "idempotent": false,
+      "errorSemantics": "Returns the updated Employee on success, `null` if no employee with the given id exists. The `data` parameter is `Partial<Employee>` \u2014 only supplied fields are updated; `id`, `createdAt` are never overwritten."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The `EmploymentStatus` enum used in `Employee.employmentStatus` must be the exact same enum exported from `src/shared/types/index.ts` \u2014 no local redefinition, no string literal union.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The `Employee` entity field names and types must match the reconciled architecture in `.gestalt/architecture/reconciled.json` \u2014 specifically the `domain_entities[].attributes` for the Employee entity: id (string), employeeNumber (string), firstName (string), lastName (string), email (string), managerId (string | null), department (string), hireDate (Date), terminationDate (Date | null), employmentStatus (EmploymentStatus), createdAt (Date), updatedAt (Date).",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "The `IEmployeeRepository` method signatures must match the interface declared in the reconciled architecture's module boundaries: the `employee` module owns the `EmployeeRepository interface`.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts",
+      "why": "The Employee entity imports `EmploymentStatus` enum. This is the only external dependency for this phase."
+    }
+  ]
+}
