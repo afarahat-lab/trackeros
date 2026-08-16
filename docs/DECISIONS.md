@@ -60,7 +60,38 @@ DTOs defined:
 Tests: `tests/unit/shared/types/index.test.ts` — Jest unit tests verifying enum
 values, member counts, and DTO shape acceptance.
 
-## ADR-003 — LeavePolicy model and repository (Phase 3)
+## ADR-003 — Employee model and repository (Phase 2)
+
+Date: 2026-06-10
+Status: Accepted
+
+Decision: Created the employee module at `src/modules/employee/` with
+model, repository interface, stub implementation, and barrel export.
+
+Files created:
+- `src/modules/employee/employee.model.ts` — `Employee` entity interface
+  with fields: id, employeeNumber, firstName, lastName, email, managerId
+  (string | null), department (string), hireDate, terminationDate (Date | null),
+  employmentStatus (EmploymentStatus enum), createdAt, updatedAt.
+  Documents invariants: employeeNumber unique, email unique, managerId is
+  self-referencing FK, terminationDate null when ACTIVE, set when TERMINATED.
+- `src/modules/employee/employee.repository.ts` — `IEmployeeRepository`
+  interface with methods: findById, findByEmployeeNumber, findByManagerId,
+  findAll, create, update. `EmployeeRepository` stub class throws
+  "not implemented" for all methods.
+- `src/modules/employee/index.ts` — Barrel export of model and repository.
+
+Tests:
+- `tests/unit/modules/employee/employee.model.test.ts` — Validates Employee
+  shape, managerId nullability, terminationDate nullability per status, all
+  EmploymentStatus enum values, and exact field count (12).
+- `tests/unit/modules/employee/employee.repository.test.ts` — Validates all
+  stub methods throw "not implemented", accepts valid create input and
+  partial updates, and verifies interface contract has all 6 methods.
+
+Dependencies: `src/shared/types/index.ts` (EmploymentStatus enum) from Phase 1.
+
+## ADR-004 — LeavePolicy model and repository (Phase 3)
 
 Date: 2026-06-10
 Status: Accepted
@@ -89,7 +120,39 @@ Tests:
 
 Dependencies: `src/shared/types/index.ts` (LeaveType enum) from Phase 1.
 
-## ADR-004 — LeaveRequest model and repository (Phase 5)
+## ADR-005 — LeaveBalance model and repository (Phase 4)
+
+Date: 2026-06-10
+Status: Accepted
+
+Decision: Created the leave-balance module at `src/modules/leave-balance/` with
+model, repository interface, stub implementation, and barrel export.
+
+Files created:
+- `src/modules/leave-balance/leave-balance.model.ts` — `LeaveBalance` entity
+  interface with fields: id, employeeId, leavePolicyId, totalEntitlement,
+  usedDays, remainingDays, fiscalYear, status ('ACTIVE' | 'EXHAUSTED' | 'CLOSED'),
+  createdAt, updatedAt. Documents invariants: lifecycle ACTIVE → EXHAUSTED → CLOSED;
+  composite uniqueness on (employeeId, leavePolicyId, fiscalYear); derived-field
+  consistency: remainingDays MUST equal totalEntitlement - usedDays.
+- `src/modules/leave-balance/leave-balance.repository.ts` — `ILeaveBalanceRepository`
+  interface with methods: findById, findByEmployeeAndPolicy, findByEmployeeId,
+  create, update. `LeaveBalanceRepository` stub class throws "not implemented"
+  for all methods.
+- `src/modules/leave-balance/index.ts` — Barrel export of model and repository.
+
+Tests:
+- `tests/unit/modules/leave-balance/leave-balance.model.test.ts` — Validates
+  LeaveBalance shape, all three status values (ACTIVE, EXHAUSTED, CLOSED),
+  remainingDays = totalEntitlement - usedDays invariant, zero-boundary cases,
+  and exact field count (10).
+- `tests/unit/modules/leave-balance/leave-balance.repository.test.ts` — Validates
+  all stub methods throw "not implemented", accepts valid create input and
+  partial updates, and verifies interface contract has all 5 methods.
+
+Dependencies: `src/shared/types/index.ts` from Phase 1.
+
+## ADR-006 — LeaveRequest model and repository (Phase 5)
 
 Date: 2026-06-10
 Status: Accepted
@@ -124,7 +187,7 @@ Tests:
 Dependencies: `src/shared/types/index.ts` (LeaveStatus enum, LeaveRequestQueryParams)
 from Phase 1.
 
-## ADR-005 — Notification model and repository (Phase 6)
+## ADR-007 — Notification model and repository (Phase 6)
 
 Date: 2026-06-10
 Status: Accepted
@@ -159,7 +222,42 @@ Tests:
 
 Dependencies: `src/shared/types/index.ts` (NotificationStatus enum) from Phase 1.
 
-## ADR-006 — LeaveRequestService — core orchestration (Phase 8)
+## ADR-008 — AuditLog model and repository (Phase 7)
+
+Date: 2026-06-10
+Status: Accepted
+
+Decision: Created the audit module at `src/modules/audit/` with
+model, repository interface, stub implementation, and barrel export.
+
+Files created:
+- `src/modules/audit/audit.model.ts` — `AuditLog` entity interface with fields:
+  id, entityType (string), entityId (string), action (string), oldValues
+  (Record<string, unknown> | null), newValues (Record<string, unknown> | null),
+  performedBy (string | null), performedAt (Date), ipAddress (string | null),
+  userAgent (string | null), createdAt (Date). Documents invariants: immutable
+  (no update/delete lifecycle); oldValues null for CREATE, newValues null for
+  DELETE, both non-null for UPDATE; referential integrity via (entityType, entityId)
+  composite enforced at service/DB layer.
+- `src/modules/audit/audit.repository.ts` — `IAuditLogRepository` interface with
+  methods: findById, findByEntity, findByPerformedBy, create. No update/delete
+  methods (immutable). `AuditLogRepository` stub class throws "not implemented"
+  for all methods.
+- `src/modules/audit/index.ts` — Barrel export of model and repository.
+
+Tests:
+- `tests/unit/modules/audit/audit.model.test.ts` — Validates AuditLog shape,
+  oldValues/newValues nullability invariants per action type (CREATE, DELETE,
+  UPDATE), performedBy nullability for system actions, ipAddress/userAgent
+  nullability, free-form action strings, and exact field count (11).
+- `tests/unit/modules/audit/audit.repository.test.ts` — Validates all stub
+  methods throw "not implemented", accepts valid create input (without
+  id/createdAt), and verifies interface contract has all 4 methods (no
+  update/delete).
+
+Dependencies: `src/shared/types/index.ts` from Phase 1.
+
+## ADR-009 — LeaveRequestService — core orchestration (Phase 8)
 
 Date: 2026-06-10
 Status: Accepted
