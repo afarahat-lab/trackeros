@@ -1,27 +1,27 @@
-# Implement this phase: Phase 9: LeaveRequest routes and controller
+# Implement this phase: Phase 10: Supporting services — Balance, Notification, Audit, Policy, Employee
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/76d847b2-5905-40af-b702-36710232b1e4/9`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/76d847b2-5905-40af-b702-36710232b1e4/10`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the Fastify routes and controller for leave requests at `src/modules/leave-request/`. This phase depends on `src/modules/leave-request/leave-request.service.ts` and `src/modules/leave-request/leave-request.service.interface.ts` from Phase 8, plus `src/modules/leave-request/leave-request.model.ts` from Phase 5 and `src/shared/types/index.ts` from Phase 1 — read all before generating.
+Create the remaining service interfaces and implementations for all supporting modules. This phase depends on all prior model and repository files — read them before generating.
 
-Files to create (approximately 2-3):
-- `src/modules/leave-request/leave-request.controller.ts` — Controller class that takes ILeaveRequestService in its constructor. Methods map 1:1 to service methods, handling HTTP concerns (extracting params from request, formatting responses, catching errors). Each method returns a plain object suitable for JSON serialization (Date fields serialized as ISO strings).
-- `src/modules/leave-request/leave-request.routes.ts` — Fastify plugin registering routes:
-  - POST /leave-requests (createDraft) — body: CreateLeaveRequestDto
-  - POST /leave-requests/:id/submit
-  - POST /leave-requests/:id/approve — body: { approverId: string }
-  - POST /leave-requests/:id/reject — body: { approverId: string }
-  - POST /leave-requests/:id/cancel
-  - GET /leave-requests/:id
-  - GET /leave-requests (query by employeeId, status, etc.)
-  - GET /leave-requests/employee/:employeeId
-- `tests/unit/modules/leave-request/leave-request.routes.test.ts` — Jest tests using Fastify's inject() method with a mocked service.
+Files to create (approximately 5):
 
-Register the routes in `src/app.ts` by importing and calling `app.register(leaveRequestRoutes)`.
+- `src/modules/leave-balance/leave-balance.service.interface.ts` — Define `IBalanceService` interface: getBalance(employeeId: string, leavePolicyId: string, fiscalYear: number): Promise<LeaveBalance>, getBalancesForEmployee(employeeId: string, fiscalYear: number): Promise<LeaveBalance[]>, initializeBalance(employeeId: string, leavePolicyId: string, fiscalYear: number): Promise<LeaveBalance>.
+- `src/modules/leave-balance/leave-balance.service.ts` — Implement `BalanceService` class using ILeaveBalanceRepository and ILeavePolicyRepository. `initializeBalance` reads the policy's entitlementDays and creates a balance with totalEntitlement=entitlementDays, usedDays=0, remainingDays=entitlementDays, status='ACTIVE', fiscalYear=current calendar year (hardcoded Jan 1 – Dec 31 per BINDING rule).
+
+- `src/modules/notification/notification.service.interface.ts` — Define `INotificationService` interface: notifyLeaveSubmitted(leaveRequest: LeaveRequest): Promise<LeaveNotification>, notifyLeaveApproved(leaveRequest: LeaveRequest): Promise<LeaveNotification>, notifyLeaveRejected(leaveRequest: LeaveRequest): Promise<LeaveNotification>, notifyLeaveCancelled(leaveRequest: LeaveRequest): Promise<LeaveNotification>, getNotificationsForUser(recipientId: string): Promise<LeaveNotification[]>, markAsRead(id: string): Promise<void>.
+- `src/modules/notification/notification.service.ts` — Implement `NotificationService` class using INotificationRepository and IEmployeeRepository. Each notify method creates a LeaveNotification with appropriate type, title, and message, targeting the employee's manager (for SUBMITTED/CANCELLED) or the employee (for APPROVED/REJECTED).
+
+- `tests/unit/modules/leave-balance/leave-balance.service.test.ts` and `tests/unit/modules/notification/notification.service.test.ts` — Jest unit tests with mocked repositories.
+
+The AuditService, LeavePolicyService, and EmployeeService interfaces are declared in the architecture but their full implementations are deferred — create stub interface files only:
+- `src/modules/audit/audit.service.interface.ts` — `IAuditService` with logAction(entityType, entityId, action, oldValues, newValues, performedBy): Promise<AuditLog>
+- `src/modules/leave-policy/leave-policy.service.interface.ts` — `ILeavePolicyService` with getPolicy(id), getPolicyByType(leaveType), isActive(id)
+- `src/modules/employee/employee.service.interface.ts` — `IEmployeeService` with getEmployee(id), getManager(employeeId), isActive(id)
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -29,19 +29,39 @@ These are resolved, feature-wide decisions. Wherever this phase touches the conc
 
 ## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
 The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
-- `LeaveRequest` — the entity MUST have exactly these fields:
+- `Employee` — the entity MUST have exactly these fields:
     - id: string
-    - employeeId: string
-    - leavePolicyId: string
-    - startDate: Date
-    - endDate: Date
-    - reason: string | undefined
-    - status: LeaveRequestStatus
-    - approvedBy: string | null
-    - approvedAt: Date | null
-    - cancelledAt: Date | null
+    - employeeNumber: string
+    - firstName: string
+    - lastName: string
+    - email: string
+    - managerId: string | null
+    - department: string
+    - hireDate: Date
+    - terminationDate: Date | null
+    - employmentStatus: 'ACTIVE' | 'INACTIVE' | 'TERMINATED'
     - createdAt: Date
     - updatedAt: Date
+
+## Constraints & consistency
+You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
+### Reuse & consistency — match these exactly
+- `BalanceService` must use the same `LeaveBalance` entity shape defined in `src/modules/leave-balance/leave-balance.model.ts` — specifically the fields `totalEntitlement`, `usedDays`, `remainingDays`, `fiscalYear`, `status` with the union type `'ACTIVE' | 'EXHAUSTED' | 'CLOSED'`. (see `src/modules/leave-balance/leave-balance.model.ts`)
+- `NotificationService` must use the same `LeaveNotification` entity shape defined in `src/modules/notification/notification.model.ts` — specifically the fields `recipientId`, `type` (union of 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'BALANCE_LOW' | 'BALANCE_EXHAUSTED'), `title`, `message`, `leaveRequestId`, `status` (NotificationStatus enum), `readAt`. (see `src/modules/notification/notification.model.ts`)
+- `NotificationService` must use `IEmployeeRepository.findById` (not `IEmployeeRepository.findByManagerId`) to resolve the employee and their manager. This matches the existing pattern in `LeaveRequestService` (Phase 8) which uses `employeeRepo.findById` for manager checks. (see `src/modules/leave-request/leave-request.service.ts`)
+- Error objects thrown by services must match the shape `{ error: string; code: string }` used throughout `LeaveRequestService` (Phase 8). No `new Error()` throws for business-logic failures — only for truly unexpected internal errors. (see `src/modules/leave-request/leave-request.service.ts`)
+- The stub interface files (`IAuditService`, `ILeavePolicyService`, `IEmployeeService`) must import entity types from their respective module models: `AuditLog` from `src/modules/audit/audit.model.ts`, `LeavePolicy` from `src/modules/leave-policy/leave-policy.model.ts`, `Employee` from `src/modules/employee/employee.model.ts`. The `LeaveType` enum used in `ILeavePolicyService.getPolicyByType` must come from `src/shared/types/index.ts`. (see `src/shared/types/index.ts`)
+### Entity invariants — enforce these
+- Reuse or extend `LeaveBalance`: `remainingDays` MUST equal `totalEntitlement - usedDays` at all times. `BalanceService.initializeBalance` sets `usedDays=0` and `remainingDays=totalEntitlement`, satisfying this invariant at creation. Any future mutation to `usedDays` (in other services) must recalculate `remainingDays` accordingly.
+- Reuse or extend `LeaveNotification`: Every `LeaveNotification` created by `NotificationService` must have `status='PENDING'` and `readAt=null` at creation time. The `type` must match the lifecycle event that triggered it (SUBMITTED, APPROVED, REJECTED, or CANCELLED). The `leaveRequestId` must reference the `LeaveRequest.id` that triggered the notification.
+- Reuse or extend `LeaveBalance`: A `LeaveBalance` initialized via `BalanceService.initializeBalance` must have `status='ACTIVE'`. The composite uniqueness constraint `(employeeId, leavePolicyId, fiscalYear)` is enforced by the repository layer — the service must not create a duplicate balance for the same tuple.
+### Interface contract — expose these operations (their shape is yours)
+- IBalanceService.initializeBalance(employeeId, leavePolicyId, fiscalYear) — Throws `{ error: 'Leave policy not found', code: 'POLICY_NOT_FOUND' }` when `ILeavePolicyRepository.findById` returns null. Throws repository-level errors unwrapped if the underlying create fails (e.g., duplicate key).
+- INotificationService.notifyLeaveSubmitted(leaveRequest) — Must not throw if the employee or manager cannot be resolved. If `employee.managerId` is null, the notification should target the employee themselves or use a defined fallback — the implementation chooses the shape but must not throw.
+- INotificationService.markAsRead(id) — idempotent; Delegates to `INotificationRepository.updateStatus(id, NotificationStatus.READ)`. If the notification does not exist, the repository returns null — the service should propagate this as a no-op (void return) rather than throwing.
+### Integration points — connect to these
+- src/modules/leave-balance/index.ts — `BalanceService` and `IBalanceService` must be exported from the leave-balance barrel so that `LeaveRequestService` (and future modules) can import them.
+- src/modules/notification/index.ts — `NotificationService` and `INotificationService` must be exported from the notification barrel so that `LeaveRequestService` (and future modules) can import them.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
