@@ -35,3 +35,27 @@ Description: Trackeros — a corporate operations web and mobile platform for
   null checks).
 Stack: TypeScript / Node.js / React / PostgreSQL
 Architecture: Modular monolith (corporate-ops-web-mobile template, tier 1)
+
+## ADR-002 — Shared types foundation (Phase 1)
+
+Date: 2026-06-10
+Status: Accepted
+
+Decision: Established `src/shared/types/index.ts` as the single source of truth
+for cross-module enums and DTOs in the leave management feature.
+
+Enums defined:
+- `LeaveStatus`: DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED
+- `LeaveType`: annual, sick, emergency, unpaid, maternity, paternity
+- `AuditAction`: CREATE, UPDATE, DELETE, APPROVE, REJECT
+- `NotificationStatus`: PENDING, SENT, READ, ARCHIVED
+- `EmploymentStatus`: ACTIVE, INACTIVE, TERMINATED
+
+DTOs defined:
+- `CreateLeaveRequestDto`: employeeId, leavePolicyId, startDate, endDate, reason
+- `UpdateLeaveRequestDto`: startDate, endDate, reason, status (all optional)
+- `LeaveRequestQueryParams`: employeeId, status, leavePolicyId, startDateFrom, startDateTo (all optional)
+- `ValidationResult`: valid (boolean), errors (string[])
+
+Tests: `tests/unit/shared/types/index.test.ts` — Jest unit tests verifying enum
+values, member counts, and DTO shape acceptance.

@@ -16,22 +16,12 @@ The architecture is modular, with a clear separation of concerns between models,
 ## Module structure
 
 ```
-src/modules/leave/leave.{model,repository,service,controller,routes}.ts
-src/modules/balance/balance.{model,repository,service,controller,routes}.ts
-src/modules/employee/employee.{model,repository,service,controller,routes}.ts
-src/modules/policy/policy.{model,repository,service,controller,routes}.ts
-src/modules/notification/notification.{model,repository,service,controller,routes}.ts
-src/modules/LeaveStatus/    — LeaveStatus module
-src/modules/BaseEntity/    — BaseEntity module
-src/modules/LeaveRequest/    — LeaveRequest module
-src/modules/LeaveType/    — LeaveType module
-src/modules/LeavePolicy/    — LeavePolicy module
-src/modules/AuditLog/    — AuditLog module
-src/modules/AuditRecord/    — AuditRecord module
-src/modules/AuditServiceInterface/    — AuditServiceInterface module
-src/shared/db connection.ts
-src/shared/base repository.ts
-src/shared/error types.ts
+src/modules/status/         — System status module (health-check, version)
+src/modules/uptime/         — Uptime monitoring module
+src/shared/types/           — Shared enums and DTOs (LeaveStatus, LeaveType, AuditAction,
+                              NotificationStatus, EmploymentStatus, CreateLeaveRequestDto,
+                              UpdateLeaveRequestDto, LeaveRequestQueryParams, ValidationResult)
+src/shared/db/              — Database connection utilities
 ```
 
 ## Key patterns
@@ -73,7 +63,7 @@ src/shared/error types.ts
 
 ### Module Boundaries
 
-- **shared-types** (`src/shared/types/`) — Enums and DTOs used across all modules.
+- **shared-types** (`src/shared/types/`) — Enums and DTOs used across all modules. **Implemented Phase 1.**
 - **employee** (`src/modules/employee/`) — Employee entity, repository, and service.
 - **leave-policy** (`src/modules/leave-policy/`) — LeavePolicy entity, repository, and service.
 - **leave-balance** (`src/modules/leave-balance/`) — LeaveBalance entity, repository, and BalanceService.
@@ -92,7 +82,7 @@ src/shared/error types.ts
 
 ### Recommended Implementation Phases
 
-1. **Shared types foundation** — Enums and DTOs.
+1. **Shared types foundation** — Enums and DTOs. ✅ **COMPLETE**
 2. **Employee module** — Foundational entity.
 3. **Leave policy module** — Policy rules.
 4. **Leave balance module** — Balance tracking.

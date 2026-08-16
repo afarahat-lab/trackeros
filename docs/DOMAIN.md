@@ -30,25 +30,27 @@ Represents a leave record managed by the `leave` module, including leave request
 |-------|------|----------|
 | id | string | true |
 | employeeId | string | true |
-| leaveTypeId | string | true |
+| leavePolicyId | string | true |
 | startDate | Date | true |
 | endDate | Date | true |
 | reason | string \| undefined | false |
-| status | LeaveRequestStatus | true |
+| status | LeaveStatus | true |
 | approvedBy | string \| null | false |
 | approvedAt | Date \| null | false |
+| cancelledAt | Date \| null | false |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
 **Relationships**
 - `Employee` — many-to-one
+- `LeavePolicy` — many-to-one
 
 ### CreateLeaveRequestDto
 
 | Field | Type | Required |
 |-------|------|----------|
 | employeeId | string | true |
-| leaveTypeId | string | true |
+| leavePolicyId | string | true |
 | startDate | Date | true |
 | endDate | Date | true |
 | reason | string \| undefined | false |
@@ -57,22 +59,20 @@ Represents a leave record managed by the `leave` module, including leave request
 
 | Field | Type | Required |
 |-------|------|----------|
-| startDate | Date | false |
-| endDate | Date | false |
+| startDate | Date \| undefined | false |
+| endDate | Date \| undefined | false |
 | reason | string \| undefined | false |
+| status | LeaveStatus \| undefined | false |
 
 ### LeaveRequestQueryParams
 
 | Field | Type | Required |
 |-------|------|----------|
-| status | LeaveRequestStatus | false |
-| leaveTypeId | string | false |
-| startDateFrom | Date | false |
-| startDateTo | Date | false |
-| endDateFrom | Date | false |
-| endDateTo | Date | false |
-| limit | number | false |
-| offset | number | false |
+| employeeId | string \| undefined | false |
+| status | LeaveStatus \| undefined | false |
+| leavePolicyId | string \| undefined | false |
+| startDateFrom | Date \| undefined | false |
+| startDateTo | Date \| undefined | false |
 
 ## balance
 
@@ -103,12 +103,12 @@ Represents leave balance data managed by the `balance` module, including tracked
 |-------|------|----------|
 | id | string | true |
 | employeeId | string | true |
-| policyId | string | true |
+| leavePolicyId | string | true |
 | totalEntitlement | number | true |
 | usedDays | number | true |
 | remainingDays | number | true |
 | fiscalYear | number | true |
-| status | string | true |
+| status | 'ACTIVE' \| 'EXHAUSTED' \| 'CLOSED' | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
@@ -175,11 +175,11 @@ Represents leave policy data managed by the `policy` module, including policy de
 |-------|------|----------|
 | id | string | true |
 | policyName | string | true |
-| leaveType | string | true |
+| leaveType | LeaveType | true |
 | entitlementDays | number | true |
-| accrualRate | number | false |
-| maxAccumulation | number | false |
-| minimumNoticeDays | number | false |
+| accrualRate | number \| null | false |
+| maxAccumulation | number \| null | false |
+| minimumNoticeDays | number \| null | false |
 | requiresManagerApproval | boolean | true |
 | isActive | boolean | true |
 | createdAt | Date | true |
@@ -230,11 +230,14 @@ Represents audit data managed by the `audit` module, including audit records, ch
 | id | string | true |
 | entityType | string | true |
 | entityId | string | true |
-| action | 'CREATE' \| 'UPDATE' \| 'DELETE' \| 'APPROVE' \| 'REJECT' | true |
+| action | AuditAction | true |
 | oldValues | Record<string, any> \| null | false |
 | newValues | Record<string, any> \| null | false |
 | performedBy | string \| null | false |
 | performedAt | Date | true |
+| ipAddress | string \| null | false |
+| userAgent | string \| null | false |
+| createdAt | Date | true |
 
 ### AuditRecord
 
@@ -269,7 +272,7 @@ Represents validation data managed by the `validation` module, including validat
 
 | Field | Type | Required |
 |-------|------|----------|
-| isValid | boolean | true |
+| valid | boolean | true |
 | errors | string[] | true |
 
 ## system
