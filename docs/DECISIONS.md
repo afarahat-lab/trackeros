@@ -158,3 +158,81 @@ Tests:
   contract has all required methods.
 
 Dependencies: `src/shared/types/index.ts` (NotificationStatus enum) from Phase 1.
+
+## ADR-006 — LeaveRequestService — core orchestration (Phase 8)
+
+Date: 2026-06-10
+Status: Accepted
+
+Decision: Implemented the `LeaveRequestService` as the core orchestration layer
+for the leave request lifecycle. The service depends on four repository
+interfaces (ILeaveRequestRepository, ILeaveBalanceRepository,
+ILeavePolicyRepository, IEmployeeRepository) and enforces all business rules
+and state transitions.
+
+Files created:
+- `src/modules/leave-request/leave-request.service.interface.ts` —
+  `ILeaveRequestService` interface with methods: createDraft, submit, approve,
+  reject, cancel, findById, findByEmployeeId, query.
+- `src/modules/leave-request/leave-request.service.ts` — `LeaveRequestService`
+  class implementing the full leave lifecycle state machine:
+  - **createDraft**: validates employee exists, policy exists and isActive,
+    startDate ≤ endDate; creates with status DRAFT.
+  - **submit**: validates DRAFT state, enforces minimumNoticeDays (if set),
+    checks balance has sufficient remainingDays using the BINDING formula
+    `daysRequested = (endDate - startDate) / msPerDay + 1`, transitions to
+    SUBMITTED.
+  - **approve**: validates SUBMITTED state, verifies approver is the
+    employee's manager (employee.managerId === approverId), deducts
+    daysRequested from balance (usedDays += daysRequested,
+    remainingDays = totalEntitlement - usedDays), sets APPROVED with
+    approvedBy and approvedAt.
+  - **reject**: validates SUBMITTED state, verifies approver is manager,
+    sets REJECTED (no balance change).
+  - **cancel**: validates SUBMITTED or APPROVED state; if APPROVED, restores
+    usedDays on balance (usedDays -= daysRequested,
+    remainingDays = totalEntitlement - usedDays); sets CANCELLED with
+    cancelledAt.
+  - **findById / findByEmployeeId / query**: pass-through to repository.
+- `src/modules/leave-request/index.ts` — Updated barrel export to include
+  service interface and implementation.
+
+Error handling: All business rule violations throw objects with shape
+`{ error: string; code: string }`. Error codes: EMPLOYEE_NOT_FOUND,
+POLICY_NOT_FOUND, POLICY_INACTIVE, INVALID_DATE_RANGE, REQUEST_NOT_FOUND,
+INVALID_STATE_TRANSITION, MINIMUM_NOTICE_VIOLATION, BALANCE_NOT_FOUND,
+BALANCE_CLOSED, INSUFFICIENT_BALANCE, NOT_MANAGER.
+
+BINDING day-counting formula: `daysRequested = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24) + 1`.
+All dates are full-day granularity — no time-of-day considerations.
+
+Tests: `tests/unit/modules/leave-request/leave-request.service.test.ts` — 40+
+Jest unit tests with fully mocked repositories covering:
+- createDraft: success, employee not found, policy not found, policy inactive,
+  invalid date range, single-day leave.
+- submit: DRAFT→SUBMITTED, request not found, wrong state, minimumNoticeDays
+  violation (and exact boundary), balance not found, balance CLOSED,
+  insufficient balance, BINDING formula verification (5-day range, single day,
+  zero remaining).
+- approve: SUBMITTED→APPROVED with balance deduction, request not found,
+  wrong state, not-manager rejection, balance not found, balance CLOSED,
+  remainingDays = totalEntitlement - usedDays invariant.
+- reject: SUBMITTED→REJECTED, request not found, wrong state, not-manager
+  rejection, balance untouched.
+- cancel: SUBMITTED→CANCELLED (no balance change), APPROVED→CANCELLED (balance
+  restoration), DRAFT/REJECTED/CANCELLED rejection, balance not found/CLOSED
+  during APPROVED cancel, remainingDays invariant on restoration.
+- read-only: findById, findByEmployeeId, query delegation.
+- state machine: DRAFT→APPROVED, APPROVED→SUBMITTED, REJECTED→CANCELLED,
+  DRAFT→REJECTED, APPROVED→REJECTED all rejected.
+
+Dependencies: `src/shared/types/index.ts` (Phase 1), `src/modules/leave-request/`
+model and repository (Phase 5), `src/modules/leave-balance/` repository (Phase 4),
+`src/modules/leave-policy/` repository (Phase 3), `src/modules/employee/`
+repository (Phase 2).
+
+Divergence from plan: The service does NOT yet integrate with notification or
+audit modules — those cross-cutting concerns are deferred to Phase 10
+(supporting services). The service also does not use database transactions
+(PoolClient / BEGIN/COMMIT) — transaction wrapping is deferred to the DB-backed
+repository implementation phase.
