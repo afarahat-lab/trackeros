@@ -1,0 +1,109 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "audit"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The `AuditLog` entity interface exists at `src/modules/audit/audit.model.ts` with exactly 11 fields: id (string), entityType (string), entityId (string), action (string), oldValues (Record<string, unknown> | null), newValues (Record<string, unknown> | null), performedBy (string | null), performedAt (Date), ipAddress (string | null), userAgent (string | null), createdAt (Date).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `IAuditLogRepository` interface exists at `src/modules/audit/audit.repository.ts` with exactly four methods: `findById(id: string): Promise<AuditLog | null>`, `findByEntity(entityType: string, entityId: string): Promise<AuditLog[]>`, `findByPerformedBy(performedBy: string): Promise<AuditLog[]>`, and `create(log: Omit<AuditLog, 'id' | 'createdAt'>): Promise<AuditLog>`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A stub `AuditLogRepository` class implements `IAuditLogRepository` with all four methods throwing `'not implemented'` \u2014 no real database access in this phase.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The barrel export at `src/modules/audit/index.ts` re-exports `AuditLog` from the model and `IAuditLogRepository` + `AuditLogRepository` from the repository.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests exist at `tests/unit/modules/audit/audit.model.test.ts` verifying the AuditLog shape: all 11 field names, type-checking of Date fields, nullability of oldValues/newValues/performedBy/ipAddress/userAgent, and free-form action strings.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests exist at `tests/unit/modules/audit/audit.repository.test.ts` verifying the stub repository: all four methods throw `'not implemented'`, the class has exactly the four expected method names (no update/delete), and the `create` input type excludes `id` and `createdAt`.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The `oldValues` and `newValues` fields must use `Record<string, unknown>` (not `Record<string, any>`) per the `no-any` constraint in HARNESS.json (severity: high).",
+    "The `action` field is a free-form `string`, not constrained to the `AuditAction` enum. The enum from `src/shared/types/index.ts` is available as a set of recommended values but the model does not restrict to it.",
+    "All database access goes through the repository interface (GP-001). The stub throws `'not implemented'` \u2014 no inline DB calls exist in this phase."
+  ],
+  "outOfScope": [
+    "Real database-backed `AuditLogRepository` implementation \u2014 the stub throwing `'not implemented'` is sufficient for this phase. The real implementation is deferred to a later phase.",
+    "`IAuditService` / `AuditService` \u2014 the service interface (`audit.service.interface.ts`) and its implementation are deferred to Phase 10 per PLAN.md.",
+    "AuditLog write-side enforcement (GP-002: \"all state-changing operations write an audit record\") \u2014 the audit module provides the model and repository for recording audit entries, but the obligation to call `IAuditLogRepository.create` on every state change belongs to the services in later phases (Phase 8 LeaveRequestService, Phase 10 supporting services)."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "AuditLog records are immutable \u2014 the repository exposes only `create` and read methods (`findById`, `findByEntity`, `findByPerformedBy`). There is no `update` or `delete` method. Once created, an AuditLog record's fields are permanent."
+    },
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "Every AuditLog record references a domain entity via the composite `(entityType, entityId)` pair. `entityType` is a string identifying the domain aggregate (e.g. 'LeaveRequest', 'LeaveBalance', 'LeavePolicy', 'Employee') and `entityId` is the primary key of that entity. Referential integrity is enforced at the service/DB layer in later phases."
+    },
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "`oldValues` and `newValues` are independently nullable with action-dependent semantics: when `action` is `CREATE`, `oldValues` must be `null` and `newValues` must be non-null; when `action` is `DELETE`, `oldValues` must be non-null and `newValues` must be `null`; when `action` is `UPDATE`, both must be non-null. This invariant is enforced at the service layer in a later phase."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IAuditLogRepository.create",
+      "authRule": "No auth rule at the repository layer \u2014 auth is enforced at the controller/route layer in later phases.",
+      "idempotent": false,
+      "errorSemantics": "Returns the created `AuditLog` with `id` and `createdAt` populated. The stub throws `'not implemented'`."
+    },
+    {
+      "operation": "IAuditLogRepository.findByEntity",
+      "authRule": "No auth rule at the repository layer.",
+      "idempotent": true,
+      "errorSemantics": "Returns an array of `AuditLog` records matching the given `(entityType, entityId)` pair, ordered by `performedAt` descending (most recent first). Returns empty array if none found. The stub throws `'not implemented'`."
+    },
+    {
+      "operation": "IAuditLogRepository.findByPerformedBy",
+      "authRule": "No auth rule at the repository layer.",
+      "idempotent": true,
+      "errorSemantics": "Returns an array of `AuditLog` records for the given actor, ordered by `performedAt` descending. Returns empty array if none found. The stub throws `'not implemented'`."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The `AuditLog` entity's `action` field is a free-form string, but the `AuditAction` enum from `src/shared/types/index.ts` (values: CREATE, UPDATE, DELETE, APPROVE, REJECT) provides the canonical set of recommended action values. Consumers of the audit module should prefer these enum values when writing audit records.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "All other modules (notably `leave-request` in Phase 8) must import `AuditLog`, `IAuditLogRepository`, and `AuditLogRepository` exclusively through the barrel export at `src/modules/audit/index.ts` \u2014 never from the internal model or repository files directly (architecture rule 1).",
+      "referencePath": "src/modules/audit/index.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts (Phase 1)",
+      "why": "The `AuditAction` enum (CREATE, UPDATE, DELETE, APPROVE, REJECT) provides the canonical action values that consumers of the audit module should use when writing audit records. The audit module depends on Phase 1 being complete."
+    }
+  ]
+}
