@@ -1,57 +1,53 @@
-# Implement this phase: Phase 7: AuditLog model and repository
+# Implement this phase: Phase 8: LeaveRequestService — core orchestration
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/76d847b2-5905-40af-b702-36710232b1e4/7`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/76d847b2-5905-40af-b702-36710232b1e4/8`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the audit module at `src/modules/audit/`. This phase depends on `src/shared/types/index.ts` from Phase 1 — read it before generating any code.
+Create the LeaveRequestService at `src/modules/leave-request/`. This phase depends on all prior model and repository files — read them before generating any code.
 
-Files to create:
-- `src/modules/audit/audit.model.ts` — Define the `AuditLog` entity interface with exact fields: id (string), entityType (string), entityId (string), action (string), oldValues (Record<string, any> | null), newValues (Record<string, any> | null), performedBy (string | null), performedAt (Date), ipAddress (string | null), userAgent (string | null), createdAt (Date).
-- `src/modules/audit/audit.repository.ts` — Define `IAuditLogRepository` interface with methods: findById(id: string): Promise<AuditLog | null>, findByEntity(entityType: string, entityId: string): Promise<AuditLog[]>, findByPerformedBy(performedBy: string): Promise<AuditLog[]>, create(log: Omit<AuditLog, 'id' | 'createdAt'>): Promise<AuditLog>. Provide a stub `AuditLogRepository` class.
+Files to create (approximately 3):
+- `src/modules/leave-request/leave-request.service.interface.ts` — Define `ILeaveRequestService` interface with methods: createDraft(dto: CreateLeaveRequestDto): Promise<LeaveRequest>, submit(id: string): Promise<LeaveRequest>, approve(id: string, approverId: string): Promise<LeaveRequest>, reject(id: string, approverId: string): Promise<LeaveRequest>, cancel(id: string): Promise<LeaveRequest>, findById(id: string): Promise<LeaveRequest | null>, findByEmployeeId(employeeId: string): Promise<LeaveRequest[]>, query(params: LeaveRequestQueryParams): Promise<LeaveRequest[]>.
+- `src/modules/leave-request/leave-request.service.ts` — Implement `LeaveRequestService` class. Constructor takes: ILeaveRequestRepository, ILeaveBalanceRepository, ILeavePolicyRepository, IEmployeeRepository. Key logic:
+  - `createDraft`: validate employee exists, validate policy exists and isActive, validate startDate <= endDate, create with status DRAFT.
+  - `submit`: validate request is in DRAFT state, validate policy minimumNoticeDays (if set, startDate must be >= now + minimumNoticeDays), check balance has sufficient remainingDays using the BINDING formula `daysRequested = (endDate - startDate) + 1` (calendar days inclusive), transition to SUBMITTED.
+  - `approve`: validate request is SUBMITTED, validate approver is the employee's manager (employee.managerId === approverId), deduct `daysRequested` from LeaveBalance.usedDays and recalculate remainingDays, set status APPROVED, approvedBy, approvedAt.
+  - `reject`: validate request is SUBMITTED, validate approver is manager, set status REJECTED.
+  - `cancel`: validate request is APPROVED or SUBMITTED, if APPROVED restore usedDays on balance, set status CANCELLED, cancelledAt.
+- `tests/unit/modules/leave-request/leave-request.service.test.ts` — Jest unit tests with mocked repositories covering all state transitions and the BINDING day-counting formula.
 
-Include Jest unit tests in `tests/unit/modules/audit/audit.model.test.ts` and `tests/unit/modules/audit/audit.repository.test.ts`.
+Use the exact BINDING formula everywhere: `daysRequested = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24) + 1`. All dates are full-day granularity — no time-of-day considerations.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
 - Consolidated decision for all questions: (1) Fiscal year = calendar year (Jan 1 to Dec 31), hardcoded — no configurable fiscalYearStart field. (2) Leave duration counts calendar days inclusive — weekends and public holidays ARE counted as leave days; do NOT introduce a holiday calendar entity. (3) Minimum granularity = full-day increments only — leave balances are integers, no half-days, no hours, no time-of-day on startDate/endDate. (4) Day counting from start_date to end_date is calendar days inclusive of both ends: daysRequested = (end_date - start_date) + 1. This single formula is BINDING at every call site (used_days deduction, overlap detection, remaining_days) — no weekend or holiday exclusion anywhere. [BINDING RULE — operator decision resolving: How is the fiscal year boundary defined — calendar year (Jan 1 – Dec 31) or a configurable start month/day? This determines when LeaveBalance transitions from ACTIVE/EXHAUSTED to CLOSED and when new balance records are created.; Should leave duration count weekends and public holidays as leave days, or only business days? The current rule uses calendar days inclusive, but this may not match all organisational policies.; What is the minimum granularity of a leave request — full days, half days, or hours? This affects the daysRequested calculation and balance precision.; How are leave days counted from start_date to end_date — calendar days (inclusive of both ends, e.g. Mon–Fri = 5 days) or business/working days only? This is BINDING across all balance-deduction and overlap-detection call sites.; apply everywhere these apply, not in one place only]
 
-## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
-The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
-- `AuditLog` — the entity MUST have exactly these fields:
-    - id: string
-    - entityType: string
-    - entityId: string
-    - action: string
-    - oldValues: Record<string, any> | null
-    - newValues: Record<string, any> | null
-    - performedBy: string | null
-    - performedAt: Date
-    - ipAddress: string | null
-    - userAgent: string | null
-    - createdAt: Date
-
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- The `AuditLog.action` field is typed as `string` (free-form), not constrained to the `AuditAction` enum from `src/shared/types/index.ts`. This is intentional — the audit module must accept any action string, including values not in the enum (e.g. 'SUBMIT', 'CANCEL'). The `AuditAction` enum remains available for callers that want to use it, but the audit module does not enforce it at the entity level. (see `src/shared/types/index.ts`)
-- The `AuditLog` entity's `oldValues` and `newValues` use `Record<string, unknown>` — consistent with the `no-any` constraint in HARNESS.json. The `unknown` type requires type-narrowing before use, which is the project-wide standard. (see `HARNESS.json → constraints.rules[no-any]`)
-- The audit module's barrel export (`src/modules/audit/index.ts`) must match the pattern established by all other modules: re-export the entity interface, the repository interface, and the stub repository class. No internal implementation details are exposed. (see `src/modules/employee/index.ts, src/modules/leave-policy/index.ts, src/modules/leave-balance/index.ts, src/modules/leave-request/index.ts, src/modules/notification/index.ts`)
+- The `LeaveRequest` entity returned by all service methods must conform to the `LeaveRequest` interface defined in `src/modules/leave-request/leave-request.model.ts` — same fields, same types, same nullability. (see `src/modules/leave-request/leave-request.model.ts`)
+- The `LeaveRequestQueryParams` parameter of `query` must match the interface defined in `src/shared/types/index.ts` — fields `employeeId`, `status`, `leavePolicyId`, `startDateFrom`, `startDateTo` with the same types and optionality. (see `src/shared/types/index.ts`)
+- The `CreateLeaveRequestDto` parameter of `createDraft` must match the interface defined in `src/shared/types/index.ts` — fields `employeeId`, `leavePolicyId`, `startDate`, `endDate`, `reason` with the same types and optionality. (see `src/shared/types/index.ts`)
+- The `LeaveBalance.remainingDays` invariant (`remainingDays = totalEntitlement - usedDays`) defined in `src/modules/leave-balance/leave-balance.model.ts` must be preserved by every balance mutation in `approve` and `cancel`. (see `src/modules/leave-balance/leave-balance.model.ts`)
+- The `LeaveRequest` lifecycle invariant documented in `src/modules/leave-request/leave-request.model.ts` (DRAFT → SUBMITTED → APPROVED | REJECTED; cancellable from SUBMITTED or APPROVED) must be enforced by every state-transitioning method. (see `src/modules/leave-request/leave-request.model.ts`)
 ### Entity invariants — enforce these
-- Reuse or extend `AuditLog`: AuditLog records are immutable — once created, no field may be updated or deleted. The repository exposes only `create` and read methods; there is no `update` or `delete` path. This is enforced structurally: the `IAuditLogRepository` interface has no mutation methods beyond `create`.
-- Reuse or extend `AuditLog`: Every AuditLog record references a domain entity via the composite `(entityType, entityId)` pair. `entityType` is a string identifying the domain aggregate (e.g. 'LeaveRequest', 'LeaveBalance', 'LeavePolicy', 'Employee'), and `entityId` is the primary key of that entity. Referential integrity is enforced at the service/DB layer in later phases — this phase only defines the shape.
-- Reuse or extend `AuditLog`: The `oldValues`/`newValues` nullability contract: for `CREATE` actions, `oldValues` must be `null` and `newValues` must be non-null; for `DELETE` actions, `oldValues` must be non-null and `newValues` must be `null`; for `UPDATE` actions, both must be non-null. This invariant is documented on the entity but enforced at the service layer in a later phase.
+- Reuse or extend `LeaveRequest`: Lifecycle state machine: DRAFT → SUBMITTED → (APPROVED | REJECTED). From SUBMITTED or APPROVED, may transition to CANCELLED. No other transitions are valid. The service must reject any attempt to transition outside this graph (e.g., DRAFT→APPROVED, REJECTED→CANCELLED, APPROVED→SUBMITTED).
+- Reuse or extend `LeaveRequest`: When `status === APPROVED`, both `approvedBy` and `approvedAt` must be non-null. When `status !== APPROVED`, both must be null. `cancelledAt` must be null unless `status === CANCELLED`, in which case it must be non-null.
+- Reuse or extend `LeaveBalance`: `remainingDays` MUST equal `totalEntitlement - usedDays` at all times. Every mutation to `usedDays` (deduction on approve, restoration on cancel) MUST recalculate `remainingDays` accordingly before persisting.
+- Reuse or extend `LeaveBalance`: A balance with `status === 'CLOSED'` must not be mutated. The service must check the balance status before deducting or restoring `usedDays` and reject the operation if the balance is CLOSED.
 ### Interface contract — expose these operations (their shape is yours)
-- IAuditLogRepository.create — No auth rule at the repository layer — auth is enforced at the controller/service layer in later phases.; In this phase, the stub throws `'not implemented'`. In the real implementation, it must return the created AuditLog with server-generated `id` and `createdAt` populated.
-- IAuditLogRepository.findById — No auth rule at the repository layer.; idempotent; Returns `null` when no record matches the given id — never throws for a missing record.
-- IAuditLogRepository.findByEntity — No auth rule at the repository layer.; idempotent; Returns an empty array when no audit records exist for the given entity — never throws.
-- IAuditLogRepository.findByPerformedBy — No auth rule at the repository layer.; idempotent; Returns an empty array when no audit records exist for the given actor — never throws.
+- createDraft — Caller identity is not validated by the service itself (RBAC is enforced at the controller/route layer in Phase 9). The service accepts the `employeeId` from the DTO and trusts the caller.; Throws if employee not found, policy not found or inactive, or startDate > endDate. Error shape: `{ error: string; code: string }`.
+- submit — RBAC deferred to controller layer (Phase 9).; Throws if request not found, request not in DRAFT status, minimumNoticeDays violated, balance not found, insufficient remainingDays, or balance is CLOSED. Error shape: `{ error: string; code: string }`.
+- approve — RBAC deferred to controller layer (Phase 9). The service validates that `approverId === employee.managerId` as a business rule, not as an auth concern.; Throws if request not found, request not in SUBMITTED status, approverId does not match employee.managerId, balance not found, or balance is CLOSED. Error shape: `{ error: string; code: string }`.
+- reject — RBAC deferred to controller layer (Phase 9). The service validates that `approverId === employee.managerId` as a business rule.; Throws if request not found, request not in SUBMITTED status, or approverId does not match employee.managerId. Error shape: `{ error: string; code: string }`.
+- cancel — RBAC deferred to controller layer (Phase 9).; Throws if request not found, request not in SUBMITTED or APPROVED status, or (if APPROVED) balance not found or balance is CLOSED. Error shape: `{ error: string; code: string }`.
+- findById / findByEmployeeId / query — RBAC deferred to controller layer (Phase 9).; idempotent; Read-only; no business-rule errors. Return null or empty array on no results.
 ### Integration points — connect to these
-- src/shared/types/index.ts — The audit module depends on shared types from Phase 1. While the AuditLog entity itself does not directly import enums from shared types (action is free-form string), the module exists in the same codebase and callers in later phases will use AuditAction enum values when creating audit records.
-- Phase 8: LeaveRequestService (src/modules/leave-request/leave-request.service.ts) — The LeaveRequestService will depend on IAuditLogRepository to write audit records for every state-changing operation (createDraft, submit, approve, reject, cancel). This phase establishes the interface that Phase 8 will consume.
-- Phase 10: AuditService (src/modules/audit/audit.service.interface.ts) — Phase 10 will add an IAuditService interface wrapping the repository with a `logAction` convenience method. This phase's entity and repository are the foundation for that service.
+- src/modules/leave-request/leave-request.repository.ts (ILeaveRequestRepository) — Service calls `findById`, `create`, and `update` on this repository for all leave request persistence operations.
+- src/modules/leave-policy/leave-policy.repository.ts (ILeavePolicyRepository) — Service calls `findById` on this repository during `createDraft` (to validate policy exists and isActive) and during `submit` (to read `minimumNoticeDays`).
+- src/modules/employee/employee.repository.ts (IEmployeeRepository) — Service calls `findById` on this repository during `createDraft` (to validate employee exists) and during `approve`/`reject` (to retrieve `managerId` for approver validation).
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
