@@ -101,6 +101,6 @@ export class NotificationService implements INotificationService {
       return;
     }
 
-    await this.notificationRepo.updateStatus(id, NotificationStatus.READ, new Date());
+    await this.notificationRepo.updateStatus(id, NotificationStatus.READ);
   }
 }
