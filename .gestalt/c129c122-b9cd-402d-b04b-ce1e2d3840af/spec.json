@@ -1,0 +1,48 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-request"
+    ],
+    "affectedLayers": [
+      "service"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The three deep imports in `src/modules/leave-request/leave-request.service.ts` are replaced with barrel imports: `ILeaveBalanceRepository` imported from `'../leave-balance'`, `ILeavePolicyRepository` from `'../leave-policy'`, and `IEmployeeRepository` from `'../employee'`. No import path in the file references a sibling module's internal `.repository.ts` file.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The project compiles successfully (`npm run build` / `tsc --noEmit`) with zero type errors after the import path changes.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The change is purely mechanical \u2014 only import paths change. No symbol names, types, logic, or runtime behavior may be altered. The three replaced imports must resolve to the identical TypeScript types exported from the barrel files."
+  ],
+  "outOfScope": [
+    "Any changes to files outside `src/modules/leave-request/leave-request.service.ts`. No other files in the leave-request module or any sibling module are modified. No barrel file changes \u2014 all three barrel files already export the required symbols."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [
+    {
+      "requirement": "The `ILeaveBalanceRepository` symbol imported into `leave-request.service.ts` must be the identical TypeScript type exported from `src/modules/leave-balance/index.ts` (which re-exports from `leave-balance.repository.ts`).",
+      "referencePath": "src/modules/leave-balance/index.ts"
+    },
+    {
+      "requirement": "The `ILeavePolicyRepository` symbol imported into `leave-request.service.ts` must be the identical TypeScript type exported from `src/modules/leave-policy/index.ts` (which re-exports from `leave-policy.repository.ts`).",
+      "referencePath": "src/modules/leave-policy/index.ts"
+    },
+    {
+      "requirement": "The `IEmployeeRepository` symbol imported into `leave-request.service.ts` must be the identical TypeScript type exported from `src/modules/employee/index.ts` (which re-exports from `employee.repository.ts`).",
+      "referencePath": "src/modules/employee/index.ts"
+    }
+  ],
+  "integrationPoints": []
+}
