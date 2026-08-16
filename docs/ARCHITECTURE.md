@@ -40,6 +40,12 @@ src/modules/
     leave.model.ts              — LeaveRequest interface
     leave.repository.ts         — ILeaveRepository + LeaveRepository
     index.ts                    — barrel export
+  audit/
+    audit.model.ts              — AuditLog interface
+    audit.repository.ts         — IAuditRepository + AuditRepository
+    audit.service.interface.ts  — IAuditService interface
+    audit.service.ts            — AuditService implementation
+    index.ts                    — barrel export
   status/                       — pre-existing status module
   uptime/                       — pre-existing uptime module (health-check routes)
 ```
@@ -49,7 +55,6 @@ src/modules/
 ```
 src/modules/leave/leave.{service,controller,routes}.ts
 src/modules/notification/notification.{model,repository,service,controller,routes}.ts
-src/modules/audit/              — AuditLog model, repository, service
 ```
 
 ## Key patterns
@@ -127,6 +132,29 @@ The `LeaveRepository` maps the `leave_requests` table columns:
 `employee_id`, `leave_policy_id`, `start_date`, `end_date`, `reason`,
 `status`, `approved_by`, `approved_at`, `created_at`, `updated_at`.
 
+### Audit module
+
+`AuditLog` is an immutable record of state changes, supporting GP-002
+("All state-changing operations write an audit record"). The `IAuditRepository`
+interface provides:
+
+- `create` — insert a new audit log entry; accepts `entityType`, `entityId`,
+  `action`, `oldValues` (JSONB), `newValues` (JSONB), `performedBy`, and
+  `performedAt`
+- `findByEntity` — retrieve all audit entries for a given entity type + id,
+  ordered by `performed_at DESC`
+
+The `AuditRepository` maps the `audit_logs` table columns: `entity_type`,
+`entity_id`, `action`, `old_values`, `new_values`, `performed_by`,
+`performed_at`, `created_at`, `updated_at`. JSON fields (`old_values`,
+`new_values`) are serialized via `JSON.stringify` on write and parsed back
+to objects on read via a private `parseJsonField` helper.
+
+`IAuditService` exposes a single `log(params)` method. `AuditService`
+implements it by injecting `IAuditRepository` and delegating to
+`repository.create`, setting `performedAt: new Date()` at the service
+boundary so callers never supply their own timestamp.
+
 <!-- gestalt:architecture feature=cb89b522-6bc0-439f-8a0d-f905145254ee START -->
 ## Leave Management Module — Reconciled Architecture
 
@@ -158,7 +186,7 @@ Employees apply for annual, sick, and emergency leave. Managers approve or rejec
 | Module | Path | Owns |
 |--------|------|------|
 | shared-types | src/shared/types/ | LeaveType, LeaveRequestStatus enums |
-| audit | src/modules/audit/ | AuditLog model, IAuditService, AuditService |
+| audit | src/modules/audit/ | AuditLog model, IAuditRepository, AuditRepository, IAuditService, AuditService |
 | employee | src/modules/employee/ | Employee model, IEmployeeRepository/Service, implementations |
 | policy | src/modules/policy/ | LeavePolicy model, IPolicyRepository/Service, implementations |
 | balance | src/modules/balance/ | LeaveBalance model, IBalanceRepository/Service, implementations |
@@ -199,7 +227,7 @@ Employees apply for annual, sick, and emergency leave. Managers approve or rejec
 
 ### Recommended Implementation Phases
 1. Shared types (LeaveType, LeaveRequestStatus) ✅
-2. Audit module
+2. Audit module ✅
 3. Employee module ✅ (model + repository)
 4. Policy module ✅ (model + repository)
 5. Balance module ✅ (model + repository)
