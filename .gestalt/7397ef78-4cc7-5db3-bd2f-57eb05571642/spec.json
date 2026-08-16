@@ -1,0 +1,72 @@
+{
+  "scope": {
+    "affectedDomains": [],
+    "affectedLayers": [],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The controller exposes exactly 8 methods that map 1:1 to ILeaveRequestService: createDraft, submit, approve, reject, cancel, findById, findByEmployeeId, query. Each method delegates to the corresponding service method and returns a plain object with Date fields serialized as ISO 8601 strings.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The routes plugin registers 8 endpoints: POST /leave-requests (returns 201), POST /leave-requests/:id/submit, POST /leave-requests/:id/approve, POST /leave-requests/:id/reject, POST /leave-requests/:id/cancel, GET /leave-requests/:id, GET /leave-requests, GET /leave-requests/employee/:employeeId. The static /employee/:employeeId route is registered before the parameterized /:id route to prevent collision.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Service-layer errors (plain objects with `error` and `code` fields) are detected by an isServiceError type guard and mapped to HTTP status codes: 400 for INVALID_DATE_RANGE/MINIMUM_NOTICE_VIOLATION, 403 for NOT_MANAGER, 404 for *_NOT_FOUND codes, 409 for INVALID_STATE_TRANSITION/INSUFFICIENT_BALANCE/BALANCE_CLOSED/POLICY_INACTIVE, 500 for unrecognized errors. The error response body shape is `{ error: string; code: string }`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All Date fields in LeaveRequest responses are serialized as ISO 8601 strings. Nullable date fields (approvedAt, cancelledAt) serialize as `null` when absent. Non-nullable date fields (startDate, endDate, createdAt, updatedAt) always produce ISO strings.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "GET /leave-requests/:id returns 404 with body `{ error: 'Leave request not found', code: 'REQUEST_NOT_FOUND' }` when the service returns null (not when it throws).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The routes plugin is registered in src/app.ts via `app.register(leaveRequestRoutes)`. The app boots without errors and all endpoints are reachable.",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "The controller constructor MUST accept ILeaveRequestService (not the concrete LeaveRequestService). This enables the routes test to inject a mock service.",
+    "Route handlers MUST NOT contain business logic \u2014 they delegate to the controller, which delegates to the service. The route layer is responsible only for extracting request data, calling the controller, formatting HTTP responses, and catching errors.",
+    "The routes plugin MUST be a named async function export (not a default export) matching the pattern `export async function leaveRequestRoutes(fastify: FastifyInstance): Promise<void>` so it can be registered with `app.register(leaveRequestRoutes)`.",
+    "Tests MUST use Fastify's `inject()` method (not supertest or raw HTTP) and mock the service layer \u2014 no real database calls.",
+    "All async errors in route handlers MUST be caught. Unhandled promise rejections are forbidden (GP-006). The catch block must log the error via `request.log.error(error)` before responding."
+  ],
+  "outOfScope": [],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequestController",
+      "mustExistOrExtend": true,
+      "invariant": "The controller is stateless \u2014 it holds only a reference to ILeaveRequestService. It never mutates the service or its own state. Every method is a pure delegation: extract arguments \u2192 call service \u2192 serialize result."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "createDraft",
+      "authRule": "RBAC not yet enforced at HTTP layer (deferred). Service layer validates employee existence and policy rules.",
+      "idempotent": false,
+      "errorSemantics": "Returns 201 on success. Errors: 400 (INVALID_DATE_RANGE), 404 (EMPLOYEE_NOT_FOUND, POLICY_NOT_FOUND), 409 (POLICY_INACTIVE), 500 (unexpected)."
+    },
+    {
+      "operation": "submit",
+      "authRule": "RBAC not yet enforced at HTTP layer (deferred).",
+      "idempotent": false,
+      "errorSemantics": "Returns 200 on success. Errors: 400 (MINIMUM_NOTICE_VIOLATION), 404 (REQUEST_NOT_FOUND, POLICY_NOT_FOUND, BALANCE_NOT_FOUND), 409 (INVALID_STATE_TRANSITION, INSUFFICIENT_BALANCE, BALANCE_CLOSED), 500 (unexpected)."
+    }
+  ],
+  "consistencyRequirements": [],
+  "integrationPoints": []
+}
