@@ -1,0 +1,122 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "audit"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository",
+      "service"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The `AuditLog` interface is defined in `src/modules/audit/audit.model.ts` with all canonical fields: `id: string`, `entityType: string`, `entityId: string`, `action: string`, `oldValues: Record<string, unknown> | null`, `newValues: Record<string, unknown> | null`, `performedBy: string | null`, `performedAt: Date`, `createdAt: Date`, `updatedAt: Date`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `IAuditRepository` interface is defined in `src/modules/audit/audit.repository.ts` with methods `create(entry: Omit<AuditLog, 'id' | 'createdAt' | 'updatedAt'>): Promise<AuditLog>` and `findByEntity(entityType: string, entityId: string): Promise<AuditLog[]>`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `AuditRepository` class implements `IAuditRepository` using the shared `pool` from `src/shared/db/connection.ts`, with parameterized SQL queries and `snake_case`-to-`camelCase` column mapping consistent with the existing repository pattern (e.g., `EmployeeRepository`).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `IAuditService` interface is defined in `src/modules/audit/audit.service.interface.ts` with a single method `log(params: { entityType: string; entityId: string; action: string; oldValues: Record<string, unknown> | null; newValues: Record<string, unknown> | null; performedBy: string | null }): Promise<void>`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `AuditService` class implements `IAuditService`, injects `IAuditRepository` via constructor, and delegates to `repository.create` \u2014 setting `performedAt: new Date()` on every call. The `log` method returns `Promise<void>` (fire-and-forget semantics from the caller's perspective).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The barrel export `src/modules/audit/index.ts` re-exports `AuditLog`, `IAuditRepository`, `AuditRepository`, `IAuditService`, and `AuditService` \u2014 and nothing else.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests exist in `tests/unit/modules/audit/` covering: (a) `AuditRepository.create` persists a row and returns an `AuditLog` with generated `id`, `createdAt`, `updatedAt`; (b) `AuditRepository.findByEntity` returns matching rows ordered by `performedAt DESC`; (c) `AuditService.log` calls `repository.create` with `performedAt` set to a `Date`; (d) `AuditService.log` propagates repository errors to the caller.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The `AuditRepository` constructor MUST accept an optional `Pool | PoolClient` parameter defaulting to the shared `pool` from `src/shared/db/connection.ts`, matching the existing repository pattern used by `EmployeeRepository`, `PolicyRepository`, `BalanceRepository`, and `LeaveRepository`. This enables callers to pass a transaction `PoolClient` for atomic multi-repository writes.",
+    "All database access MUST use parameterized SQL queries via `pg` \u2014 no string interpolation of user-supplied values into SQL. This follows the existing repository pattern and the `no-direct-db-outside-repository` constraint from HARNESS.json.",
+    "The `AuditLog` entity is immutable after creation. The repository MUST NOT expose an `update` or `delete` method. The `audit_logs` table columns `created_at` and `updated_at` are set once on insert and never modified thereafter."
+  ],
+  "outOfScope": [
+    "HTTP controller, routes, or any REST API surface for audit logs. This phase delivers only the domain model, repository interface + implementation, and service interface + implementation. The HTTP layer is deferred to a later phase (or may never be built if audit is consumed only internally by other services).",
+    "Any integration with other domain modules (employee, leave, balance, policy). This phase has zero dependencies on other phases \u2014 it only depends on `src/shared/db/connection.ts`. Wiring `IAuditService` into `LeaveService` or `BalanceService` is deferred to Phase 7/8."
+  ],
+  "ambiguities": [
+    {
+      "description": "The `audit_logs` database table is defined in the reconciled architecture but no migration file is mentioned in this phase's scope. The code agent must either assume the table already exists (and the repository queries it directly) or create a migration. The existing repository pattern (EmployeeRepository, etc.) assumes tables exist \u2014 the code agent should follow that convention and assume the `audit_logs` table is present.",
+      "options": [
+        "Assume the audit_logs table already exists (consistent with existing repository pattern \u2014 no migration in scope)",
+        "Create a Knex migration for audit_logs as part of this phase"
+      ],
+      "impactIfWrong": "medium"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "An `AuditLog` record is immutable once created \u2014 it represents a point-in-time snapshot of a state change. No update or delete operations exist on the repository. The `id`, `createdAt`, and `updatedAt` fields are generated on insert and never change."
+    },
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "Every `AuditLog` record MUST have a non-empty `entityType` and `entityId` \u2014 these together identify the domain entity whose state changed. `action` MUST be a non-empty string describing the operation (e.g., 'CREATE', 'UPDATE', 'APPROVE', 'REJECT', 'CANCEL'). `performedAt` MUST be set to the moment the state change occurred (not the moment the audit record was persisted)."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IAuditService.log",
+      "authRule": "None at this layer \u2014 auth is enforced at the HTTP boundary (controller/middleware), not in the service. The `performedBy` parameter is trusted caller-supplied data.",
+      "idempotent": false,
+      "errorSemantics": "If the underlying repository `create` call fails (e.g., database connection error, constraint violation), the error MUST propagate to the caller \u2014 the service does not swallow or transform repository errors. The method returns `Promise<void>` on success."
+    },
+    {
+      "operation": "IAuditRepository.create",
+      "authRule": "None \u2014 repository has no auth concern.",
+      "idempotent": false,
+      "errorSemantics": "Returns the created `AuditLog` with server-generated `id`, `createdAt`, and `updatedAt`. On database failure, the error propagates to the caller."
+    },
+    {
+      "operation": "IAuditRepository.findByEntity",
+      "authRule": "None \u2014 repository has no auth concern.",
+      "idempotent": true,
+      "errorSemantics": "Returns an array of `AuditLog` records matching the given `entityType` and `entityId`, ordered by `performedAt DESC` (most recent first). Returns an empty array (not null) when no records match. On database failure, the error propagates to the caller."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The `AuditRepository` constructor signature and pool-accepting pattern MUST match the existing repository convention: `constructor(client?: Pool | PoolClient)` with `this.db = client ?? pool`. Reference: `src/modules/employee/employee.repository.ts` lines 28-30.",
+      "referencePath": "src/modules/employee/employee.repository.ts"
+    },
+    {
+      "requirement": "The `AuditRepository` MUST use a private `rowToAuditLog` helper function that maps `snake_case` database columns to `camelCase` TypeScript properties, following the exact same pattern as `rowToEmployee` in `src/modules/employee/employee.repository.ts`. Column mapping: `entity_type` \u2192 `entityType`, `entity_id` \u2192 `entityId`, `old_values` \u2192 `oldValues`, `new_values` \u2192 `newValues`, `performed_by` \u2192 `performedBy`, `performed_at` \u2192 `performedAt`, `created_at` \u2192 `createdAt`, `updated_at` \u2192 `updatedAt`.",
+      "referencePath": "src/modules/employee/employee.repository.ts"
+    },
+    {
+      "requirement": "The `AuditService` constructor MUST accept `IAuditRepository` via dependency injection (constructor parameter), following the same pattern that `LeaveService` will use to inject `IAuditService` in Phase 8. The service MUST NOT instantiate the repository internally.",
+      "referencePath": "src/modules/employee/employee.repository.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "The `AuditRepository` imports the shared `pool` as its default database connection, identical to all existing repositories."
+    }
+  ]
+}
