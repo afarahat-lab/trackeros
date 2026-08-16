@@ -1,0 +1,120 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-policy"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository-interface",
+      "barrel-export",
+      "unit-tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The `LeavePolicy` interface is exported from `src/modules/leave-policy/leave-policy.model.ts` with exactly these 11 fields: `id` (string), `policyName` (string), `leaveType` (LeaveType), `entitlementDays` (number), `accrualRate` (number | null), `maxAccumulation` (number | null), `minimumNoticeDays` (number | null), `requiresManagerApproval` (boolean), `isActive` (boolean), `createdAt` (Date), `updatedAt` (Date).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `LeavePolicy` interface imports `LeaveType` from `../../shared/types` (relative to `src/modules/leave-policy/`), and the `leaveType` field is typed as `LeaveType`, not `string`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `ILeavePolicyRepository` interface is exported from `src/modules/leave-policy/leave-policy.repository.ts` with exactly these five methods: `findById(id: string): Promise<LeavePolicy | null>`, `findByLeaveType(leaveType: LeaveType): Promise<LeavePolicy | null>`, `findAllActive(): Promise<LeavePolicy[]>`, `create(policy: Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeavePolicy>`, `update(id: string, data: Partial<LeavePolicy>): Promise<LeavePolicy | null>`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A stub `LeavePolicyRepository` class implements `ILeavePolicyRepository`. Every method throws `new Error('not implemented')` and unused parameters are prefixed with `_` to satisfy strict TypeScript (`noUnusedParameters`).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A barrel export `src/modules/leave-policy/index.ts` re-exports the `LeavePolicy` interface, `ILeavePolicyRepository` interface, and `LeavePolicyRepository` class.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Unit test `tests/unit/modules/leave-policy/leave-policy.model.test.ts` verifies: (a) a valid `LeavePolicy` object is accepted with all 11 fields, (b) `leaveType` accepts every `LeaveType` enum value, (c) nullable fields (`accrualRate`, `maxAccumulation`, `minimumNoticeDays`) accept both `null` and `number`, (d) the object has exactly the expected field names (no extras, no missing).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Unit test `tests/unit/modules/leave-policy/leave-policy.repository.test.ts` verifies: (a) each of the five repository methods throws `'not implemented'`, (b) `create` accepts input without `id`, `createdAt`, `updatedAt`, (c) `update` accepts a `Partial<LeavePolicy>`, (d) the repository instance has all five methods as functions.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The project compiles without type errors (`npm run build`) and all Jest tests pass (`npx jest --passWithNoTests`).",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The `LeavePolicy` entity interface must import `LeaveType` from `../../shared/types` \u2014 the relative path from `src/modules/leave-policy/` to `src/shared/types/index.ts`. No other import path is acceptable; this matches the existing pattern in `src/modules/employee/employee.model.ts`.",
+    "The stub `LeavePolicyRepository` must follow the exact same pattern as `EmployeeRepository`: every method is `async`, throws `new Error('not implemented')`, and unused parameters are prefixed with `_`. No method may return a dummy value or `undefined` \u2014 they must all throw.",
+    "The barrel export `index.ts` must re-export only the public surface: `LeavePolicy` (type), `ILeavePolicyRepository` (interface), and `LeavePolicyRepository` (class). No internal implementation details may leak through the barrel."
+  ],
+  "outOfScope": [
+    "LeavePolicyService, controller, routes, or any HTTP/API surface \u2014 these are deferred to Phase 10 (service interface stub) and beyond.",
+    "Database-backed repository implementation (Knex queries, migrations, the `leave_policies` table) \u2014 the stub throws \"not implemented\"; the real implementation comes in a later phase."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "A LeavePolicy has exactly one `leaveType` from the `LeaveType` enum; no two active policies may share the same `leaveType` (uniqueness enforced at the service/repository layer in later phases, but the interface must support the lookup `findByLeaveType` that returns a single policy or null)."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "A LeavePolicy has a lifecycle: it is either ACTIVE (`isActive: true`) or INACTIVE (`isActive: false`). Only active policies are returned by `findAllActive()` and are eligible for use in leave requests."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "`entitlementDays` must be a positive integer. `accrualRate`, `maxAccumulation`, and `minimumNoticeDays` are nullable: when non-null they must be non-negative numbers. These constraints are validated at the service layer in later phases; the model interface itself does not enforce them at the type level."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "ILeavePolicyRepository.findById",
+      "authRule": "No auth rule at the repository layer \u2014 auth is enforced at the controller/route layer per GP-005.",
+      "idempotent": true,
+      "errorSemantics": "Returns `null` when no policy exists with the given id; never throws for a missing record."
+    },
+    {
+      "operation": "ILeavePolicyRepository.findByLeaveType",
+      "authRule": "No auth rule at the repository layer.",
+      "idempotent": true,
+      "errorSemantics": "Returns `null` when no policy exists for the given `LeaveType`; never throws for a missing record."
+    },
+    {
+      "operation": "ILeavePolicyRepository.findAllActive",
+      "authRule": "No auth rule at the repository layer.",
+      "idempotent": true,
+      "errorSemantics": "Returns an empty array when no active policies exist; never returns null."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The `LeavePolicy` interface field names, types, and nullability must match the authoritative entity definition in `.gestalt/architecture/reconciled.json` domain_entities: `id: string`, `policyName: string`, `leaveType: LeaveType`, `entitlementDays: number`, `accrualRate: number | null`, `maxAccumulation: number | null`, `minimumNoticeDays: number | null`, `requiresManagerApproval: boolean`, `isActive: boolean`, `createdAt: Date`, `updatedAt: Date`.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "The barrel export `src/modules/leave-policy/index.ts` must follow the same structure as `src/modules/employee/index.ts`: re-export the model interface and the repository interface + class.",
+      "referencePath": "src/modules/employee/index.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts",
+      "why": "The `LeavePolicy` entity depends on `LeaveType` enum from shared types. This is the only external dependency of the leave-policy module in this phase."
+    }
+  ]
+}
