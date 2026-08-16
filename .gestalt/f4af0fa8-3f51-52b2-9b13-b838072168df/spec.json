@@ -1,0 +1,66 @@
+{
+  "scope": {
+    "affectedDomains": [],
+    "affectedLayers": [],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The controller class exposes exactly 8 public async methods \u2014 createDraft, submit, approve, reject, cancel, findById, findByEmployeeId, query \u2014 each mapping 1:1 to the corresponding ILeaveRequestService method signature.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Every controller method returns a plain object with all Date fields serialized as ISO 8601 strings; nullable Date fields (approvedAt, cancelledAt) serialize as null when absent.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The routes plugin registers all 8 endpoints with correct HTTP status codes: 201 for createDraft, 200 for all other success responses, 404 for not-found results from findById.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Service errors with a known code are mapped to the correct HTTP status: 400 for INVALID_DATE_RANGE/MINIMUM_NOTICE_VIOLATION, 403 for NOT_MANAGER, 404 for EMPLOYEE_NOT_FOUND/POLICY_NOT_FOUND/REQUEST_NOT_FOUND/BALANCE_NOT_FOUND, 409 for INVALID_STATE_TRANSITION/INSUFFICIENT_BALANCE/BALANCE_CLOSED/POLICY_INACTIVE, 500 for unrecognized errors.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Error response bodies conform to the shape { error: string; code: string } for known errors, and { error: 'Internal Server Error' } (no code field) for unexpected errors.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The route file registers GET /leave-requests/employee/:employeeId before GET /leave-requests/:id to avoid the employeeId path segment being captured as an :id parameter.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The routes plugin is registered in src/app.ts via app.register(leaveRequestRoutes).",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "Jest tests use Fastify's inject() method with a mocked ILeaveRequestService, covering all 8 endpoints with at least one happy-path and one error case each, and verifying status codes and error body shapes.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The controller constructor MUST accept ILeaveRequestService (not the concrete LeaveRequestService) \u2014 the controller depends on the interface, enabling testability via mocking.",
+    "The routes plugin MUST be a named async function export (not a default export) so it can be registered with app.register().",
+    "No RBAC middleware is wired at the HTTP layer in this phase \u2014 manager authorization for approve/reject is enforced at the service layer only. RBAC guards are deferred to a later phase.",
+    "No audit logging or notification dispatch is triggered from the controller or routes \u2014 these cross-cutting concerns are deferred to Phase 10.",
+    "The controller must not import or depend on Fastify types (FastifyRequest, FastifyReply, etc.) \u2014 it is a plain TypeScript class that receives already-extracted values from the route handlers."
+  ],
+  "outOfScope": [
+    "RBAC middleware (GP-005) wired at the HTTP layer \u2014 routes accept all requests without auth guards in this phase.",
+    "Notification dispatch on leave lifecycle transitions \u2014 not integrated; deferred to Phase 10."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [],
+  "integrationPoints": []
+}
