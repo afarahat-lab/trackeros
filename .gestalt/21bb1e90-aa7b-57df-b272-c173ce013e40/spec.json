@@ -1,0 +1,72 @@
+{
+  "scope": {
+    "affectedDomains": [],
+    "affectedLayers": [],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The `ILeaveRequestService` interface exposes exactly 8 methods: `createDraft(dto: CreateLeaveRequestDto): Promise<LeaveRequest>`, `submit(id: string): Promise<LeaveRequest>`, `approve(id: string, approverId: string): Promise<LeaveRequest>`, `reject(id: string, approverId: string): Promise<LeaveRequest>`, `cancel(id: string): Promise<LeaveRequest>`, `findById(id: string): Promise<LeaveRequest | null>`, `findByEmployeeId(employeeId: string): Promise<LeaveRequest[]>`, `query(params: LeaveRequestQueryParams): Promise<LeaveRequest[]>`",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`createDraft` validates employee exists, policy exists and isActive, startDate <= endDate, then creates a LeaveRequest with status DRAFT; rejects with typed error `{ error, code }` on any validation failure",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`submit` enforces the state machine (only DRAFT \u2192 SUBMITTED), checks minimumNoticeDays (calendar-day based: `now + policy.minimumNoticeDays`), verifies balance exists and is not CLOSED, checks `remainingDays >= daysRequested` using the BINDING formula `(endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24) + 1`, then transitions to SUBMITTED",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`approve` enforces only SUBMITTED \u2192 APPROVED, validates `approverId === employee.managerId`, deducts `daysRequested` from balance (`usedDays += daysRequested`, `remainingDays = totalEntitlement - usedDays`), sets `approvedBy`, `approvedAt`, and status APPROVED",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`reject` enforces only SUBMITTED \u2192 REJECTED, validates `approverId === employee.managerId`, sets status REJECTED without touching balance",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`cancel` enforces SUBMITTED or APPROVED \u2192 CANCELLED; if APPROVED, restores `usedDays -= daysRequested` and recalculates `remainingDays = totalEntitlement - usedDays`; sets `cancelledAt` and status CANCELLED",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All invalid state transitions (DRAFT\u2192APPROVED, DRAFT\u2192REJECTED, APPROVED\u2192SUBMITTED, REJECTED\u2192CANCELLED, APPROVED\u2192REJECTED, CANCELLED\u2192anything) are rejected with `{ error, code: 'INVALID_STATE_TRANSITION' }`",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The BINDING day-counting formula `(endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24) + 1` is used at every call site that computes `daysRequested` \u2014 submit balance check, approve deduction, cancel restoration \u2014 and produces correct results for single-day (1), multi-day (5 for Mon\u2013Fri), and multi-week (12 for 10\u201321 Aug) ranges",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Read-only methods `findById`, `findByEmployeeId`, `query` delegate directly to the corresponding repository methods without additional business logic",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The `LeaveRequestService` constructor MUST accept exactly four dependencies in this order: `ILeaveRequestRepository`, `ILeaveBalanceRepository`, `ILeavePolicyRepository`, `IEmployeeRepository`",
+    "All errors thrown by the service MUST use the shape `{ error: string; code: string }` \u2014 no exceptions, no custom Error subclasses, no string-only throws",
+    "The service MUST NOT inject or depend on notification, audit, or any other repository/service beyond the four declared constructor dependencies \u2014 notification and audit integration is deferred to Phase 10"
+  ],
+  "outOfScope": [],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "Lifecycle state machine: DRAFT \u2192 SUBMITTED \u2192 (APPROVED | REJECTED); SUBMITTED or APPROVED \u2192 CANCELLED. No other transitions are valid. The service must reject any transition not in this set."
+    }
+  ],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [],
+  "integrationPoints": []
+}
