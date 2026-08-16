@@ -1,0 +1,66 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-request"
+    ],
+    "affectedLayers": [
+      "routes",
+      "tests"
+    ],
+    "isBreakingChange": true,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The error-to-HTTP-status mapping function in `leave-request.routes.ts` returns HTTP 409 for error codes INVALID_STATE_TRANSITION, INSUFFICIENT_BALANCE, BALANCE_CLOSED, and POLICY_INACTIVE \u2014 these are business-rule conflicts, not validation errors.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The error-to-HTTP-status mapping function in `leave-request.routes.ts` continues to return HTTP 400 for error codes INVALID_DATE_RANGE and MINIMUM_NOTICE_VIOLATION \u2014 these remain input-validation errors.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The route registration for the employee-specific GET endpoint (`/leave-requests/employee/:employeeId`) is registered before the parameterized GET endpoint (`/leave-requests/:id`) so that Fastify matches the literal path segment `employee` before attempting to bind it as an `:id` parameter.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All three test cases in `leave-request.routes.test.ts` that assert on INVALID_STATE_TRANSITION errors (in the submit, approve, and cancel describe blocks) expect HTTP status 409 instead of 400, and their test descriptions reflect the 409 semantics.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The error-to-HTTP-status mapping must align with the reconciled architecture's error_response_contract: 400 for validation errors, 409 for business rule conflicts. INVALID_STATE_TRANSITION, INSUFFICIENT_BALANCE, BALANCE_CLOSED, and POLICY_INACTIVE are business rule conflicts \u2192 409. INVALID_DATE_RANGE and MINIMUM_NOTICE_VIOLATION are validation errors \u2192 400.",
+    "Route registration order must place literal-path routes before parameterized-path routes to prevent Fastify from matching the literal segment as a parameter value. The employee-specific route (`/leave-requests/employee/:employeeId`) must be registered before the generic `:id` route (`/leave-requests/:id`).",
+    "No new error codes, routes, or service methods may be introduced. This is a pure bug-fix phase: only the mapping function, route registration order, and test expectations change."
+  ],
+  "outOfScope": [
+    "Changes to the service layer (leave-request.service.ts) \u2014 the service already throws the correct error codes; only the HTTP mapping and route registration order need fixing."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "The LeaveRequest entity's status lifecycle (DRAFT \u2192 SUBMITTED \u2192 APPROVED | REJECTED | CANCELLED) is enforced by the service layer. Any attempt to transition outside the legal state graph must produce an INVALID_STATE_TRANSITION error, which the HTTP layer must surface as a 409 Conflict \u2014 not a 400 Bad Request \u2014 because the request is syntactically valid but conflicts with the current resource state."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "Error-to-HTTP-status mapping (mapErrorToHttpStatus)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Must partition error codes into: 400 (INVALID_DATE_RANGE, MINIMUM_NOTICE_VIOLATION), 403 (NOT_MANAGER), 404 (EMPLOYEE_NOT_FOUND, POLICY_NOT_FOUND, REQUEST_NOT_FOUND, BALANCE_NOT_FOUND), 409 (INVALID_STATE_TRANSITION, INSUFFICIENT_BALANCE, BALANCE_CLOSED, POLICY_INACTIVE), 500 (all others)."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The error-to-HTTP-status mapping must match the reconciled architecture's error_response_contract: 409 for business rule conflicts (INVALID_STATE_TRANSITION, INSUFFICIENT_BALANCE, BALANCE_CLOSED, POLICY_INACTIVE), 400 for validation errors (INVALID_DATE_RANGE, MINIMUM_NOTICE_VIOLATION).",
+      "referencePath": ".gestalt/architecture/reconciled.json \u2192 error_response_contract"
+    }
+  ],
+  "integrationPoints": []
+}
