@@ -1,0 +1,159 @@
+{
+  "scope": {
+    "affectedDomains": [],
+    "affectedLayers": [],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The `LeaveRequest` interface is defined in `src/modules/leave/leave.model.ts` with all canonical fields: `id: string`, `employeeId: string`, `leavePolicyId: string`, `startDate: Date`, `endDate: Date`, `reason: string | undefined`, `status: LeaveRequestStatus`, `approvedBy: string | null`, `approvedAt: Date | null`, `createdAt: Date`, `updatedAt: Date`. It imports `LeaveRequestStatus` from `src/shared/types/leave-request-status.enum.ts`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `ILeaveRepository` interface is defined in `src/modules/leave/leave.repository.ts` with all seven methods: `findById`, `findByEmployee`, `findByEmployeeAndStatus`, `findOverlapping`, `create`, `update`, `findPendingByEmployee` \u2014 each with the exact signatures specified in the phase scope.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`LeaveRepository` class implements `ILeaveRepository` using the shared `pool` from `src/shared/db/connection.ts`, with a constructor accepting an optional `Pool | PoolClient` (defaulting to the shared pool) \u2014 matching the existing pattern in `EmployeeRepository`, `PolicyRepository`, and `BalanceRepository`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`LeaveRepository.create` inserts a row into the `leave_requests` table with all provided fields (excluding `id`, `createdAt`, `updatedAt` which are generated server-side) and returns the created `LeaveRequest` with the generated `id` and timestamps.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`LeaveRepository.findOverlapping` returns only `LeaveRequest` rows where `employee_id` matches, `status IN ('SUBMITTED', 'APPROVED')`, and the date range overlaps (`start_date <= $endDate AND end_date >= $startDate`), optionally excluding a given `excludeId`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`LeaveRepository.findPendingByEmployee` returns all `LeaveRequest` rows for the given `employeeId` where `status = 'SUBMITTED'`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`LeaveRepository.update` uses a dynamic field-map loop (matching the pattern in `EmployeeRepository.update` and `PolicyRepository.update`) to build a parameterized `UPDATE` statement, sets `updated_at` to the current timestamp, and returns the updated `LeaveRequest` or `null` if not found.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A private `rowToLeaveRequest` helper maps `snake_case` DB columns to `camelCase` TypeScript properties with correct type conversions: `id` as string, `employee_id` as string, `leave_policy_id` as string, `start_date`/`end_date`/`created_at`/`updated_at` as `new Date()`, `approved_at` as `Date | null` (conditional), `approved_by` as `string | null`, `reason` as `string | undefined`, `status` as `LeaveRequestStatus`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`src/modules/leave/index.ts` barrel-exports `LeaveRequest`, `ILeaveRepository`, and `LeaveRepository`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests exist in `tests/unit/modules/leave/` covering: each query method (found and not-found cases), `create` (verifying SQL and params), `update` (found, not-found, no-fields-to-update), `findOverlapping` (with and without `excludeId`), `findPendingByEmployee`, and constructor-with-custom-client \u2014 following the test conventions established in `employee.repository.test.ts`, `policy.repository.test.ts`, and `balance.repository.test.ts`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `LeaveRequest` interface is defined in `src/modules/leave/leave.model.ts` with all canonical fields: `id: string`, `employeeId: string`, `leavePolicyId: string`, `startDate: Date`, `endDate: Date`, `reason: string | undefined`, `status: LeaveRequestStatus`, `approvedBy: string | null`, `approvedAt: Date | null`, `createdAt: Date`, `updatedAt: Date`. It imports `LeaveRequestStatus` from `src/shared/types/leave-request-status.enum.ts`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `ILeaveRepository` interface is defined in `src/modules/leave/leave.repository.ts` with all seven methods: `findById`, `findByEmployee`, `findByEmployeeAndStatus`, `findOverlapping`, `create`, `update`, `findPendingByEmployee` \u2014 each with the exact signatures specified in the phase scope.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`LeaveRepository` class implements `ILeaveRepository` using the shared `pool` from `src/shared/db/connection.ts`, with a constructor accepting an optional `Pool | PoolClient` (defaulting to the shared pool) \u2014 matching the existing pattern in `EmployeeRepository`, `PolicyRepository`, and `BalanceRepository`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`LeaveRepository.create` inserts a row into the `leave_requests` table with all provided fields (excluding `id`, `createdAt`, `updatedAt` which are generated server-side) and returns the created `LeaveRequest` with the generated `id` and timestamps.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`LeaveRepository.findOverlapping` returns only `LeaveRequest` rows where `employee_id` matches, `status IN ('SUBMITTED', 'APPROVED')`, and the date range overlaps (`start_date <= $endDate AND end_date >= $startDate`), optionally excluding a given `excludeId`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`LeaveRepository.findPendingByEmployee` returns all `LeaveRequest` rows for the given `employeeId` where `status = 'SUBMITTED'`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`LeaveRepository.update` uses a dynamic field-map loop (matching the pattern in `EmployeeRepository.update` and `PolicyRepository.update`) to build a parameterized `UPDATE` statement, sets `updated_at` to the current timestamp, and returns the updated `LeaveRequest` or `null` if not found.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A private `rowToLeaveRequest` helper maps `snake_case` DB columns to `camelCase` TypeScript properties with correct type conversions: `id` as string, `employee_id` as string, `leave_policy_id` as string, `start_date`/`end_date`/`created_at`/`updated_at` as `new Date()`, `approved_at` as `Date | null` (conditional), `approved_by` as `string | null`, `reason` as `string | undefined`, `status` as `LeaveRequestStatus`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`src/modules/leave/index.ts` barrel-exports `LeaveRequest`, `ILeaveRepository`, and `LeaveRepository`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests exist in `tests/unit/modules/leave/` covering: each query method (found and not-found cases), `create` (verifying SQL and params), `update` (found, not-found, no-fields-to-update), `findOverlapping` (with and without `excludeId`), `findPendingByEmployee`, and constructor-with-custom-client \u2014 following the test conventions established in `employee.repository.test.ts`, `policy.repository.test.ts`, and `balance.repository.test.ts`.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access must go through the repository layer \u2014 no inline SQL in models or barrel exports (GP-001).",
+    "The `LeaveRepository` constructor must accept an optional `Pool | PoolClient` parameter defaulting to the shared `pool` from `src/shared/db/connection.ts`, matching the transaction contract in `.gestalt/architecture/reconciled.json`.",
+    "No `any` type \u2014 use `unknown` with type guards (HARNESS.json constraint `no-any`).",
+    "The `LeaveRequest` model must import `LeaveRequestStatus` from `src/shared/types/leave-request-status.enum.ts` \u2014 not redefine it and not import from a different path.",
+    "All database access must go through the repository layer \u2014 no inline SQL in models or barrel exports (GP-001)."
+  ],
+  "outOfScope": [],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "Lifecycle: DRAFT \u2192 SUBMITTED \u2192 APPROVED | REJECTED; any non-terminal status \u2192 CANCELLED. The `status` field must always be one of the five `LeaveRequestStatus` values. The repository does not enforce transitions (that is the service's responsibility), but it must store and retrieve the status faithfully."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "`approvedBy` and `approvedAt` are both `null` when the request has not been acted upon (DRAFT, SUBMITTED, CANCELLED). When status transitions to APPROVED or REJECTED, both fields must be set together \u2014 but this invariant is enforced by the service layer, not the repository."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "ILeaveRepository.findOverlapping",
+      "authRule": "No auth rule at the repository layer \u2014 repositories are data-access only. Auth is enforced at the controller/route layer.",
+      "idempotent": true,
+      "errorSemantics": "Returns empty array (not null, not error) when no overlapping requests exist."
+    },
+    {
+      "operation": "ILeaveRepository.findById",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns `null` when no row matches the given `id` \u2014 never throws."
+    },
+    {
+      "operation": "ILeaveRepository.create",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Generates `id` (via DB default), sets `createdAt` and `updatedAt` to the current timestamp. Returns the fully-hydrated `LeaveRequest`. Fails with a DB error if FK constraints are violated (e.g., invalid `employeeId` or `leavePolicyId`)."
+    },
+    {
+      "operation": "ILeaveRepository.update",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns `null` when the target row does not exist. Returns the existing row unchanged when the `data` argument is empty (no-op). Always bumps `updated_at` when fields are changed."
+    }
+  ],
+  "consistencyRequirements": [],
+  "integrationPoints": []
+}
