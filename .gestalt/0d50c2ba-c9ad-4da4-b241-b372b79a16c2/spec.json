@@ -1,0 +1,70 @@
+{
+  "scope": {
+    "affectedDomains": [],
+    "affectedLayers": [],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "BalanceService.getBalance returns the LeaveBalance when found, and throws a typed error `{ error: string; code: 'BALANCE_NOT_FOUND' }` when no balance exists for the given (employeeId, leavePolicyId, fiscalYear) tuple.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "BalanceService.getBalancesForEmployee returns all LeaveBalance records for the given employeeId and fiscalYear (empty array when none exist).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "BalanceService.initializeBalance reads the LeavePolicy's entitlementDays, creates a LeaveBalance with totalEntitlement=entitlementDays, usedDays=0, remainingDays=entitlementDays, status='ACTIVE', and the given fiscalYear. Throws `{ code: 'POLICY_NOT_FOUND' }` when the policy does not exist, and `{ code: 'BALANCE_ALREADY_EXISTS' }` when a balance already exists for that (employeeId, leavePolicyId, fiscalYear) tuple.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "NotificationService.notifyLeaveSubmitted creates a LeaveNotification with type='SUBMITTED', recipientId=employee's managerId, status=PENDING, and throws `{ code: 'EMPLOYEE_NOT_FOUND' }` or `{ code: 'NO_MANAGER_ASSIGNED' }` as appropriate.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "NotificationService.notifyLeaveApproved and notifyLeaveRejected create notifications with type='APPROVED'/'REJECTED', recipientId=the employee (leaveRequest.employeeId), status=PENDING.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "NotificationService.notifyLeaveCancelled creates a LeaveNotification with type='CANCELLED', recipientId=employee's managerId, status=PENDING.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "NotificationService.getNotificationsForUser returns all LeaveNotification records for the given recipientId (empty array when none exist).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "NotificationService.markAsRead transitions a PENDING or SENT notification to READ; is idempotent for already-READ or ARCHIVED notifications (no-op, no error); throws `{ code: 'NOTIFICATION_NOT_FOUND' }` when the notification does not exist.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Stub service interfaces exist for IAuditService (logAction), ILeavePolicyService (getPolicy, getPolicyByType, isActive), and IEmployeeService (getEmployee, getManager, isActive) \u2014 each exported from its module's barrel index.ts.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All 17 test suites pass (including the leave-policy.repository.test.ts suite that was killed by SIGKILL due to resource exhaustion \u2014 the suite itself has no assertion failures; the transient OOM kill must not recur).",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Fiscal year is calendar year (Jan 1 \u2013 Dec 31), hardcoded. No configurable fiscalYearStart field. [BINDING RULE from reconciled.json business_rules]",
+    "Leave day counting uses the BINDING formula: `daysRequested = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24) + 1` \u2014 calendar days inclusive of both ends. Weekends and public holidays ARE counted as leave days. [BINDING RULE]"
+  ],
+  "outOfScope": [],
+  "ambiguities": [],
+  "entityInvariants": [],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [],
+  "integrationPoints": []
+}
