@@ -27,14 +27,20 @@ src/modules/
   employee/
     employee.model.ts           — Employee interface
     employee.repository.ts      — IEmployeeRepository + EmployeeRepository
+    employee.service.interface.ts — IEmployeeService interface
+    employee.service.ts         — EmployeeService implementation
     index.ts                    — barrel export
   policy/
     policy.model.ts             — LeavePolicy interface
     policy.repository.ts        — IPolicyRepository + PolicyRepository
+    policy.service.interface.ts — IPolicyService interface
+    policy.service.ts           — PolicyService implementation
     index.ts                    — barrel export
   balance/
     balance.model.ts            — LeaveBalance interface
     balance.repository.ts       — IBalanceRepository + BalanceRepository
+    balance.service.interface.ts — IBalanceService interface
+    balance.service.ts          — BalanceService implementation
     index.ts                    — barrel export
   leave/
     leave.model.ts              — LeaveRequest interface
@@ -94,6 +100,46 @@ Repositories use `snake_case` column names in SQL and map to `camelCase`
 TypeScript properties via private `rowTo*` helper functions. This is the
 convention for all database-backed modules.
 
+### Employee module
+
+`Employee` models a company employee with fields: `id`, `employeeNumber`,
+`firstName`, `lastName`, `email`, `managerId`, `department`, `hireDate`,
+`terminationDate`, `employmentStatus` (`ACTIVE` | `INACTIVE` | `TERMINATED`),
+`createdAt`, `updatedAt`, `deletedAt`.
+
+`IEmployeeRepository` provides: `findById`, `findByEmployeeNumber`, `findAll`,
+`create`, `update`, `softDelete`.
+
+`IEmployeeService` provides:
+- `getById(id)` — delegates to repository
+- `getByEmployeeNumber(employeeNumber)` — delegates to repository
+- `isActive(id)` — returns `true` only when `employmentStatus === 'ACTIVE'`
+  AND `terminationDate` is `null`; returns `false` for missing employees
+- `getManagerId(id)` — returns the employee's `managerId` or `null` if not
+  found or no manager assigned
+
+`EmployeeService` injects `IEmployeeRepository` and delegates read operations
+directly. The `isActive` check is the key business rule: both status and
+absence of a termination date are required.
+
+### Policy module
+
+`LeavePolicy` models a leave policy with fields: `id`, `policyName`,
+`leaveType` (LeaveType), `entitlementDays`, `accrualRate`, `maxAccumulation`,
+`minimumNoticeDays`, `requiresManagerApproval`, `isActive`, `createdAt`,
+`updatedAt`.
+
+`IPolicyRepository` provides: `findById`, `findByLeaveType`, `findAllActive`,
+`create`, `update`.
+
+`IPolicyService` provides:
+- `getById(id)` — delegates to repository
+- `getByLeaveType(leaveType)` — delegates to repository
+- `getAllActive()` — delegates to repository
+
+`PolicyService` injects `IPolicyRepository` and is a thin pass-through with
+no additional business logic at this layer.
+
 ### Balance module
 
 `LeaveBalance` tracks per-employee, per-policy, per-fiscal-year entitlement
@@ -110,6 +156,41 @@ and usage. The `IBalanceRepository` interface provides:
 The `BalanceRepository` maps the `leave_balances` table columns:
 `employee_id`, `leave_policy_id`, `total_entitlement`, `used_days`,
 `remaining_days`, `fiscal_year`, `status`.
+
+`IBalanceService` provides:
+- `getBalance(employeeId, policyId)` — delegates to repository
+- `getAvailableDays(employeeId, policyId)` — returns `remainingDays` from the
+  balance, or `0` if no balance exists
+- `reserveDays(employeeId, policyId, days)` — reduces `remainingDays` by the
+  reserved amount; throws if `days <= 0`, no balance exists, or insufficient
+  remaining days. Reservation is modeled implicitly: `remainingDays` is
+  decremented immediately (no separate pending-reservation column).
+- `releaseReservation(employeeId, policyId, days)` — increases `remainingDays`
+  by the released amount; throws if `days <= 0` or no balance exists
+- `deductDays(employeeId, policyId, days)` — increases `usedDays` via
+  `updateUsedDays` while keeping `remainingDays` unchanged (remaining was
+  already reduced during `reserveDays`); throws if `days <= 0` or no balance
+  exists
+- `initializeBalancesForEmployee(employeeId)` — creates a balance for every
+  active policy for the current calendar year, skipping policies that already
+  have a balance. Applies mid-year hire pro-rating via
+  `computeProRatedEntitlement`: full-year employees get the full entitlement;
+  hires in the current fiscal year get `floor(entitlement × remainingWholeMonths / 12)`;
+  future-year hires get 0. A hire on the 1st of a month counts that month;
+  otherwise the hire month is excluded.
+
+`BalanceService` injects `IBalanceRepository`, `IPolicyRepository`, and
+`IEmployeeRepository`. The `IEmployeeRepository` dependency (not originally
+in the plan) is required by `initializeBalancesForEmployee` to look up the
+employee's `hireDate` for pro-rating.
+
+**Business rules encoded:**
+- Fiscal year = calendar year (current year from `new Date().getFullYear()`)
+- Annual lump-sum entitlement upfront on Jan 1 for existing employees
+- Mid-year hire pro-rating: whole months remaining, rounded down
+- No carry-over (balances are per fiscal year)
+- No negative balance (reserve throws on insufficient remaining days)
+- Zero-entitlement balances are created with status `EXHAUSTED`
 
 ### Leave module
 
