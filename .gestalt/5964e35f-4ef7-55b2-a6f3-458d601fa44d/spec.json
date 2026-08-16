@@ -1,0 +1,75 @@
+{
+  "scope": {
+    "affectedDomains": [],
+    "affectedLayers": [],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The controller class accepts ILeaveRequestService in its constructor and exposes one handler method per service operation (createDraft, submit, approve, reject, cancel, findById, findByEmployeeId, query) \u2014 8 methods total, each returning a plain JSON-serializable object with Date fields converted to ISO 8601 strings.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The routes plugin registers exactly 8 endpoints covering all service operations: createDraft, submit, approve, reject, cancel, findById, findByEmployeeId, and query. The employee-specific route is registered before the parameterized :id route to prevent route collision.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Every service error code is mapped to the correct HTTP status: REQUEST_NOT_FOUND/EMPLOYEE_NOT_FOUND/POLICY_NOT_FOUND/BALANCE_NOT_FOUND \u2192 404, INVALID_DATE_RANGE/MINIMUM_NOTICE_VIOLATION \u2192 400, INVALID_STATE_TRANSITION \u2192 409, NOT_MANAGER \u2192 403, INSUFFICIENT_BALANCE/BALANCE_CLOSED/POLICY_INACTIVE \u2192 409, and any unrecognized error \u2192 500.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The routes plugin is registered in src/app.ts via app.register(leaveRequestRoutes), making all leave-request endpoints available on the Fastify instance.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "The route test file uses Fastify's inject() method with a mocked ILeaveRequestService, covering at minimum: a successful createDraft call, a 404 from findById when the service returns null, a 409 from an invalid state transition, and a 200 with empty array from query/findByEmployeeId.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The controller must not contain any business logic \u2014 it delegates entirely to ILeaveRequestService. Its sole responsibilities are: extracting parameters from the request, calling the service method, formatting the response (Date \u2192 ISO string), and catching/re-mapping errors to HTTP responses.",
+    "The routes plugin must be a standard Fastify plugin (exported async function receiving FastifyInstance). It must instantiate the controller with a real or injected ILeaveRequestService \u2014 the wiring strategy (direct instantiation vs. dependency injection) is left to the code agent, but the controller must receive the service interface, not a concrete class."
+  ],
+  "outOfScope": [
+    "Authentication and authorization middleware (RBAC enforcement via requireRole guard) \u2014 deferred to a later phase. The controller and routes in this phase do not inspect request.user or enforce role checks.",
+    "Request body and query parameter validation (GP-003) \u2014 the controller in this phase passes DTOs directly to the service without schema validation. Validation middleware or decorators are deferred."
+  ],
+  "ambiguities": [
+    {
+      "description": "The controller reads `request.body` and casts it to a DTO type. At runtime, `request.body` could be `null`, `undefined`, or a non-object primitive. The code agent must decide whether the controller should check that `request.body` is a non-null object before destructuring it into a DTO, or whether to let a runtime TypeError propagate (which the catch block would map to 500).",
+      "options": [
+        "Let TypeError propagate \u2014 the catch block maps it to 500",
+        "Guard with a null check and return 400 if body is not an object"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequestController",
+      "mustExistOrExtend": true,
+      "invariant": "The controller MUST NOT contain any business logic, state-machine enforcement, or direct repository access. It delegates all operations to ILeaveRequestService and only handles HTTP concerns: parameter extraction, response formatting, and error-to-HTTP-status mapping."
+    },
+    {
+      "entity": "LeaveRequest (response shape)",
+      "mustExistOrExtend": false,
+      "invariant": "All Date fields (startDate, endDate, approvedAt, cancelledAt, createdAt, updatedAt) in HTTP responses MUST be serialized as ISO 8601 strings. The controller is responsible for this transformation; the service returns Date objects."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "createDraft",
+      "authRule": "Deferred \u2014 no auth enforcement in this phase",
+      "idempotent": false,
+      "errorSemantics": "Service errors EMPLOYEE_NOT_FOUND, POLICY_NOT_FOUND \u2192 404; POLICY_INACTIVE, INVALID_DATE_RANGE \u2192 400; unexpected \u2192 500"
+    }
+  ],
+  "consistencyRequirements": [],
+  "integrationPoints": []
+}
