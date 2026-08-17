@@ -1,40 +1,55 @@
-# Implement this phase: Phase 1 — Shared types & enums
+# Implement this phase: Phase 2a — LeavePolicy model & repository interface
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/825d20d1-d747-449a-b683-c4c1e534f9eb/1`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/825d20d1-d747-449a-b683-c4c1e534f9eb/2`. Do not clone anything; work only in this directory.
 
 ## What to build
-(no phase architecture provided — infer from the success criteria below)
+src/modules/leave-policy/leave-policy.model.ts exists with the LeavePolicy type/interface containing all specified fields
+src/modules/leave-policy/leave-policy.repository.ts exists with the ILeavePolicyRepository interface declaring all 6 CRUD methods with correct signatures
+Both files compile without errors when checked with tsc --noEmit
 
 ## Success criteria
-Create src/shared/types/index.ts with ALL of the following canonical types in one file:
+Create the core type definitions for the leave-policy module. This sub-phase produces zero runtime side-effects — only TypeScript types and interfaces.
 
-- LeaveType enum: 'annual' | 'sick' | 'emergency' | 'unpaid' | 'maternity' | 'paternity'
-- LeaveStatus enum: 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED'
-- EmploymentStatus enum: 'ACTIVE' | 'INACTIVE' | 'TERMINATED'
-- AuditAction enum: 'CREATED' | 'UPDATED' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'BALANCE_DEDUCTED' | 'BALANCE_RESTORED'
-- NotificationStatus enum: 'PENDING' | 'SENT' | 'FAILED'
-- CreateLeaveRequestDto interface: employeeId (string), leaveType (LeaveType), startDate (string), endDate (string), reason (string | undefined)
-- UpdateLeaveRequestDto interface: status (LeaveStatus), approverId (string | null)
-- LeaveRequestQueryParams interface: employeeId (string | undefined), leaveType (LeaveType | undefined), status (LeaveStatus | undefined), startDate (string | undefined), endDate (string | undefined)
-- ValidationResult interface: valid (boolean), errors (string[])
+Files to create:
+1. src/modules/leave-policy/leave-policy.model.ts — Define the LeavePolicy entity with EXACT fields: id (string), policyName (string), leaveType (LeaveType from src/shared/types/index.ts), entitlementDays (number), accrualRate (number | null), maxAccumulation (number | null), minimumNoticeDays (number | null), requiresManagerApproval (boolean), isActive (boolean), createdAt (Date), updatedAt (Date). Export the LeavePolicy interface/type.
 
-No dependencies on any other project files. Include a Jest unit test at tests/unit/shared/types/types.test.ts that verifies enum values and DTO shapes.
+2. src/modules/leave-policy/leave-policy.repository.ts — Define the ILeavePolicyRepository interface with methods: findById(id: string): Promise<LeavePolicy | null>, findByLeaveType(leaveType: string): Promise<LeavePolicy | null>, findAll(): Promise<LeavePolicy[]>, create(policy: Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeavePolicy>, update(id: string, data: Partial<LeavePolicy>): Promise<LeavePolicy | null>, delete(id: string): Promise<boolean>.
+
+Depends on: src/shared/types/index.ts (Phase 1, for LeaveType enum).
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
 - Consolidated decision for all questions: (1) Day counting = inclusive calendar days: daysRequested = (endDate - startDate) + 1. Weekends and public holidays ARE counted; do NOT introduce a holiday calendar. This single formula is BINDING at every call site (deduction, sufficiency check, overlap detection). (2) Fiscal year = calendar year (Jan 1 to Dec 31), hardcoded — no configurable fiscal-year start. A leave request is assumed within one calendar year. (3) Half-day leave is NOT supported — minimum unit is 1 full day; balances are integers; no time-of-day on startDate/endDate and no isHalfDay flag. (4) Balance seeding = pre-seed leave_balances via a scheduled job at year start for all active employees, so a leave_balances row is ALWAYS present for an employee-year-type (repository uses straightforward read/update, never read-then-compute). Keep the LeaveBalance entity. (5) Deduction semantics = Option A atomic dual-update: deductBalance increments usedDays AND decrements remainingDays in ONE transaction; restoreBalance reverses both; recalculateRemainingDays stays consistent with that (remainingDays = totalEntitlement - usedDays). All sibling methods MUST agree on this — no BR-001 drift. [BINDING RULE — operator decision resolving: How are leave days counted from startDate and endDate? Is it inclusive calendar days (endDate - startDate + 1), business days only (excluding weekends/holidays), or half-day granularity? This affects deduction amounts, balance sufficiency checks, and overlap detection.; What defines the fiscal year boundary for LeaveBalance? When a leave request spans two fiscal years, does it draw from one balance or split across two?; Is half-day leave supported? If so, how is it modeled — a boolean flag, or time components on startDate/endDate?; How are leave balances seeded for a new year — are they pre-inserted by a scheduled job at year start, or computed on-the-fly as (policy.days_per_year - SUM(approved leave days))?; Balance deduction semantics: when deductBalance is called, should it (a) increment usedDays AND decrement remainingDays atomically, or (b) only decrement remainingDays and let a separate recalculateRemainingDays reconcile usedDays later? The Balance entity tracks both fields independently.; apply everywhere these apply, not in one place only]
 
+## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
+The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
+- `LeavePolicy` — the entity MUST have exactly these fields:
+    - id: string
+    - policyName: string
+    - leaveType: string
+    - entitlementDays: number
+    - accrualRate: number | null
+    - maxAccumulation: number | null
+    - minimumNoticeDays: number | null
+    - requiresManagerApproval: boolean
+    - isActive: boolean
+    - createdAt: Date
+    - updatedAt: Date
+
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- The `LeaveType` enum values must match the LeaveType domain entity defined in the reconciled architecture (`'annual' | 'sick' | 'emergency' | 'unpaid' | 'maternity' | 'paternity'`). Any deviation would break the dependency map where all inner modules depend on `src/shared/types/` for this enum. (see `.gestalt/architecture/reconciled.json → domain_entities[1].attributes[0].value`)
-- The `LeaveStatus` enum values must match the LeaveRequest lifecycle states in the reconciled architecture: DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED. The business rules (BR-1) in ARCHITECTURE.md depend on these exact string values for state transitions. (see `.gestalt/architecture/reconciled.json → domain_entities[0] lifecycle: "DRAFT → SUBMITTED → (APPROVED | REJECTED); DRAFT/SUBMITTED/APPROVED → CANCELLED"`)
-- The `EmploymentStatus` enum must match the Employee domain entity's employmentStatus attribute in the reconciled architecture (`'ACTIVE' | 'INACTIVE' | 'TERMINATED'`). Business rule BR-11 (terminated employees cannot create/submit leave) depends on this enum. (see `.gestalt/architecture/reconciled.json → domain_entities[4].attributes[9]`)
+- The `LeaveType` enum used by `LeavePolicy.leaveType` MUST be the canonical enum exported from `src/shared/types/index.ts` — do not define a local copy or use a plain string union. (see `src/shared/types/index.ts`)
+- The `LeavePolicy` entity MUST be defined as a TypeScript interface (not a class), matching the convention established by `UptimeStatus` in `src/modules/uptime/uptime.model.ts` and `SystemStatus` in `src/modules/status/status.model.ts`. (see `src/modules/uptime/uptime.model.ts`)
+- The module MUST use barrel exports via `index.ts`, re-exporting `LeavePolicy` from the model file and `ILeavePolicyRepository` from the repository file, following the pattern in `src/modules/uptime/index.ts`. (see `src/modules/uptime/index.ts`)
 ### Entity invariants — enforce these
-- Reuse or extend `LeaveType`: The set of LeaveType values is closed — no code outside `src/shared/types/index.ts` may define additional leave types. All six values (`annual`, `sick`, `emergency`, `unpaid`, `maternity`, `paternity`) are the canonical and only valid leave categories across the entire system.
-- Reuse or extend `LeaveStatus`: The LeaveStatus values define the complete state machine for LeaveRequest. The lifecycle DRAFT → SUBMITTED → (APPROVED | REJECTED) and DRAFT/SUBMITTED/APPROVED → CANCELLED is enforced by business rules in later phases, but the enum itself must contain exactly these five states — no more, no less.
+- Reuse or extend `LeavePolicy`: A LeavePolicy is uniquely identified by its `id` field. The `leaveType` field references a value from the `LeaveType` enum defined in `src/shared/types/index.ts`. The `isActive` boolean governs whether the policy is currently in effect — only one policy per `leaveType` should be active at a time (enforced at the service layer in a later phase). Nullable fields (`accrualRate`, `maxAccumulation`, `minimumNoticeDays`) represent optional policy rules; `null` means the rule is not enforced for that policy.
 ### Interface contract — expose these operations (their shape is yours)
-- Type export contract — all nine types (5 enums + 4 interfaces) must be importable by downstream modules via `import { LeaveType, LeaveStatus, ... } from 'src/shared/types'` (or the relative equivalent). No type may be private or require a secondary import path. — N/A — this is a compile-time type module with no runtime access control.; idempotent; Missing or misspelled exports produce a TypeScript compilation error (`TS2305: Module has no exported member`) at build time, not a runtime error.
+- ILeavePolicyRepository.create — No auth rule at this layer — the repository interface is a data-access contract; RBAC is enforced at the service/controller layer in a later phase.; Returns the created `LeavePolicy` with `id`, `createdAt`, and `updatedAt` populated. The caller must handle persistence failures (e.g., unique constraint violations on `leaveType`).
+- ILeavePolicyRepository.update — No auth rule at this layer.; Returns the updated `LeavePolicy` or `null` if no policy with the given `id` exists. The `data` parameter is `Partial<LeavePolicy>` — only supplied fields are changed.
+- ILeavePolicyRepository.delete — No auth rule at this layer.; idempotent; Returns `true` if a policy was deleted, `false` if no policy with the given `id` existed. Deleting a non-existent policy is not an error.
+### Integration points — connect to these
+- src/shared/types/index.ts — Imports the `LeaveType` enum for the `LeavePolicy.leaveType` field. This is the sole external dependency of this phase.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
