@@ -1,0 +1,55 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-policy"
+    ],
+    "affectedLayers": [
+      "repository"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The `update` method in `PgLeavePolicyRepository` returns `null` (not throws) when the target row is deleted by a concurrent operation between the pre-check `findById` and the `UPDATE ... RETURNING *` query.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `update` method's post-UPDATE empty-result check follows the same pattern already established in `findById` and `findByLeaveType` within the same file: `if (result.rows.length === 0) return null;` before calling `rowToLeavePolicy`.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The fix must not change the method signature \u2014 `update(id: string, data: Partial<LeavePolicy>): Promise<LeavePolicy | null>` remains unchanged.",
+    "The fix must not remove or alter the existing pre-check `findById` call \u2014 it is an additive guard after the UPDATE query only.",
+    "No new dependencies, imports, or modules may be introduced. The change is confined to the body of the `update` method in `src/modules/leave-policy/pg-leave-policy.repository.ts`."
+  ],
+  "outOfScope": [
+    "No new or modified unit tests \u2014 this phase is a targeted bugfix to the `update` method body only. Test coverage for the race-condition scenario is deferred."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "The `update` method must never throw a TypeError caused by passing `undefined` to `rowToLeavePolicy`. If the row disappears between the pre-check and the UPDATE (concurrent delete), the method returns `null` \u2014 consistent with the `LeavePolicy | null` return type."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "ILeavePolicyRepository.update",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns `null` when the entity does not exist at the time of the UPDATE \u2014 whether it was never present or concurrently deleted. Must not throw for this case."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The post-UPDATE empty-result guard must use the identical pattern already present in `findById` and `findByLeaveType` within the same file: check `result.rows.length === 0`, return `null`, and only then call `rowToLeavePolicy(result.rows[0])`.",
+      "referencePath": "src/modules/leave-policy/pg-leave-policy.repository.ts"
+    }
+  ],
+  "integrationPoints": []
+}
