@@ -40,13 +40,10 @@ The entities below are shared, cross-module DATA CONTRACTS. Implement each one w
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Entity invariants — enforce these
-- Reuse or extend `LeavePolicy`: Every LeavePolicy row MUST have a non-null id (UUID), policyName, leaveType, entitlementDays, requiresManagerApproval, isActive, createdAt, and updatedAt. accrualRate, maxAccumulation, and minimumNoticeDays are nullable. The leaveType value MUST be one of the LeaveType enum members defined in src/shared/types/index.ts.
+- Reuse or extend `LeavePolicy`: A LeavePolicy row MUST have a non-null, unique id (UUID v4 generated on create). The leaveType field MUST be one of the canonical LeaveType enum values from src/shared/types/index.ts. The isActive field governs the ACTIVE ↔ INACTIVE lifecycle; deactivating a policy (isActive: false) will freeze all associated LeaveBalances (enforced at the service layer in Phase 7).
 ### Interface contract — expose these operations (their shape is yours)
-- findById — Returns null when no row matches the given id — never throws for a missing row
-- findByLeaveType — Returns null when no policy matches the given leaveType — never throws for a missing row. Returns the first matching row if multiple exist.
-- create — Accepts Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>. Generates id and timestamps internally. Returns the fully populated LeavePolicy. Throws on database-level constraint violations (e.g., duplicate leave_type).
-- update — Returns null when no row matches the given id. Merges partial input with existing values. Updates updatedAt to current timestamp. Returns the updated row.
-- delete — Returns true if a row was deleted, false if no row matched the id. Never throws for a missing row.
+- ILeavePolicyRepository.findById — idempotent; Returns null when no row matches the given id — does not throw. Database connectivity errors propagate as exceptions (no silent swallowing).
+- ILeavePolicyRepository.findByLeaveType — idempotent; Returns null when no policy exists for the given leaveType — does not throw. Returns the first matching row if multiple exist (unique constraint on leave_type is expected but not enforced by the repository).
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
