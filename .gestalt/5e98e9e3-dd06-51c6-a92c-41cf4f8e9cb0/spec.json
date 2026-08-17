@@ -1,0 +1,51 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-policy"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository-interface",
+      "repository-implementation",
+      "barrel"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The LeavePolicy entity is defined in src/modules/leave-policy/leave-policy.model.ts with exactly these fields: id (string), policyName (string), leaveType (string), entitlementDays (number), accrualRate (number | null), maxAccumulation (number | null), minimumNoticeDays (number | null), requiresManagerApproval (boolean), isActive (boolean), createdAt (Date), updatedAt (Date).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The ILeavePolicyRepository interface is defined in src/modules/leave-policy/leave-policy.repository.ts with exactly these methods: findById(id: string): Promise<LeavePolicy | null>, findByLeaveType(leaveType: string): Promise<LeavePolicy | null>, findAll(): Promise<LeavePolicy[]>, create(policy: Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeavePolicy>, update(id: string, data: Partial<LeavePolicy>): Promise<LeavePolicy | null>, delete(id: string): Promise<boolean>.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "PgLeavePolicyRepository in src/modules/leave-policy/pg-leave-policy.repository.ts implements all ILeavePolicyRepository methods using the shared pool from src/shared/db/connection.ts against a leave_policies table. Each method accepts an optional PoolClient parameter for transaction participation; when omitted, the method acquires its own connection from the pool.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The barrel file src/modules/leave-policy/index.ts re-exports all public symbols: LeavePolicy, ILeavePolicyRepository, and PgLeavePolicyRepository.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests at tests/unit/modules/leave-policy/leave-policy.repository.test.ts mock the db pool and verify all CRUD operations: create persists a row and returns the created LeavePolicy with generated id/createdAt/updatedAt; findById returns the policy or null; findByLeaveType returns the policy matching the leave type string or null; findAll returns all policies; update applies partial data and returns the updated policy or null; delete removes the row and returns true, or false if not found.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The leave-policy module MUST only depend on src/shared/types/index.ts and src/shared/db/connection.ts. No cross-module imports to leave-request, leave-balance, leave, audit, or notification are permitted."
+  ],
+  "outOfScope": [],
+  "ambiguities": [],
+  "entityInvariants": [],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [],
+  "integrationPoints": []
+}
