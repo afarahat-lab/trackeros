@@ -1,0 +1,92 @@
+{
+  "scope": {
+    "affectedDomains": [],
+    "affectedLayers": [],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "PgLeavePolicyRepository implements all 6 ILeavePolicyRepository methods (findById, findByLeaveType, findAll, create, update, delete) with correct signatures matching the interface exactly",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All SQL queries use parameterized placeholders ($1, $2, ...) \u2014 no string interpolation or template-literal concatenation of user-supplied values into SQL",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The barrel file (index.ts) exports exactly three symbols: LeavePolicy, ILeavePolicyRepository, PgLeavePolicyRepository \u2014 no internal symbols leak",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "create() generates a UUID via crypto.randomUUID(), sets createdAt and updatedAt to the same timestamp, and returns the persisted row with all fields populated",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "update() uses read-then-write: fetches the existing row, merges partial input (nullish coalescing for booleans, explicit undefined checks for nullable numbers), updates updatedAt, and returns the updated row or null if not found",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "delete() returns a boolean: true when rowCount > 0 (row existed and was deleted), false otherwise",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findAll() returns results ordered by created_at DESC (most recent first)",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Database access MUST go through the shared pool imported from src/shared/db/connection.ts \u2014 no inline pg.Pool instantiation, no direct pg imports outside the repository",
+    "Column names in SQL MUST use snake_case (policy_name, leave_type, entitlement_days, accrual_rate, max_accumulation, minimum_notice_days, requires_manager_approval, is_active, created_at, updated_at) to match the existing database schema"
+  ],
+  "outOfScope": [],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "Every LeavePolicy row MUST have a non-null id (UUID), policyName, leaveType, entitlementDays, requiresManagerApproval, isActive, createdAt, and updatedAt. accrualRate, maxAccumulation, and minimumNoticeDays are nullable. The leaveType value MUST be one of the LeaveType enum members defined in src/shared/types/index.ts."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "findById",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns null when no row matches the given id \u2014 never throws for a missing row"
+    },
+    {
+      "operation": "findByLeaveType",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns null when no policy matches the given leaveType \u2014 never throws for a missing row. Returns the first matching row if multiple exist."
+    },
+    {
+      "operation": "create",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Accepts Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>. Generates id and timestamps internally. Returns the fully populated LeavePolicy. Throws on database-level constraint violations (e.g., duplicate leave_type)."
+    },
+    {
+      "operation": "update",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns null when no row matches the given id. Merges partial input with existing values. Updates updatedAt to current timestamp. Returns the updated row."
+    },
+    {
+      "operation": "delete",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns true if a row was deleted, false if no row matched the id. Never throws for a missing row."
+    }
+  ],
+  "consistencyRequirements": [],
+  "integrationPoints": []
+}
