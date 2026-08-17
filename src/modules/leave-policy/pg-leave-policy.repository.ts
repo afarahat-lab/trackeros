@@ -130,6 +130,9 @@ export class PgLeavePolicyRepository implements ILeavePolicyRepository {
         id,
       ],
     );
+    if (result.rows.length === 0) {
+      return null;
+    }
     return rowToLeavePolicy(result.rows[0]);
   }
 
