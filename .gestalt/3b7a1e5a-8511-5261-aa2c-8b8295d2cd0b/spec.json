@@ -1,0 +1,128 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-policy"
+    ],
+    "affectedLayers": [
+      "repository",
+      "module-public-api"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "PgLeavePolicyRepository implements all 6 methods of ILeavePolicyRepository (findById, findByLeaveType, findAll, create, update, delete) with exact matching signatures \u2014 the TypeScript compiler verifies `implements ILeavePolicyRepository` without errors.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All SQL queries use parameterized placeholders ($1, $2, \u2026) \u2014 no string interpolation or template concatenation of user-supplied values into SQL text.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The barrel export at src/modules/leave-policy/index.ts re-exports exactly three public symbols: LeavePolicy (model), ILeavePolicyRepository (interface), and PgLeavePolicyRepository (class). No internal symbols leak.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository imports the shared pool from src/shared/db/connection.ts \u2014 no other database connection, no inline pool creation, no direct pg.Client instantiation.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "create() generates a unique id via crypto.randomUUID() and sets createdAt/updatedAt to the current timestamp; the returned LeavePolicy includes those server-assigned fields.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "update() returns null when the target row does not exist (idempotent not-found), and handles nullable fields (accrualRate, maxAccumulation, minimumNoticeDays) correctly \u2014 a Partial<LeavePolicy> with undefined for a nullable field preserves the existing value rather than overwriting with null.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "delete() returns a boolean: true when a row was deleted (rowCount > 0), false when no matching row existed.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The repository MUST import the pool from src/shared/db/connection.ts \u2014 no other database connection source, no inline pool creation, no direct pg.Client instantiation.",
+    "All SQL MUST use parameterized queries ($1, $2, \u2026). No string interpolation, template literals, or concatenation for query values.",
+    "The module MUST NOT import from any other domain module's internals. Allowed imports: src/shared/types/index.ts, src/shared/db/connection.ts, and the module's own files (model, repository interface)."
+  ],
+  "outOfScope": [
+    "Jest unit tests at tests/unit/modules/leave-policy/leave-policy.repository.test.ts \u2014 the PLAN.md Phase 2 mentions them but this sub-phase task description only covers the repository implementation and barrel export files. Unit tests are deferred to a subsequent phase or a dedicated test phase."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "Every LeavePolicy row persisted by the repository MUST have a non-null, unique id (generated server-side via crypto.randomUUID()), non-null policyName, non-null leaveType (matching a LeaveType enum value), non-null entitlementDays (positive integer), non-null requiresManagerApproval, non-null isActive, and non-null createdAt/updatedAt timestamps. Nullable fields (accrualRate, maxAccumulation, minimumNoticeDays) may be null."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "findById",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns null when no row matches \u2014 never throws for a missing row."
+    },
+    {
+      "operation": "findByLeaveType",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns null when no policy exists for the given leaveType \u2014 never throws for a missing row."
+    },
+    {
+      "operation": "findAll",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns an empty array when no policies exist \u2014 never returns null."
+    },
+    {
+      "operation": "create",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Creates a new row with a server-generated id and timestamps. Returns the fully populated LeavePolicy. Fails only on database-level errors (e.g., constraint violation)."
+    },
+    {
+      "operation": "update",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns null when the target row does not exist. When data contains undefined for a nullable field, the existing database value is preserved (not overwritten with null)."
+    },
+    {
+      "operation": "delete",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns true when a row was deleted, false when no matching row existed. Never throws for a missing row."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The PgLeavePolicyRepository class MUST implement the ILeavePolicyRepository interface exactly as declared \u2014 method names, parameter types, return types, and Promise wrappers must match without deviation.",
+      "referencePath": "src/modules/leave-policy/leave-policy.repository.ts"
+    },
+    {
+      "requirement": "The LeavePolicy model re-exported from the barrel MUST match the LeavePolicy interface declared in the model file \u2014 same fields, same types, same optionality.",
+      "referencePath": "src/modules/leave-policy/leave-policy.model.ts"
+    },
+    {
+      "requirement": "The snake_case column names used in SQL queries (policy_name, leave_type, entitlement_days, accrual_rate, max_accumulation, minimum_notice_days, requires_manager_approval, is_active, created_at, updated_at) MUST match the leave_policies table schema as declared in the reconciled architecture.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "The repository MUST use the singleton pool exported from src/shared/db/connection.ts \u2014 no other pool, no direct pg.Pool construction, no separate connection management.",
+      "referencePath": "src/shared/db/connection.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "The repository acquires database connections exclusively through the shared pool exported here."
+    }
+  ]
+}
