@@ -1,0 +1,115 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared/types"
+    ],
+    "affectedLayers": [
+      "types"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The file `src/shared/types/index.ts` exists and exports all five enums (LeaveType, LeaveStatus, EmploymentStatus, AuditAction, NotificationStatus), four interfaces (CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveRequestQueryParams, ValidationResult), and nothing else \u2014 no runtime code, no side effects.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `LeaveType` enum exposes exactly six string members: `'annual'`, `'sick'`, `'emergency'`, `'unpaid'`, `'maternity'`, `'paternity'` \u2014 no additional values, no numeric members.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `LeaveStatus` enum exposes exactly five uppercase string members: `'DRAFT'`, `'SUBMITTED'`, `'APPROVED'`, `'REJECTED'`, `'CANCELLED'`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `EmploymentStatus` enum exposes exactly three uppercase string members: `'ACTIVE'`, `'INACTIVE'`, `'TERMINATED'`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `AuditAction` enum exposes exactly seven uppercase string members: `'CREATED'`, `'UPDATED'`, `'APPROVED'`, `'REJECTED'`, `'CANCELLED'`, `'BALANCE_DEDUCTED'`, `'BALANCE_RESTORED'`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `NotificationStatus` enum exposes exactly three uppercase string members: `'PENDING'`, `'SENT'`, `'FAILED'`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `CreateLeaveRequestDto` interface has exactly these properties: `employeeId: string`, `leaveType: LeaveType`, `startDate: string`, `endDate: string`, and `reason?: string` (optional, may be `undefined`). No additional properties.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `UpdateLeaveRequestDto` interface has exactly these properties: `status: LeaveStatus` and `approverId: string | null`. No additional properties.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `LeaveRequestQueryParams` interface has exactly these optional properties: `employeeId?: string`, `leaveType?: LeaveType`, `status?: LeaveStatus`, `startDate?: string`, `endDate?: string`. All properties are optional (`undefined`-able).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `ValidationResult` interface has exactly two properties: `valid: boolean` and `errors: string[]`. No additional properties.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A Jest unit test file exists at `tests/unit/shared/types/types.test.ts` that verifies every enum's member values and every DTO interface's shape (property presence, types, optionality). The test passes when run with `npx jest`.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The file `src/shared/types/index.ts` must have zero imports from other project files \u2014 it is the zero-dependency foundation. It may only import from TypeScript itself (no third-party packages, no project modules).",
+    "All types must compile under the project's strict TypeScript configuration: `strict: true`, `target: ES2022`, `module: commonjs`, `noImplicitAny`, `strictNullChecks`. The `no-any` rule from HARNESS.json applies \u2014 use `unknown` with type guards if needed, never `any`.",
+    "The file must use barrel exports via `index.ts` \u2014 all types are exported from a single entry point. No default exports; use named exports only, consistent with existing code style (e.g., `export interface UptimeStatus`).",
+    "Enums must be TypeScript string enums (not `const` enums, not union types masquerading as enums) so they produce runtime values that downstream code can iterate over or use as keys. The reconciled architecture and PLAN.md both specify them as enums, not type aliases."
+  ],
+  "outOfScope": [
+    "Database access, repository implementations, service logic, controllers, routes, HTTP handlers, and any runtime behavior beyond type definitions. This phase produces only compile-time types and a unit test that verifies their shapes.",
+    "Validation logic for DTOs (e.g., checking that startDate \u2264 endDate, that employeeId is non-empty). The `ValidationResult` interface defines the shape for validation outcomes, but actual validation functions belong to later phases (GP-003 input validation at API boundaries)."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveType",
+      "mustExistOrExtend": true,
+      "invariant": "The set of LeaveType values is closed \u2014 no code outside `src/shared/types/index.ts` may define additional leave types. All six values (`annual`, `sick`, `emergency`, `unpaid`, `maternity`, `paternity`) are the canonical and only valid leave categories across the entire system."
+    },
+    {
+      "entity": "LeaveStatus",
+      "mustExistOrExtend": true,
+      "invariant": "The LeaveStatus values define the complete state machine for LeaveRequest. The lifecycle DRAFT \u2192 SUBMITTED \u2192 (APPROVED | REJECTED) and DRAFT/SUBMITTED/APPROVED \u2192 CANCELLED is enforced by business rules in later phases, but the enum itself must contain exactly these five states \u2014 no more, no less."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "Type export contract \u2014 all nine types (5 enums + 4 interfaces) must be importable by downstream modules via `import { LeaveType, LeaveStatus, ... } from 'src/shared/types'` (or the relative equivalent). No type may be private or require a secondary import path.",
+      "authRule": "N/A \u2014 this is a compile-time type module with no runtime access control.",
+      "idempotent": true,
+      "errorSemantics": "Missing or misspelled exports produce a TypeScript compilation error (`TS2305: Module has no exported member`) at build time, not a runtime error."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The `LeaveType` enum values must match the LeaveType domain entity defined in the reconciled architecture (`'annual' | 'sick' | 'emergency' | 'unpaid' | 'maternity' | 'paternity'`). Any deviation would break the dependency map where all inner modules depend on `src/shared/types/` for this enum.",
+      "referencePath": ".gestalt/architecture/reconciled.json \u2192 domain_entities[1].attributes[0].value"
+    },
+    {
+      "requirement": "The `LeaveStatus` enum values must match the LeaveRequest lifecycle states in the reconciled architecture: DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED. The business rules (BR-1) in ARCHITECTURE.md depend on these exact string values for state transitions.",
+      "referencePath": ".gestalt/architecture/reconciled.json \u2192 domain_entities[0] lifecycle: \"DRAFT \u2192 SUBMITTED \u2192 (APPROVED | REJECTED); DRAFT/SUBMITTED/APPROVED \u2192 CANCELLED\""
+    },
+    {
+      "requirement": "The `EmploymentStatus` enum must match the Employee domain entity's employmentStatus attribute in the reconciled architecture (`'ACTIVE' | 'INACTIVE' | 'TERMINATED'`). Business rule BR-11 (terminated employees cannot create/submit leave) depends on this enum.",
+      "referencePath": ".gestalt/architecture/reconciled.json \u2192 domain_entities[4].attributes[9]"
+    }
+  ],
+  "integrationPoints": []
+}
