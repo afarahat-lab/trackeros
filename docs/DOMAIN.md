@@ -80,9 +80,27 @@ Canonical types are defined in `src/shared/types/index.ts` (Phase 1 ✓).
 | valid | boolean | true |
 | errors | string[] | true |
 
-## Domain Entities (planned)
+## Domain Entities
 
-### LeaveRequest
+### LeavePolicy (Phase 2 — model + repository interface committed)
+
+| Field | Type | Required |
+|-------|------|----------|
+| id | string | true |
+| policyName | string | true |
+| leaveType | LeaveType | true |
+| entitlementDays | number | true |
+| accrualRate | number \| null | false |
+| maxAccumulation | number \| null | false |
+| minimumNoticeDays | number \| null | false |
+| requiresManagerApproval | boolean | true |
+| isActive | boolean | true |
+| createdAt | Date | true |
+| updatedAt | Date | true |
+
+Files: `src/modules/leave-policy/leave-policy.model.ts` (interface), `src/modules/leave-policy/leave-policy.repository.ts` (ILeavePolicyRepository interface), `src/modules/leave-policy/index.ts` (barrel). PG implementation and unit tests not yet built.
+
+### LeaveRequest (planned)
 | Field | Type | Required |
 |-------|------|----------|
 | id | string | true |
@@ -97,7 +115,7 @@ Canonical types are defined in `src/shared/types/index.ts` (Phase 1 ✓).
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
-### LeaveBalance
+### LeaveBalance (planned)
 | Field | Type | Required |
 |-------|------|----------|
 | id | string | true |
@@ -111,22 +129,7 @@ Canonical types are defined in `src/shared/types/index.ts` (Phase 1 ✓).
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
-### LeavePolicy
-| Field | Type | Required |
-|-------|------|----------|
-| id | string | true |
-| policyName | string | true |
-| leaveType | string | true |
-| entitlementDays | number | true |
-| accrualRate | number \| null | false |
-| maxAccumulation | number \| null | false |
-| minimumNoticeDays | number \| null | false |
-| requiresManagerApproval | boolean | true |
-| isActive | boolean | true |
-| createdAt | Date | true |
-| updatedAt | Date | true |
-
-### Employee
+### Employee (planned)
 | Field | Type | Required |
 |-------|------|----------|
 | id | string | true |
@@ -143,7 +146,7 @@ Canonical types are defined in `src/shared/types/index.ts` (Phase 1 ✓).
 | updatedAt | Date | true |
 | deletedAt | Date \| null | false |
 
-### AuditLog
+### AuditLog (planned)
 | Field | Type | Required |
 |-------|------|----------|
 | id | string | true |
@@ -154,7 +157,7 @@ Canonical types are defined in `src/shared/types/index.ts` (Phase 1 ✓).
 | changes | Record\<string, unknown\> \| null | false |
 | timestamp | Date | true |
 
-### Notification
+### Notification (planned)
 | Field | Type | Required |
 |-------|------|----------|
 | id | string | true |
