@@ -1,0 +1,87 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-policy"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository-interface"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The `LeavePolicy` type/interface is exported from `src/modules/leave-policy/leave-policy.model.ts` with all required fields: id (string), policyName (string), leaveType (LeaveType from src/shared/types/index.ts), entitlementDays (number), accrualRate (number | null), maxAccumulation (number | null), minimumNoticeDays (number | null), requiresManagerApproval (boolean), isActive (boolean), createdAt (Date), updatedAt (Date).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `ILeavePolicyRepository` interface is exported from `src/modules/leave-policy/leave-policy.repository.ts` with all six methods: `findById(id: string): Promise<LeavePolicy | null>`, `findByLeaveType(leaveType: string): Promise<LeavePolicy | null>`, `findAll(): Promise<LeavePolicy[]>`, `create(policy: Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeavePolicy>`, `update(id: string, data: Partial<LeavePolicy>): Promise<LeavePolicy | null>`, `delete(id: string): Promise<boolean>`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "TypeScript compilation succeeds with `tsc --noEmit` after both files are created \u2014 no type errors from the new module, and the `LeaveType` import from `src/shared/types/index.ts` resolves correctly.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "This phase produces zero runtime side-effects \u2014 only TypeScript type and interface definitions. No database calls, no service logic, no HTTP handlers.",
+    "The `LeavePolicy` model MUST import `LeaveType` from `src/shared/types/index.ts` (Phase 1 dependency) \u2014 do not redefine or duplicate the enum.",
+    "The `ILeavePolicyRepository` interface MUST NOT include a transaction client parameter (`PoolClient`) \u2014 that concern is deferred to the implementation file (`pg-leave-policy.repository.ts`) in a later sub-phase."
+  ],
+  "outOfScope": [
+    "The `PgLeavePolicyRepository` implementation (file 3 in the phase plan: `src/modules/leave-policy/pg-leave-policy.repository.ts`) \u2014 deferred to the next sub-phase. This sub-phase only creates the model interface and repository interface.",
+    "Jest unit tests for the repository \u2014 deferred to the implementation sub-phase when `PgLeavePolicyRepository` is created. This sub-phase produces only types/interfaces with no runtime behavior to test."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "A LeavePolicy is uniquely identified by its `id` field. The `leaveType` field references a value from the `LeaveType` enum defined in `src/shared/types/index.ts`. The `isActive` boolean governs whether the policy is currently in effect \u2014 only one policy per `leaveType` should be active at a time (enforced at the service layer in a later phase). Nullable fields (`accrualRate`, `maxAccumulation`, `minimumNoticeDays`) represent optional policy rules; `null` means the rule is not enforced for that policy."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "ILeavePolicyRepository.create",
+      "authRule": "No auth rule at this layer \u2014 the repository interface is a data-access contract; RBAC is enforced at the service/controller layer in a later phase.",
+      "idempotent": false,
+      "errorSemantics": "Returns the created `LeavePolicy` with `id`, `createdAt`, and `updatedAt` populated. The caller must handle persistence failures (e.g., unique constraint violations on `leaveType`)."
+    },
+    {
+      "operation": "ILeavePolicyRepository.update",
+      "authRule": "No auth rule at this layer.",
+      "idempotent": false,
+      "errorSemantics": "Returns the updated `LeavePolicy` or `null` if no policy with the given `id` exists. The `data` parameter is `Partial<LeavePolicy>` \u2014 only supplied fields are changed."
+    },
+    {
+      "operation": "ILeavePolicyRepository.delete",
+      "authRule": "No auth rule at this layer.",
+      "idempotent": true,
+      "errorSemantics": "Returns `true` if a policy was deleted, `false` if no policy with the given `id` existed. Deleting a non-existent policy is not an error."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The `LeaveType` enum used by `LeavePolicy.leaveType` MUST be the canonical enum exported from `src/shared/types/index.ts` \u2014 do not define a local copy or use a plain string union.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The `LeavePolicy` entity MUST be defined as a TypeScript interface (not a class), matching the convention established by `UptimeStatus` in `src/modules/uptime/uptime.model.ts` and `SystemStatus` in `src/modules/status/status.model.ts`.",
+      "referencePath": "src/modules/uptime/uptime.model.ts"
+    },
+    {
+      "requirement": "The module MUST use barrel exports via `index.ts`, re-exporting `LeavePolicy` from the model file and `ILeavePolicyRepository` from the repository file, following the pattern in `src/modules/uptime/index.ts`.",
+      "referencePath": "src/modules/uptime/index.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts",
+      "why": "Imports the `LeaveType` enum for the `LeavePolicy.leaveType` field. This is the sole external dependency of this phase."
+    }
+  ]
+}
