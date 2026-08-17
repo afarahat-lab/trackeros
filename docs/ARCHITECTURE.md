@@ -58,7 +58,7 @@ src/shared/types/index.ts   — canonical enums & DTOs (Phase 1 ✓)
 | Phase | Description | Status |
 |-------|-------------|--------|
 | 1 | Shared types & enums | ✅ Complete |
-| 2 | LeavePolicy module | 🔄 Partial — model, repository interface, and barrel export committed; PG implementation and unit tests not yet built |
+| 2 | LeavePolicy module | 🔄 Partial — model, repository interface, barrel export, and PG implementation committed; unit tests not yet built |
 | 3 | LeaveBalance module | ⬜ Pending |
 | 4 | LeaveRequest module | ⬜ Pending |
 | 5 | Audit module | ⬜ Pending |
@@ -134,7 +134,7 @@ All canonical enums and DTOs live in `src/shared/types/index.ts`.
 | shared/types | src/shared/types/ | Enums, DTOs, shared types ✅ |
 | leave-request | src/modules/leave-request/ | LeaveRequest entity, repository interface & impl |
 | leave-balance | src/modules/leave-balance/ | LeaveBalance entity, repository interface & impl |
-| leave-policy | src/modules/leave-policy/ | LeavePolicy entity, repository interface (PG impl pending) |
+| leave-policy | src/modules/leave-policy/ | LeavePolicy entity, repository interface & PG impl (unit tests pending) |
 | leave | src/modules/leave/ | LeaveService (orchestrator), controller, routes |
 | audit | src/modules/audit/ | AuditService, AuditLog entity, repository |
 | notification | src/modules/notification/ | NotificationService, Notification entity, repository |
@@ -150,7 +150,7 @@ All canonical enums and DTOs live in `src/shared/types/index.ts`.
 1. **Phase 1 — Shared types & enums** (1 file) ✅  
    Zero-dependency foundation.
 2. **Phase 2 — LeavePolicy module** (4 files) 🔄  
-   Model, repository interface, and barrel export committed. PG implementation and unit tests still needed.
+   Model, repository interface, barrel export, and PG implementation committed. Unit tests still needed.
 3. **Phase 3 — LeaveBalance module** (4 files)  
    Balance checks needed before approvals.
 4. **Phase 4 — LeaveRequest module** (4 files)  
