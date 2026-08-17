@@ -29,9 +29,10 @@ src/modules/LeavePolicy/    — LeavePolicy module
 src/modules/AuditLog/    — AuditLog module
 src/modules/AuditRecord/    — AuditRecord module
 src/modules/AuditServiceInterface/    — AuditServiceInterface module
-src/shared/db connection.ts
+src/shared/db/connection.ts
 src/shared/base repository.ts
 src/shared/error types.ts
+src/shared/types/index.ts   — canonical enums & DTOs (Phase 1 ✓)
 ```
 
 ## Key patterns
@@ -52,10 +53,41 @@ src/shared/error types.ts
 <!-- gestalt:architecture feature=825d20d1-d747-449a-b683-c4c1e534f9eb START -->
 # Leave Management Module Architecture
 
+## Implementation Status
+
+| Phase | Description | Status |
+|-------|-------------|--------|
+| 1 | Shared types & enums | ✅ Complete |
+| 2 | LeavePolicy module | ⬜ Pending |
+| 3 | LeaveBalance module | ⬜ Pending |
+| 4 | LeaveRequest module | ⬜ Pending |
+| 5 | Audit module | ⬜ Pending |
+| 6 | Notification module | ⬜ Pending |
+| 7 | LeaveService & API surface | ⬜ Pending |
+
+## Canonical Types (Phase 1 — committed)
+
+All canonical enums and DTOs live in `src/shared/types/index.ts`.
+
+### Enums
+
+- **LeaveType**: `'annual' | 'sick' | 'emergency' | 'unpaid' | 'maternity' | 'paternity'`
+- **LeaveStatus**: `'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED'`
+- **EmploymentStatus**: `'ACTIVE' | 'INACTIVE' | 'TERMINATED'`
+- **AuditAction**: `'CREATED' | 'UPDATED' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'BALANCE_DEDUCTED' | 'BALANCE_RESTORED'`
+- **NotificationStatus**: `'PENDING' | 'SENT' | 'FAILED'`
+
+### DTOs
+
+- **CreateLeaveRequestDto**: `{ employeeId: string; leaveType: LeaveType; startDate: string; endDate: string; reason: string | undefined }`
+- **UpdateLeaveRequestDto**: `{ status: LeaveStatus; approverId: string | null }`
+- **LeaveRequestQueryParams**: `{ employeeId?: string; leaveType?: LeaveType; status?: LeaveStatus; startDate?: string; endDate?: string }`
+- **ValidationResult**: `{ valid: boolean; errors: string[] }`
+
 ## Domain Entities
 
 ### LeaveRequest
-- **Attributes**: id, employeeId, leaveType, startDate, endDate, reason, status, approverId, approvedAt, createdAt, updatedAt
+- **Attributes**: id, employeeId, leaveType (LeaveType), startDate, endDate, reason, status (LeaveStatus), approverId, approvedAt, createdAt, updatedAt
 - **Lifecycle**: DRAFT → SUBMITTED → (APPROVED | REJECTED); DRAFT/SUBMITTED/APPROVED → CANCELLED
 - **Purpose**: Represents an employee's leave application. Tracks full lifecycle.
 
@@ -99,7 +131,7 @@ src/shared/error types.ts
 
 | Module | Path | Responsibilities |
 |--------|------|------------------|
-| shared/types | src/shared/types/ | Enums, DTOs, shared types |
+| shared/types | src/shared/types/ | Enums, DTOs, shared types ✅ |
 | leave-request | src/modules/leave-request/ | LeaveRequest entity, repository interface & impl |
 | leave-balance | src/modules/leave-balance/ | LeaveBalance entity, repository interface & impl |
 | leave-policy | src/modules/leave-policy/ | LeavePolicy entity, repository interface & impl |
@@ -115,7 +147,7 @@ src/shared/error types.ts
 
 ## Recommended Implementation Phases
 
-1. **Phase 1 — Shared types & enums** (1 file)  
+1. **Phase 1 — Shared types & enums** (1 file) ✅  
    Zero-dependency foundation.
 2. **Phase 2 — LeavePolicy module** (4 files)  
    Policy validation needed before processing requests.
