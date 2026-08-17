@@ -1,0 +1,136 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-policy"
+    ],
+    "affectedLayers": [
+      "repository",
+      "module-public-api"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "PgLeavePolicyRepository implements all 6 methods of ILeavePolicyRepository (findById, findByLeaveType, findAll, create, update, delete) and the TypeScript compiler accepts the class as satisfying the interface without error.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "create(policy) generates a UUID id via crypto.randomUUID(), sets createdAt and updatedAt to new Date(), inserts a row into the leave_policies table, and returns the complete LeavePolicy with all fields matching the input plus the generated id/timestamps.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findById(id) returns the LeavePolicy row with that id (with created_at/updated_at converted to Date objects), or null when no row matches.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findByLeaveType(leaveType) returns the LeavePolicy matching that leave_type string, or null when no policy exists for that type.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findAll() returns all rows from leave_policies as LeavePolicy[] (empty array when table is empty), each with Date-converted timestamps.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "update(id, data) dynamically builds a SET clause from the provided Partial<LeavePolicy> keys, always bumps updated_at to new Date(), and returns the updated row (or null if no row matched). Only the fields present in data are changed; other columns retain their existing values.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "delete(id) executes DELETE ... RETURNING id and returns true if a row was deleted, false if no row matched.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All SQL queries use parameterized placeholders ($1, $2, \u2026) with the pool.query(text, params) signature \u2014 no string concatenation or template interpolation of user-supplied values into SQL.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/modules/leave-policy/index.ts barrel re-exports LeavePolicy, ILeavePolicyRepository, and PgLeavePolicyRepository.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The PgLeavePolicyRepository MUST import pool from src/shared/db/connection.ts \u2014 it must not create its own Pool or connection.",
+    "The implementation MUST NOT add, remove, or rename any columns relative to the LeavePolicy model fields (id, policyName, leaveType, entitlementDays, accrualRate, maxAccumulation, minimumNoticeDays, requiresManagerApproval, isActive, createdAt, updatedAt). Database columns like max_consecutive_days and allow_negative_balance present in the reconciled architecture's SQL schema but absent from the model are out of scope.",
+    "The repository MUST NOT accept or use an optional PoolClient parameter \u2014 the ILeavePolicyRepository interface does not declare one, and the transaction contract (optional client for multi-step writes) is deferred to later phases when the orchestrating LeaveService is built.",
+    "All database column names in SQL queries MUST use snake_case (policy_name, leave_type, entitlement_days, accrual_rate, max_accumulation, minimum_notice_days, requires_manager_approval, is_active, created_at, updated_at) while the TypeScript model uses camelCase \u2014 the repository is responsible for the mapping."
+  ],
+  "outOfScope": [
+    "Transaction contract (optional PoolClient parameter on repository methods). The ILeavePolicyRepository interface does not declare a client parameter, and the orchestrating LeaveService that would own units of work is Phase 7. This phase implements single-step queries only.",
+    "Input validation (GP-003). The repository layer stores what it is given; validation of leaveType enum membership, field ranges, or business rules is a service-layer concern deferred to Phase 7.",
+    "Audit logging (GP-002). The repository is a data-access layer; audit records for policy CRUD operations will be emitted by the service layer in Phase 7, not by the repository itself."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "Every LeavePolicy returned by the repository MUST have id (non-empty string), createdAt (Date), and updatedAt (Date) populated. The create method MUST generate these; the find/update methods MUST return them as stored."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "The leaveType field on every persisted LeavePolicy MUST be one of the six LeaveType enum values ('annual', 'sick', 'emergency', 'unpaid', 'maternity', 'paternity'). The repository itself does not validate this (validation is a service-layer concern per GP-003), but it must faithfully store and retrieve whatever leaveType string is provided."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "ILeavePolicyRepository.findById",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns null (not throws) when no row matches the given id. Throws only on database-level failures (connection lost, query syntax error)."
+    },
+    {
+      "operation": "ILeavePolicyRepository.findByLeaveType",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns null when no policy exists for the given leave type. Throws only on database-level failures."
+    },
+    {
+      "operation": "ILeavePolicyRepository.create",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the created LeavePolicy on success. Throws on database-level failures (e.g., unique constraint violation on leave_type if the DB enforces uniqueness)."
+    },
+    {
+      "operation": "ILeavePolicyRepository.update",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the updated LeavePolicy on success, null when no row matches the given id. Throws on database-level failures. An empty Partial<LeavePolicy> (no keys) is valid input \u2014 it should still bump updated_at and return the row."
+    },
+    {
+      "operation": "ILeavePolicyRepository.delete",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns true if a row was deleted, false if no row matched. Calling delete twice with the same id returns true then false. Throws only on database-level failures."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The PgLeavePolicyRepository class MUST implement the ILeavePolicyRepository interface exactly as declared \u2014 same method signatures, same return types, same parameter types. No additional public methods beyond the interface.",
+      "referencePath": "src/modules/leave-policy/leave-policy.repository.ts"
+    },
+    {
+      "requirement": "The PgLeavePolicyRepository MUST use the shared pool from src/shared/db/connection.ts for all database access \u2014 no inline pg.Pool construction, no direct pg imports beyond what connection.ts already provides.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "The row-to-model mapping in the repository MUST produce objects that conform to the LeavePolicy interface \u2014 every field name and type must match exactly. Specifically: createdAt and updatedAt must be Date objects (converted from the string timestamps pg returns), accrualRate/maxAccumulation/minimumNoticeDays must be number | null, requiresManagerApproval and isActive must be boolean.",
+      "referencePath": "src/modules/leave-policy/leave-policy.model.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "The PgLeavePolicyRepository imports the shared pg.Pool instance for all database queries."
+    }
+  ]
+}

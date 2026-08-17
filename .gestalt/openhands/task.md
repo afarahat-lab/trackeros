@@ -1,21 +1,22 @@
-# Implement this phase: Phase 2a — LeavePolicy model & repository interface
+# Implement this phase: Phase 2b — PgLeavePolicyRepository implementation & barrel export
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/825d20d1-d747-449a-b683-c4c1e534f9eb/2`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/825d20d1-d747-449a-b683-c4c1e534f9eb/3`. Do not clone anything; work only in this directory.
 
 ## What to build
-src/modules/leave-policy/leave-policy.model.ts exists with the LeavePolicy type/interface containing all specified fields
-src/modules/leave-policy/leave-policy.repository.ts exists with the ILeavePolicyRepository interface declaring all 6 CRUD methods with correct signatures
+src/modules/leave-policy/pg-leave-policy.repository.ts exists with PgLeavePolicyRepository class implementing all ILeavePolicyRepository methods
+All SQL queries use parameterized statements against the leave_policies table
+src/modules/leave-policy/index.ts barrel-exports LeavePolicy, ILeavePolicyRepository, and PgLeavePolicyRepository
 Both files compile without errors when checked with tsc --noEmit
 
 ## Success criteria
-Create the core type definitions for the leave-policy module. This sub-phase produces zero runtime side-effects — only TypeScript types and interfaces.
+Implement the concrete PostgreSQL repository and wire up the module's public API.
 
 Files to create:
-1. src/modules/leave-policy/leave-policy.model.ts — Define the LeavePolicy entity with EXACT fields: id (string), policyName (string), leaveType (LeaveType from src/shared/types/index.ts), entitlementDays (number), accrualRate (number | null), maxAccumulation (number | null), minimumNoticeDays (number | null), requiresManagerApproval (boolean), isActive (boolean), createdAt (Date), updatedAt (Date). Export the LeavePolicy interface/type.
+1. src/modules/leave-policy/pg-leave-policy.repository.ts — Implement PgLeavePolicyRepository class that implements ILeavePolicyRepository. Import the shared db pool from src/shared/db/connection.ts. Implement all 6 methods (findById, findByLeaveType, findAll, create, update, delete) against a leave_policies table. Use parameterized queries throughout.
 
-2. src/modules/leave-policy/leave-policy.repository.ts — Define the ILeavePolicyRepository interface with methods: findById(id: string): Promise<LeavePolicy | null>, findByLeaveType(leaveType: string): Promise<LeavePolicy | null>, findAll(): Promise<LeavePolicy[]>, create(policy: Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeavePolicy>, update(id: string, data: Partial<LeavePolicy>): Promise<LeavePolicy | null>, delete(id: string): Promise<boolean>.
+2. src/modules/leave-policy/index.ts — Barrel export of all public symbols: LeavePolicy, ILeavePolicyRepository, PgLeavePolicyRepository.
 
-Depends on: src/shared/types/index.ts (Phase 1, for LeaveType enum).
+Depends on: src/modules/leave-policy/leave-policy.model.ts (Phase 2a), src/modules/leave-policy/leave-policy.repository.ts (Phase 2a), src/shared/db/connection.ts (existing).
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -38,18 +39,11 @@ The entities below are shared, cross-module DATA CONTRACTS. Implement each one w
 
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
-### Reuse & consistency — match these exactly
-- The `LeaveType` enum used by `LeavePolicy.leaveType` MUST be the canonical enum exported from `src/shared/types/index.ts` — do not define a local copy or use a plain string union. (see `src/shared/types/index.ts`)
-- The `LeavePolicy` entity MUST be defined as a TypeScript interface (not a class), matching the convention established by `UptimeStatus` in `src/modules/uptime/uptime.model.ts` and `SystemStatus` in `src/modules/status/status.model.ts`. (see `src/modules/uptime/uptime.model.ts`)
-- The module MUST use barrel exports via `index.ts`, re-exporting `LeavePolicy` from the model file and `ILeavePolicyRepository` from the repository file, following the pattern in `src/modules/uptime/index.ts`. (see `src/modules/uptime/index.ts`)
 ### Entity invariants — enforce these
-- Reuse or extend `LeavePolicy`: A LeavePolicy is uniquely identified by its `id` field. The `leaveType` field references a value from the `LeaveType` enum defined in `src/shared/types/index.ts`. The `isActive` boolean governs whether the policy is currently in effect — only one policy per `leaveType` should be active at a time (enforced at the service layer in a later phase). Nullable fields (`accrualRate`, `maxAccumulation`, `minimumNoticeDays`) represent optional policy rules; `null` means the rule is not enforced for that policy.
+- Reuse or extend `LeavePolicy`: A LeavePolicy row MUST have a non-null, unique id (UUID v4 generated on create). The leaveType field MUST be one of the canonical LeaveType enum values from src/shared/types/index.ts. The isActive field governs the ACTIVE ↔ INACTIVE lifecycle; deactivating a policy (isActive: false) will freeze all associated LeaveBalances (enforced at the service layer in Phase 7).
 ### Interface contract — expose these operations (their shape is yours)
-- ILeavePolicyRepository.create — No auth rule at this layer — the repository interface is a data-access contract; RBAC is enforced at the service/controller layer in a later phase.; Returns the created `LeavePolicy` with `id`, `createdAt`, and `updatedAt` populated. The caller must handle persistence failures (e.g., unique constraint violations on `leaveType`).
-- ILeavePolicyRepository.update — No auth rule at this layer.; Returns the updated `LeavePolicy` or `null` if no policy with the given `id` exists. The `data` parameter is `Partial<LeavePolicy>` — only supplied fields are changed.
-- ILeavePolicyRepository.delete — No auth rule at this layer.; idempotent; Returns `true` if a policy was deleted, `false` if no policy with the given `id` existed. Deleting a non-existent policy is not an error.
-### Integration points — connect to these
-- src/shared/types/index.ts — Imports the `LeaveType` enum for the `LeavePolicy.leaveType` field. This is the sole external dependency of this phase.
+- ILeavePolicyRepository.findById — idempotent; Returns null when no row matches the given id — does not throw. Database connectivity errors propagate as exceptions (no silent swallowing).
+- ILeavePolicyRepository.findByLeaveType — idempotent; Returns null when no policy exists for the given leaveType — does not throw. Returns the first matching row if multiple exist (unique constraint on leave_type is expected but not enforced by the repository).
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:

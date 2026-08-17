@@ -82,7 +82,7 @@ Canonical types are defined in `src/shared/types/index.ts` (Phase 1 ✓).
 
 ## Domain Entities
 
-### LeavePolicy (Phase 2 — model + repository interface committed)
+### LeavePolicy (Phase 2 — model, repository interface, and PG implementation committed)
 
 | Field | Type | Required |
 |-------|------|----------|
@@ -98,7 +98,7 @@ Canonical types are defined in `src/shared/types/index.ts` (Phase 1 ✓).
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
-Files: `src/modules/leave-policy/leave-policy.model.ts` (interface), `src/modules/leave-policy/leave-policy.repository.ts` (ILeavePolicyRepository interface), `src/modules/leave-policy/index.ts` (barrel). PG implementation and unit tests not yet built.
+Files: `src/modules/leave-policy/leave-policy.model.ts` (interface), `src/modules/leave-policy/leave-policy.repository.ts` (ILeavePolicyRepository interface), `src/modules/leave-policy/pg-leave-policy.repository.ts` (PgLeavePolicyRepository implementation), `src/modules/leave-policy/index.ts` (barrel). Unit tests not yet built.
 
 ### LeaveRequest (planned)
 | Field | Type | Required |
