@@ -21,7 +21,7 @@ src/modules/uptime/           — UptimeStatus model + routes + service
 src/modules/employee/         — Employee model, repository, service
 src/modules/leave-policy/     — LeavePolicy model, repository, service
 src/modules/balance/          — LeaveBalance model, repository, service
-src/modules/leave-request/    — LeaveRequest model, repository (service/controller/routes planned)
+src/modules/leave-request/    — LeaveRequest model, repository, service, controller, routes
 src/shared/db/connection.ts   — pg Pool (DATABASE_URL)
 src/shared/types/             — shared enums: LeaveStatus, LeaveType,
                                  LeaveAction, NotificationType,
@@ -57,7 +57,29 @@ src/shared/error-types.ts     — NotFoundError, ValidationError,
 
 - **leave-request.model.ts** — `LeaveRequest` entity interface: id, employeeId, leavePolicyId, startDate (Date), endDate (Date), reason (string | undefined), status (LeaveStatus), approvedBy (string | null), approvedAt (Date | null), cancelledBy (string | null), cancelledAt (Date | null), createdAt, updatedAt. Also exports `CreateLeaveRequestDto` (employeeId, leavePolicyId, startDate, endDate, reason?), `UpdateLeaveRequestDto` (partial of startDate, endDate, reason, status), and `LeaveRequestQueryParams` (employeeId?, status?, leavePolicyId?, startDate?, endDate?).
 - **leave-request.repository.ts** — `ILeaveRequestRepository` extends `IBaseRepository<LeaveRequest>` with `findByEmployeeId`, `findByStatus`, `findOverlapping`, `findByDateRange`, `findPendingForManager`. `LeaveRequestRepository` extends `BaseRepository<LeaveRequest>`, table `leave_requests`. `findOverlapping` uses the inclusive-day overlap formula (`existing.startDate <= newEndDate AND existing.endDate >= newStartDate`), filtering out REJECTED and CANCELLED requests. `findPendingForManager` JOINs `employees` on `manager_id`. All methods accept optional `PoolClient` for transaction support.
-- **index.ts** — barrel re-export of model and repository (service, controller, routes planned).
+- **leave-request.service.ts** — `ILeaveRequestService` with `create`, `submit`, `approve`, `reject`, `cancel`, `update`, `getById`, `query`, `getEmployeeRequests`. `LeaveRequestService` constructor injects `ILeaveRequestRepository`, `IEmployeeService`, `ILeavePolicyService`, `ILeaveBalanceService`. Key rules:
+  - `create`: validates employee is ACTIVE, policy is active, `endDate >= startDate`; creates in DRAFT status.
+  - `submit`: only from DRAFT; validates employee active, policy active, minimum notice (skipped for EMERGENCY leave type), no overlapping requests, sufficient balance via `getRemainingDays`. Transitions to SUBMITTED.
+  - `approve`: only from SUBMITTED; deducts days from balance via `deductDays` (using inclusive formula); sets `approvedBy`/`approvedAt`. Transitions to APPROVED.
+  - `reject`: only from SUBMITTED; no balance change; sets `approvedBy`/`approvedAt`. Transitions to REJECTED.
+  - `cancel`: from SUBMITTED or APPROVED; if from APPROVED, restores days via `restoreDays`; sets `cancelledBy`/`cancelledAt`. Transitions to CANCELLED.
+  - `update`: only DRAFT can be updated; validates `endDate >= startDate` if both provided.
+  - Fiscal year = `startDate.getFullYear()` (calendar year of start date).
+  - `computeDays` = `(endDate - startDate) + 1` (inclusive calendar days, integer).
+  - Note: self-approval is not checked in the service layer (divergence from the planned cross-cutting contract — planned for a future phase).
+- **leave-request.controller.ts** — `LeaveRequestController` with handler methods: `createLeaveRequest`, `submitLeaveRequest`, `approveLeaveRequest`, `rejectLeaveRequest`, `cancelLeaveRequest`, `updateLeaveRequest`, `getLeaveRequest`, `queryLeaveRequests`. Uses Zod schemas for request validation (body, params, query). Returns 201 for create, 200 for all other success responses, 400 with `{ error, details }` on validation failure. Service-thrown errors (NotFoundError, ValidationError, ConflictError) propagate as unhandled — no global error handler is wired yet.
+- **leave-request.routes.ts** — Fastify plugin registering 8 routes:
+  - `POST /leave-requests` → `createLeaveRequest`
+  - `POST /leave-requests/:id/submit` → `submitLeaveRequest`
+  - `POST /leave-requests/:id/approve` → `approveLeaveRequest`
+  - `POST /leave-requests/:id/reject` → `rejectLeaveRequest`
+  - `POST /leave-requests/:id/cancel` → `cancelLeaveRequest`
+  - `PUT /leave-requests/:id` → `updateLeaveRequest`
+  - `GET /leave-requests/:id` → `getLeaveRequest`
+  - `GET /leave-requests` → `queryLeaveRequests`
+  - Dependencies are manually wired (no DI container): instantiates all repositories and services inline.
+  - Routes are NOT yet registered in `src/app.ts` (wiring deferred to Phase 5).
+- **index.ts** — barrel re-export of model, repository interfaces/classes, service interfaces/classes, controller, and routes plugin.
 
 ## Key patterns
 
@@ -117,7 +139,7 @@ The leave management module enables employees to apply for annual, sick, emergen
 - `employee` — Employee entity, repository, service
 - `leave-policy` — LeavePolicy entity, repository, service
 - `balance` — LeaveBalance entity, repository, service (model + repository + service built; controller + routes planned for Phase 5)
-- `leave-request` — LeaveRequest aggregate, repository (model + repository built; service, controller, routes planned)
+- `leave-request` — LeaveRequest aggregate, repository, service, controller, routes (fully built; routes not yet registered in app.ts)
 - `audit` — AuditRecord entity, repository, service (planned)
 - `notification` — Notification entity, repository, service (planned)
 
@@ -146,7 +168,7 @@ Repository methods for multi-step writes accept optional `PoolClient`. Service a
 | 1 | Shared types, base repository, error types | ✅ Built |
 | 2 | Employee, LeavePolicy | ✅ Built |
 | 3 | LeaveBalance (model, repository, service) | ✅ Built |
-| 4 | LeaveRequest (model + repository) | ✅ Built (service, controller, routes planned) |
+| 4 | LeaveRequest (model, repository, service, controller, routes) | ✅ Built (routes not yet registered in app.ts; no unit tests) |
 | 5 | Audit, Notification, routes, integration tests | Planned |
 
 ### Open Questions
