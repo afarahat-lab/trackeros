@@ -1,52 +1,63 @@
-# Implement this phase: Phase 1: Foundation & Shared Types
+# Implement this phase: Phase 2: Employee & LeavePolicy Modules
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/d8fc2ea6-3dd4-4741-b0ac-513d3ac0f17f/1`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/d8fc2ea6-3dd4-4741-b0ac-513d3ac0f17f/2`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create all shared enums, base repository interface, and error types. These are the foundation every other module imports.
+Build the Employee and LeavePolicy domain modules — models, repository interfaces, repository implementations, service interfaces, and service implementations. No controllers/routes yet.
 
-Files to create:
-- `src/shared/types/leave-status.enum.ts` — LeaveStatus enum: DRAFT | SUBMITTED | APPROVED | REJECTED | CANCELLED
-- `src/shared/types/leave-type.enum.ts` — LeaveType enum: annual | sick | emergency | unpaid | maternity | paternity
-- `src/shared/types/leave-action.enum.ts` — LeaveAction enum: CREATE | SUBMIT | APPROVE | REJECT | CANCEL | UPDATE | DELETE
-- `src/shared/types/notification-type.enum.ts` — NotificationType enum: LEAVE_SUBMITTED | LEAVE_APPROVED | LEAVE_REJECTED | LEAVE_CANCELLED | BALANCE_UPDATED
-- `src/shared/types/employment-status.enum.ts` — EmploymentStatus enum: ACTIVE | INACTIVE | TERMINATED
-- `src/shared/types/audit-action.enum.ts` — AuditAction enum: CREATE | UPDATE | DELETE | APPROVE | REJECT
-- `src/shared/types/index.ts` — barrel export re-exporting all enums
-- `src/shared/error-types.ts` — base error classes: NotFoundError, ValidationError, ConflictError, UnauthorizedError (extend Error, include statusCode)
-- `src/shared/base-repository.ts` — generic IBaseRepository<T> interface with findById, findAll, create, update, delete methods; and an abstract BaseRepository<T> class using the existing pg Pool from `src/shared/db/connection.ts`
-- `tests/unit/shared/types/enums.spec.ts` — Jest tests verifying every enum value exists
+Employee module files (~6 files):
+- `src/modules/employee/employee.model.ts` — Employee entity interface with exact fields: id, employeeNumber, firstName, lastName, email, managerId (string | null), department (string | null), hireDate (Date), terminationDate (Date | null), employmentStatus (EmploymentStatus), createdAt, updatedAt, deletedAt (Date | null). Import EmploymentStatus from `shared/types/employment-status.enum`.
+- `src/modules/employee/employee.repository.ts` — IEmployeeRepository interface extending IBaseRepository<Employee> plus findByEmployeeNumber, findByEmail, findByManagerId, findActive. EmployeeRepository class extending BaseRepository<Employee> implementing IEmployeeRepository using the pg Pool.
+- `src/modules/employee/employee.service.ts` — IEmployeeService interface with getById, getByEmployeeNumber, getByEmail, getSubordinates, isActive. EmployeeService implementation delegating to IEmployeeRepository.
+- `src/modules/employee/index.ts` — barrel export
 
-Existing files to read before generating: `src/shared/db/connection.ts` (the pg Pool export), `tsconfig.json` (baseUrl is `./src` so imports use non-relative paths like `shared/db/connection`).
+LeavePolicy module files (~6 files):
+- `src/modules/leave-policy/leave-policy.model.ts` — LeavePolicy entity interface with exact fields: id, policyName, leaveType (LeaveType), entitlementDays, accrualRate (number | null), maxAccumulation (number | null), minimumNoticeDays (number | null), requiresManagerApproval, isActive, createdAt, updatedAt. Import LeaveType from `shared/types/leave-type.enum`.
+- `src/modules/leave-policy/leave-policy.repository.ts` — ILeavePolicyRepository interface extending IBaseRepository<LeavePolicy> plus findByLeaveType, findActive. LeavePolicyRepository class.
+- `src/modules/leave-policy/leave-policy.service.ts` — ILeavePolicyService interface with getById, getByLeaveType, getActivePolicies, isLeaveTypeActive. LeavePolicyService implementation.
+- `src/modules/leave-policy/index.ts` — barrel export
+
+Test files:
+- `tests/unit/modules/employee/employee.service.spec.ts`
+- `tests/unit/modules/leave-policy/leave-policy.service.spec.ts`
+
+This phase depends on Phase 1 files: `src/shared/types/index.ts`, `src/shared/base-repository.ts`, `src/shared/error-types.ts`, `src/shared/db/connection.ts`. Read all of them before generating any code.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
 - Consolidated decision for all questions: (1) Fiscal year = calendar year (Jan 1 to Dec 31), hardcoded — no configurable fiscal-year start, no per-policy override. (2) Cross-year requests = single-year: the ENTIRE LeaveRequest is charged to the fiscal year of its startDate; a request never touches two LeaveBalance records; do NOT build multi-balance/pro-rate logic. (3 & 7) Day counting = inclusive calendar days: daysRequested = (endDate - startDate) + 1; weekends and public holidays ARE counted; do NOT introduce a holiday calendar. This single formula is BINDING at every call site (balance deduction, sufficiency check, overlap detection, reporting). (4) Accrual = annual lump sum: the full totalEntitlement is granted at fiscal-year start; NO monthly pro-rata, NO per-pay-period, NO accrual scheduler; partial-year employees get the full entitlement. (5) Emergency leave ALWAYS bypasses minimumNoticeDays, regardless of policy setting. (6) Granularity = full days only: leave balances are INTEGERS (total_entitlement, used_days, remaining_days are whole numbers), so no fractional days ever arise and no rounding is needed; remaining_days = total_entitlement - used_days exactly. If a fractional value ever arises, floor it. This integer rule is consistent across deduction on approval, restoration on cancellation, and display. [BINDING RULE — operator decision resolving: What is the fiscal year definition — calendar year (Jan 1 – Dec 31) or a custom period (e.g. Apr 1 – Mar 31)?; How should a LeaveRequest whose date range spans two fiscal years be handled?; Should leave day counting use calendar days or business days?; How does leave entitlement accrue — lump sum at fiscal year start, monthly pro-rata, or per-pay-period?; Does emergency leave bypass the minimumNoticeDays constraint?; When leave_balances.remaining_days is computed from total_entitlement minus used_days, what rounding direction applies if fractional days arise (e.g. half-day leave, pro-rated entitlements)?; How are leave days counted — calendar days or business days (Mon–Fri excluding holidays)?; apply everywhere these apply, not in one place only]
 
-## Constraints & consistency
-You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
-### Reuse & consistency — match these exactly
-- BaseRepository must import the named `pool` export from `shared/db/connection` — the exact file at `src/shared/db/connection.ts` which exports `export const pool = new Pool({...})`. (see `src/shared/db/connection.ts`)
-- All enum files and the barrel index must use non-relative imports matching the `baseUrl: "./src"` configured in `tsconfig.json`. The barrel index at `src/shared/types/index.ts` must re-export from sibling files using paths like `./leave-status.enum` (relative within the same directory is acceptable for barrel re-exports), but any consumer importing from outside the types directory must use `shared/types`. (see `tsconfig.json`)
-- The Jest test file must import enums from `shared/types` (the barrel), not from individual enum files. The test file name must match the Jest `testMatch` pattern (which accepts `**.test.ts`). (see `tests/unit/shared/types/enums.test.ts`)
-### Entity invariants — enforce these
-- Reuse or extend `LeaveStatus`: Must contain exactly five members: DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED. These represent the complete lifecycle of a LeaveRequest: DRAFT → SUBMITTED → {APPROVED | REJECTED}; any non-terminal state → CANCELLED.
-- Reuse or extend `AuditAction`: Must contain exactly five members: CREATE, UPDATE, DELETE, APPROVE, REJECT. Every state-changing operation on any domain entity must be logged with one of these actions.
-- Reuse or extend `LeaveType`: Must contain exactly six members with lowercase string values: ANNUAL='annual', SICK='sick', EMERGENCY='emergency', UNPAID='unpaid', MATERNITY='maternity', PATERNITY='paternity'. Each LeaveType has exactly one active LeavePolicy at any time.
-- Reuse or extend `LeaveAction`: Must contain exactly seven members: CREATE, SUBMIT, APPROVE, REJECT, CANCEL, UPDATE, DELETE. Represents all possible actions that can be performed on a LeaveRequest.
-- Reuse or extend `NotificationType`: Must contain exactly five members: LEAVE_SUBMITTED, LEAVE_APPROVED, LEAVE_REJECTED, LEAVE_CANCELLED, BALANCE_UPDATED. Each corresponds to a domain event that triggers a user-facing notification.
-- Reuse or extend `EmploymentStatus`: Must contain exactly three members: ACTIVE, INACTIVE, TERMINATED. Only ACTIVE employees may submit leave requests. The status drives the Employee lifecycle.
-### Interface contract — expose these operations (their shape is yours)
-- IBaseRepository.findById — idempotent; Returns null when no row matches the given id — never throws. Accepts optional PoolClient for transaction participation.
-- IBaseRepository.create — Inserts a new row and returns the created entity including its generated id. Accepts optional PoolClient for transaction participation. On constraint violation (e.g., duplicate unique key), the underlying pg error propagates — callers should wrap in try/catch and translate to a domain error (e.g., ConflictError).
-- IBaseRepository.update — idempotent; Applies a partial update to the row identified by id. Returns the updated entity, or null if no row matched. An empty partial update returns the existing entity unchanged. Accepts optional PoolClient.
-- IBaseRepository.delete — idempotent; Deletes the row identified by id. Returns true if a row was deleted, false if no row matched. Accepts optional PoolClient.
-### Integration points — connect to these
-- src/shared/db/connection.ts — BaseRepository depends on the named `pool` export for all database operations. Every domain repository in later phases will extend BaseRepository and thus transitively depend on this connection.
-- tsconfig.json (baseUrl: "./src") — All shared types and the base repository use non-relative imports. Every module in later phases must follow this same import convention.
+## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
+The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
+- `LeavePolicy` — the entity MUST have exactly these fields:
+    - id: string
+    - policyName: string
+    - leaveType: LeaveType
+    - entitlementDays: number
+    - accrualRate: number | null
+    - maxAccumulation: number | null
+    - minimumNoticeDays: number | null
+    - requiresManagerApproval: boolean
+    - isActive: boolean
+    - createdAt: Date
+    - updatedAt: Date
+- `Employee` — the entity MUST have exactly these fields:
+    - id: string
+    - employeeNumber: string
+    - firstName: string
+    - lastName: string
+    - email: string
+    - managerId: string | null
+    - department: string | null
+    - hireDate: Date
+    - terminationDate: Date | null
+    - employmentStatus: 'ACTIVE' | 'INACTIVE' | 'TERMINATED'
+    - createdAt: Date
+    - updatedAt: Date
+    - deletedAt: Date | null
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
