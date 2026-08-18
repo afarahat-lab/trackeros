@@ -1,0 +1,128 @@
+{
+  "scope": {
+    "affectedDomains": [],
+    "affectedLayers": [],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "AuditRecord entity interface exists at `src/modules/audit/audit.model.ts` with exact fields: id (string), entityType (string), entityId (string), action (AuditAction), oldValues (Record&lt;string, unknown&gt; | null), newValues (Record&lt;string, unknown&gt; | null), performedBy (string), performedAt (Date), ipAddress (string | null), userAgent (string | null), createdAt (Date). Imports AuditAction from `shared/types/audit-action.enum`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "IAuditRepository interface extends IBaseRepository&lt;AuditRecord&gt; and declares findByEntity(entityType: string, entityId: string), findByPerformedBy(performedBy: string), and findByDateRange(startDate: Date, endDate: Date). AuditRepository class extends BaseRepository&lt;AuditRecord&gt;, table name 'audit_logs', and implements all three custom methods plus inherited CRUD.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "IAuditService interface declares log(entry: Omit&lt;AuditRecord, 'id' | 'createdAt'&gt;): Promise&lt;AuditRecord&gt;, getAuditTrail(entityType: string, entityId: string): Promise&lt;AuditRecord[]&gt;, and getByEntity(entityType: string, entityId: string): Promise&lt;AuditRecord[]&gt;. AuditService implementation delegates to IAuditRepository: log calls repository.create, getAuditTrail and getByEntity both call repository.findByEntity.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Notification entity interface exists at `src/modules/notification/notification.model.ts` with exact fields: id (string), recipientId (string), type (NotificationType), title (string), message (string), relatedEntityType (string | null), relatedEntityId (string | null), status ('UNREAD' | 'READ'), createdAt (Date), readAt (Date | null). Imports NotificationType from `shared/types/notification-type.enum`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "INotificationRepository interface extends IBaseRepository&lt;Notification&gt; and declares findByRecipient(recipientId: string), findUnreadByRecipient(recipientId: string), and markAsRead(id: string). NotificationRepository class extends BaseRepository&lt;Notification&gt;, table name 'notifications'. markAsRead updates status to 'READ' and readAt to the current timestamp.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "INotificationService interface declares send(notification: Omit&lt;Notification, 'id' | 'createdAt' | 'readAt'&gt;): Promise&lt;Notification&gt;, getNotifications(recipientId: string): Promise&lt;Notification[]&gt;, markAsRead(id: string): Promise&lt;Notification&gt;, and markAllAsRead(recipientId: string): Promise&lt;void&gt;. NotificationService delegates to INotificationRepository. send creates with status 'UNREAD' and readAt null. markAllAsRead finds all unread via findUnreadByRecipient then calls markAsRead on each.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Both modules have barrel index.ts files re-exporting their model interface, repository interface + class, and service interface + class. Audit barrel at `src/modules/audit/index.ts`, notification barrel at `src/modules/notification/index.ts`.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access must go through the repository layer \u2014 no inline SQL in services. AuditRepository and NotificationRepository must extend BaseRepository and use the shared pg Pool from `src/shared/db/connection.ts`.",
+    "All imports from shared modules must use non-relative paths from baseUrl 'src' (e.g., `shared/types`, `shared/base-repository`, `shared/error-types`, `shared/db/connection`).",
+    "No DI container \u2014 services receive repository instances via constructor injection. The code agent chooses the constructor shape.",
+    "No `any` type \u2014 use `unknown` with type guards where needed (HARNESS.json constraint `no-any`).",
+    "Audit logs are append-only \u2014 the AuditRepository must not expose update or delete operations that mutate existing records. The inherited BaseRepository.update and delete are available but the service must never call them."
+  ],
+  "outOfScope": [
+    "Routes, controllers, and HTTP wiring for audit and notification modules \u2014 these are deferred to a later phase (Sub-phase 5.2: App Wiring & Balance Routes).",
+    "Unit and integration tests for audit and notification modules \u2014 these are produced in Sub-phase 5.3: Integration Tests.",
+    "Integration of audit logging into LeaveRequestService (e.g., logging on approve/reject/cancel) \u2014 the audit module is built standalone; callers wire it in a later phase."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "AuditRecord",
+      "mustExistOrExtend": true,
+      "invariant": "AuditRecord is immutable after creation \u2014 once persisted, no field may be updated or deleted. The repository's update and delete methods are inherited from BaseRepository but must never be called on audit_logs rows."
+    },
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "Notification status transitions are one-way: UNREAD \u2192 READ only. Once READ, a notification must never revert to UNREAD. readAt is null when status is UNREAD and must be set to a Date when status transitions to READ."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "AuditService.log",
+      "authRule": "No auth enforcement at this layer \u2014 the caller is responsible for providing the performedBy value. The service trusts the caller.",
+      "idempotent": false,
+      "errorSemantics": "Must not throw on valid input. Repository-level errors (e.g., DB connection failure) propagate as-is."
+    },
+    {
+      "operation": "NotificationService.send",
+      "authRule": "No auth enforcement at this layer \u2014 the caller provides recipientId. The service trusts the caller.",
+      "idempotent": false,
+      "errorSemantics": "Creates notification with status 'UNREAD' and readAt null. Must not throw on valid input."
+    },
+    {
+      "operation": "NotificationService.markAsRead",
+      "authRule": "No auth enforcement at this layer.",
+      "idempotent": true,
+      "errorSemantics": "If the notification is already READ, the operation is a no-op (idempotent). If the notification does not exist, throws NotFoundError."
+    },
+    {
+      "operation": "NotificationService.markAllAsRead",
+      "authRule": "No auth enforcement at this layer.",
+      "idempotent": true,
+      "errorSemantics": "Finds all unread notifications for the recipient via findUnreadByRecipient, then calls markAsRead on each individually. If no unread notifications exist, completes silently (no-op)."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "AuditRepository must extend BaseRepository&lt;AuditRecord&gt; following the same pattern as EmployeeRepository, LeavePolicyRepository, LeaveBalanceRepository, and LeaveRequestRepository \u2014 overriding tableName, using the shared pool, and accepting optional PoolClient on all custom methods.",
+      "referencePath": "src/modules/employee/employee.repository.ts"
+    },
+    {
+      "requirement": "NotificationRepository must extend BaseRepository&lt;Notification&gt; following the same pattern \u2014 tableName override, shared pool, optional PoolClient on custom methods.",
+      "referencePath": "src/modules/employee/employee.repository.ts"
+    },
+    {
+      "requirement": "AuditService and NotificationService must follow the same constructor-injection pattern as EmployeeService, LeavePolicyService, LeaveBalanceService, and LeaveRequestService \u2014 receiving their repository interface as a constructor parameter, typed against the interface (not the concrete class).",
+      "referencePath": "src/modules/employee/employee.service.ts"
+    },
+    {
+      "requirement": "Barrel index.ts files must re-export the model interface, repository interface + class, and service interface + class, matching the exact export structure of existing modules.",
+      "referencePath": "src/modules/employee/index.ts"
+    },
+    {
+      "requirement": "AuditRecord's action field must use the AuditAction enum from `shared/types/audit-action.enum` (values: CREATE, UPDATE, DELETE, APPROVE, REJECT).",
+      "referencePath": "src/shared/types/audit-action.enum.ts"
+    },
+    {
+      "requirement": "Notification's type field must use the NotificationType enum from `shared/types/notification-type.enum` (values: LEAVE_SUBMITTED, LEAVE_APPROVED, LEAVE_REJECTED, LEAVE_CANCELLED, BALANCE_UPDATED).",
+      "referencePath": "src/shared/types/notification-type.enum.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts",
+      "why": "Audit module imports AuditAction enum; Notification module imports NotificationType enum."
+    }
+  ]
+}
