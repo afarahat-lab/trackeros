@@ -1,23 +1,38 @@
-# Implement this phase: Phase 3: LeaveBalance Module
+# Implement this phase: Sub-phase 4a: LeaveRequest Model &amp; Repository
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/d8fc2ea6-3dd4-4741-b0ac-513d3ac0f17f/3`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/d8fc2ea6-3dd4-4741-b0ac-513d3ac0f17f/4`. Do not clone anything; work only in this directory.
 
 ## What to build
-(no phase architecture provided — infer from the success criteria below)
+leave-request.model.ts exports LeaveRequest interface with all 14 fields typed correctly
+leave-request.model.ts exports CreateLeaveRequestDto, UpdateLeaveRequestDto, and LeaveRequestQueryParams
+leave-request.repository.ts exports ILeaveRequestRepository extending IBaseRepository with findByEmployeeId, findByStatus, findOverlapping, findByDateRange, findPendingForManager
+leave-request.repository.ts exports LeaveRequestRepository class implementing all interface methods
+findOverlapping uses the inclusive-day formula: existing.startDate <= newEndDate AND existing.endDate >= newStartDate
+index.ts barrel export re-exports all public symbols from model and repository
 
 ## Success criteria
-Build the LeaveBalance domain module — model, repository, service. LeaveBalance tracks an employee's entitlement, usage, and remaining balance for a specific policy and fiscal year.
+Create the LeaveRequest domain foundation — entity interface, DTOs, repository interface, and repository implementation.
 
-Files to create (~5 files):
-- `src/modules/balance/balance.model.ts` — LeaveBalance entity interface with exact fields: id, employeeId, leavePolicyId, totalEntitlement (number), usedDays (number), remainingDays (number), fiscalYear (number), status ('ACTIVE' | 'CLOSED'), createdAt, updatedAt. Also define CreateLeaveBalanceDto (employeeId, leavePolicyId, totalEntitlement, fiscalYear) and UpdateLeaveBalanceDto (partial of usedDays, remainingDays, status).
-- `src/modules/balance/balance.repository.ts` — ILeaveBalanceRepository interface extending IBaseRepository<LeaveBalance> plus findByEmployeeId, findByEmployeeAndPolicy, findByEmployeeAndFiscalYear, findActiveByEmployee, upsert (for idempotent balance creation). LeaveBalanceRepository class implementing it.
-- `src/modules/balance/balance.service.ts` — ILeaveBalanceService interface with getBalance, getOrCreateBalance, deductDays, restoreDays, getRemainingDays, closeBalance. LeaveBalanceService implementation. The deductDays method MUST use the BINDING formula: daysRequested = (endDate - startDate) + 1 (inclusive calendar days, integer). remainingDays = totalEntitlement - usedDays (integer arithmetic). Throw ValidationError if insufficient balance.
-- `src/modules/balance/index.ts` — barrel export
-- `tests/unit/modules/balance/balance.service.spec.ts` — Jest tests covering balance creation, deduction (including exact-boundary and insufficient-balance cases), restoration, and fiscal-year scoping.
+Files to create (3):
 
-This phase depends on:
-- Phase 1: `src/shared/types/index.ts`, `src/shared/base-repository.ts`, `src/shared/error-types.ts`, `src/shared/db/connection.ts`
-- Phase 2: `src/modules/employee/employee.model.ts`, `src/modules/leave-policy/leave-policy.model.ts` (LeaveBalance references employeeId and leavePolicyId — read these to understand the FK shapes)
+- `src/modules/leave-request/leave-request.model.ts` — LeaveRequest entity interface with exact fields: id (string), employeeId (string), leavePolicyId (string), startDate (Date), endDate (Date), reason (string | undefined), status (LeaveStatus), approvedBy (string | null), approvedAt (Date | null), cancelledBy (string | null), cancelledAt (Date | null), createdAt (Date), updatedAt (Date). Also define and export:
+  * CreateLeaveRequestDto: { employeeId, leavePolicyId, startDate, endDate, reason? }
+  * UpdateLeaveRequestDto: Partial of { startDate, endDate, reason, status }
+  * LeaveRequestQueryParams: { employeeId?, status?, leavePolicyId?, startDate?, endDate? }
+  Import LeaveStatus from `../../shared/types/leave-status.enum`.
+
+- `src/modules/leave-request/leave-request.repository.ts` — ILeaveRequestRepository interface extending IBaseRepository&lt;LeaveRequest&gt; with additional methods: findByEmployeeId(employeeId: string), findByStatus(status: LeaveStatus), findOverlapping(employeeId: string, startDate: Date, endDate: Date, excludeId?: string), findByDateRange(startDate: Date, endDate: Date), findPendingForManager(managerId: string). LeaveRequestRepository class implementing it via the shared db connection. The findOverlapping query MUST use the BINDING inclusive-day overlap formula: existing.startDate &lt;= newEndDate AND existing.endDate &gt;= newStartDate. Import IBaseRepository from `../../shared/base-repository` and the db helper from `../../shared/db/connection`.
+
+- `src/modules/leave-request/index.ts` — barrel export re-exporting everything from leave-request.model and leave-request.repository.
+
+Read before generating: `src/shared/types/index.ts`, `src/shared/base-repository.ts`, `src/shared/error-types.ts`, `src/shared/db/connection.ts`.
+
+## Owned by SIBLING sub-phases (OUT OF SCOPE for this sub-phase)
+This is ONE sub-phase of a split phase. The deliverables below belong to sibling sub-phases — do NOT create them here, do NOT list them as success criteria, and this sub-phase MUST NOT be gated on their presence (they are produced by a sibling, not missing):
+- "Sub-phase 4b: LeaveRequest Service, Controller &amp; Routes": src/modules/leave-request/leave-request.service.ts, src/modules/leave-request/leave-request.controller.ts, src/modules/leave-request/leave-request.routes.ts
+- "Sub-phase 4c: LeaveRequest Service Unit Tests": tests/unit/modules/leave-request/leave-request.service.spec.ts
+
+In particular, UNIT/INTEGRATION TESTS are OUT OF SCOPE for this sub-phase — they are produced in: Sub-phase 4c: LeaveRequest Service Unit Tests. Do not create test files here, do not require test existence or coverage as a success criterion, and do not fail the gate for missing tests.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -25,15 +40,18 @@ These are resolved, feature-wide decisions. Wherever this phase touches the conc
 
 ## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
 The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
-- `LeaveBalance` — the entity MUST have exactly these fields:
+- `LeaveRequest` — the entity MUST have exactly these fields:
     - id: string
     - employeeId: string
     - leavePolicyId: string
-    - totalEntitlement: number
-    - usedDays: number
-    - remainingDays: number
-    - fiscalYear: number
-    - status: 'ACTIVE' | 'CLOSED'
+    - startDate: Date
+    - endDate: Date
+    - reason: string | undefined
+    - status: LeaveRequestStatus
+    - approvedBy: string | null
+    - approvedAt: Date | null
+    - cancelledBy: string | null
+    - cancelledAt: Date | null
     - createdAt: Date
     - updatedAt: Date
 
