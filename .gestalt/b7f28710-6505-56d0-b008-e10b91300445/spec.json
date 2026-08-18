@@ -1,0 +1,163 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "balance"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository",
+      "service"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The `LeaveBalance` entity interface exposes exactly these fields: `id: string`, `employeeId: string`, `leavePolicyId: string`, `totalEntitlement: number`, `usedDays: number`, `remainingDays: number`, `fiscalYear: number`, `status: 'ACTIVE' | 'CLOSED'`, `createdAt: Date`, `updatedAt: Date`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`CreateLeaveBalanceDto` requires `employeeId`, `leavePolicyId`, `totalEntitlement`, and `fiscalYear` (all required, no optional fields). `UpdateLeaveBalanceDto` is a partial of `usedDays`, `remainingDays`, and `status`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`ILeaveBalanceRepository` extends `IBaseRepository<LeaveBalance>` and adds: `findByEmployeeId(employeeId)`, `findByEmployeeAndPolicy(employeeId, leavePolicyId)`, `findByEmployeeAndFiscalYear(employeeId, fiscalYear)`, `findActiveByEmployee(employeeId)`, and `upsert(dto)` for idempotent balance creation.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`ILeaveBalanceService` exposes: `getBalance(employeeId, leavePolicyId, fiscalYear)`, `getOrCreateBalance(dto)`, `deductDays(employeeId, leavePolicyId, fiscalYear, startDate, endDate)`, `restoreDays(employeeId, leavePolicyId, fiscalYear, days)`, `getRemainingDays(employeeId, leavePolicyId, fiscalYear)`, and `closeBalance(employeeId, leavePolicyId, fiscalYear)`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`deductDays` computes `daysRequested = (endDate - startDate) + 1` (inclusive calendar days, integer), then `remainingDays = totalEntitlement - usedDays` (integer arithmetic). Throws `ValidationError` when `remainingDays < daysRequested`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`restoreDays` adds the given integer days back to `usedDays` and recalculates `remainingDays = totalEntitlement - usedDays`. Must not allow `usedDays` to go below 0.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`closeBalance` transitions status from `'ACTIVE'` to `'CLOSED'`. Throws `ValidationError` if the balance is already `'CLOSED'`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`getOrCreateBalance` is idempotent: if a balance already exists for the given `(employeeId, leavePolicyId, fiscalYear)` tuple, it returns the existing record; otherwise it creates and returns a new one with `usedDays = 0` and `remainingDays = totalEntitlement`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests in `tests/unit/modules/balance/balance.service.spec.ts` cover: balance creation, deduction at exact boundary (remainingDays == daysRequested), deduction with insufficient balance (expect `ValidationError`), restoration, restoration that would exceed entitlement (clamped or error), fiscal-year scoping (different fiscal years produce different balances), and closeBalance on already-closed balance.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access MUST go through `ILeaveBalanceRepository` \u2014 no inline SQL or direct pool usage in the service layer (GP-001).",
+    "The `(employeeId, leavePolicyId, fiscalYear)` tuple MUST be enforced as unique \u2014 at most one `LeaveBalance` row per employee per policy per fiscal year.",
+    "All balance arithmetic MUST use integers only: `totalEntitlement`, `usedDays`, and `remainingDays` are whole numbers. The formula `remainingDays = totalEntitlement - usedDays` is exact; no rounding, no fractional days.",
+    "`deductDays` MUST use the BINDING inclusive-day formula: `daysRequested = (endDate - startDate) + 1`. This formula is non-negotiable and must be the single source of truth for day counting in this module.",
+    "The `LeaveBalanceRepository` MUST extend `BaseRepository<LeaveBalance>` and accept an optional `PoolClient` on every method to support transactional units of work (per the transaction contract in ARCHITECTURE.md)."
+  ],
+  "outOfScope": [
+    "Controllers and HTTP routes for the balance module \u2014 deferred to Phase 5 (`src/modules/balance/balance.routes.ts` and `BalanceController`).",
+    "Audit logging for balance mutations \u2014 deferred to Phase 5 when the Audit module is built. The balance service in this phase does not produce audit records."
+  ],
+  "ambiguities": [
+    {
+      "description": "When `restoreDays` is called with a value that would cause `usedDays` to exceed `totalEntitlement` (e.g., restoring 5 days when only 3 were deducted), should the service clamp `usedDays` to `totalEntitlement`, throw a `ValidationError`, or silently cap at 0? The PLAN.md only specifies \"must not allow usedDays to go below 0\" but does not address the upper-bound case.",
+      "options": [
+        "Clamp: set usedDays = max(0, usedDays - days) and remainingDays = totalEntitlement - usedDays (silent correction)",
+        "Throw ValidationError if days > usedDays (strict, caller must get it right)",
+        "Cap at 0: usedDays = max(0, usedDays - days) \u2014 same as clamp but only floor, no ceiling check"
+      ],
+      "impactIfWrong": "medium"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "`remainingDays` MUST always equal `totalEntitlement - usedDays`. No code path may set `remainingDays` independently of this invariant."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "`usedDays` MUST be \u2265 0 and \u2264 `totalEntitlement` at all times. Deduction must not push `usedDays` above `totalEntitlement`; restoration must not push `usedDays` below 0."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "Lifecycle: a `LeaveBalance` is created with status `'ACTIVE'`. It may transition to `'CLOSED'` exactly once (fiscal year rollover). Once `'CLOSED'`, no further deductions or restorations are permitted."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "The tuple `(employeeId, leavePolicyId, fiscalYear)` is unique across all `LeaveBalance` rows \u2014 at most one active balance per employee per policy per fiscal year."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "deductDays",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws `NotFoundError` if no ACTIVE balance exists for the given `(employeeId, leavePolicyId, fiscalYear)`. Throws `ValidationError` if `remainingDays < daysRequested` (insufficient balance) or if the balance status is `'CLOSED'`."
+    },
+    {
+      "operation": "restoreDays",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws `NotFoundError` if no balance exists. Throws `ValidationError` if the balance is `'CLOSED'` or if restoration would cause `usedDays` to go below 0."
+    },
+    {
+      "operation": "getOrCreateBalance",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns the existing balance if one exists for `(employeeId, leavePolicyId, fiscalYear)`; otherwise creates a new ACTIVE balance with `usedDays = 0`, `remainingDays = totalEntitlement`. Never throws for duplicate tuples."
+    },
+    {
+      "operation": "closeBalance",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws `NotFoundError` if no balance exists. Throws `ValidationError` if the balance is already `'CLOSED'`. On success, status transitions from `'ACTIVE'` to `'CLOSED'`."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "`LeaveBalance.employeeId` must reference a valid `Employee.id`. The type must match `Employee.id: string` as defined in `src/modules/employee/employee.model.ts`.",
+      "referencePath": "src/modules/employee/employee.model.ts"
+    },
+    {
+      "requirement": "`LeaveBalance.leavePolicyId` must reference a valid `LeavePolicy.id`. The type must match `LeavePolicy.id: string` as defined in `src/modules/leave-policy/leave-policy.model.ts`.",
+      "referencePath": "src/modules/leave-policy/leave-policy.model.ts"
+    },
+    {
+      "requirement": "`LeaveBalanceRepository` must extend `BaseRepository<LeaveBalance>` and follow the same pattern as `EmployeeRepository` and `LeavePolicyRepository`: accept optional `PoolClient`, use `this.pool` as fallback, and delegate to `executor.query`.",
+      "referencePath": "src/shared/base-repository.ts"
+    },
+    {
+      "requirement": "Error classes thrown by the service (`NotFoundError`, `ValidationError`) must be imported from `src/shared/error-types.ts` \u2014 no ad-hoc error classes in the balance module.",
+      "referencePath": "src/shared/error-types.ts"
+    },
+    {
+      "requirement": "The `upsert` method on `ILeaveBalanceRepository` must use the `(employeeId, leavePolicyId, fiscalYear)` unique constraint to detect existing rows, matching the unique index defined in the reconciled architecture's `leave_balances` table specification.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/employee/employee.model.ts",
+      "why": "`LeaveBalance.employeeId` references `Employee.id`. The balance module must be compatible with the Employee entity shape for downstream join/validation logic in Phase 4."
+    },
+    {
+      "target": "src/modules/leave-policy/leave-policy.model.ts",
+      "why": "`LeaveBalance.leavePolicyId` references `LeavePolicy.id`. The balance module must be compatible with the LeavePolicy entity shape for downstream policy-aware logic in Phase 4."
+    }
+  ]
+}
