@@ -67,7 +67,8 @@ src/shared/error-types.ts     — NotFoundError, ValidationError,
   - Fiscal year = `startDate.getFullYear()` (calendar year of start date).
   - `computeDays` = `(endDate - startDate) + 1` (inclusive calendar days, integer).
   - Note: self-approval is not checked in the service layer (divergence from the planned cross-cutting contract — planned for a future phase).
-- **leave-request.controller.ts** — `LeaveRequestController` with handler methods: `createLeaveRequest`, `submitLeaveRequest`, `approveLeaveRequest`, `rejectLeaveRequest`, `cancelLeaveRequest`, `updateLeaveRequest`, `getLeaveRequest`, `queryLeaveRequests`. Uses Zod schemas for request validation (body, params, query). Returns 201 for create, 200 for all other success responses, 400 with `{ error, details }` on validation failure. Service-thrown errors (NotFoundError, ValidationError, ConflictError) propagate as unhandled — no global error handler is wired yet.
+  - Note: service methods do NOT use database transactions — `approve` calls `deductDays` and `update` as separate operations without `BEGIN`/`COMMIT`.
+- **leave-request.controller.ts** — `LeaveRequestController` with handler methods: `createLeaveRequest`, `submitLeaveRequest`, `approveLeaveRequest`, `rejectLeaveRequest`, `cancelLeaveRequest`, `updateLeaveRequest`, `getLeaveRequest`, `queryLeaveRequests`. Uses Zod schemas for request validation (body, params, query). Returns 201 for create, 200 for all other success responses, 400 with `{ error, details }` on Zod validation failure. Each handler catches `NotFoundError` → 404, `ValidationError` → 400, `ConflictError` → 409 with `{ error, code, statusCode }` response bodies. Unrecognized errors re-throw (no global error handler is wired yet).
 - **leave-request.routes.ts** — Fastify plugin registering 8 routes:
   - `POST /leave-requests` → `createLeaveRequest`
   - `POST /leave-requests/:id/submit` → `submitLeaveRequest`
@@ -119,8 +120,8 @@ The leave management module enables employees to apply for annual, sick, emergen
 - **LeaveBalance** — Tracks entitlement, used, and remaining days per employee per policy per fiscal year. Lifecycle: ACTIVE → CLOSED (on fiscal year rollover).
 - **Employee** — Owns leave requests and balances; managerId establishes approval hierarchy. Lifecycle: ACTIVE, INACTIVE, TERMINATED.
 - **LeaveType** — Enum: annual, sick, emergency, unpaid, maternity, paternity.
-- **AuditRecord** — Immutable log of all state-changing operations.
-- **Notification** — User-facing notification for leave events.
+- **AuditRecord** — Immutable log of all state-changing operations (planned, not yet built).
+- **Notification** — User-facing notification for leave events (planned, not yet built).
 
 ### Conceptual Table Specifications
 
@@ -152,14 +153,14 @@ leave-request → employee, leave-policy, balance, audit, notification
 
 ### Cross-Cutting Contracts
 
-**Auth Contract**  
-JWT bearer token → `request.user: { id: string, role: UserRole }`. Roles: `employee`, `manager`, `hr_admin`. RBAC enforced via `requireRole(...)` middleware. Self-approval prevented in service layer.
+**Auth Contract** (planned — not yet implemented)  
+JWT bearer token → `request.user: { id: string, role: UserRole }`. Roles: `employee`, `manager`, `hr_admin`. RBAC enforced via `requireRole(...)` middleware. Self-approval prevented in service layer. Currently no auth middleware is wired; all routes are unauthenticated.
 
-**Transaction Contract**  
-Repository methods for multi-step writes accept optional `PoolClient`. Service acquires client, runs `BEGIN`, passes client to repos, then `COMMIT`/`ROLLBACK`. Atomic boundary: status change + balance adjustment + audit log.
+**Transaction Contract** (planned — not yet implemented)  
+Repository methods for multi-step writes accept optional `PoolClient`. Service acquires client, runs `BEGIN`, passes client to repos, then `COMMIT`/`ROLLBACK`. Atomic boundary: status change + balance adjustment + audit log. Currently services call repository methods without transaction wrapping — `approve` performs `deductDays` and `update` as separate non-atomic operations.
 
-**Error Response Contract**  
-`{ error: string, code: string, statusCode: number }`. 400 validation, 401 unauthenticated, 403 forbidden, 404 not found, 409 conflict (overlap), 422 domain rule violation.
+**Error Response Contract** (partially implemented)  
+Controller handlers catch known domain errors and return `{ error: string, code: string, statusCode: number }`. 400 for ValidationError, 404 for NotFoundError, 409 for ConflictError. Unrecognized errors re-throw (no global error handler). 401 (unauthenticated) and 403 (forbidden) are not yet implemented (no auth middleware). 422 (domain rule violation) is not yet used.
 
 ### Implementation Status (by Phase)
 
