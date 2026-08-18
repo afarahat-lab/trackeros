@@ -8,7 +8,7 @@ export class NotFoundError extends Error {
 }
 
 export class ValidationError extends Error {
-  public readonly statusCode: number = 422;
+  public readonly statusCode: number = 400;
 
   constructor(message: string) {
     super(message);

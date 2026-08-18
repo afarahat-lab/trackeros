@@ -1,9 +1,22 @@
-import { LeaveStatus } from 'shared/types/leave-status.enum';
-import { LeaveType } from 'shared/types/leave-type.enum';
-import { LeaveAction } from 'shared/types/leave-action.enum';
-import { NotificationType } from 'shared/types/notification-type.enum';
-import { EmploymentStatus } from 'shared/types/employment-status.enum';
-import { AuditAction } from 'shared/types/audit-action.enum';
+import {
+  LeaveStatus,
+  LeaveType,
+  LeaveAction,
+  NotificationType,
+  EmploymentStatus,
+  AuditAction,
+} from 'shared/types';
+
+describe('shared/types barrel', () => {
+  it('should re-export all enums from the barrel index', () => {
+    expect(LeaveStatus).toBeDefined();
+    expect(LeaveType).toBeDefined();
+    expect(LeaveAction).toBeDefined();
+    expect(NotificationType).toBeDefined();
+    expect(EmploymentStatus).toBeDefined();
+    expect(AuditAction).toBeDefined();
+  });
+});
 
 describe('LeaveStatus', () => {
   it('should have all expected values', () => {

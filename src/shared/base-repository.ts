@@ -2,11 +2,11 @@ import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
 import { pool } from 'shared/db/connection';
 
 export interface IBaseRepository<T> {
-  findById(id: string): Promise<T | null>;
-  findAll(): Promise<T[]>;
-  create(entity: Omit<T, 'id'>): Promise<T>;
-  update(id: string, entity: Partial<T>): Promise<T | null>;
-  delete(id: string): Promise<boolean>;
+  findById(id: string, client?: PoolClient): Promise<T | null>;
+  findAll(client?: PoolClient): Promise<T[]>;
+  create(entity: Omit<T, 'id'>, client?: PoolClient): Promise<T>;
+  update(id: string, entity: Partial<T>, client?: PoolClient): Promise<T | null>;
+  delete(id: string, client?: PoolClient): Promise<boolean>;
 }
 
 export abstract class BaseRepository<T extends { id: string }> implements IBaseRepository<T> {
@@ -17,52 +17,57 @@ export abstract class BaseRepository<T extends { id: string }> implements IBaseR
     this.pool = poolOverride ?? pool;
   }
 
-  async findById(id: string): Promise<T | null> {
-    const result: QueryResult<T> = await this.pool.query(
+  async findById(id: string, client?: PoolClient): Promise<T | null> {
+    const executor = client ?? this.pool;
+    const result: QueryResult<T> = await executor.query(
       `SELECT * FROM ${this.tableName} WHERE id = $1`,
       [id],
     );
     return result.rows[0] ?? null;
   }
 
-  async findAll(): Promise<T[]> {
-    const result: QueryResult<T> = await this.pool.query(
+  async findAll(client?: PoolClient): Promise<T[]> {
+    const executor = client ?? this.pool;
+    const result: QueryResult<T> = await executor.query(
       `SELECT * FROM ${this.tableName}`,
     );
     return result.rows;
   }
 
-  async create(entity: Omit<T, 'id'>): Promise<T> {
+  async create(entity: Omit<T, 'id'>, client?: PoolClient): Promise<T> {
+    const executor = client ?? this.pool;
     const keys = Object.keys(entity as Record<string, unknown>);
     const values = Object.values(entity as Record<string, unknown>);
     const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
     const columns = keys.join(', ');
 
-    const result: QueryResult<T> = await this.pool.query(
+    const result: QueryResult<T> = await executor.query(
       `INSERT INTO ${this.tableName} (${columns}) VALUES (${placeholders}) RETURNING *`,
       values,
     );
     return result.rows[0];
   }
 
-  async update(id: string, entity: Partial<T>): Promise<T | null> {
+  async update(id: string, entity: Partial<T>, client?: PoolClient): Promise<T | null> {
+    const executor = client ?? this.pool;
     const keys = Object.keys(entity as Record<string, unknown>);
     if (keys.length === 0) {
-      return this.findById(id);
+      return this.findById(id, client);
     }
 
     const values = Object.values(entity as Record<string, unknown>);
     const setClauses = keys.map((key, i) => `${key} = $${i + 1}`).join(', ');
 
-    const result: QueryResult<T> = await this.pool.query(
+    const result: QueryResult<T> = await executor.query(
       `UPDATE ${this.tableName} SET ${setClauses} WHERE id = $${keys.length + 1} RETURNING *`,
       [...values, id],
     );
     return result.rows[0] ?? null;
   }
 
-  async delete(id: string): Promise<boolean> {
-    const result: QueryResult = await this.pool.query(
+  async delete(id: string, client?: PoolClient): Promise<boolean> {
+    const executor = client ?? this.pool;
+    const result: QueryResult = await executor.query(
       `DELETE FROM ${this.tableName} WHERE id = $1`,
       [id],
     );
