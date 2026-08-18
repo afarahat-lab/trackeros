@@ -1,0 +1,135 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "employee"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository-interface",
+      "service-interface",
+      "service",
+      "controller",
+      "routes",
+      "tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The Employee entity is defined in `src/modules/employee/employee.model.ts` with all canonical fields (id, employeeNumber, firstName, lastName, email, managerId, department, hireDate, terminationDate, employmentStatus, createdAt, updatedAt, deletedAt) and imports `EmploymentStatus` from `src/shared/types/index.ts`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`IEmployeeRepository` interface exposes all eight methods: findById, findByEmployeeNumber, findByEmail, findByManagerId, findAll, create, update, softDelete \u2014 each with the correct return types (nullable for single-lookup, array for multi-result, boolean for softDelete).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`IEmployeeService` interface exposes six methods (getById, getByEmployeeNumber, getSubordinates, create, update, terminate) and the `CreateEmployeeDto` type is defined in the same file with fields: employeeNumber, firstName, lastName, email, managerId?, department, hireDate.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`EmployeeService.create` constructs an Employee with id generated via `crypto.randomUUID()`, employmentStatus set to `EmploymentStatus.ACTIVE`, createdAt/updatedAt set to `new Date()`, deletedAt set to `null`, and delegates to `repository.create` \u2014 returning the created Employee.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`EmployeeService.terminate` sets employmentStatus to `EmploymentStatus.TERMINATED`, terminationDate to `new Date()`, and delegates to `repository.update` \u2014 returning the updated Employee or null if not found.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Controller functions return HTTP 200 for successful GET/update/terminate, 201 for successful create, and 404 when the service returns null for a lookup by id/employeeNumber.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "`employeeRoutes` registers all employee endpoints on a FastifyInstance under the `/employees` prefix, wiring each route to its corresponding controller function.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "Jest unit tests in `tests/unit/modules/employee/employee.service.test.ts` mock `IEmployeeRepository` and verify: create constructs the Employee correctly and calls repo.create; getById delegates and returns the result; getSubordinates delegates to repo.findByManagerId; terminate sets TERMINATED status + terminationDate and calls repo.update.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Employee module depends only on `src/shared/types/index.ts` (Phase 1) for `EmploymentStatus` and `BaseEntity`. It must not import from any other module (audit, leave-policy, leave-balance, leave-request).",
+    "All database access must go through `IEmployeeRepository` \u2014 no inline SQL or direct db calls in the service or controller layers (GP-001).",
+    "The Employee entity's `employmentStatus` field must use the `EmploymentStatus` enum imported from `src/shared/types/index.ts` \u2014 no string literal or locally redefined enum."
+  ],
+  "outOfScope": [
+    "Concrete Knex/Postgres repository implementation \u2014 the `IEmployeeRepository` interface is defined in this phase but the implementation is deferred (same pattern as Phase 1's audit module)."
+  ],
+  "ambiguities": [
+    {
+      "description": "How do controller functions obtain the `EmployeeService` instance? The PLAN.md does not specify a DI/wiring strategy. Options: (a) module-level singleton instantiated in the routes file, (b) factory function accepting the service, (c) closure-based injection where routes receive the service as a parameter.",
+      "options": [
+        "Module-level singleton instantiated in routes file",
+        "Factory function accepting service as parameter",
+        "Closure-based injection in route registration"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "Every Employee must have a unique `employeeNumber` and a unique `email` across all non-soft-deleted records. `employmentStatus` must be one of ACTIVE, INACTIVE, or TERMINATED. `hireDate` must be set at creation and must not be in the future. `terminationDate` must be null unless `employmentStatus` is TERMINATED, in which case it must be set. `deletedAt` is null for active records; soft-delete sets it to the current timestamp."
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "An Employee with `employmentStatus` TERMINATED cannot be the target of new leave-request submissions or balance initializations (enforced by downstream modules, but the status value is the authoritative signal). The `terminate` service method is the sole path to transition an Employee to TERMINATED status."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "EmployeeService.create",
+      "authRule": "Caller must be authenticated; RBAC enforcement (e.g. HR admin or manager role required to create employees) is applied at the route level, not inside the service.",
+      "idempotent": false,
+      "errorSemantics": "Must reject with a typed error if employeeNumber or email already exists. Must validate that all required fields in CreateEmployeeDto are present and non-empty before constructing the entity."
+    },
+    {
+      "operation": "EmployeeService.terminate",
+      "authRule": "Caller must be authenticated; RBAC enforcement (HR admin or manager role) is applied at the route level.",
+      "idempotent": true,
+      "errorSemantics": "Returns null if the employee does not exist (caller returns 404). If the employee is already TERMINATED, the operation is idempotent \u2014 it sets the same values again and succeeds."
+    },
+    {
+      "operation": "EmployeeService.getById / getByEmployeeNumber / getSubordinates",
+      "authRule": "Caller must be authenticated; RBAC enforcement is applied at the route level.",
+      "idempotent": true,
+      "errorSemantics": "Read operations return null (single-lookup) or empty array (multi-result) when no records match \u2014 they do not throw."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The `Employee` entity must import and use `EmploymentStatus` from `src/shared/types/index.ts` \u2014 the exact enum defined in Phase 1 with values ACTIVE, INACTIVE, TERMINATED. No local redefinition.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The `Employee` entity must structurally conform to `BaseEntity` from `src/shared/types/index.ts` \u2014 it carries `id: string`, `createdAt: Date`, `updatedAt: Date` with the same semantics (id is a UUID string, timestamps are set at creation and updated on mutation).",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The `Employee` entity's `deletedAt: Date | null` field follows the soft-delete pattern: null means active, a Date value means soft-deleted. The `softDelete` repository method sets `deletedAt` to the current timestamp rather than physically removing the row. All repository lookup methods (findById, findByEmployeeNumber, findByEmail, findByManagerId, findAll) must exclude soft-deleted records (deletedAt IS NOT NULL filter).",
+      "referencePath": "src/modules/employee/employee.repository.interface.ts"
+    },
+    {
+      "requirement": "The module's public surface (`index.ts` barrel export) must re-export Employee, IEmployeeRepository, IEmployeeService, EmployeeService, and the route registration function \u2014 matching the pattern established by the audit module's barrel export at `src/modules/audit/index.ts`.",
+      "referencePath": "src/modules/audit/index.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts",
+      "why": "Imports `EmploymentStatus` enum and conforms to `BaseEntity` shape \u2014 the sole external dependency of the Employee module."
+    }
+  ]
+}
