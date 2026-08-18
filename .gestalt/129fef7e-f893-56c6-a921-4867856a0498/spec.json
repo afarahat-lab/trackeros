@@ -1,0 +1,100 @@
+{
+  "scope": {
+    "affectedDomains": [],
+    "affectedLayers": [],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "ILeaveRequestService interface exposes all 9 methods: create(dto: CreateLeaveRequestDto), submit(id: string), approve(id: string, approverId: string), reject(id: string, approverId: string), cancel(id: string, cancelledBy: string), update(id: string, dto: UpdateLeaveRequestDto), getById(id: string), query(params: LeaveRequestQueryParams), getEmployeeRequests(employeeId: string)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "LeaveRequestService constructor injects IEmployeeService, ILeavePolicyService, ILeaveBalanceService, and ILeaveRequestRepository as dependencies",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "submit() validates employee is ACTIVE via IEmployeeService.isActive, throws ValidationError if not",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "submit() validates the leave policy is active via ILeavePolicyService.getById, throws ValidationError if policy is inactive",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "submit() checks minimumNoticeDays from the policy, but skips the check when the policy's leaveType is 'emergency' (BINDING emergency bypass rule)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "submit() checks for overlapping requests via ILeaveRequestRepository.findOverlapping and throws ConflictError if any overlap exists",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "submit() computes daysRequested = (endDate - startDate) + 1 (inclusive calendar days, integer) and checks sufficient balance via ILeaveBalanceService.getBalance; throws ValidationError if insufficient",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "approve() calls ILeaveBalanceService.deductDays with the same inclusive-day formula, sets approvedBy/approvedAt/status=APPROVED on the request",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "reject() makes no balance change, sets status=REJECTED, approvedBy, approvedAt on the request",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "cancel() from APPROVED status calls ILeaveBalanceService.restoreDays with the same inclusive-day formula, sets cancelledBy/cancelledAt/status=CANCELLED",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "cancel() from SUBMITTED status makes no balance change, sets status=CANCELLED, cancelledBy, cancelledAt",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Fiscal year is derived as calendar year of startDate (startDate.getFullYear()); cross-year requests charge entirely to startDate's fiscal year \u2014 a single LeaveBalance is used",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "LeaveRequestController has handler methods for all 8 endpoints: createLeaveRequest, submitLeaveRequest, approveLeaveRequest, rejectLeaveRequest, cancelLeaveRequest, updateLeaveRequest, getLeaveRequest, queryLeaveRequests \u2014 each extracts input from Fastify request, calls the service, and returns the appropriate HTTP status code (201 for create, 200 for others)",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "Controller uses Zod schemas for request validation (body, params, query) on every handler, rejecting invalid input before the service is called",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "leave-request.routes.ts exports a default async Fastify plugin function that registers all 8 routes",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "src/modules/leave-request/index.ts barrel export re-exports from service, controller, and routes in addition to the existing model and repository re-exports",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access must go through repository interfaces \u2014 the service must not call the pool directly or inline SQL",
+    "Service must import from sibling modules only through their index.ts barrel exports (e.g., 'modules/employee' not 'modules/employee/employee.service.ts')"
+  ],
+  "outOfScope": [],
+  "ambiguities": [],
+  "entityInvariants": [],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [],
+  "integrationPoints": []
+}
