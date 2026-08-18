@@ -1,0 +1,75 @@
+{
+  "scope": {
+    "affectedDomains": [],
+    "affectedLayers": [],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "ILeaveRequestService interface exposes all 9 methods: create(dto: CreateLeaveRequestDto), submit(id: string), approve(id: string, approverId: string), reject(id: string, approverId: string), cancel(id: string, cancelledBy: string), update(id: string, dto: UpdateLeaveRequestDto), getById(id: string), query(params: LeaveRequestQueryParams), getEmployeeRequests(employeeId: string)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "create() validates employee is ACTIVE via IEmployeeService.getById, policy is active via ILeavePolicyService.getById, endDate >= startDate, and creates the request in DRAFT status",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "submit() transitions only from DRAFT; validates employee active, policy active, minimumNoticeDays (skipped when policy.leaveType === LeaveType.EMERGENCY), no overlapping requests via findOverlapping, sufficient balance via getRemainingDays using inclusive formula daysRequested = (endDate - startDate) + 1; transitions to SUBMITTED",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "approve() transitions only from SUBMITTED; deducts days via ILeaveBalanceService.deductDays using the same inclusive formula; sets approvedBy, approvedAt, status=APPROVED",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "reject() transitions only from SUBMITTED; performs no balance change; sets approvedBy, approvedAt, status=REJECTED",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "cancel() transitions from SUBMITTED or APPROVED; if from APPROVED, restores days via ILeaveBalanceService.restoreDays; if from SUBMITTED, no balance change; sets cancelledBy, cancelledAt, status=CANCELLED",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Fiscal year is computed as startDate.getFullYear() (calendar year); cross-year requests are charged entirely to the startDate's fiscal year",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Service throws ValidationError for business rule violations (invalid state transition, inactive employee/policy, insufficient balance, invalid date range), NotFoundError for missing entities, ConflictError for overlapping requests",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "LeaveRequestController has 8 handler methods (createLeaveRequest, submitLeaveRequest, approveLeaveRequest, rejectLeaveRequest, cancelLeaveRequest, updateLeaveRequest, getLeaveRequest, queryLeaveRequests), each using Zod schemas for request validation and mapping domain errors to HTTP status codes (400/404/409)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "leave-request.routes.ts exports a default Fastify plugin registering all 8 routes (POST /leave-requests, POST /leave-requests/:id/submit, POST /leave-requests/:id/approve, POST /leave-requests/:id/reject, POST /leave-requests/:id/cancel, PUT /leave-requests/:id, GET /leave-requests/:id, GET /leave-requests)",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "src/modules/leave-request/index.ts barrel export re-exports LeaveRequestService, LeaveRequestController, and leaveRequestRoutes alongside the model and repository exports",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Service constructor MUST inject ILeaveRequestRepository, IEmployeeService, ILeavePolicyService, ILeaveBalanceService \u2014 no direct instantiation of dependencies inside the service",
+    "All database access goes through repository interfaces (ILeaveRequestRepository, ILeaveBalanceRepository) \u2014 no inline SQL/ORM calls in service or controller"
+  ],
+  "outOfScope": [],
+  "ambiguities": [],
+  "entityInvariants": [],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [],
+  "integrationPoints": []
+}
