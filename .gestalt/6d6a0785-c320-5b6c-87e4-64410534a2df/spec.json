@@ -1,0 +1,65 @@
+{
+  "scope": {
+    "affectedDomains": [],
+    "affectedLayers": [],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "`src/modules/leave-request/leave-request.model.ts` exports a `LeaveRequest` entity interface with all required fields: id (string), employeeId (string), leavePolicyId (string), startDate (Date), endDate (Date), reason (string | undefined), status (LeaveStatus), approvedBy (string | null), approvedAt (Date | null), cancelledBy (string | null), cancelledAt (Date | null), createdAt (Date), updatedAt (Date). LeaveStatus is imported from `shared/types`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`src/modules/leave-request/leave-request.model.ts` exports `CreateLeaveRequestDto` with fields: employeeId (string), leavePolicyId (string), startDate (Date), endDate (Date), reason (string | undefined, optional).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`src/modules/leave-request/leave-request.model.ts` exports `UpdateLeaveRequestDto` as a Partial of { startDate, endDate, reason, status }.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`src/modules/leave-request/leave-request.model.ts` exports `LeaveRequestQueryParams` with optional fields: employeeId?, status?, leavePolicyId?, startDate?, endDate?.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`src/modules/leave-request/leave-request.repository.ts` exports `ILeaveRequestRepository` interface extending `IBaseRepository<LeaveRequest>` with methods: findByEmployeeId(employeeId: string), findByStatus(status: LeaveStatus), findOverlapping(employeeId: string, startDate: Date, endDate: Date, excludeId?: string), findByDateRange(startDate: Date, endDate: Date), findPendingForManager(managerId: string).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`src/modules/leave-request/leave-request.repository.ts` exports `LeaveRequestRepository` class extending `BaseRepository<LeaveRequest>` with `tableName = 'leave_requests'`, implementing all `ILeaveRequestRepository` methods using the `const executor = client ?? this.pool` pattern.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`LeaveRequestRepository.findOverlapping` uses the BINDING inclusive-day overlap formula: `existing.startDate <= newEndDate AND existing.endDate >= newStartDate`, filtering by employeeId and optionally excluding a request id.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`LeaveRequestRepository.findPendingForManager` uses a JOIN: `SELECT lr.* FROM leave_requests lr JOIN employees e ON lr.employee_id = e.id WHERE e.manager_id = $1 AND lr.status = 'SUBMITTED'`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`src/modules/leave-request/index.ts` barrel re-exports everything from leave-request.model and leave-request.repository (LeaveRequest, CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveRequestQueryParams, ILeaveRequestRepository, LeaveRequestRepository).",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All SQL column references in repository queries MUST use snake_case (e.g., employee_id, leave_policy_id, start_date, end_date, approved_by, approved_at, cancelled_by, cancelled_at, created_at, updated_at) matching the `leave_requests` table schema.",
+    "Repository methods that accept an optional `PoolClient` MUST use the `const executor = client ?? this.pool` pattern for transaction support, consistent with all existing repository implementations."
+  ],
+  "outOfScope": [],
+  "ambiguities": [],
+  "entityInvariants": [],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [],
+  "integrationPoints": []
+}
