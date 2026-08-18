@@ -1,0 +1,91 @@
+{
+  "scope": {
+    "affectedDomains": [],
+    "affectedLayers": [],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "Employee entity interface exists at `src/modules/employee/employee.model.ts` with all required fields (id, employeeNumber, firstName, lastName, email, managerId, department, hireDate, terminationDate, employmentStatus, createdAt, updatedAt, deletedAt) and imports EmploymentStatus from `shared/types`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "IEmployeeRepository extends IBaseRepository<Employee> and declares findByEmployeeNumber, findByEmail, findByManagerId, and findActive methods. EmployeeRepository extends BaseRepository<Employee> and implements all methods using the pg Pool, with table name 'employees'.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "IEmployeeService declares getById, getByEmployeeNumber, getByEmail, getSubordinates, and isActive. EmployeeService delegates to IEmployeeRepository. getById/getByEmployeeNumber/getByEmail throw NotFoundError when the employee is not found. isActive throws NotFoundError for nonexistent employees and returns boolean for existing ones.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "LeavePolicy entity interface exists at `src/modules/leave-policy/leave-policy.model.ts` with all required fields (id, policyName, leaveType, entitlementDays, accrualRate, maxAccumulation, minimumNoticeDays, requiresManagerApproval, isActive, createdAt, updatedAt) and imports LeaveType from `shared/types`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "ILeavePolicyRepository extends IBaseRepository<LeavePolicy> and declares findByLeaveType and findActive methods. LeavePolicyRepository extends BaseRepository<LeavePolicy> and implements all methods using the pg Pool, with table name 'leave_policies'.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "ILeavePolicyService declares getById, getByLeaveType, getActivePolicies, and isLeaveTypeActive. LeavePolicyService delegates to ILeavePolicyRepository. getById and getByLeaveType throw NotFoundError when not found. isLeaveTypeActive returns false (never throws) for nonexistent policies.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Unit tests at `tests/unit/modules/employee/employee.service.spec.ts` cover all IEmployeeService methods: getById (found + not-found), getByEmployeeNumber (found + not-found), getByEmail (found + not-found), getSubordinates (with results + empty), isActive (active/inactive/terminated + not-found). Repository is mocked; no real DB.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Unit tests at `tests/unit/modules/leave-policy/leave-policy.service.spec.ts` cover all ILeavePolicyService methods: getById (found + not-found), getByLeaveType (found + not-found), getActivePolicies (with results + empty), isLeaveTypeActive (active/inactive/nonexistent). Repository is mocked; no real DB.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access must go through the repository layer \u2014 no inline SQL or direct pg Pool usage in services or models (GP-001, HARNESS constraint no-direct-db-outside-repository).",
+    "No controllers or routes are created in this phase \u2014 those belong to Phase 4 (LeaveRequest) and Phase 5 (integration wiring).",
+    "Modules must only import from each other's public barrel (index.ts), never from internal files directly (ARCHITECTURE.md dependency rules).",
+    "All TypeScript code must pass strict mode (no implicit any, strict null checks) as declared in HARNESS.json and AGENTS.md.",
+    "Repository methods that accept an optional PoolClient must use it when provided, falling back to the shared pool \u2014 supporting the transaction contract defined in .gestalt/architecture/reconciled.json."
+  ],
+  "outOfScope": [],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "Every Employee has a unique employeeNumber and a unique email. Soft-delete via deletedAt \u2014 repository queries filter `deleted_at IS NULL` so soft-deleted employees are invisible to all lookup methods."
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "employmentStatus must be one of ACTIVE, INACTIVE, or TERMINATED (EmploymentStatus enum). Only ACTIVE employees are returned by findActive."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "leaveType must be one of the LeaveType enum values (annual, sick, emergency, unpaid, maternity, paternity). Each LeaveType has at most one active LeavePolicy at any time \u2014 enforced by the (leave_type, is_active) unique constraint in the database."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "entitlementDays is a positive integer (whole days only per BINDING rule). accrualRate, maxAccumulation, and minimumNoticeDays are nullable \u2014 null means \"not applicable\" (e.g., no accrual cap, no notice requirement)."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IEmployeeService.getById",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws NotFoundError when no employee exists with the given id. Never returns null."
+    }
+  ],
+  "consistencyRequirements": [],
+  "integrationPoints": []
+}
