@@ -1,0 +1,71 @@
+{
+  "scope": {
+    "affectedDomains": [],
+    "affectedLayers": [],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "LeaveRequest entity interface exists with fields: id, employeeId, leavePolicyId, startDate (Date), endDate (Date), reason (string | undefined), status (LeaveStatus), approvedBy (string | null), approvedAt (Date | null), cancelledBy (string | null), cancelledAt (Date | null), createdAt, updatedAt \u2014 and imports LeaveStatus from 'shared/types'",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "CreateLeaveRequestDto, UpdateLeaveRequestDto (partial), and LeaveRequestQueryParams (employeeId?, status?, leavePolicyId?, startDate?, endDate?) are exported from the model file",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "ILeaveRequestRepository extends IBaseRepository<LeaveRequest> and declares findByEmployeeId, findByStatus, findOverlapping, findByDateRange, findPendingForManager",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findOverlapping uses the BINDING inclusive-day overlap formula: existing.startDate <= newEndDate AND existing.endDate >= newStartDate",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "ILeaveRequestService declares create, submit, approve, reject, cancel, update, getById, query, getEmployeeRequests",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "submit validates employee is ACTIVE via IEmployeeService.isActive, validates policy is active via ILeavePolicyService, checks minimumNoticeDays (skipped for emergency leave), checks for overlapping requests via findOverlapping, computes daysRequested = (endDate - startDate) + 1, and checks sufficient balance via ILeaveBalanceService.getRemainingDays",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "approve deducts days from LeaveBalance using the inclusive formula, sets approvedBy and approvedAt, and transitions status to APPROVED",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "reject transitions status to REJECTED with no balance change",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Fiscal year = calendar year of startDate; cross-year requests charge entirely to startDate's fiscal year",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "cancel from APPROVED restores days to LeaveBalance and sets cancelledBy/cancelledAt; cancel from SUBMITTED or DRAFT makes no balance change",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "LeaveRequestService constructor MUST inject IEmployeeService, ILeavePolicyService, ILeaveBalanceService, and ILeaveRequestRepository \u2014 no other dependencies",
+    "All database access for leave-request goes through ILeaveRequestRepository \u2014 no inline SQL or ORM calls in service or controller",
+    "Controller MUST use Zod for request validation at the API boundary (GP-003)"
+  ],
+  "outOfScope": [],
+  "ambiguities": [],
+  "entityInvariants": [],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [],
+  "integrationPoints": []
+}
