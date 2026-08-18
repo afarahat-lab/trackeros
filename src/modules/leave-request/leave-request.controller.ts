@@ -3,6 +3,7 @@ import { FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { ILeaveRequestService } from './leave-request.service';
 import { LeaveStatus } from 'shared/types';
+import { NotFoundError, ValidationError, ConflictError } from 'shared/error-types';
 
 const createSchema = z.object({
   employeeId: z.string().min(1),
@@ -85,8 +86,21 @@ export class LeaveRequestController {
       reason: parsed.data.reason,
     };
 
-    const result = await this.leaveRequestService.create(dto);
-    return reply.status(201).send(result);
+    try {
+      const result = await this.leaveRequestService.create(dto);
+      return reply.status(201).send(result);
+    } catch (err: unknown) {
+      if (err instanceof NotFoundError) {
+        return reply.status(404).send({ error: err.message, code: 'NOT_FOUND', statusCode: 404 });
+      }
+      if (err instanceof ValidationError) {
+        return reply.status(400).send({ error: err.message, code: 'VALIDATION_ERROR', statusCode: 400 });
+      }
+      if (err instanceof ConflictError) {
+        return reply.status(409).send({ error: err.message, code: 'CONFLICT', statusCode: 409 });
+      }
+      throw err;
+    }
   };
 
   submitLeaveRequest = async (
@@ -101,8 +115,21 @@ export class LeaveRequestController {
       });
     }
 
-    const result = await this.leaveRequestService.submit(paramsParsed.data.id);
-    return reply.status(200).send(result);
+    try {
+      const result = await this.leaveRequestService.submit(paramsParsed.data.id);
+      return reply.status(200).send(result);
+    } catch (err: unknown) {
+      if (err instanceof NotFoundError) {
+        return reply.status(404).send({ error: err.message, code: 'NOT_FOUND', statusCode: 404 });
+      }
+      if (err instanceof ValidationError) {
+        return reply.status(400).send({ error: err.message, code: 'VALIDATION_ERROR', statusCode: 400 });
+      }
+      if (err instanceof ConflictError) {
+        return reply.status(409).send({ error: err.message, code: 'CONFLICT', statusCode: 409 });
+      }
+      throw err;
+    }
   };
 
   approveLeaveRequest = async (
@@ -125,11 +152,24 @@ export class LeaveRequestController {
       });
     }
 
-    const result = await this.leaveRequestService.approve(
-      paramsParsed.data.id,
-      bodyParsed.data.approverId,
-    );
-    return reply.status(200).send(result);
+    try {
+      const result = await this.leaveRequestService.approve(
+        paramsParsed.data.id,
+        bodyParsed.data.approverId,
+      );
+      return reply.status(200).send(result);
+    } catch (err: unknown) {
+      if (err instanceof NotFoundError) {
+        return reply.status(404).send({ error: err.message, code: 'NOT_FOUND', statusCode: 404 });
+      }
+      if (err instanceof ValidationError) {
+        return reply.status(400).send({ error: err.message, code: 'VALIDATION_ERROR', statusCode: 400 });
+      }
+      if (err instanceof ConflictError) {
+        return reply.status(409).send({ error: err.message, code: 'CONFLICT', statusCode: 409 });
+      }
+      throw err;
+    }
   };
 
   rejectLeaveRequest = async (
@@ -152,11 +192,24 @@ export class LeaveRequestController {
       });
     }
 
-    const result = await this.leaveRequestService.reject(
-      paramsParsed.data.id,
-      bodyParsed.data.approverId,
-    );
-    return reply.status(200).send(result);
+    try {
+      const result = await this.leaveRequestService.reject(
+        paramsParsed.data.id,
+        bodyParsed.data.approverId,
+      );
+      return reply.status(200).send(result);
+    } catch (err: unknown) {
+      if (err instanceof NotFoundError) {
+        return reply.status(404).send({ error: err.message, code: 'NOT_FOUND', statusCode: 404 });
+      }
+      if (err instanceof ValidationError) {
+        return reply.status(400).send({ error: err.message, code: 'VALIDATION_ERROR', statusCode: 400 });
+      }
+      if (err instanceof ConflictError) {
+        return reply.status(409).send({ error: err.message, code: 'CONFLICT', statusCode: 409 });
+      }
+      throw err;
+    }
   };
 
   cancelLeaveRequest = async (
@@ -179,11 +232,24 @@ export class LeaveRequestController {
       });
     }
 
-    const result = await this.leaveRequestService.cancel(
-      paramsParsed.data.id,
-      bodyParsed.data.cancelledBy,
-    );
-    return reply.status(200).send(result);
+    try {
+      const result = await this.leaveRequestService.cancel(
+        paramsParsed.data.id,
+        bodyParsed.data.cancelledBy,
+      );
+      return reply.status(200).send(result);
+    } catch (err: unknown) {
+      if (err instanceof NotFoundError) {
+        return reply.status(404).send({ error: err.message, code: 'NOT_FOUND', statusCode: 404 });
+      }
+      if (err instanceof ValidationError) {
+        return reply.status(400).send({ error: err.message, code: 'VALIDATION_ERROR', statusCode: 400 });
+      }
+      if (err instanceof ConflictError) {
+        return reply.status(409).send({ error: err.message, code: 'CONFLICT', statusCode: 409 });
+      }
+      throw err;
+    }
   };
 
   updateLeaveRequest = async (
@@ -222,8 +288,21 @@ export class LeaveRequestController {
       dto.reason = bodyParsed.data.reason;
     }
 
-    const result = await this.leaveRequestService.update(paramsParsed.data.id, dto);
-    return reply.status(200).send(result);
+    try {
+      const result = await this.leaveRequestService.update(paramsParsed.data.id, dto);
+      return reply.status(200).send(result);
+    } catch (err: unknown) {
+      if (err instanceof NotFoundError) {
+        return reply.status(404).send({ error: err.message, code: 'NOT_FOUND', statusCode: 404 });
+      }
+      if (err instanceof ValidationError) {
+        return reply.status(400).send({ error: err.message, code: 'VALIDATION_ERROR', statusCode: 400 });
+      }
+      if (err instanceof ConflictError) {
+        return reply.status(409).send({ error: err.message, code: 'CONFLICT', statusCode: 409 });
+      }
+      throw err;
+    }
   };
 
   getLeaveRequest = async (
@@ -238,8 +317,21 @@ export class LeaveRequestController {
       });
     }
 
-    const result = await this.leaveRequestService.getById(paramsParsed.data.id);
-    return reply.status(200).send(result);
+    try {
+      const result = await this.leaveRequestService.getById(paramsParsed.data.id);
+      return reply.status(200).send(result);
+    } catch (err: unknown) {
+      if (err instanceof NotFoundError) {
+        return reply.status(404).send({ error: err.message, code: 'NOT_FOUND', statusCode: 404 });
+      }
+      if (err instanceof ValidationError) {
+        return reply.status(400).send({ error: err.message, code: 'VALIDATION_ERROR', statusCode: 400 });
+      }
+      if (err instanceof ConflictError) {
+        return reply.status(409).send({ error: err.message, code: 'CONFLICT', statusCode: 409 });
+      }
+      throw err;
+    }
   };
 
   queryLeaveRequests = async (
@@ -278,7 +370,20 @@ export class LeaveRequestController {
       params.endDate = new Date(queryParsed.data.endDate);
     }
 
-    const result = await this.leaveRequestService.query(params);
-    return reply.status(200).send(result);
+    try {
+      const result = await this.leaveRequestService.query(params);
+      return reply.status(200).send(result);
+    } catch (err: unknown) {
+      if (err instanceof NotFoundError) {
+        return reply.status(404).send({ error: err.message, code: 'NOT_FOUND', statusCode: 404 });
+      }
+      if (err instanceof ValidationError) {
+        return reply.status(400).send({ error: err.message, code: 'VALIDATION_ERROR', statusCode: 400 });
+      }
+      if (err instanceof ConflictError) {
+        return reply.status(409).send({ error: err.message, code: 'CONFLICT', statusCode: 409 });
+      }
+      throw err;
+    }
   };
 }
