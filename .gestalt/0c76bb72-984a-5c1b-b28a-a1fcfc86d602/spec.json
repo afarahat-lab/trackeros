@@ -1,0 +1,155 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "audit",
+      "notification",
+      "balance",
+      "leave-request",
+      "app"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository",
+      "service",
+      "routes",
+      "integration-tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "AuditRecord entity interface exists at src/modules/audit/audit.model.ts with all required fields: id, entityType, entityId, action (typed as AuditAction from shared/types), oldValues (Record<string, unknown> | null), newValues (Record<string, unknown> | null), performedBy, performedAt, ipAddress (string | null), userAgent (string | null), createdAt",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "IAuditRepository interface extends IBaseRepository<AuditRecord> and adds findByEntity(entityType, entityId), findByPerformedBy(performedBy), and findByDateRange(startDate, endDate) \u2014 all accepting optional PoolClient",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "IAuditService interface exposes log(entry) to persist an AuditRecord, getAuditTrail(filters) to query audit records, and getByEntity(entityType, entityId) to retrieve the audit trail for a specific entity",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Notification entity interface exists at src/modules/notification/notification.model.ts with all required fields: id, recipientId, type (typed as NotificationType from shared/types), title, message, relatedEntityType (string | null), relatedEntityId (string | null), status ('UNREAD' | 'READ'), createdAt, readAt (Date | null)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "INotificationRepository interface extends IBaseRepository<Notification> and adds findByRecipient(recipientId), findUnreadByRecipient(recipientId), and markAsRead(id) \u2014 all accepting optional PoolClient",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "INotificationService interface exposes send(notification) to create and persist a Notification, getNotifications(recipientId) to list all notifications for a recipient, markAsRead(id) to mark a single notification as READ, and markAllAsRead(recipientId) to mark all unread notifications for a recipient as READ",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/app.ts registers leaveRequestRoutes (from modules/leave-request) and balanceRoutes (from modules/balance) as Fastify plugins alongside the existing uptimeRoutes",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "balance.routes.ts exists as a Fastify plugin exposing endpoints to query balances by employeeId and by employeeId+leavePolicyId, using BalanceService wired through BalanceRepository",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "Integration test at tests/integration/leave-request-workflow.spec.ts exercises the full lifecycle: create draft \u2192 submit \u2192 approve \u2192 verify balance deducted \u2192 cancel \u2192 verify balance restored, using a Fastify instance with all routes registered",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "Audit and Notification modules must import from other modules ONLY through their barrel index.ts files (e.g., modules/employee, modules/leave-policy) \u2014 never from internal files",
+    "AuditRepository and NotificationRepository must extend BaseRepository<T> and use the shared pg Pool from src/shared/db/connection.ts \u2014 no inline SQL outside the repository layer (GP-001)",
+    "AuditRecord is immutable \u2014 the AuditRepository must NOT expose update or delete operations that modify existing records; only create and query methods are permitted"
+  ],
+  "outOfScope": [
+    "Wiring audit logging into LeaveRequestService state-changing methods (submit, approve, reject, cancel) \u2014 the Audit module is built as a standalone capability in this phase; integration into the leave workflow is deferred",
+    "Wiring notification sending into LeaveRequestService state-changing methods \u2014 the Notification module is built as a standalone capability in this phase; integration into the leave workflow is deferred",
+    "Auth middleware, RBAC enforcement, and JWT verification \u2014 all routes remain unauthenticated; auth is a cross-cutting concern deferred to a future phase per the reconciled architecture",
+    "Database transactions wrapping multi-step writes (BEGIN/COMMIT/ROLLBACK) \u2014 the transaction contract is planned but not yet implemented; services continue to call repository methods without transaction coordination"
+  ],
+  "ambiguities": [
+    {
+      "description": "The AuditService.log method signature is not fully specified \u2014 PLAN.md says \"log\" but does not define a DTO shape. The code agent must decide whether to accept individual parameters (entityType, entityId, action, etc.) or a dedicated DTO interface.",
+      "options": [
+        "Accept a dedicated CreateAuditRecordDto interface with all required fields",
+        "Accept individual parameters: log(entityType, entityId, action, oldValues, newValues, performedBy, ...)",
+        "Accept a minimal set of required params with optional metadata"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "AuditRecord",
+      "mustExistOrExtend": true,
+      "invariant": "AuditRecord is immutable once created \u2014 no update or delete operations may modify an existing record; the only write operation is create (log)"
+    },
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "Notification status transitions: created with status 'UNREAD'; may transition to 'READ' exactly once (setting readAt to the current timestamp); no other status transitions are permitted"
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "AuditService.log",
+      "authRule": "No auth enforcement in this phase \u2014 the performedBy field is caller-supplied",
+      "idempotent": false,
+      "errorSemantics": "Must throw ValidationError if required fields (entityType, entityId, action, performedBy) are missing or invalid"
+    },
+    {
+      "operation": "NotificationService.send",
+      "authRule": "No auth enforcement in this phase",
+      "idempotent": false,
+      "errorSemantics": "Must throw ValidationError if required fields (recipientId, type, title, message) are missing or invalid"
+    },
+    {
+      "operation": "NotificationService.markAsRead",
+      "authRule": "No auth enforcement in this phase",
+      "idempotent": true,
+      "errorSemantics": "Must throw NotFoundError if notification does not exist; must be a no-op (not an error) if notification is already READ"
+    },
+    {
+      "operation": "NotificationService.markAllAsRead",
+      "authRule": "No auth enforcement in this phase",
+      "idempotent": true,
+      "errorSemantics": "Must be a no-op if recipient has no unread notifications; must not throw for nonexistent recipient"
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "AuditRecord.action must use the AuditAction enum from shared/types/audit-action.enum \u2014 values: CREATE, UPDATE, DELETE, APPROVE, REJECT",
+      "referencePath": "src/shared/types/audit-action.enum.ts"
+    },
+    {
+      "requirement": "Notification.type must use the NotificationType enum from shared/types/notification-type.enum \u2014 values: LEAVE_SUBMITTED, LEAVE_APPROVED, LEAVE_REJECTED, LEAVE_CANCELLED, BALANCE_UPDATED",
+      "referencePath": "src/shared/types/notification-type.enum.ts"
+    },
+    {
+      "requirement": "AuditRepository and NotificationRepository must follow the same pattern as all existing repositories: extend BaseRepository<T>, accept optional PoolClient on every method, and use snake_case column names in SQL matching the reconciled schema (audit_logs table: entity_type, entity_id, old_values, new_values, performed_by, performed_at, ip_address, user_agent; notifications table: recipient_id, related_entity_type, related_entity_id, read_at)",
+      "referencePath": "src/shared/base-repository.ts"
+    },
+    {
+      "requirement": "balance.routes.ts must follow the same wiring pattern as leave-request.routes.ts: instantiate BalanceRepository \u2192 BalanceService inline (no DI container), and export a default async Fastify plugin function",
+      "referencePath": "src/modules/leave-request/leave-request.routes.ts"
+    },
+    {
+      "requirement": "app.ts must register balanceRoutes and leaveRequestRoutes using the same app.register() pattern already used for uptimeRoutes",
+      "referencePath": "src/app.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/leave-request/leave-request.service.ts",
+      "why": "Future phase will inject IAuditService and INotificationService into LeaveRequestService to log state changes and send notifications on submit/approve/reject/cancel"
+    }
+  ]
+}
