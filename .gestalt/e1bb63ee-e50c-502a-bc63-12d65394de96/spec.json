@@ -1,0 +1,87 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "balance"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository",
+      "service",
+      "tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The `LeaveBalance` entity interface is exported from `src/modules/balance/balance.model.ts` with exactly these fields: `id: string`, `employeeId: string`, `leavePolicyId: string`, `totalEntitlement: number`, `usedDays: number`, `remainingDays: number`, `fiscalYear: number`, `status: 'ACTIVE' | 'CLOSED'`, `createdAt: Date`, `updatedAt: Date`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`CreateLeaveBalanceDto` is exported with fields `employeeId`, `leavePolicyId`, `totalEntitlement`, `fiscalYear` (all required, no `status`/`usedDays`/`remainingDays`). `UpdateLeaveBalanceDto` is exported as a partial of `usedDays`, `remainingDays`, and `status`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`ILeaveBalanceRepository` extends `IBaseRepository<LeaveBalance>` and declares these additional methods: `findByEmployeeId(employeeId: string, client?: PoolClient): Promise<LeaveBalance[]>`, `findByEmployeeAndPolicy(employeeId: string, leavePolicyId: string, client?: PoolClient): Promise<LeaveBalance | null>`, `findByEmployeeAndFiscalYear(employeeId: string, fiscalYear: number, client?: PoolClient): Promise<LeaveBalance[]>`, `findActiveByEmployee(employeeId: string, client?: PoolClient): Promise<LeaveBalance[]>`, `upsert(dto: CreateLeaveBalanceDto, client?: PoolClient): Promise<LeaveBalance>`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`LeaveBalanceRepository` extends `BaseRepository<LeaveBalance>`, targets table `leave_balances`, and implements all `ILeaveBalanceRepository` methods. The `upsert` method uses `INSERT ... ON CONFLICT (employee_id, leave_policy_id, fiscal_year) DO UPDATE SET ...` to guarantee idempotent balance creation.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`ILeaveBalanceService` declares: `getBalance(id: string): Promise<LeaveBalance>`, `getOrCreateBalance(dto: CreateLeaveBalanceDto): Promise<LeaveBalance>`, `deductDays(id: string, startDate: Date, endDate: Date): Promise<LeaveBalance>`, `restoreDays(id: string, days: number): Promise<LeaveBalance>`, `getRemainingDays(id: string): Promise<number>`, `closeBalance(id: string): Promise<LeaveBalance>`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`deductDays` computes `daysRequested = (endDate - startDate) + 1` (inclusive calendar days, integer), then `newUsedDays = usedDays + daysRequested`, `newRemainingDays = totalEntitlement - newUsedDays`. If `newRemainingDays < 0`, it throws `ValidationError` with a message indicating insufficient balance. On success it persists the updated `usedDays` and `remainingDays` and returns the updated `LeaveBalance`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`restoreDays` subtracts the given `days` from `usedDays` and adds them back to `remainingDays`, then persists and returns the updated `LeaveBalance`. It does not allow `usedDays` to go below 0.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`getOrCreateBalance` delegates to `upsert` on the repository, defaulting `usedDays` to 0, `remainingDays` to `totalEntitlement`, and `status` to `'ACTIVE'` when creating a new balance.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`closeBalance` sets `status` to `'CLOSED'` on an existing balance. Throws `NotFoundError` if the balance does not exist.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`getBalance` and `getRemainingDays` throw `NotFoundError` when the balance does not exist.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The barrel export `src/modules/balance/index.ts` re-exports `LeaveBalance`, `CreateLeaveBalanceDto`, `UpdateLeaveBalanceDto`, `ILeaveBalanceRepository`, `LeaveBalanceRepository`, `ILeaveBalanceService`, and `LeaveBalanceService`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest tests at `tests/unit/modules/balance/balance.service.spec.ts` cover: balance creation via `getOrCreateBalance`, deduction with exact-boundary (remainingDays goes to 0), deduction with insufficient balance (throws `ValidationError`), restoration, fiscal-year scoping (two balances for same employee+policy but different fiscal years are distinct), and `closeBalance`.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access MUST go through the repository layer \u2014 the service must not execute SQL directly (GP-001).",
+    "The `deductDays` formula `daysRequested = (endDate - startDate) + 1` is BINDING \u2014 it must be used exactly as stated, with integer arithmetic, at every call site. No alternative day-counting logic is permitted."
+  ],
+  "outOfScope": [],
+  "ambiguities": [],
+  "entityInvariants": [],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [],
+  "integrationPoints": []
+}
