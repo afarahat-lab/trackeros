@@ -84,6 +84,64 @@ Audit records track all state-changing operations (GP-002).
 |--------|-----------|
 | record | `(params: { entityType, entityId, action, oldValues?, newValues?, performedBy, ipAddress?, userAgent? }) => Promise<AuditRecord>` |
 
+## employee (contracts built)
+
+Represents employee data managed by the `employee` module. Model, repository interface, and service interface are defined; implementation, controller, routes, and tests are pending.
+
+### Employee
+
+| Field | Type | Required |
+|-------|------|----------|
+| id | string | true |
+| employeeNumber | string | true |
+| firstName | string | true |
+| lastName | string | true |
+| email | string | true |
+| managerId | string \| null | false |
+| department | string | true |
+| hireDate | Date | true |
+| terminationDate | Date \| null | false |
+| employmentStatus | EmploymentStatus | true |
+| createdAt | Date | true |
+| updatedAt | Date | true |
+| deletedAt | Date \| null | false |
+
+### IEmployeeRepository
+
+| Method | Signature |
+|--------|-----------|
+| findById | `(id: string) => Promise<Employee \| null>` |
+| findByEmployeeNumber | `(employeeNumber: string) => Promise<Employee \| null>` |
+| findByEmail | `(email: string) => Promise<Employee \| null>` |
+| findByManagerId | `(managerId: string) => Promise<Employee[]>` |
+| findAll | `() => Promise<Employee[]>` |
+| create | `(employee: Employee) => Promise<Employee>` |
+| update | `(id: string, data: Partial<Employee>) => Promise<Employee \| null>` |
+| softDelete | `(id: string) => Promise<boolean>` |
+
+### IEmployeeService
+
+| Method | Signature |
+|--------|-----------|
+| getById | `(id: string) => Promise<Employee \| null>` |
+| getByEmployeeNumber | `(employeeNumber: string) => Promise<Employee \| null>` |
+| getSubordinates | `(managerId: string) => Promise<Employee[]>` |
+| create | `(data: CreateEmployeeDto) => Promise<Employee>` |
+| update | `(id: string, data: Partial<Employee>) => Promise<Employee \| null>` |
+| terminate | `(id: string) => Promise<Employee \| null>` |
+
+### CreateEmployeeDto
+
+| Field | Type | Required |
+|-------|------|----------|
+| employeeNumber | string | true |
+| firstName | string | true |
+| lastName | string | true |
+| email | string | true |
+| managerId | string \| null | false |
+| department | string | true |
+| hireDate | Date | true |
+
 ## leave (planned)
 
 Represents a leave record managed by the `leave` module, including leave requests and related leave-tracking data.
@@ -157,28 +215,6 @@ Represents leave balance data managed by the `leave-balance` module.
 **Relationships**
 - `Employee` — many-to-one
 - `LeavePolicy` — many-to-one
-
-## employee (planned)
-
-Represents employee data managed by the `employee` module.
-
-### Employee
-
-| Field | Type | Required |
-|-------|------|----------|
-| id | string | true |
-| employeeNumber | string | true |
-| firstName | string | true |
-| lastName | string | true |
-| email | string | true |
-| managerId | string \| null | false |
-| department | string | true |
-| hireDate | Date | true |
-| terminationDate | Date \| null | false |
-| employmentStatus | EmploymentStatus | true |
-| createdAt | Date | true |
-| updatedAt | Date | true |
-| deletedAt | Date \| null | false |
 
 ## policy (planned)
 

@@ -28,6 +28,11 @@ src/modules/audit/              — Audit module (Phase 1 ✓)
   audit.service.ts              — AuditService (DI: IAuditRepository)
   index.ts                      — Barrel export
 
+src/modules/employee/           — Employee module (Phase 2 — contracts only)
+  employee.model.ts             — Employee entity
+  employee.repository.interface.ts — IEmployeeRepository
+  employee.service.interface.ts — IEmployeeService + CreateEmployeeDto
+
 src/modules/status/             — System status (pre-existing)
   status.model.ts               — SystemStatus
   status.service.interface.ts   — IStatusService
@@ -108,10 +113,10 @@ tests/unit/modules/audit/       — AuditService unit tests
 ### Phases
 
 1. **Shared types & Audit** — ✅ Complete. Foundation enums and audit capability.
-2. **Employee** — Employee lookup and status checks.
-3. **Leave Policy** — Policy definitions.
-4. **Leave Balance** — Balance lifecycle (init, deduct, restore).
-5. **Leave Request** — Core workflow: submit, approve, reject, cancel.
+2. **Employee** — 🔶 Contracts built (model, repository interface, service interface). Implementation, controller, routes, barrel export, and tests still pending.
+3. **Leave Policy** — Planned.
+4. **Leave Balance** — Planned.
+5. **Leave Request** — Planned.
 
 ### Cross-cutting Contracts
 
