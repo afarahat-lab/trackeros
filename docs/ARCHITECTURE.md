@@ -20,6 +20,7 @@ src/modules/status/           — SystemStatus model + service (health-check)
 src/modules/uptime/           — UptimeStatus model + routes + service
 src/modules/employee/         — Employee model, repository, service
 src/modules/leave-policy/     — LeavePolicy model, repository, service
+src/modules/balance/          — LeaveBalance model, repository, service
 src/shared/db/connection.ts   — pg Pool (DATABASE_URL)
 src/shared/types/             — shared enums: LeaveStatus, LeaveType,
                                  LeaveAction, NotificationType,
@@ -44,12 +45,20 @@ src/shared/error-types.ts     — NotFoundError, ValidationError,
 - **leave-policy.service.ts** — `ILeavePolicyService` with `getById`, `getByLeaveType` (both throw `NotFoundError` when not found), `getActivePolicies`, `isLeaveTypeActive` (returns false for nonexistent policy — never throws). `LeavePolicyService` delegates to `ILeavePolicyRepository`.
 - **index.ts** — barrel re-export of model, repository interfaces/classes, service interfaces/classes.
 
+### Balance module (`src/modules/balance/`)
+
+- **balance.model.ts** — `LeaveBalance` entity interface: id, employeeId, leavePolicyId, totalEntitlement, usedDays, remainingDays, fiscalYear, status ('ACTIVE' | 'CLOSED'), createdAt, updatedAt. Also exports `CreateLeaveBalanceDto` (employeeId, leavePolicyId, totalEntitlement, fiscalYear) and `UpdateLeaveBalanceDto` (partial of usedDays, remainingDays, status).
+- **balance.repository.ts** — `ILeaveBalanceRepository` extends `IBaseRepository<LeaveBalance>` with `findByEmployeeId`, `findByEmployeeAndPolicy`, `findByEmployeeAndFiscalYear`, `findActiveByEmployee`, `upsert`. `LeaveBalanceRepository` extends `BaseRepository<LeaveBalance>`, table `leave_balances`. The `upsert` method uses `ON CONFLICT (employee_id, leave_policy_id, fiscal_year)` for idempotent balance creation.
+- **balance.service.ts** — `ILeaveBalanceService` with `getBalance`, `getOrCreateBalance`, `deductDays`, `restoreDays`, `getRemainingDays`, `closeBalance`. `LeaveBalanceService` delegates to `ILeaveBalanceRepository`. Key rules: `deductDays` computes `daysRequested = (endDate - startDate) + 1` (inclusive calendar days, integer), throws `ValidationError` on insufficient balance or closed balance. `restoreDays` floors `usedDays` at 0. `getBalance` throws `NotFoundError` when balance not found or fiscal year mismatch.
+- **index.ts** — barrel re-export of model, repository interfaces/classes, service interfaces/classes.
+
 ## Key patterns
 
 - See `AGENTS.md` for stack-specific coding conventions
 - See `docs/GOLDEN_PRINCIPLES.md` for the non-negotiable rules every
   cycle is checked against
 - Service methods follow a "throw on not found" pattern: `getById`, `getByEmployeeNumber`, `getByEmail`, `getByLeaveType` all throw `NotFoundError` rather than returning `null`. Existence-check methods (`isActive`, `isLeaveTypeActive`) diverge: `isActive` throws for nonexistent employees; `isLeaveTypeActive` returns `false` for nonexistent policies.
+- Balance service `getBalance` throws `NotFoundError` on fiscal year mismatch — balances are strictly scoped to a single fiscal year.
 
 ## Dependency rules
 
@@ -100,15 +109,15 @@ The leave management module enables employees to apply for annual, sick, emergen
 - `shared/types` — Enums (LeaveStatus, LeaveType, EmploymentStatus, AuditAction, NotificationType, LeaveAction)
 - `employee` — Employee entity, repository, service
 - `leave-policy` — LeavePolicy entity, repository, service
-- `leave-request` — LeaveRequest aggregate, repository, service, controller, routes
-- `balance` — LeaveBalance entity, repository, service, controller, routes
-- `audit` — AuditRecord entity, repository, service
-- `notification` — Notification entity, repository, service
+- `balance` — LeaveBalance entity, repository, service (model + repository + service built; controller + routes planned for Phase 5)
+- `leave-request` — LeaveRequest aggregate, repository, service, controller, routes (planned)
+- `audit` — AuditRecord entity, repository, service (planned)
+- `notification` — Notification entity, repository, service (planned)
 
 ### Dependency Map
 
 ```
-shared/types ← employee, leave-policy, leave-request, balance, audit, notification
+shared/types ← employee, leave-policy, balance, leave-request, audit, notification
 leave-request → employee, leave-policy, balance, audit, notification
 ```
 
@@ -123,13 +132,15 @@ Repository methods for multi-step writes accept optional `PoolClient`. Service a
 **Error Response Contract**  
 `{ error: string, code: string, statusCode: number }`. 400 validation, 401 unauthenticated, 403 forbidden, 404 not found, 409 conflict (overlap), 422 domain rule violation.
 
-### Recommended Implementation Phases
+### Implementation Status (by Phase)
 
-1. Foundation & Shared Types — DB connection, migrations, enums.
-2. Employee & LeavePolicy Modules — Reference data with basic CRUD.
-3. LeaveBalance Module — Balance initialization and queries.
-4. LeaveRequest Core Workflow — Full lifecycle with business rules, balance integration, audit, notifications.
-5. Integration, Testing & Polish — E2E tests, performance, docs.
+| Phase | Module | Status |
+|-------|--------|--------|
+| 1 | Shared types, base repository, error types | ✅ Built |
+| 2 | Employee, LeavePolicy | ✅ Built |
+| 3 | LeaveBalance (model, repository, service) | ✅ Built |
+| 4 | LeaveRequest (full workflow) | Planned |
+| 5 | Audit, Notification, routes, integration tests | Planned |
 
 ### Open Questions
 

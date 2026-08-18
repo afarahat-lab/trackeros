@@ -76,26 +76,7 @@ Represents a leave record managed by the `leave` module, including leave request
 
 ## balance
 
-Represents leave balance data managed by the `balance` module, including tracked entitlement, accrual, and remaining leave amounts.
-
-### Balance
-
-| Field | Type | Required |
-|-------|------|----------|
-| id | string | true |
-| employeeId | string | true |
-| policyId | string | true |
-| totalEntitlement | number | true |
-| usedDays | number | true |
-| remainingDays | number | true |
-| fiscalYear | number | true |
-| status | string | true |
-| createdAt | Date | true |
-| updatedAt | Date | true |
-
-**Relationships**
-- `Employee` — many-to-one
-- `LeavePolicy` — many-to-one
+Represents leave balance data managed by the `balance` module, tracking entitlement, used, and remaining days per employee per policy per fiscal year.
 
 ### LeaveBalance
 
@@ -103,18 +84,38 @@ Represents leave balance data managed by the `balance` module, including tracked
 |-------|------|----------|
 | id | string | true |
 | employeeId | string | true |
-| policyId | string | true |
+| leavePolicyId | string | true |
 | totalEntitlement | number | true |
 | usedDays | number | true |
 | remainingDays | number | true |
 | fiscalYear | number | true |
-| status | string | true |
+| status | 'ACTIVE' \| 'CLOSED' | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
 **Relationships**
-- `Employee` — many-to-one
-- `LeavePolicy` — many-to-one
+- `Employee` — many-to-one (via employeeId)
+- `LeavePolicy` — many-to-one (via leavePolicyId)
+
+**Constraints**
+- Unique constraint on `(employee_id, leave_policy_id, fiscal_year)` — one balance per employee per policy per fiscal year
+
+### CreateLeaveBalanceDto
+
+| Field | Type | Required |
+|-------|------|----------|
+| employeeId | string | true |
+| leavePolicyId | string | true |
+| totalEntitlement | number | true |
+| fiscalYear | number | true |
+
+### UpdateLeaveBalanceDto
+
+| Field | Type | Required |
+|-------|------|----------|
+| usedDays | number | false |
+| remainingDays | number | false |
+| status | 'ACTIVE' \| 'CLOSED' | false |
 
 ## employee
 
