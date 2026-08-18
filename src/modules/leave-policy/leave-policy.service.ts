@@ -1,11 +1,10 @@
 import { LeavePolicy } from './leave-policy.model';
 import { ILeavePolicyRepository } from './leave-policy.repository';
 import { LeaveType } from 'shared/types';
-import { NotFoundError } from 'shared/error-types';
 
 export interface ILeavePolicyService {
-  getById(id: string): Promise<LeavePolicy>;
-  getByLeaveType(leaveType: LeaveType): Promise<LeavePolicy>;
+  getById(id: string): Promise<LeavePolicy | null>;
+  getByLeaveType(leaveType: LeaveType): Promise<LeavePolicy | null>;
   getActivePolicies(): Promise<LeavePolicy[]>;
   isLeaveTypeActive(leaveType: LeaveType): Promise<boolean>;
 }
@@ -13,20 +12,14 @@ export interface ILeavePolicyService {
 export class LeavePolicyService implements ILeavePolicyService {
   constructor(private readonly leavePolicyRepository: ILeavePolicyRepository) {}
 
-  async getById(id: string): Promise<LeavePolicy> {
+  async getById(id: string): Promise<LeavePolicy | null> {
     const policy = await this.leavePolicyRepository.findById(id);
-    if (!policy) {
-      throw new NotFoundError(`LeavePolicy with id ${id} not found`);
-    }
-    return policy;
+    return policy ?? null;
   }
 
-  async getByLeaveType(leaveType: LeaveType): Promise<LeavePolicy> {
+  async getByLeaveType(leaveType: LeaveType): Promise<LeavePolicy | null> {
     const policy = await this.leavePolicyRepository.findByLeaveType(leaveType);
-    if (!policy) {
-      throw new NotFoundError(`LeavePolicy for leave type ${leaveType} not found`);
-    }
-    return policy;
+    return policy ?? null;
   }
 
   async getActivePolicies(): Promise<LeavePolicy[]> {

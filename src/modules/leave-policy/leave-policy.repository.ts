@@ -14,7 +14,7 @@ export class LeavePolicyRepository extends BaseRepository<LeavePolicy> implement
   async findByLeaveType(leaveType: LeaveType, client?: PoolClient): Promise<LeavePolicy | null> {
     const executor = client ?? this.pool;
     const result = await executor.query(
-      `SELECT * FROM ${this.tableName} WHERE leave_type = $1`,
+      `SELECT * FROM ${this.tableName} WHERE leave_type = $1 AND is_active = true`,
       [leaveType],
     );
     return result.rows[0] ?? null;

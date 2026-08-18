@@ -1,7 +1,6 @@
 import { LeavePolicyService, ILeavePolicyService } from 'modules/leave-policy';
 import { ILeavePolicyRepository } from 'modules/leave-policy';
 import { LeavePolicy } from 'modules/leave-policy';
-import { NotFoundError } from 'shared/error-types';
 import { LeaveType } from 'shared/types';
 
 function createMockLeavePolicy(overrides: Partial<LeavePolicy> = {}): LeavePolicy {
@@ -49,13 +48,11 @@ describe('LeavePolicyService', () => {
       expect(mockRepository.findById).toHaveBeenCalledWith('lp-1');
     });
 
-    it('should throw NotFoundError when policy not found', async () => {
+    it('should return null when policy not found', async () => {
       mockRepository.findById.mockResolvedValue(null);
 
-      await expect(leavePolicyService.getById('nonexistent')).rejects.toThrow(NotFoundError);
-      await expect(leavePolicyService.getById('nonexistent')).rejects.toThrow(
-        'LeavePolicy with id nonexistent not found',
-      );
+      const result = await leavePolicyService.getById('nonexistent');
+      expect(result).toBeNull();
     });
   });
 
@@ -69,13 +66,11 @@ describe('LeavePolicyService', () => {
       expect(mockRepository.findByLeaveType).toHaveBeenCalledWith(LeaveType.SICK);
     });
 
-    it('should throw NotFoundError when policy not found', async () => {
+    it('should return null when policy not found', async () => {
       mockRepository.findByLeaveType.mockResolvedValue(null);
 
-      await expect(leavePolicyService.getByLeaveType(LeaveType.UNPAID)).rejects.toThrow(NotFoundError);
-      await expect(leavePolicyService.getByLeaveType(LeaveType.UNPAID)).rejects.toThrow(
-        'LeavePolicy for leave type unpaid not found',
-      );
+      const result = await leavePolicyService.getByLeaveType(LeaveType.UNPAID);
+      expect(result).toBeNull();
     });
   });
 

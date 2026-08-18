@@ -34,14 +34,14 @@ src/shared/error-types.ts     — NotFoundError, ValidationError,
 
 - **employee.model.ts** — `Employee` entity interface: id, employeeNumber, firstName, lastName, email, managerId (string | null), department (string | null), hireDate, terminationDate (Date | null), employmentStatus (EmploymentStatus), createdAt, updatedAt, deletedAt (Date | null).
 - **employee.repository.ts** — `IEmployeeRepository` extends `IBaseRepository<Employee>` with `findByEmployeeNumber`, `findByEmail`, `findByManagerId`, `findActive`. `EmployeeRepository` extends `BaseRepository<Employee>`, table `employees`. All queries filter `deleted_at IS NULL`.
-- **employee.service.ts** — `IEmployeeService` with `getById`, `getByEmployeeNumber`, `getByEmail` (all throw `NotFoundError` when not found), `getSubordinates`, `isActive` (throws `NotFoundError` for nonexistent employee; returns boolean for existing). `EmployeeService` delegates to `IEmployeeRepository`.
+- **employee.service.ts** — `IEmployeeService` with `getById`, `getByEmployeeNumber`, `getByEmail` (all return `Employee | null`), `getSubordinates` (returns only ACTIVE employees), `isActive` (returns `false` for nonexistent employee; returns boolean for existing). `EmployeeService` delegates to `IEmployeeRepository`.
 - **index.ts** — barrel re-export of model, repository interfaces/classes, service interfaces/classes.
 
 ### LeavePolicy module (`src/modules/leave-policy/`)
 
 - **leave-policy.model.ts** — `LeavePolicy` entity interface: id, policyName, leaveType (LeaveType), entitlementDays, accrualRate (number | null), maxAccumulation (number | null), minimumNoticeDays (number | null), requiresManagerApproval, isActive, createdAt, updatedAt.
 - **leave-policy.repository.ts** — `ILeavePolicyRepository` extends `IBaseRepository<LeavePolicy>` with `findByLeaveType`, `findActive`. `LeavePolicyRepository` extends `BaseRepository<LeavePolicy>`, table `leave_policies`.
-- **leave-policy.service.ts** — `ILeavePolicyService` with `getById`, `getByLeaveType` (both throw `NotFoundError` when not found), `getActivePolicies`, `isLeaveTypeActive` (returns false for nonexistent policy — never throws). `LeavePolicyService` delegates to `ILeavePolicyRepository`.
+- **leave-policy.service.ts** — `ILeavePolicyService` with `getById`, `getByLeaveType` (both return `LeavePolicy | null`), `getActivePolicies`, `isLeaveTypeActive` (returns false for nonexistent policy — never throws). `LeavePolicyService` delegates to `ILeavePolicyRepository`.
 - **index.ts** — barrel re-export of model, repository interfaces/classes, service interfaces/classes.
 
 ## Key patterns
@@ -49,7 +49,7 @@ src/shared/error-types.ts     — NotFoundError, ValidationError,
 - See `AGENTS.md` for stack-specific coding conventions
 - See `docs/GOLDEN_PRINCIPLES.md` for the non-negotiable rules every
   cycle is checked against
-- Service methods follow a "throw on not found" pattern: `getById`, `getByEmployeeNumber`, `getByEmail`, `getByLeaveType` all throw `NotFoundError` rather than returning `null`. Existence-check methods (`isActive`, `isLeaveTypeActive`) diverge: `isActive` throws for nonexistent employees; `isLeaveTypeActive` returns `false` for nonexistent policies.
+- Service methods follow a "return null on not found" pattern: `getById`, `getByEmployeeNumber`, `getByEmail`, `getByLeaveType` all return `null` rather than throwing. Existence-check methods (`isActive`, `isLeaveTypeActive`) both return `false` for nonexistent entities — never throw.
 
 ## Dependency rules
 

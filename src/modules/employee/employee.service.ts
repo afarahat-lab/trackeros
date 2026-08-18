@@ -1,11 +1,11 @@
 import { Employee } from './employee.model';
 import { IEmployeeRepository } from './employee.repository';
-import { NotFoundError } from 'shared/error-types';
+import { EmploymentStatus } from 'shared/types';
 
 export interface IEmployeeService {
-  getById(id: string): Promise<Employee>;
-  getByEmployeeNumber(employeeNumber: string): Promise<Employee>;
-  getByEmail(email: string): Promise<Employee>;
+  getById(id: string): Promise<Employee | null>;
+  getByEmployeeNumber(employeeNumber: string): Promise<Employee | null>;
+  getByEmail(email: string): Promise<Employee | null>;
   getSubordinates(managerId: string): Promise<Employee[]>;
   isActive(id: string): Promise<boolean>;
 }
@@ -13,39 +13,31 @@ export interface IEmployeeService {
 export class EmployeeService implements IEmployeeService {
   constructor(private readonly employeeRepository: IEmployeeRepository) {}
 
-  async getById(id: string): Promise<Employee> {
+  async getById(id: string): Promise<Employee | null> {
     const employee = await this.employeeRepository.findById(id);
-    if (!employee) {
-      throw new NotFoundError(`Employee with id ${id} not found`);
-    }
-    return employee;
+    return employee ?? null;
   }
 
-  async getByEmployeeNumber(employeeNumber: string): Promise<Employee> {
+  async getByEmployeeNumber(employeeNumber: string): Promise<Employee | null> {
     const employee = await this.employeeRepository.findByEmployeeNumber(employeeNumber);
-    if (!employee) {
-      throw new NotFoundError(`Employee with employee number ${employeeNumber} not found`);
-    }
-    return employee;
+    return employee ?? null;
   }
 
-  async getByEmail(email: string): Promise<Employee> {
+  async getByEmail(email: string): Promise<Employee | null> {
     const employee = await this.employeeRepository.findByEmail(email);
-    if (!employee) {
-      throw new NotFoundError(`Employee with email ${email} not found`);
-    }
-    return employee;
+    return employee ?? null;
   }
 
   async getSubordinates(managerId: string): Promise<Employee[]> {
-    return this.employeeRepository.findByManagerId(managerId);
+    const employees = await this.employeeRepository.findByManagerId(managerId);
+    return employees.filter(e => e.employmentStatus === EmploymentStatus.ACTIVE);
   }
 
   async isActive(id: string): Promise<boolean> {
     const employee = await this.employeeRepository.findById(id);
     if (!employee) {
-      throw new NotFoundError(`Employee with id ${id} not found`);
+      return false;
     }
-    return employee.employmentStatus === 'ACTIVE';
+    return employee.employmentStatus === EmploymentStatus.ACTIVE;
   }
 }

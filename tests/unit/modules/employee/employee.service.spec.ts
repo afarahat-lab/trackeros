@@ -1,7 +1,6 @@
 import { EmployeeService, IEmployeeService } from 'modules/employee';
 import { IEmployeeRepository } from 'modules/employee';
 import { Employee } from 'modules/employee';
-import { NotFoundError } from 'shared/error-types';
 import { EmploymentStatus } from 'shared/types';
 
 function createMockEmployee(overrides: Partial<Employee> = {}): Employee {
@@ -53,13 +52,11 @@ describe('EmployeeService', () => {
       expect(mockRepository.findById).toHaveBeenCalledWith('emp-1');
     });
 
-    it('should throw NotFoundError when employee not found', async () => {
+    it('should return null when employee not found', async () => {
       mockRepository.findById.mockResolvedValue(null);
 
-      await expect(employeeService.getById('nonexistent')).rejects.toThrow(NotFoundError);
-      await expect(employeeService.getById('nonexistent')).rejects.toThrow(
-        'Employee with id nonexistent not found',
-      );
+      const result = await employeeService.getById('nonexistent');
+      expect(result).toBeNull();
     });
   });
 
@@ -73,10 +70,11 @@ describe('EmployeeService', () => {
       expect(mockRepository.findByEmployeeNumber).toHaveBeenCalledWith('EMP001');
     });
 
-    it('should throw NotFoundError when employee not found', async () => {
+    it('should return null when employee not found', async () => {
       mockRepository.findByEmployeeNumber.mockResolvedValue(null);
 
-      await expect(employeeService.getByEmployeeNumber('NONEXISTENT')).rejects.toThrow(NotFoundError);
+      const result = await employeeService.getByEmployeeNumber('NONEXISTENT');
+      expect(result).toBeNull();
     });
   });
 
@@ -90,23 +88,26 @@ describe('EmployeeService', () => {
       expect(mockRepository.findByEmail).toHaveBeenCalledWith('john.doe@example.com');
     });
 
-    it('should throw NotFoundError when employee not found', async () => {
+    it('should return null when employee not found', async () => {
       mockRepository.findByEmail.mockResolvedValue(null);
 
-      await expect(employeeService.getByEmail('unknown@example.com')).rejects.toThrow(NotFoundError);
+      const result = await employeeService.getByEmail('unknown@example.com');
+      expect(result).toBeNull();
     });
   });
 
   describe('getSubordinates', () => {
-    it('should return list of employees for a manager', async () => {
+    it('should return only ACTIVE employees for a manager', async () => {
       const subordinates = [
-        createMockEmployee({ id: 'emp-2', employeeNumber: 'EMP002', email: 'jane@example.com' }),
-        createMockEmployee({ id: 'emp-3', employeeNumber: 'EMP003', email: 'bob@example.com' }),
+        createMockEmployee({ id: 'emp-2', employeeNumber: 'EMP002', email: 'jane@example.com', employmentStatus: EmploymentStatus.ACTIVE }),
+        createMockEmployee({ id: 'emp-3', employeeNumber: 'EMP003', email: 'bob@example.com', employmentStatus: EmploymentStatus.INACTIVE }),
+        createMockEmployee({ id: 'emp-4', employeeNumber: 'EMP004', email: 'alice@example.com', employmentStatus: EmploymentStatus.ACTIVE }),
       ];
       mockRepository.findByManagerId.mockResolvedValue(subordinates);
 
       const result = await employeeService.getSubordinates('mgr-1');
-      expect(result).toEqual(subordinates);
+      expect(result).toHaveLength(2);
+      expect(result).toEqual([subordinates[0], subordinates[2]]);
       expect(mockRepository.findByManagerId).toHaveBeenCalledWith('mgr-1');
     });
 
@@ -143,10 +144,11 @@ describe('EmployeeService', () => {
       expect(result).toBe(false);
     });
 
-    it('should throw NotFoundError when employee not found', async () => {
+    it('should return false when employee not found', async () => {
       mockRepository.findById.mockResolvedValue(null);
 
-      await expect(employeeService.isActive('nonexistent')).rejects.toThrow(NotFoundError);
+      const result = await employeeService.isActive('nonexistent');
+      expect(result).toBe(false);
     });
   });
 });
