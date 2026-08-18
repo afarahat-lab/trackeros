@@ -169,7 +169,7 @@ Controller handlers catch known domain errors and return `{ error: string, code:
 | 1 | Shared types, base repository, error types | ✅ Built |
 | 2 | Employee, LeavePolicy | ✅ Built |
 | 3 | LeaveBalance (model, repository, service) | ✅ Built |
-| 4 | LeaveRequest (model, repository, service, controller, routes) | ✅ Built (routes not yet registered in app.ts; no unit tests) |
+| 4 | LeaveRequest (model, repository, service, controller, routes) | ✅ Built (routes not yet registered in app.ts; unit tests at `tests/unit/modules/leave-request/leave-request.service.spec.ts`) |
 | 5 | Audit, Notification, routes, integration tests | Planned |
 
 ### Open Questions
