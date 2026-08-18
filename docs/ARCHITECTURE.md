@@ -16,22 +16,16 @@ The architecture is modular, with a clear separation of concerns between models,
 ## Module structure
 
 ```
-src/modules/leave/leave.{model,repository,service,controller,routes}.ts
-src/modules/balance/balance.{model,repository,service,controller,routes}.ts
-src/modules/employee/employee.{model,repository,service,controller,routes}.ts
-src/modules/policy/policy.{model,repository,service,controller,routes}.ts
-src/modules/notification/notification.{model,repository,service,controller,routes}.ts
-src/modules/LeaveStatus/    — LeaveStatus module
-src/modules/BaseEntity/    — BaseEntity module
-src/modules/LeaveRequest/    — LeaveRequest module
-src/modules/LeaveType/    — LeaveType module
-src/modules/LeavePolicy/    — LeavePolicy module
-src/modules/AuditLog/    — AuditLog module
-src/modules/AuditRecord/    — AuditRecord module
-src/modules/AuditServiceInterface/    — AuditServiceInterface module
-src/shared/db connection.ts
-src/shared/base repository.ts
-src/shared/error types.ts
+src/modules/status/           — SystemStatus model + service (health-check)
+src/modules/uptime/           — UptimeStatus model + routes + service
+src/shared/db/connection.ts   — pg Pool (DATABASE_URL)
+src/shared/types/             — shared enums: LeaveStatus, LeaveType,
+                                 LeaveAction, NotificationType,
+                                 EmploymentStatus, AuditAction
+src/shared/base-repository.ts — generic IBaseRepository<T> interface +
+                                 abstract BaseRepository<T> class
+src/shared/error-types.ts     — NotFoundError, ValidationError,
+                                 ConflictError, UnauthorizedError
 ```
 
 ## Key patterns
