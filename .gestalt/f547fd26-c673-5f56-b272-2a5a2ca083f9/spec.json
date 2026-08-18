@@ -1,0 +1,109 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "employee"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository-interface",
+      "service-interface"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The `Employee` interface is defined in `src/modules/employee/employee.model.ts` with exactly these fields: `id: string`, `employeeNumber: string`, `firstName: string`, `lastName: string`, `email: string`, `managerId: string | null`, `department: string`, `hireDate: Date`, `terminationDate: Date | null`, `employmentStatus: EmploymentStatus`, `createdAt: Date`, `updatedAt: Date`, `deletedAt: Date | null` \u2014 matching the reconciled architecture entity shape in `.gestalt/architecture/reconciled.json`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `IEmployeeRepository` interface is defined in `src/modules/employee/employee.repository.interface.ts` with all eight methods: `findById`, `findByEmployeeNumber`, `findByEmail`, `findByManagerId`, `findAll`, `create`, `update`, `softDelete` \u2014 each with the exact signatures specified in PLAN.md Phase 2.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `IEmployeeService` interface is defined in `src/modules/employee/employee.service.interface.ts` with all six methods: `getById`, `getByEmployeeNumber`, `getSubordinates`, `create`, `update`, `terminate` \u2014 each with the exact signatures specified in PLAN.md Phase 2.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `CreateEmployeeDto` interface is defined and exported from `src/modules/employee/employee.service.interface.ts` with fields: `employeeNumber: string`, `firstName: string`, `lastName: string`, `email: string`, `managerId?: string | null`, `department: string`, `hireDate: Date` \u2014 excluding `id`, `employmentStatus`, `createdAt`, `updatedAt`, `deletedAt`, and `terminationDate` which are set by the service.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All three files compile without errors under the project's TypeScript configuration (`strict: true`, `module: commonjs`, `target: ES2022`). The `EmploymentStatus` import in `employee.model.ts` resolves correctly from `../../shared/types` (or `../../shared/types/index`).",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All three files are type-level artifacts only \u2014 no runtime logic, no class implementations, no function bodies beyond interface declarations. The `Employee` model must be an interface (not a class), following the convention established by `AuditRecord` in `src/modules/audit/audit.model.ts`.",
+    "Imports must use relative paths within the module (`./employee.model`) and relative paths to shared types (`../../shared/types` or `../../shared/types/index`). No barrel-file re-export is produced in this sub-phase \u2014 `index.ts` belongs to sibling sub-phase 2.2.",
+    "The `Employee` interface must NOT extend `BaseEntity` \u2014 the audit module's `AuditRecord` does not extend it either, and the reconciled architecture lists Employee's fields explicitly including `id`, `createdAt`, `updatedAt` directly rather than via inheritance."
+  ],
+  "outOfScope": [
+    "Employee service implementation (`employee.service.ts`) \u2014 produced in sibling sub-phase 2.2.",
+    "Employee controller, routes, and barrel export (`employee.controller.ts`, `employee.routes.ts`, `index.ts`) \u2014 produced in sibling sub-phase 2.2.",
+    "Employee service unit tests (`tests/unit/modules/employee/employee.service.test.ts`) \u2014 produced in sibling sub-phase 2.3."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "Every Employee has a unique `employeeNumber` and a unique `email` \u2014 enforced at the database level (unique indexes per the reconciled SQL schema) and reflected in the repository's `findByEmployeeNumber` / `findByEmail` lookup methods."
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "`employmentStatus` must be one of the `EmploymentStatus` enum values: ACTIVE, INACTIVE, or TERMINATED. Only ACTIVE employees are eligible for leave operations (enforced by downstream modules)."
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "`managerId` is nullable \u2014 a null value indicates the employee has no manager (e.g., top-level executives). When non-null, it must reference a valid Employee `id`. The `deletedAt` field supports soft-delete: null means active record, a Date value means logically deleted."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IEmployeeRepository.findById",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns `null` when no employee matches the given id \u2014 never throws for a missing record."
+    },
+    {
+      "operation": "IEmployeeRepository.softDelete",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns `boolean` \u2014 `true` if a row was updated (employee existed and was not already deleted), `false` if no matching active employee was found."
+    },
+    {
+      "operation": "IEmployeeService.terminate",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns `Employee | null` \u2014 the updated employee with `employmentStatus` set to TERMINATED and `terminationDate` set to the current timestamp, or `null` if the employee was not found or was already terminated."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The `Employee` interface shape must match the authoritative entity definition in `.gestalt/architecture/reconciled.json` \u2014 same field names, types, and nullability. No extra fields, no missing fields.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "The `EmploymentStatus` enum must be imported from `src/shared/types/index.ts` (Phase 1 artifact) \u2014 do not redefine or duplicate the enum. The import path must resolve correctly from `src/modules/employee/`.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The interface-file conventions (model as interface, repository interface importing model with `./<name>.model`, service interface importing model with `./<name>.model`) must follow the pattern established by the audit module in `src/modules/audit/`.",
+      "referencePath": "src/modules/audit/audit.model.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts",
+      "why": "The `Employee` model imports `EmploymentStatus` enum from shared types. This is the employee module's sole dependency at this sub-phase."
+    }
+  ]
+}
