@@ -84,9 +84,9 @@ Audit records track all state-changing operations (GP-002).
 |--------|-----------|
 | record | `(params: { entityType, entityId, action, oldValues?, newValues?, performedBy, ipAddress?, userAgent? }) => Promise<AuditRecord>` |
 
-## employee (contracts built)
+## employee (implementation complete; tests pending)
 
-Represents employee data managed by the `employee` module. Model, repository interface, and service interface are defined; implementation, controller, routes, and tests are pending.
+Represents employee data managed by the `employee` module. Model, repository interface, service interface, service implementation, controller, and routes are complete. Unit tests are pending.
 
 ### Employee
 
@@ -141,6 +141,27 @@ Represents employee data managed by the `employee` module. Model, repository int
 | managerId | string \| null | false |
 | department | string | true |
 | hireDate | Date | true |
+
+### EmployeeService
+
+Constructor-injected `IEmployeeRepository`. Key behaviours:
+- `create()`: generates UUID, sets `employmentStatus=ACTIVE`, `terminationDate=null`, `deletedAt=null`.
+- `update()`: field-level allowlist — only `firstName`, `lastName`, `email`, `managerId`, `department`, `hireDate` are writable.
+- `terminate()`: fetches employee first (returns null if not found), then sets `employmentStatus=TERMINATED` and `terminationDate=now`.
+
+### EmployeeController
+
+Factory function `makeEmployeeController(service: IEmployeeService)` returning an object of Fastify handler functions. Each handler extracts params/body from the request, delegates to the service, and returns appropriate status codes (200, 201, 404).
+
+### EmployeeRoutes
+
+`employeeRoutes(fastify, repo)` — accepts `FastifyInstance` + `IEmployeeRepository`, constructs service and controller inline, registers six endpoints under `/employees`:
+- `GET /employees/:id`
+- `GET /employees/number/:employeeNumber`
+- `GET /employees/:managerId/subordinates`
+- `POST /employees`
+- `PUT /employees/:id`
+- `POST /employees/:id/terminate`
 
 ## leave (planned)
 
