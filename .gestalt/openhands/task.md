@@ -59,6 +59,16 @@ The entities below are shared, cross-module DATA CONTRACTS. Implement each one w
     - updatedAt: Date
     - deletedAt: Date | null
 
+## Constraints & consistency
+You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
+### Entity invariants — enforce these
+- Reuse or extend `Employee`: Every Employee has a unique employeeNumber and a unique email. Soft-delete via deletedAt — repository queries filter `deleted_at IS NULL` so soft-deleted employees are invisible to all lookup methods.
+- Reuse or extend `Employee`: employmentStatus must be one of ACTIVE, INACTIVE, or TERMINATED (EmploymentStatus enum). Only ACTIVE employees are returned by findActive.
+- Reuse or extend `LeavePolicy`: leaveType must be one of the LeaveType enum values (annual, sick, emergency, unpaid, maternity, paternity). Each LeaveType has at most one active LeavePolicy at any time — enforced by the (leave_type, is_active) unique constraint in the database.
+- Reuse or extend `LeavePolicy`: entitlementDays is a positive integer (whole days only per BINDING rule). accrualRate, maxAccumulation, and minimumNoticeDays are nullable — null means "not applicable" (e.g., no accrual cap, no notice requirement).
+### Interface contract — expose these operations (their shape is yours)
+- IEmployeeService.getById — Throws NotFoundError when no employee exists with the given id. Never returns null.
+
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
 - Use unknown with type guards instead of any (rule: `no-any`)
