@@ -1,35 +1,53 @@
-# Implement this phase: Sub-phase 4a: LeaveRequest Model &amp; Repository
+# Implement this phase: Sub-phase 4b: LeaveRequest Service, Controller &amp; Routes
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/d8fc2ea6-3dd4-4741-b0ac-513d3ac0f17f/4`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/d8fc2ea6-3dd4-4741-b0ac-513d3ac0f17f/5`. Do not clone anything; work only in this directory.
 
 ## What to build
-leave-request.model.ts exports LeaveRequest interface with all 14 fields typed correctly
-leave-request.model.ts exports CreateLeaveRequestDto, UpdateLeaveRequestDto, and LeaveRequestQueryParams
-leave-request.repository.ts exports ILeaveRequestRepository extending IBaseRepository with findByEmployeeId, findByStatus, findOverlapping, findByDateRange, findPendingForManager
-leave-request.repository.ts exports LeaveRequestRepository class implementing all interface methods
-findOverlapping uses the inclusive-day formula: existing.startDate <= newEndDate AND existing.endDate >= newStartDate
-index.ts barrel export re-exports all public symbols from model and repository
+leave-request.service.ts exports ILeaveRequestService with create, submit, approve, reject, cancel, update, getById, query, getEmployeeRequests
+LeaveRequestService.submit validates employee ACTIVE status, policy active status, minimumNoticeDays (skipped for emergency), overlapping requests, and sufficient balance
+LeaveRequestService.approve deducts days via ILeaveBalanceService.deductDays using inclusive formula (endDate - startDate + 1)
+LeaveRequestService.reject performs no balance change, only status transition
+LeaveRequestService.cancel from APPROVED restores days via ILeaveBalanceService.addDays; cancel from SUBMITTED only changes status
+Fiscal year = calendar year of startDate; cross-year requests charged entirely to startDate fiscal year
+Throws ValidationError, NotFoundError, ConflictError appropriately
+leave-request.controller.ts has handler methods for all 8 endpoints with Zod validation
+leave-request.routes.ts registers all 8 routes on a Fastify plugin
+index.ts barrel export updated to include service, controller, and routes exports
 
 ## Success criteria
-Create the LeaveRequest domain foundation — entity interface, DTOs, repository interface, and repository implementation.
+Build the LeaveRequest service with all business rules, the Fastify controller, and route registration.
 
 Files to create (3):
 
-- `src/modules/leave-request/leave-request.model.ts` — LeaveRequest entity interface with exact fields: id (string), employeeId (string), leavePolicyId (string), startDate (Date), endDate (Date), reason (string | undefined), status (LeaveStatus), approvedBy (string | null), approvedAt (Date | null), cancelledBy (string | null), cancelledAt (Date | null), createdAt (Date), updatedAt (Date). Also define and export:
-  * CreateLeaveRequestDto: { employeeId, leavePolicyId, startDate, endDate, reason? }
-  * UpdateLeaveRequestDto: Partial of { startDate, endDate, reason, status }
-  * LeaveRequestQueryParams: { employeeId?, status?, leavePolicyId?, startDate?, endDate? }
-  Import LeaveStatus from `../../shared/types/leave-status.enum`.
+- `src/modules/leave-request/leave-request.service.ts` — ILeaveRequestService interface with methods: create(dto: CreateLeaveRequestDto), submit(id: string), approve(id: string, approverId: string), reject(id: string, approverId: string), cancel(id: string, cancelledBy: string), update(id: string, dto: UpdateLeaveRequestDto), getById(id: string), query(params: LeaveRequestQueryParams), getEmployeeRequests(employeeId: string). LeaveRequestService class implementing it. BINDING business rules to enforce:
+  * On SUBMIT: validate employee is ACTIVE (via IEmployeeService.getById), validate policy is active (via ILeavePolicyService.getById), check minimumNoticeDays (skip for emergency leave per BINDING rule — if policy has emergencyLeaveAllowed and request reason indicates emergency), check for overlapping requests via findOverlapping, compute daysRequested = (endDate - startDate) + 1 (inclusive calendar days, integer), check sufficient balance via ILeaveBalanceService.getBalanceForPolicy.
+  * On APPROVE: deduct days from LeaveBalance using the same inclusive formula via ILeaveBalanceService.deductDays. Set approvedBy, approvedAt, status=APPROVED.
+  * On REJECT: no balance change, set status=REJECTED, approvedBy, approvedAt.
+  * On CANCEL (from APPROVED): restore days to LeaveBalance via ILeaveBalanceService.addDays, set cancelledBy, cancelledAt, status=CANCELLED.
+  * On CANCEL (from SUBMITTED): no balance change, just status=CANCELLED.
+  * Fiscal year = calendar year of startDate (BINDING). Cross-year requests charge entirely to startDate's fiscal year.
+  * Inject IEmployeeService, ILeavePolicyService, ILeaveBalanceService, ILeaveRequestRepository as constructor dependencies.
+  * Throw ValidationError for business rule violations, NotFoundError for missing entities, ConflictError for overlapping requests.
 
-- `src/modules/leave-request/leave-request.repository.ts` — ILeaveRequestRepository interface extending IBaseRepository&lt;LeaveRequest&gt; with additional methods: findByEmployeeId(employeeId: string), findByStatus(status: LeaveStatus), findOverlapping(employeeId: string, startDate: Date, endDate: Date, excludeId?: string), findByDateRange(startDate: Date, endDate: Date), findPendingForManager(managerId: string). LeaveRequestRepository class implementing it via the shared db connection. The findOverlapping query MUST use the BINDING inclusive-day overlap formula: existing.startDate &lt;= newEndDate AND existing.endDate &gt;= newStartDate. Import IBaseRepository from `../../shared/base-repository` and the db helper from `../../shared/db/connection`.
+- `src/modules/leave-request/leave-request.controller.ts` — LeaveRequestController class with handler methods: createLeaveRequest, submitLeaveRequest, approveLeaveRequest, rejectLeaveRequest, cancelLeaveRequest, updateLeaveRequest, getLeaveRequest, queryLeaveRequests. Each method extracts/validates input from Fastify request (params, body, query), calls the service, and returns appropriate HTTP response (201 for create, 200 for others). Use Zod schemas for request validation (inline or imported). Inject ILeaveRequestService via constructor.
 
-- `src/modules/leave-request/index.ts` — barrel export re-exporting everything from leave-request.model and leave-request.repository.
+- `src/modules/leave-request/leave-request.routes.ts` — Fastify plugin exporting default async function registering routes:
+  * POST /leave-requests → createLeaveRequest
+  * POST /leave-requests/:id/submit → submitLeaveRequest
+  * POST /leave-requests/:id/approve → approveLeaveRequest
+  * POST /leave-requests/:id/reject → rejectLeaveRequest
+  * POST /leave-requests/:id/cancel → cancelLeaveRequest
+  * PUT /leave-requests/:id → updateLeaveRequest
+  * GET /leave-requests/:id → getLeaveRequest
+  * GET /leave-requests → queryLeaveRequests
 
-Read before generating: `src/shared/types/index.ts`, `src/shared/base-repository.ts`, `src/shared/error-types.ts`, `src/shared/db/connection.ts`.
+Update `src/modules/leave-request/index.ts` barrel export to also re-export from service, controller, and routes.
+
+Read before generating: all files from Sub-phase 4a, plus `src/modules/employee/employee.service.ts`, `src/modules/leave-policy/leave-policy.service.ts`, `src/modules/balance/balance.service.ts`, `src/shared/error-types.ts`.
 
 ## Owned by SIBLING sub-phases (OUT OF SCOPE for this sub-phase)
 This is ONE sub-phase of a split phase. The deliverables below belong to sibling sub-phases — do NOT create them here, do NOT list them as success criteria, and this sub-phase MUST NOT be gated on their presence (they are produced by a sibling, not missing):
-- "Sub-phase 4b: LeaveRequest Service, Controller &amp; Routes": src/modules/leave-request/leave-request.service.ts, src/modules/leave-request/leave-request.controller.ts, src/modules/leave-request/leave-request.routes.ts
+- "Sub-phase 4a: LeaveRequest Model &amp; Repository": src/modules/leave-request/leave-request.model.ts, src/modules/leave-request/leave-request.repository.ts, src/modules/leave-request/index.ts
 - "Sub-phase 4c: LeaveRequest Service Unit Tests": tests/unit/modules/leave-request/leave-request.service.spec.ts
 
 In particular, UNIT/INTEGRATION TESTS are OUT OF SCOPE for this sub-phase — they are produced in: Sub-phase 4c: LeaveRequest Service Unit Tests. Do not create test files here, do not require test existence or coverage as a success criterion, and do not fail the gate for missing tests.
@@ -54,6 +72,20 @@ The entities below are shared, cross-module DATA CONTRACTS. Implement each one w
     - cancelledAt: Date | null
     - createdAt: Date
     - updatedAt: Date
+- `Employee` — the entity MUST have exactly these fields:
+    - id: string
+    - employeeNumber: string
+    - firstName: string
+    - lastName: string
+    - email: string
+    - managerId: string | null
+    - department: string | null
+    - hireDate: Date
+    - terminationDate: Date | null
+    - employmentStatus: 'ACTIVE' | 'INACTIVE' | 'TERMINATED'
+    - createdAt: Date
+    - updatedAt: Date
+    - deletedAt: Date | null
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
