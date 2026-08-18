@@ -18,6 +18,8 @@ The architecture is modular, with a clear separation of concerns between models,
 ```
 src/modules/status/           — SystemStatus model + service (health-check)
 src/modules/uptime/           — UptimeStatus model + routes + service
+src/modules/employee/         — Employee model, repository, service
+src/modules/leave-policy/     — LeavePolicy model, repository, service
 src/shared/db/connection.ts   — pg Pool (DATABASE_URL)
 src/shared/types/             — shared enums: LeaveStatus, LeaveType,
                                  LeaveAction, NotificationType,
@@ -28,11 +30,26 @@ src/shared/error-types.ts     — NotFoundError, ValidationError,
                                  ConflictError, UnauthorizedError
 ```
 
+### Employee module (`src/modules/employee/`)
+
+- **employee.model.ts** — `Employee` entity interface: id, employeeNumber, firstName, lastName, email, managerId (string | null), department (string | null), hireDate, terminationDate (Date | null), employmentStatus (EmploymentStatus), createdAt, updatedAt, deletedAt (Date | null).
+- **employee.repository.ts** — `IEmployeeRepository` extends `IBaseRepository<Employee>` with `findByEmployeeNumber`, `findByEmail`, `findByManagerId`, `findActive`. `EmployeeRepository` extends `BaseRepository<Employee>`, table `employees`. All queries filter `deleted_at IS NULL`.
+- **employee.service.ts** — `IEmployeeService` with `getById`, `getByEmployeeNumber`, `getByEmail` (all throw `NotFoundError` when not found), `getSubordinates`, `isActive` (throws `NotFoundError` for nonexistent employee; returns boolean for existing). `EmployeeService` delegates to `IEmployeeRepository`.
+- **index.ts** — barrel re-export of model, repository interfaces/classes, service interfaces/classes.
+
+### LeavePolicy module (`src/modules/leave-policy/`)
+
+- **leave-policy.model.ts** — `LeavePolicy` entity interface: id, policyName, leaveType (LeaveType), entitlementDays, accrualRate (number | null), maxAccumulation (number | null), minimumNoticeDays (number | null), requiresManagerApproval, isActive, createdAt, updatedAt.
+- **leave-policy.repository.ts** — `ILeavePolicyRepository` extends `IBaseRepository<LeavePolicy>` with `findByLeaveType`, `findActive`. `LeavePolicyRepository` extends `BaseRepository<LeavePolicy>`, table `leave_policies`.
+- **leave-policy.service.ts** — `ILeavePolicyService` with `getById`, `getByLeaveType` (both throw `NotFoundError` when not found), `getActivePolicies`, `isLeaveTypeActive` (returns false for nonexistent policy — never throws). `LeavePolicyService` delegates to `ILeavePolicyRepository`.
+- **index.ts** — barrel re-export of model, repository interfaces/classes, service interfaces/classes.
+
 ## Key patterns
 
 - See `AGENTS.md` for stack-specific coding conventions
 - See `docs/GOLDEN_PRINCIPLES.md` for the non-negotiable rules every
   cycle is checked against
+- Service methods follow a "throw on not found" pattern: `getById`, `getByEmployeeNumber`, `getByEmail`, `getByLeaveType` all throw `NotFoundError` rather than returning `null`. Existence-check methods (`isActive`, `isLeaveTypeActive`) diverge: `isActive` throws for nonexistent employees; `isLeaveTypeActive` returns `false` for nonexistent policies.
 
 ## Dependency rules
 
@@ -42,6 +59,13 @@ src/shared/error-types.ts     — NotFoundError, ValidationError,
 - All database access goes through a repository layer — no inline SQL
   / ORM calls in route handlers or business logic
 - No circular dependencies between modules
+
+## Test configuration
+
+- Jest with `ts-jest` preset, `node` test environment
+- Test files under `tests/` matching `*.test.(ts|js)` or `*.spec.(ts|js)`
+- `moduleDirectories: ['node_modules', 'src']` enables non-relative imports (e.g. `import { Employee } from 'modules/employee'`)
+- Unit tests mock the repository layer — no real database connection required
 
 <!-- gestalt:architecture feature=d8fc2ea6-3dd4-4741-b0ac-513d3ac0f17f START -->
 ## Leave Management Module — Reconciled Architecture
