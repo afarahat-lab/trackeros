@@ -1,30 +1,23 @@
-# Implement this phase: Phase 2: Employee & LeavePolicy Modules
+# Implement this phase: Phase 3: LeaveBalance Module
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/d8fc2ea6-3dd4-4741-b0ac-513d3ac0f17f/2`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/d8fc2ea6-3dd4-4741-b0ac-513d3ac0f17f/3`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Build the Employee and LeavePolicy domain modules — models, repository interfaces, repository implementations, service interfaces, and service implementations. No controllers/routes yet.
+Build the LeaveBalance domain module — model, repository, service. LeaveBalance tracks an employee's entitlement, usage, and remaining balance for a specific policy and fiscal year.
 
-Employee module files (~6 files):
-- `src/modules/employee/employee.model.ts` — Employee entity interface with exact fields: id, employeeNumber, firstName, lastName, email, managerId (string | null), department (string | null), hireDate (Date), terminationDate (Date | null), employmentStatus (EmploymentStatus), createdAt, updatedAt, deletedAt (Date | null). Import EmploymentStatus from `shared/types/employment-status.enum`.
-- `src/modules/employee/employee.repository.ts` — IEmployeeRepository interface extending IBaseRepository<Employee> plus findByEmployeeNumber, findByEmail, findByManagerId, findActive. EmployeeRepository class extending BaseRepository<Employee> implementing IEmployeeRepository using the pg Pool.
-- `src/modules/employee/employee.service.ts` — IEmployeeService interface with getById, getByEmployeeNumber, getByEmail, getSubordinates, isActive. EmployeeService implementation delegating to IEmployeeRepository.
-- `src/modules/employee/index.ts` — barrel export
+Files to create (~5 files):
+- `src/modules/balance/balance.model.ts` — LeaveBalance entity interface with exact fields: id, employeeId, leavePolicyId, totalEntitlement (number), usedDays (number), remainingDays (number), fiscalYear (number), status ('ACTIVE' | 'CLOSED'), createdAt, updatedAt. Also define CreateLeaveBalanceDto (employeeId, leavePolicyId, totalEntitlement, fiscalYear) and UpdateLeaveBalanceDto (partial of usedDays, remainingDays, status).
+- `src/modules/balance/balance.repository.ts` — ILeaveBalanceRepository interface extending IBaseRepository<LeaveBalance> plus findByEmployeeId, findByEmployeeAndPolicy, findByEmployeeAndFiscalYear, findActiveByEmployee, upsert (for idempotent balance creation). LeaveBalanceRepository class implementing it.
+- `src/modules/balance/balance.service.ts` — ILeaveBalanceService interface with getBalance, getOrCreateBalance, deductDays, restoreDays, getRemainingDays, closeBalance. LeaveBalanceService implementation. The deductDays method MUST use the BINDING formula: daysRequested = (endDate - startDate) + 1 (inclusive calendar days, integer). remainingDays = totalEntitlement - usedDays (integer arithmetic). Throw ValidationError if insufficient balance.
+- `src/modules/balance/index.ts` — barrel export
+- `tests/unit/modules/balance/balance.service.spec.ts` — Jest tests covering balance creation, deduction (including exact-boundary and insufficient-balance cases), restoration, and fiscal-year scoping.
 
-LeavePolicy module files (~6 files):
-- `src/modules/leave-policy/leave-policy.model.ts` — LeavePolicy entity interface with exact fields: id, policyName, leaveType (LeaveType), entitlementDays, accrualRate (number | null), maxAccumulation (number | null), minimumNoticeDays (number | null), requiresManagerApproval, isActive, createdAt, updatedAt. Import LeaveType from `shared/types/leave-type.enum`.
-- `src/modules/leave-policy/leave-policy.repository.ts` — ILeavePolicyRepository interface extending IBaseRepository<LeavePolicy> plus findByLeaveType, findActive. LeavePolicyRepository class.
-- `src/modules/leave-policy/leave-policy.service.ts` — ILeavePolicyService interface with getById, getByLeaveType, getActivePolicies, isLeaveTypeActive. LeavePolicyService implementation.
-- `src/modules/leave-policy/index.ts` — barrel export
-
-Test files:
-- `tests/unit/modules/employee/employee.service.spec.ts`
-- `tests/unit/modules/leave-policy/leave-policy.service.spec.ts`
-
-This phase depends on Phase 1 files: `src/shared/types/index.ts`, `src/shared/base-repository.ts`, `src/shared/error-types.ts`, `src/shared/db/connection.ts`. Read all of them before generating any code.
+This phase depends on:
+- Phase 1: `src/shared/types/index.ts`, `src/shared/base-repository.ts`, `src/shared/error-types.ts`, `src/shared/db/connection.ts`
+- Phase 2: `src/modules/employee/employee.model.ts`, `src/modules/leave-policy/leave-policy.model.ts` (LeaveBalance references employeeId and leavePolicyId — read these to understand the FK shapes)
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -32,42 +25,17 @@ These are resolved, feature-wide decisions. Wherever this phase touches the conc
 
 ## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
 The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
-- `LeavePolicy` — the entity MUST have exactly these fields:
+- `LeaveBalance` — the entity MUST have exactly these fields:
     - id: string
-    - policyName: string
-    - leaveType: LeaveType
-    - entitlementDays: number
-    - accrualRate: number | null
-    - maxAccumulation: number | null
-    - minimumNoticeDays: number | null
-    - requiresManagerApproval: boolean
-    - isActive: boolean
+    - employeeId: string
+    - leavePolicyId: string
+    - totalEntitlement: number
+    - usedDays: number
+    - remainingDays: number
+    - fiscalYear: number
+    - status: 'ACTIVE' | 'CLOSED'
     - createdAt: Date
     - updatedAt: Date
-- `Employee` — the entity MUST have exactly these fields:
-    - id: string
-    - employeeNumber: string
-    - firstName: string
-    - lastName: string
-    - email: string
-    - managerId: string | null
-    - department: string | null
-    - hireDate: Date
-    - terminationDate: Date | null
-    - employmentStatus: 'ACTIVE' | 'INACTIVE' | 'TERMINATED'
-    - createdAt: Date
-    - updatedAt: Date
-    - deletedAt: Date | null
-
-## Constraints & consistency
-You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
-### Entity invariants — enforce these
-- Reuse or extend `Employee`: Every Employee has a unique employeeNumber and a unique email. Soft-delete via deletedAt — repository queries filter `deleted_at IS NULL` so soft-deleted employees are invisible to all lookup methods.
-- Reuse or extend `Employee`: employmentStatus must be one of ACTIVE, INACTIVE, or TERMINATED (EmploymentStatus enum). Only ACTIVE employees are returned by findActive.
-- Reuse or extend `LeavePolicy`: leaveType must be one of the LeaveType enum values (annual, sick, emergency, unpaid, maternity, paternity). Each LeaveType has at most one active LeavePolicy at any time — enforced by the (leave_type, is_active) unique constraint in the database.
-- Reuse or extend `LeavePolicy`: entitlementDays is a positive integer (whole days only per BINDING rule). accrualRate, maxAccumulation, and minimumNoticeDays are nullable — null means "not applicable" (e.g., no accrual cap, no notice requirement).
-### Interface contract — expose these operations (their shape is yours)
-- IEmployeeService.getById — Throws NotFoundError when no employee exists with the given id. Never returns null.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
