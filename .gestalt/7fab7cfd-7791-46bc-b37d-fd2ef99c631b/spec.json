@@ -1,0 +1,92 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "employee",
+      "leave-policy"
+    ],
+    "affectedLayers": [
+      "repository",
+      "service",
+      "test",
+      "documentation"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "`LeavePolicyRepository.findByLeaveType` filters by `is_active = true` in its SQL query, so it only returns the active policy for a given LeaveType (or null if none is active), enforcing the invariant \"Each LeaveType has exactly one active LeavePolicy at any time.\"",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`EmployeeService.isActive` uses the `EmploymentStatus.ACTIVE` enum value (not the string literal `'ACTIVE'`) when comparing `employee.employmentStatus`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `leave-policy.service.spec.ts` test \"should return false when policy exists but is inactive\" is updated: `findByLeaveType` now returns null for an inactive policy (since the repository filters to active-only), and `isLeaveTypeActive` correctly returns false when no active policy is found.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`ARCHITECTURE.md` is updated so the `leave-policy` module description accurately states that `findByLeaveType` returns only the active policy for a given LeaveType (or null), consistent with the invariant \"Each LeaveType has exactly one active LeavePolicy at any time.\"",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No new modules, files, or exports may be introduced \u2014 this phase only modifies existing files: `src/modules/leave-policy/leave-policy.repository.ts`, `src/modules/employee/employee.service.ts`, `tests/unit/modules/leave-policy/leave-policy.service.spec.ts`, and `docs/ARCHITECTURE.md`.",
+    "The `ILeavePolicyRepository` interface signature for `findByLeaveType` must not change \u2014 it still accepts `LeaveType` and optional `PoolClient` and returns `Promise<LeavePolicy | null>`. Only the SQL implementation changes.",
+    "The `IEmployeeService` interface signature for `isActive` must not change \u2014 it still accepts `id: string` and returns `Promise<boolean>`. Only the implementation's comparison changes from string literal to enum.",
+    "All existing tests in `employee.service.spec.ts` must continue to pass without modification. All existing tests in `leave-policy.service.spec.ts` must pass after the one test case is updated; no other test cases may be removed or altered."
+  ],
+  "outOfScope": [],
+  "ambiguities": [
+    {
+      "description": "After fixing `findByLeaveType` to return only active policies, the `isLeaveTypeActive` method's `policy.isActive` check becomes redundant (it will always be true when policy is non-null). Should the service method be simplified to `return policy !== null`, or should the redundant check remain as a defensive guard?",
+      "options": [
+        "Simplify to `return policy !== null` \u2014 the repository now guarantees active-only results",
+        "Keep the `policy.isActive` check as a defensive guard \u2014 harmless redundancy"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "For any given LeaveType, at most one LeavePolicy with `isActive = true` exists at any time. The `findByLeaveType` repository method MUST enforce this by filtering `is_active = true` in its query, returning the single active policy or null."
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "The `employmentStatus` field is typed as the `EmploymentStatus` enum. All comparisons against this field MUST use the enum values (`EmploymentStatus.ACTIVE`, `EmploymentStatus.INACTIVE`, `EmploymentStatus.TERMINATED`), never raw string literals."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "LeavePolicyRepository.findByLeaveType",
+      "authRule": "N/A \u2014 repository layer, no auth",
+      "idempotent": true,
+      "errorSemantics": "Returns the single active LeavePolicy for the given LeaveType, or null if no active policy exists. Must not return inactive policies."
+    },
+    {
+      "operation": "EmployeeService.isActive",
+      "authRule": "N/A \u2014 service layer, no auth",
+      "idempotent": true,
+      "errorSemantics": "Throws NotFoundError if employee does not exist. Returns boolean: true only when employmentStatus equals EmploymentStatus.ACTIVE."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The `findByLeaveType` SQL query must match the reconciled architecture invariant: \"Each LeaveType has exactly one active LeavePolicy at any time.\" The query must include `AND is_active = true`.",
+      "referencePath": ".gestalt/architecture/reconciled.json \u2192 domain_entities[1] (LeavePolicy) purpose field"
+    },
+    {
+      "requirement": "The `isActive` method must use the `EmploymentStatus` enum from `shared/types` for its comparison, matching the type declared in `employee.model.ts`.",
+      "referencePath": "src/modules/employee/employee.model.ts \u2192 employmentStatus field typed as EmploymentStatus"
+    }
+  ],
+  "integrationPoints": []
+}
