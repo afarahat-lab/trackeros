@@ -1,0 +1,122 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared-types",
+      "audit"
+    ],
+    "affectedLayers": [
+      "types",
+      "model",
+      "repository-interface",
+      "service-interface",
+      "service",
+      "tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The four shared enums are defined and exported from `src/shared/types/index.ts`: `LeaveRequestStatus` (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED), `LeaveType` (annual, sick, emergency, unpaid, maternity, paternity), `BalanceStatus` (ACTIVE, EXHAUSTED, CLOSED), `EmploymentStatus` (ACTIVE, INACTIVE, TERMINATED).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `BaseEntity` interface is defined and exported from `src/shared/types/index.ts` with exactly the fields `id: string`, `createdAt: Date`, `updatedAt: Date`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `AuditRecord` entity is defined in `src/modules/audit/audit.model.ts` with the exact canonical fields: `id: string`, `entityType: string`, `entityId: string`, `action: string`, `oldValues: Record<string, unknown> | null`, `newValues: Record<string, unknown> | null`, `performedBy: string`, `performedAt: Date`, `ipAddress: string | undefined`, `userAgent: string | undefined`, `createdAt: Date`. It does NOT extend `BaseEntity` (no `updatedAt` field \u2014 immutable audit log).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`IAuditRepository` interface is defined in `src/modules/audit/audit.repository.interface.ts` with methods `create(record: AuditRecord): Promise<AuditRecord>` and `findByEntity(entityType: string, entityId: string): Promise<AuditRecord[]>`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`IAuditService` interface is defined in `src/modules/audit/audit.service.interface.ts` with a single `record` method accepting params: `entityType`, `entityId`, `action`, optional `oldValues`/`newValues` (both `Record<string, unknown> | null | undefined`), `performedBy`, optional `ipAddress`/`userAgent`, and returning `Promise<AuditRecord>`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`AuditService` class implements `IAuditService` and receives `IAuditRepository` via constructor injection. Its `record` method constructs an `AuditRecord` with `id` generated via `crypto.randomUUID()`, `performedAt` set to `new Date()`, `createdAt` set to `new Date()`, and delegates to `repository.create(record)`, returning the result.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`src/modules/audit/index.ts` barrel re-exports `AuditRecord`, `IAuditRepository`, `IAuditService`, and `AuditService`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit test at `tests/unit/modules/audit/audit.service.test.ts` mocks `IAuditRepository` and verifies: (a) `record()` constructs the `AuditRecord` with a UUID id, correct `performedAt`/`createdAt` timestamps, and all passed-through fields; (b) `record()` calls `repository.create` exactly once with the constructed record; (c) `record()` returns the value returned by `repository.create`.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No `any` type anywhere \u2014 use `unknown` with type guards. The `oldValues` and `newValues` fields must use `Record<string, unknown>`, not `any`. (HARNESS.json constraint: no-any)",
+    "All database access must go through the repository pattern. The concrete `IAuditRepository` implementation (Knex/Postgres) is deferred to a later phase; this phase defines only the interface. (GP-001, HARNESS.json constraint: no-direct-db-outside-repository)",
+    "Strict TypeScript: `strict: true` in tsconfig \u2014 no implicit any, strict null checks. All nullable/optional fields must be explicitly typed as `| null` or `| undefined` as specified."
+  ],
+  "outOfScope": [
+    "Concrete `IAuditRepository` implementation (Knex/Postgres) \u2014 deferred to a later phase. Only the interface is defined now.",
+    "Fastify routes, controllers, or HTTP endpoints for the audit module \u2014 this phase is foundation types and service layer only."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "AuditRecord",
+      "mustExistOrExtend": true,
+      "invariant": "AuditRecord is immutable after creation \u2014 it has no `updatedAt` field and does not extend `BaseEntity`. Once written, an audit record must never be modified or deleted."
+    },
+    {
+      "entity": "BaseEntity",
+      "mustExistOrExtend": true,
+      "invariant": "Every domain entity that supports updates (Employee, LeaveRequest, LeavePolicy, LeaveBalance) must extend `BaseEntity`, which guarantees `id: string`, `createdAt: Date`, and `updatedAt: Date`. AuditRecord is the sole exception \u2014 it is immutable and does not extend BaseEntity."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IAuditService.record",
+      "authRule": "No auth enforcement at this layer \u2014 the caller (service or controller) is responsible for providing the correct `performedBy` identity. The audit service records whatever identity it receives.",
+      "idempotent": false,
+      "errorSemantics": "Must propagate errors from the underlying repository (e.g. connection failures) without swallowing them. Must not throw for missing optional fields \u2014 `oldValues`, `newValues`, `ipAddress`, `userAgent` are all optional and may be `undefined` or `null`."
+    },
+    {
+      "operation": "IAuditRepository.create",
+      "authRule": "No auth \u2014 repository is a pure data-access interface.",
+      "idempotent": false,
+      "errorSemantics": "Must return the created `AuditRecord` (with any server-generated defaults applied). Must reject on persistence failure."
+    },
+    {
+      "operation": "IAuditRepository.findByEntity",
+      "authRule": "No auth \u2014 repository is a pure data-access interface.",
+      "idempotent": true,
+      "errorSemantics": "Returns an array (empty if no records found \u2014 never null). Must reject on query failure."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The `AuditRecord` entity must match the canonical field list in `.gestalt/architecture/reconciled.json` exactly: `id`, `entityType`, `entityId`, `action`, `oldValues`, `newValues`, `performedBy`, `performedAt`, `ipAddress`, `userAgent`, `createdAt`. No extra fields, no missing fields.",
+      "referencePath": ".gestalt/architecture/reconciled.json \u2192 domain_entities \u2192 audit module owns AuditRecord"
+    },
+    {
+      "requirement": "The four enums (`LeaveRequestStatus`, `LeaveType`, `BalanceStatus`, `EmploymentStatus`) must match the values declared in `.gestalt/architecture/reconciled.json` under the `shared-types` module. No extra enum members, no missing members.",
+      "referencePath": ".gestalt/architecture/reconciled.json \u2192 modules \u2192 shared-types"
+    },
+    {
+      "requirement": "Module structure must follow the existing pattern established by `src/modules/uptime/` and `src/modules/status/`: a model file, a service interface file, a service implementation file, and a barrel `index.ts`. The audit module adds a repository interface file (`audit.repository.interface.ts`) which is a new pattern for this project but required by GP-001.",
+      "referencePath": "src/modules/uptime/index.ts, src/modules/status/index.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts",
+      "why": "All downstream modules (employee, leave-policy, leave-balance, leave-request) import enums and BaseEntity from here. The audit module's audit.model.ts imports BaseEntity from here."
+    }
+  ]
+}
