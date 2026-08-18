@@ -1,0 +1,135 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared/types",
+      "shared/base-repository",
+      "shared/error-types"
+    ],
+    "affectedLayers": [
+      "shared infrastructure",
+      "types",
+      "data access"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "All six shared enums (LeaveStatus, LeaveType, LeaveAction, NotificationType, EmploymentStatus, AuditAction) exist as TypeScript string enums with their exact specified values, and are re-exported from a single barrel file at `src/shared/types/index.ts`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Four custom error classes (NotFoundError, ValidationError, ConflictError, UnauthorizedError) exist in `src/shared/error-types.ts`, each extending Error, exposing a `statusCode` numeric property (404, 400, 409, 401 respectively), and setting `this.name` to the class name.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`IBaseRepository<T>` interface declares five methods: `findById(id: string, client?: PoolClient): Promise<T | null>`, `findAll(client?: PoolClient): Promise<T[]>`, `create(entity: Omit<T, 'id'>, client?: PoolClient): Promise<T>`, `update(id: string, entity: Partial<T>, client?: PoolClient): Promise<T | null>`, `delete(id: string, client?: PoolClient): Promise<boolean>`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`BaseRepository<T>` abstract class implements `IBaseRepository<T>`, accepts an optional `poolOverride` in its constructor (defaulting to the shared pool from `shared/db/connection`), and all five methods accept an optional `PoolClient` \u2014 using it when provided, falling back to the pool otherwise \u2014 enabling transaction participation.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests in `tests/unit/shared/types/enums.test.ts` verify every enum value exists and each enum has the correct count of members (LeaveStatus: 5, LeaveType: 6, LeaveAction: 7, NotificationType: 5, EmploymentStatus: 3, AuditAction: 5), and that the barrel index re-exports all six enums.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All imports within `src/` must use non-relative paths (e.g., `shared/db/connection`, `shared/types`) because `tsconfig.json` sets `baseUrl: \"./src\"`.",
+    "The `BaseRepository` class MUST import and use the named `pool` export from `shared/db/connection` \u2014 never create a new Pool instance or read DATABASE_URL directly.",
+    "All enum files must use TypeScript string enums (e.g., `enum Foo { BAR = 'BAR' }`), not `const` objects or numeric enums, so the values are both type-level and runtime-accessible."
+  ],
+  "outOfScope": [
+    "Database migrations (Knex) \u2014 table creation is deferred to later phases when domain modules are built.",
+    "Any domain module (employee, leave-policy, balance, leave-request, audit, notification) \u2014 these are built in Phases 2\u20135."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveStatus",
+      "mustExistOrExtend": true,
+      "invariant": "Must contain exactly five members: DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED. These represent the complete lifecycle of a LeaveRequest: DRAFT \u2192 SUBMITTED \u2192 {APPROVED | REJECTED}; any non-terminal state \u2192 CANCELLED."
+    },
+    {
+      "entity": "AuditAction",
+      "mustExistOrExtend": true,
+      "invariant": "Must contain exactly five members: CREATE, UPDATE, DELETE, APPROVE, REJECT. Every state-changing operation on any domain entity must be logged with one of these actions."
+    },
+    {
+      "entity": "LeaveType",
+      "mustExistOrExtend": true,
+      "invariant": "Must contain exactly six members with lowercase string values: ANNUAL='annual', SICK='sick', EMERGENCY='emergency', UNPAID='unpaid', MATERNITY='maternity', PATERNITY='paternity'. Each LeaveType has exactly one active LeavePolicy at any time."
+    },
+    {
+      "entity": "LeaveAction",
+      "mustExistOrExtend": true,
+      "invariant": "Must contain exactly seven members: CREATE, SUBMIT, APPROVE, REJECT, CANCEL, UPDATE, DELETE. Represents all possible actions that can be performed on a LeaveRequest."
+    },
+    {
+      "entity": "NotificationType",
+      "mustExistOrExtend": true,
+      "invariant": "Must contain exactly five members: LEAVE_SUBMITTED, LEAVE_APPROVED, LEAVE_REJECTED, LEAVE_CANCELLED, BALANCE_UPDATED. Each corresponds to a domain event that triggers a user-facing notification."
+    },
+    {
+      "entity": "EmploymentStatus",
+      "mustExistOrExtend": true,
+      "invariant": "Must contain exactly three members: ACTIVE, INACTIVE, TERMINATED. Only ACTIVE employees may submit leave requests. The status drives the Employee lifecycle."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IBaseRepository.findById",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns null when no row matches the given id \u2014 never throws. Accepts optional PoolClient for transaction participation."
+    },
+    {
+      "operation": "IBaseRepository.create",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Inserts a new row and returns the created entity including its generated id. Accepts optional PoolClient for transaction participation. On constraint violation (e.g., duplicate unique key), the underlying pg error propagates \u2014 callers should wrap in try/catch and translate to a domain error (e.g., ConflictError)."
+    },
+    {
+      "operation": "IBaseRepository.update",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Applies a partial update to the row identified by id. Returns the updated entity, or null if no row matched. An empty partial update returns the existing entity unchanged. Accepts optional PoolClient."
+    },
+    {
+      "operation": "IBaseRepository.delete",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Deletes the row identified by id. Returns true if a row was deleted, false if no row matched. Accepts optional PoolClient."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "BaseRepository must import the named `pool` export from `shared/db/connection` \u2014 the exact file at `src/shared/db/connection.ts` which exports `export const pool = new Pool({...})`.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "All enum files and the barrel index must use non-relative imports matching the `baseUrl: \"./src\"` configured in `tsconfig.json`. The barrel index at `src/shared/types/index.ts` must re-export from sibling files using paths like `./leave-status.enum` (relative within the same directory is acceptable for barrel re-exports), but any consumer importing from outside the types directory must use `shared/types`.",
+      "referencePath": "tsconfig.json"
+    },
+    {
+      "requirement": "The Jest test file must import enums from `shared/types` (the barrel), not from individual enum files. The test file name must match the Jest `testMatch` pattern (which accepts `**.test.ts`).",
+      "referencePath": "tests/unit/shared/types/enums.test.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "BaseRepository depends on the named `pool` export for all database operations. Every domain repository in later phases will extend BaseRepository and thus transitively depend on this connection."
+    },
+    {
+      "target": "tsconfig.json (baseUrl: \"./src\")",
+      "why": "All shared types and the base repository use non-relative imports. Every module in later phases must follow this same import convention."
+    }
+  ]
+}
