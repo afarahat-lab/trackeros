@@ -1,0 +1,178 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-request"
+    ],
+    "affectedLayers": [
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "Test file exists at `tests/unit/modules/leave-request/leave-request.service.spec.ts` and all 15+ test cases pass when run with `npx jest`",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`create` test: when called with valid DTO, returns a LeaveRequest with status DRAFT and all input fields preserved",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`submit` test with valid policy and sufficient balance: status transitions from DRAFT to SUBMITTED, and `getRemainingDays` is called with fiscal year = startDate.getFullYear()",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`submit` test with insufficient balance: throws ValidationError with message containing 'Insufficient leave balance'",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`submit` test with overlapping dates: throws ConflictError when `findOverlapping` returns non-empty array",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`submit` test for emergency leave: succeeds even when `minimumNoticeDays` is not met, because `policy.leaveType === LeaveType.EMERGENCY` bypasses the notice check",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`submit` test for non-emergency leave failing minimumNoticeDays: throws ValidationError when notice period is insufficient",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`approve` test: calls `deductDays` on ILeaveBalanceService with correct employeeId, leavePolicyId, fiscalYear, startDate, endDate; sets approvedBy/approvedAt; status transitions to APPROVED",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`reject` test: does NOT call any balance service method; sets approvedBy/approvedAt; status transitions to REJECTED",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`cancel` from APPROVED test: calls `restoreDays` on ILeaveBalanceService with correct days count; sets cancelledBy/cancelledAt; status transitions to CANCELLED",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`cancel` from SUBMITTED test: does NOT call any balance service method; sets cancelledBy/cancelledAt; status transitions to CANCELLED",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Cross-year request test: a LeaveRequest with startDate in one calendar year and endDate in the next is charged entirely to startDate's fiscal year \u2014 verify `deductDays` and `getRemainingDays` receive fiscalYear = startDate.getFullYear()",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`getById` test: returns the LeaveRequest when found; throws NotFoundError when repository returns null",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`query` test: delegates to `findByEmployeeId` when employeeId is present, `findByStatus` when status is present, `findByDateRange` when both startDate and endDate are present, and `findAll` when no filter is given",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`getEmployeeRequests` test: delegates to `repository.findByEmployeeId` with the given employeeId",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All four dependencies (ILeaveRequestRepository, IEmployeeService, ILeavePolicyService, ILeaveBalanceService) MUST be mocked using Jest \u2014 no real database, no real HTTP calls, no testcontainers",
+    "Test file MUST import from the module barrel (`modules/leave-request`) for the service class and interface, and from `shared/error-types` for error classes, matching the existing test conventions in `tests/unit/modules/balance/balance.service.spec.ts` and `tests/unit/modules/employee/employee.service.spec.ts`",
+    "Mock LeavePolicy objects used in tests MUST include `leaveType` set to `LeaveType.EMERGENCY` for the emergency-bypass test and a non-emergency type (e.g. `LeaveType.ANNUAL`) for the minimum-notice test",
+    "The `computeDays` formula `(endDate - startDate) + 1` is private in the service \u2014 tests MUST verify its effect indirectly through balance service mock expectations (e.g. a 5-day range from Jun 1 to Jun 5 should result in `deductDays` being called with those exact dates, and `restoreDays` receiving `days=5`)"
+  ],
+  "outOfScope": [
+    "Sub-phase 4a deliverables: `leave-request.model.ts`, `leave-request.repository.ts`, `index.ts` \u2014 these are produced by a sibling sub-phase and are read-only inputs for this test phase",
+    "Sub-phase 4b deliverables: `leave-request.service.ts`, `leave-request.controller.ts`, `leave-request.routes.ts` \u2014 the service is the subject under test (read-only input), and the controller/routes are tested separately or in integration"
+  ],
+  "ambiguities": [
+    {
+      "description": "The `query` method in LeaveRequestService applies filters with mutual-exclusion priority: if `employeeId` is present, only `findByEmployeeId` is called (ignoring `status` and date range); if only `status` is present, only `findByStatus` is called; if only `startDate`+`endDate` are present, only `findByDateRange` is called. The test cases should verify this priority chain, not combined filtering.",
+      "options": [
+        "Test each filter branch independently as the service currently implements",
+        "Test combined filters and update the service to support them",
+        "Document the mutual-exclusion behavior as intentional and test accordingly"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "A LeaveRequest in DRAFT status is the only valid starting state for `submit`; SUBMITTED is the only valid state for `approve` and `reject`; only SUBMITTED or APPROVED can transition to CANCELLED; only DRAFT can be updated via `update`"
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "Balance deduction on approve uses inclusive calendar days: `daysRequested = (endDate - startDate) + 1`. Balance restoration on cancel-from-APPROVED restores the same computed day count. `remainingDays = totalEntitlement - usedDays` (integer arithmetic)."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "ILeaveRequestService.create",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws ValidationError when endDate < startDate, when employee is not ACTIVE, or when policy is not active. Returns LeaveRequest with status DRAFT on success."
+    },
+    {
+      "operation": "ILeaveRequestService.submit",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws NotFoundError when request not found. Throws ValidationError when status is not DRAFT, employee not active, policy not active, minimum notice not met (unless emergency), or insufficient balance. Throws ConflictError when overlapping requests exist. Returns LeaveRequest with status SUBMITTED on success."
+    },
+    {
+      "operation": "ILeaveRequestService.approve",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws NotFoundError when request not found. Throws ValidationError when status is not SUBMITTED. Calls ILeaveBalanceService.deductDays. Sets approvedBy and approvedAt. Returns LeaveRequest with status APPROVED on success."
+    },
+    {
+      "operation": "ILeaveRequestService.reject",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws NotFoundError when request not found. Throws ValidationError when status is not SUBMITTED. Does NOT call any balance service method. Sets approvedBy and approvedAt. Returns LeaveRequest with status REJECTED on success."
+    },
+    {
+      "operation": "ILeaveRequestService.cancel",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws NotFoundError when request not found. Throws ValidationError when status is neither SUBMITTED nor APPROVED. When cancelling from APPROVED: calls ILeaveBalanceService.restoreDays. When cancelling from SUBMITTED: no balance call. Sets cancelledBy and cancelledAt. Returns LeaveRequest with status CANCELLED on success."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Must use the same error classes imported from `shared/error-types` \u2014 NotFoundError, ValidationError, ConflictError \u2014 matching the exact class names and constructor signatures defined there",
+      "referencePath": "src/shared/error-types.ts"
+    },
+    {
+      "requirement": "Must use the same enum values from `shared/types` \u2014 LeaveStatus (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED), LeaveType (ANNUAL, SICK, EMERGENCY, UNPAID, MATERNITY, PATERNITY), EmploymentStatus (ACTIVE, INACTIVE, TERMINATED)",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "Must match the ILeaveRequestService interface exactly as declared in `leave-request.service.ts` \u2014 all 9 method signatures (create, submit, approve, reject, cancel, update, getById, query, getEmployeeRequests) with their parameter types and return types",
+      "referencePath": "src/modules/leave-request/leave-request.service.ts"
+    },
+    {
+      "requirement": "Must match the ILeaveBalanceService interface \u2014 specifically `deductDays(employeeId, leavePolicyId, fiscalYear, startDate, endDate)`, `restoreDays(employeeId, leavePolicyId, fiscalYear, days)`, and `getRemainingDays(employeeId, leavePolicyId, fiscalYear)` \u2014 with their exact parameter lists",
+      "referencePath": "src/modules/balance/balance.service.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/leave-request/leave-request.service.ts",
+      "why": "Subject under test \u2014 the LeaveRequestService class and ILeaveRequestService interface are the targets being verified by these unit tests"
+    }
+  ]
+}
