@@ -21,6 +21,7 @@ src/modules/uptime/           — UptimeStatus model + routes + service
 src/modules/employee/         — Employee model, repository, service
 src/modules/leave-policy/     — LeavePolicy model, repository, service
 src/modules/balance/          — LeaveBalance model, repository, service
+src/modules/leave-request/    — LeaveRequest model, repository (service/controller/routes planned)
 src/shared/db/connection.ts   — pg Pool (DATABASE_URL)
 src/shared/types/             — shared enums: LeaveStatus, LeaveType,
                                  LeaveAction, NotificationType,
@@ -51,6 +52,12 @@ src/shared/error-types.ts     — NotFoundError, ValidationError,
 - **balance.repository.ts** — `ILeaveBalanceRepository` extends `IBaseRepository<LeaveBalance>` with `findByEmployeeId`, `findByEmployeeAndPolicy`, `findByEmployeeAndFiscalYear`, `findActiveByEmployee`, `upsert`. `LeaveBalanceRepository` extends `BaseRepository<LeaveBalance>`, table `leave_balances`. The `upsert` method uses `ON CONFLICT (employee_id, leave_policy_id, fiscal_year)` for idempotent balance creation.
 - **balance.service.ts** — `ILeaveBalanceService` with `getBalance`, `getOrCreateBalance`, `deductDays`, `restoreDays`, `getRemainingDays`, `closeBalance`. `LeaveBalanceService` delegates to `ILeaveBalanceRepository`. Key rules: `deductDays` computes `daysRequested = (endDate - startDate) + 1` (inclusive calendar days, integer), throws `ValidationError` on insufficient balance or closed balance. `restoreDays` floors `usedDays` at 0. `getBalance` throws `NotFoundError` when balance not found or fiscal year mismatch.
 - **index.ts** — barrel re-export of model, repository interfaces/classes, service interfaces/classes.
+
+### LeaveRequest module (`src/modules/leave-request/`)
+
+- **leave-request.model.ts** — `LeaveRequest` entity interface: id, employeeId, leavePolicyId, startDate (Date), endDate (Date), reason (string | undefined), status (LeaveStatus), approvedBy (string | null), approvedAt (Date | null), cancelledBy (string | null), cancelledAt (Date | null), createdAt, updatedAt. Also exports `CreateLeaveRequestDto` (employeeId, leavePolicyId, startDate, endDate, reason?), `UpdateLeaveRequestDto` (partial of startDate, endDate, reason, status), and `LeaveRequestQueryParams` (employeeId?, status?, leavePolicyId?, startDate?, endDate?).
+- **leave-request.repository.ts** — `ILeaveRequestRepository` extends `IBaseRepository<LeaveRequest>` with `findByEmployeeId`, `findByStatus`, `findOverlapping`, `findByDateRange`, `findPendingForManager`. `LeaveRequestRepository` extends `BaseRepository<LeaveRequest>`, table `leave_requests`. `findOverlapping` uses the inclusive-day overlap formula (`existing.startDate <= newEndDate AND existing.endDate >= newStartDate`), filtering out REJECTED and CANCELLED requests. `findPendingForManager` JOINs `employees` on `manager_id`. All methods accept optional `PoolClient` for transaction support.
+- **index.ts** — barrel re-export of model and repository (service, controller, routes planned).
 
 ## Key patterns
 
@@ -110,7 +117,7 @@ The leave management module enables employees to apply for annual, sick, emergen
 - `employee` — Employee entity, repository, service
 - `leave-policy` — LeavePolicy entity, repository, service
 - `balance` — LeaveBalance entity, repository, service (model + repository + service built; controller + routes planned for Phase 5)
-- `leave-request` — LeaveRequest aggregate, repository, service, controller, routes (planned)
+- `leave-request` — LeaveRequest aggregate, repository (model + repository built; service, controller, routes planned)
 - `audit` — AuditRecord entity, repository, service (planned)
 - `notification` — Notification entity, repository, service (planned)
 
@@ -139,7 +146,7 @@ Repository methods for multi-step writes accept optional `PoolClient`. Service a
 | 1 | Shared types, base repository, error types | ✅ Built |
 | 2 | Employee, LeavePolicy | ✅ Built |
 | 3 | LeaveBalance (model, repository, service) | ✅ Built |
-| 4 | LeaveRequest (full workflow) | Planned |
+| 4 | LeaveRequest (model + repository) | ✅ Built (service, controller, routes planned) |
 | 5 | Audit, Notification, routes, integration tests | Planned |
 
 ### Open Questions

@@ -12,7 +12,7 @@ Base entity providing common fields for domain models.
 
 ## leave
 
-Represents a leave record managed by the `leave` module, including leave requests and related leave-tracking data.
+Represents a leave record managed by the `leave-request` module, including leave requests and related leave-tracking data.
 
 ### LeaveStatus
 
@@ -30,25 +30,28 @@ Represents a leave record managed by the `leave` module, including leave request
 |-------|------|----------|
 | id | string | true |
 | employeeId | string | true |
-| leaveTypeId | string | true |
+| leavePolicyId | string | true |
 | startDate | Date | true |
 | endDate | Date | true |
 | reason | string \| undefined | false |
-| status | LeaveRequestStatus | true |
+| status | LeaveStatus | true |
 | approvedBy | string \| null | false |
 | approvedAt | Date \| null | false |
+| cancelledBy | string \| null | false |
+| cancelledAt | Date \| null | false |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
 **Relationships**
-- `Employee` — many-to-one
+- `Employee` — many-to-one (via employeeId)
+- `LeavePolicy` — many-to-one (via leavePolicyId)
 
 ### CreateLeaveRequestDto
 
 | Field | Type | Required |
 |-------|------|----------|
 | employeeId | string | true |
-| leaveTypeId | string | true |
+| leavePolicyId | string | true |
 | startDate | Date | true |
 | endDate | Date | true |
 | reason | string \| undefined | false |
@@ -60,19 +63,17 @@ Represents a leave record managed by the `leave` module, including leave request
 | startDate | Date | false |
 | endDate | Date | false |
 | reason | string \| undefined | false |
+| status | LeaveStatus | false |
 
 ### LeaveRequestQueryParams
 
 | Field | Type | Required |
 |-------|------|----------|
-| status | LeaveRequestStatus | false |
-| leaveTypeId | string | false |
-| startDateFrom | Date | false |
-| startDateTo | Date | false |
-| endDateFrom | Date | false |
-| endDateTo | Date | false |
-| limit | number | false |
-| offset | number | false |
+| employeeId | string | false |
+| status | LeaveStatus | false |
+| leavePolicyId | string | false |
+| startDate | Date | false |
+| endDate | Date | false |
 
 ## balance
 
@@ -141,7 +142,7 @@ Represents employee data managed by the `employee` module, including employee re
 
 ## policy
 
-Represents leave policy data managed by the `policy` module, including policy definitions, rules, and leave entitlement configurations.
+Represents leave policy data managed by the `leave-policy` module, including policy definitions, rules, and leave entitlement configurations.
 
 ### Policy
 
