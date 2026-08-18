@@ -7,14 +7,14 @@ Base entity providing common fields for domain models.
 | Field | Type | Required |
 |-------|------|----------|
 | id | string | true |
-| created_at | Date | true |
-| updated_at | Date | true |
+| createdAt | Date | true |
+| updatedAt | Date | true |
 
-## leave
+## shared types
 
-Represents a leave record managed by the `leave` module, including leave requests and related leave-tracking data.
+Shared enums used across domain modules.
 
-### LeaveStatus
+### LeaveRequestStatus
 
 | Value | Description |
 |-------|-------------|
@@ -24,13 +24,77 @@ Represents a leave record managed by the `leave` module, including leave request
 | REJECTED | Leave request has been rejected |
 | CANCELLED | Leave request has been cancelled |
 
+### LeaveType
+
+| Value | Description |
+|-------|-------------|
+| annual | Annual leave |
+| sick | Sick leave |
+| emergency | Emergency leave |
+| unpaid | Unpaid leave |
+| maternity | Maternity leave |
+| paternity | Paternity leave |
+
+### BalanceStatus
+
+| Value | Description |
+|-------|-------------|
+| ACTIVE | Balance is active |
+| EXHAUSTED | Balance has no remaining days |
+| CLOSED | Balance closed (fiscal year end) |
+
+### EmploymentStatus
+
+| Value | Description |
+|-------|-------------|
+| ACTIVE | Employee is active |
+| INACTIVE | Employee is inactive |
+| TERMINATED | Employee has been terminated |
+
+## audit
+
+Audit records track all state-changing operations (GP-002).
+
+### AuditRecord
+
+| Field | Type | Required |
+|-------|------|----------|
+| id | string | true |
+| entityType | string | true |
+| entityId | string | true |
+| action | string | true |
+| oldValues | Record\<string, unknown\> \| null | false |
+| newValues | Record\<string, unknown\> \| null | false |
+| performedBy | string | true |
+| performedAt | Date | true |
+| ipAddress | string \| undefined | false |
+| userAgent | string \| undefined | false |
+| createdAt | Date | true |
+
+### IAuditRepository
+
+| Method | Signature |
+|--------|-----------|
+| create | `(record: AuditRecord) => Promise<AuditRecord>` |
+| findByEntity | `(entityType: string, entityId: string) => Promise<AuditRecord[]>` |
+
+### IAuditService
+
+| Method | Signature |
+|--------|-----------|
+| record | `(params: { entityType, entityId, action, oldValues?, newValues?, performedBy, ipAddress?, userAgent? }) => Promise<AuditRecord>` |
+
+## leave (planned)
+
+Represents a leave record managed by the `leave` module, including leave requests and related leave-tracking data.
+
 ### LeaveRequest
 
 | Field | Type | Required |
 |-------|------|----------|
 | id | string | true |
 | employeeId | string | true |
-| leaveTypeId | string | true |
+| leavePolicyId | string | true |
 | startDate | Date | true |
 | endDate | Date | true |
 | reason | string \| undefined | false |
@@ -42,13 +106,14 @@ Represents a leave record managed by the `leave` module, including leave request
 
 **Relationships**
 - `Employee` — many-to-one
+- `LeavePolicy` — many-to-one
 
 ### CreateLeaveRequestDto
 
 | Field | Type | Required |
 |-------|------|----------|
 | employeeId | string | true |
-| leaveTypeId | string | true |
+| leavePolicyId | string | true |
 | startDate | Date | true |
 | endDate | Date | true |
 | reason | string \| undefined | false |
@@ -65,37 +130,14 @@ Represents a leave record managed by the `leave` module, including leave request
 
 | Field | Type | Required |
 |-------|------|----------|
+| employeeId | string | false |
 | status | LeaveRequestStatus | false |
-| leaveTypeId | string | false |
-| startDateFrom | Date | false |
-| startDateTo | Date | false |
-| endDateFrom | Date | false |
-| endDateTo | Date | false |
-| limit | number | false |
-| offset | number | false |
+| startDate | Date | false |
+| endDate | Date | false |
 
-## balance
+## balance (planned)
 
-Represents leave balance data managed by the `balance` module, including tracked entitlement, accrual, and remaining leave amounts.
-
-### Balance
-
-| Field | Type | Required |
-|-------|------|----------|
-| id | string | true |
-| employeeId | string | true |
-| policyId | string | true |
-| totalEntitlement | number | true |
-| usedDays | number | true |
-| remainingDays | number | true |
-| fiscalYear | number | true |
-| status | string | true |
-| createdAt | Date | true |
-| updatedAt | Date | true |
-
-**Relationships**
-- `Employee` — many-to-one
-- `LeavePolicy` — many-to-one
+Represents leave balance data managed by the `leave-balance` module.
 
 ### LeaveBalance
 
@@ -103,12 +145,12 @@ Represents leave balance data managed by the `balance` module, including tracked
 |-------|------|----------|
 | id | string | true |
 | employeeId | string | true |
-| policyId | string | true |
+| leavePolicyId | string | true |
 | totalEntitlement | number | true |
 | usedDays | number | true |
 | remainingDays | number | true |
 | fiscalYear | number | true |
-| status | string | true |
+| status | BalanceStatus | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
@@ -116,9 +158,9 @@ Represents leave balance data managed by the `balance` module, including tracked
 - `Employee` — many-to-one
 - `LeavePolicy` — many-to-one
 
-## employee
+## employee (planned)
 
-Represents employee data managed by the `employee` module, including employee records and related personnel information.
+Represents employee data managed by the `employee` module.
 
 ### Employee
 
@@ -130,44 +172,17 @@ Represents employee data managed by the `employee` module, including employee re
 | lastName | string | true |
 | email | string | true |
 | managerId | string \| null | false |
-| department | string \| null | false |
+| department | string | true |
 | hireDate | Date | true |
 | terminationDate | Date \| null | false |
-| employmentStatus | 'ACTIVE' \| 'INACTIVE' \| 'TERMINATED' | true |
+| employmentStatus | EmploymentStatus | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 | deletedAt | Date \| null | false |
 
-## policy
+## policy (planned)
 
-Represents leave policy data managed by the `policy` module, including policy definitions, rules, and leave entitlement configurations.
-
-### Policy
-
-| Field | Type | Required |
-|-------|------|----------|
-| id | string | true |
-| policyName | string | true |
-| leaveType | string | true |
-| entitlementDays | number | true |
-| accrualRate | number | false |
-| maxAccumulation | number | false |
-| minimumNoticeDays | number | false |
-| requiresManagerApproval | boolean | true |
-| isActive | boolean | true |
-| createdAt | Date | true |
-| updatedAt | Date | true |
-
-### LeaveType
-
-| Value | Description |
-|-------|-------------|
-| annual | Annual leave |
-| sick | Sick leave |
-| emergency | Emergency leave |
-| unpaid | Unpaid leave |
-| maternity | Maternity leave |
-| paternity | Paternity leave |
+Represents leave policy data managed by the `leave-policy` module.
 
 ### LeavePolicy
 
@@ -175,19 +190,19 @@ Represents leave policy data managed by the `policy` module, including policy de
 |-------|------|----------|
 | id | string | true |
 | policyName | string | true |
-| leaveType | string | true |
+| leaveType | LeaveType | true |
 | entitlementDays | number | true |
-| accrualRate | number | false |
-| maxAccumulation | number | false |
-| minimumNoticeDays | number | false |
+| accrualRate | number \| null | false |
+| maxAccumulation | number \| null | false |
+| minimumNoticeDays | number \| null | false |
 | requiresManagerApproval | boolean | true |
 | isActive | boolean | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
-## notification
+## notification (planned)
 
-Represents notification data managed by the `notification` module, including notification records, delivery status, and related messaging information.
+Represents notification data managed by the `notification` module.
 
 ### Notification
 
@@ -204,74 +219,6 @@ Represents notification data managed by the `notification` module, including not
 | createdAt | Date | true |
 | readAt | Date \| null | false |
 
-## audit
-
-Represents audit data managed by the `audit` module, including audit records, change history, and activity tracking information.
-
-### Audit
-
-| Field | Type | Required |
-|-------|------|----------|
-| id | string | true |
-| entityType | string | true |
-| entityId | string | true |
-| action | 'CREATE' \| 'UPDATE' \| 'DELETE' \| 'APPROVE' \| 'REJECT' | true |
-| oldValues | Record<string, any> \| null | false |
-| newValues | Record<string, any> \| null | false |
-| performedBy | string \| null | false |
-| performedAt | Date | true |
-| createdAt | Date | true |
-| updatedAt | Date | true |
-
-### AuditLog
-
-| Field | Type | Required |
-|-------|------|----------|
-| id | string | true |
-| entityType | string | true |
-| entityId | string | true |
-| action | 'CREATE' \| 'UPDATE' \| 'DELETE' \| 'APPROVE' \| 'REJECT' | true |
-| oldValues | Record<string, any> \| null | false |
-| newValues | Record<string, any> \| null | false |
-| performedBy | string \| null | false |
-| performedAt | Date | true |
-
-### AuditRecord
-
-| Field | Type | Required |
-|-------|------|----------|
-| entity_type | string | true |
-| entity_id | string | true |
-| action | string | true |
-| changed_by | string \| null | false |
-| old_values | Record<string, any> \| null | false |
-| new_values | Record<string, any> \| null | false |
-| ip_address | string \| null | false |
-| user_agent | string \| null | false |
-
-### AuditServiceInterface
-
-| Field | Type | Required |
-|-------|------|----------|
-| id | string | true |
-| action | string | true |
-| resourceType | string | true |
-| resourceId | string | true |
-| actorId | string | true |
-| timestamp | Date | true |
-| metadata | Record<string, unknown> \| null | false |
-
-## validation
-
-Represents validation data managed by the `validation` module, including validation results and related error information.
-
-### ValidationResult
-
-| Field | Type | Required |
-|-------|------|----------|
-| isValid | boolean | true |
-| errors | string[] | true |
-
 ## system
 
 Represents system-level status information, including health-check and version data.
@@ -282,3 +229,9 @@ Represents system-level status information, including health-check and version d
 |-------|------|----------|
 | up | boolean | true |
 | version | string | true |
+
+### UptimeStatus
+
+| Field | Type | Required |
+|-------|------|----------|
+| uptimeSeconds | number | true |

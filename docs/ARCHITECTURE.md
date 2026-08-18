@@ -16,22 +16,35 @@ The architecture is modular, with a clear separation of concerns between models,
 ## Module structure
 
 ```
-src/modules/leave/leave.{model,repository,service,controller,routes}.ts
-src/modules/balance/balance.{model,repository,service,controller,routes}.ts
-src/modules/employee/employee.{model,repository,service,controller,routes}.ts
-src/modules/policy/policy.{model,repository,service,controller,routes}.ts
-src/modules/notification/notification.{model,repository,service,controller,routes}.ts
-src/modules/LeaveStatus/    — LeaveStatus module
-src/modules/BaseEntity/    — BaseEntity module
-src/modules/LeaveRequest/    — LeaveRequest module
-src/modules/LeaveType/    — LeaveType module
-src/modules/LeavePolicy/    — LeavePolicy module
-src/modules/AuditLog/    — AuditLog module
-src/modules/AuditRecord/    — AuditRecord module
-src/modules/AuditServiceInterface/    — AuditServiceInterface module
-src/shared/db connection.ts
-src/shared/base repository.ts
-src/shared/error types.ts
+src/shared/
+  db/connection.ts              — PostgreSQL connection pool (pg)
+  types/index.ts                — Shared enums (LeaveRequestStatus, LeaveType,
+                                  BalanceStatus, EmploymentStatus) + BaseEntity
+
+src/modules/audit/              — Audit module (Phase 1 ✓)
+  audit.model.ts                — AuditRecord entity
+  audit.repository.interface.ts — IAuditRepository
+  audit.service.interface.ts    — IAuditService
+  audit.service.ts              — AuditService (DI: IAuditRepository)
+  index.ts                      — Barrel export
+
+src/modules/status/             — System status (pre-existing)
+  status.model.ts               — SystemStatus
+  status.service.interface.ts   — IStatusService
+  status.service.ts             — StatusService
+  index.ts
+
+src/modules/uptime/             — Uptime (pre-existing)
+  uptime.model.ts               — UptimeStatus
+  uptime.service.interface.ts   — IUptimeService
+  uptime.service.ts             — UptimeService
+  uptime.routes.ts              — Fastify routes
+  index.ts
+
+src/app.ts                      — Fastify app bootstrap
+src/index.ts                    — Entry point (port 3000)
+
+tests/unit/modules/audit/       — AuditService unit tests
 ```
 
 ## Key patterns
@@ -43,8 +56,7 @@ src/shared/error types.ts
 ## Dependency rules
 
 - Modules import from each other ONLY through their declared public
-  entry point (`index.ts`, `__init__.py`, package root — whatever the
-  stack uses)
+  entry point (`index.ts`)
 - All database access goes through a repository layer — no inline SQL
   / ORM calls in route handlers or business logic
 - No circular dependencies between modules
@@ -95,7 +107,7 @@ src/shared/error types.ts
 
 ### Phases
 
-1. **Shared types & Audit** — Foundation enums and audit capability.
+1. **Shared types & Audit** — ✅ Complete. Foundation enums and audit capability.
 2. **Employee** — Employee lookup and status checks.
 3. **Leave Policy** — Policy definitions.
 4. **Leave Balance** — Balance lifecycle (init, deduct, restore).
