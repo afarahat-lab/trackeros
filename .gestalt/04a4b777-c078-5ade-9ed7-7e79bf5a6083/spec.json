@@ -1,0 +1,92 @@
+{
+  "scope": {
+    "affectedDomains": [],
+    "affectedLayers": [],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "Every enum file exists at the specified path with all declared values: LeaveStatus (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED), LeaveType (annual, sick, emergency, unpaid, maternity, paternity), LeaveAction (CREATE, SUBMIT, APPROVE, REJECT, CANCEL, UPDATE, DELETE), NotificationType (LEAVE_SUBMITTED, LEAVE_APPROVED, LEAVE_REJECTED, LEAVE_CANCELLED, BALANCE_UPDATED), EmploymentStatus (ACTIVE, INACTIVE, TERMINATED), AuditAction (CREATE, UPDATE, DELETE, APPROVE, REJECT).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`src/shared/types/index.ts` barrel-export re-exports every enum from the six individual enum files so that consumers can import all shared types from a single entry point (`shared/types`).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`src/shared/error-types.ts` exports four error classes \u2014 NotFoundError, ValidationError, ConflictError, UnauthorizedError \u2014 each extending the built-in `Error` and exposing a numeric `statusCode` property (404, 400, 409, 401 respectively).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`src/shared/base-repository.ts` exports a generic `IBaseRepository<T>` interface with methods `findById(id: string): Promise<T | null>`, `findAll(): Promise<T[]>`, `create(entity: Omit<T, 'id'>): Promise<T>`, `update(id: string, entity: Partial<T>): Promise<T | null>`, and `delete(id: string): Promise<boolean>`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`src/shared/base-repository.ts` exports an abstract `BaseRepository<T>` class that accepts the pg `Pool` from `shared/db/connection` in its constructor and provides concrete implementations of `findById`, `findAll`, `create`, `update`, and `delete` using parameterized SQL queries.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Every repository method on `BaseRepository<T>` accepts an optional `PoolClient` parameter; when provided, the method uses that client instead of the pool, enabling transactional use by callers.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A Jest test file at `tests/unit/shared/types/enums.test.ts` verifies that every enum value exists for all six enums (e.g., `LeaveStatus.DRAFT`, `LeaveType.annual`, `LeaveAction.CREATE`, etc.) and that the barrel index re-exports them.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All enum files must use TypeScript `const enum` or plain `enum` declarations \u2014 no `any` type, no implicit values. The `no-any` constraint from HARNESS.json applies.",
+    "The `BaseRepository<T>` must import the `pool` export from `shared/db/connection` using the non-relative import path (baseUrl `./src`). No relative imports like `../../shared/db/connection`.",
+    "Test files must use the `.test.ts` extension (not `.spec.ts`) to match the Jest `testMatch` pattern `**/tests/**/*.test.(ts|js)`.",
+    "Error classes must extend the built-in `Error` (not a custom base) and expose `statusCode` as a public readonly numeric property. The `message` must be passed through to the `Error` super constructor."
+  ],
+  "outOfScope": [],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveStatus",
+      "mustExistOrExtend": true,
+      "invariant": "The enum values DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED are the only valid states for a LeaveRequest. No other status value may be introduced without updating this enum and all consumers."
+    },
+    {
+      "entity": "LeaveType",
+      "mustExistOrExtend": true,
+      "invariant": "The enum values annual, sick, emergency, unpaid, maternity, paternity are the complete set of leave categories. Every LeavePolicy must reference exactly one of these types."
+    },
+    {
+      "entity": "EmploymentStatus",
+      "mustExistOrExtend": true,
+      "invariant": "The enum values ACTIVE, INACTIVE, TERMINATED are the only valid employment states. Only ACTIVE employees may submit leave requests; TERMINATED employees are permanently excluded from all workflows."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IBaseRepository.findById",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the entity or null; never throws for a missing entity. Callers decide whether to throw NotFoundError."
+    },
+    {
+      "operation": "IBaseRepository.create",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Accepts an entity without `id` (the database assigns it). Returns the created entity including the generated `id`. Must use parameterized queries \u2014 no string concatenation of SQL."
+    },
+    {
+      "operation": "IBaseRepository.delete",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns `true` if a row was deleted, `false` if no row matched the id. Never throws for a missing entity."
+    }
+  ],
+  "consistencyRequirements": [],
+  "integrationPoints": []
+}
