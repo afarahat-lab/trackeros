@@ -1,0 +1,138 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "employee",
+      "leave-policy"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository",
+      "service"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "Employee entity interface exists at src/modules/employee/employee.model.ts with all required fields: id, employeeNumber, firstName, lastName, email, managerId (string | null), department (string | null), hireDate (Date), terminationDate (Date | null), employmentStatus (EmploymentStatus), createdAt, updatedAt, deletedAt (Date | null). It imports EmploymentStatus from shared/types.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "IEmployeeRepository extends IBaseRepository<Employee> and adds findByEmployeeNumber(employeeNumber: string): Promise<Employee | null>, findByEmail(email: string): Promise<Employee | null>, findByManagerId(managerId: string): Promise<Employee[]>, and findActive(): Promise<Employee[]>.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "EmployeeRepository class extends BaseRepository<Employee> and implements IEmployeeRepository. All query methods use the pg Pool from shared/db/connection. findByEmployeeNumber and findByEmail return a single Employee or null; findByManagerId and findActive return arrays.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "IEmployeeService interface declares getById, getByEmployeeNumber, getByEmail, getSubordinates(managerId: string), and isActive(employeeId: string). EmployeeService implements it by delegating to IEmployeeRepository.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "LeavePolicy entity interface exists at src/modules/leave-policy/leave-policy.model.ts with all required fields: id, policyName, leaveType (LeaveType), entitlementDays, accrualRate (number | null), maxAccumulation (number | null), minimumNoticeDays (number | null), requiresManagerApproval, isActive, createdAt, updatedAt. It imports LeaveType from shared/types.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "ILeavePolicyRepository extends IBaseRepository<LeavePolicy> and adds findByLeaveType(leaveType: LeaveType): Promise<LeavePolicy | null> and findActive(): Promise<LeavePolicy[]>.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "LeavePolicyRepository class extends BaseRepository<LeavePolicy> and implements ILeavePolicyRepository. findByLeaveType returns the active policy for a given LeaveType or null; findActive returns all policies where isActive is true.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "ILeavePolicyService interface declares getById, getByLeaveType, getActivePolicies, and isLeaveTypeActive(leaveType: LeaveType). LeavePolicyService implements it by delegating to ILeavePolicyRepository.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Both modules expose a barrel index.ts that re-exports the model, repository interface, repository class, service interface, and service class. No controllers or routes are created in this phase.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Unit tests exist at tests/unit/modules/employee/employee.service.spec.ts and tests/unit/modules/leave-policy/leave-policy.service.spec.ts. Tests mock the repository layer and verify service methods delegate correctly, including edge cases (employee not found, policy not found, inactive employee).",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access must go through the repository layer \u2014 EmployeeService and LeavePolicyService must not call pool.query or any raw SQL directly (GP-001).",
+    "No controllers or HTTP routes are created in this phase \u2014 only models, repository interfaces/implementations, service interfaces/implementations, and barrel exports.",
+    "EmployeeRepository and LeavePolicyRepository must extend BaseRepository<T> from shared/base-repository.ts and use the shared pg Pool from shared/db/connection.ts. No new Pool instances.",
+    "All TypeScript files must pass strict compilation (no implicit any, strict null checks). No use of `any` \u2014 use `unknown` with type guards per HARNESS.json constraint no-any."
+  ],
+  "outOfScope": [
+    "Controllers and HTTP routes for employee or leave-policy modules \u2014 deferred to later phases when the API surface is needed."
+  ],
+  "ambiguities": [
+    {
+      "description": "Should EmployeeService.getById (and similar lookup methods) throw NotFoundError when the entity is not found, or return null? The PLAN.md does not specify error-throwing semantics for the service layer. The base repository returns null on not-found.",
+      "options": [
+        "Service methods throw NotFoundError when repository returns null",
+        "Service methods return null and let callers decide",
+        "Service methods throw NotFoundError for getById but return null for search-style methods"
+      ],
+      "impactIfWrong": "medium"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "An Employee's employmentStatus must be one of ACTIVE, INACTIVE, or TERMINATED. Only ACTIVE employees may have leave requests submitted on their behalf. managerId is nullable (employees with no manager exist, e.g. CEO). employeeNumber and email are unique across all employees."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "A LeavePolicy's leaveType must be a valid LeaveType enum value. entitlementDays must be a positive integer. For each LeaveType, at most one LeavePolicy may be active (isActive = true) at any time. isActive transitions are ACTIVE \u2194 INACTIVE; a policy cannot be deleted while any LeaveRequest references it."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IEmployeeService.getById",
+      "authRule": "No auth enforcement at this layer \u2014 auth is enforced at the controller/route layer in later phases.",
+      "idempotent": true,
+      "errorSemantics": "Returns null if employee not found (no throw)."
+    },
+    {
+      "operation": "IEmployeeService.isActive",
+      "authRule": "No auth enforcement at this layer.",
+      "idempotent": true,
+      "errorSemantics": "Returns false if employee not found or employmentStatus is not ACTIVE; never throws."
+    },
+    {
+      "operation": "ILeavePolicyService.isLeaveTypeActive",
+      "authRule": "No auth enforcement at this layer.",
+      "idempotent": true,
+      "errorSemantics": "Returns false if no active policy exists for the given LeaveType; never throws."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Employee model must import EmploymentStatus from shared/types/employment-status.enum (via the barrel shared/types/index.ts). The enum values are ACTIVE, INACTIVE, TERMINATED.",
+      "referencePath": "src/shared/types/employment-status.enum.ts"
+    },
+    {
+      "requirement": "LeavePolicy model must import LeaveType from shared/types/leave-type.enum (via the barrel shared/types/index.ts). The enum values are annual, sick, emergency, unpaid, maternity, paternity.",
+      "referencePath": "src/shared/types/leave-type.enum.ts"
+    },
+    {
+      "requirement": "EmployeeRepository and LeavePolicyRepository must extend BaseRepository<T> from shared/base-repository.ts, which provides findById, findAll, create, update, delete using the shared pg Pool. The tableName property must be set to the correct table name ('employees' and 'leave_policies' respectively).",
+      "referencePath": "src/shared/base-repository.ts"
+    },
+    {
+      "requirement": "All error classes used in service methods (e.g., NotFoundError when an employee/policy is not found) must be imported from shared/error-types.ts. The existing classes are NotFoundError (404), ValidationError (422), ConflictError (409), UnauthorizedError (401).",
+      "referencePath": "src/shared/error-types.ts"
+    }
+  ],
+  "integrationPoints": []
+}
