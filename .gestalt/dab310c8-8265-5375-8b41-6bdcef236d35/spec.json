@@ -1,0 +1,37 @@
+{
+  "scope": {
+    "affectedDomains": [],
+    "affectedLayers": [],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The `ILeaveRequestService` interface exposes all 9 methods: `create(dto: CreateLeaveRequestDto)`, `submit(id: string)`, `approve(id: string, approverId: string)`, `reject(id: string, approverId: string)`, `cancel(id: string, cancelledBy: string)`, `update(id: string, dto: UpdateLeaveRequestDto)`, `getById(id: string)`, `query(params: LeaveRequestQueryParams)`, `getEmployeeRequests(employeeId: string)` \u2014 each returning `Promise<LeaveRequest>` (or `Promise<LeaveRequest[]>` for query/getEmployeeRequests).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`create` validates employee is ACTIVE (via `IEmployeeService.getById`), policy is active (via `ILeavePolicyService.getById`), `endDate >= startDate`, and creates the request in DRAFT status \u2014 throwing `ValidationError` for any violation.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`submit` transitions only from DRAFT; validates employee active, policy active; checks minimumNoticeDays (skipped when `policy.leaveType === LeaveType.EMERGENCY`); detects overlapping requests via `findOverlapping` and throws `ConflictError`; computes `daysRequested = (endDate - startDate) + 1` (inclusive calendar days, integer); checks sufficient balance via `ILeaveBalanceService.getRemainingDays` using `startDate.getFullYear()` as fiscal year; throws `ValidationError` on insufficient balance.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`approve` transitions only from SUBMITTED; deducts days from LeaveBalance via `ILeaveBalanceService.deductDays` using the inclusive formula; sets `approvedBy`, `approvedAt`, `status=APPROVED`; throws `ValidationError` for invalid state transition.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [],
+  "outOfScope": [],
+  "ambiguities": [],
+  "entityInvariants": [],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [],
+  "integrationPoints": []
+}
