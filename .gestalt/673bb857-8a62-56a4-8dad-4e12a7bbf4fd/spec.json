@@ -1,0 +1,69 @@
+{
+  "scope": {
+    "affectedDomains": [],
+    "affectedLayers": [],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The Employee module barrel (`src/modules/employee/index.ts`) re-exports the Employee entity interface, IEmployeeRepository, EmployeeRepository, IEmployeeService, and EmployeeService \u2014 and all five compile without type errors under strict TypeScript.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The LeavePolicy module barrel (`src/modules/leave-policy/index.ts`) re-exports the LeavePolicy entity interface, ILeavePolicyRepository, LeavePolicyRepository, ILeavePolicyService, and LeavePolicyService \u2014 and all five compile without type errors under strict TypeScript.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "IEmployeeRepository extends IBaseRepository<Employee> and declares findByEmployeeNumber(employeeNumber: string): Promise<Employee | null>, findByEmail(email: string): Promise<Employee | null>, findByManagerId(managerId: string): Promise<Employee[]>, and findActive(): Promise<Employee[]>.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "ILeavePolicyRepository extends IBaseRepository<LeavePolicy> and declares findByLeaveType(leaveType: LeaveType): Promise<LeavePolicy | null> and findActive(): Promise<LeavePolicy[]>.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "IEmployeeService declares getById(id: string): Promise<Employee | null>, getByEmployeeNumber(employeeNumber: string): Promise<Employee | null>, getByEmail(email: string): Promise<Employee | null>, getSubordinates(managerId: string): Promise<Employee[]>, and isActive(id: string): Promise<boolean>.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "ILeavePolicyService declares getById(id: string): Promise<LeavePolicy | null>, getByLeaveType(leaveType: LeaveType): Promise<LeavePolicy | null>, getActivePolicies(): Promise<LeavePolicy[]>, and isLeaveTypeActive(leaveType: LeaveType): Promise<boolean>.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "EmployeeService.getSubordinates returns only employees whose managerId matches the given id AND whose employmentStatus is ACTIVE.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "EmployeeService.isActive returns true when the employee exists and employmentStatus === EmploymentStatus.ACTIVE; returns false when the employee does not exist or is not ACTIVE (never throws).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "LeavePolicyService.isLeaveTypeActive returns true when an active policy exists for the given LeaveType; returns false when no active policy exists for that type (never throws).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Both unit test files (`tests/unit/modules/employee/employee.service.spec.ts` and `tests/unit/modules/leave-policy/leave-policy.service.spec.ts`) exist, pass with Jest, and mock the repository layer \u2014 no real database connection is required.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access MUST go through the repository layer \u2014 EmployeeService and LeavePolicyService MUST NOT import or use the pg Pool directly; they delegate to IEmployeeRepository / ILeavePolicyRepository exclusively."
+  ],
+  "outOfScope": [],
+  "ambiguities": [],
+  "entityInvariants": [],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [],
+  "integrationPoints": []
+}
