@@ -1,0 +1,72 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-request"
+    ],
+    "affectedLayers": [
+      "controller"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "Every controller handler method (createLeaveRequest, submitLeaveRequest, approveLeaveRequest, rejectLeaveRequest, cancelLeaveRequest, updateLeaveRequest, getLeaveRequest, queryLeaveRequests) wraps its service call(s) in a try/catch that catches NotFoundError and returns HTTP 404 with a JSON body matching the error response contract shape { error: string, code: string, statusCode: number }.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Every controller handler method catches ValidationError and returns HTTP 400 with a JSON body matching the error response contract shape { error: string, code: string, statusCode: number }.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Every controller handler method catches ConflictError and returns HTTP 409 with a JSON body matching the error response contract shape { error: string, code: string, statusCode: number }.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The existing Zod validation error handling (400 with { error, details }) is preserved and not altered \u2014 the new try/catch wraps only the service call, not the Zod parsing.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Do NOT introduce a global Fastify error handler or setErrorHandler hook \u2014 error handling stays per-handler in the controller.",
+    "Do NOT modify the service layer \u2014 services continue to throw NotFoundError, ValidationError, and ConflictError as they do today. Only the controller layer changes."
+  ],
+  "outOfScope": [
+    "Adding try/catch to any controller other than LeaveRequestController \u2014 no other controllers exist in the codebase at this time."
+  ],
+  "ambiguities": [
+    {
+      "description": "The error response contract requires a `code` field as a machine-readable string. The phase intent does not specify the exact code values. Should the code be derived from the error class name (e.g., 'NOT_FOUND', 'VALIDATION_ERROR', 'CONFLICT') or from the specific business rule violated (e.g., 'INSUFFICIENT_BALANCE', 'OVERLAPPING_LEAVE', 'EMPLOYEE_NOT_ACTIVE')?",
+      "options": [
+        "Use the error class name as the code: 'NOT_FOUND', 'VALIDATION_ERROR', 'CONFLICT'",
+        "Use the error's message or a derived business-rule code from the service layer",
+        "Use a static mapping: NotFoundError \u2192 'RESOURCE_NOT_FOUND', ValidationError \u2192 'VALIDATION_ERROR', ConflictError \u2192 'RESOURCE_CONFLICT'"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [],
+  "interfaceConstraints": [
+    {
+      "operation": "LeaveRequestController handler methods (all 8)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Each handler must catch NotFoundError \u2192 404, ValidationError \u2192 400, ConflictError \u2192 409. The response body must conform to the error response contract: { error: string, code: string, statusCode: number }. The `code` field must be a machine-readable string derived from the error name (e.g., 'NOT_FOUND', 'VALIDATION_ERROR', 'CONFLICT'). The `error` field must be the error's message. The `statusCode` field must match the HTTP status code sent."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The error response body shape MUST match the error response contract defined in the reconciled architecture: { error: string, code: string, statusCode: number }. The statusCode in the body MUST equal the HTTP status code sent on the reply.",
+      "referencePath": ".gestalt/architecture/reconciled.json \u2192 error_response_contract"
+    },
+    {
+      "requirement": "The catch blocks MUST use `instanceof` checks against the error classes exported from src/shared/error-types.ts (NotFoundError, ValidationError, ConflictError). Do not check by string name, message content, or any other heuristic.",
+      "referencePath": "src/shared/error-types.ts"
+    }
+  ],
+  "integrationPoints": []
+}
