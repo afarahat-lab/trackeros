@@ -1,26 +1,26 @@
-# Implement this phase: Phase 3: Audit module
+# Implement this phase: Phase 4: Policy module
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/63ff1071-5533-4487-9cf5-cd66e5b8b64e/3`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/63ff1071-5533-4487-9cf5-cd66e5b8b64e/4`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Build the audit module at `src/modules/audit/`. Create these files:
+Build the policy module at `src/modules/policy/`. Create these files:
 
-1. `src/modules/audit/audit.model.ts` — Define the `AuditRecord` interface with fields: `id: string`, `entityType: string`, `entityId: string`, `action: AuditAction`, `performedBy: string`, `changes: Record<string, unknown> | null`, `timestamp: Date`, `createdAt: Date`. Import `AuditAction` from `src/shared/types/index.ts` (Phase 1).
+1. `src/modules/policy/policy.model.ts` — Define the `LeavePolicy` interface with the canonical fields: `id: string`, `policyName: string`, `leaveType: LeaveType`, `entitlementDays: number`, `accrualRate: number | null`, `maxAccumulation: number | null`, `minimumNoticeDays: number | null`, `requiresManagerApproval: boolean`, `isActive: boolean`, `createdAt: Date`, `updatedAt: Date`. Import `LeaveType` from `src/shared/types/index.ts` (Phase 1).
 
-2. `src/modules/audit/audit.repository.ts` — Define `IAuditRepository` interface with methods: `create(record: Omit<AuditRecord, 'id' | 'createdAt'>): Promise<AuditRecord>`, `findByEntity(entityType: string, entityId: string): Promise<AuditRecord[]>`, `findByUser(performedBy: string): Promise<AuditRecord[]>`, `findByDateRange(start: Date, end: Date): Promise<AuditRecord[]>`.
+2. `src/modules/policy/policy.repository.ts` — Define `ILeavePolicyRepository` interface with methods: `findById(id: string): Promise<LeavePolicy | null>`, `findAll(): Promise<LeavePolicy[]>`, `findByLeaveType(leaveType: LeaveType): Promise<LeavePolicy[]>`, `findActive(): Promise<LeavePolicy[]>`, `create(policy: Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeavePolicy>`, `update(id: string, data: Partial<LeavePolicy>): Promise<LeavePolicy | null>`, `delete(id: string): Promise<boolean>`.
 
-3. `src/modules/audit/audit.service.interface.ts` — Define `IAuditService` interface with: `log(record: CreateAuditRecordDto): Promise<AuditRecord>`, `getEntityHistory(entityType: string, entityId: string): Promise<AuditRecord[]>`, `getUserActions(performedBy: string): Promise<AuditRecord[]>`, `getByDateRange(start: Date, end: Date): Promise<AuditRecord[]>`. Also define `CreateAuditRecordDto` here.
+3. `src/modules/policy/policy.service.interface.ts` — Define `ILeavePolicyService` interface with: `getById(id: string): Promise<LeavePolicy | null>`, `getAll(): Promise<LeavePolicy[]>`, `getByLeaveType(leaveType: LeaveType): Promise<LeavePolicy[]>`, `getActive(): Promise<LeavePolicy[]>`, `create(data: CreateLeavePolicyDto): Promise<LeavePolicy>`, `update(id: string, data: UpdateLeavePolicyDto): Promise<LeavePolicy | null>`, `deactivate(id: string): Promise<boolean>`. Also define `CreateLeavePolicyDto` and `UpdateLeavePolicyDto` here.
 
-4. `src/modules/audit/audit.service.ts` — Implement `AuditService` class implementing `IAuditService`. Constructor-injected `IAuditRepository`. The `log` method creates an audit record with the current timestamp.
+4. `src/modules/policy/policy.service.ts` — Implement `LeavePolicyService` class implementing `ILeavePolicyService`. Constructor-injected `ILeavePolicyRepository`. Keep logic minimal: validate, delegate, return.
 
-5. `src/modules/audit/index.ts` — Barrel export of all public symbols.
+5. `src/modules/policy/index.ts` — Barrel export of all public symbols.
 
-This phase depends on `src/shared/types/index.ts` from Phase 1 for the `AuditAction` enum. No other module dependencies.
+This phase depends on `src/shared/types/index.ts` from Phase 1 for the `LeaveType` enum. No other module dependencies.
 
-Include Jest unit tests in `tests/unit/modules/audit/` covering the service with a mock repository.
+Include Jest unit tests in `tests/unit/modules/policy/` covering the service with a mock repository.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -29,17 +29,18 @@ These are resolved, feature-wide decisions. Wherever this phase touches the conc
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- The `AuditAction` enum must be imported from `src/shared/types/index.ts` — the audit module must not redefine or duplicate it. (see `src/shared/types/index.ts`)
-- The `CreateAuditRecordDto` must mirror the `AuditRecord` fields minus `id`, `createdAt`, and `timestamp` — the DTO carries the caller-supplied data, while `timestamp` is set by the service and `id`/`createdAt` by the repository. (see `src/modules/audit/audit.model.ts`)
-- The test file must follow the same patterns as `tests/unit/modules/employee/employee.service.test.ts`: use `jest.Mocked<T>` for the mock repository, define a factory function (e.g., `makeAuditRecord`) for test data, and call `jest.clearAllMocks()` or equivalent in `beforeEach`. (see `tests/unit/modules/employee/employee.service.test.ts`)
+- The `LeaveType` enum MUST be imported from `src/shared/types/index.ts` — the single authoritative definition from Phase 1. The policy module MUST NOT redefine or duplicate `LeaveType`. (see `src/shared/types/index.ts`)
+- The `ValidationError` class in the policy service MUST follow the same pattern as `EmployeeService.ValidationError` and `AuditService.ValidationError`: extend `Error`, set `this.name = 'ValidationError'` in the constructor. (see `src/modules/employee/employee.service.ts`)
+- Unit tests MUST follow the established naming convention: `tests/unit/modules/policy/policy.service.test.ts` (matching `employee.service.test.ts` and `audit.service.test.ts`). Tests MUST use `jest.Mocked<>` for the mock repository and follow the same structure: `makeMockRepo()` factory, `beforeEach` setup, and `describe`/`it` blocks per service method. (see `tests/unit/modules/employee/employee.service.test.ts`)
 ### Entity invariants — enforce these
-- Reuse or extend `AuditRecord`: Every AuditRecord is immutable after creation — `id` and `createdAt` are assigned by the repository on creation and never updated. The `timestamp` field captures the business time of the action (set by the service), while `createdAt` captures the system insertion time (set by the repository).
-- Reuse or extend `AuditRecord`: The `action` field must be one of the `AuditAction` enum values defined in `src/shared/types/index.ts`: CREATED, UPDATED, APPROVED, REJECTED, CANCELLED, DELETED.
+- Reuse or extend `LeavePolicy`: A LeavePolicy has a lifecycle of ACTIVE ↔ INACTIVE, governed by the `isActive` boolean. The `deactivate` service operation transitions a policy from active to inactive; there is no explicit `activate` operation in this phase (reactivation is done via `update` setting `isActive: true`). A policy that is inactive MUST still be returned by `findById`, `findAll`, and `findByLeaveType` — only `findActive` filters to `isActive: true`.
+- Reuse or extend `LeavePolicy`: `entitlementDays` MUST be a positive integer (> 0). `accrualRate`, `maxAccumulation`, and `minimumNoticeDays` are nullable — when non-null they MUST be non-negative numbers. `requiresManagerApproval` defaults to `true` when creating a policy if not explicitly provided.
 ### Interface contract — expose these operations (their shape is yours)
-- IAuditService.log — No auth enforcement at this layer — the audit service is a cross-cutting internal dependency called by other services, not directly by controllers. Auth is enforced at the controller/route layer of the calling module.; Must reject with a typed error if required fields (entityType, entityId, action, performedBy) are missing or invalid. Must not silently drop records.
-- IAuditRepository.create — Must return the full AuditRecord with `id` and `createdAt` populated. The repository is responsible for generating these fields.
+- ILeavePolicyService.create — No auth rule at this layer — the service interface is auth-agnostic. RBAC enforcement belongs in the controller/route layer (Phase 6).; Throws ValidationError for missing/invalid policyName, invalid leaveType, or non-positive entitlementDays. Returns the created LeavePolicy on success.
+- ILeavePolicyService.update — No auth rule at this layer.; Returns `null` when the policy does not exist. Throws ValidationError if `entitlementDays` is updated to a non-positive value. Partial update — only supplied fields are changed.
+- ILeavePolicyService.deactivate — No auth rule at this layer.; idempotent; Returns `true` when the policy exists and is active (transition performed) or already inactive (no-op). Returns `false` when the policy does not exist. Never throws.
 ### Integration points — connect to these
-- src/shared/types/index.ts — The audit module imports `AuditAction` enum — this is its sole external dependency in this phase.
+- src/shared/types/index.ts — The `LeavePolicy` model imports `LeaveType` enum from the shared types module (Phase 1). This is the policy module's sole external dependency.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
