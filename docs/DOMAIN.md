@@ -343,11 +343,104 @@ ACTIVE/EXHAUSTED ──(external)──▶ CLOSED (terminal)
 - `BalanceStatus` enum is defined locally in `balance.model.ts` — no dependency on `shared/types/`
 - The module is self-contained — it does not import from `policy/` or `shared/types/`. Cross-module wiring (e.g., validating that `leavePolicyId` references a real policy) is deferred to the leave module (Phase 6).
 
+## leave
+
+Leave module. Phase 6 🚧 (model, repository interface, service interface committed; service impl, controller, routes, barrel export remain).
+
+### LeaveRequest
+
+| Field | Type | Required |
+|-------|------|----------|
+| id | string | true |
+| employeeId | string | true |
+| leavePolicyId | string | true |
+| startDate | Date | true |
+| endDate | Date | true |
+| reason | string \| undefined | false |
+| status | LeaveRequestStatus | true |
+| approvedBy | string \| null | false |
+| approvedAt | Date \| null | false |
+| rejectedBy | string \| null | false |
+| rejectedAt | Date \| null | false |
+| rejectionReason | string \| null | false |
+| cancelledBy | string \| null | false |
+| cancelledAt | Date \| null | false |
+| cancellationReason | string \| null | false |
+| createdAt | Date | true |
+| updatedAt | Date | true |
+
+### CreateLeaveRequestDto
+
+| Field | Type | Required |
+|-------|------|----------|
+| employeeId | string | true |
+| leavePolicyId | string | true |
+| startDate | Date | true |
+| endDate | Date | true |
+| reason | string | false |
+
+### UpdateLeaveRequestDto
+
+| Field | Type | Required |
+|-------|------|----------|
+| status | LeaveRequestStatus | false |
+| approvedBy | string \| null | false |
+| approvedAt | Date \| null | false |
+| rejectedBy | string \| null | false |
+| rejectedAt | Date \| null | false |
+| rejectionReason | string \| null | false |
+| cancelledBy | string \| null | false |
+| cancelledAt | Date \| null | false |
+| cancellationReason | string \| null | false |
+| reason | string | false |
+
+### LeaveRequestQueryParams
+
+| Field | Type | Required |
+|-------|------|----------|
+| status | LeaveRequestStatus | false |
+| employeeId | string | false |
+| startDate | Date | false |
+| endDate | Date | false |
+
+### ILeaveRequestRepository
+
+| Method | Signature |
+|--------|-----------|
+| findById | `(id: string) => Promise<LeaveRequest \| null>` |
+| findByEmployee | `(employeeId: string) => Promise<LeaveRequest[]>` |
+| findByStatus | `(status: LeaveRequestStatus) => Promise<LeaveRequest[]>` |
+| findByDateRange | `(start: Date, end: Date) => Promise<LeaveRequest[]>` |
+| query | `(params: LeaveRequestQueryParams) => Promise<LeaveRequest[]>` |
+| create | `(request: Omit<LeaveRequest, 'id' \| 'createdAt' \| 'updatedAt'>) => Promise<LeaveRequest>` |
+| update | `(id: string, data: Partial<LeaveRequest>) => Promise<LeaveRequest \| null>` |
+| delete | `(id: string) => Promise<boolean>` |
+
+### ILeaveService
+
+| Method | Signature |
+|--------|-----------|
+| create | `(data: CreateLeaveRequestDto) => Promise<LeaveRequest>` |
+| submit | `(id: string) => Promise<LeaveRequest>` |
+| approve | `(id: string, approverId: string) => Promise<LeaveRequest>` |
+| reject | `(id: string, rejectorId: string, reason: string) => Promise<LeaveRequest>` |
+| cancel | `(id: string, cancelledBy: string, reason: string) => Promise<LeaveRequest>` |
+| getById | `(id: string) => Promise<LeaveRequest \| null>` |
+| getByEmployee | `(employeeId: string) => Promise<LeaveRequest[]>` |
+| query | `(params: LeaveRequestQueryParams) => Promise<LeaveRequest[]>` |
+
+### Entity invariants
+
+- `LeaveRequest` imports `LeaveRequestStatus` from `shared/types/`
+- `reason` is typed as `string | undefined` (not `string | null`)
+- All actor fields (`approvedBy`, `rejectedBy`, `cancelledBy`) and their timestamps/reasons are nullable, set only on the corresponding state transition
+- Lifecycle: DRAFT → SUBMITTED → APPROVED | REJECTED; cancellable from DRAFT, SUBMITTED, or APPROVED
+
 ## Planned modules (not yet built)
 
 The following domain entities are defined in PLAN.md but not yet implemented:
 
-- **leave** (Phase 6) — LeaveRequest with full lifecycle state machine
+- **leave** (Phase 6 remainder) — LeaveService implementation, controller, routes, barrel export, unit tests
 - **notification** (Phase 7) — Notification with read-status tracking
 
 ## system

@@ -40,6 +40,10 @@ src/modules/balance/           — Balance module (Phase 5 ✅)
   balance.service.interface.ts — IBalanceService + CreateBalanceDto
   balance.service.ts           — BalanceService with ValidationError
   index.ts                     — Barrel export
+src/modules/leave/             — Leave module (Phase 6 🚧 partial)
+  leave.model.ts               — LeaveRequest interface + DTOs
+  leave.repository.ts          — ILeaveRequestRepository interface
+  leave.service.interface.ts   — ILeaveService interface
 src/modules/status/            — System status module (seed)
   status.model.ts, status.service.interface.ts, status.service.ts, index.ts
 src/modules/uptime/            — Uptime health-check (seed)
@@ -51,7 +55,7 @@ src/shared/db/connection.ts    — Database connection utility
 ### Planned (not yet built)
 
 ```
-src/modules/leave/             — LeaveRequest module (Phase 6)
+src/modules/leave/             — LeaveRequest service impl, controller, routes, barrel export (Phase 6 remainder)
 src/modules/notification/      — Notification module (Phase 7)
 ```
 
@@ -107,8 +111,20 @@ notification/  ← shared/types/, employee/
 3. **Audit module** – AuditRecord model, repository, service. ✅ IMPLEMENTED
 4. **Policy module** – LeavePolicy model, repository, service interface, service implementation, barrel export, unit tests. ✅ IMPLEMENTED
 5. **Balance module** – LeaveBalance model (with BalanceStatus enum), repository interface, service interface (with CreateBalanceDto), service implementation (deduct/restore with status transitions, hasSufficientBalance), barrel export, unit tests. ✅ IMPLEMENTED
-6. **Leave module** – LeaveRequest model, repository, service, controller, routes.
+6. **Leave module** – LeaveRequest model, repository interface, service interface. 🚧 PARTIAL (service impl, controller, routes, barrel export remain)
 7. **Notification module** – Notification model, repository, service.
+
+### Leave Module Implementation (Phase 6 partial)
+
+Three files committed:
+
+- **leave.model.ts** — `LeaveRequest` interface with all canonical fields (id, employeeId, leavePolicyId, startDate, endDate, reason, status, approvedBy/At, rejectedBy/At/rejectionReason, cancelledBy/At/cancellationReason, createdAt, updatedAt). Also defines `CreateLeaveRequestDto` (employeeId, leavePolicyId, startDate, endDate, reason?), `UpdateLeaveRequestDto` (Partial of status-relevant fields), and `LeaveRequestQueryParams` (status?, employeeId?, startDate?, endDate?). Imports `LeaveRequestStatus` from `shared/types/`.
+
+- **leave.repository.ts** — `ILeaveRequestRepository` interface with: `findById`, `findByEmployee`, `findByStatus`, `findByDateRange`, `query`, `create`, `update`, `delete`.
+
+- **leave.service.interface.ts** — `ILeaveService` interface with: `create`, `submit`, `approve`, `reject`, `cancel`, `getById`, `getByEmployee`, `query`.
+
+Still to build: `leave.service.ts` (implementation with cross-module wiring to employee, policy, balance, audit), `leave.controller.ts`, `leave.routes.ts`, `index.ts`, and unit tests.
 
 ### Balance Module Implementation Notes
 - `BalanceStatus` enum is defined locally in `balance.model.ts` (ACTIVE, EXHAUSTED, CLOSED) — no dependency on `shared/types/`.
