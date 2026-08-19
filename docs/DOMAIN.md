@@ -156,11 +156,51 @@ Audit module. Phase 3 ✅.
 - All string fields are trimmed before storage
 - Throws `ValidationError` (exported from audit.service.ts) on invalid input
 
+## policy
+
+Policy module. Phase 4 🚧 (model + repository interface built; service, tests, barrel export pending).
+
+### LeavePolicy
+
+| Field | Type | Required |
+|-------|------|----------|
+| id | string | true |
+| policyName | string | true |
+| leaveType | LeaveType | true |
+| entitlementDays | number | true |
+| accrualRate | number \| null | false |
+| maxAccumulation | number \| null | false |
+| minimumNoticeDays | number \| null | false |
+| requiresManagerApproval | boolean | true |
+| isActive | boolean | true |
+| createdAt | Date | true |
+| updatedAt | Date | true |
+
+### ILeavePolicyRepository
+
+| Method | Signature |
+|--------|-----------|
+| findById | `(id: string) => Promise<LeavePolicy \| null>` |
+| findAll | `() => Promise<LeavePolicy[]>` |
+| findByLeaveType | `(leaveType: LeaveType) => Promise<LeavePolicy[]>` |
+| findActive | `() => Promise<LeavePolicy[]>` |
+| create | `(policy: Omit<LeavePolicy, 'id' \| 'createdAt' \| 'updatedAt'>) => Promise<LeavePolicy>` |
+| update | `(id: string, data: Partial<LeavePolicy>) => Promise<LeavePolicy \| null>` |
+| delete | `(id: string) => Promise<boolean>` |
+
+### Entity invariants
+
+- `leaveType` must be a valid `LeaveType` enum value
+- `entitlementDays` must be a positive integer (> 0)
+- `accrualRate`, `maxAccumulation`, `minimumNoticeDays` are nullable; when non-null they must be non-negative numbers
+- `requiresManagerApproval` and `isActive` are required booleans
+- Lifecycle: ACTIVE when `isActive === true`, INACTIVE when `isActive === false`
+
 ## Planned modules (not yet built)
 
 The following domain entities are defined in PLAN.md but not yet implemented:
 
-- **policy** (Phase 4) — LeavePolicy with entitlement, accrual, notice rules
+- **policy** (Phase 4 remainder) — service interface, service implementation, barrel export, unit tests
 - **balance** (Phase 5) — LeaveBalance with deduction/restoration logic
 - **leave** (Phase 6) — LeaveRequest with full lifecycle state machine
 - **notification** (Phase 7) — Notification with read-status tracking
