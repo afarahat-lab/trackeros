@@ -119,14 +119,9 @@ describe('BalanceService', () => {
       });
     });
 
-    it('should floor fractional totalEntitlement', async () => {
-      const created = makeBalance({ totalEntitlement: 15, remainingDays: 15 });
-      repo.create.mockResolvedValue(created);
-
-      await service.create({ ...validDto, totalEntitlement: 15.7 });
-      expect(repo.create).toHaveBeenCalledWith(
-        expect.objectContaining({ totalEntitlement: 15, remainingDays: 15 }),
-      );
+    it('should reject fractional totalEntitlement', async () => {
+      await expect(service.create({ ...validDto, totalEntitlement: 15.7 }))
+        .rejects.toThrow(ValidationError);
     });
 
     it('should reject when employeeId is empty', async () => {

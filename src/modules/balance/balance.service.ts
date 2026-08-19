@@ -41,8 +41,8 @@ export class BalanceService implements IBalanceService {
       throw new ValidationError('leavePolicyId is required and must not be empty');
     }
 
-    if (typeof data.totalEntitlement !== 'number' || data.totalEntitlement <= 0 || !Number.isFinite(data.totalEntitlement)) {
-      throw new ValidationError('totalEntitlement must be a positive number');
+    if (typeof data.totalEntitlement !== 'number' || data.totalEntitlement <= 0 || !Number.isFinite(data.totalEntitlement) || !Number.isInteger(data.totalEntitlement)) {
+      throw new ValidationError('totalEntitlement must be a positive integer');
     }
 
     if (typeof data.fiscalYear !== 'number' || data.fiscalYear <= 0 || !Number.isInteger(data.fiscalYear)) {
