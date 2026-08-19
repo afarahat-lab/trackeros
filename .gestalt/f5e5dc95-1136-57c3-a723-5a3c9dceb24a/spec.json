@@ -1,0 +1,121 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "employee"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository-interface",
+      "service-interface",
+      "service",
+      "tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The `Employee` interface is defined in `src/modules/employee/employee.model.ts` with exactly these fields: `id: string`, `fullName: string`, `email: string`, `department: string | null`, `managerId: string | null`, `isActive: boolean`, `createdAt: Date`, `updatedAt: Date`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `IEmployeeRepository` interface is defined in `src/modules/employee/employee.repository.ts` with exactly these methods: `findById(id: string): Promise<Employee | null>`, `findAll(): Promise<Employee[]>`, `findByManager(managerId: string): Promise<Employee[]>`, `create(employee: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'>): Promise<Employee>`, `update(id: string, data: Partial<Employee>): Promise<Employee | null>`, `delete(id: string): Promise<boolean>`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `IEmployeeService` interface is defined in `src/modules/employee/employee.service.interface.ts` with exactly these methods: `getById(id: string): Promise<Employee | null>`, `getAll(): Promise<Employee[]>`, `getSubordinates(managerId: string): Promise<Employee[]>`, `create(data: CreateEmployeeDto): Promise<Employee>`, `update(id: string, data: UpdateEmployeeDto): Promise<Employee | null>`, `deactivate(id: string): Promise<boolean>`. The file also exports `CreateEmployeeDto` and `UpdateEmployeeDto`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`EmployeeService` in `src/modules/employee/employee.service.ts` implements `IEmployeeService` and accepts `IEmployeeRepository` via constructor injection. Every service method delegates to the corresponding repository method. `deactivate` calls `update(id, { isActive: false })` and returns `true` if the update succeeded (non-null result), `false` otherwise.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`src/modules/employee/index.ts` barrel-exports all public symbols: `Employee`, `IEmployeeRepository`, `IEmployeeService`, `CreateEmployeeDto`, `UpdateEmployeeDto`, `EmployeeService`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests in `tests/unit/modules/employee/` cover all six `IEmployeeService` methods using a mock `IEmployeeRepository`. Tests verify: `getById` returns employee or null, `getAll` returns array, `getSubordinates` returns employees with matching managerId, `create` returns the created employee, `update` returns updated employee or null, `deactivate` returns true on success and false when employee not found.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The `EmployeeService` must never access the database directly \u2014 all data access goes through `IEmployeeRepository` (GP-001, HARNESS.json constraint `no-direct-db-outside-repository`).",
+    "No `any` types anywhere in the module \u2014 use `unknown` with type guards if needed (HARNESS.json constraint `no-any`).",
+    "The module must compile under strict TypeScript (`strict: true`, `noImplicitAny`, `strictNullChecks`).",
+    "The module must not import from any other module's internals \u2014 only from `index.ts` barrel exports (ARCHITECTURE.md dependency rule). The sole external dependency is `src/shared/types/index.ts`."
+  ],
+  "outOfScope": [
+    "Controller, routes, or HTTP handlers for the employee module \u2014 deferred to a later phase.",
+    "Concrete repository implementation (e.g., Knex/PostgreSQL adapter) \u2014 only the interface is defined in this phase.",
+    "Audit logging \u2014 the employee service does not produce audit records in this phase (audit module is Phase 3)."
+  ],
+  "ambiguities": [
+    {
+      "description": "Should `IEmployeeService.getAll()` return all employees (including deactivated ones) or only active employees? The repository's `findAll()` has no filter, but the service could choose to filter by `isActive`.",
+      "options": [
+        "Return all employees regardless of isActive status",
+        "Return only active employees (isActive === true)"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "`id` is a non-empty string that uniquely identifies the employee. `email` is a non-empty string. `isActive` defaults to `true` on creation. `createdAt` and `updatedAt` are set at creation time and `updatedAt` is refreshed on every update. `department` and `managerId` are nullable."
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "Deactivation is a soft-delete: `deactivate` sets `isActive = false` via `update`. The repository's `delete` method exists but is not exposed through `IEmployeeService`. An employee, once deactivated, can still be retrieved by `getById` and appears in `getAll` results."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IEmployeeService.create",
+      "authRule": "No auth rule enforced at this layer \u2014 auth is a controller/route concern deferred to a later phase.",
+      "idempotent": false,
+      "errorSemantics": "Must reject with a typed error when required fields (`fullName`, `email`) are missing or empty. Must reject when `email` is not a valid email format."
+    },
+    {
+      "operation": "IEmployeeService.deactivate",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns `false` when the employee does not exist. Returns `true` when the employee was successfully deactivated or was already inactive (idempotent)."
+    },
+    {
+      "operation": "IEmployeeService.update",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns `null` when the employee does not exist. Must reject with a typed error when `email` is being updated to an invalid format."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The barrel export pattern in `src/modules/employee/index.ts` must match the convention established by `src/modules/status/index.ts`: re-export model interfaces, service interfaces, DTOs, and the service class using named `export { X } from './file'` syntax.",
+      "referencePath": "src/modules/status/index.ts"
+    },
+    {
+      "requirement": "The service interface file naming convention (`*.service.interface.ts`) and the service implementation file naming (`*.service.ts`) must match the pattern used by the existing `status` and `uptime` modules.",
+      "referencePath": "src/modules/status/status.service.interface.ts"
+    },
+    {
+      "requirement": "The `Employee` model file must follow the same interface-only pattern as `src/modules/status/status.model.ts` \u2014 a TypeScript interface export, no class, no runtime code.",
+      "referencePath": "src/modules/status/status.model.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts",
+      "why": "Phase 1 foundation \u2014 the employee module depends on this for shared enums (LeaveRequestStatus, LeaveType, AuditAction). Although the employee model does not directly consume these enums in this phase, the dependency is declared in the reconciled architecture and will be needed by later phases that consume the employee module."
+    }
+  ]
+}
