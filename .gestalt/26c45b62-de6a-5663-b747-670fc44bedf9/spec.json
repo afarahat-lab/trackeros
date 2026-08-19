@@ -1,0 +1,104 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "audit"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository-interface",
+      "service-interface",
+      "service",
+      "tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The `AuditRecord` interface is defined in `src/modules/audit/audit.model.ts` with exactly these fields: `id: string`, `entityType: string`, `entityId: string`, `action: AuditAction`, `performedBy: string`, `changes: Record<string, unknown> | null`, `timestamp: Date`, `createdAt: Date` \u2014 and `AuditAction` is imported from `src/shared/types/index.ts`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `IAuditRepository` interface is defined in `src/modules/audit/audit.repository.ts` with exactly four methods: `create(record: Omit<AuditRecord, 'id' | 'createdAt'>): Promise<AuditRecord>`, `findByEntity(entityType: string, entityId: string): Promise<AuditRecord[]>`, `findByUser(performedBy: string): Promise<AuditRecord[]>`, `findByDateRange(start: Date, end: Date): Promise<AuditRecord[]>`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `IAuditService` interface is defined in `src/modules/audit/audit.service.interface.ts` with exactly four methods: `log(record: CreateAuditRecordDto): Promise<AuditRecord>`, `getEntityHistory(entityType: string, entityId: string): Promise<AuditRecord[]>`, `getUserActions(performedBy: string): Promise<AuditRecord[]>`, `getByDateRange(start: Date, end: Date): Promise<AuditRecord[]>` \u2014 and `CreateAuditRecordDto` is defined in the same file.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `AuditService` class in `src/modules/audit/audit.service.ts` implements `IAuditService`, receives `IAuditRepository` via constructor injection, and its `log` method sets `timestamp: new Date()` on the incoming DTO before delegating to `repository.create`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The barrel export `src/modules/audit/index.ts` re-exports all public symbols: `AuditRecord`, `IAuditRepository`, `IAuditService`, `CreateAuditRecordDto`, and `AuditService`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests exist at `tests/unit/modules/audit/audit.service.test.ts` covering all four service methods (`log`, `getEntityHistory`, `getUserActions`, `getByDateRange`) with a mock `IAuditRepository` using `jest.Mocked<T>`, factory functions for test data, and `beforeEach` to reset mocks \u2014 following the conventions established by `tests/unit/modules/employee/employee.service.test.ts`.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The `changes` field in `AuditRecord` must use `Record<string, unknown> | null` \u2014 never `any` (HARNESS.json constraint `no-any`).",
+    "All database access goes through the repository interface \u2014 the service must never call the database directly (GP-001).",
+    "The module must follow the exact file structure and naming conventions established by the Phase 2 employee module: `audit.model.ts`, `audit.repository.ts`, `audit.service.interface.ts`, `audit.service.ts`, `index.ts`."
+  ],
+  "outOfScope": [
+    "Controllers, routes, or HTTP endpoints for the audit module \u2014 this phase builds only the core model, repository interface, service interface, service implementation, and barrel export. Controllers will be added in later phases when other modules integrate with audit.",
+    "Database migrations, Knex schema definitions, or a concrete repository implementation \u2014 this phase defines only the repository interface. The concrete implementation (e.g., a Postgres-backed repository) is deferred."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "AuditRecord",
+      "mustExistOrExtend": true,
+      "invariant": "Every AuditRecord is immutable after creation \u2014 `id` and `createdAt` are assigned by the repository on creation and never updated. The `timestamp` field captures the business time of the action (set by the service), while `createdAt` captures the system insertion time (set by the repository)."
+    },
+    {
+      "entity": "AuditRecord",
+      "mustExistOrExtend": true,
+      "invariant": "The `action` field must be one of the `AuditAction` enum values defined in `src/shared/types/index.ts`: CREATED, UPDATED, APPROVED, REJECTED, CANCELLED, DELETED."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IAuditService.log",
+      "authRule": "No auth enforcement at this layer \u2014 the audit service is a cross-cutting internal dependency called by other services, not directly by controllers. Auth is enforced at the controller/route layer of the calling module.",
+      "idempotent": false,
+      "errorSemantics": "Must reject with a typed error if required fields (entityType, entityId, action, performedBy) are missing or invalid. Must not silently drop records."
+    },
+    {
+      "operation": "IAuditRepository.create",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Must return the full AuditRecord with `id` and `createdAt` populated. The repository is responsible for generating these fields."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The `AuditAction` enum must be imported from `src/shared/types/index.ts` \u2014 the audit module must not redefine or duplicate it.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The `CreateAuditRecordDto` must mirror the `AuditRecord` fields minus `id`, `createdAt`, and `timestamp` \u2014 the DTO carries the caller-supplied data, while `timestamp` is set by the service and `id`/`createdAt` by the repository.",
+      "referencePath": "src/modules/audit/audit.model.ts"
+    },
+    {
+      "requirement": "The test file must follow the same patterns as `tests/unit/modules/employee/employee.service.test.ts`: use `jest.Mocked<T>` for the mock repository, define a factory function (e.g., `makeAuditRecord`) for test data, and call `jest.clearAllMocks()` or equivalent in `beforeEach`.",
+      "referencePath": "tests/unit/modules/employee/employee.service.test.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts",
+      "why": "The audit module imports `AuditAction` enum \u2014 this is its sole external dependency in this phase."
+    }
+  ]
+}
