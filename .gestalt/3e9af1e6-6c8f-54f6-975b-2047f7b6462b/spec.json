@@ -1,0 +1,199 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave",
+      "balance",
+      "audit",
+      "policy",
+      "employee",
+      "shared-types"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository-interface",
+      "service-interface",
+      "service",
+      "routes",
+      "tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "large"
+  },
+  "successCriteria": [
+    {
+      "description": "The `LeaveRequest` interface exposes all canonical fields: id, employeeId, leavePolicyId, startDate, endDate, reason (string | undefined), status (LeaveRequestStatus), approvedBy/approvedAt (both string|null/Date|null), rejectedBy/rejectedAt/rejectionReason (all set-or-null together), cancelledBy/cancelledAt/cancellationReason (all set-or-null together), createdAt, updatedAt.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`CreateLeaveRequestDto` requires employeeId, leavePolicyId, startDate, endDate and accepts an optional reason. `UpdateLeaveRequestDto` is a Partial of status-relevant fields. `LeaveRequestQueryParams` accepts optional status, employeeId, startDate, endDate filters.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`ILeaveRequestRepository` declares findById, findByEmployee, findByStatus, findByDateRange, query, create, update, and delete with the exact signatures specified in the phase scope.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`ILeaveService` declares create, submit, approve, reject, cancel, getById, getByEmployee, and query with the exact signatures specified in the phase scope.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`LeaveService.create` sets status to DRAFT, computes no day count, and returns the created LeaveRequest. It does NOT validate employee/policy/balance \u2014 those checks are deferred to submit.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`LeaveService.submit` validates: (a) employee exists via `IEmployeeService.getById`, (b) policy exists and isActive via `ILeavePolicyService.getById`, (c) sufficient balance via `IBalanceService.hasSufficientBalance`, (d) minimumNoticeDays \u2014 if set on the policy, startDate >= now + minimumNoticeDays. On success, sets status to SUBMITTED and logs an audit record with action SUBMITTED.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`LeaveService.approve` validates current status is SUBMITTED, sets approvedBy/approvedAt, sets status to APPROVED, calls `IBalanceService.getByEmployeeAndPolicy` then `IBalanceService.deductDays` with the balance id and computed days (inclusive calendar days: Math.floor((endDate - startDate) / msPerDay + 1)), and logs an audit record with action APPROVED.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`LeaveService.reject` validates current status is SUBMITTED, sets rejectedBy/rejectedAt/rejectionReason, sets status to REJECTED, and logs an audit record with action REJECTED. No balance interaction occurs.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`LeaveService.cancel` validates current status is APPROVED or SUBMITTED. If APPROVED, calls `IBalanceService.getByEmployeeAndPolicy` then `IBalanceService.restoreDays` with the balance id and computed days. Sets cancelledBy/cancelledAt/cancellationReason, sets status to CANCELLED, and logs an audit record with action CANCELLED.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Every state-changing operation (create, submit, approve, reject, cancel) calls `IAuditService.log` with the correct entityType ('LeaveRequest'), entityId, action (matching AuditAction enum), performedBy, and relevant changes payload.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Day counting uses the BINDING formula: `daysRequested = Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24) + 1)` \u2014 inclusive calendar days, integer result. This formula is used consistently for balance deduction, balance restoration, and sufficiency checks.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Emergency leave follows the same `requiresManagerApproval` path as all other leave types \u2014 no auto-approval, no special SLA, no separate code path.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Invalid state transitions (e.g., approving a non-SUBMITTED request, rejecting an already-APPROVED request, cancelling a DRAFT or REJECTED request) throw a local `ValidationError` with a descriptive message.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Route handlers follow the `uptime.routes.ts` pattern: an async function receiving `FastifyInstance`, registering handlers that instantiate the service with its dependencies inline per request, delegating to the service, and returning appropriate HTTP status codes on success/error.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "Barrel export at `src/modules/leave/index.ts` re-exports all public symbols: LeaveRequest, CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveRequestQueryParams, ILeaveRequestRepository, ILeaveService, LeaveService, ValidationError, and the routes function.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests in `tests/unit/modules/leave/` cover all state transitions (DRAFT\u2192SUBMITTED\u2192APPROVED, DRAFT\u2192SUBMITTED\u2192REJECTED, SUBMITTED\u2192CANCELLED, APPROVED\u2192CANCELLED), balance deduction on approve, balance restoration on cancel-from-APPROVED, no restoration on cancel-from-SUBMITTED, validation failures (missing employee, inactive policy, insufficient balance, minimum notice violation, invalid state transitions), and audit logging on every state change \u2014 all using `jest.Mocked<>` mock dependencies.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The `LeaveService` constructor MUST accept exactly five injected dependencies: `ILeaveRequestRepository`, `IEmployeeService`, `ILeavePolicyService`, `IBalanceService`, `IAuditService`. No other cross-module dependencies are permitted.",
+    "All module imports from other modules MUST go through the target module's `index.ts` barrel export only \u2014 never import directly from internal files like `employee.service.interface.ts` or `balance.model.ts`.",
+    "The `ValidationError` class MUST be defined locally in `leave.service.ts` (not imported from a shared module), following the pattern established by audit, policy, and balance modules.",
+    "The day-counting formula `Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24) + 1)` is BINDING \u2014 it must be used at every call site that computes requested days (balance deduction, balance restoration, sufficiency check). No alternative formula or per-type variation is allowed.",
+    "Fiscal year is hardcoded as the calendar year of `startDate` (`startDate.getFullYear()`). No configuration, no per-tenant variation, no per-employee anniversary logic."
+  ],
+  "outOfScope": [
+    "Notification dispatch on leave state changes \u2014 this is deferred to Phase 7 (Notification module). The leave service does NOT call any notification service in this phase.",
+    "Database migrations, Knex schema definitions, and actual PostgreSQL repository implementations \u2014 this phase defines only the repository interface and service logic; concrete persistence is deferred.",
+    "Overlap detection (checking whether an employee already has an approved leave request covering the same date range) \u2014 not specified in the phase scope or business rules.",
+    "Post-startDate cancellation with prorated balance restoration \u2014 the business rules settled during discovery do not address this scenario; full-day restoration is used regardless of timing."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "A LeaveRequest MUST always be in exactly one of the five lifecycle states: DRAFT \u2192 SUBMITTED \u2192 (APPROVED | REJECTED); cancellable from SUBMITTED or APPROVED to CANCELLED. Once in a terminal state (APPROVED, REJECTED, CANCELLED), no further transitions are permitted except APPROVED\u2192CANCELLED."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "When status is APPROVED, approvedBy and approvedAt MUST be non-null. When status is REJECTED, rejectedBy, rejectedAt, and rejectionReason MUST be non-null. When status is CANCELLED, cancelledBy, cancelledAt, and cancellationReason MUST be non-null. These actor/timestamp/reason fields MUST be null in all other states."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "startDate MUST be on or before endDate. The computed daysRequested (inclusive calendar days) MUST be a positive integer \u2265 1."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "LeaveService.submit",
+      "authRule": "Caller must be authenticated; the employeeId on the request must match the authenticated user's id or the caller must hold the 'manager' or 'hr_admin' role.",
+      "idempotent": false,
+      "errorSemantics": "Throws ValidationError if: employee not found, policy not found or not active, insufficient balance, minimumNoticeDays not met, request not in DRAFT status. Returns the updated LeaveRequest with status SUBMITTED on success."
+    },
+    {
+      "operation": "LeaveService.approve",
+      "authRule": "Caller must hold the 'manager' or 'hr_admin' role.",
+      "idempotent": false,
+      "errorSemantics": "Throws ValidationError if: request not found, request not in SUBMITTED status, balance lookup fails, balance deduction fails (insufficient balance or balance not ACTIVE). On success, status is APPROVED, balance is deducted, and audit is logged. The status update and balance deduction must be atomic (same transaction)."
+    },
+    {
+      "operation": "LeaveService.reject",
+      "authRule": "Caller must hold the 'manager' or 'hr_admin' role.",
+      "idempotent": false,
+      "errorSemantics": "Throws ValidationError if: request not found, request not in SUBMITTED status, rejectionReason is empty. On success, status is REJECTED with actor/timestamp/reason set, and audit is logged. No balance interaction."
+    },
+    {
+      "operation": "LeaveService.cancel",
+      "authRule": "Caller must be the request owner (employeeId match) or hold the 'manager' or 'hr_admin' role.",
+      "idempotent": false,
+      "errorSemantics": "Throws ValidationError if: request not found, request not in SUBMITTED or APPROVED status, cancellationReason is empty. If APPROVED, restores balance days atomically with the status update. On success, status is CANCELLED with actor/timestamp/reason set, and audit is logged."
+    },
+    {
+      "operation": "LeaveService.create",
+      "authRule": "Caller must be authenticated.",
+      "idempotent": false,
+      "errorSemantics": "Throws ValidationError if required fields (employeeId, leavePolicyId, startDate, endDate) are missing or if startDate > endDate. Returns the created LeaveRequest with status DRAFT. No cross-module validation is performed at this stage."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The `LeaveRequestStatus` enum used by the leave module MUST be the one defined in `src/shared/types/index.ts` \u2014 no local redefinition or shadow enum.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The `AuditAction` enum values used in audit log calls (CREATED, SUBMITTED, APPROVED, REJECTED, CANCELLED) MUST match the enum defined in `src/shared/types/index.ts`.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The `IEmployeeService` interface used by LeaveService MUST match the one exported from `src/modules/employee/index.ts`. Specifically, `getById(id: string): Promise<Employee | null>` is the method used for employee existence validation.",
+      "referencePath": "src/modules/employee/index.ts"
+    },
+    {
+      "requirement": "The `ILeavePolicyService` interface used by LeaveService MUST match the one exported from `src/modules/policy/index.ts`. Specifically, `getById(id: string): Promise<LeavePolicy | null>` is used for policy validation, and the `isActive` boolean field on the returned `LeavePolicy` is checked.",
+      "referencePath": "src/modules/policy/index.ts"
+    },
+    {
+      "requirement": "The `IBalanceService` interface used by LeaveService MUST match the one exported from `src/modules/balance/index.ts`. Specifically: `hasSufficientBalance(employeeId, leavePolicyId, requestedDays)` for pre-submit checks, `getByEmployeeAndPolicy(employeeId, leavePolicyId)` to obtain the balance id, `deductDays(balanceId, days)` on approve, and `restoreDays(balanceId, days)` on cancel-from-APPROVED.",
+      "referencePath": "src/modules/balance/index.ts"
+    },
+    {
+      "requirement": "The `IAuditService` interface used by LeaveService MUST match the one exported from `src/modules/audit/index.ts`. Specifically, `log(record: CreateAuditRecordDto): Promise<AuditRecord>` is called with entityType='LeaveRequest', the request id as entityId, the appropriate AuditAction, the actor id as performedBy, and an optional changes object.",
+      "referencePath": "src/modules/audit/index.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/employee/index.ts",
+      "why": "LeaveService calls IEmployeeService.getById to validate that the employee exists before allowing submission."
+    }
+  ]
+}
