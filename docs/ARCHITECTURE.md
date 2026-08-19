@@ -34,6 +34,12 @@ src/modules/policy/            — Policy module (Phase 4 ✅)
   policy.service.interface.ts  — ILeavePolicyService + DTOs
   policy.service.ts            — LeavePolicyService with ValidationError
   index.ts                     — Barrel export
+src/modules/balance/           — Balance module (Phase 5 ✅)
+  balance.model.ts             — LeaveBalance interface + BalanceStatus enum
+  balance.repository.ts        — IBalanceRepository interface
+  balance.service.interface.ts — IBalanceService + CreateBalanceDto
+  balance.service.ts           — BalanceService with ValidationError
+  index.ts                     — Barrel export
 src/modules/status/            — System status module (seed)
   status.model.ts, status.service.interface.ts, status.service.ts, index.ts
 src/modules/uptime/            — Uptime health-check (seed)
@@ -45,7 +51,6 @@ src/shared/db/connection.ts    — Database connection utility
 ### Planned (not yet built)
 
 ```
-src/modules/balance/           — LeaveBalance module (Phase 5)
 src/modules/leave/             — LeaveRequest module (Phase 6)
 src/modules/notification/      — Notification module (Phase 7)
 ```
@@ -101,9 +106,18 @@ notification/  ← shared/types/, employee/
 2. **Employee module** – Employee model, repository, service. ✅ IMPLEMENTED
 3. **Audit module** – AuditRecord model, repository, service. ✅ IMPLEMENTED
 4. **Policy module** – LeavePolicy model, repository, service interface, service implementation, barrel export, unit tests. ✅ IMPLEMENTED
-5. **Balance module** – Balance model, repository, service (deduct/restore).
+5. **Balance module** – LeaveBalance model (with BalanceStatus enum), repository interface, service interface (with CreateBalanceDto), service implementation (deduct/restore with status transitions, hasSufficientBalance), barrel export, unit tests. ✅ IMPLEMENTED
 6. **Leave module** – LeaveRequest model, repository, service, controller, routes.
 7. **Notification module** – Notification model, repository, service.
+
+### Balance Module Implementation Notes
+- `BalanceStatus` enum is defined locally in `balance.model.ts` (ACTIVE, EXHAUSTED, CLOSED) — no dependency on `shared/types/`.
+- `remainingDays = Math.floor(totalEntitlement - usedDays)` — integer arithmetic, floor for safety.
+- `deductDays`: validates balance is ACTIVE, checks sufficiency, increments `usedDays`, recalculates `remainingDays`, transitions to EXHAUSTED when `remainingDays` reaches 0.
+- `restoreDays`: validates balance is not CLOSED, checks `usedDays >= days`, decrements `usedDays`, recalculates `remainingDays`, transitions back to ACTIVE when `remainingDays > 0`.
+- `hasSufficientBalance`: returns `false` (never throws) when no balance exists or balance is not ACTIVE; floors fractional `requestedDays`.
+- `ValidationError` is defined locally in the service file (consistent with audit and policy modules).
+- The module is self-contained — it does not import from `policy/` or `shared/types/` at this stage. Cross-module wiring (e.g., validating that `leavePolicyId` references a real policy) is deferred to the leave module (Phase 6).
 
 ### Cross-Cutting Contracts
 - **Auth** – JWT bearer tokens. Auth middleware populates `request.user` with `{ id, role }`. Roles: `employee`, `manager`, `hr_admin`. RBAC enforced via `requireRole(...)` guard.
