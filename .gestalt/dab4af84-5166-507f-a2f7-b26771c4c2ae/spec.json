@@ -1,0 +1,127 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "policy"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository-interface",
+      "service-interface",
+      "service",
+      "unit-tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The `LeavePolicy` interface is exported from `src/modules/policy/policy.model.ts` with all canonical fields (`id`, `policyName`, `leaveType`, `entitlementDays`, `accrualRate`, `maxAccumulation`, `minimumNoticeDays`, `requiresManagerApproval`, `isActive`, `createdAt`, `updatedAt`) and imports `LeaveType` from `src/shared/types/index.ts`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `ILeavePolicyRepository` interface is exported from `src/modules/policy/policy.repository.ts` with all seven methods: `findById`, `findAll`, `findByLeaveType`, `findActive`, `create`, `update`, `delete`, each with the correct signatures matching the phase scope.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `ILeavePolicyService` interface is exported from `src/modules/policy/policy.service.interface.ts` with all seven operations (`getById`, `getAll`, `getByLeaveType`, `getActive`, `create`, `update`, `deactivate`) plus `CreateLeavePolicyDto` and `UpdateLeavePolicyDto` types.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`LeavePolicyService` implements `ILeavePolicyService`, accepts `ILeavePolicyRepository` via constructor injection, and delegates all operations to the repository with input validation on `create` (rejecting missing `policyName`, invalid `leaveType`, non-positive `entitlementDays`).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`deactivate(id)` sets `isActive` to `false` and returns `true` when the policy exists and is active; returns `false` when the policy does not exist; returns `true` (no-op) when the policy is already inactive.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`src/modules/policy/index.ts` barrel-exports all public symbols: `LeavePolicy`, `ILeavePolicyRepository`, `ILeavePolicyService`, `CreateLeavePolicyDto`, `UpdateLeavePolicyDto`, `LeavePolicyService`, and any `ValidationError` class.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests in `tests/unit/modules/policy/` cover the service with a mock repository: create with valid/invalid data, getById (found/not-found), getAll, getByLeaveType, getActive, update (found/not-found), deactivate (active/inactive/not-found).",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The policy module MUST only depend on `src/shared/types/index.ts` (Phase 1). It MUST NOT import from any other module (`employee/`, `audit/`, `balance/`, `leave/`, `notification/`).",
+    "All database access MUST go through the repository interface (`ILeavePolicyRepository`). The service MUST NOT contain inline SQL, ORM calls, or direct DB connection usage (GP-001).",
+    "The `create` method MUST validate that `policyName` is non-empty, `leaveType` is a valid `LeaveType` enum member, and `entitlementDays` is a positive integer. Invalid input MUST throw a typed `ValidationError` (matching the pattern established in `employee.service.ts` and `audit.service.ts`).",
+    "The `update` method MUST return `null` when the policy does not exist (not throw), matching the pattern in `EmployeeService.update`.",
+    "No `any` types \u2014 use `unknown` with type guards where needed (HARNESS.json constraint `no-any`)."
+  ],
+  "outOfScope": [
+    "HTTP routes, controllers, and Fastify plugin registration for the policy module \u2014 deferred to Phase 6 (Leave module) or a future policy-specific API phase.",
+    "Database migrations (Knex) for the `leave_policies` table \u2014 this phase defines only the domain model, repository interface, and service; the persistence implementation is deferred.",
+    "Audit logging from the policy service \u2014 GP-002 requires audit records for state-changing operations, but the policy module has no dependency on the audit module in this phase. Audit integration for policy changes is deferred to a later phase or handled at the controller/route layer."
+  ],
+  "ambiguities": [
+    {
+      "description": "Should `create` validation accept all six `LeaveType` enum values (ANNUAL, SICK, EMERGENCY, UNPAID, MATERNITY, PATERNITY) or restrict to the three in scope (ANNUAL, SICK, EMERGENCY)?",
+      "options": [
+        "Accept all six \u2014 the enum is the source of truth and restricting would require a separate allowlist that could drift",
+        "Restrict to ANNUAL/SICK/EMERGENCY \u2014 the other types are placeholders for future phases"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "A LeavePolicy has a lifecycle of ACTIVE \u2194 INACTIVE, governed by the `isActive` boolean. The `deactivate` service operation transitions a policy from active to inactive; there is no explicit `activate` operation in this phase (reactivation is done via `update` setting `isActive: true`). A policy that is inactive MUST still be returned by `findById`, `findAll`, and `findByLeaveType` \u2014 only `findActive` filters to `isActive: true`."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "`entitlementDays` MUST be a positive integer (> 0). `accrualRate`, `maxAccumulation`, and `minimumNoticeDays` are nullable \u2014 when non-null they MUST be non-negative numbers. `requiresManagerApproval` defaults to `true` when creating a policy if not explicitly provided."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "ILeavePolicyService.create",
+      "authRule": "No auth rule at this layer \u2014 the service interface is auth-agnostic. RBAC enforcement belongs in the controller/route layer (Phase 6).",
+      "idempotent": false,
+      "errorSemantics": "Throws ValidationError for missing/invalid policyName, invalid leaveType, or non-positive entitlementDays. Returns the created LeavePolicy on success."
+    },
+    {
+      "operation": "ILeavePolicyService.update",
+      "authRule": "No auth rule at this layer.",
+      "idempotent": false,
+      "errorSemantics": "Returns `null` when the policy does not exist. Throws ValidationError if `entitlementDays` is updated to a non-positive value. Partial update \u2014 only supplied fields are changed."
+    },
+    {
+      "operation": "ILeavePolicyService.deactivate",
+      "authRule": "No auth rule at this layer.",
+      "idempotent": true,
+      "errorSemantics": "Returns `true` when the policy exists and is active (transition performed) or already inactive (no-op). Returns `false` when the policy does not exist. Never throws."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The `LeaveType` enum MUST be imported from `src/shared/types/index.ts` \u2014 the single authoritative definition from Phase 1. The policy module MUST NOT redefine or duplicate `LeaveType`.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The `ValidationError` class in the policy service MUST follow the same pattern as `EmployeeService.ValidationError` and `AuditService.ValidationError`: extend `Error`, set `this.name = 'ValidationError'` in the constructor.",
+      "referencePath": "src/modules/employee/employee.service.ts"
+    },
+    {
+      "requirement": "Unit tests MUST follow the established naming convention: `tests/unit/modules/policy/policy.service.test.ts` (matching `employee.service.test.ts` and `audit.service.test.ts`). Tests MUST use `jest.Mocked<>` for the mock repository and follow the same structure: `makeMockRepo()` factory, `beforeEach` setup, and `describe`/`it` blocks per service method.",
+      "referencePath": "tests/unit/modules/employee/employee.service.test.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts",
+      "why": "The `LeavePolicy` model imports `LeaveType` enum from the shared types module (Phase 1). This is the policy module's sole external dependency."
+    }
+  ]
+}
