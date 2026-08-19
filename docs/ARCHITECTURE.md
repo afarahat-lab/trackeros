@@ -28,13 +28,12 @@ src/modules/audit/             — Audit module (Phase 3 ✅)
   audit.service.interface.ts   — IAuditService + CreateAuditRecordDto
   audit.service.ts             — AuditService with ValidationError
   index.ts                     — Barrel export
-src/modules/policy/            — Policy module (Phase 4 🚧)
+src/modules/policy/            — Policy module (Phase 4 ✅)
   policy.model.ts              — LeavePolicy interface
   policy.repository.ts         — ILeavePolicyRepository interface
   policy.service.interface.ts  — ILeavePolicyService + DTOs
   policy.service.ts            — LeavePolicyService with ValidationError
-  (index.ts pending)
-  (unit tests pending)
+  index.ts                     — Barrel export
 src/modules/status/            — System status module (seed)
   status.model.ts, status.service.interface.ts, status.service.ts, index.ts
 src/modules/uptime/            — Uptime health-check (seed)
@@ -46,7 +45,6 @@ src/shared/db/connection.ts    — Database connection utility
 ### Planned (not yet built)
 
 ```
-src/modules/policy/            — Barrel export, unit tests (remainder of Phase 4)
 src/modules/balance/           — LeaveBalance module (Phase 5)
 src/modules/leave/             — LeaveRequest module (Phase 6)
 src/modules/notification/      — Notification module (Phase 7)
@@ -102,7 +100,7 @@ notification/  ← shared/types/, employee/
 1. **Shared types** – Enums (LeaveRequestStatus, LeaveType, AuditAction). ✅ IMPLEMENTED
 2. **Employee module** – Employee model, repository, service. ✅ IMPLEMENTED
 3. **Audit module** – AuditRecord model, repository, service. ✅ IMPLEMENTED
-4. **Policy module** – LeavePolicy model, repository, service interface, service implementation. 🚧 PARTIAL (model, repository, service interface, and service done; barrel export and unit tests pending)
+4. **Policy module** – LeavePolicy model, repository, service interface, service implementation, barrel export, unit tests. ✅ IMPLEMENTED
 5. **Balance module** – Balance model, repository, service (deduct/restore).
 6. **Leave module** – LeaveRequest model, repository, service, controller, routes.
 7. **Notification module** – Notification model, repository, service.
