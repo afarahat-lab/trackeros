@@ -1,0 +1,106 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "policy"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository-interface"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "File `src/modules/policy/policy.model.ts` exists and exports a `LeavePolicy` interface with exactly these fields: `id: string`, `policyName: string`, `leaveType: LeaveType`, `entitlementDays: number`, `accrualRate: number | null`, `maxAccumulation: number | null`, `minimumNoticeDays: number | null`, `requiresManagerApproval: boolean`, `isActive: boolean`, `createdAt: Date`, `updatedAt: Date`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`LeavePolicy` imports `LeaveType` from `../../shared/types/index` (the Phase 1 shared types module) \u2014 no other module dependencies.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "File `src/modules/policy/policy.repository.ts` exists and exports an `ILeavePolicyRepository` interface with exactly these seven methods: `findById(id: string): Promise<LeavePolicy | null>`, `findAll(): Promise<LeavePolicy[]>`, `findByLeaveType(leaveType: LeaveType): Promise<LeavePolicy[]>`, `findActive(): Promise<LeavePolicy[]>`, `create(policy: Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeavePolicy>`, `update(id: string, data: Partial<LeavePolicy>): Promise<LeavePolicy | null>`, `delete(id: string): Promise<boolean>`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`ILeavePolicyRepository` imports `LeavePolicy` from `./policy.model` \u2014 no other module dependencies.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Both files compile under `tsc --noEmit` with strict TypeScript settings (no implicit any, strict null checks) and produce zero type errors.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No `any` types \u2014 use `unknown` with type guards if needed (HARNESS.json constraint `no-any`).",
+    "No database access in model or repository interface files \u2014 these are pure TypeScript interfaces with no implementation, no Knex imports, no SQL (HARNESS.json constraint `no-direct-db-outside-repository`; GP-001).",
+    "No barrel export (`index.ts`) in this sub-phase \u2014 that is owned by sibling sub-phase 4.3.",
+    "No unit tests in this sub-phase \u2014 tests are owned by sibling sub-phase 4.3."
+  ],
+  "outOfScope": [
+    "Policy service interface and implementation (`policy.service.interface.ts`, `policy.service.ts`) \u2014 owned by sibling sub-phase 4.2.",
+    "Barrel export (`index.ts`) and unit tests \u2014 owned by sibling sub-phase 4.3."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "`leaveType` must be one of the `LeaveType` enum values (ANNUAL, SICK, EMERGENCY, UNPAID, MATERNITY, PATERNITY). `entitlementDays` must be a positive integer. `accrualRate`, `maxAccumulation`, and `minimumNoticeDays` are nullable \u2014 when non-null they must be non-negative numbers. `requiresManagerApproval` and `isActive` are required booleans. Lifecycle: a policy is ACTIVE when `isActive === true` and INACTIVE when `isActive === false`; the `isActive` flag is the sole lifecycle discriminator."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "ILeavePolicyRepository.create",
+      "authRule": "No auth rule at the repository interface level \u2014 auth is enforced at the service/controller layer (GP-005).",
+      "idempotent": false,
+      "errorSemantics": "Returns the created `LeavePolicy` with `id`, `createdAt`, and `updatedAt` populated. The input is `Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>` \u2014 the caller must not supply these auto-generated fields."
+    },
+    {
+      "operation": "ILeavePolicyRepository.update",
+      "authRule": "No auth rule at the repository interface level.",
+      "idempotent": false,
+      "errorSemantics": "Accepts `Partial<LeavePolicy>` \u2014 only supplied fields are updated. Returns the updated `LeavePolicy` or `null` if no policy with the given `id` exists."
+    },
+    {
+      "operation": "ILeavePolicyRepository.delete",
+      "authRule": "No auth rule at the repository interface level.",
+      "idempotent": true,
+      "errorSemantics": "Returns `true` if a policy was deleted, `false` if no policy with the given `id` existed. Deleting a non-existent policy is not an error."
+    },
+    {
+      "operation": "ILeavePolicyRepository.findByLeaveType",
+      "authRule": "No auth rule at the repository interface level.",
+      "idempotent": true,
+      "errorSemantics": "Returns an array of `LeavePolicy` matching the given `LeaveType`. Returns an empty array (not null) when no policies match."
+    },
+    {
+      "operation": "ILeavePolicyRepository.findActive",
+      "authRule": "No auth rule at the repository interface level.",
+      "idempotent": true,
+      "errorSemantics": "Returns an array of `LeavePolicy` where `isActive === true`. Returns an empty array (not null) when no active policies exist."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "`LeavePolicy.leaveType` must use the `LeaveType` enum from `src/shared/types/index.ts` \u2014 the same enum used by all other modules (Phase 1). Do not redefine or duplicate the enum.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The `ILeavePolicyRepository` interface must follow the same structural pattern as `IEmployeeRepository` (`src/modules/employee/employee.repository.ts`) and `IAuditRepository` (`src/modules/audit/audit.repository.ts`): a single exported interface with async methods returning `Promise<T>`, using `Omit<>` for create inputs and `Partial<>` for update inputs, and `null` for not-found returns.",
+      "referencePath": "src/modules/employee/employee.repository.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts (Phase 1)",
+      "why": "`LeavePolicy.leaveType` references the `LeaveType` enum. `ILeavePolicyRepository.findByLeaveType` accepts `LeaveType` as a parameter. This is the policy module's sole external dependency."
+    }
+  ]
+}
