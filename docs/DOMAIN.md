@@ -158,7 +158,7 @@ Audit module. Phase 3 ✅.
 
 ## policy
 
-Policy module. Phase 4 🚧 (model, repository, service interface, and service implementation done; barrel export and unit tests pending).
+Policy module. Phase 4 ✅.
 
 ### LeavePolicy
 
@@ -245,12 +245,108 @@ Policy module. Phase 4 🚧 (model, repository, service interface, and service i
 - `requiresManagerApproval` and `isActive` are required booleans
 - Lifecycle: ACTIVE when `isActive === true`, INACTIVE when `isActive === false`
 
+## balance
+
+Balance module. Phase 5 ✅.
+
+### BalanceStatus
+
+| Value | Description |
+|-------|-------------|
+| ACTIVE | Balance is available for deductions |
+| EXHAUSTED | Balance has zero remaining days |
+| CLOSED | Balance is permanently closed (no deductions or restorations) |
+
+### LeaveBalance
+
+| Field | Type | Required |
+|-------|------|----------|
+| id | string | true |
+| employeeId | string | true |
+| leavePolicyId | string | true |
+| totalEntitlement | number | true |
+| usedDays | number | true |
+| remainingDays | number | true |
+| fiscalYear | number | true |
+| status | BalanceStatus | true |
+| createdAt | Date | true |
+| updatedAt | Date | true |
+
+### CreateBalanceDto
+
+| Field | Type | Required |
+|-------|------|----------|
+| employeeId | string | true |
+| leavePolicyId | string | true |
+| totalEntitlement | number | true |
+| fiscalYear | number | true |
+
+### IBalanceRepository
+
+| Method | Signature |
+|--------|-----------|
+| findById | `(id: string) => Promise<LeaveBalance \| null>` |
+| findByEmployee | `(employeeId: string) => Promise<LeaveBalance[]>` |
+| findByEmployeeAndPolicy | `(employeeId: string, leavePolicyId: string) => Promise<LeaveBalance \| null>` |
+| findByEmployeeAndFiscalYear | `(employeeId: string, fiscalYear: number) => Promise<LeaveBalance[]>` |
+| create | `(balance: Omit<LeaveBalance, 'id' \| 'createdAt' \| 'updatedAt'>) => Promise<LeaveBalance>` |
+| update | `(id: string, data: Partial<LeaveBalance>) => Promise<LeaveBalance \| null>` |
+| delete | `(id: string) => Promise<boolean>` |
+
+### IBalanceService
+
+| Method | Signature |
+|--------|-----------|
+| getById | `(id: string) => Promise<LeaveBalance \| null>` |
+| getByEmployee | `(employeeId: string) => Promise<LeaveBalance[]>` |
+| getByEmployeeAndPolicy | `(employeeId: string, leavePolicyId: string) => Promise<LeaveBalance \| null>` |
+| create | `(data: CreateBalanceDto) => Promise<LeaveBalance>` |
+| deductDays | `(id: string, days: number) => Promise<LeaveBalance>` |
+| restoreDays | `(id: string, days: number) => Promise<LeaveBalance>` |
+| hasSufficientBalance | `(employeeId: string, leavePolicyId: string, requestedDays: number) => Promise<boolean>` |
+
+### Validation rules
+
+- `employeeId`: required, non-empty after trim
+- `leavePolicyId`: required, non-empty after trim
+- `totalEntitlement`: required, must be a positive finite integer (> 0)
+- `fiscalYear`: required, must be a positive integer (> 0)
+- `days` (deduct/restore): must be a positive finite number (> 0); fractional values are floored
+- `requestedDays` (hasSufficientBalance): fractional values are floored before comparison
+- All string fields are trimmed before storage
+- Throws `ValidationError` (exported from balance.service.ts) on invalid input
+
+### Business rules
+
+- `remainingDays = Math.floor(totalEntitlement - usedDays)` — integer arithmetic, floor for safety
+- **create**: sets `usedDays = 0`, `remainingDays = totalEntitlement`, `status = ACTIVE`
+- **deductDays**: validates balance is ACTIVE, checks `remainingDays >= days`, increments `usedDays`, recalculates `remainingDays`, transitions to EXHAUSTED when `remainingDays` reaches 0
+- **restoreDays**: validates balance is not CLOSED, checks `usedDays >= days`, decrements `usedDays`, recalculates `remainingDays`, transitions back to ACTIVE when `remainingDays > 0`
+- **hasSufficientBalance**: returns `false` (never throws) when no balance exists or balance is not ACTIVE; floors fractional `requestedDays`
+- CLOSED balances reject both deduction and restoration
+- EXHAUSTED balances reject deduction but accept restoration (transitioning back to ACTIVE)
+
+### Status transitions
+
+```
+ACTIVE ──deduct to zero──▶ EXHAUSTED
+EXHAUSTED ──restore > 0──▶ ACTIVE
+ACTIVE/EXHAUSTED ──(external)──▶ CLOSED (terminal)
+```
+
+### Entity invariants
+
+- `remainingDays` is always derived from `totalEntitlement - usedDays` (never set independently)
+- `remainingDays` is always a non-negative integer
+- `usedDays` is always a non-negative integer
+- `status` is consistent with `remainingDays`: ACTIVE when > 0, EXHAUSTED when 0
+- `BalanceStatus` enum is defined locally in `balance.model.ts` — no dependency on `shared/types/`
+- The module is self-contained — it does not import from `policy/` or `shared/types/`. Cross-module wiring (e.g., validating that `leavePolicyId` references a real policy) is deferred to the leave module (Phase 6).
+
 ## Planned modules (not yet built)
 
 The following domain entities are defined in PLAN.md but not yet implemented:
 
-- **policy** (Phase 4 remainder) — barrel export, unit tests
-- **balance** (Phase 5) — LeaveBalance with deduction/restoration logic
 - **leave** (Phase 6) — LeaveRequest with full lifecycle state machine
 - **notification** (Phase 7) — Notification with read-status tracking
 
