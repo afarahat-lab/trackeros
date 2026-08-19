@@ -158,7 +158,7 @@ Audit module. Phase 3 ✅.
 
 ## policy
 
-Policy module. Phase 4 🚧 (model + repository interface built; service, tests, barrel export pending).
+Policy module. Phase 4 🚧 (model, repository, service interface, and service implementation done; barrel export and unit tests pending).
 
 ### LeavePolicy
 
@@ -176,6 +176,31 @@ Policy module. Phase 4 🚧 (model + repository interface built; service, tests,
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
+### CreateLeavePolicyDto
+
+| Field | Type | Required |
+|-------|------|----------|
+| policyName | string | true |
+| leaveType | LeaveType | true |
+| entitlementDays | number | true |
+| accrualRate | number \| null | false |
+| maxAccumulation | number \| null | false |
+| minimumNoticeDays | number \| null | false |
+| requiresManagerApproval | boolean | false |
+
+### UpdateLeavePolicyDto
+
+| Field | Type | Required |
+|-------|------|----------|
+| policyName | string | false |
+| leaveType | LeaveType | false |
+| entitlementDays | number | false |
+| accrualRate | number \| null | false |
+| maxAccumulation | number \| null | false |
+| minimumNoticeDays | number \| null | false |
+| requiresManagerApproval | boolean | false |
+| isActive | boolean | false |
+
 ### ILeavePolicyRepository
 
 | Method | Signature |
@@ -187,6 +212,30 @@ Policy module. Phase 4 🚧 (model + repository interface built; service, tests,
 | create | `(policy: Omit<LeavePolicy, 'id' \| 'createdAt' \| 'updatedAt'>) => Promise<LeavePolicy>` |
 | update | `(id: string, data: Partial<LeavePolicy>) => Promise<LeavePolicy \| null>` |
 | delete | `(id: string) => Promise<boolean>` |
+
+### ILeavePolicyService
+
+| Method | Signature |
+|--------|-----------|
+| getById | `(id: string) => Promise<LeavePolicy \| null>` |
+| getAll | `() => Promise<LeavePolicy[]>` |
+| getByLeaveType | `(leaveType: LeaveType) => Promise<LeavePolicy[]>` |
+| getActive | `() => Promise<LeavePolicy[]>` |
+| create | `(data: CreateLeavePolicyDto) => Promise<LeavePolicy>` |
+| update | `(id: string, data: UpdateLeavePolicyDto) => Promise<LeavePolicy \| null>` |
+| deactivate | `(id: string) => Promise<boolean>` |
+
+### Validation rules
+
+- `policyName`: required, non-empty after trim
+- `leaveType`: required, must be a valid `LeaveType` enum value
+- `entitlementDays`: required, must be a positive finite number (> 0)
+- `accrualRate`, `maxAccumulation`, `minimumNoticeDays`: optional, default to `null` when not provided
+- `requiresManagerApproval`: optional on create, defaults to `true`
+- `isActive`: always set to `true` on create; toggled to `false` on deactivate
+- `deactivate`: idempotent — returns `true` if already inactive, `false` if policy not found
+- `update`: returns `null` if policy not found; validates leaveType and entitlementDays if provided
+- Throws `ValidationError` (exported from policy.service.ts) on invalid input
 
 ### Entity invariants
 
@@ -200,7 +249,7 @@ Policy module. Phase 4 🚧 (model + repository interface built; service, tests,
 
 The following domain entities are defined in PLAN.md but not yet implemented:
 
-- **policy** (Phase 4 remainder) — service interface, service implementation, barrel export, unit tests
+- **policy** (Phase 4 remainder) — barrel export, unit tests
 - **balance** (Phase 5) — LeaveBalance with deduction/restoration logic
 - **leave** (Phase 6) — LeaveRequest with full lifecycle state machine
 - **notification** (Phase 7) — Notification with read-status tracking
