@@ -44,14 +44,15 @@ describe('LeaveType', () => {
 });
 
 describe('AuditAction', () => {
-  it('should have exactly six members', () => {
+  it('should have exactly seven members', () => {
     const members = Object.keys(AuditAction).filter((k) => isNaN(Number(k)));
-    expect(members).toHaveLength(6);
+    expect(members).toHaveLength(7);
   });
 
-  it('should include CREATED, UPDATED, APPROVED, REJECTED, CANCELLED, DELETED', () => {
+  it('should include CREATED, UPDATED, SUBMITTED, APPROVED, REJECTED, CANCELLED, DELETED', () => {
     expect(AuditAction.CREATED).toBe('CREATED');
     expect(AuditAction.UPDATED).toBe('UPDATED');
+    expect(AuditAction.SUBMITTED).toBe('SUBMITTED');
     expect(AuditAction.APPROVED).toBe('APPROVED');
     expect(AuditAction.REJECTED).toBe('REJECTED');
     expect(AuditAction.CANCELLED).toBe('CANCELLED');

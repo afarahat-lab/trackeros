@@ -1,10 +1,20 @@
 # Fix specific quality-gate violations: Phase 6a: Leave module — interfaces & model
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/fix/63ff1071-5533-4487-9cf5-cd66e5b8b64e/8/1`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/fix/63ff1071-5533-4487-9cf5-cd66e5b8b64e/8/2`. Do not clone anything; work only in this directory.
 
 You are fixing SPECIFIC violations the quality gate found in EXISTING, already-committed files. Make the targeted edits listed below — do NOT refactor, regenerate, or change unrelated code.
 
 The files ALREADY EXIST. You MUST edit them in place with the `str_replace_editor` tool. Reading or viewing a file is NOT sufficient — you have NOT finished until you have edited EVERY file listed below.
+
+## This is fix attempt 2 — you are CONTINUING, not starting over
+The changes from the previous fix attempt(s) are ALREADY PRESENT in this working tree — you are editing that real, accumulated state, not a fresh checkout. The violation(s) listed below are what STILL FAILS *after* those prior changes. Build on the existing code: read what is already there, then refine or correct the prior attempt's edits to resolve the remaining violation — do NOT discard the prior work or re-derive the whole change from scratch.
+
+## Constraints & consistency
+You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
+### Reuse & consistency — match these exactly
+- The AuditAction test expectations (member count and member list) must exactly match the AuditAction enum defined in src/shared/types/index.ts (see `src/shared/types/index.ts`)
+### Entity invariants — enforce these
+- Reuse or extend `AuditAction`: The AuditAction enum has exactly 7 members: CREATED, UPDATED, SUBMITTED, APPROVED, REJECTED, CANCELLED, DELETED — the unit test must assert this exact set
 
 ## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
 The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
@@ -77,29 +87,12 @@ Before making the edits below, read the referenced files (those present in the w
 
 ## Required edits
 
-### Coherent change 1 — apply as ONE atomic edit across ALL sites below
-
-Unifying change (do this now): Remove the `reason?: string;` line from `UpdateLeaveRequestDto` in `src/modules/leave/leave.model.ts`.
-
-The sites below are the SAME underlying issue. Fixing some but not others leaves the code incoherent and the quality gate WILL re-flag it — apply the one change above consistently to EVERY site:
-
-- Site 1
-File: src/modules/leave/leave.model.ts
-Line: 40
-Offending code: `reason?: string;`
-Rule violated: spec-success-criteria
-Action (do this now): Edit `src/modules/leave/leave.model.ts` at line 40 in place to fix the `spec-success-criteria` violation.
-What the quality gate found — apply this: [spec-success-criteria] The spec requires UpdateLeaveRequestDto to be a partial of status-relevant fields only: status, approvedBy, approvedAt, rejectedBy, rejectedAt, rejectionReason, cancelledBy, cancelledAt, cancellationReason. The 'reason' field is not a status-relevant field and must not be included in UpdateLeaveRequestDto.
-
-- Site 2
-File: src/modules/leave/leave.model.ts
-Line: 30
-Offending code: `reason?: string;`
-Rule violated: review/spec-deviation
-Action (do this now): Edit `src/modules/leave/leave.model.ts` at line 30 in place to fix the `review/spec-deviation` violation.
-What the quality gate found — apply this: [review/spec-deviation] UpdateLeaveRequestDto includes `reason?: string` which is not in the spec's enumerated list of status-relevant fields. The spec states the DTO should be "a partial of status-relevant fields only" — `reason` (the original leave reason) is not a status-relevant field and should not appear here.
-
-Then check the rest of these files (and the surrounding module) for ANY OTHER occurrence of the same pattern beyond the specific lines listed above, and apply the same change there too — do NOT limit the fix to only the enumerated sites.
+### Edit 1
+File: tests/unit/shared/types/index.test.ts
+Line: 49
+Rule violated: test-failure
+Action (do this now): Edit `tests/unit/shared/types/index.test.ts` at line 49 in place to fix the `test-failure` violation.
+What the quality gate found — apply this: Failing test: AuditAction › should have exactly six members. expect(received).toHaveLength(expected) Expected length: 6 Received length: 7 Received array:  ["CREATED", "UPDATED", "SUBMITTED", "APPROVED", "REJECTED", "CANCELLED", "DELETED"]
 
 ## Verify before you finish (MANDATORY)
 After making the edits above, the code MUST still compile and its tests MUST pass — a compilation/type error, or a test your change breaks, must NEVER be left for CI or the quality gate to find. Before you declare this task done:
