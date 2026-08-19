@@ -1,0 +1,139 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "balance",
+      "policy"
+    ],
+    "affectedLayers": [
+      "domain",
+      "service",
+      "repository-interface"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The `LeaveBalance` interface is defined in `src/modules/balance/balance.model.ts` with exactly these fields: `id: string`, `employeeId: string`, `leavePolicyId: string`, `totalEntitlement: number`, `usedDays: number`, `remainingDays: number`, `fiscalYear: number`, `status: BalanceStatus`, `createdAt: Date`, `updatedAt: Date`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `BalanceStatus` enum is defined in `src/modules/balance/balance.model.ts` with exactly three members: `ACTIVE`, `EXHAUSTED`, `CLOSED`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `IBalanceRepository` interface is defined in `src/modules/balance/balance.repository.ts` with all seven methods: `findById`, `findByEmployee`, `findByEmployeeAndPolicy`, `findByEmployeeAndFiscalYear`, `create`, `update`, `delete` \u2014 each with the exact signatures specified in PLAN.md Phase 5.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `IBalanceService` interface is defined in `src/modules/balance/balance.service.interface.ts` with all seven methods: `getById`, `getByEmployee`, `getByEmployeeAndPolicy`, `create`, `deductDays`, `restoreDays`, `hasSufficientBalance` \u2014 plus the `CreateBalanceDto` type.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`BalanceService.create` validates that `employeeId` is a non-empty string, `leavePolicyId` is a non-empty string, `totalEntitlement` is a positive finite integer, and `fiscalYear` is a positive integer; rejects invalid input with a `ValidationError` (following the pattern in `LeavePolicyService`).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`BalanceService.deductDays` validates that `days > 0`, the balance exists, its status is `ACTIVE`, and `remainingDays >= days`; on success it increments `usedDays` by `days`, recalculates `remainingDays = totalEntitlement - usedDays`, and transitions status to `EXHAUSTED` when `remainingDays` reaches 0.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`BalanceService.restoreDays` validates that `days > 0`, the balance exists, and `usedDays >= days` (never goes below 0); on success it decrements `usedDays` by `days`, recalculates `remainingDays`, and if status was `EXHAUSTED` and `remainingDays > 0`, reverts status to `ACTIVE`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`BalanceService.hasSufficientBalance` returns `true` when a balance exists for the given employee+policy and `remainingDays >= requestedDays`; returns `false` when no balance exists or `remainingDays < requestedDays`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests exist at `tests/unit/modules/balance/balance.service.test.ts` covering: deduction (valid, insufficient balance, non-ACTIVE status, non-existent balance), restoration (valid, would go below zero, EXHAUSTED\u2192ACTIVE transition), sufficiency checks (sufficient, insufficient, missing balance), and status transitions (ACTIVE\u2192EXHAUSTED on zero remaining, EXHAUSTED\u2192ACTIVE on restore). Uses `jest.Mocked<IBalanceRepository>` and a factory function for `LeaveBalance`.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access must go through `IBalanceRepository` \u2014 the `BalanceService` must never call the database directly (GP-001).",
+    "The `BalanceService` must define its own `ValidationError` class (extending `Error`, setting `name = 'ValidationError'`), following the pattern established by `LeavePolicyService` and `AuditService`.",
+    "The `remainingDays` derivation rule is BINDING: `remainingDays = totalEntitlement - usedDays`, computed as an integer (use `Math.floor` if any fractional value arises). This must be recalculated on every mutation of `usedDays` or `totalEntitlement`."
+  ],
+  "outOfScope": [
+    "HTTP controllers, routes, and request/response serialization \u2014 this phase delivers only the domain model, repository interface, service interface, and service implementation. The balance module has no HTTP surface yet.",
+    "Database migrations, Knex schema definitions, and concrete repository implementations (e.g., `BalanceRepository` with PostgreSQL queries) \u2014 this phase defines only the `IBalanceRepository` interface."
+  ],
+  "ambiguities": [
+    {
+      "description": "`hasSufficientBalance(employeeId, leavePolicyId, requestedDays)` does not accept a `fiscalYear` parameter. When multiple balances exist for the same employee+policy across different fiscal years, which balance is checked? The natural default is the current calendar year, but the code agent must choose and apply it consistently.",
+      "options": [
+        "Use current calendar year (Jan 1 \u2013 Dec 31) as the implicit fiscal year for sufficiency checks",
+        "Check all fiscal years and return true if any balance has sufficient remaining days",
+        "Require the caller to pass fiscalYear explicitly"
+      ],
+      "impactIfWrong": "medium"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "`remainingDays` is always derived as `totalEntitlement - usedDays` (integer, floored if fractional) and must be recalculated on every mutation of `usedDays` or `totalEntitlement`. It is stored denormalized but must never drift from the derivation."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "Lifecycle: `ACTIVE` \u2192 `EXHAUSTED` \u2192 `CLOSED`. A balance is `ACTIVE` when `remainingDays > 0`. It transitions to `EXHAUSTED` when `remainingDays` reaches 0 after a deduction. It reverts to `ACTIVE` from `EXHAUSTED` when `remainingDays` becomes > 0 after a restoration. `CLOSED` is a terminal state (e.g., fiscal year end) \u2014 no deductions or restorations are permitted on a `CLOSED` balance."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "`usedDays` must never be negative and must never exceed `totalEntitlement`. `remainingDays` must never be negative."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "BalanceService.deductDays",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws `ValidationError` if `days <= 0`, if balance not found, if balance status is not `ACTIVE`, or if `remainingDays < days`. Must never produce a negative `remainingDays`."
+    },
+    {
+      "operation": "BalanceService.restoreDays",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws `ValidationError` if `days <= 0`, if balance not found, or if `usedDays < days` (cannot restore more than was used). Must never produce a negative `usedDays`."
+    },
+    {
+      "operation": "BalanceService.hasSufficientBalance",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns `false` (never throws) when no balance exists for the given employee+policy combination. Returns `false` when `remainingDays < requestedDays`. Returns `true` only when a balance exists and `remainingDays >= requestedDays`."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The `BalanceService` must follow the same module pattern as `LeavePolicyService`: a class with constructor-injected repository, a local `ValidationError` class, input validation before delegation, and barrel export via `index.ts`.",
+      "referencePath": "src/modules/policy/policy.service.ts"
+    },
+    {
+      "requirement": "The `LeaveBalance` model's `leavePolicyId` field references `LeavePolicy.id`. The module may import `LeavePolicy` from the policy module's public barrel export (`src/modules/policy/index.ts`) for type-checking, but must never import from policy internals.",
+      "referencePath": "src/modules/policy/policy.model.ts"
+    },
+    {
+      "requirement": "The `BalanceService` must use `Math.floor` for the `remainingDays` calculation to match the BINDING rule in the reconciled architecture. This is the same integer-day semantics used throughout the leave management domain.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts",
+      "why": "The balance module does not directly consume shared enums in its model, but the `LeavePolicy` model (which `leavePolicyId` references) imports `LeaveType` from here. The balance module's dependency on shared types is indirect via policy."
+    }
+  ]
+}
