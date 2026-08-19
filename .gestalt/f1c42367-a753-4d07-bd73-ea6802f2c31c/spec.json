@@ -1,0 +1,56 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "balance"
+    ],
+    "affectedLayers": [
+      "service",
+      "test"
+    ],
+    "isBreakingChange": true,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The `create` method in `balance.service.ts` rejects a `CreateBalanceDto` whose `totalEntitlement` is not an integer by throwing a `ValidationError` with a descriptive message.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The existing test \"should floor fractional totalEntitlement\" in `tests/unit/modules/balance/balance.service.test.ts` is replaced with a test that expects a `ValidationError` when `totalEntitlement` is fractional (e.g., 15.7).",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The `ValidationError` class already defined in `balance.service.ts` must be reused \u2014 do not introduce a new error type.",
+    "The `totalEntitlement` validation guard in `create` must use `!Number.isInteger(data.totalEntitlement)` \u2014 consistent with the existing `fiscalYear` integer check pattern already in the same method.",
+    "No other method signatures, return types, or exported symbols in the balance module may change. This is a validation-only change confined to the `create` method body and its corresponding test."
+  ],
+  "outOfScope": [
+    "Changing validation in `deductDays`, `restoreDays`, or `hasSufficientBalance` \u2014 those methods continue to floor fractional `days`/`requestedDays` inputs as they do today."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "`totalEntitlement` must be a positive integer at creation time. Fractional values are rejected at the service boundary with a `ValidationError` rather than silently floored."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "BalanceService.create",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws `ValidationError` for: empty/whitespace-only employeeId, empty/whitespace-only leavePolicyId, non-positive or non-finite totalEntitlement, non-integer totalEntitlement, non-positive or non-integer fiscalYear."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The new `!Number.isInteger(data.totalEntitlement)` check must follow the same guard pattern as the existing `!Number.isInteger(data.fiscalYear)` check on line 42 of `balance.service.ts` \u2014 same predicate, same error-throwing style, same placement within the validation block.",
+      "referencePath": "src/modules/balance/balance.service.ts"
+    }
+  ],
+  "integrationPoints": []
+}
