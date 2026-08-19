@@ -1,0 +1,46 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared/types"
+    ],
+    "affectedLayers": [
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The AuditAction unit test in tests/unit/shared/types/index.test.ts expects exactly 7 members (not 6), matching the source enum in src/shared/types/index.ts",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The AuditAction member-list test includes SUBMITTED alongside CREATED, UPDATED, APPROVED, REJECTED, CANCELLED, DELETED",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The source enum AuditAction in src/shared/types/index.ts MUST NOT be modified \u2014 it already has the correct 7 members"
+  ],
+  "outOfScope": [
+    "Modifying the AuditAction enum itself (it already has 7 members including SUBMITTED)"
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "AuditAction",
+      "mustExistOrExtend": true,
+      "invariant": "The AuditAction enum has exactly 7 members: CREATED, UPDATED, SUBMITTED, APPROVED, REJECTED, CANCELLED, DELETED \u2014 the unit test must assert this exact set"
+    }
+  ],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [
+    {
+      "requirement": "The AuditAction test expectations (member count and member list) must exactly match the AuditAction enum defined in src/shared/types/index.ts",
+      "referencePath": "src/shared/types/index.ts"
+    }
+  ],
+  "integrationPoints": []
+}
