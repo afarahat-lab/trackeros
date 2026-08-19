@@ -1,0 +1,114 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "policy"
+    ],
+    "affectedLayers": [
+      "service"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "`src/modules/policy/policy.service.interface.ts` exists and exports `ILeavePolicyService` interface with all 7 methods: `getById(id: string): Promise<LeavePolicy | null>`, `getAll(): Promise<LeavePolicy[]>`, `getByLeaveType(leaveType: LeaveType): Promise<LeavePolicy[]>`, `getActive(): Promise<LeavePolicy[]>`, `create(data: CreateLeavePolicyDto): Promise<LeavePolicy>`, `update(id: string, data: UpdateLeavePolicyDto): Promise<LeavePolicy | null>`, `deactivate(id: string): Promise<boolean>`",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`src/modules/policy/policy.service.interface.ts` exports `CreateLeavePolicyDto` with required fields `policyName`, `leaveType`, `entitlementDays` and optional fields `accrualRate`, `maxAccumulation`, `minimumNoticeDays`, `requiresManagerApproval` \u2014 and does NOT include `isActive`, `id`, `createdAt`, or `updatedAt`",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`src/modules/policy/policy.service.interface.ts` exports `UpdateLeavePolicyDto` as a `Partial<>` of all mutable `LeavePolicy` fields: `policyName`, `leaveType`, `entitlementDays`, `accrualRate`, `maxAccumulation`, `minimumNoticeDays`, `requiresManagerApproval`, `isActive` \u2014 and does NOT include `id`, `createdAt`, or `updatedAt`",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`src/modules/policy/policy.service.ts` exports `LeavePolicyService` class that implements `ILeavePolicyService` and accepts `ILeavePolicyRepository` via constructor injection",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`LeavePolicyService.create()` validates that `policyName` is a non-empty string, `leaveType` is a valid `LeaveType` enum member, and `entitlementDays` is a positive number \u2014 throwing a `ValidationError` (local class, same pattern as EmployeeService/AuditService) on failure; on success it sets `isActive: true` and delegates to `repository.create()`",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`LeavePolicyService.update()` looks up the existing policy by id; returns `null` if not found; otherwise applies the partial `UpdateLeavePolicyDto` fields and delegates to `repository.update()`",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`LeavePolicyService.deactivate()` looks up the existing policy by id; returns `false` if not found; returns `true` if already inactive; otherwise sets `isActive: false` and `updatedAt: new Date()`, delegates to `repository.update()`, and returns `true` if the update succeeded (result !== null)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`LeavePolicyService.getById()`, `getAll()`, `getByLeaveType()`, and `getActive()` are pure delegation methods that pass through to the corresponding repository method with no additional logic",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The service interface file (`policy.service.interface.ts`) MUST import `LeavePolicy` from `./policy.model` and `LeaveType` from `src/shared/types/index.ts` \u2014 no other imports are permitted",
+    "The service implementation file (`policy.service.ts`) MUST import only from `./policy.model`, `./policy.repository`, `./policy.service.interface`, and `src/shared/types/index.ts` \u2014 no cross-module imports (e.g., no employee, audit, or balance module imports)",
+    "The `ValidationError` class used by `LeavePolicyService` MUST be defined locally in `policy.service.ts` (same pattern as `EmployeeService` and `AuditService`), not imported from another module",
+    "No `any` types anywhere \u2014 use `unknown` with type guards if needed (HARNESS.json constraint `no-any`)",
+    "No direct database access \u2014 all persistence goes through the injected `ILeavePolicyRepository` (GP-001)"
+  ],
+  "outOfScope": [
+    "Unit tests for the policy service \u2014 these are produced in Sub-phase 4.3 (Barrel export and unit tests)",
+    "Barrel export file (`src/modules/policy/index.ts`) \u2014 produced in Sub-phase 4.3"
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeavePolicy (via service)",
+      "mustExistOrExtend": true,
+      "invariant": "A newly created LeavePolicy always has `isActive: true` \u2014 the service sets this, never the caller"
+    },
+    {
+      "entity": "LeavePolicy (via service)",
+      "mustExistOrExtend": true,
+      "invariant": "A LeavePolicy's `isActive` can only transition ACTIVE\u2192INACTIVE via `deactivate()` or an explicit `update()` with `isActive: false`; there is no dedicated \"activate\" method \u2014 reactivation goes through `update()` with `isActive: true`"
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "ILeavePolicyService.create",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws ValidationError (locally defined) when required fields are missing/invalid: policyName empty/missing, leaveType not a valid LeaveType enum member, entitlementDays not a positive number"
+    },
+    {
+      "operation": "ILeavePolicyService.update",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns `null` when the policy does not exist (caller distinguishes \"not found\" from \"updated\"); no error thrown for missing record"
+    },
+    {
+      "operation": "ILeavePolicyService.deactivate",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns `false` when the policy does not exist; returns `true` when already inactive (no-op); returns `true` on successful deactivation. Never throws."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "`LeavePolicyService` must follow the exact same structural pattern as `EmployeeService`: local `ValidationError` class, constructor-injected repository, `create()` validates required fields then sets active-state default before delegating, `update()` does find-then-apply, `deactivate()` does find-then-check-active-then-update with boolean return semantics",
+      "referencePath": "src/modules/employee/employee.service.ts"
+    },
+    {
+      "requirement": "`ILeavePolicyService` interface + DTOs must follow the same co-location pattern as `IEmployeeService` + `CreateEmployeeDto` + `UpdateEmployeeDto` in a single `*.service.interface.ts` file",
+      "referencePath": "src/modules/employee/employee.service.interface.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts",
+      "why": "Both service interface and implementation import `LeaveType` enum for method signatures and validation; this is the policy module's sole external dependency per the reconciled architecture dependency map"
+    }
+  ]
+}
