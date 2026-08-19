@@ -1,22 +1,26 @@
-# Implement this phase: Phase 1: Shared types foundation
+# Implement this phase: Phase 2: Employee module
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/63ff1071-5533-4487-9cf5-cd66e5b8b64e/1`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/63ff1071-5533-4487-9cf5-cd66e5b8b64e/2`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the shared types module at `src/shared/types/index.ts`. Define and export three enums exactly as the architecture specifies:
+Build the employee module at `src/modules/employee/`. Create these files:
 
-- `LeaveRequestStatus`: DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED
-- `LeaveType`: ANNUAL, SICK, EMERGENCY, UNPAID, MATERNITY, PATERNITY
-- `AuditAction`: CREATED, UPDATED, APPROVED, REJECTED, CANCELLED, DELETED
+1. `src/modules/employee/employee.model.ts` — Define the `Employee` interface with fields: `id: string`, `fullName: string`, `email: string`, `department: string | null`, `managerId: string | null`, `isActive: boolean`, `createdAt: Date`, `updatedAt: Date`.
 
-This is a standalone file with no dependencies on other project modules. Use the existing project conventions: TypeScript strict mode, no `any` types, ES module exports.
+2. `src/modules/employee/employee.repository.ts` — Define `IEmployeeRepository` interface with methods: `findById(id: string): Promise<Employee | null>`, `findAll(): Promise<Employee[]>`, `findByManager(managerId: string): Promise<Employee[]>`, `create(employee: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'>): Promise<Employee>`, `update(id: string, data: Partial<Employee>): Promise<Employee | null>`, `delete(id: string): Promise<boolean>`.
 
-Include a Jest unit test file at `tests/unit/shared/types/index.test.ts` that verifies each enum has the correct members and that enum values are distinct.
+3. `src/modules/employee/employee.service.interface.ts` — Define `IEmployeeService` interface with: `getById(id: string): Promise<Employee | null>`, `getAll(): Promise<Employee[]>`, `getSubordinates(managerId: string): Promise<Employee[]>`, `create(data: CreateEmployeeDto): Promise<Employee>`, `update(id: string, data: UpdateEmployeeDto): Promise<Employee | null>`, `deactivate(id: string): Promise<boolean>`. Also define `CreateEmployeeDto` and `UpdateEmployeeDto` in this file.
 
-This phase has no dependencies on prior phases — it is the foundation.
+4. `src/modules/employee/employee.service.ts` — Implement `EmployeeService` class implementing `IEmployeeService`. It delegates to `IEmployeeRepository` (constructor injection). Keep logic minimal: validate input, delegate to repository, return results.
+
+5. `src/modules/employee/index.ts` — Barrel export of all public symbols.
+
+This phase depends on `src/shared/types/index.ts` from Phase 1 — read it before generating any code. No other module dependencies.
+
+Include Jest unit tests in `tests/unit/modules/employee/` covering the service methods with a mock repository.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -25,13 +29,18 @@ These are resolved, feature-wide decisions. Wherever this phase touches the conc
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- The `AuditAction` enum members must match the audit action names referenced in the reconciled architecture's business rules and the audit module's planned `AuditRecord.action` field. Specifically: CREATED, UPDATED, APPROVED, REJECTED, CANCELLED, DELETED. (see `.gestalt/architecture/reconciled.json`)
-- The `LeaveRequestStatus` enum members must match the lifecycle states declared in the reconciled architecture's `LeaveRequest` entity: DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED. (see `.gestalt/architecture/reconciled.json`)
-- The `LeaveType` enum members must match the leave categories declared in the reconciled architecture's `LeaveType` entity: ANNUAL, SICK, EMERGENCY, UNPAID, MATERNITY, PATERNITY. (see `.gestalt/architecture/reconciled.json`)
+- The barrel export pattern in `src/modules/employee/index.ts` must match the convention established by `src/modules/status/index.ts`: re-export model interfaces, service interfaces, DTOs, and the service class using named `export { X } from './file'` syntax. (see `src/modules/status/index.ts`)
+- The service interface file naming convention (`*.service.interface.ts`) and the service implementation file naming (`*.service.ts`) must match the pattern used by the existing `status` and `uptime` modules. (see `src/modules/status/status.service.interface.ts`)
+- The `Employee` model file must follow the same interface-only pattern as `src/modules/status/status.model.ts` — a TypeScript interface export, no class, no runtime code. (see `src/modules/status/status.model.ts`)
 ### Entity invariants — enforce these
-- Reuse or extend `LeaveRequestStatus`: The enum is a closed set of five lifecycle states: DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED. No other values are valid for a LeaveRequest status. Every member value is distinct.
-- Reuse or extend `LeaveType`: The enum is a closed set of six leave categories: ANNUAL, SICK, EMERGENCY, UNPAID, MATERNITY, PATERNITY. Every member value is distinct. The feature scope explicitly covers ANNUAL, SICK, and EMERGENCY; the remaining types are defined for completeness.
-- Reuse or extend `AuditAction`: The enum is a closed set of six auditable actions: CREATED, UPDATED, APPROVED, REJECTED, CANCELLED, DELETED. Every member value is distinct. These values are used by the audit module to classify every state-changing operation.
+- Reuse or extend `Employee`: `id` is a non-empty string that uniquely identifies the employee. `email` is a non-empty string. `isActive` defaults to `true` on creation. `createdAt` and `updatedAt` are set at creation time and `updatedAt` is refreshed on every update. `department` and `managerId` are nullable.
+- Reuse or extend `Employee`: Deactivation is a soft-delete: `deactivate` sets `isActive = false` via `update`. The repository's `delete` method exists but is not exposed through `IEmployeeService`. An employee, once deactivated, can still be retrieved by `getById` and appears in `getAll` results.
+### Interface contract — expose these operations (their shape is yours)
+- IEmployeeService.create — No auth rule enforced at this layer — auth is a controller/route concern deferred to a later phase.; Must reject with a typed error when required fields (`fullName`, `email`) are missing or empty. Must reject when `email` is not a valid email format.
+- IEmployeeService.deactivate — idempotent; Returns `false` when the employee does not exist. Returns `true` when the employee was successfully deactivated or was already inactive (idempotent).
+- IEmployeeService.update — Returns `null` when the employee does not exist. Must reject with a typed error when `email` is being updated to an invalid format.
+### Integration points — connect to these
+- src/shared/types/index.ts — Phase 1 foundation — the employee module depends on this for shared enums (LeaveRequestStatus, LeaveType, AuditAction). Although the employee model does not directly consume these enums in this phase, the dependency is declared in the reconciled architecture and will be needed by later phases that consume the employee module.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
