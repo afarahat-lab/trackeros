@@ -1,0 +1,30 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "model"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The `UpdateLeaveRequestDto` interface in `src/modules/leave/leave.model.ts` does not contain a `reason` field \u2014 confirmed by static inspection of the file.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No modifications to `src/modules/leave/leave.model.ts` are permitted \u2014 the file already satisfies the intent. Any change beyond verification would be a regression."
+  ],
+  "outOfScope": [
+    "Any modification to `LeaveRequest`, `CreateLeaveRequestDto`, `LeaveRequestQueryParams`, or any other interface in `leave.model.ts` \u2014 only `UpdateLeaveRequestDto` was in scope, and it already satisfies the requirement."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [],
+  "integrationPoints": []
+}
