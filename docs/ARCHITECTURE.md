@@ -22,6 +22,12 @@ src/modules/employee/          — Employee module (Phase 2 ✅)
   employee.service.interface.ts — IEmployeeService + DTOs
   employee.service.ts          — EmployeeService implementation
   index.ts                     — Barrel export
+src/modules/audit/             — Audit module (Phase 3 ✅)
+  audit.model.ts               — AuditRecord interface
+  audit.repository.ts          — IAuditRepository interface
+  audit.service.interface.ts   — IAuditService + CreateAuditRecordDto
+  audit.service.ts             — AuditService with ValidationError
+  index.ts                     — Barrel export
 src/modules/status/            — System status module (seed)
   status.model.ts, status.service.interface.ts, status.service.ts, index.ts
 src/modules/uptime/            — Uptime health-check (seed)
@@ -33,7 +39,6 @@ src/shared/db/connection.ts    — Database connection utility
 ### Planned (not yet built)
 
 ```
-src/modules/audit/             — Audit module (Phase 3)
 src/modules/policy/            — LeavePolicy module (Phase 4)
 src/modules/balance/           — LeaveBalance module (Phase 5)
 src/modules/leave/             — LeaveRequest module (Phase 6)
@@ -66,12 +71,14 @@ Modular monolith built with TypeScript, Fastify, PostgreSQL, and React Native (f
 - **LeavePolicy** – Defines entitlement, accrual, notice, and approval rules per leave type. Lifecycle: ACTIVE ↔ INACTIVE.
 - **LeaveBalance** – Per-employee, per-policy, per-fiscal-year balance. Lifecycle: ACTIVE → EXHAUSTED → CLOSED. `remainingDays` is derived (`totalEntitlement - usedDays`) but stored denormalized.
 - **Employee** – Employee record with id, fullName, email, department, managerId, isActive. Used by leave module for identity and manager hierarchy lookups.
+- **AuditRecord** – Immutable audit trail entry. Tracks entity type/id, action (AuditAction), performer, optional changes payload, and timestamp. Created via AuditService.log() with input validation.
 - **Enums** – `LeaveRequestStatus`, `LeaveType`, `AuditAction`.
 
 ### Database Tables (Conceptual)
 - **leave_requests** – Core request table with full lifecycle fields (approved_by, rejected_by, cancelled_by, etc.). Indexed for employee, status, policy, and date-range queries.
 - **leave_policies** – Policy definitions. Indexed by leave_type and is_active.
 - **leave_balances** – Balance tracking. Unique compound index on (employee_id, leave_policy_id, fiscal_year).
+- **audit_records** – Immutable audit log. Indexed by entity_type+entity_id, performed_by, and timestamp.
 
 ### Modules & Dependency Graph
 ```
@@ -87,7 +94,7 @@ notification/  ← shared/types/, employee/
 ### Build Phases
 1. **Shared types** – Enums (LeaveRequestStatus, LeaveType, AuditAction). ✅ IMPLEMENTED
 2. **Employee module** – Employee model, repository, service. ✅ IMPLEMENTED
-3. **Audit module** – Audit record model, repository, service.
+3. **Audit module** – AuditRecord model, repository, service. ✅ IMPLEMENTED
 4. **Policy module** – LeavePolicy model, repository, service.
 5. **Balance module** – Balance model, repository, service (deduct/restore).
 6. **Leave module** – LeaveRequest model, repository, service, controller, routes.

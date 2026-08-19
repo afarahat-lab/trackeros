@@ -100,11 +100,66 @@ Employee module. Phase 2 ✅.
 - `isActive`: always set to `true` on create
 - `deactivate`: idempotent — returns `true` if already inactive, `false` if employee not found
 
+## audit
+
+Audit module. Phase 3 ✅.
+
+### AuditRecord
+
+| Field | Type | Required |
+|-------|------|----------|
+| id | string | true |
+| entityType | string | true |
+| entityId | string | true |
+| action | AuditAction | true |
+| performedBy | string | true |
+| changes | Record\<string, unknown\> \| null | false |
+| timestamp | Date | true |
+| createdAt | Date | true |
+
+### CreateAuditRecordDto
+
+| Field | Type | Required |
+|-------|------|----------|
+| entityType | string | true |
+| entityId | string | true |
+| action | AuditAction | true |
+| performedBy | string | true |
+| changes | Record\<string, unknown\> \| null | false |
+
+### IAuditRepository
+
+| Method | Signature |
+|--------|-----------|
+| create | `(record: Omit<AuditRecord, 'id' \| 'createdAt'>) => Promise<AuditRecord>` |
+| findByEntity | `(entityType: string, entityId: string) => Promise<AuditRecord[]>` |
+| findByUser | `(performedBy: string) => Promise<AuditRecord[]>` |
+| findByDateRange | `(start: Date, end: Date) => Promise<AuditRecord[]>` |
+
+### IAuditService
+
+| Method | Signature |
+|--------|-----------|
+| log | `(record: CreateAuditRecordDto) => Promise<AuditRecord>` |
+| getEntityHistory | `(entityType: string, entityId: string) => Promise<AuditRecord[]>` |
+| getUserActions | `(performedBy: string) => Promise<AuditRecord[]>` |
+| getByDateRange | `(start: Date, end: Date) => Promise<AuditRecord[]>` |
+
+### Validation rules
+
+- `entityType`: required, non-empty after trim
+- `entityId`: required, non-empty after trim
+- `action`: required, must be a valid `AuditAction` enum value
+- `performedBy`: required, non-empty after trim
+- `changes`: optional, defaults to `null` when not provided
+- `timestamp`: auto-set to `new Date()` at log time
+- All string fields are trimmed before storage
+- Throws `ValidationError` (exported from audit.service.ts) on invalid input
+
 ## Planned modules (not yet built)
 
 The following domain entities are defined in PLAN.md but not yet implemented:
 
-- **audit** (Phase 3) — AuditRecord with entity tracking, change history
 - **policy** (Phase 4) — LeavePolicy with entitlement, accrual, notice rules
 - **balance** (Phase 5) — LeaveBalance with deduction/restoration logic
 - **leave** (Phase 6) — LeaveRequest with full lifecycle state machine
