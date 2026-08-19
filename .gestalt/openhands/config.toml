@@ -1,5 +1,5 @@
 [core]
-workspace_base = "/tmp/gestalt/phase/5718a840-0b03-4112-91da-8c645c2fae86/3"
+workspace_base = "/tmp/gestalt/fix/5718a840-0b03-4112-91da-8c645c2fae86/3/1"
 runtime = "cli"
 file_store = "local"
-file_store_path = "/tmp/gestalt/phase/5718a840-0b03-4112-91da-8c645c2fae86/3/.gestalt/oh-store"
+file_store_path = "/tmp/gestalt/fix/5718a840-0b03-4112-91da-8c645c2fae86/3/1/.gestalt/oh-store"

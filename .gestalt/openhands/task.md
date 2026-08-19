@@ -1,43 +1,29 @@
-# Implement this phase: Sub-phase 2.2 — Employee service, controller, routes, and barrel export
+# Fix specific quality-gate violations: Sub-phase 2.2 — Employee service, controller, routes, and barrel export
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/5718a840-0b03-4112-91da-8c645c2fae86/3`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/fix/5718a840-0b03-4112-91da-8c645c2fae86/3/1`. Do not clone anything; work only in this directory.
 
-## What to build
-employee.service.ts compiles, EmployeeService correctly implements IEmployeeService, create() generates UUID and sets ACTIVE status / timestamps, terminate() sets TERMINATED status and terminationDate
-employee.controller.ts compiles and exports 6 handler functions, each extracting params/body and delegating to the service with correct HTTP status codes
-employee.routes.ts compiles and registers all 6 endpoints on /employees prefix with correct HTTP methods (GET /:id, GET /number/:employeeNumber, GET /:managerId/subordinates, POST /, PUT /:id, POST /:id/terminate)
-index.ts barrel export re-exports all public symbols from the module
-All imports resolve to files created in Sub-phase 2.1
+You are fixing SPECIFIC violations the quality gate found in EXISTING, already-committed files. Make the targeted edits listed below — do NOT refactor, regenerate, or change unrelated code.
 
-## Success criteria
-Implement the EmployeeService, controller functions, route registration, and barrel export. Depends on Sub-phase 2.1 for the model and interfaces.
+The files ALREADY EXIST. You MUST edit them in place with the `str_replace_editor` tool. Reading or viewing a file is NOT sufficient — you have NOT finished until you have edited EVERY file listed below.
 
-**Files to create (4):**
-
-1. `src/modules/employee/employee.service.ts` — Implement `EmployeeService` class implementing `IEmployeeService`. Constructor receives `IEmployeeRepository`. Methods:
-   - `getById(id)` → delegates to `repo.findById`
-   - `getByEmployeeNumber(employeeNumber)` → delegates to `repo.findByEmployeeNumber`
-   - `getSubordinates(managerId)` → delegates to `repo.findByManagerId`
-   - `create(data: CreateEmployeeDto)` → constructs an Employee: generates `id` via `crypto.randomUUID()`, sets `employmentStatus` to `EmploymentStatus.ACTIVE`, `createdAt`/`updatedAt` to `new Date()`, `deletedAt` to `null`, `terminationDate` to `null`; delegates to `repo.create`
-   - `update(id, data)` → delegates to `repo.update`
-   - `terminate(id)` → sets `employmentStatus` to `EmploymentStatus.TERMINATED`, `terminationDate` to `new Date()`, delegates to `repo.update`
-
-2. `src/modules/employee/employee.controller.ts` — Fastify route handler functions (not route registration). Export functions: `getEmployeeById`, `getEmployeeByNumber`, `getSubordinates`, `createEmployee`, `updateEmployee`, `terminateEmployee`. Each receives `(request, reply)`, extracts params/body, calls `EmployeeService`, returns appropriate status codes (200 for success, 201 for create, 404 for not found). The controller receives the service instance via a factory/closure pattern (e.g., export a function `makeEmployeeController(service: IEmployeeService)` returning the handler object).
-
-3. `src/modules/employee/employee.routes.ts` — Export `employeeRoutes` as an async function receiving a `FastifyInstance`. Register all employee endpoints under prefix `/employees`, wiring each route to the corresponding controller function. The function should instantiate the service (accepting a repository parameter or creating one inline — use a simple factory pattern).
-
-4. `src/modules/employee/index.ts` — Barrel export re-exporting everything from the module: model, interfaces, service, controller, routes.
-
-## Owned by SIBLING sub-phases (OUT OF SCOPE for this sub-phase)
-This is ONE sub-phase of a split phase. The deliverables below belong to sibling sub-phases — do NOT create them here, do NOT list them as success criteria, and this sub-phase MUST NOT be gated on their presence (they are produced by a sibling, not missing):
-- "Sub-phase 2.1 — Employee model and interfaces": src/modules/employee/employee.model.ts, src/modules/employee/employee.repository.interface.ts, src/modules/employee/employee.service.interface.ts
-- "Sub-phase 2.3 — Employee service unit tests": tests/unit/modules/employee/employee.service.test.ts
-
-In particular, UNIT/INTEGRATION TESTS are OUT OF SCOPE for this sub-phase — they are produced in: Sub-phase 2.3 — Employee service unit tests. Do not create test files here, do not require test existence or coverage as a success criterion, and do not fail the gate for missing tests.
-
-## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
-These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
-- Consolidated decision for all questions — keep everything MINIMAL, uniform, and self-consistent: (1 & 4) Day counting = inclusive calendar days for ALL leave types: daysRequested = (endDate - startDate) + 1. Weekends and public holidays ARE counted; do NOT introduce a holiday calendar and do NOT vary counting by leave type. This single formula is BINDING at every call site (balance deduction, sufficiency check, overlap detection, entitlement check, reporting). (2) Fiscal year = calendar year (Jan 1 to Dec 31), hardcoded — no per-company/tenant/jurisdiction configuration. (3) Emergency leave ALWAYS requires manager approval, exactly like every other leave type — no auto-approval, no separate emergency policy flag, no special SLA. The policy requiresManagerApproval flag governs uniformly. Balances are integers (full-day granularity only); remaining_days = total_entitlement - used_days exactly. [BINDING RULE — operator decision resolving: Should leave day counting use calendar days (inclusive: endDate - startDate + 1) or working/business days (excluding weekends and/or public holidays)?; What is the fiscal year boundary? (e.g. calendar year Jan 1–Dec 31, or April 6–April 5 for UK tax year, or company-specific); Should emergency leave bypass the manager-approval requirement even when the policy says requiresManagerApproval=true? Or should it always require approval but with a shorter SLA?; How are leave days counted — are start_date and end_date inclusive, and how are weekends/public-holidays handled?; What defines the fiscal_year boundary for leave balances — calendar year, a configurable company fiscal year, or a rolling 12-month window from the employee's hire date?; How are leave days counted — calendar days or business days (Mon–Fri excluding holidays)?; apply everywhere these apply, not in one place only]
+## Constraints & consistency
+You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
+### Reuse & consistency — match these exactly
+- The AuditRecord objects constructed by EmployeeService MUST conform to the AuditRecord interface declared in src/modules/audit/audit.model.ts — all required fields (id, entityType, entityId, action, oldValues, newValues, performedBy, performedAt, createdAt) must be present with correct types (see `src/modules/audit/audit.model.ts`)
+- The IAuditRepository passed to EmployeeService MUST match the interface declared in src/modules/audit/audit.repository.interface.ts — specifically the create(record: AuditRecord): Promise<AuditRecord> method signature (see `src/modules/audit/audit.repository.interface.ts`)
+- The IEmployeeService interface in src/modules/employee/employee.service.interface.ts MUST remain unchanged — the audit dependency is an implementation detail of EmployeeService, not a change to the public contract (see `src/modules/employee/employee.service.interface.ts`)
+- The employee.routes.ts wiring MUST be updated to pass an IAuditRepository instance to the EmployeeService constructor — the current signature `new EmployeeService(repo)` must become `new EmployeeService(repo, auditRepo)` or equivalent (see `src/modules/employee/employee.routes.ts`)
+### Entity invariants — enforce these
+- Reuse or extend `AuditRecord`: Every AuditRecord written by EmployeeService MUST have entityType set to the literal string 'Employee'
+- Reuse or extend `Employee`: The Employee entity's shape, fields, and lifecycle are unchanged by this phase — the audit integration is purely additive and does not alter Employee attributes or business rules
+### Interface contract — expose these operations (their shape is yours)
+- EmployeeService constructor — N/A — constructor is not an API endpoint; Must accept two parameters: IEmployeeRepository (existing) and IAuditRepository (new). Must store both for use in state-changing methods.
+- EmployeeService.create — N/A — auth is enforced at the controller/route layer; After a successful repository.create call, must call auditRepository.create with a fully constructed AuditRecord. If auditRepository.create fails, the employee has already been persisted — the error must propagate to the caller.
+- EmployeeService.update — N/A — auth is enforced at the controller/route layer; Must fetch the existing employee before applying the update (to capture oldValues). After a successful repository.update call, must call auditRepository.create. If the employee is not found (null from findById), returns null without writing an audit record.
+- EmployeeService.terminate — N/A — auth is enforced at the controller/route layer; Already fetches the existing employee (to check existence). After a successful repository.update call setting TERMINATED status, must call auditRepository.create. If the employee is not found, returns null without writing an audit record.
+### Integration points — connect to these
+- src/modules/audit/index.ts (barrel export) — EmployeeService imports IAuditRepository and AuditRecord from the audit module's public barrel — this is the new employee → audit cross-module dependency
+- src/modules/employee/employee.routes.ts — The wiring point where IAuditRepository is instantiated (or received) and passed to EmployeeService — this file must be modified to supply the second constructor argument
 
 ## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
 The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
@@ -56,30 +42,16 @@ The entities below are shared, cross-module DATA CONTRACTS. Implement each one w
     - updatedAt: Date
     - deletedAt: Date | null
 
-## Constraints & consistency
-You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
-### Reuse & consistency — match these exactly
-- EmployeeService must implement every method declared in IEmployeeService with matching signatures (parameter types, return types including Promise wrappers). (see `src/modules/employee/employee.service.interface.ts`)
-- employeeRoutes must follow the same pattern as uptimeRoutes: export an async function receiving a FastifyInstance, registering routes directly on the instance without returning a value. (see `src/modules/uptime/uptime.routes.ts`)
-- The barrel export at src/modules/employee/index.ts must follow the same re-export pattern as the audit module: named re-exports of the model, repository interface, service interface, service class, plus the controller factory and routes function. (see `src/modules/audit/index.ts`)
-### Entity invariants — enforce these
-- Reuse or extend `Employee`: A newly created Employee must have employmentStatus = EmploymentStatus.ACTIVE, terminationDate = null, deletedAt = null, and an id generated via crypto.randomUUID().
-- Reuse or extend `Employee`: When terminated, an Employee must have employmentStatus = EmploymentStatus.TERMINATED and terminationDate set to the current timestamp. The terminationDate must not be null after termination.
-- Reuse or extend `Employee`: The update operation must not mutate id, employeeNumber, employmentStatus, terminationDate, deletedAt, or createdAt. Only mutable fields (firstName, lastName, email, managerId, department, hireDate) may be changed via update.
-### Interface contract — expose these operations (their shape is yours)
-- EmployeeService.create — No auth enforcement at this phase — RBAC is applied at the route level in a later phase.; Returns the created Employee. Does not validate uniqueness of employeeNumber or email at this phase.
-- EmployeeService.terminate — No auth enforcement at this phase.; idempotent; Returns the updated Employee or null if the employee does not exist. Does not check whether the employee is already terminated — it simply sets the fields and delegates to repo.update.
-- EmployeeService.getById / getByEmployeeNumber / getSubordinates — No auth enforcement at this phase.; idempotent; Read operations return the entity or null/empty array. No side effects.
-### Integration points — connect to these
-- src/shared/types/index.ts — EmploymentStatus enum — EmployeeService.create sets employmentStatus to EmploymentStatus.ACTIVE; EmployeeService.terminate sets it to EmploymentStatus.TERMINATED.
-- src/modules/employee/employee.repository.interface.ts — IEmployeeRepository — EmployeeService constructor receives IEmployeeRepository; all service methods delegate to repository methods (findById, findByEmployeeNumber, findByManagerId, create, update).
-
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
 - Use unknown with type guards instead of any (rule: `no-any`)
 - Database calls must go through repository pattern (rule: `no-direct-db-outside-repository`)
 - No hardcoded passwords, API keys, or tokens (rule: `no-hardcoded-secrets`)
 - Do not add @gestalt/* packages as project dependencies — these are Gestalt platform internals not available on npm (rule: `no-gestalt-internal-deps`)
+
+## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
+These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
+- Consolidated decision for all questions — keep everything MINIMAL, uniform, and self-consistent: (1 & 4) Day counting = inclusive calendar days for ALL leave types: daysRequested = (endDate - startDate) + 1. Weekends and public holidays ARE counted; do NOT introduce a holiday calendar and do NOT vary counting by leave type. This single formula is BINDING at every call site (balance deduction, sufficiency check, overlap detection, entitlement check, reporting). (2) Fiscal year = calendar year (Jan 1 to Dec 31), hardcoded — no per-company/tenant/jurisdiction configuration. (3) Emergency leave ALWAYS requires manager approval, exactly like every other leave type — no auto-approval, no separate emergency policy flag, no special SLA. The policy requiresManagerApproval flag governs uniformly. Balances are integers (full-day granularity only); remaining_days = total_entitlement - used_days exactly. [BINDING RULE — operator decision resolving: Should leave day counting use calendar days (inclusive: endDate - startDate + 1) or working/business days (excluding weekends and/or public holidays)?; What is the fiscal year boundary? (e.g. calendar year Jan 1–Dec 31, or April 6–April 5 for UK tax year, or company-specific); Should emergency leave bypass the manager-approval requirement even when the policy says requiresManagerApproval=true? Or should it always require approval but with a shorter SLA?; How are leave days counted — are start_date and end_date inclusive, and how are weekends/public-holidays handled?; What defines the fiscal_year boundary for leave balances — calendar year, a configurable company fiscal year, or a rolling 12-month window from the employee's hire date?; How are leave days counted — calendar days or business days (Mon–Fri excluding holidays)?; apply everywhere these apply, not in one place only]
 
 ## Architecture & constraint rules the quality gate enforces (satisfy these now)
 The quality gate judges your code against the rules below and BLOCKS the phase on any violation — a violation it rates critical escalates to a human with no automatic retry. These are the same rules the gate checks, so comply up front rather than leaving them for the gate:
@@ -105,21 +77,30 @@ These are the project's non-negotiable invariants. A violation is a GOLDEN_PRINC
 - GP-006 — Error handling: No unhandled promise rejections. All async errors are caught and handled.
 
 ## Project stack & references
-Before writing code, read the referenced files below (those present in the working directory) to learn the project's language, framework, test runner, and conventions, and the cross-cutting rules your code must satisfy — then follow the existing repository conventions:
+Before making the edits below, read the referenced files (those present in the working directory) to learn the project's architecture, conventions, and the cross-cutting rules your fix must still satisfy — then keep the edits consistent with them:
 - `HARNESS.json`
 - `docs/ARCHITECTURE.md`
 - `docs/GOLDEN_PRINCIPLES.md`
 - `AGENTS.md`
 - `PLAN.md`
 
+## Required edits
+
+### Edit 1
+File: src/modules/employee/employee.service.ts
+Line: 40
+Offending code: `return this.repo.create(employee);`
+Rule violated: GP-002
+Action (do this now): Edit `src/modules/employee/employee.service.ts` at line 40 in place to fix the `GP-002` violation.
+What the quality gate found — apply this: [GP-002] GP-002 requires all state-changing operations to write an audit record. The EmployeeService.create() method constructs and persists a new Employee but does not write an audit record — the service has no dependency on IAuditRepository and makes no audit call. The same applies to update() (line 55) and terminate() (line 63), which also perform state changes without audit.
+
 ## Verify before you finish (MANDATORY)
-The code you write MUST compile and its tests MUST pass — a compilation or type error must NEVER be left for CI to find. Before you declare this task done:
-- Read the project's build / type-check / test commands from `package.json` (scripts) and `HARNESS.json`.
-- Install dependencies if they are not already installed, then RUN the type-check / build (e.g. `npm run build` or `tsc --noEmit`) AND the tests (e.g. `npm test`) for the files this phase touches.
-- FIX every compilation error, type error, and failing test you introduced — including in test files — and re-run until they pass.
+After making the edits above, the code MUST still compile and its tests MUST pass — a compilation/type error, or a test your change breaks, must NEVER be left for CI or the quality gate to find. Before you declare this task done:
+- Read the project's build / type-check / test commands from `package.json` (scripts) and `HARNESS.json`, install dependencies if they are not already installed, then RUN the type-check / build (e.g. `npm run build` or `tsc --noEmit`) AND the tests (e.g. `npm test`).
+- FIX every compilation error, type error, and failing test that YOUR edits introduced — including updating a test whose expectation your change legitimately invalidated (e.g. a new required field, a new status code such as 401/403 from an added authorization check, added input validation) — and re-run until they pass.
 - Only when the build and the tests pass may you consider the task complete. If a dependency install genuinely cannot be made to work, say so explicitly in your final message rather than declaring success on unverified code.
 
 ## Constraints (mandatory)
-- Write and modify source files ONLY. Do NOT run `git commit`, `git push`, `git add`, or any other git command. The platform handles all git operations. (Running the build / type-check / tests above is expected and encouraged — that is NOT a git operation.)
-- Do not create a new repository or change the git remote.
-- Stay within the scope of this phase; do not implement deferred/later work.
+- Keep the change SURGICAL: make the required edits above and fix only what they broke (compile/type errors and the tests they invalidated). Do NOT refactor, regenerate, or change unrelated code, and do not add / delete / rename source files beyond what a required edit — or a test-fix for it — needs.
+- Do NOT run `git commit`, `git push`, `git add`, or any git command. The platform handles all git operations. (Running the build / type-check / tests above is expected and encouraged — that is NOT a git operation.)
+- When the listed edits are made and the build + tests pass, stop.
