@@ -16,23 +16,28 @@ The architecture is modular, with a clear separation of concerns between models,
 ## Module structure
 
 ```
-src/modules/leave/leave.{model,repository,service,controller,routes}.ts
-src/modules/balance/balance.{model,repository,service,controller,routes}.ts
-src/modules/employee/employee.{model,repository,service,controller,routes}.ts
-src/modules/policy/policy.{model,repository,service,controller,routes}.ts
-src/modules/notification/notification.{model,repository,service,controller,routes}.ts
-src/modules/LeaveStatus/    — LeaveStatus module
-src/modules/BaseEntity/    — BaseEntity module
-src/modules/LeaveRequest/    — LeaveRequest module
-src/modules/LeaveType/    — LeaveType module
-src/modules/LeavePolicy/    — LeavePolicy module
-src/modules/AuditLog/    — AuditLog module
-src/modules/AuditRecord/    — AuditRecord module
-src/modules/AuditServiceInterface/    — AuditServiceInterface module
-src/shared/db connection.ts
-src/shared/base repository.ts
-src/shared/error types.ts
-src/shared/types/index.ts   — Shared enums: LeaveRequestStatus, LeaveType, AuditAction
+src/modules/employee/          — Employee module (Phase 2 ✅)
+  employee.model.ts            — Employee interface
+  employee.repository.ts       — IEmployeeRepository interface
+  employee.service.interface.ts — IEmployeeService + DTOs
+  employee.service.ts          — EmployeeService implementation
+  index.ts                     — Barrel export
+src/modules/status/            — System status module (seed)
+  status.model.ts, status.service.interface.ts, status.service.ts, index.ts
+src/modules/uptime/            — Uptime health-check (seed)
+  uptime.model.ts, uptime.routes.ts, uptime.service.interface.ts, uptime.service.ts, index.ts
+src/shared/types/index.ts      — Shared enums: LeaveRequestStatus, LeaveType, AuditAction (Phase 1 ✅)
+src/shared/db/connection.ts    — Database connection utility
+```
+
+### Planned (not yet built)
+
+```
+src/modules/audit/             — Audit module (Phase 3)
+src/modules/policy/            — LeavePolicy module (Phase 4)
+src/modules/balance/           — LeaveBalance module (Phase 5)
+src/modules/leave/             — LeaveRequest module (Phase 6)
+src/modules/notification/      — Notification module (Phase 7)
 ```
 
 ## Key patterns
@@ -60,6 +65,7 @@ Modular monolith built with TypeScript, Fastify, PostgreSQL, and React Native (f
 - **LeaveRequest** – Full lifecycle: DRAFT → SUBMITTED → APPROVED | REJECTED; cancellable from DRAFT, SUBMITTED, or APPROVED. Tracks employee, policy, dates, status, and actor timestamps.
 - **LeavePolicy** – Defines entitlement, accrual, notice, and approval rules per leave type. Lifecycle: ACTIVE ↔ INACTIVE.
 - **LeaveBalance** – Per-employee, per-policy, per-fiscal-year balance. Lifecycle: ACTIVE → EXHAUSTED → CLOSED. `remainingDays` is derived (`totalEntitlement - usedDays`) but stored denormalized.
+- **Employee** – Employee record with id, fullName, email, department, managerId, isActive. Used by leave module for identity and manager hierarchy lookups.
 - **Enums** – `LeaveRequestStatus`, `LeaveType`, `AuditAction`.
 
 ### Database Tables (Conceptual)
@@ -80,7 +86,7 @@ notification/  ← shared/types/, employee/
 
 ### Build Phases
 1. **Shared types** – Enums (LeaveRequestStatus, LeaveType, AuditAction). ✅ IMPLEMENTED
-2. **Employee module** – Employee model, repository, service.
+2. **Employee module** – Employee model, repository, service. ✅ IMPLEMENTED
 3. **Audit module** – Audit record model, repository, service.
 4. **Policy module** – LeavePolicy model, repository, service.
 5. **Balance module** – Balance model, repository, service (deduct/restore).
