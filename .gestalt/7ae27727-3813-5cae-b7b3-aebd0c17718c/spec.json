@@ -1,0 +1,114 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "employee"
+    ],
+    "affectedLayers": [
+      "service",
+      "controller",
+      "routes",
+      "barrel-export"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "EmployeeService class implements IEmployeeService and receives IEmployeeRepository via constructor injection",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "create(data) constructs an Employee with id from crypto.randomUUID(), employmentStatus=ACTIVE, terminationDate=null, deletedAt=null, createdAt/updatedAt=new Date(), and delegates to repo.create",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "update(id, data) applies field-level allowlisting \u2014 only firstName, lastName, email, managerId, department, hireDate are writable \u2014 then delegates to repo.update",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "terminate(id) fetches the employee first; returns null if not found; otherwise sets employmentStatus=TERMINATED and terminationDate=new Date() then delegates to repo.update",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "getById, getByEmployeeNumber, getSubordinates delegate directly to the corresponding repository method without transformation",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Controller factory makeEmployeeController(service) returns an object with six handler functions: getEmployeeById, getEmployeeByNumber, getSubordinates, createEmployee, updateEmployee, terminateEmployee",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Controller handlers return 200 for successful GET/PUT/POST-terminate, 201 for create, and 404 with { error, code } shape when the requested resource is not found",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "employeeRoutes(fastify, repo) registers six endpoints under /employees prefix: GET /:id, GET /number/:employeeNumber, GET /:managerId/subordinates, POST /, PUT /:id, POST /:id/terminate",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "Barrel export index.ts re-exports Employee, IEmployeeRepository, CreateEmployeeDto, IEmployeeService, EmployeeService, makeEmployeeController, and employeeRoutes",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access must go through IEmployeeRepository \u2014 no inline SQL or direct db calls in service, controller, or routes",
+    "Service and controller must not import from sibling modules' internals \u2014 only from the employee module's own index.ts or shared/types"
+  ],
+  "outOfScope": [
+    "Unit and integration tests for the employee service \u2014 these are produced in Sub-phase 2.3 (Employee service unit tests)"
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "A newly created Employee always has employmentStatus=ACTIVE, terminationDate=null, and deletedAt=null \u2014 these fields are set by the service, not accepted from the caller's DTO"
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "A terminated Employee must have employmentStatus=TERMINATED and terminationDate set to the time of termination; terminationDate must not be null when status is TERMINATED"
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "Employee id is always a UUID generated via crypto.randomUUID() at creation time \u2014 never supplied by the caller"
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "EmployeeService.create",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Must return the created Employee; repository failures propagate as-is (no try/catch masking in the service)"
+    },
+    {
+      "operation": "EmployeeService.update",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Only the allowlisted fields (firstName, lastName, email, managerId, department, hireDate) are forwarded to repo.update; all other keys in the input are silently dropped. Returns null when the employee does not exist."
+    },
+    {
+      "operation": "EmployeeService.terminate",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns null when the employee does not exist (idempotent for already-terminated employees \u2014 still sets the fields again). Must fetch before mutating to distinguish not-found from update failure."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Employee model must match the canonical fields defined in src/modules/employee/employee.model.ts \u2014 id, employeeNumber, firstName, lastName, email, managerId, department, hireDate, terminationDate, employmentStatus, createdAt, updatedAt, deletedAt",
+      "referencePath": "src/modules/employee/employee.model.ts"
+    }
+  ],
+  "integrationPoints": []
+}

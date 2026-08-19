@@ -28,10 +28,14 @@ src/modules/audit/              — Audit module (Phase 1 ✓)
   audit.service.ts              — AuditService (DI: IAuditRepository)
   index.ts                      — Barrel export
 
-src/modules/employee/           — Employee module (Phase 2 — contracts only)
+src/modules/employee/           — Employee module (Phase 2 ✓ — implementation complete; tests pending)
   employee.model.ts             — Employee entity
   employee.repository.interface.ts — IEmployeeRepository
   employee.service.interface.ts — IEmployeeService + CreateEmployeeDto
+  employee.service.ts           — EmployeeService (DI: IEmployeeRepository)
+  employee.controller.ts        — Fastify controller factory (makeEmployeeController)
+  employee.routes.ts            — Fastify route registration (prefix /employees)
+  index.ts                      — Barrel export
 
 src/modules/status/             — System status (pre-existing)
   status.model.ts               — SystemStatus
@@ -113,10 +117,22 @@ tests/unit/modules/audit/       — AuditService unit tests
 ### Phases
 
 1. **Shared types & Audit** — ✅ Complete. Foundation enums and audit capability.
-2. **Employee** — 🔶 Contracts built (model, repository interface, service interface). Implementation, controller, routes, barrel export, and tests still pending.
+2. **Employee** — ✅ Implementation complete (model, repository interface, service interface, service, controller, routes, barrel export). Unit tests still pending.
 3. **Leave Policy** — Planned.
 4. **Leave Balance** — Planned.
 5. **Leave Request** — Planned.
+
+### Employee Module Implementation Details
+
+- **Service** (`EmployeeService`): Constructor-injected `IEmployeeRepository`. `create()` generates UUID, sets `employmentStatus=ACTIVE`, `terminationDate=null`, `deletedAt=null`. `update()` applies field-level allowlisting — only `firstName`, `lastName`, `email`, `managerId`, `department`, `hireDate` are writable. `terminate()` fetches the employee first (returns null if not found), then sets `employmentStatus=TERMINATED` and `terminationDate=now`.
+- **Controller** (`makeEmployeeController`): Factory returning an object of Fastify handler functions. Each handler extracts params/body from the request, delegates to the service, and returns appropriate status codes (200, 201, 404).
+- **Routes** (`employeeRoutes`): Accepts `FastifyInstance` + `IEmployeeRepository`, constructs service and controller inline, registers six endpoints under `/employees`:
+  - `GET /employees/:id` — get by ID
+  - `GET /employees/number/:employeeNumber` — get by employee number
+  - `GET /employees/:managerId/subordinates` — list direct reports
+  - `POST /employees` — create
+  - `PUT /employees/:id` — update (field-allowlisted)
+  - `POST /employees/:id/terminate` — terminate
 
 ### Cross-cutting Contracts
 

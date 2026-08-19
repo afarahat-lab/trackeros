@@ -1,27 +1,36 @@
-# Implement this phase: Sub-phase 2.1 — Employee model and interfaces
+# Implement this phase: Sub-phase 2.2 — Employee service, controller, routes, and barrel export
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/5718a840-0b03-4112-91da-8c645c2fae86/2`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/5718a840-0b03-4112-91da-8c645c2fae86/3`. Do not clone anything; work only in this directory.
 
 ## What to build
-employee.model.ts compiles without errors and exports the Employee type with all 13 canonical fields
-employee.repository.interface.ts compiles and exports IEmployeeRepository with all 8 method signatures matching the spec
-employee.service.interface.ts compiles and exports both IEmployeeService (6 methods) and CreateEmployeeDto (7 fields)
-All imports resolve correctly — EmploymentStatus from src/shared/types/index.ts, Employee from ./employee.model
+employee.service.ts compiles, EmployeeService correctly implements IEmployeeService, create() generates UUID and sets ACTIVE status / timestamps, terminate() sets TERMINATED status and terminationDate
+employee.controller.ts compiles and exports 6 handler functions, each extracting params/body and delegating to the service with correct HTTP status codes
+employee.routes.ts compiles and registers all 6 endpoints on /employees prefix with correct HTTP methods (GET /:id, GET /number/:employeeNumber, GET /:managerId/subordinates, POST /, PUT /:id, POST /:id/terminate)
+index.ts barrel export re-exports all public symbols from the module
+All imports resolve to files created in Sub-phase 2.1
 
 ## Success criteria
-Define the Employee entity and the two repository/service interfaces that the rest of the module depends on. This sub-phase produces only type-level artifacts (no runtime logic).
+Implement the EmployeeService, controller functions, route registration, and barrel export. Depends on Sub-phase 2.1 for the model and interfaces.
 
-**Files to create (3):**
+**Files to create (4):**
 
-1. `src/modules/employee/employee.model.ts` — Define the `Employee` entity with the exact canonical fields: `id: string`, `employeeNumber: string`, `firstName: string`, `lastName: string`, `email: string`, `managerId: string | null`, `department: string`, `hireDate: Date`, `terminationDate: Date | null`, `employmentStatus: EmploymentStatus`, `createdAt: Date`, `updatedAt: Date`, `deletedAt: Date | null`. Import `EmploymentStatus` from `src/shared/types/index.ts` (already exists from Phase 1).
+1. `src/modules/employee/employee.service.ts` — Implement `EmployeeService` class implementing `IEmployeeService`. Constructor receives `IEmployeeRepository`. Methods:
+   - `getById(id)` → delegates to `repo.findById`
+   - `getByEmployeeNumber(employeeNumber)` → delegates to `repo.findByEmployeeNumber`
+   - `getSubordinates(managerId)` → delegates to `repo.findByManagerId`
+   - `create(data: CreateEmployeeDto)` → constructs an Employee: generates `id` via `crypto.randomUUID()`, sets `employmentStatus` to `EmploymentStatus.ACTIVE`, `createdAt`/`updatedAt` to `new Date()`, `deletedAt` to `null`, `terminationDate` to `null`; delegates to `repo.create`
+   - `update(id, data)` → delegates to `repo.update`
+   - `terminate(id)` → sets `employmentStatus` to `EmploymentStatus.TERMINATED`, `terminationDate` to `new Date()`, delegates to `repo.update`
 
-2. `src/modules/employee/employee.repository.interface.ts` — Define `IEmployeeRepository` interface with methods: `findById(id: string): Promise<Employee | null>`, `findByEmployeeNumber(employeeNumber: string): Promise<Employee | null>`, `findByEmail(email: string): Promise<Employee | null>`, `findByManagerId(managerId: string): Promise<Employee[]>`, `findAll(): Promise<Employee[]>`, `create(employee: Employee): Promise<Employee>`, `update(id: string, data: Partial<Employee>): Promise<Employee | null>`, `softDelete(id: string): Promise<boolean>`. Import `Employee` from `./employee.model`.
+2. `src/modules/employee/employee.controller.ts` — Fastify route handler functions (not route registration). Export functions: `getEmployeeById`, `getEmployeeByNumber`, `getSubordinates`, `createEmployee`, `updateEmployee`, `terminateEmployee`. Each receives `(request, reply)`, extracts params/body, calls `EmployeeService`, returns appropriate status codes (200 for success, 201 for create, 404 for not found). The controller receives the service instance via a factory/closure pattern (e.g., export a function `makeEmployeeController(service: IEmployeeService)` returning the handler object).
 
-3. `src/modules/employee/employee.service.interface.ts` — Define `IEmployeeService` interface with methods: `getById(id: string): Promise<Employee | null>`, `getByEmployeeNumber(employeeNumber: string): Promise<Employee | null>`, `getSubordinates(managerId: string): Promise<Employee[]>`, `create(data: CreateEmployeeDto): Promise<Employee>`, `update(id: string, data: Partial<Employee>): Promise<Employee | null>`, `terminate(id: string): Promise<Employee | null>`. Also define and export `CreateEmployeeDto` interface: `{ employeeNumber: string; firstName: string; lastName: string; email: string; managerId?: string | null; department: string; hireDate: Date }`. Import `Employee` from `./employee.model`.
+3. `src/modules/employee/employee.routes.ts` — Export `employeeRoutes` as an async function receiving a `FastifyInstance`. Register all employee endpoints under prefix `/employees`, wiring each route to the corresponding controller function. The function should instantiate the service (accepting a repository parameter or creating one inline — use a simple factory pattern).
+
+4. `src/modules/employee/index.ts` — Barrel export re-exporting everything from the module: model, interfaces, service, controller, routes.
 
 ## Owned by SIBLING sub-phases (OUT OF SCOPE for this sub-phase)
 This is ONE sub-phase of a split phase. The deliverables below belong to sibling sub-phases — do NOT create them here, do NOT list them as success criteria, and this sub-phase MUST NOT be gated on their presence (they are produced by a sibling, not missing):
-- "Sub-phase 2.2 — Employee service, controller, routes, and barrel export": src/modules/employee/employee.service.ts, src/modules/employee/employee.controller.ts, src/modules/employee/employee.routes.ts, src/modules/employee/index.ts
+- "Sub-phase 2.1 — Employee model and interfaces": src/modules/employee/employee.model.ts, src/modules/employee/employee.repository.interface.ts, src/modules/employee/employee.service.interface.ts
 - "Sub-phase 2.3 — Employee service unit tests": tests/unit/modules/employee/employee.service.test.ts
 
 In particular, UNIT/INTEGRATION TESTS are OUT OF SCOPE for this sub-phase — they are produced in: Sub-phase 2.3 — Employee service unit tests. Do not create test files here, do not require test existence or coverage as a success criterion, and do not fail the gate for missing tests.
@@ -50,19 +59,15 @@ The entities below are shared, cross-module DATA CONTRACTS. Implement each one w
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- The `Employee` interface shape must match the authoritative entity definition in `.gestalt/architecture/reconciled.json` — same field names, types, and nullability. No extra fields, no missing fields. (see `.gestalt/architecture/reconciled.json`)
-- The `EmploymentStatus` enum must be imported from `src/shared/types/index.ts` (Phase 1 artifact) — do not redefine or duplicate the enum. The import path must resolve correctly from `src/modules/employee/`. (see `src/shared/types/index.ts`)
-- The interface-file conventions (model as interface, repository interface importing model with `./<name>.model`, service interface importing model with `./<name>.model`) must follow the pattern established by the audit module in `src/modules/audit/`. (see `src/modules/audit/audit.model.ts`)
+- Employee model must match the canonical fields defined in src/modules/employee/employee.model.ts — id, employeeNumber, firstName, lastName, email, managerId, department, hireDate, terminationDate, employmentStatus, createdAt, updatedAt, deletedAt (see `src/modules/employee/employee.model.ts`)
 ### Entity invariants — enforce these
-- Reuse or extend `Employee`: Every Employee has a unique `employeeNumber` and a unique `email` — enforced at the database level (unique indexes per the reconciled SQL schema) and reflected in the repository's `findByEmployeeNumber` / `findByEmail` lookup methods.
-- Reuse or extend `Employee`: `employmentStatus` must be one of the `EmploymentStatus` enum values: ACTIVE, INACTIVE, or TERMINATED. Only ACTIVE employees are eligible for leave operations (enforced by downstream modules).
-- Reuse or extend `Employee`: `managerId` is nullable — a null value indicates the employee has no manager (e.g., top-level executives). When non-null, it must reference a valid Employee `id`. The `deletedAt` field supports soft-delete: null means active record, a Date value means logically deleted.
+- Reuse or extend `Employee`: A newly created Employee always has employmentStatus=ACTIVE, terminationDate=null, and deletedAt=null — these fields are set by the service, not accepted from the caller's DTO
+- Reuse or extend `Employee`: A terminated Employee must have employmentStatus=TERMINATED and terminationDate set to the time of termination; terminationDate must not be null when status is TERMINATED
+- Reuse or extend `Employee`: Employee id is always a UUID generated via crypto.randomUUID() at creation time — never supplied by the caller
 ### Interface contract — expose these operations (their shape is yours)
-- IEmployeeRepository.findById — idempotent; Returns `null` when no employee matches the given id — never throws for a missing record.
-- IEmployeeRepository.softDelete — idempotent; Returns `boolean` — `true` if a row was updated (employee existed and was not already deleted), `false` if no matching active employee was found.
-- IEmployeeService.terminate — Returns `Employee | null` — the updated employee with `employmentStatus` set to TERMINATED and `terminationDate` set to the current timestamp, or `null` if the employee was not found or was already terminated.
-### Integration points — connect to these
-- src/shared/types/index.ts — The `Employee` model imports `EmploymentStatus` enum from shared types. This is the employee module's sole dependency at this sub-phase.
+- EmployeeService.create — Must return the created Employee; repository failures propagate as-is (no try/catch masking in the service)
+- EmployeeService.update — Only the allowlisted fields (firstName, lastName, email, managerId, department, hireDate) are forwarded to repo.update; all other keys in the input are silently dropped. Returns null when the employee does not exist.
+- EmployeeService.terminate — idempotent; Returns null when the employee does not exist (idempotent for already-terminated employees — still sets the fields again). Must fetch before mutating to distinguish not-found from update failure.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:

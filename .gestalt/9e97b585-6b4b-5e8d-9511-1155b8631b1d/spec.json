@@ -1,0 +1,126 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "employee"
+    ],
+    "affectedLayers": [
+      "service",
+      "controller",
+      "routes",
+      "module-export"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "EmployeeService class exists at src/modules/employee/employee.service.ts, implements IEmployeeService, and its constructor accepts IEmployeeRepository via dependency injection.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "EmployeeService.create(data) constructs an Employee with id from crypto.randomUUID(), employmentStatus set to EmploymentStatus.ACTIVE, createdAt and updatedAt set to new Date(), deletedAt and terminationDate set to null, and delegates to repository.create returning the persisted Employee.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "EmployeeService.terminate(id) sets employmentStatus to EmploymentStatus.TERMINATED and terminationDate to new Date(), then delegates to repository.update, returning the updated Employee or null if not found.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "EmployeeService.getById, getByEmployeeNumber, getSubordinates, and update each delegate directly to the corresponding repository method (findById, findByEmployeeNumber, findByManagerId, update) without additional transformation.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Controller factory function makeEmployeeController(service: IEmployeeService) returns an object with handler functions: getEmployeeById, getEmployeeByNumber, getSubordinates, createEmployee, updateEmployee, terminateEmployee. Each handler extracts params/body from the Fastify request, calls the corresponding service method, and returns 200 (or 201 for create) on success, 404 when the service returns null.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "employeeRoutes async function registers all six employee endpoints on a FastifyInstance under the /employees prefix, wiring each route to the corresponding controller handler. The function instantiates EmployeeService with an IEmployeeRepository parameter via a factory pattern.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "Barrel export at src/modules/employee/index.ts re-exports Employee model, IEmployeeRepository, IEmployeeService, CreateEmployeeDto, EmployeeService, the controller factory, and employeeRoutes.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Use unknown with type guards instead of any \u2014 the no-any constraint from HARNESS.json applies to all files in this phase.",
+    "All database access must go through the IEmployeeRepository interface \u2014 no inline SQL, Knex, or pg Pool calls in the service, controller, or routes files (no-direct-db-outside-repository constraint).",
+    "The employee module must only import from its own internals and from src/shared/types/index.ts \u2014 no cross-module imports from audit, uptime, or other modules at this phase.",
+    "Strict TypeScript: no implicit any, strict null checks \u2014 tsconfig.json strict: true applies to all new files."
+  ],
+  "outOfScope": [
+    "Unit tests for EmployeeService \u2014 these are produced in Sub-phase 2.3 (tests/unit/modules/employee/employee.service.test.ts).",
+    "The Employee model (employee.model.ts), IEmployeeRepository (employee.repository.interface.ts), and IEmployeeService + CreateEmployeeDto (employee.service.interface.ts) \u2014 these are produced in Sub-phase 2.1 and already exist.",
+    "Concrete repository implementation (e.g. KnexEmployeeRepository) \u2014 the repository interface is defined but the concrete implementation is deferred to a later phase.",
+    "Input validation beyond what the service methods inherently enforce \u2014 validation middleware, schema validation, and uniqueness checks for employeeNumber/email are deferred."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "A newly created Employee must have employmentStatus = EmploymentStatus.ACTIVE, terminationDate = null, deletedAt = null, and an id generated via crypto.randomUUID()."
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "When terminated, an Employee must have employmentStatus = EmploymentStatus.TERMINATED and terminationDate set to the current timestamp. The terminationDate must not be null after termination."
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "The update operation must not mutate id, employeeNumber, employmentStatus, terminationDate, deletedAt, or createdAt. Only mutable fields (firstName, lastName, email, managerId, department, hireDate) may be changed via update."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "EmployeeService.create",
+      "authRule": "No auth enforcement at this phase \u2014 RBAC is applied at the route level in a later phase.",
+      "idempotent": false,
+      "errorSemantics": "Returns the created Employee. Does not validate uniqueness of employeeNumber or email at this phase."
+    },
+    {
+      "operation": "EmployeeService.terminate",
+      "authRule": "No auth enforcement at this phase.",
+      "idempotent": true,
+      "errorSemantics": "Returns the updated Employee or null if the employee does not exist. Does not check whether the employee is already terminated \u2014 it simply sets the fields and delegates to repo.update."
+    },
+    {
+      "operation": "EmployeeService.getById / getByEmployeeNumber / getSubordinates",
+      "authRule": "No auth enforcement at this phase.",
+      "idempotent": true,
+      "errorSemantics": "Read operations return the entity or null/empty array. No side effects."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "EmployeeService must implement every method declared in IEmployeeService with matching signatures (parameter types, return types including Promise wrappers).",
+      "referencePath": "src/modules/employee/employee.service.interface.ts"
+    },
+    {
+      "requirement": "employeeRoutes must follow the same pattern as uptimeRoutes: export an async function receiving a FastifyInstance, registering routes directly on the instance without returning a value.",
+      "referencePath": "src/modules/uptime/uptime.routes.ts"
+    },
+    {
+      "requirement": "The barrel export at src/modules/employee/index.ts must follow the same re-export pattern as the audit module: named re-exports of the model, repository interface, service interface, service class, plus the controller factory and routes function.",
+      "referencePath": "src/modules/audit/index.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts \u2014 EmploymentStatus enum",
+      "why": "EmployeeService.create sets employmentStatus to EmploymentStatus.ACTIVE; EmployeeService.terminate sets it to EmploymentStatus.TERMINATED."
+    },
+    {
+      "target": "src/modules/employee/employee.repository.interface.ts \u2014 IEmployeeRepository",
+      "why": "EmployeeService constructor receives IEmployeeRepository; all service methods delegate to repository methods (findById, findByEmployeeNumber, findByManagerId, create, update)."
+    }
+  ]
+}
