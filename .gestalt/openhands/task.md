@@ -59,20 +59,15 @@ The entities below are shared, cross-module DATA CONTRACTS. Implement each one w
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- EmployeeService must implement every method declared in IEmployeeService with matching signatures (parameter types, return types including Promise wrappers). (see `src/modules/employee/employee.service.interface.ts`)
-- employeeRoutes must follow the same pattern as uptimeRoutes: export an async function receiving a FastifyInstance, registering routes directly on the instance without returning a value. (see `src/modules/uptime/uptime.routes.ts`)
-- The barrel export at src/modules/employee/index.ts must follow the same re-export pattern as the audit module: named re-exports of the model, repository interface, service interface, service class, plus the controller factory and routes function. (see `src/modules/audit/index.ts`)
+- Employee model must match the canonical fields defined in src/modules/employee/employee.model.ts — id, employeeNumber, firstName, lastName, email, managerId, department, hireDate, terminationDate, employmentStatus, createdAt, updatedAt, deletedAt (see `src/modules/employee/employee.model.ts`)
 ### Entity invariants — enforce these
-- Reuse or extend `Employee`: A newly created Employee must have employmentStatus = EmploymentStatus.ACTIVE, terminationDate = null, deletedAt = null, and an id generated via crypto.randomUUID().
-- Reuse or extend `Employee`: When terminated, an Employee must have employmentStatus = EmploymentStatus.TERMINATED and terminationDate set to the current timestamp. The terminationDate must not be null after termination.
-- Reuse or extend `Employee`: The update operation must not mutate id, employeeNumber, employmentStatus, terminationDate, deletedAt, or createdAt. Only mutable fields (firstName, lastName, email, managerId, department, hireDate) may be changed via update.
+- Reuse or extend `Employee`: A newly created Employee always has employmentStatus=ACTIVE, terminationDate=null, and deletedAt=null — these fields are set by the service, not accepted from the caller's DTO
+- Reuse or extend `Employee`: A terminated Employee must have employmentStatus=TERMINATED and terminationDate set to the time of termination; terminationDate must not be null when status is TERMINATED
+- Reuse or extend `Employee`: Employee id is always a UUID generated via crypto.randomUUID() at creation time — never supplied by the caller
 ### Interface contract — expose these operations (their shape is yours)
-- EmployeeService.create — No auth enforcement at this phase — RBAC is applied at the route level in a later phase.; Returns the created Employee. Does not validate uniqueness of employeeNumber or email at this phase.
-- EmployeeService.terminate — No auth enforcement at this phase.; idempotent; Returns the updated Employee or null if the employee does not exist. Does not check whether the employee is already terminated — it simply sets the fields and delegates to repo.update.
-- EmployeeService.getById / getByEmployeeNumber / getSubordinates — No auth enforcement at this phase.; idempotent; Read operations return the entity or null/empty array. No side effects.
-### Integration points — connect to these
-- src/shared/types/index.ts — EmploymentStatus enum — EmployeeService.create sets employmentStatus to EmploymentStatus.ACTIVE; EmployeeService.terminate sets it to EmploymentStatus.TERMINATED.
-- src/modules/employee/employee.repository.interface.ts — IEmployeeRepository — EmployeeService constructor receives IEmployeeRepository; all service methods delegate to repository methods (findById, findByEmployeeNumber, findByManagerId, create, update).
+- EmployeeService.create — Must return the created Employee; repository failures propagate as-is (no try/catch masking in the service)
+- EmployeeService.update — Only the allowlisted fields (firstName, lastName, email, managerId, department, hireDate) are forwarded to repo.update; all other keys in the input are silently dropped. Returns null when the employee does not exist.
+- EmployeeService.terminate — idempotent; Returns null when the employee does not exist (idempotent for already-terminated employees — still sets the fields again). Must fetch before mutating to distinguish not-found from update failure.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
