@@ -1,0 +1,103 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository-interface",
+      "service-interface"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "`src/modules/leave/leave.model.ts` exists and exports the `LeaveRequest` interface with all 17 canonical fields: `id` (string), `employeeId` (string), `leavePolicyId` (string), `startDate` (Date), `endDate` (Date), `reason` (string | undefined), `status` (LeaveRequestStatus), `approvedBy` (string | null), `approvedAt` (Date | null), `rejectedBy` (string | null), `rejectedAt` (Date | null), `rejectionReason` (string | null), `cancelledBy` (string | null), `cancelledAt` (Date | null), `cancellationReason` (string | null), `createdAt` (Date), `updatedAt` (Date).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`src/modules/leave/leave.model.ts` exports `CreateLeaveRequestDto` with fields: `employeeId` (string, required), `leavePolicyId` (string, required), `startDate` (Date, required), `endDate` (Date, required), `reason` (string, optional).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`src/modules/leave/leave.model.ts` exports `UpdateLeaveRequestDto` as a partial of status-relevant fields only: `status`, `approvedBy`, `approvedAt`, `rejectedBy`, `rejectedAt`, `rejectionReason`, `cancelledBy`, `cancelledAt`, `cancellationReason` \u2014 all optional.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`src/modules/leave/leave.model.ts` exports `LeaveRequestQueryParams` with all-optional fields: `status` (LeaveRequestStatus), `employeeId` (string), `startDate` (Date), `endDate` (Date).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`src/modules/leave/leave.repository.ts` exists and exports `ILeaveRequestRepository` interface with all 8 methods: `findById`, `findByEmployee`, `findByStatus`, `findByDateRange`, `query`, `create`, `update`, `delete` \u2014 each with the exact signatures from PLAN.md Phase 6.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`src/modules/leave/leave.service.interface.ts` exists and exports `ILeaveService` interface with all 8 methods: `create`, `submit`, `approve`, `reject`, `cancel`, `getById`, `getByEmployee`, `query` \u2014 each with the exact signatures from PLAN.md Phase 6.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All three files compile without errors under strict TypeScript (`tsc --noEmit` passes) and contain zero runtime logic \u2014 only type/interface declarations and imports.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No `any` type anywhere \u2014 use `unknown` with type guards if a dynamic type is needed (per HARNESS.json constraint `no-any`).",
+    "Strict TypeScript: no implicit any, strict null checks enabled. All files must pass `tsc --noEmit`.",
+    "ES module exports only \u2014 use `export interface` / `export type`, not `module.exports` or `export default`.",
+    "No runtime logic in these files \u2014 no function bodies, no class implementations, no side effects. Only type/interface declarations and imports."
+  ],
+  "outOfScope": [
+    "`src/modules/leave/leave.service.ts` \u2014 service implementation (owned by sibling sub-phase \"Phase 6b: Leave module \u2014 service, routes & barrel export\").",
+    "`src/modules/leave/index.ts` \u2014 barrel export (owned by sibling sub-phase \"Phase 6b: Leave module \u2014 service, routes & barrel export\")."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "The `status` field must be one of the `LeaveRequestStatus` enum values. The valid lifecycle transitions are: DRAFT \u2192 SUBMITTED; SUBMITTED \u2192 APPROVED; SUBMITTED \u2192 REJECTED; DRAFT, SUBMITTED, or APPROVED \u2192 CANCELLED. No other transitions are valid."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "The actor-timestamp pairs (`approvedBy`/`approvedAt`, `rejectedBy`/`rejectedAt`, `cancelledBy`/`cancelledAt`) are mutually exclusive: at most one pair is non-null at any time, corresponding to the terminal state. When `status` is APPROVED, only `approvedBy`/`approvedAt` are non-null; when REJECTED, only `rejectedBy`/`rejectedAt`/`rejectionReason`; when CANCELLED, only `cancelledBy`/`cancelledAt`/`cancellationReason`; otherwise all are null."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "ILeaveRequestRepository.create",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the created LeaveRequest with server-assigned `id`, `createdAt`, `updatedAt`. Input is `Omit<LeaveRequest, 'id' | 'createdAt' | 'updatedAt'>`."
+    },
+    {
+      "operation": "ILeaveRequestRepository.update",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the updated LeaveRequest or null if not found. Accepts `Partial<LeaveRequest>` \u2014 only the fields present are changed."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "`LeaveRequest.status` must use the `LeaveRequestStatus` enum imported from `src/shared/types/index.ts` \u2014 the same enum used by all other modules for leave status.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The import path for `LeaveRequestStatus` from within `src/modules/leave/` must be `../../shared/types/index` \u2014 matching the relative-path convention used by sibling modules (e.g., `policy.model.ts` imports `LeaveType` from `../../shared/types/index`).",
+      "referencePath": "src/modules/policy/policy.model.ts"
+    },
+    {
+      "requirement": "`ILeaveRequestRepository` method signatures must follow the same patterns as `ILeavePolicyRepository` and `IBalanceRepository`: `findById` returns `Promise<T | null>`, `create` accepts `Omit<T, 'id' | 'createdAt' | 'updatedAt'>` and returns `Promise<T>`, `update` accepts `(id: string, data: Partial<T>)` and returns `Promise<T | null>`, `delete` accepts `(id: string)` and returns `Promise<boolean>`.",
+      "referencePath": "src/modules/policy/policy.repository.ts"
+    }
+  ],
+  "integrationPoints": []
+}
