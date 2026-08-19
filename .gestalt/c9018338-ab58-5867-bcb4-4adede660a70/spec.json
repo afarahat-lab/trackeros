@@ -1,0 +1,92 @@
+{
+  "scope": {
+    "affectedDomains": [],
+    "affectedLayers": [],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The `BalanceStatus` enum is defined locally in `src/modules/balance/balance.model.ts` with exactly three members: ACTIVE, EXHAUSTED, CLOSED \u2014 each a string enum value matching its key.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `LeaveBalance` interface exposes all canonical fields: `id`, `employeeId`, `leavePolicyId`, `totalEntitlement`, `usedDays`, `remainingDays`, `fiscalYear`, `status: BalanceStatus`, `createdAt`, `updatedAt` \u2014 with correct types (string for IDs, number for numeric fields, Date for timestamps).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`IBalanceRepository` declares all seven methods: `findById`, `findByEmployee`, `findByEmployeeAndPolicy`, `findByEmployeeAndFiscalYear`, `create`, `update`, `delete` \u2014 with correct signatures matching the phase spec.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`IBalanceService` declares all seven methods: `getById`, `getByEmployee`, `getByEmployeeAndPolicy`, `create`, `deductDays`, `restoreDays`, `hasSufficientBalance` \u2014 plus `CreateBalanceDto` with fields `employeeId`, `leavePolicyId`, `totalEntitlement`, `fiscalYear`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`BalanceService.create` validates that `totalEntitlement` is a positive finite integer and `fiscalYear` is a positive integer; rejects invalid input by throwing a `ValidationError` with a descriptive message.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`BalanceService.create` initializes `usedDays` to 0, sets `remainingDays = totalEntitlement`, and sets `status` to ACTIVE on the newly created balance.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`BalanceService.deductDays` floors the `days` argument, validates the balance is ACTIVE (rejects CLOSED and EXHAUSTED), checks sufficiency, increments `usedDays`, recalculates `remainingDays = Math.floor(totalEntitlement - usedDays)`, and transitions status to EXHAUSTED when `remainingDays` reaches 0.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`BalanceService.restoreDays` floors the `days` argument, rejects restoration on a CLOSED balance, validates `usedDays >= days`, decrements `usedDays`, recalculates `remainingDays`, and transitions status back to ACTIVE when `remainingDays > 0`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`BalanceService.hasSufficientBalance` returns `false` (never throws) when no balance exists for the given employee+policy pair, when the balance status is not ACTIVE, or when `remainingDays < requestedDays` (after flooring `requestedDays`). Returns `true` only when an ACTIVE balance exists with `remainingDays >= requestedDays`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests in `tests/unit/modules/balance/` cover: deduction happy path, deduction with insufficient balance, deduction on EXHAUSTED balance, deduction on CLOSED balance, restoration happy path, restoration on CLOSED balance, restoration exceeding used days, sufficiency check (true/false/not-found/non-ACTIVE), status transitions (ACTIVE\u2192EXHAUSTED on deduction to zero, EXHAUSTED\u2192ACTIVE on restoration), and edge cases (fractional days, zero, negative, NaN, Infinity).",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The balance module MUST NOT import from `src/modules/policy/` or `src/modules/employee/` at this phase. It is self-contained; `leavePolicyId` and `employeeId` are plain string references. Cross-module validation (e.g., verifying `leavePolicyId` references a real policy) is deferred to Phase 6 (leave module)."
+  ],
+  "outOfScope": [],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "`remainingDays` is always `Math.floor(totalEntitlement - usedDays)`. It is never set independently \u2014 every mutation (create, deduct, restore) recalculates it from the two source fields."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "Status lifecycle: a new balance starts ACTIVE. When `remainingDays` reaches 0 (via deduction), status transitions to EXHAUSTED. When `remainingDays` becomes > 0 (via restoration), status transitions back to ACTIVE. CLOSED is a terminal state \u2014 once CLOSED, no deduction or restoration is permitted."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "`usedDays` must never exceed `totalEntitlement`. `usedDays` must never go below 0. Both are enforced by the service methods (deductDays checks sufficiency; restoreDays checks `usedDays >= days`)."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "BalanceService.deductDays",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws ValidationError for: non-positive/finite days argument, balance not found, balance status is CLOSED, balance status is not ACTIVE (including EXHAUSTED), insufficient remainingDays. The `days` argument is floored before use."
+    }
+  ],
+  "consistencyRequirements": [],
+  "integrationPoints": []
+}
