@@ -14,7 +14,7 @@ Base entity providing common fields for domain models.
 
 Represents a leave record managed by the `leave` module, including leave requests and related leave-tracking data.
 
-### LeaveStatus
+### LeaveRequestStatus
 
 | Value | Description |
 |-------|-------------|
@@ -162,12 +162,12 @@ Represents leave policy data managed by the `policy` module, including policy de
 
 | Value | Description |
 |-------|-------------|
-| annual | Annual leave |
-| sick | Sick leave |
-| emergency | Emergency leave |
-| unpaid | Unpaid leave |
-| maternity | Maternity leave |
-| paternity | Paternity leave |
+| ANNUAL | Annual leave |
+| SICK | Sick leave |
+| EMERGENCY | Emergency leave |
+| UNPAID | Unpaid leave |
+| MATERNITY | Maternity leave |
+| PATERNITY | Paternity leave |
 
 ### LeavePolicy
 
@@ -208,6 +208,17 @@ Represents notification data managed by the `notification` module, including not
 
 Represents audit data managed by the `audit` module, including audit records, change history, and activity tracking information.
 
+### AuditAction
+
+| Value | Description |
+|-------|-------------|
+| CREATED | Entity was created |
+| UPDATED | Entity was updated |
+| APPROVED | Entity was approved |
+| REJECTED | Entity was rejected |
+| CANCELLED | Entity was cancelled |
+| DELETED | Entity was deleted |
+
 ### Audit
 
 | Field | Type | Required |
@@ -215,7 +226,7 @@ Represents audit data managed by the `audit` module, including audit records, ch
 | id | string | true |
 | entityType | string | true |
 | entityId | string | true |
-| action | 'CREATE' \| 'UPDATE' \| 'DELETE' \| 'APPROVE' \| 'REJECT' | true |
+| action | 'CREATE' \| 'UPDATE' \| 'DELETE' \| 'APPROVE' \| 'REJECT' | false |
 | oldValues | Record<string, any> \| null | false |
 | newValues | Record<string, any> \| null | false |
 | performedBy | string \| null | false |
@@ -230,7 +241,7 @@ Represents audit data managed by the `audit` module, including audit records, ch
 | id | string | true |
 | entityType | string | true |
 | entityId | string | true |
-| action | 'CREATE' \| 'UPDATE' \| 'DELETE' \| 'APPROVE' \| 'REJECT' | true |
+| action | 'CREATE' \| 'UPDATE' \| 'DELETE' \| 'APPROVE' \| 'REJECT' | false |
 | oldValues | Record<string, any> \| null | false |
 | newValues | Record<string, any> \| null | false |
 | performedBy | string \| null | false |

@@ -32,6 +32,7 @@ src/modules/AuditServiceInterface/    — AuditServiceInterface module
 src/shared/db connection.ts
 src/shared/base repository.ts
 src/shared/error types.ts
+src/shared/types/index.ts   — Shared enums: LeaveRequestStatus, LeaveType, AuditAction
 ```
 
 ## Key patterns
@@ -59,7 +60,7 @@ Modular monolith built with TypeScript, Fastify, PostgreSQL, and React Native (f
 - **LeaveRequest** – Full lifecycle: DRAFT → SUBMITTED → APPROVED | REJECTED; cancellable from DRAFT, SUBMITTED, or APPROVED. Tracks employee, policy, dates, status, and actor timestamps.
 - **LeavePolicy** – Defines entitlement, accrual, notice, and approval rules per leave type. Lifecycle: ACTIVE ↔ INACTIVE.
 - **LeaveBalance** – Per-employee, per-policy, per-fiscal-year balance. Lifecycle: ACTIVE → EXHAUSTED → CLOSED. `remainingDays` is derived (`totalEntitlement - usedDays`) but stored denormalized.
-- **Enums** – `LeaveRequestStatus`, `LeaveType`, `BalanceStatus`, `AuditAction`.
+- **Enums** – `LeaveRequestStatus`, `LeaveType`, `AuditAction`.
 
 ### Database Tables (Conceptual)
 - **leave_requests** – Core request table with full lifecycle fields (approved_by, rejected_by, cancelled_by, etc.). Indexed for employee, status, policy, and date-range queries.
@@ -78,7 +79,7 @@ notification/  ← shared/types/, employee/
 ```
 
 ### Build Phases
-1. **Shared types** – Enums (LeaveRequestStatus, LeaveType, AuditAction).
+1. **Shared types** – Enums (LeaveRequestStatus, LeaveType, AuditAction). ✅ IMPLEMENTED
 2. **Employee module** – Employee model, repository, service.
 3. **Audit module** – Audit record model, repository, service.
 4. **Policy module** – LeavePolicy model, repository, service.
