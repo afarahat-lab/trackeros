@@ -1,0 +1,91 @@
+{
+  "scope": {
+    "affectedDomains": [],
+    "affectedLayers": [],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The `LeaveRequest` interface is defined in `src/modules/leave/leave.model.ts` with all 17 canonical fields: `id`, `employeeId`, `leavePolicyId`, `startDate`, `endDate`, `reason`, `status` (typed as `LeaveRequestStatus`), `approvedBy`, `approvedAt`, `rejectedBy`, `rejectedAt`, `rejectionReason`, `cancelledBy`, `cancelledAt`, `cancellationReason`, `createdAt`, `updatedAt`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`CreateLeaveRequestDto` is defined in `src/modules/leave/leave.model.ts` with required fields `employeeId`, `leavePolicyId`, `startDate`, `endDate` and optional `reason`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`UpdateLeaveRequestDto` is defined in `src/modules/leave/leave.model.ts` as a `Partial`-like shape covering status-relevant fields (`status`, `approvedBy`, `approvedAt`, `rejectedBy`, `rejectedAt`, `rejectionReason`, `cancelledBy`, `cancelledAt`, `cancellationReason`, `reason`).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`LeaveRequestQueryParams` is defined in `src/modules/leave/leave.model.ts` with optional filter fields: `status` (`LeaveRequestStatus`), `employeeId`, `startDate`, `endDate`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`ILeaveRequestRepository` is defined in `src/modules/leave/leave.repository.ts` with all 8 methods: `findById`, `findByEmployee`, `findByStatus`, `findByDateRange`, `query`, `create`, `update`, `delete` \u2014 each with the correct signature matching PLAN.md.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`ILeaveService` is defined in `src/modules/leave/leave.service.interface.ts` with all 8 methods: `create`, `submit`, `approve`, `reject`, `cancel`, `getById`, `getByEmployee`, `query` \u2014 each with the correct signature matching PLAN.md.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`LeaveRequest` imports `LeaveRequestStatus` from `src/shared/types/index.ts` (Phase 1 dependency) \u2014 no local redefinition of the enum.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All three files (`leave.model.ts`, `leave.repository.ts`, `leave.service.interface.ts`) must compile under strict TypeScript (`no implicit any`, `strict null checks`) with zero errors.",
+    "No runtime logic, no implementations, no database calls, no HTTP handlers \u2014 this phase produces only type definitions and interface contracts.",
+    "No `any` types \u2014 use `unknown` with type guards if needed (HARNESS.json constraint `no-any`).",
+    "The `LeaveRequest` interface must use `LeaveRequestStatus` enum (imported from `src/shared/types/index.ts`) for the `status` field \u2014 not a string literal union."
+  ],
+  "outOfScope": [
+    "`src/modules/leave/leave.service.ts` \u2014 service implementation with cross-module wiring (employee, policy, balance, audit) belongs to sibling sub-phase \"Phase 6b: Leave module \u2014 service, routes & barrel export\".",
+    "`src/modules/leave/leave.routes.ts` \u2014 Fastify route definitions belong to sibling sub-phase \"Phase 6b: Leave module \u2014 service, routes & barrel export\".",
+    "`src/modules/leave/index.ts` \u2014 barrel export belongs to sibling sub-phase \"Phase 6b: Leave module \u2014 service, routes & barrel export\"."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "The `status` field must be typed as `LeaveRequestStatus` (the shared enum), not as a plain string. The lifecycle states are DRAFT \u2192 SUBMITTED \u2192 APPROVED | REJECTED; cancellable from DRAFT, SUBMITTED, or APPROVED into CANCELLED."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "Actor timestamp fields (`approvedBy`/`approvedAt`, `rejectedBy`/`rejectedAt`, `cancelledBy`/`cancelledAt`) are paired: when one member of a pair is non-null, the other must also be non-null. The interface shape enforces this through the type system by keeping both as `string | null` / `Date | null` \u2014 the implementation (Phase 6b) must enforce the pairing at runtime."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "ILeaveRequestRepository.create",
+      "authRule": "No auth rule at repository layer \u2014 auth is enforced at the service/route layer.",
+      "idempotent": false,
+      "errorSemantics": "Returns the created `LeaveRequest` with server-generated `id`, `createdAt`, `updatedAt`. Must accept `Omit<LeaveRequest, 'id' | 'createdAt' | 'updatedAt'>`."
+    },
+    {
+      "operation": "ILeaveService.approve",
+      "authRule": "Caller must have `manager` or `hr_admin` role (enforced at route layer, not in this interface).",
+      "idempotent": false,
+      "errorSemantics": "Must reject if current status is not SUBMITTED (409 conflict). Must accept `approverId: string` and return the updated `LeaveRequest`."
+    },
+    {
+      "operation": "ILeaveService.reject",
+      "authRule": "Caller must have `manager` or `hr_admin` role (enforced at route layer).",
+      "idempotent": false,
+      "errorSemantics": "Must reject if current status is not SUBMITTED (409 conflict). Must accept `rejectorId: string` and `reason: string` and return the updated `LeaveRequest`."
+    }
+  ],
+  "consistencyRequirements": [],
+  "integrationPoints": []
+}
