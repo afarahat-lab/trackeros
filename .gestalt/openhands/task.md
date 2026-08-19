@@ -1,39 +1,77 @@
-# Implement this phase: Phase 5: Balance module
+# Implement this phase: Phase 6a: Leave module — interfaces & model
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/63ff1071-5533-4487-9cf5-cd66e5b8b64e/7`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/63ff1071-5533-4487-9cf5-cd66e5b8b64e/8`. Do not clone anything; work only in this directory.
 
 ## What to build
-(no phase architecture provided — infer from the success criteria below)
+src/modules/leave/leave.model.ts exports LeaveRequest, CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveRequestQueryParams
+src/modules/leave/leave.model.ts imports LeaveRequestStatus from src/shared/types/index.ts
+src/modules/leave/leave.repository.ts exports ILeaveRequestRepository with all 8 method signatures
+src/modules/leave/leave.service.interface.ts exports ILeaveService with all 8 method signatures
+All three files compile with tsc --noEmit without errors
 
 ## Success criteria
-Build the balance module at `src/modules/balance/`. Create these files:
+Create the type definitions and interfaces that the leave module implementation and tests will depend on. No runtime logic yet — only contracts and data shapes.
 
-1. `src/modules/balance/balance.model.ts` — Define the `LeaveBalance` interface with canonical fields: `id: string`, `employeeId: string`, `leavePolicyId: string`, `totalEntitlement: number`, `usedDays: number`, `remainingDays: number`, `fiscalYear: number`, `status: BalanceStatus`, `createdAt: Date`, `updatedAt: Date`. Also define the `BalanceStatus` enum in this same file: ACTIVE, EXHAUSTED, CLOSED.
+Files to create:
+1. `src/modules/leave/leave.model.ts` — Define `LeaveRequest` interface with ALL canonical fields: `id`, `employeeId`, `leavePolicyId`, `startDate`, `endDate`, `reason`, `status` (LeaveRequestStatus), `approvedBy`, `approvedAt`, `rejectedBy`, `rejectedAt`, `rejectionReason`, `cancelledBy`, `cancelledAt`, `cancellationReason`, `createdAt`, `updatedAt`. Also define `CreateLeaveRequestDto` (employeeId, leavePolicyId, startDate, endDate, reason?), `UpdateLeaveRequestDto` (Partial of status-relevant fields), and `LeaveRequestQueryParams` (status?, employeeId?, startDate?, endDate?). Import `LeaveRequestStatus` from `src/shared/types/index.ts`.
 
-2. `src/modules/balance/balance.repository.ts` — Define `IBalanceRepository` interface with methods: `findById(id: string): Promise<LeaveBalance | null>`, `findByEmployee(employeeId: string): Promise<LeaveBalance[]>`, `findByEmployeeAndPolicy(employeeId: string, leavePolicyId: string): Promise<LeaveBalance | null>`, `findByEmployeeAndFiscalYear(employeeId: string, fiscalYear: number): Promise<LeaveBalance[]>`, `create(balance: Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeaveBalance>`, `update(id: string, data: Partial<LeaveBalance>): Promise<LeaveBalance | null>`, `delete(id: string): Promise<boolean>`.
+2. `src/modules/leave/leave.repository.ts` — Define `ILeaveRequestRepository` interface with: `findById`, `findByEmployee`, `findByStatus`, `findByDateRange`, `query`, `create`, `update`, `delete`. All method signatures as specified in the parent phase.
 
-3. `src/modules/balance/balance.service.interface.ts` — Define `IBalanceService` interface with: `getById(id: string): Promise<LeaveBalance | null>`, `getByEmployee(employeeId: string): Promise<LeaveBalance[]>`, `getByEmployeeAndPolicy(employeeId: string, leavePolicyId: string): Promise<LeaveBalance | null>`, `create(data: CreateBalanceDto): Promise<LeaveBalance>`, `deductDays(id: string, days: number): Promise<LeaveBalance>`, `restoreDays(id: string, days: number): Promise<LeaveBalance>`, `hasSufficientBalance(employeeId: string, leavePolicyId: string, requestedDays: number): Promise<boolean>`. Also define `CreateBalanceDto` here.
+3. `src/modules/leave/leave.service.interface.ts` — Define `ILeaveService` interface with: `create`, `submit`, `approve`, `reject`, `cancel`, `getById`, `getByEmployee`, `query`. All method signatures as specified in the parent phase.
 
-4. `src/modules/balance/balance.service.ts` — Implement `BalanceService` class implementing `IBalanceService`. Constructor-injected `IBalanceRepository`. Apply the BINDING rule: `remainingDays = totalEntitlement - usedDays` (integer, floor if fractional). `deductDays` increments `usedDays` and recalculates `remainingDays`; if `remainingDays` reaches 0, set status to EXHAUSTED. `restoreDays` decrements `usedDays`. `hasSufficientBalance` checks `remainingDays >= requestedDays`.
+Dependencies (read-only, already exist):
+- `src/shared/types/index.ts` (Phase 1) — for LeaveRequestStatus
 
-5. `src/modules/balance/index.ts` — Barrel export of all public symbols.
+## Owned by SIBLING sub-phases (OUT OF SCOPE for this sub-phase)
+This is ONE sub-phase of a split phase. The deliverables below belong to sibling sub-phases — do NOT create them here, do NOT list them as success criteria, and this sub-phase MUST NOT be gated on their presence (they are produced by a sibling, not missing):
+- "Phase 6b: Leave module — service, routes & barrel export": src/modules/leave/leave.service.ts, src/modules/leave/leave.routes.ts, src/modules/leave/index.ts
+- "Phase 6c: Leave module — unit tests": tests/unit/modules/leave/leave.service.test.ts
 
-This phase depends on `src/shared/types/index.ts` from Phase 1 and `src/modules/policy/policy.model.ts` from Phase 4 — read both before generating. The `leavePolicyId` field references a policy; the service may import `LeavePolicy` for type-checking if needed.
-
-Include Jest unit tests in `tests/unit/modules/balance/` covering deduction, restoration, sufficiency checks, and status transitions with a mock repository.
+In particular, UNIT/INTEGRATION TESTS are OUT OF SCOPE for this sub-phase — they are produced in: Phase 6c: Leave module — unit tests. Do not create test files here, do not require test existence or coverage as a success criterion, and do not fail the gate for missing tests.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
 - Consolidated decision for all questions — keep everything MINIMAL, uniform, and self-consistent: (1) Day counting = inclusive calendar days for ALL leave types: daysRequested = (endDate - startDate) + 1. Weekends and public holidays ARE counted; do NOT introduce a holiday calendar and do NOT vary counting by leave type. This single formula is BINDING at every call site (balance deduction, sufficiency check, overlap detection, entitlement check, reporting). (2) Fiscal year = calendar year (Jan 1 to Dec 31), hardcoded — no per-company/tenant/jurisdiction configuration. (3) Emergency leave ALWAYS requires manager approval, exactly like every other leave type — no auto-approval, no separate emergency policy flag, no special SLA. The policy requiresManagerApproval flag governs uniformly. (4) Balances are integers (full-day granularity only); remaining_days = total_entitlement - used_days exactly; if a fractional value ever arises, floor it. [BINDING RULE — operator decision resolving: How are leave days counted from startDate and endDate? Specifically: (a) inclusive or exclusive of the end date, and (b) calendar days or business/working days? The answer affects balance deduction arithmetic, minimum-notice calculations, and sufficiency checks everywhere.; Can an APPROVED leave request be cancelled after its startDate has already passed (or partially passed)? If so, how is the balance restoration calculated — full days, only remaining future days, or prorated?; How is the fiscal year defined for LeaveBalance? Is it calendar year (Jan 1 – Dec 31), a configurable company fiscal year (e.g. Apr 1 – Mar 31), or per-employee based on hire date anniversary?; How are leave days counted — calendar days or business/working days? The count affects both the balance decrement on approval and the validation that sufficient balance exists before submission.; apply everywhere these apply, not in one place only]
 
+## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
+The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
+- `LeaveRequest` — the entity MUST have exactly these fields:
+    - id: string
+    - employeeId: string
+    - leavePolicyId: string
+    - startDate: Date
+    - endDate: Date
+    - reason: string | undefined
+    - status: LeaveRequestStatus
+    - approvedBy: string | null
+    - approvedAt: Date | null
+    - rejectedBy: string | null
+    - rejectedAt: Date | null
+    - rejectionReason: string | null
+    - cancelledBy: string | null
+    - cancelledAt: Date | null
+    - cancellationReason: string | null
+    - createdAt: Date
+    - updatedAt: Date
+- `LeaveRequestStatus` — the entity MUST have exactly these fields:
+    - DRAFT
+    - SUBMITTED
+    - APPROVED
+    - REJECTED
+    - CANCELLED
+
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
+### Reuse & consistency — match these exactly
+- `LeaveRequest.status` must use the `LeaveRequestStatus` enum imported from `src/shared/types/index.ts` — the same enum used by all other modules for leave status. (see `src/shared/types/index.ts`)
+- The import path for `LeaveRequestStatus` from within `src/modules/leave/` must be `../../shared/types/index` — matching the relative-path convention used by sibling modules (e.g., `policy.model.ts` imports `LeaveType` from `../../shared/types/index`). (see `src/modules/policy/policy.model.ts`)
+- `ILeaveRequestRepository` method signatures must follow the same patterns as `ILeavePolicyRepository` and `IBalanceRepository`: `findById` returns `Promise<T | null>`, `create` accepts `Omit<T, 'id' | 'createdAt' | 'updatedAt'>` and returns `Promise<T>`, `update` accepts `(id: string, data: Partial<T>)` and returns `Promise<T | null>`, `delete` accepts `(id: string)` and returns `Promise<boolean>`. (see `src/modules/policy/policy.repository.ts`)
 ### Entity invariants — enforce these
-- Reuse or extend `LeaveBalance`: `remainingDays` is always `Math.floor(totalEntitlement - usedDays)`. It is never set independently — every mutation (create, deduct, restore) recalculates it from the two source fields.
-- Reuse or extend `LeaveBalance`: Status lifecycle: a new balance starts ACTIVE. When `remainingDays` reaches 0 (via deduction), status transitions to EXHAUSTED. When `remainingDays` becomes > 0 (via restoration), status transitions back to ACTIVE. CLOSED is a terminal state — once CLOSED, no deduction or restoration is permitted.
-- Reuse or extend `LeaveBalance`: `usedDays` must never exceed `totalEntitlement`. `usedDays` must never go below 0. Both are enforced by the service methods (deductDays checks sufficiency; restoreDays checks `usedDays >= days`).
+- Reuse or extend `LeaveRequest`: The `status` field must be one of the `LeaveRequestStatus` enum values. The valid lifecycle transitions are: DRAFT → SUBMITTED; SUBMITTED → APPROVED; SUBMITTED → REJECTED; DRAFT, SUBMITTED, or APPROVED → CANCELLED. No other transitions are valid.
+- Reuse or extend `LeaveRequest`: The actor-timestamp pairs (`approvedBy`/`approvedAt`, `rejectedBy`/`rejectedAt`, `cancelledBy`/`cancelledAt`) are mutually exclusive: at most one pair is non-null at any time, corresponding to the terminal state. When `status` is APPROVED, only `approvedBy`/`approvedAt` are non-null; when REJECTED, only `rejectedBy`/`rejectedAt`/`rejectionReason`; when CANCELLED, only `cancelledBy`/`cancelledAt`/`cancellationReason`; otherwise all are null.
 ### Interface contract — expose these operations (their shape is yours)
-- BalanceService.deductDays — Throws ValidationError for: non-positive/finite days argument, balance not found, balance status is CLOSED, balance status is not ACTIVE (including EXHAUSTED), insufficient remainingDays. The `days` argument is floored before use.
+- ILeaveRequestRepository.create — Returns the created LeaveRequest with server-assigned `id`, `createdAt`, `updatedAt`. Input is `Omit<LeaveRequest, 'id' | 'createdAt' | 'updatedAt'>`.
+- ILeaveRequestRepository.update — Returns the updated LeaveRequest or null if not found. Accepts `Partial<LeaveRequest>` — only the fields present are changed.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
