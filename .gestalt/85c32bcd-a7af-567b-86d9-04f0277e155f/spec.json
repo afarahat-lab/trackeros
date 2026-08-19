@@ -1,0 +1,127 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository-interface",
+      "service-interface"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The `LeaveRequest` interface in `src/modules/leave/leave.model.ts` exposes all 17 canonical fields: `id`, `employeeId`, `leavePolicyId`, `startDate`, `endDate`, `reason`, `status` (typed as `LeaveRequestStatus`), `approvedBy`, `approvedAt`, `rejectedBy`, `rejectedAt`, `rejectionReason`, `cancelledBy`, `cancelledAt`, `cancellationReason`, `createdAt`, `updatedAt`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`CreateLeaveRequestDto` in `src/modules/leave/leave.model.ts` requires `employeeId`, `leavePolicyId`, `startDate`, `endDate` and accepts an optional `reason`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`UpdateLeaveRequestDto` in `src/modules/leave/leave.model.ts` is a `Partial` of status-relevant fields (`status`, `approvedBy`, `approvedAt`, `rejectedBy`, `rejectedAt`, `rejectionReason`, `cancelledBy`, `cancelledAt`, `cancellationReason`, `reason`).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`LeaveRequestQueryParams` in `src/modules/leave/leave.model.ts` exposes optional filters: `status` (`LeaveRequestStatus`), `employeeId`, `startDate`, `endDate`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`ILeaveRequestRepository` in `src/modules/leave/leave.repository.ts` declares all 8 methods: `findById` (returns `Promise<LeaveRequest | null>`), `findByEmployee`, `findByStatus`, `findByDateRange`, `query`, `create` (returns `Promise<LeaveRequest>`), `update` (returns `Promise<LeaveRequest | null>`), `delete` (returns `Promise<boolean>`).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`ILeaveService` in `src/modules/leave/leave.service.interface.ts` declares all 8 methods: `create`, `submit`, `approve`, `reject`, `cancel`, `getById`, `getByEmployee`, `query` \u2014 each with the correct parameter and return types matching the PLAN.md specification.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All three files (`leave.model.ts`, `leave.repository.ts`, `leave.service.interface.ts`) compile without errors under `tsc --noEmit` and contain zero `any` types.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All three files must use only TypeScript interfaces and type aliases \u2014 no runtime code, no classes, no implementations, no enums (the only enum, `LeaveRequestStatus`, is imported from `src/shared/types/index.ts`).",
+    "The `LeaveRequest` interface must import `LeaveRequestStatus` from `src/shared/types/index.ts` via a relative path \u2014 no re-exporting or redefining the enum locally.",
+    "Repository method signatures must follow the established sibling-module conventions: `findById` \u2192 `Promise<T | null>`, `create` \u2192 `Promise<T>`, `update` \u2192 `Promise<T | null>`, `delete` \u2192 `Promise<boolean>`."
+  ],
+  "outOfScope": [
+    "`src/modules/leave/leave.service.ts` \u2014 the `LeaveService` implementation class with cross-module wiring to employee, policy, balance, and audit services. Owned by sibling sub-phase \"Phase 6b: Leave module \u2014 service, routes & barrel export\".",
+    "`src/modules/leave/leave.routes.ts` and `src/modules/leave/index.ts` \u2014 Fastify route definitions and barrel export. Owned by sibling sub-phase \"Phase 6b: Leave module \u2014 service, routes & barrel export\".",
+    "Unit tests (`tests/unit/modules/leave/leave.service.test.ts` and any other test files). Owned by sibling sub-phase \"Phase 6c: Leave module \u2014 unit tests\"."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "Every `LeaveRequest` has a `status` field typed as `LeaveRequestStatus` (imported from `src/shared/types/index.ts`). The status drives the lifecycle: DRAFT \u2192 SUBMITTED \u2192 (APPROVED | REJECTED); cancellable from DRAFT, SUBMITTED, or APPROVED. Actor-timestamp pairs (`approvedBy`/`approvedAt`, `rejectedBy`/`rejectedAt`, `cancelledBy`/`cancelledAt`) are nullable and must be set atomically with their corresponding status transition."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "ILeaveService.create",
+      "authRule": "Caller must be authenticated (JWT). The `employeeId` in the DTO must match the authenticated user's identity unless the caller holds `manager` or `hr_admin` role.",
+      "idempotent": false,
+      "errorSemantics": "Returns the created `LeaveRequest` with status DRAFT. Must validate that `employeeId` references an existing active employee, `leavePolicyId` references an existing active policy, `startDate` \u2264 `endDate`, and `startDate` is not in the past. Violations produce a 400 or 422 error."
+    },
+    {
+      "operation": "ILeaveService.submit",
+      "authRule": "Caller must be authenticated. The request's `employeeId` must match the authenticated user's identity unless the caller holds `manager` or `hr_admin` role.",
+      "idempotent": false,
+      "errorSemantics": "Validates current status is DRAFT, employee exists and is active, policy exists and is active, `hasSufficientBalance` returns true, `minimumNoticeDays` is satisfied (if set). Sets status to SUBMITTED. Violations produce 409 (invalid state transition) or 422 (business rule)."
+    },
+    {
+      "operation": "ILeaveService.approve",
+      "authRule": "Caller must hold `manager` or `hr_admin` role.",
+      "idempotent": false,
+      "errorSemantics": "Validates current status is SUBMITTED. Sets `approvedBy`/`approvedAt`, status to APPROVED, and calls `balanceService.deductDays`. Must execute atomically within a transaction. Violations produce 409 (invalid state transition) or 422 (balance deduction failure)."
+    },
+    {
+      "operation": "ILeaveService.reject",
+      "authRule": "Caller must hold `manager` or `hr_admin` role.",
+      "idempotent": false,
+      "errorSemantics": "Validates current status is SUBMITTED. Sets `rejectedBy`/`rejectedAt`/`rejectionReason`, status to REJECTED. Must execute atomically within a transaction. Violations produce 409 (invalid state transition)."
+    },
+    {
+      "operation": "ILeaveService.cancel",
+      "authRule": "Caller must be authenticated. The request's `employeeId` must match the authenticated user's identity unless the caller holds `manager` or `hr_admin` role.",
+      "idempotent": false,
+      "errorSemantics": "Validates current status is SUBMITTED or APPROVED. If APPROVED, calls `balanceService.restoreDays`. Sets `cancelledBy`/`cancelledAt`/`cancellationReason`, status to CANCELLED. Must execute atomically within a transaction when restoring balance. Violations produce 409 (invalid state transition)."
+    },
+    {
+      "operation": "ILeaveService.getById",
+      "authRule": "Caller must be authenticated. Returns the request only if the caller is the owning employee, their manager, or holds `hr_admin` role.",
+      "idempotent": true,
+      "errorSemantics": "Returns `LeaveRequest | null`. Null when the request does not exist or the caller lacks access."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "`LeaveRequest.status` must use the `LeaveRequestStatus` enum from `src/shared/types/index.ts` \u2014 the single source of truth for all leave request lifecycle states (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED).",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "`ILeaveRequestRepository` method signatures must match the repository pattern established by sibling modules: `findById` \u2192 `Promise<T | null>`, `create` \u2192 `Promise<T>`, `update` \u2192 `Promise<T | null>`, `delete` \u2192 `Promise<boolean>`. The `create` parameter must use `Omit<LeaveRequest, 'id' | 'createdAt' | 'updatedAt'>`.",
+      "referencePath": "src/modules/employee/employee.repository.ts"
+    },
+    {
+      "requirement": "`ILeaveService` method signatures for `create`, `getById`, `getByEmployee`, and `query` must follow the same DTO-driven pattern used by `IEmployeeService`, `ILeavePolicyService`, and `IBalanceService`: domain DTOs defined in the model file, service interface imports and uses them.",
+      "referencePath": "src/modules/balance/balance.service.interface.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts",
+      "why": "`LeaveRequestStatus` enum is imported by `leave.model.ts` and `leave.repository.ts`. This is the sole runtime dependency of the three files in this sub-phase."
+    }
+  ]
+}
