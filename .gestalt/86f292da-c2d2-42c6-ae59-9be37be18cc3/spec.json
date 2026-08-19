@@ -1,0 +1,118 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "employee",
+      "audit"
+    ],
+    "affectedLayers": [
+      "service",
+      "routes"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "EmployeeService accepts an IAuditRepository dependency (in addition to its existing IEmployeeRepository) so that state-changing methods can write audit records",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "EmployeeService.create() writes an AuditRecord with entityType='Employee', action='CREATE', newValues containing the created employee's fields, and the entityId matching the newly created employee's id",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "EmployeeService.update() writes an AuditRecord with entityType='Employee', action='UPDATE', oldValues capturing the employee state before the update, newValues capturing the sanitized (allowlisted) fields applied, and entityId matching the updated employee's id",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "EmployeeService.terminate() writes an AuditRecord with entityType='Employee', action='TERMINATE', oldValues capturing the employee state before termination, newValues reflecting employmentStatus=TERMINATED and terminationDate set, and entityId matching the terminated employee's id",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Every AuditRecord written by EmployeeService has a valid UUID for id, performedAt and createdAt set to the current timestamp, and uses crypto.randomUUID() for id generation \u2014 matching the pattern established by AuditService",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The employee \u2192 audit cross-module dependency MUST import exclusively through the audit module's barrel export (src/modules/audit/index.ts) \u2014 no direct imports from audit.model.ts, audit.repository.interface.ts, or any other audit internal file",
+    "EmployeeService MUST NOT depend on IAuditService \u2014 it depends on IAuditRepository only, and constructs AuditRecord objects directly (matching the settled decision)",
+    "Audit writes MUST occur after the corresponding repository operation succeeds \u2014 if the repository call fails, no audit record is written (no phantom audit entries for failed operations)",
+    "The IEmployeeService interface (employee.service.interface.ts) MUST NOT change \u2014 the audit dependency is an implementation detail of EmployeeService and does not alter the public service contract"
+  ],
+  "outOfScope": [
+    "A concrete IAuditRepository implementation (e.g., a Postgres/Knex repository) \u2014 the audit module currently defines only the interface; the concrete implementation is deferred to a later phase",
+    "Unit tests for EmployeeService \u2014 tests are pending per PLAN.md and are not part of this phase"
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "AuditRecord",
+      "mustExistOrExtend": true,
+      "invariant": "Every AuditRecord written by EmployeeService MUST have entityType set to the literal string 'Employee'"
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "The Employee entity's shape, fields, and lifecycle are unchanged by this phase \u2014 the audit integration is purely additive and does not alter Employee attributes or business rules"
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "EmployeeService constructor",
+      "authRule": "N/A \u2014 constructor is not an API endpoint",
+      "idempotent": false,
+      "errorSemantics": "Must accept two parameters: IEmployeeRepository (existing) and IAuditRepository (new). Must store both for use in state-changing methods."
+    },
+    {
+      "operation": "EmployeeService.create",
+      "authRule": "N/A \u2014 auth is enforced at the controller/route layer",
+      "idempotent": false,
+      "errorSemantics": "After a successful repository.create call, must call auditRepository.create with a fully constructed AuditRecord. If auditRepository.create fails, the employee has already been persisted \u2014 the error must propagate to the caller."
+    },
+    {
+      "operation": "EmployeeService.update",
+      "authRule": "N/A \u2014 auth is enforced at the controller/route layer",
+      "idempotent": false,
+      "errorSemantics": "Must fetch the existing employee before applying the update (to capture oldValues). After a successful repository.update call, must call auditRepository.create. If the employee is not found (null from findById), returns null without writing an audit record."
+    },
+    {
+      "operation": "EmployeeService.terminate",
+      "authRule": "N/A \u2014 auth is enforced at the controller/route layer",
+      "idempotent": false,
+      "errorSemantics": "Already fetches the existing employee (to check existence). After a successful repository.update call setting TERMINATED status, must call auditRepository.create. If the employee is not found, returns null without writing an audit record."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The AuditRecord objects constructed by EmployeeService MUST conform to the AuditRecord interface declared in src/modules/audit/audit.model.ts \u2014 all required fields (id, entityType, entityId, action, oldValues, newValues, performedBy, performedAt, createdAt) must be present with correct types",
+      "referencePath": "src/modules/audit/audit.model.ts"
+    },
+    {
+      "requirement": "The IAuditRepository passed to EmployeeService MUST match the interface declared in src/modules/audit/audit.repository.interface.ts \u2014 specifically the create(record: AuditRecord): Promise<AuditRecord> method signature",
+      "referencePath": "src/modules/audit/audit.repository.interface.ts"
+    },
+    {
+      "requirement": "The IEmployeeService interface in src/modules/employee/employee.service.interface.ts MUST remain unchanged \u2014 the audit dependency is an implementation detail of EmployeeService, not a change to the public contract",
+      "referencePath": "src/modules/employee/employee.service.interface.ts"
+    },
+    {
+      "requirement": "The employee.routes.ts wiring MUST be updated to pass an IAuditRepository instance to the EmployeeService constructor \u2014 the current signature `new EmployeeService(repo)` must become `new EmployeeService(repo, auditRepo)` or equivalent",
+      "referencePath": "src/modules/employee/employee.routes.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/audit/index.ts (barrel export)",
+      "why": "EmployeeService imports IAuditRepository and AuditRecord from the audit module's public barrel \u2014 this is the new employee \u2192 audit cross-module dependency"
+    },
+    {
+      "target": "src/modules/employee/employee.routes.ts",
+      "why": "The wiring point where IAuditRepository is instantiated (or received) and passed to EmployeeService \u2014 this file must be modified to supply the second constructor argument"
+    }
+  ]
+}
