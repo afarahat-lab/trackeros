@@ -18,6 +18,7 @@ export enum LeaveType {
 export enum AuditAction {
   CREATED = 'CREATED',
   UPDATED = 'UPDATED',
+  SUBMITTED = 'SUBMITTED',
   APPROVED = 'APPROVED',
   REJECTED = 'REJECTED',
   CANCELLED = 'CANCELLED',
