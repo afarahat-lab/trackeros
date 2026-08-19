@@ -1,0 +1,123 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "policy"
+    ],
+    "affectedLayers": [
+      "module-public-api",
+      "unit-tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "Barrel export file `src/modules/policy/index.ts` exists and re-exports exactly these symbols: `LeavePolicy` from `./policy.model`, `ILeavePolicyRepository` from `./policy.repository`, `ILeavePolicyService`, `CreateLeavePolicyDto`, `UpdateLeavePolicyDto` from `./policy.service.interface`, and `LeavePolicyService`, `ValidationError` from `./policy.service`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit test file `tests/unit/modules/policy/policy.service.test.ts` exists and covers `LeavePolicyService` with a mock `ILeavePolicyRepository` (jest.fn() based).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Test: `getById` returns the policy when `repository.findById` resolves to a `LeavePolicy`, and returns `null` when the repository resolves to `null`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Test: `getAll` returns the array from `repository.findAll`, including an empty array when the repository returns `[]`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Test: `getByLeaveType` delegates to `repository.findByLeaveType` with the given `LeaveType` and returns its result, including an empty array.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Test: `getActive` delegates to `repository.findActive` and returns its result, including an empty array.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Test: `create` with valid `CreateLeavePolicyDto` calls `repository.create` with the correct mapped fields (trimmed `policyName`, validated `leaveType`, `entitlementDays`, null-defaulted optional fields, `requiresManagerApproval` defaulting to `true`, `isActive` forced to `true`) and returns the created `LeavePolicy`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Test: `create` throws `ValidationError` when `policyName` is empty/whitespace, when `leaveType` is not a valid `LeaveType` enum member, or when `entitlementDays` is non-positive, non-finite, or not a number.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Test: `update` fetches the existing policy via `repository.findById`; returns `null` if not found (without calling `repository.update`); on success calls `repository.update` with the merged data including `updatedAt` set to a `Date`; validates `leaveType`, `policyName`, and `entitlementDays` when present in the DTO.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Test: `deactivate` returns `false` when `repository.findById` returns `null`; returns `true` without calling `repository.update` when the policy is already inactive (idempotent); otherwise calls `repository.update` with `{ isActive: false, updatedAt: <Date> }` and returns `true` when the update result is non-null.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The barrel export must follow the exact pattern established by `src/modules/employee/index.ts` and `src/modules/audit/index.ts`: named re-exports using `export { X } from './file'` syntax, with `ValidationError` exported alongside the service class.",
+    "The test file must import `LeavePolicyService` and `ValidationError` directly from `../../../../src/modules/policy/policy.service` (not the barrel index), matching the pattern in `tests/unit/modules/employee/employee.service.test.ts` and `tests/unit/modules/audit/audit.service.test.ts`.",
+    "Tests must use a factory function (e.g., `makePolicy`) to construct `LeavePolicy` objects with sensible defaults, and a `makeMockRepo` function returning `jest.Mocked<ILeavePolicyRepository>` with all methods as `jest.fn()`, following the established test patterns.",
+    "The test file must be placed at `tests/unit/modules/policy/policy.service.test.ts` \u2014 the directory `tests/unit/modules/policy/` does not yet exist and must be created."
+  ],
+  "outOfScope": [
+    "Creating or modifying `src/modules/policy/policy.model.ts`, `policy.repository.ts`, `policy.service.interface.ts`, or `policy.service.ts` \u2014 these are owned by sibling sub-phases 4.1 and 4.2 and already exist."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeavePolicy (as re-exported from barrel)",
+      "mustExistOrExtend": true,
+      "invariant": "The barrel export must expose the `LeavePolicy` interface exactly as defined in `policy.model.ts` \u2014 no fields added, removed, or altered. Consumers importing from the barrel see the identical type."
+    },
+    {
+      "entity": "ValidationError (as re-exported from barrel)",
+      "mustExistOrExtend": true,
+      "invariant": "`ValidationError` is a class extending `Error` with `name` set to `'ValidationError'`. It is defined in `policy.service.ts` and re-exported through the barrel. Consumers can `instanceof` check it."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "LeavePolicyService.create",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws `ValidationError` (not a generic Error) when: `policyName` is empty or whitespace-only after trim; `leaveType` is not a member of the `LeaveType` enum; `entitlementDays` is not a positive finite number. On success, returns the `LeavePolicy` as persisted by the repository."
+    },
+    {
+      "operation": "LeavePolicyService.update",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns `null` when the policy does not exist (no error thrown). Throws `ValidationError` when `policyName` is whitespace-only, `leaveType` is invalid, or `entitlementDays` is non-positive/non-finite \u2014 but only when those fields are present in the DTO. On success, returns the updated `LeavePolicy`."
+    },
+    {
+      "operation": "LeavePolicyService.deactivate",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns `false` when the policy does not exist. Returns `true` when the policy is already inactive (idempotent \u2014 no repository write). Returns `true` when the policy was active and the update succeeds. Never throws."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The barrel export must match the export shape of `src/modules/employee/index.ts` and `src/modules/audit/index.ts`: re-export the model interface, repository interface, service interface with its DTOs, service class, and `ValidationError` \u2014 all as named exports using `export { X } from './file'` syntax.",
+      "referencePath": "src/modules/employee/index.ts"
+    },
+    {
+      "requirement": "The test file must follow the structure and patterns of `tests/unit/modules/employee/employee.service.test.ts`: factory function for the entity, `makeMockRepo` returning `jest.Mocked<T>`, `beforeEach` creating fresh service + repo instances, `describe` blocks per method, and direct imports from the service source file (not the barrel).",
+      "referencePath": "tests/unit/modules/employee/employee.service.test.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/policy/index.ts (barrel) \u2192 any consumer module importing from the policy module",
+      "why": "The barrel is the public entry point for the policy module per the architecture rule that modules never import from each other's internals \u2014 only from index.ts."
+    }
+  ]
+}
