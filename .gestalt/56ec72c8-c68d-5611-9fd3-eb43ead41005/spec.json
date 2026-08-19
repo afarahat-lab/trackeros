@@ -1,0 +1,84 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared-types"
+    ],
+    "affectedLayers": [
+      "types"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The `LeaveRequestStatus` enum is exported from `src/shared/types/index.ts` and exposes exactly five members: DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED \u2014 each with a distinct numeric or string value.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `LeaveType` enum is exported from `src/shared/types/index.ts` and exposes exactly six members: ANNUAL, SICK, EMERGENCY, UNPAID, MATERNITY, PATERNITY \u2014 each with a distinct numeric or string value.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `AuditAction` enum is exported from `src/shared/types/index.ts` and exposes exactly six members: CREATED, UPDATED, APPROVED, REJECTED, CANCELLED, DELETED \u2014 each with a distinct numeric or string value.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A Jest unit test file at `tests/unit/shared/types/index.test.ts` verifies each enum's member set and that all values within each enum are distinct (no duplicate values).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`npm run build` (i.e., `tsc --noEmit`) passes with zero type errors, and `npx jest --passWithNoTests` passes with all enum tests green.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The module at `src/shared/types/index.ts` must have zero imports from other project modules \u2014 it is the foundation with no dependencies.",
+    "TypeScript strict mode is enforced project-wide (`tsconfig.json` strict: true). No `any` types are permitted (HARNESS constraint `no-any`).",
+    "The file must use ES module export syntax (`export enum ...`) consistent with the project's source conventions, even though `tsconfig.json` targets `commonjs` module output.",
+    "The test file must follow the Jest configuration: `testMatch` pattern `**/tests/**/*.test.(ts|js)`, `ts-jest` transform, and `node` test environment."
+  ],
+  "outOfScope": [
+    "The `BalanceStatus` enum (ACTIVE, EXHAUSTED, CLOSED) \u2014 it is defined in Phase 5 within `src/modules/balance/balance.model.ts`, not in the shared types module.",
+    "Any model interfaces (LeaveRequest, LeavePolicy, LeaveBalance, Employee, AuditRecord, Notification), DTOs, repository interfaces, service interfaces, service implementations, controllers, or routes \u2014 all belong to later phases.",
+    "Database migrations, Knex configuration, seed data, or any runtime infrastructure \u2014 this phase is pure TypeScript types with no runtime behavior."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequestStatus",
+      "mustExistOrExtend": true,
+      "invariant": "The enum is a closed set of five lifecycle states: DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED. No other values are valid for a LeaveRequest status. Every member value is distinct."
+    },
+    {
+      "entity": "LeaveType",
+      "mustExistOrExtend": true,
+      "invariant": "The enum is a closed set of six leave categories: ANNUAL, SICK, EMERGENCY, UNPAID, MATERNITY, PATERNITY. Every member value is distinct. The feature scope explicitly covers ANNUAL, SICK, and EMERGENCY; the remaining types are defined for completeness."
+    },
+    {
+      "entity": "AuditAction",
+      "mustExistOrExtend": true,
+      "invariant": "The enum is a closed set of six auditable actions: CREATED, UPDATED, APPROVED, REJECTED, CANCELLED, DELETED. Every member value is distinct. These values are used by the audit module to classify every state-changing operation."
+    }
+  ],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [
+    {
+      "requirement": "The `AuditAction` enum members must match the audit action names referenced in the reconciled architecture's business rules and the audit module's planned `AuditRecord.action` field. Specifically: CREATED, UPDATED, APPROVED, REJECTED, CANCELLED, DELETED.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "The `LeaveRequestStatus` enum members must match the lifecycle states declared in the reconciled architecture's `LeaveRequest` entity: DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "The `LeaveType` enum members must match the leave categories declared in the reconciled architecture's `LeaveType` entity: ANNUAL, SICK, EMERGENCY, UNPAID, MATERNITY, PATERNITY.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    }
+  ],
+  "integrationPoints": []
+}
