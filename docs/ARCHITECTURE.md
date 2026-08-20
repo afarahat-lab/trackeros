@@ -17,7 +17,9 @@ The architecture is modular, with a clear separation of concerns between models,
 
 ```
 src/modules/employee/employee.model.ts          — Employee entity + IEmployeeRepository interface
+src/modules/employee/employee.repository.ts     — PgEmployeeRepository (pg Pool, parameterized queries, snake_case↔camelCase mapping)
 src/modules/leave-policy/leave-policy.model.ts  — LeavePolicy entity + ILeavePolicyRepository + ILeavePolicyService interfaces
+src/modules/leave-policy/leave-policy.repository.ts — PgLeavePolicyRepository (pg Pool, parameterized queries, snake_case↔camelCase mapping)
 src/modules/status/                             — System status module (model, service interface, service)
 src/modules/uptime/                             — Uptime health-check module (model, service interface, service, routes)
 src/shared/types/index.ts                       — Shared enums: LeaveType, LeaveStatus, EmploymentStatus, BalanceStatus, NotificationType, NotificationStatus
@@ -29,6 +31,10 @@ src/shared/db/connection.ts                     — PostgreSQL pool (pg)
 - See `AGENTS.md` for stack-specific coding conventions
 - See `docs/GOLDEN_PRINCIPLES.md` for the non-negotiable rules every
   cycle is checked against
+- Repository implementations use a `mapRowTo*` function to convert
+  snake_case database rows to camelCase entity objects, and a
+  `COLUMN_MAP` lookup for dynamic UPDATE SET clause construction.
+  All queries use parameterized placeholders (`$1`, `$2`, …).
 
 ## Dependency rules
 
@@ -85,7 +91,7 @@ Modular monolith built with TypeScript, Fastify, PostgreSQL. The leave managemen
 - **Transaction**: Multi-step writes (approve/cancel) use a caller-owned transaction. Repository methods accept an optional `pg.PoolClient`; the service acquires a client, runs `BEGIN`, passes it to repositories, then `COMMIT`/`ROLLBACK`.
 
 ## Phased Implementation
-1. **Foundation**: shared-types, employee, leave-policy
+1. **Foundation**: shared-types, employee, leave-policy (models + repositories done; service + tests deferred)
 2. **Balance & Audit**: balance module, audit-log module
 3. **Core Workflow**: leave-request module, notification module
 
