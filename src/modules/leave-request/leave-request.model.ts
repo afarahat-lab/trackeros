@@ -57,8 +57,8 @@ export const createLeaveRequestSchema = z.object({
     LeaveType.sick,
     LeaveType.emergency,
   ]),
-  startDate: z.date(),
-  endDate: z.date(),
+  startDate: z.coerce.date(),
+  endDate: z.coerce.date(),
   reason: z.string().optional(),
 }).refine(
   (data) => data.startDate <= data.endDate,
@@ -71,8 +71,8 @@ export const updateLeaveRequestSchema = z.object({
     LeaveType.sick,
     LeaveType.emergency,
   ]).optional(),
-  startDate: z.date().optional(),
-  endDate: z.date().optional(),
+  startDate: z.coerce.date().optional(),
+  endDate: z.coerce.date().optional(),
   reason: z.string().optional(),
   status: z.enum([
     LeaveStatus.draft,
@@ -82,7 +82,7 @@ export const updateLeaveRequestSchema = z.object({
     LeaveStatus.cancelled,
   ]).optional(),
   approvedBy: z.string().nullable().optional(),
-  approvedAt: z.date().nullable().optional(),
+  approvedAt: z.coerce.date().nullable().optional(),
   rejectionReason: z.string().optional(),
 });
 
