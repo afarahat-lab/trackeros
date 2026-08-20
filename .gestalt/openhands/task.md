@@ -1,33 +1,22 @@
-# Implement this phase: Sub-phase 3/3: Unit Tests for Repositories & Service
+# Implement this phase: Phase 2: Balance & Audit Log (part 1/2)
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/3350baf6-9bd5-4cac-b688-f263972317f9/4`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/3350baf6-9bd5-4cac-b688-f263972317f9/5`. Do not clone anything; work only in this directory.
 
 ## What to build
-employee.repository.spec.ts mocks pg Pool and tests all 6 repository methods
-findAll test verifies soft-deleted rows are excluded
-softDelete test verifies deletedAt is set to a timestamp
-leave-policy.repository.spec.ts mocks pg Pool and tests all 5 CRUD methods
-findAllActive test verifies is_active = true filter
-leave-policy.service.spec.ts mocks ILeavePolicyRepository
-getPolicyForLeaveType test verifies delegation to repo.findByLeaveType
-validateEntitlement test covers both true (requestedDays <= entitlementDays) and false (requestedDays > entitlementDays) scenarios
-All 3 spec files compile and run with Jest without errors
+(no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Write all unit tests. Depends on all implementation files from sub-phases 1/3 and 2/3, plus the model interfaces from part 1/2 — read those files before generating any code.
+Create the Balance and AuditLog domain models with their repository/service interfaces. This is the models+interfaces slice only — NO concrete implementations.
+
+Read these files before generating: `src/shared/types/index.ts` (for BalanceStatus enum), `src/modules/employee/employee.model.ts` (for Employee reference pattern).
 
 Files to create:
 
-1. `tests/unit/modules/employee/employee.repository.spec.ts` — Jest unit tests for PgEmployeeRepository. Mock the pg Pool. Test findById returns employee, findByEmployeeNumber, findAll excludes soft-deleted, create inserts, update modifies, softDelete sets deletedAt.
+1. `src/modules/balance/balance.model.ts` — Define the `Balance` entity interface with canonical fields: id, employeeId, leaveType, totalEntitlement, usedDays, remainingDays, fiscalYear, status (BalanceStatus), createdAt, updatedAt. Define `IBalanceRepository` interface with methods: findByEmployeeId(employeeId: string), findByEmployeeIdAndLeaveType(employeeId: string, leaveType: string), findByEmployeeIdAndFiscalYear(employeeId: string, fiscalYear: number), create(balance: Omit<Balance, 'id' | 'createdAt' | 'updatedAt'>), update(id: string, data: Partial<Balance>), deductDays(id: string, days: number). Define `IBalanceService` interface with methods: getBalance(employeeId: string, leaveType: string), hasSufficientBalance(employeeId: string, leaveType: string, requestedDays: number), deductBalance(employeeId: string, leaveType: string, days: number).
 
-2. `tests/unit/modules/leave-policy/leave-policy.repository.spec.ts` — Jest unit tests for PgLeavePolicyRepository. Mock the pg Pool. Test all CRUD methods.
+2. `src/modules/audit-log/audit-log.model.ts` — Define the `AuditLog` entity interface with fields: id, entityType (string), entityId (string), action (string), performedBy (string), changes (Record<string, unknown>), createdAt (Date). Define `IAuditLogRepository` interface with methods: findByEntity(entityType: string, entityId: string), create(entry: Omit<AuditLog, 'id' | 'createdAt'>), findAll(filters?: { entityType?: string; performedBy?: string; fromDate?: Date; toDate?: Date }).
 
-3. `tests/unit/modules/leave-policy/leave-policy.service.spec.ts` — Jest unit tests for LeavePolicyService. Mock ILeavePolicyRepository. Test getPolicyForLeaveType delegates correctly, validateEntitlement returns true/false based on entitlementDays vs requestedDays.
-
-## Owned by SIBLING sub-phases (OUT OF SCOPE for this sub-phase)
-This is ONE sub-phase of a split phase. The deliverables below belong to sibling sub-phases — do NOT create them here, do NOT list them as success criteria, and this sub-phase MUST NOT be gated on their presence (they are produced by a sibling, not missing):
-- "Sub-phase 1/3: Employee & LeavePolicy Repositories": src/modules/employee/employee.repository.ts, src/modules/leave-policy/leave-policy.repository.ts
-- "Sub-phase 2/3: LeavePolicy Service": src/modules/leave-policy/leave-policy.service.ts
+No tests in this phase — tests come in part 2/2.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -35,40 +24,35 @@ These are resolved, feature-wide decisions. Wherever this phase touches the conc
 
 ## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
 The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
-- `Employee` — the entity MUST have exactly these fields:
+- `Balance` — the entity MUST have exactly these fields:
     - id: string
-    - employeeNumber: string
-    - firstName: string
-    - lastName: string
-    - email: string
-    - managerId: string | null
-    - department: string | null
-    - hireDate: Date
-    - terminationDate: Date | null
-    - employmentStatus: string
+    - employeeId: string
+    - leaveType: string
+    - totalEntitlement: number
+    - usedDays: number
+    - remainingDays: number
+    - fiscalYear: number
+    - status: string
     - createdAt: Date
     - updatedAt: Date
-    - deletedAt: Date | null
 
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- Employee repository tests must mock the pg Pool and verify that PgEmployeeRepository satisfies the IEmployeeRepository interface contract defined in src/modules/employee/employee.model.ts — every method signature (findById, findByEmployeeNumber, findAll, create, update, softDelete) must be tested. (see `src/modules/employee/employee.model.ts`)
-- LeavePolicyService tests must mock ILeavePolicyRepository and verify that LeavePolicyService satisfies the ILeavePolicyService interface contract defined in src/modules/leave-policy/leave-policy.model.ts — both methods (getPolicyForLeaveType, validateEntitlement) must be tested. (see `src/modules/leave-policy/leave-policy.model.ts`)
-- LeavePolicy repository tests must mock the pg Pool and verify that PgLeavePolicyRepository satisfies the ILeavePolicyRepository interface contract defined in src/modules/leave-policy/leave-policy.model.ts — every method signature (findById, findByLeaveType, findAllActive, create, update) must be tested. (see `src/modules/leave-policy/leave-policy.model.ts`)
-- All test files must use the same Jest configuration and conventions as the project (per HARNESS.json stack.testFramework = Jest). Test file naming must follow the pattern <name>.spec.ts under tests/unit/modules/<module>/. (see `HARNESS.json`)
+- The `Balance.status` field must use the `BalanceStatus` enum imported from `src/shared/types/index.ts` — matching the pattern used by `Employee.employmentStatus` (EmploymentStatus enum) and `LeavePolicy.leaveType` (LeaveType enum). (see `src/shared/types/index.ts`)
+- The `Balance.leaveType` field must be typed as `string` (not the `LeaveType` enum) — matching the reconciled architecture specification where `leaveType` is `string` on the Balance entity, even though `LeavePolicy.leaveType` uses the `LeaveType` enum. (see `.gestalt/architecture/reconciled.json`)
+- The `create` method parameter type must follow the exact `Omit` pattern established by `IEmployeeRepository.create`: omit server-assigned fields (`id`, timestamps). For Balance: `Omit<Balance, 'id' | 'createdAt' | 'updatedAt'>`. For AuditLog: `Omit<AuditLog, 'id' | 'createdAt'>` (AuditLog has no `updatedAt`). (see `src/modules/employee/employee.model.ts`)
 ### Entity invariants — enforce these
-- Reuse or extend `Employee`: Soft-delete semantics: findAll() and findById() must exclude rows where deleted_at IS NOT NULL. The softDelete() method sets deleted_at = NOW() without physically removing the row.
-- Reuse or extend `LeavePolicy`: findAllActive() returns only policies where is_active = true. findByLeaveType() returns at most one policy per leave type (the active one).
+- Reuse or extend `Balance`: `remainingDays` must always equal `totalEntitlement - usedDays`. Any operation that modifies `usedDays` (via `deductDays` or `update`) must maintain this invariant. The `status` field must be `BalanceStatus.active` when `remainingDays > 0` and `BalanceStatus.exhausted` when `remainingDays === 0`.
+- Reuse or extend `AuditLog`: AuditLog records are immutable once created — there is no `update` or `delete` method on `IAuditLogRepository`. The `changes` field captures the full state delta as a `Record<string, unknown>` and must never be null or undefined.
 ### Interface contract — expose these operations (their shape is yours)
-- PgEmployeeRepository.findById — Returns Employee when row exists; returns null when no matching non-deleted row found. Must filter deleted_at IS NULL.
-- PgEmployeeRepository.findAll — Returns array of Employee (empty array when no non-deleted rows). Must filter deleted_at IS NULL.
-- PgEmployeeRepository.softDelete — idempotent; Sets deleted_at = NOW() for the given id. Returns void. Does not throw if the id does not exist — it is a no-op in that case.
-- LeavePolicyService.validateEntitlement — Returns boolean. Returns false when no policy exists for the given leaveType. Returns false when requestedDays > policy.entitlementDays. Returns true when requestedDays <= policy.entitlementDays. Never throws.
-- LeavePolicyService.getPolicyForLeaveType — Delegates to repository.findByLeaveType(leaveType). Returns the LeavePolicy or null. Never throws.
+- IBalanceRepository.deductDays — Must reject with a typed error when `days` exceeds `remainingDays` (INSUFFICIENT_BALANCE). Must reject when the balance `status` is already `exhausted`. Must reject when the balance is not found (NOT_FOUND).
+- IBalanceService.deductBalance — Must reject with a typed error when no balance exists for the given employee + leaveType combination (NOT_FOUND). Must reject when `days` exceeds available `remainingDays` (INSUFFICIENT_BALANCE). On success, returns the updated Balance with decremented remainingDays and incremented usedDays.
+- IBalanceService.hasSufficientBalance — idempotent; Returns `false` (not an error) when no balance record exists for the given employee + leaveType. Returns `false` when `remainingDays < requestedDays`. Returns `true` only when a balance exists and `remainingDays >= requestedDays`.
+- IAuditLogRepository.create — Must reject with a typed error when required fields (`entityType`, `entityId`, `action`, `performedBy`, `changes`) are missing or invalid. On success, returns the created AuditLog with server-assigned `id` and `createdAt`.
 ### Integration points — connect to these
-- src/shared/db/connection.ts (pg Pool) — Repository tests must mock the pg Pool exported from this module. The mock must intercept pool.query() calls and return synthetic pg QueryResult objects with rows shaped as the repository's internal Row interfaces.
-- src/modules/leave-policy/leave-policy.model.ts (ILeavePolicyRepository interface) — LeavePolicyService tests must mock ILeavePolicyRepository — the service's only constructor dependency. The mock must implement findByLeaveType to return synthetic LeavePolicy objects or null.
+- src/shared/types/index.ts — Balance entity imports `BalanceStatus` enum. The `status` field is typed as `BalanceStatus`, not a plain string.
+- src/modules/employee/employee.model.ts — Both Balance and AuditLog entities reference employees: `Balance.employeeId` is a string referencing an Employee `id`, and `AuditLog.performedBy` is a string referencing the employee who performed the action. The repository `create` parameter pattern (`Omit<Entity, 'id' | 'createdAt' | 'updatedAt'>`) is also derived from `IEmployeeRepository`.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
