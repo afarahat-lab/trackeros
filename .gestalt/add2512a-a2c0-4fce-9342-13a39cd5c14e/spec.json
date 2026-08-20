@@ -1,0 +1,83 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "employee",
+      "leave-policy",
+      "shared-types"
+    ],
+    "affectedLayers": [
+      "model"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "Employee.employmentStatus is typed as EmploymentStatus enum (imported from ../../shared/types), not as string",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "LeavePolicy.leaveType is typed as LeaveType enum (imported from ../../shared/types), not as string",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "ILeavePolicyService.getPolicyForLeaveType parameter leaveType is typed as LeaveType enum, not as string",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "ILeavePolicyService.validateEntitlement parameter leaveType is typed as LeaveType enum, not as string",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "IEmployeeRepository.softDelete returns Promise<Employee | null> (the soft-deleted entity), consistent with the update method's return pattern, not Promise<boolean>",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Must not change the shape of Employee or LeavePolicy entities beyond type annotation fixes \u2014 no field additions, removals, or renames",
+    "Must not change IEmployeeRepository or ILeavePolicyRepository method signatures beyond the return-type fix for softDelete \u2014 no method additions or removals",
+    "Must not introduce any runtime logic, concrete classes, or new files \u2014 this is a type-annotation-only fix phase"
+  ],
+  "outOfScope": [],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "employmentStatus must be typed as EmploymentStatus enum, not as string \u2014 the enum values (active | inactive | terminated) are the only valid states"
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "leaveType must be typed as LeaveType enum, not as string \u2014 the enum values (annual | sick | emergency) are the only valid leave types"
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "ILeavePolicyService.getPolicyForLeaveType",
+      "authRule": "No auth rule at interface level \u2014 auth is enforced at the controller/route layer per GP-005",
+      "idempotent": false,
+      "errorSemantics": ""
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "LeavePolicy.leaveType and ILeavePolicyService method parameters must use the LeaveType enum imported from src/shared/types/index.ts \u2014 the import already exists but is unused; the field and parameters must reference it",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "Employee.employmentStatus must use the EmploymentStatus enum from src/shared/types/index.ts \u2014 add the import and replace the string type",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "IEmployeeRepository.softDelete return type must match the pattern established by update (Promise<Employee | null>), not Promise<boolean> \u2014 the reconciled architecture and PLAN.md both describe softDelete as setting deletedAt and returning the entity",
+      "referencePath": "src/modules/employee/employee.model.ts"
+    }
+  ],
+  "integrationPoints": []
+}
