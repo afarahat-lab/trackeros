@@ -1,0 +1,82 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-policy"
+    ],
+    "affectedLayers": [
+      "service"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "A `LeavePolicyService` class exists in `src/modules/leave-policy/leave-policy.service.ts` that satisfies the `ILeavePolicyService` interface declared in `./leave-policy.model.ts` \u2014 verified by TypeScript compilation (the class must compile without errors when assigned to a variable typed `ILeavePolicyService`).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `LeavePolicyService` constructor accepts exactly one parameter of type `ILeavePolicyRepository` (the interface, not the concrete `PgLeavePolicyRepository`), satisfying dependency inversion.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`getPolicyForLeaveType(leaveType)` delegates to `this.repo.findByLeaveType(leaveType)` and returns its result directly \u2014 a `LeavePolicy | null`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`validateEntitlement(employeeId, leaveType, requestedDays)` calls `this.repo.findByLeaveType(leaveType)`. If the repository returns `null` (no policy found), the method returns `false`. If a policy is found, the method returns `requestedDays <= policy.entitlementDays`.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The service must NOT access the database directly \u2014 all data access goes through the injected `ILeavePolicyRepository` (GP-001).",
+    "The service must NOT create audit records \u2014 both `getPolicyForLeaveType` and `validateEntitlement` are read-only operations (GP-002 applies only to state-changing operations).",
+    "The service must NOT import or reference `PgLeavePolicyRepository` \u2014 it depends only on the `ILeavePolicyRepository` interface from `./leave-policy.model.ts`."
+  ],
+  "outOfScope": [
+    "Unit tests for `LeavePolicyService` \u2014 these are produced in sibling sub-phase 3/3.",
+    "The `PgLeavePolicyRepository` implementation \u2014 produced in sibling sub-phase 1/3.",
+    "The `PgEmployeeRepository` implementation \u2014 produced in sibling sub-phase 1/3."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeavePolicyService",
+      "mustExistOrExtend": true,
+      "invariant": "The service is stateless \u2014 it holds a reference to `ILeavePolicyRepository` but maintains no mutable state of its own. Every method call is a pure delegation or computation over repository results."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "getPolicyForLeaveType(leaveType: LeaveType): Promise<LeavePolicy | null>",
+      "authRule": "No auth enforcement at this layer \u2014 the service is a pure business-logic component; auth is enforced at the controller/route layer.",
+      "idempotent": true,
+      "errorSemantics": "Returns null when no policy exists for the given leave type (not-found is not an error at this layer). Propagates any repository-level errors without wrapping."
+    },
+    {
+      "operation": "validateEntitlement(employeeId: string, leaveType: LeaveType, requestedDays: number): Promise<boolean>",
+      "authRule": "No auth enforcement at this layer \u2014 the service is a pure business-logic component; auth is enforced at the controller/route layer.",
+      "idempotent": true,
+      "errorSemantics": "Returns false when no policy exists for the leave type (graceful degradation \u2014 missing policy means no entitlement). Propagates any repository-level errors without wrapping. The employeeId parameter is accepted but not used in the lookup (entitlement is per leave type, not per employee)."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The `LeavePolicyService` class must satisfy the `ILeavePolicyService` interface exactly as declared in `./leave-policy.model.ts` \u2014 both method signatures (`getPolicyForLeaveType` and `validateEntitlement`) must match the interface's parameter types and return types.",
+      "referencePath": "src/modules/leave-policy/leave-policy.model.ts"
+    },
+    {
+      "requirement": "The `LeaveType` parameter in both service methods must use the `LeaveType` enum imported from `../../shared/types`, matching the type used by `ILeavePolicyRepository.findByLeaveType` and the `LeavePolicy.leaveType` field.",
+      "referencePath": "src/shared/types/index.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "ILeavePolicyRepository (interface from ./leave-policy.model.ts, concrete PgLeavePolicyRepository from ./leave-policy.repository.ts)",
+      "why": "The service delegates all data access to the repository \u2014 `getPolicyForLeaveType` calls `findByLeaveType`, and `validateEntitlement` also calls `findByLeaveType`."
+    }
+  ]
+}
