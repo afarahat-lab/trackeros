@@ -18,11 +18,11 @@ Represents a leave record managed by the `leave` module, including leave request
 
 | Value | Description |
 |-------|-------------|
-| DRAFT | Leave request is in draft state |
-| SUBMITTED | Leave request has been submitted |
-| APPROVED | Leave request has been approved |
-| REJECTED | Leave request has been rejected |
-| CANCELLED | Leave request has been cancelled |
+| draft | Leave request is in draft state |
+| submitted | Leave request has been submitted |
+| approved | Leave request has been approved |
+| rejected | Leave request has been rejected |
+| cancelled | Leave request has been cancelled |
 
 ### LeaveRequest
 
@@ -104,7 +104,7 @@ Interface for balance persistence. Methods:
 - `findByEmployeeIdAndFiscalYear(employeeId: string, fiscalYear: number): Promise<Balance[]>`
 - `create(balance: Omit<Balance, 'id' | 'createdAt' | 'updatedAt'>): Promise<Balance>`
 - `update(id: string, data: Partial<Balance>): Promise<Balance | null>`
-- `deductDays(id: string, days: number): Promise<Balance>`
+- `deductDays(id: string, days: number): Promise<Balance | null>`
 
 ### IBalanceService
 
@@ -183,7 +183,7 @@ Represents notification data managed by the `notification` module, including not
 | message | string | true |
 | relatedEntityType | string \| null | false |
 | relatedEntityId | string \| null | false |
-| status | 'PENDING' \| 'SENT' \| 'READ' \| 'ARCHIVED' | true |
+| status | 'pending' \| 'sent' \| 'read' \| 'archived' | true |
 | createdAt | Date | true |
 | readAt | Date \| null | false |
 
