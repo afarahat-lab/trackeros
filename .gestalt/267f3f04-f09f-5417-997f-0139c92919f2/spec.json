@@ -1,0 +1,113 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "balance",
+      "audit-log"
+    ],
+    "affectedLayers": [
+      "domain-model",
+      "repository-interface",
+      "service-interface"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The Balance entity interface is exported from src/modules/balance/balance.model.ts with all canonical fields: id (string), employeeId (string), leaveType (string), totalEntitlement (number), usedDays (number), remainingDays (number), fiscalYear (number), status (BalanceStatus enum), createdAt (Date), updatedAt (Date).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The IBalanceRepository interface is exported with all six methods: findByEmployeeId(employeeId: string): Promise<Balance[]>, findByEmployeeIdAndLeaveType(employeeId: string, leaveType: string): Promise<Balance | null>, findByEmployeeIdAndFiscalYear(employeeId: string, fiscalYear: number): Promise<Balance[]>, create(balance: Omit<Balance, 'id' | 'createdAt' | 'updatedAt'>): Promise<Balance>, update(id: string, data: Partial<Balance>): Promise<Balance | null>, deductDays(id: string, days: number): Promise<Balance | null>.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The IBalanceService interface is exported with three methods: getBalance(employeeId: string, leaveType: string): Promise<Balance | null>, hasSufficientBalance(employeeId: string, leaveType: string, requestedDays: number): Promise<boolean>, deductBalance(employeeId: string, leaveType: string, days: number): Promise<Balance>.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The AuditLog entity interface is exported from src/modules/audit-log/audit-log.model.ts with all canonical fields: id (string), entityType (string), entityId (string), action (string), performedBy (string), changes (Record<string, unknown>), createdAt (Date).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The IAuditLogRepository interface is exported with three methods: findByEntity(entityType: string, entityId: string): Promise<AuditLog[]>, create(entry: Omit<AuditLog, 'id' | 'createdAt'>): Promise<AuditLog>, findAll(filters?: { entityType?: string; performedBy?: string; fromDate?: Date; toDate?: Date }): Promise<AuditLog[]>.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Domain error classes InsufficientBalanceError (code: 'INSUFFICIENT_BALANCE'), BalanceNotFoundError (code: 'NOT_FOUND'), and AuditLogValidationError (code: 'VALIDATION_ERROR') are exported and extend Error with a public readonly code property matching the architecture error-response contract.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No concrete repository or service implementations \u2014 this phase delivers only entity interfaces, repository interfaces, service interfaces, and error classes. The files balance.model.ts and audit-log.model.ts must contain zero database access logic, zero pg Pool imports, and zero class implementations beyond error classes.",
+    "The Balance entity's leaveType field must be typed as string (not the LeaveType enum), matching the reconciled architecture where leaveType is a string attribute. The status field must use the BalanceStatus enum imported from src/shared/types/index.ts.",
+    "Repository create methods must use the Omit pattern: Omit<Balance, 'id' | 'createdAt' | 'updatedAt'> for Balance and Omit<AuditLog, 'id' | 'createdAt'> for AuditLog, consistent with the Employee and LeavePolicy module patterns.",
+    "All repository and service methods must return Promises, consistent with the async-by-default pattern established in Employee and LeavePolicy modules."
+  ],
+  "outOfScope": [
+    "Concrete repository implementations (PgBalanceRepository, PgAuditLogRepository) \u2014 deferred to Phase 4 (part 2/2).",
+    "Concrete service implementation (BalanceService) \u2014 deferred to Phase 4 (part 2/2).",
+    "Balance controller, routes, and Fastify plugin registration \u2014 deferred to Phase 4 (part 2/2).",
+    "Unit tests for Balance and AuditLog modules \u2014 deferred to Phase 4 (part 2/2)."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "Balance",
+      "mustExistOrExtend": true,
+      "invariant": "remainingDays must always equal totalEntitlement - usedDays. Any mutation to usedDays or totalEntitlement must recalculate remainingDays accordingly. The status must be 'active' when remainingDays > 0 and 'exhausted' when remainingDays <= 0."
+    },
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "Every AuditLog entry must be immutable after creation \u2014 id, entityType, entityId, action, performedBy, changes, and createdAt are set once at creation and never updated. There is no update method on IAuditLogRepository."
+    },
+    {
+      "entity": "Balance",
+      "mustExistOrExtend": true,
+      "invariant": "A Balance is uniquely identified by the composite of (employeeId, leaveType, fiscalYear). No two Balance records may share the same combination of these three fields."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IBalanceRepository.deductDays",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Must throw BalanceNotFoundError if no balance row matches the given id. Must throw InsufficientBalanceError if remainingDays < days. Must atomically decrement remainingDays and increment usedDays, and transition status to 'exhausted' when remainingDays reaches 0."
+    },
+    {
+      "operation": "IBalanceService.deductBalance",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Must locate the Balance by employeeId + leaveType (delegating to repository), then delegate to repository.deductDays. Must propagate InsufficientBalanceError and BalanceNotFoundError from the repository layer. Must return the updated Balance."
+    },
+    {
+      "operation": "IAuditLogRepository.create",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Must validate that entityType, entityId, action, and performedBy are non-empty strings before persisting. Must throw AuditLogValidationError on invalid input. Must return the created AuditLog with generated id and createdAt."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The Balance entity's status field must use the BalanceStatus enum imported from src/shared/types/index.ts \u2014 not a string literal, not a locally redefined enum.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The Omit pattern for create methods must match the pattern established in IEmployeeRepository.create: Omit<Entity, auto-generated fields>. For Balance, auto-generated fields are 'id' | 'createdAt' | 'updatedAt'. For AuditLog, they are 'id' | 'createdAt'.",
+      "referencePath": "src/modules/employee/employee.model.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts",
+      "why": "Balance entity imports BalanceStatus enum from shared types. AuditLog entity conceptually depends on shared types for consistency with the module ecosystem, though it currently uses only primitive types."
+    }
+  ]
+}
