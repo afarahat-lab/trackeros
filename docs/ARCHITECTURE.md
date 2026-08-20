@@ -22,7 +22,12 @@ src/modules/leave-policy/leave-policy.model.ts  — LeavePolicy entity + ILeaveP
 src/modules/leave-policy/leave-policy.repository.ts — PgLeavePolicyRepository (pg Pool, parameterized queries, snake_case↔camelCase mapping)
 src/modules/leave-policy/leave-policy.service.ts — LeavePolicyService (stateless, delegates to ILeavePolicyRepository)
 src/modules/balance/balance.model.ts            — Balance entity + IBalanceRepository + IBalanceService interfaces + error classes (InsufficientBalanceError, BalanceNotFoundError)
+src/modules/balance/balance.repository.ts       — PgBalanceRepository (pg Pool, parameterized queries, snake_case↔camelCase mapping, dynamic UPDATE via COLUMN_MAP)
+src/modules/balance/balance.service.ts          — BalanceService (stateless, delegates to IBalanceRepository; enforces balance rules: throws BalanceNotFoundError / InsufficientBalanceError)
+src/modules/balance/balance.controller.ts       — BalanceController (Fastify handlers: getBalance, getBalances)
+src/modules/balance/balance.routes.ts           — Fastify plugin registering GET /balance/:employeeId/:leaveType and GET /balance/:employeeId
 src/modules/audit-log/audit-log.model.ts        — AuditLog entity + IAuditLogRepository interface + AuditLogValidationError
+src/modules/audit-log/audit-log.repository.ts   — PgAuditLogRepository (pg Pool, parameterized queries, dynamic filter construction for findAll)
 src/modules/status/                             — System status module (model, service interface, service)
 src/modules/uptime/                             — Uptime health-check module (model, service interface, service, routes)
 src/shared/types/index.ts                       — Shared enums: LeaveType, LeaveStatus, EmploymentStatus, BalanceStatus, NotificationType, NotificationStatus
@@ -31,6 +36,9 @@ src/shared/db/connection.ts                     — PostgreSQL pool (pg)
 tests/unit/modules/employee/employee.repository.spec.ts       — Jest tests for PgEmployeeRepository (mock pg Pool)
 tests/unit/modules/leave-policy/leave-policy.repository.spec.ts — Jest tests for PgLeavePolicyRepository (mock pg Pool)
 tests/unit/modules/leave-policy/leave-policy.service.spec.ts   — Jest tests for LeavePolicyService (mock ILeavePolicyRepository)
+tests/unit/modules/balance/balance.repository.spec.ts          — Jest tests for PgBalanceRepository (mock pg Pool)
+tests/unit/modules/balance/balance.service.spec.ts             — Jest tests for BalanceService (mock IBalanceRepository)
+tests/unit/modules/audit-log/audit-log.repository.spec.ts      — Jest tests for PgAuditLogRepository (mock pg Pool)
 ```
 
 ## Key patterns
@@ -45,7 +53,8 @@ tests/unit/modules/leave-policy/leave-policy.service.spec.ts   — Jest tests fo
 - Tests use Jest with `ts-jest` preset. Repository tests mock the pg
   `Pool` from `src/shared/db/connection` via `jest.mock`. Service tests
   mock the repository interface directly. Test helpers (`makeEmployeeRow`,
-  `makeEmployee`, `makePolicyRow`, `makePolicy`) produce canonical test
+  `makeEmployee`, `makePolicyRow`, `makePolicy`, `makeBalanceRow`,
+  `makeBalance`, `makeAuditLogRow`, `makeAuditLog`) produce canonical test
   fixtures.
 - Domain error classes carry a `code` property for HTTP mapping
   (e.g. `InsufficientBalanceError.code = 'INSUFFICIENT_BALANCE'`,
@@ -80,10 +89,10 @@ Modular monolith built with TypeScript, Fastify, PostgreSQL. The leave managemen
 | shared-types | src/shared/types/ | Enums: LeaveType, LeaveStatus, EmploymentStatus, BalanceStatus, NotificationType, NotificationStatus |
 | employee | src/modules/employee/ | Employee entity, repository |
 | leave-policy | src/modules/leave-policy/ | LeavePolicy entity, repository, service |
-| balance | src/modules/balance/ | Balance entity, repository interface, service interface, error classes (models+interfaces only — no concrete implementations yet) |
+| balance | src/modules/balance/ | Balance entity, repository, service, controller, routes, error classes |
 | leave-request | src/modules/leave-request/ | LeaveRequest entity, repository, service, controller, routes, validation |
 | notification | src/modules/notification/ | Notification entity, repository, service |
-| audit-log | src/modules/audit-log/ | AuditLog entity, repository interface, error class (models+interfaces only — no concrete implementation yet) |
+| audit-log | src/modules/audit-log/ | AuditLog entity, repository, error class |
 
 ## Dependency Map
 - leave-request → shared-types, balance, leave-policy, employee, notification, audit-log
@@ -108,8 +117,14 @@ Modular monolith built with TypeScript, Fastify, PostgreSQL. The leave managemen
 
 ## Phased Implementation
 1. **Foundation**: shared-types, employee, leave-policy (models + repositories + service + tests done)
-2. **Balance & Audit**: balance module (models+interfaces done), audit-log module (models+interfaces done) — concrete implementations pending
-3. **Core Workflow**: leave-request module, notification module
+2. **Balance & Audit**: balance module (models, repository, service, controller, routes, tests done), audit-log module (models, repository, tests done)
+3. **Core Workflow**: leave-request module, notification module (pending)
+
+## Implementation Notes
+- Balance routes are defined as a Fastify plugin (`balanceRoutes`) but are **not yet registered** in `src/app.ts` — integration will happen in a follow-up phase.
+- The `IBalanceService` interface includes `getBalances(employeeId)` returning all balances for an employee, in addition to the single-type `getBalance`.
+- `PgBalanceRepository.deductDays` uses a SQL `CASE` expression to set `status` to `'exhausted'` when `remaining_days` reaches 0 or below.
+- `PgAuditLogRepository.findAll` builds dynamic WHERE clauses from optional filter parameters using indexed placeholders.
 
 ## Open Question
 - Day-counting semantics (inclusive calendar days vs business days) – see open questions list.
