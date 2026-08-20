@@ -1,0 +1,54 @@
+{
+  "scope": {
+    "affectedDomains": [],
+    "affectedLayers": [],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "PgBalanceRepository implements all 6 methods of IBalanceRepository (findByEmployeeId, findByEmployeeIdAndLeaveType, findByEmployeeIdAndFiscalYear, create, update, deductDays) and each method uses parameterized queries against the pg Pool imported from src/shared/db/connection",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "PgBalanceRepository.deductDays atomically decrements remaining_days by the given days, increments used_days by the same amount, and sets status to 'exhausted' when remaining_days reaches 0 \u2014 all in a single UPDATE RETURNING * statement",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "BalanceService implements all 3 methods of IBalanceService: getBalance delegates to repository.findByEmployeeIdAndLeaveType, hasSufficientBalance returns true iff remainingDays >= requestedDays (false if balance not found), deductBalance delegates to repository.deductDays",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Balance controller exposes two route handlers that call BalanceService: one returns a single balance for an employeeId+leaveType pair, the other returns all balances for an employeeId. Both handlers return 404 when no balance is found and 500 on unexpected errors",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Balance routes register as a Fastify plugin function that wires the balance controller's handlers to the appropriate paths, following the same plugin pattern as src/modules/uptime/uptime.routes.ts",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "PgAuditLogRepository implements all 3 methods of IAuditLogRepository (findByEntity, create, findAll) using parameterized queries against the pg Pool. findAll supports optional filters (entityType, performedBy, fromDate, toDate) that are conditionally appended to the WHERE clause",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All 3 unit test files exist and pass: balance.repository.spec.ts (mocks pg Pool, tests all 6 repository methods including deductDays exhaustion logic), balance.service.spec.ts (mocks IBalanceRepository, tests all 3 service methods including edge cases), audit-log.repository.spec.ts (mocks pg Pool, tests all 3 repository methods including filtered findAll)",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access must go through the repository layer \u2014 the BalanceService and BalanceController must never call pool.query directly; they delegate to IBalanceRepository"
+  ],
+  "outOfScope": [],
+  "ambiguities": [],
+  "entityInvariants": [],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [],
+  "integrationPoints": []
+}
