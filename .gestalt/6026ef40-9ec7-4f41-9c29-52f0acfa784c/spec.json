@@ -1,0 +1,138 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "balance",
+      "audit-log"
+    ],
+    "affectedLayers": [
+      "repository",
+      "service",
+      "controller",
+      "routes",
+      "tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "PgBalanceRepository implements every method declared in IBalanceRepository (findByEmployeeId, findByEmployeeIdAndLeaveType, findByEmployeeIdAndFiscalYear, create, update, deductDays) using parameterized SQL queries against the pg Pool from src/shared/db/connection.ts",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "deductDays(id, days) throws BalanceNotFoundError (code 'NOT_FOUND') when no balance row matches the given id, and throws InsufficientBalanceError (code 'INSUFFICIENT_BALANCE') when remaining_days is less than the requested days \u2014 it never returns null",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "deductDays atomically decrements remaining_days and increments used_days by the requested days, and sets status to 'exhausted' (BalanceStatus.exhausted) when remaining_days reaches 0 after deduction",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "BalanceService implements IBalanceService: getBalance delegates to repo.findByEmployeeIdAndLeaveType, hasSufficientBalance returns true iff remainingDays >= requestedDays, deductBalance delegates to repo.deductDays",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "PgAuditLogRepository implements every method declared in IAuditLogRepository (findByEntity, create, findAll with optional filters) using parameterized SQL queries against the pg Pool",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Balance controller exposes endpoints that return balance data for an employee; RBAC is enforced via requireRole middleware (employees see their own, managers see their direct reports, hr_admin sees all)",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "Unit tests exist for PgBalanceRepository (mock pg Pool), BalanceService (mock IBalanceRepository), and PgAuditLogRepository (mock pg Pool) covering all methods including error paths",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access must go through the repository layer \u2014 no inline SQL in services, controllers, or route handlers (GP-001)",
+    "Repository methods must use parameterized queries ($1, $2, \u2026) \u2014 no string interpolation of user-supplied values into SQL",
+    "No unhandled promise rejections \u2014 all async errors must be caught and surfaced as typed domain errors (GP-006)"
+  ],
+  "outOfScope": [
+    "Leave-request module (Phase 5/6) \u2014 balance deduction orchestration during leave approval lives in LeaveRequestService, not in this phase",
+    "Notification module (Phase 5/6) \u2014 no notification creation or dispatch in this phase"
+  ],
+  "ambiguities": [
+    {
+      "description": "PLAN.md states balance routes \"should be registered in src/app.ts in a follow-up integration phase or as part of this phase if the app.ts already supports plugin registration.\" Since app.ts already uses app.register() for uptimeRoutes, the balance routes plugin could be registered in this phase or deferred. The code agent should decide based on whether the controller+route files are produced.",
+      "options": [
+        "Register balance routes in app.ts in this phase",
+        "Defer app.ts registration to a follow-up integration phase"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "Balance",
+      "mustExistOrExtend": true,
+      "invariant": "remainingDays must always equal totalEntitlement - usedDays; any mutation to usedDays or totalEntitlement must recalculate remainingDays accordingly"
+    },
+    {
+      "entity": "Balance",
+      "mustExistOrExtend": true,
+      "invariant": "status must be 'active' when remainingDays > 0 and 'exhausted' when remainingDays === 0; the deductDays operation must enforce this transition"
+    },
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "Every AuditLog entry must have a non-empty entityType, entityId, action, and performedBy; changes must be a plain object (Record<string, unknown>) \u2014 never null or undefined"
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IBalanceRepository.deductDays",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws BalanceNotFoundError (code 'NOT_FOUND') when no row matches id; throws InsufficientBalanceError (code 'INSUFFICIENT_BALANCE') when remaining_days < days; returns the updated Balance on success \u2014 never returns null"
+    },
+    {
+      "operation": "IBalanceService.deductBalance",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Delegates to IBalanceRepository.deductDays; propagates BalanceNotFoundError and InsufficientBalanceError from the repository layer"
+    },
+    {
+      "operation": "IBalanceService.getBalance",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns Balance | null \u2014 null when no balance row exists for the given employeeId + leaveType combination (no error thrown for missing balance)"
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Balance entity shape must match the reconciled architecture: id, employeeId, leaveType, totalEntitlement, usedDays, remainingDays, fiscalYear, status (BalanceStatus), createdAt, updatedAt \u2014 as declared in balance.model.ts",
+      "referencePath": "src/modules/balance/balance.model.ts"
+    },
+    {
+      "requirement": "Repository implementations must use the pg Pool exported from src/shared/db/connection.ts \u2014 no separate pool creation",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "Error classes InsufficientBalanceError (code 'INSUFFICIENT_BALANCE') and BalanceNotFoundError (code 'NOT_FOUND') already defined in balance.model.ts must be used \u2014 no new error classes for the same semantics",
+      "referencePath": "src/modules/balance/balance.model.ts"
+    },
+    {
+      "requirement": "AuditLog entity shape must match the reconciled architecture: id, entityType, entityId, action, performedBy, changes (Record<string, unknown>), createdAt \u2014 as declared in audit-log.model.ts",
+      "referencePath": "src/modules/audit-log/audit-log.model.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "PgBalanceRepository and PgAuditLogRepository must import the shared pg Pool for all database operations"
+    },
+    {
+      "target": "src/shared/types/index.ts",
+      "why": "Balance entity uses BalanceStatus enum; repository must import it for status transitions (active \u2194 exhausted)"
+    }
+  ]
+}
