@@ -1,32 +1,22 @@
-# Implement this phase: Phase 2: Balance & Audit Log (part 2/2)
+# Implement this phase: Phase 3: Leave Request & Notification (part 1/2)
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/3350baf6-9bd5-4cac-b688-f263972317f9/6`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/3350baf6-9bd5-4cac-b688-f263972317f9/7`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Implement the concrete repository classes for Balance and AuditLog, plus the Balance service, controller, and routes. This phase depends on the models/interfaces from part 1/2.
+Create the LeaveRequest and Notification domain models with their repository/service interfaces. This is the models+interfaces slice only — NO concrete implementations.
 
-Read these files before generating: `src/modules/balance/balance.model.ts`, `src/modules/audit-log/audit-log.model.ts`, `src/shared/db/connection.ts`, `src/app.ts`.
+Read these files before generating: `src/shared/types/index.ts` (for LeaveType, LeaveStatus, NotificationType, NotificationStatus enums), `src/modules/employee/employee.model.ts` (for Employee reference), `src/modules/leave-policy/leave-policy.model.ts` (for LeavePolicy reference), `src/modules/balance/balance.model.ts` (for Balance reference).
 
 Files to create:
 
-1. `src/modules/balance/balance.repository.ts` — Implement `PgBalanceRepository` satisfying `IBalanceRepository`. Use pg Pool. Methods: findByEmployeeId, findByEmployeeIdAndLeaveType, findByEmployeeIdAndFiscalYear, create, update, deductDays (UPDATE remaining_days = remaining_days - $days, used_days = used_days + $days, set status to 'exhausted' if remaining reaches 0). Import from `./balance.model.ts`.
+1. `src/modules/leave-request/leave-request.model.ts` — Define the `LeaveRequest` entity interface with canonical fields: id, employeeId, leaveType (LeaveType), startDate (Date), endDate (Date), reason (string | undefined), status (LeaveStatus), approvedBy (string | null), approvedAt (Date | null), rejectionReason (string | undefined), createdAt (Date), updatedAt (Date). Define `ILeaveRequestRepository` interface with methods: findById(id: string), findByEmployeeId(employeeId: string), findByStatus(status: LeaveStatus), findByManagerId(managerId: string), create(request: Omit<LeaveRequest, 'id' | 'createdAt' | 'updatedAt'>), update(id: string, data: Partial<LeaveRequest>), updateStatus(id: string, status: LeaveStatus, approvedBy?: string, rejectionReason?: string). Define `ILeaveRequestService` interface with methods: submit(request: CreateLeaveRequestDto), approve(id: string, approverId: string), reject(id: string, approverId: string, reason: string), cancel(id: string, employeeId: string), getById(id: string), getByEmployee(employeeId: string), getPendingForManager(managerId: string). Also define `CreateLeaveRequestDto` with fields: employeeId, leaveType, startDate, endDate, reason (optional). Also define the validation schemas (Zod): createLeaveRequestSchema, updateLeaveRequestSchema.
 
-2. `src/modules/balance/balance.service.ts` — Implement `BalanceService` satisfying `IBalanceService`. Constructor takes `IBalanceRepository`. getBalance delegates to repo, hasSufficientBalance checks remainingDays >= requestedDays, deductBalance delegates to repo.deductDays. [BINDING RULE: Calendar days inclusive — the service must accept the pre-calculated day count; the calculation itself lives in the leave-request module.]
+2. `src/modules/notification/notification.model.ts` — Define the `Notification` entity interface with canonical fields: id, recipientId, type (NotificationType), title, message, relatedEntityType (string | null), relatedEntityId (string | null), status (NotificationStatus), createdAt (Date), readAt (Date | null). Define `INotificationRepository` interface with methods: findByRecipientId(recipientId: string), findByRecipientIdAndStatus(recipientId: string, status: NotificationStatus), create(notification: Omit<Notification, 'id' | 'createdAt'>), updateStatus(id: string, status: NotificationStatus, readAt?: Date). Define `INotificationService` interface with methods: notifyLeaveSubmitted(leaveRequest: LeaveRequest), notifyLeaveApproved(leaveRequest: LeaveRequest), notifyLeaveRejected(leaveRequest: LeaveRequest), notifyLeaveCancelled(leaveRequest: LeaveRequest), getNotifications(recipientId: string), markAsRead(id: string).
 
-3. `src/modules/balance/balance.controller.ts` — Fastify route handlers: getBalance (GET /balance/:employeeId/:leaveType), getBalances (GET /balance/:employeeId). Import BalanceService.
-
-4. `src/modules/balance/balance.routes.ts` — Register Fastify routes for the balance controller. Export a plugin function.
-
-5. `src/modules/audit-log/audit-log.repository.ts` — Implement `PgAuditLogRepository` satisfying `IAuditLogRepository`. Use pg Pool. Methods: findByEntity, create, findAll with optional filters.
-
-6. `tests/unit/modules/balance/balance.repository.spec.ts` — Jest tests for PgBalanceRepository (mock pg Pool).
-   `tests/unit/modules/balance/balance.service.spec.ts` — Jest tests for BalanceService (mock IBalanceRepository).
-   `tests/unit/modules/audit-log/audit-log.repository.spec.ts` — Jest tests for PgAuditLogRepository.
-
-Note: The balance routes should be registered in `src/app.ts` in a follow-up integration phase or as part of this phase if the app.ts already supports plugin registration.
+No tests in this phase — tests come in part 2/2.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -34,40 +24,43 @@ These are resolved, feature-wide decisions. Wherever this phase touches the conc
 
 ## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
 The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
-- `Balance` — the entity MUST have exactly these fields:
+- `Notification` — the entity MUST have exactly these fields:
     - id: string
-    - employeeId: string
-    - leaveType: string
-    - totalEntitlement: number
-    - usedDays: number
-    - remainingDays: number
-    - fiscalYear: number
+    - recipientId: string
+    - type: string
+    - title: string
+    - message: string
+    - relatedEntityType: string | null
+    - relatedEntityId: string | null
     - status: string
     - createdAt: Date
-    - updatedAt: Date
+    - readAt: Date | null
 
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- PgBalanceRepository must import pool from src/shared/db/connection (not create its own Pool instance). (see `src/shared/db/connection.ts`)
-- PgAuditLogRepository must import pool from src/shared/db/connection (not create its own Pool instance). (see `src/shared/db/connection.ts`)
-- Balance entity, IBalanceRepository, IBalanceService, InsufficientBalanceError, and BalanceNotFoundError must be imported from ./balance.model.ts — not redefined. (see `src/modules/balance/balance.model.ts`)
-- AuditLog entity, IAuditLogRepository, and AuditLogValidationError must be imported from ./audit-log.model.ts — not redefined. (see `src/modules/audit-log/audit-log.model.ts`)
-- BalanceStatus enum must be imported from src/shared/types/index.ts — not redefined locally. (see `src/shared/types/index.ts`)
+- The `create` method signature on both ILeaveRequestRepository and INotificationRepository must follow the same Omit pattern used by IBalanceRepository.create and ILeavePolicyRepository.create: the input omits server-generated fields (id, createdAt, updatedAt for LeaveRequest; id, createdAt for Notification). (see `src/modules/balance/balance.model.ts`)
+- The `update` method signature on ILeaveRequestRepository must follow the same pattern as IBalanceRepository.update and ILeavePolicyRepository.update: accepts (id: string, data: Partial<T>) and returns Promise<T | null>. (see `src/modules/balance/balance.model.ts`)
+- Error classes must carry a `code` property (string literal) matching the existing pattern: `LeaveRequestNotFoundError.code = 'NOT_FOUND'`, `LeaveRequestValidationError.code = 'VALIDATION_ERROR'`. This matches BalanceNotFoundError, InsufficientBalanceError, and AuditLogValidationError. (see `src/modules/balance/balance.model.ts`)
+- The `LeaveRequest.leaveType` field must be typed as `LeaveType` (the enum, not `string`), matching how `LeavePolicy.leaveType` is typed in leave-policy.model.ts. (see `src/modules/leave-policy/leave-policy.model.ts`)
+- The `LeaveRequest.status` field must be typed as `LeaveStatus` (the enum, not `string`), and `Notification.type` as `NotificationType`, `Notification.status` as `NotificationStatus` — matching the pattern where Employee.employmentStatus uses the EmploymentStatus enum. (see `src/modules/employee/employee.model.ts`)
+- The `INotificationService` interface methods that accept a `LeaveRequest` parameter must import the `LeaveRequest` type from `../leave-request/leave-request.model` (or the leave-request module must import `INotificationService` from `../notification/notification.model`). The circular type reference must be resolved via TypeScript interface erasure — no runtime import cycles. (see `docs/ARCHITECTURE.md`)
 ### Entity invariants — enforce these
-- Reuse or extend `Balance`: remainingDays = totalEntitlement - usedDays must hold after every state change. deductDays is the only operation that mutates usedDays/remainingDays; it must decrement remainingDays and increment usedDays by the same amount atomically.
-- Reuse or extend `Balance`: status transitions: active → exhausted when remainingDays reaches 0 or below. The transition is computed in SQL (CASE WHEN remaining_days - $days <= 0 THEN 'exhausted' ELSE status END) and must never be set to 'exhausted' while remainingDays > 0.
-- Reuse or extend `AuditLog`: Every AuditLog record is immutable after creation — no update or delete methods exist on IAuditLogRepository. The create method is the only write path.
+- Reuse or extend `LeaveRequest`: A LeaveRequest's status must always be one of the LeaveStatus enum values (draft, submitted, approved, rejected, cancelled). The approvedBy and approvedAt fields must both be null when status is 'draft' or 'submitted'; approvedBy must be non-null and approvedAt must be non-null when status is 'approved'; rejectionReason must be non-null when status is 'rejected'. startDate must be <= endDate.
+- Reuse or extend `LeaveRequest`: LeaveRequest lifecycle: status transitions are only permitted along the path DRAFT → SUBMITTED → APPROVED | REJECTED, with CANCELLED reachable from SUBMITTED or APPROVED. Once REJECTED or CANCELLED, no further transitions are allowed. The interface must document these allowed transitions (e.g., via JSDoc on updateStatus or the service methods).
+- Reuse or extend `Notification`: A Notification's status must always be one of the NotificationStatus enum values (pending, sent, read, archived). readAt must be null when status is 'pending' or 'sent'; readAt must be non-null when status is 'read'. The type field must be one of the NotificationType enum values and must correspond to the lifecycle event that triggered it.
 ### Interface contract — expose these operations (their shape is yours)
-- IBalanceRepository.deductDays — Returns null when the balance row does not exist (id not found). The caller (BalanceService) is responsible for translating null into BalanceNotFoundError.
-- IBalanceService.deductBalance — Throws BalanceNotFoundError (code: NOT_FOUND) when no balance exists for the given employeeId+leaveType or when deductDays returns null. Throws InsufficientBalanceError (code: INSUFFICIENT_BALANCE) when remainingDays < days. Accepts a pre-calculated day count; the service does NOT compute days from dates — that responsibility lives in the leave-request module.
-- IBalanceService.hasSufficientBalance — idempotent; Returns false (not an error) when the balance does not exist. Returns false when remainingDays < requestedDays. Returns true only when remainingDays >= requestedDays.
-- IAuditLogRepository.findAll — idempotent; All filter parameters are optional. When no filters are provided, returns all audit logs ordered by created_at DESC. Dynamic WHERE clause construction uses indexed placeholders ($1, $2, …) built incrementally.
+- ILeaveRequestRepository.updateStatus — Must return null (not throw) when the leave request with the given id does not exist. The caller (service) is responsible for throwing a domain error (LeaveRequestNotFoundError) when null is returned.
+- ILeaveRequestService.submit — Must validate the DTO via createLeaveRequestSchema before processing. Must throw LeaveRequestValidationError for invalid input. Must throw domain errors for business rule violations (e.g., insufficient balance, overlapping request, inactive employee).
+- ILeaveRequestService.approve — Must throw LeaveRequestNotFoundError if the request does not exist. Must throw a domain error if the request is not in 'submitted' status (invalid transition). The approverId must be recorded as approvedBy.
+- ILeaveRequestService.reject — Must throw LeaveRequestNotFoundError if the request does not exist. Must throw a domain error if the request is not in 'submitted' status. The reason parameter must be non-empty; an empty reason must throw LeaveRequestValidationError.
+- ILeaveRequestService.cancel — Must throw LeaveRequestNotFoundError if the request does not exist. Must throw a domain error if the request is not in 'submitted' or 'approved' status. The employeeId must match the request's employeeId (self-cancellation only); mismatch must throw a domain error.
+- INotificationService.notifyLeaveSubmitted / notifyLeaveApproved / notifyLeaveRejected / notifyLeaveCancelled — Each method must create a Notification with relatedEntityType set to 'leave_request' and relatedEntityId set to the leaveRequest.id. The type field must match the corresponding NotificationType enum value. The recipientId must be derived from the leaveRequest (employeeId for submit/cancel notifications; employeeId for approval/rejection notifications to the requester).
 ### Integration points — connect to these
-- src/shared/db/connection.ts (pg Pool) — Both PgBalanceRepository and PgAuditLogRepository depend on the shared pg Pool for all database operations.
-- src/modules/balance/balance.model.ts (IBalanceRepository, IBalanceService, error classes) — PgBalanceRepository implements IBalanceRepository; BalanceService implements IBalanceService and consumes IBalanceRepository; BalanceController consumes BalanceService. The leave-request module (Phase 3) will consume IBalanceService for balance checks and deductions.
-- src/modules/audit-log/audit-log.model.ts (IAuditLogRepository) — PgAuditLogRepository implements IAuditLogRepository. The leave-request module (Phase 3) will consume IAuditLogRepository to write audit records for all state-changing operations.
-- src/app.ts (Fastify instance) — The balance routes plugin is exported and ready for registration via app.register(balanceRoutes) in a follow-up integration phase.
+- src/shared/types/index.ts — Both modules import LeaveType, LeaveStatus, NotificationType, and NotificationStatus enums from the shared types module.
+- src/modules/balance/balance.model.ts — ILeaveRequestService depends on IBalanceService for balance checks and deduction during submit/approve/cancel workflows. The interface reference (not concrete import) is needed for the service interface contract.
+- src/modules/leave-policy/leave-policy.model.ts — ILeaveRequestService depends on ILeavePolicyService for policy lookup and entitlement validation during the submit workflow.
+- src/modules/audit-log/audit-log.model.ts — ILeaveRequestService depends on IAuditLogRepository for writing audit records on every state-changing operation (submit, approve, reject, cancel), per GP-002.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
