@@ -104,12 +104,12 @@ Interface for balance persistence. Methods:
 - `findByEmployeeIdAndFiscalYear(employeeId: string, fiscalYear: number): Promise<Balance[]>`
 - `create(balance: Omit<Balance, 'id' | 'createdAt' | 'updatedAt'>): Promise<Balance>`
 - `update(id: string, data: Partial<Balance>): Promise<Balance | null>`
-- `deductDays(id: string, days: number): Promise<Balance>`
+- `deductDays(id: string, days: number): Promise<Balance | null>`
 
 ### IBalanceService
 
 Interface for balance business logic. Methods:
-- `getBalance(employeeId: string, leaveType: string): Promise<Balance>`
+- `getBalance(employeeId: string, leaveType: string): Promise<Balance | null>`
 - `hasSufficientBalance(employeeId: string, leaveType: string, requestedDays: number): Promise<boolean>`
 - `deductBalance(employeeId: string, leaveType: string, days: number): Promise<Balance>`
 
