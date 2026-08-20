@@ -1,0 +1,81 @@
+{
+  "scope": {
+    "affectedDomains": [],
+    "affectedLayers": [],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The `LeaveType` enum is defined and exported from `src/shared/types/index.ts` with exactly three members: `annual`, `sick`, `emergency` (case-sensitive, matching the reconciled architecture)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `LeaveStatus` enum is defined and exported from `src/shared/types/index.ts` with exactly five members: `draft`, `submitted`, `approved`, `rejected`, `cancelled`",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `EmploymentStatus` enum is defined and exported from `src/shared/types/index.ts` with exactly three members: `active`, `inactive`, `terminated`",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `BalanceStatus` enum is defined and exported from `src/shared/types/index.ts` with exactly two members: `active`, `exhausted`",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `NotificationType` enum is defined and exported from `src/shared/types/index.ts` with exactly four members: `leave_submitted`, `leave_approved`, `leave_rejected`, `leave_cancelled`",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `NotificationStatus` enum is defined and exported from `src/shared/types/index.ts` with exactly four members: `pending`, `sent`, `read`, `archived`",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `Employee` entity interface is defined in `src/modules/employee/employee.model.ts` with all canonical fields: id (string), employeeNumber (string), firstName (string), lastName (string), email (string), managerId (string | null), department (string | null), hireDate (Date), terminationDate (Date | null), employmentStatus (string), createdAt (Date), updatedAt (Date), deletedAt (Date | null)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `IEmployeeRepository` interface is defined in `src/modules/employee/employee.model.ts` with methods: `findById(id: string): Promise<Employee | null>`, `findByEmployeeNumber(employeeNumber: string): Promise<Employee | null>`, `findAll(): Promise<Employee[]>`, `create(employee: Omit<Employee, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt'>): Promise<Employee>`, `update(id: string, data: Partial<Employee>): Promise<Employee | null>`, `softDelete(id: string): Promise<void>`",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `LeavePolicy` entity interface is defined in `src/modules/leave-policy/leave-policy.model.ts` with all canonical fields: id (string), policyName (string), leaveType (typed as `LeaveType` imported from `../../shared/types`), entitlementDays (number), accrualRate (number | undefined), maxAccumulation (number | undefined), minimumNoticeDays (number), requiresManagerApproval (boolean), isActive (boolean), createdAt (Date), updatedAt (Date)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `ILeavePolicyRepository` interface is defined in `src/modules/leave-policy/leave-policy.model.ts` with methods: `findById(id: string): Promise<LeavePolicy | null>`, `findByLeaveType(leaveType: string): Promise<LeavePolicy | null>`, `findAllActive(): Promise<LeavePolicy[]>`, `create(policy: Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeavePolicy>`, `update(id: string, data: Partial<LeavePolicy>): Promise<LeavePolicy | null>`",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `ILeavePolicyService` interface is defined in `src/modules/leave-policy/leave-policy.model.ts` with methods: `getPolicyForLeaveType(leaveType: string): Promise<LeavePolicy | null>`, `validateEntitlement(employeeId: string, leaveType: string, requestedDays: number): Promise<boolean>`",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No concrete implementations \u2014 this phase produces only type definitions (enums, interfaces). No classes, no database calls, no service logic, no route handlers.",
+    "All six shared enums MUST use TypeScript `enum` (not `const` objects, not union types) so they are both a type and a runtime value importable by downstream modules",
+    "The `leaveType` field on `LeavePolicy` MUST be typed as the `LeaveType` enum imported from `../../shared/types` (relative from `src/modules/leave-policy/`), not as `string`",
+    "No `any` type anywhere \u2014 use `unknown` with type guards if needed (HARNESS.json constraint `no-any`)",
+    "The `src/shared/types/index.ts` file MUST re-export all enums so that consumers can `import { LeaveType, LeaveStatus, ... } from '../../shared/types'`",
+    "The `Employee` entity's `employmentStatus` field MUST be typed as `EmploymentStatus` (the enum from shared types), not as `string`"
+  ],
+  "outOfScope": [
+    "Concrete repository implementations (PgEmployeeRepository, PgLeavePolicyRepository) \u2014 deferred to Phase 1 part 2/2"
+  ],
+  "ambiguities": [],
+  "entityInvariants": [],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [],
+  "integrationPoints": []
+}
