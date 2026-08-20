@@ -1,22 +1,34 @@
-# Fix specific quality-gate violations: Phase 1: Foundation – Shared types, Employee, LeavePolicy (part 1/2)
+# Implement this phase: Phase 1: Foundation – Shared types, Employee, LeavePolicy (part 1/2)
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/fix/3350baf6-9bd5-4cac-b688-f263972317f9/1/1`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/3350baf6-9bd5-4cac-b688-f263972317f9/1`. Do not clone anything; work only in this directory.
 
-You are fixing SPECIFIC violations the quality gate found in EXISTING, already-committed files. Make the targeted edits listed below — do NOT refactor, regenerate, or change unrelated code.
+## What to build
+(no phase architecture provided — infer from the success criteria below)
 
-The files ALREADY EXIST. You MUST edit them in place with the `str_replace_editor` tool. Reading or viewing a file is NOT sufficient — you have NOT finished until you have edited EVERY file listed below.
+## Success criteria
+Create the foundational shared enums and the Employee + LeavePolicy domain models with their repository/service interfaces. This is the models+interfaces slice only — NO concrete implementations.
 
-## Constraints & consistency
-You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
-### Reuse & consistency — match these exactly
-- LeavePolicy.leaveType and ILeavePolicyService method parameters must use the LeaveType enum imported from src/shared/types/index.ts — the import already exists but is unused; the field and parameters must reference it (see `src/shared/types/index.ts`)
-- Employee.employmentStatus must use the EmploymentStatus enum from src/shared/types/index.ts — add the import and replace the string type (see `src/shared/types/index.ts`)
-- IEmployeeRepository.softDelete return type must match the pattern established by update (Promise<Employee | null>), not Promise<boolean> — the reconciled architecture and PLAN.md both describe softDelete as setting deletedAt and returning the entity (see `src/modules/employee/employee.model.ts`)
-### Entity invariants — enforce these
-- Reuse or extend `Employee`: employmentStatus must be typed as EmploymentStatus enum, not as string — the enum values (active | inactive | terminated) are the only valid states
-- Reuse or extend `LeavePolicy`: leaveType must be typed as LeaveType enum, not as string — the enum values (annual | sick | emergency) are the only valid leave types
-### Interface contract — expose these operations (their shape is yours)
-- ILeavePolicyService.getPolicyForLeaveType — No auth rule at interface level — auth is enforced at the controller/route layer per GP-005
+Files to create:
+
+1. `src/shared/types/index.ts` — Define and export all shared enums with EXACT names from the architecture:
+   - `LeaveType` enum: `annual`, `sick`, `emergency`
+   - `LeaveStatus` enum: `draft`, `submitted`, `approved`, `rejected`, `cancelled`
+   - `EmploymentStatus` enum: `active`, `inactive`, `terminated`
+   - `BalanceStatus` enum: `active`, `exhausted`
+   - `NotificationType` enum: `leave_submitted`, `leave_approved`, `leave_rejected`, `leave_cancelled`
+   - `NotificationStatus` enum: `pending`, `sent`, `read`, `archived`
+
+2. `src/modules/employee/employee.model.ts` — Define the `Employee` entity interface with the canonical fields: id, employeeNumber, firstName, lastName, email, managerId (string | null), department (string | null), hireDate (Date), terminationDate (Date | null), employmentStatus (string), createdAt (Date), updatedAt (Date), deletedAt (Date | null). Also define the `IEmployeeRepository` interface with methods: findById(id: string), findByEmployeeNumber(employeeNumber: string), findAll(), create(employee: Omit<Employee, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt'>), update(id: string, data: Partial<Employee>), softDelete(id: string).
+
+3. `src/modules/leave-policy/leave-policy.model.ts` — Define the `LeavePolicy` entity interface with the canonical fields: id, policyName, leaveType, entitlementDays, accrualRate (number | undefined), maxAccumulation (number | undefined), minimumNoticeDays, requiresManagerApproval, isActive, createdAt, updatedAt. Also define `ILeavePolicyRepository` interface with methods: findById, findByLeaveType, findAllActive, create, update. Also define `ILeavePolicyService` interface with methods: getPolicyForLeaveType(leaveType: string), validateEntitlement(employeeId: string, leaveType: string, requestedDays: number).
+
+Import `LeaveType` from `../../shared/types` (relative from src/modules/leave-policy/) for the leaveType field typing.
+
+No tests in this phase — tests come in part 2/2.
+
+## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
+These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
+- Calendar days inclusive: start_date through end_date, all days count toward used_days (weekends and public holidays included). end_date is inclusive. [BINDING RULE — operator decision resolving: How are leave days counted — are start_date and end_date inclusive, and do weekends/public holidays count toward the used-days total?; apply everywhere these apply, not in one place only]
 
 ## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
 The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
@@ -47,16 +59,29 @@ The entities below are shared, cross-module DATA CONTRACTS. Implement each one w
     - updatedAt: Date
     - deletedAt: Date | null
 
+## Constraints & consistency
+You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
+### Reuse & consistency — match these exactly
+- The `LeaveType` enum used in `LeavePolicy.leaveType` and all `ILeavePolicyRepository`/`ILeavePolicyService` method signatures MUST be the single canonical `LeaveType` exported from `src/shared/types/index.ts` — no local redefinition or string literal substitution (see `src/shared/types/index.ts`)
+- The `EmploymentStatus` enum used in `Employee.employmentStatus` MUST be the single canonical `EmploymentStatus` exported from `src/shared/types/index.ts` — no local redefinition or string literal substitution (see `src/shared/types/index.ts`)
+### Entity invariants — enforce these
+- Reuse or extend `Employee`: Every Employee MUST have a unique `employeeNumber` and a unique `email`. The `employmentStatus` MUST be one of the `EmploymentStatus` enum values. `deletedAt` being non-null signals a soft-deleted record; soft-deleted employees MUST be excluded from `findAll` results
+- Reuse or extend `Employee`: Soft-delete semantics: setting `deletedAt` to a non-null value marks the Employee as deleted. The `findAll()` repository method MUST exclude records where `deletedAt IS NOT NULL`. The `softDelete(id)` method MUST set `deletedAt` to the current timestamp rather than physically removing the row
+- Reuse or extend `LeavePolicy`: Each `LeavePolicy` MUST have a unique `leaveType` among active policies. `entitlementDays` MUST be a positive integer. `minimumNoticeDays` MUST be >= 0. `requiresManagerApproval` defaults to `true` when not explicitly set. Only policies with `isActive === true` are considered for leave validation
+### Interface contract — expose these operations (their shape is yours)
+- IEmployeeRepository.findAll — Returns an empty array (not null, not an error) when no active employees exist. Must exclude soft-deleted records (deletedAt IS NOT NULL)
+- IEmployeeRepository.softDelete — idempotent; Idempotent: calling softDelete on an already soft-deleted employee succeeds silently (no error). Calling on a non-existent id may either succeed silently or throw NOT_FOUND — the interface does not prescribe which, but the implementation must be consistent
+- ILeavePolicyService.validateEntitlement — Returns `false` (not throws) when the requested days exceed the policy's entitlementDays. Returns `false` when no active policy exists for the given leaveType. Returns `true` only when an active policy exists AND requestedDays <= entitlementDays
+- ILeavePolicyRepository.findByLeaveType — Returns `null` when no policy exists for the given LeaveType — does not throw. The caller is responsible for handling the missing-policy case
+### Integration points — connect to these
+- src/shared/types/index.ts — Both `src/modules/employee/employee.model.ts` and `src/modules/leave-policy/leave-policy.model.ts` import enums from this module. It is the single source of truth for all domain enumerations used across the leave management system
+
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
 - Use unknown with type guards instead of any (rule: `no-any`)
 - Database calls must go through repository pattern (rule: `no-direct-db-outside-repository`)
 - No hardcoded passwords, API keys, or tokens (rule: `no-hardcoded-secrets`)
 - Do not add @gestalt/* packages as project dependencies — these are Gestalt platform internals not available on npm (rule: `no-gestalt-internal-deps`)
-
-## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
-These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
-- Calendar days inclusive: start_date through end_date, all days count toward used_days (weekends and public holidays included). end_date is inclusive. [BINDING RULE — operator decision resolving: How are leave days counted — are start_date and end_date inclusive, and do weekends/public holidays count toward the used-days total?; apply everywhere these apply, not in one place only]
 
 ## Architecture & constraint rules the quality gate enforces (satisfy these now)
 The quality gate judges your code against the rules below and BLOCKS the phase on any violation — a violation it rates critical escalates to a human with no automatic retry. These are the same rules the gate checks, so comply up front rather than leaving them for the gate:
@@ -82,91 +107,21 @@ These are the project's non-negotiable invariants. A violation is a GOLDEN_PRINC
 - GP-006 — Error handling: No unhandled promise rejections. All async errors are caught and handled.
 
 ## Project stack & references
-Before making the edits below, read the referenced files (those present in the working directory) to learn the project's architecture, conventions, and the cross-cutting rules your fix must still satisfy — then keep the edits consistent with them:
+Before writing code, read the referenced files below (those present in the working directory) to learn the project's language, framework, test runner, and conventions, and the cross-cutting rules your code must satisfy — then follow the existing repository conventions:
 - `HARNESS.json`
 - `docs/ARCHITECTURE.md`
 - `docs/GOLDEN_PRINCIPLES.md`
 - `AGENTS.md`
 - `PLAN.md`
 
-## Required edits
-
-### Coherent change 1 — apply as ONE atomic edit across ALL sites below
-
-Unifying change (do this now): Change the leaveType field type from string to LeaveType in leave-policy.model.ts (the import already exists).
-
-The sites below are the SAME underlying issue. Fixing some but not others leaves the code incoherent and the quality gate WILL re-flag it — apply the one change above consistently to EVERY site:
-
-- Site 1
-File: src/modules/leave-policy/leave-policy.model.ts
-Line: 6
-Offending code: `leaveType: string;`
-Rule violated: spec-constraint-leaveType-enum
-Action (do this now): Edit `src/modules/leave-policy/leave-policy.model.ts` at line 6 in place to fix the `spec-constraint-leaveType-enum` violation.
-What the quality gate found — apply this: [spec-constraint-leaveType-enum] The spec constraint requires: "The `leaveType` field on `LeavePolicy` MUST be typed as the `LeaveType` enum imported from `../../shared/types`, not as `string`". The `LeaveType` enum is imported on line 1 but the field is typed as `string` instead of `LeaveType`.
-
-- Site 2
-File: src/modules/leave-policy/leave-policy.model.ts
-Offending code: `leaveType: string;`
-Rule violated: review/architecture
-Action (do this now): Edit `src/modules/leave-policy/leave-policy.model.ts` in place to fix the `review/architecture` violation.
-What the quality gate found — apply this: [review/architecture] The `leaveType` field is typed as `string` but the spec constraint requires it be typed as the `LeaveType` enum. The import `import { LeaveType } from '../../shared/types';` exists on line 1 but is unused — the field still uses `string`.
-
-Then check the rest of these files (and the surrounding module) for ANY OTHER occurrence of the same pattern beyond the specific lines listed above, and apply the same change there too — do NOT limit the fix to only the enumerated sites.
-
-### Coherent change 2 — apply as ONE atomic edit across ALL sites below
-
-Unifying change (do this now): Import EmploymentStatus from '../../shared/types' and change the employmentStatus field type from string to EmploymentStatus in employee.model.ts.
-
-The sites below are the SAME underlying issue. Fixing some but not others leaves the code incoherent and the quality gate WILL re-flag it — apply the one change above consistently to EVERY site:
-
-- Site 1
-File: src/modules/employee/employee.model.ts
-Line: 11
-Offending code: `employmentStatus: string;`
-Rule violated: spec-constraint-employmentStatus-enum
-Action (do this now): Edit `src/modules/employee/employee.model.ts` at line 11 in place to fix the `spec-constraint-employmentStatus-enum` violation.
-What the quality gate found — apply this: [spec-constraint-employmentStatus-enum] The spec constraint requires: "The `Employee` entity's `employmentStatus` field MUST be typed as `EmploymentStatus` (the enum from shared types), not as `string`". The `EmploymentStatus` enum is defined in `src/shared/types/index.ts` but is not imported in this file, and the field is typed as `string`.
-
-- Site 2
-File: src/modules/employee/employee.model.ts
-Offending code: `employmentStatus: string;`
-Rule violated: review/architecture
-Action (do this now): Edit `src/modules/employee/employee.model.ts` in place to fix the `review/architecture` violation.
-What the quality gate found — apply this: [review/architecture] The `employmentStatus` field is typed as `string` but the spec constraint requires it be typed as the `EmploymentStatus` enum imported from `../../shared/types`. The Employee model does not import `EmploymentStatus` at all.
-
-Then check the rest of these files (and the surrounding module) for ANY OTHER occurrence of the same pattern beyond the specific lines listed above, and apply the same change there too — do NOT limit the fix to only the enumerated sites.
-
-### Coherent change 3 — apply as ONE atomic edit across ALL sites below
-
-Unifying change (do this now): Change the return type of softDelete method from Promise<boolean> to Promise<void> in employee.model.ts.
-
-The sites below are the SAME underlying issue. Fixing some but not others leaves the code incoherent and the quality gate WILL re-flag it — apply the one change above consistently to EVERY site:
-
-- Site 1
-File: src/modules/employee/employee.model.ts
-Line: 23
-Offending code: `softDelete(id: string): Promise<boolean>;`
-Rule violated: spec-constraint-softDelete-return-type
-Action (do this now): Edit `src/modules/employee/employee.model.ts` at line 23 in place to fix the `spec-constraint-softDelete-return-type` violation.
-What the quality gate found — apply this: [spec-constraint-softDelete-return-type] The success criteria specify `softDelete(id: string): Promise<void>`, but the implementation returns `Promise<boolean>`. This is a contract mismatch — downstream consumers expecting `void` will get a different type.
-
-- Site 2
-File: src/modules/employee/employee.model.ts
-Offending code: `softDelete(id: string): Promise<boolean>;`
-Rule violated: review/architecture
-Action (do this now): Edit `src/modules/employee/employee.model.ts` in place to fix the `review/architecture` violation.
-What the quality gate found — apply this: [review/architecture] The `softDelete` method returns `Promise<boolean>` but the spec success criterion #8 requires `Promise<void>`. The return type does not match the contract.
-
-Then check the rest of these files (and the surrounding module) for ANY OTHER occurrence of the same pattern beyond the specific lines listed above, and apply the same change there too — do NOT limit the fix to only the enumerated sites.
-
 ## Verify before you finish (MANDATORY)
-After making the edits above, the code MUST still compile and its tests MUST pass — a compilation/type error, or a test your change breaks, must NEVER be left for CI or the quality gate to find. Before you declare this task done:
-- Read the project's build / type-check / test commands from `package.json` (scripts) and `HARNESS.json`, install dependencies if they are not already installed, then RUN the type-check / build (e.g. `npm run build` or `tsc --noEmit`) AND the tests (e.g. `npm test`).
-- FIX every compilation error, type error, and failing test that YOUR edits introduced — including updating a test whose expectation your change legitimately invalidated (e.g. a new required field, a new status code such as 401/403 from an added authorization check, added input validation) — and re-run until they pass.
+The code you write MUST compile and its tests MUST pass — a compilation or type error must NEVER be left for CI to find. Before you declare this task done:
+- Read the project's build / type-check / test commands from `package.json` (scripts) and `HARNESS.json`.
+- Install dependencies if they are not already installed, then RUN the type-check / build (e.g. `npm run build` or `tsc --noEmit`) AND the tests (e.g. `npm test`) for the files this phase touches.
+- FIX every compilation error, type error, and failing test you introduced — including in test files — and re-run until they pass.
 - Only when the build and the tests pass may you consider the task complete. If a dependency install genuinely cannot be made to work, say so explicitly in your final message rather than declaring success on unverified code.
 
 ## Constraints (mandatory)
-- Keep the change SURGICAL: make the required edits above and fix only what they broke (compile/type errors and the tests they invalidated). Do NOT refactor, regenerate, or change unrelated code, and do not add / delete / rename source files beyond what a required edit — or a test-fix for it — needs.
-- Do NOT run `git commit`, `git push`, `git add`, or any git command. The platform handles all git operations. (Running the build / type-check / tests above is expected and encouraged — that is NOT a git operation.)
-- When the listed edits are made and the build + tests pass, stop.
+- Write and modify source files ONLY. Do NOT run `git commit`, `git push`, `git add`, or any other git command. The platform handles all git operations. (Running the build / type-check / tests above is expected and encouraged — that is NOT a git operation.)
+- Do not create a new repository or change the git remote.
+- Stay within the scope of this phase; do not implement deferred/later work.
