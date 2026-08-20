@@ -12,7 +12,7 @@ Base entity providing common fields for domain models.
 
 ## leave
 
-Represents a leave record managed by the `leave` module, including leave requests and related leave-tracking data.
+Represents a leave record managed by the `leave-request` module, including leave requests and related leave-tracking data.
 
 ### LeaveStatus
 
@@ -30,13 +30,14 @@ Represents a leave record managed by the `leave` module, including leave request
 |-------|------|----------|
 | id | string | true |
 | employeeId | string | true |
-| leaveTypeId | string | true |
+| leaveType | LeaveType | true |
 | startDate | Date | true |
 | endDate | Date | true |
 | reason | string \| undefined | false |
-| status | LeaveRequestStatus | true |
+| status | LeaveStatus | true |
 | approvedBy | string \| null | false |
 | approvedAt | Date \| null | false |
+| rejectionReason | string \| undefined | false |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
@@ -48,31 +49,44 @@ Represents a leave record managed by the `leave` module, including leave request
 | Field | Type | Required |
 |-------|------|----------|
 | employeeId | string | true |
-| leaveTypeId | string | true |
+| leaveType | LeaveType | true |
 | startDate | Date | true |
 | endDate | Date | true |
 | reason | string \| undefined | false |
 
-### UpdateLeaveRequestDto
+### ILeaveRequestRepository
 
-| Field | Type | Required |
-|-------|------|----------|
-| startDate | Date | false |
-| endDate | Date | false |
-| reason | string \| undefined | false |
+Interface for leave request persistence. Methods:
+- `findById(id: string): Promise<LeaveRequest | null>`
+- `findByEmployeeId(employeeId: string): Promise<LeaveRequest[]>`
+- `findByStatus(status: LeaveStatus): Promise<LeaveRequest[]>`
+- `findByManagerId(managerId: string): Promise<LeaveRequest[]>`
+- `create(request: Omit<LeaveRequest, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeaveRequest>`
+- `update(id: string, data: Partial<LeaveRequest>): Promise<LeaveRequest | null>`
+- `updateStatus(id: string, status: LeaveStatus, approvedBy?: string, rejectionReason?: string): Promise<LeaveRequest | null>`
 
-### LeaveRequestQueryParams
+Allowed status transitions: DRAFT→SUBMITTED, SUBMITTED→APPROVED|REJECTED, SUBMITTED|APPROVED→CANCELLED. REJECTED and CANCELLED are terminal.
 
-| Field | Type | Required |
-|-------|------|----------|
-| status | LeaveRequestStatus | false |
-| leaveTypeId | string | false |
-| startDateFrom | Date | false |
-| startDateTo | Date | false |
-| endDateFrom | Date | false |
-| endDateTo | Date | false |
-| limit | number | false |
-| offset | number | false |
+### ILeaveRequestService
+
+Interface for leave request business logic. Methods:
+- `submit(request: CreateLeaveRequestDto): Promise<LeaveRequest>`
+- `approve(id: string, approverId: string): Promise<LeaveRequest>`
+- `reject(id: string, approverId: string, reason: string): Promise<LeaveRequest>`
+- `cancel(id: string, employeeId: string): Promise<LeaveRequest>`
+- `getById(id: string): Promise<LeaveRequest | null>`
+- `getByEmployee(employeeId: string): Promise<LeaveRequest[]>`
+- `getPendingForManager(managerId: string): Promise<LeaveRequest[]>`
+
+### Validation schemas (Zod)
+
+- `createLeaveRequestSchema` — validates CreateLeaveRequestDto; enforces `startDate <= endDate` via `.refine()`
+- `updateLeaveRequestSchema` — partial schema for update payloads; all fields optional
+
+### Error classes
+
+- `LeaveRequestNotFoundError` — code: `'NOT_FOUND'`
+- `LeaveRequestValidationError` — code: `'VALIDATION_ERROR'`
 
 ## balance
 
@@ -143,7 +157,7 @@ Represents employee data managed by the `employee` module, including employee re
 
 ## policy
 
-Represents leave policy data managed by the `policy` module, including policy definitions, rules, and leave entitlement configurations.
+Represents leave policy data managed by the `leave-policy` module, including policy definitions, rules, and leave entitlement configurations.
 
 ### LeavePolicy
 
@@ -179,18 +193,38 @@ Represents notification data managed by the `notification` module, including not
 |-------|------|----------|
 | id | string | true |
 | recipientId | string | true |
-| type | string | true |
+| type | NotificationType | true |
 | title | string | true |
 | message | string | true |
 | relatedEntityType | string \| null | false |
 | relatedEntityId | string \| null | false |
-| status | 'pending' \| 'sent' \| 'read' \| 'archived' | true |
+| status | NotificationStatus | true |
 | createdAt | Date | true |
 | readAt | Date \| null | false |
 
+### INotificationRepository
+
+Interface for notification persistence. Methods:
+- `findByRecipientId(recipientId: string): Promise<Notification[]>`
+- `findByRecipientIdAndStatus(recipientId: string, status: NotificationStatus): Promise<Notification[]>`
+- `create(notification: Omit<Notification, 'id' | 'createdAt'>): Promise<Notification>`
+- `updateStatus(id: string, status: NotificationStatus, readAt?: Date): Promise<Notification | null>`
+
+### INotificationService
+
+Interface for notification business logic. Methods:
+- `notifyLeaveSubmitted(leaveRequest: LeaveRequest): Promise<Notification>`
+- `notifyLeaveApproved(leaveRequest: LeaveRequest): Promise<Notification>`
+- `notifyLeaveRejected(leaveRequest: LeaveRequest): Promise<Notification>`
+- `notifyLeaveCancelled(leaveRequest: LeaveRequest): Promise<Notification>`
+- `getNotifications(recipientId: string): Promise<Notification[]>`
+- `markAsRead(id: string): Promise<Notification>`
+
+Each `notify*` method sets `relatedEntityType` to `'leave_request'`, `relatedEntityId` to the leave request's id, and `recipientId` to the leave request's employeeId.
+
 ## audit
 
-Represents audit data managed by the `audit` module, including audit records, change history, and activity tracking information.
+Represents audit data managed by the `audit-log` module, including audit records, change history, and activity tracking information.
 
 ### AuditLog
 

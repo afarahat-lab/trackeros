@@ -28,6 +28,8 @@ src/modules/balance/balance.controller.ts       — BalanceController (Fastify h
 src/modules/balance/balance.routes.ts           — Fastify plugin registering GET /balance/:employeeId/:leaveType and GET /balance/:employeeId
 src/modules/audit-log/audit-log.model.ts        — AuditLog entity + IAuditLogRepository interface + AuditLogValidationError
 src/modules/audit-log/audit-log.repository.ts   — PgAuditLogRepository (pg Pool, parameterized queries, dynamic filter construction for findAll)
+src/modules/leave-request/leave-request.model.ts — LeaveRequest entity + CreateLeaveRequestDto + ILeaveRequestRepository + ILeaveRequestService interfaces + error classes (LeaveRequestNotFoundError, LeaveRequestValidationError) + Zod validation schemas (createLeaveRequestSchema, updateLeaveRequestSchema)
+src/modules/notification/notification.model.ts  — Notification entity + INotificationRepository + INotificationService interfaces
 src/modules/status/                             — System status module (model, service interface, service)
 src/modules/uptime/                             — Uptime health-check module (model, service interface, service, routes)
 src/shared/types/index.ts                       — Shared enums: LeaveType, LeaveStatus, EmploymentStatus, BalanceStatus, NotificationType, NotificationStatus
@@ -59,7 +61,9 @@ tests/unit/modules/audit-log/audit-log.repository.spec.ts      — Jest tests fo
 - Domain error classes carry a `code` property for HTTP mapping
   (e.g. `InsufficientBalanceError.code = 'INSUFFICIENT_BALANCE'`,
   `BalanceNotFoundError.code = 'NOT_FOUND'`,
-  `AuditLogValidationError.code = 'VALIDATION_ERROR'`).
+  `AuditLogValidationError.code = 'VALIDATION_ERROR'`,
+  `LeaveRequestNotFoundError.code = 'NOT_FOUND'`,
+  `LeaveRequestValidationError.code = 'VALIDATION_ERROR'`).
 
 ## Dependency rules
 
@@ -90,8 +94,8 @@ Modular monolith built with TypeScript, Fastify, PostgreSQL. The leave managemen
 | employee | src/modules/employee/ | Employee entity, repository |
 | leave-policy | src/modules/leave-policy/ | LeavePolicy entity, repository, service |
 | balance | src/modules/balance/ | Balance entity, repository, service, controller, routes, error classes |
-| leave-request | src/modules/leave-request/ | LeaveRequest entity, repository, service, controller, routes, validation |
-| notification | src/modules/notification/ | Notification entity, repository, service |
+| leave-request | src/modules/leave-request/ | LeaveRequest entity, repository interface, service interface, DTOs, Zod schemas, error classes |
+| notification | src/modules/notification/ | Notification entity, repository interface, service interface |
 | audit-log | src/modules/audit-log/ | AuditLog entity, repository, error class |
 
 ## Dependency Map
@@ -99,7 +103,7 @@ Modular monolith built with TypeScript, Fastify, PostgreSQL. The leave managemen
 - balance → shared-types, leave-policy, employee
 - leave-policy → shared-types
 - employee → shared-types
-- notification → shared-types, employee
+- notification → shared-types, employee, leave-request (type import only)
 - audit-log → shared-types, employee
 
 ## Database Tables (Conceptual)
@@ -118,13 +122,18 @@ Modular monolith built with TypeScript, Fastify, PostgreSQL. The leave managemen
 ## Phased Implementation
 1. **Foundation**: shared-types, employee, leave-policy (models + repositories + service + tests done)
 2. **Balance & Audit**: balance module (models, repository, service, controller, routes, tests done), audit-log module (models, repository, tests done)
-3. **Core Workflow**: leave-request module, notification module (pending)
+3. **Core Workflow — Models**: leave-request module (model, DTOs, repository interface, service interface, Zod schemas, error classes done), notification module (model, repository interface, service interface done)
+4. **Core Workflow — Implementations**: leave-request repository, service, controller, routes; notification repository, service (pending)
 
 ## Implementation Notes
 - Balance routes are defined as a Fastify plugin (`balanceRoutes`) but are **not yet registered** in `src/app.ts` — integration will happen in a follow-up phase.
 - The `IBalanceService` interface includes `getBalances(employeeId)` returning all balances for an employee, in addition to the single-type `getBalance`.
 - `PgBalanceRepository.deductDays` uses a SQL `CASE` expression to set `status` to `'exhausted'` when `remaining_days` reaches 0 or below.
 - `PgAuditLogRepository.findAll` builds dynamic WHERE clauses from optional filter parameters using indexed placeholders.
+- `ILeaveRequestRepository.updateStatus` documents allowed state transitions: DRAFT→SUBMITTED, SUBMITTED→APPROVED|REJECTED, SUBMITTED|APPROVED→CANCELLED. REJECTED/CANCELLED are terminal.
+- `ILeaveRequestService` methods document their error contracts: `submit` throws `LeaveRequestValidationError` for invalid input plus domain errors for business rule violations; `approve`/`reject` throw `LeaveRequestNotFoundError`; `cancel` enforces self-cancellation (employeeId must match).
+- `createLeaveRequestSchema` uses Zod `.refine()` to enforce `startDate <= endDate`.
+- `Notification` model imports `LeaveRequest` as a **type-only** import from `../leave-request/leave-request.model` — this is a cross-module dependency for the service interface signatures only.
 
 ## Open Question
 - Day-counting semantics (inclusive calendar days vs business days) – see open questions list.

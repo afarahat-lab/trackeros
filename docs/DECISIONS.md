@@ -35,3 +35,21 @@ Description: Trackeros — a corporate operations web and mobile platform for
   null checks).
 Stack: TypeScript / Node.js / React / PostgreSQL
 Architecture: Modular monolith (corporate-ops-web-mobile template, tier 1)
+
+## ADR-002 — LeaveRequest & Notification models (interfaces-only slice)
+
+Date: 2026-06-10
+Status: Accepted
+
+Decision: Created the LeaveRequest and Notification domain models as an interfaces-only slice (no concrete implementations). This follows the same two-part pattern used for earlier modules (Employee/LeavePolicy, Balance/AuditLog).
+
+Files created:
+- `src/modules/leave-request/leave-request.model.ts` — LeaveRequest entity, CreateLeaveRequestDto, ILeaveRequestRepository, ILeaveRequestService, error classes (LeaveRequestNotFoundError, LeaveRequestValidationError), Zod validation schemas (createLeaveRequestSchema with startDate≤endDate refinement, updateLeaveRequestSchema)
+- `src/modules/notification/notification.model.ts` — Notification entity, INotificationRepository, INotificationService
+
+Key design decisions:
+- `ILeaveRequestRepository.updateStatus` documents allowed state transitions inline (DRAFT→SUBMITTED, SUBMITTED→APPROVED|REJECTED, SUBMITTED|APPROVED→CANCELLED; REJECTED/CANCELLED terminal)
+- `ILeaveRequestService` methods document their error contracts in JSDoc (submit throws LeaveRequestValidationError; approve/reject throw LeaveRequestNotFoundError; cancel enforces self-cancellation)
+- `createLeaveRequestSchema` uses Zod `.refine()` for startDate ≤ endDate validation
+- `Notification` model imports `LeaveRequest` as a **type-only** import — the first cross-module dependency at the model layer
+- Error classes follow the established `code` property pattern for HTTP mapping
