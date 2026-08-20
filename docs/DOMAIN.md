@@ -110,6 +110,7 @@ Interface for balance persistence. Methods:
 
 Interface for balance business logic. Methods:
 - `getBalance(employeeId: string, leaveType: string): Promise<Balance | null>`
+- `getBalances(employeeId: string): Promise<Balance[]>`
 - `hasSufficientBalance(employeeId: string, leaveType: string, requestedDays: number): Promise<boolean>`
 - `deductBalance(employeeId: string, leaveType: string, days: number): Promise<Balance>`
 
