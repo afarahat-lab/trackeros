@@ -1,0 +1,143 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "balance",
+      "audit-log"
+    ],
+    "affectedLayers": [
+      "repository",
+      "service",
+      "controller",
+      "routes",
+      "tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "PgBalanceRepository satisfies the IBalanceRepository interface: findByEmployeeId returns Balance[], findByEmployeeIdAndLeaveType returns Balance|null, findByEmployeeIdAndFiscalYear returns Balance[], create inserts and returns Balance, update modifies fields via COLUMN_MAP and returns Balance|null, deductDays atomically decrements remaining_days, increments used_days, and sets status to 'exhausted' via CASE WHEN remaining reaches \u22640",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "BalanceService satisfies the IBalanceService interface: getBalance delegates to repo.findByEmployeeIdAndLeaveType, getBalances delegates to repo.findByEmployeeId, hasSufficientBalance returns true when remainingDays >= requestedDays (false when balance missing or insufficient), deductBalance throws BalanceNotFoundError when balance missing, throws InsufficientBalanceError when remainingDays < days, otherwise delegates to repo.deductDays and returns the updated Balance",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "PgAuditLogRepository satisfies the IAuditLogRepository interface: findByEntity returns AuditLog[] ordered by created_at DESC, create inserts and returns AuditLog, findAll builds dynamic WHERE clauses from optional filters (entityType, performedBy, fromDate, toDate) using indexed parameterized placeholders",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "BalanceController exposes two route handlers: one returns a single Balance by employeeId+leaveType (404 when not found), the other returns all Balance[] for an employeeId (200 with empty array when none exist). Both handlers catch errors and return 500 with { error: 'Internal Server Error' }",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "balance.routes.ts exports a Fastify plugin function that instantiates PgBalanceRepository \u2192 BalanceService \u2192 BalanceController and registers the two GET routes",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All three unit test suites pass: balance.repository.spec.ts (mock pg Pool, covers all 6 methods including deductDays exhausted-status transition), balance.service.spec.ts (mock IBalanceRepository, covers error paths for BalanceNotFoundError and InsufficientBalanceError), audit-log.repository.spec.ts (mock pg Pool, covers dynamic filter combinations in findAll)",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access MUST go through the repository layer \u2014 no inline SQL in services, controllers, or route handlers (GP-001). The pg Pool is imported exclusively from src/shared/db/connection.ts",
+    "All SQL queries MUST use parameterized placeholders ($1, $2, \u2026) \u2014 no string interpolation of user-supplied values into query text",
+    "Repository implementations MUST map snake_case database columns to camelCase entity fields via a dedicated mapRowTo* function. Dynamic UPDATE queries MUST use a COLUMN_MAP lookup to translate camelCase keys to snake_case column names",
+    "The BalanceService.deductBalance method MUST accept a pre-calculated day count \u2014 the calendar-days-inclusive calculation lives in the leave-request module, not here. The service validates sufficiency and delegates the atomic UPDATE to the repository",
+    "Error classes (InsufficientBalanceError, BalanceNotFoundError, AuditLogValidationError) MUST carry a `code` string property for downstream HTTP status mapping"
+  ],
+  "outOfScope": [
+    "Registering balance routes in src/app.ts \u2014 the architecture doc explicitly defers this to a follow-up integration phase. The balance.routes.ts plugin is defined and exported but not yet registered"
+  ],
+  "ambiguities": [
+    {
+      "description": "Should balance routes be registered in src/app.ts now or deferred? The PLAN.md says \"as part of this phase if the app.ts already supports plugin registration\" (it does \u2014 uptimeRoutes is already registered). The ARCHITECTURE.md says \"not yet registered \u2014 integration will happen in a follow-up phase.\" These conflict.",
+      "options": [
+        "Register balanceRoutes in src/app.ts now (app.ts already supports plugin registration, matching PLAN.md's permissive clause)",
+        "Defer registration to a follow-up integration phase (matching ARCHITECTURE.md's explicit deferral)"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "Balance",
+      "mustExistOrExtend": true,
+      "invariant": "remainingDays = totalEntitlement - usedDays at all times. When remainingDays reaches 0 or below after a deduction, status MUST transition to 'exhausted'. A Balance is uniquely identified by the combination of (employeeId, leaveType, fiscalYear) \u2014 no two rows may share all three values"
+    },
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "Every AuditLog record captures: the entity type and id being acted upon, the action name, the identity of the performer (performedBy), a changes payload (Record<string, unknown>), and a createdAt timestamp. AuditLog records are append-only \u2014 never updated or deleted after creation"
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IBalanceRepository.deductDays(id: string, days: number): Promise<Balance | null>",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns null when no balance row matches the given id. The UPDATE is atomic \u2014 remaining_days and used_days are modified in a single statement. Status transitions to 'exhausted' via a CASE WHEN clause when remaining_days - $days <= 0"
+    },
+    {
+      "operation": "IBalanceService.deductBalance(employeeId: string, leaveType: string, days: number): Promise<Balance>",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws BalanceNotFoundError (code: 'NOT_FOUND') when no balance exists for the given employee+leaveType or when the repository's deductDays returns null. Throws InsufficientBalanceError (code: 'INSUFFICIENT_BALANCE') when remainingDays < days. On success, returns the updated Balance with decremented remainingDays and incremented usedDays"
+    },
+    {
+      "operation": "IBalanceService.hasSufficientBalance(employeeId: string, leaveType: string, requestedDays: number): Promise<boolean>",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns false (not an error) when the balance does not exist or when remainingDays < requestedDays. Returns true when remainingDays >= requestedDays. Never throws"
+    },
+    {
+      "operation": "IAuditLogRepository.findAll(filters?: { entityType?, performedBy?, fromDate?, toDate? }): Promise<AuditLog[]>",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Builds a dynamic WHERE clause from whichever optional filters are present, using indexed parameterized placeholders. Returns results ordered by created_at DESC. Returns empty array when no rows match"
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "PgBalanceRepository MUST import pool from src/shared/db/connection.ts (the single shared pg Pool instance) \u2014 not create its own connection",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "PgBalanceRepository MUST use the same snake_case\u2194camelCase mapping pattern as PgEmployeeRepository and PgLeavePolicyRepository: a mapRowToBalance function and a COLUMN_MAP lookup for dynamic UPDATE SET clause construction",
+      "referencePath": "src/modules/employee/employee.repository.ts"
+    },
+    {
+      "requirement": "PgAuditLogRepository MUST use the same snake_case\u2194camelCase mapping pattern (mapRowToAuditLog) and import pool from the shared connection module",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "Balance entity fields (employeeId, leaveType, totalEntitlement, usedDays, remainingDays, fiscalYear, status) MUST match the IBalanceRepository interface defined in balance.model.ts and the BalanceStatus enum from shared/types",
+      "referencePath": "src/modules/balance/balance.model.ts"
+    },
+    {
+      "requirement": "AuditLog entity fields (entityType, entityId, action, performedBy, changes, createdAt) MUST match the IAuditLogRepository interface defined in audit-log.model.ts",
+      "referencePath": "src/modules/audit-log/audit-log.model.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "Both PgBalanceRepository and PgAuditLogRepository import the shared pg Pool for all database operations"
+    },
+    {
+      "target": "src/shared/types/index.ts",
+      "why": "BalanceStatus enum (active | exhausted) is used by Balance entity, PgBalanceRepository (deductDays CASE expression), and BalanceService"
+    },
+    {
+      "target": "src/modules/balance/balance.model.ts",
+      "why": "IBalanceRepository and IBalanceService interfaces are the contracts that PgBalanceRepository and BalanceService must satisfy; error classes (InsufficientBalanceError, BalanceNotFoundError) are consumed by the service"
+    }
+  ]
+}
