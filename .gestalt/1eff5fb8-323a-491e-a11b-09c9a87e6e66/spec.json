@@ -1,0 +1,91 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "notification",
+      "shared-types"
+    ],
+    "affectedLayers": [
+      "model"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The `Notification` entity's `type` field is typed as `NotificationType` (imported from `../../shared/types`), not `string`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `Notification` entity's `status` field is typed as `NotificationStatus` (imported from `../../shared/types`), not `string`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `INotificationRepository.create` parameter type uses `NotificationType` for `type` and `NotificationStatus` for `status` in the `Omit<Notification, 'id' | 'createdAt'>` expansion \u2014 i.e., the create input is consistent with the entity's enum-typed fields.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `INotificationService` method signatures (notifyLeaveSubmitted, notifyLeaveApproved, notifyLeaveRejected, notifyLeaveCancelled) return `Promise<Notification>` where `Notification.type` is `NotificationType` and `Notification.status` is `NotificationStatus` \u2014 the return type is consistent with the fixed entity.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Only the `Notification` entity interface and the `INotificationRepository` / `INotificationService` interfaces in `src/modules/notification/notification.model.ts` are modified. No new files are created. No concrete implementations (repository, service) are written \u2014 those belong to Phase 6.",
+    "The `NotificationType` and `NotificationStatus` enums in `src/shared/types/index.ts` are NOT modified \u2014 they are already correct and are the authoritative source.",
+    "The existing `import { NotificationStatus } from '../../shared/types'` in notification.model.ts must be extended to also import `NotificationType`. No other imports change."
+  ],
+  "outOfScope": [
+    "Creating or modifying concrete implementations (PgNotificationRepository, NotificationService) \u2014 deferred to Phase 6.",
+    "Creating or modifying notification tests \u2014 deferred to Phase 6.",
+    "Changing any other entity's field types (LeaveRequest, Balance, LeavePolicy, Employee, AuditLog) \u2014 only the Notification entity is in scope."
+  ],
+  "ambiguities": [
+    {
+      "description": "The `INotificationRepository.findByRecipientIdAndStatus` and `INotificationRepository.updateStatus` already use `NotificationStatus` in their parameter types \u2014 this is correct and consistent with the fix. No ambiguity about whether those signatures should also change.",
+      "options": [
+        "Keep repository method signatures as-is (they already use NotificationStatus)",
+        "Also change repository method signatures (unnecessary \u2014 they are already correct)"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "Every Notification instance MUST have a `type` value that is a member of the `NotificationType` enum (leave_submitted | leave_approved | leave_rejected | leave_cancelled) and a `status` value that is a member of the `NotificationStatus` enum (pending | sent | read | archived). This is enforced at compile time by the TypeScript type system."
+    },
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "The `Notification` entity's `type` and `status` fields are the single source of truth for notification typing. Any code that creates or consumes a Notification (repository implementations, service implementations, controllers) MUST derive the field types from the entity interface, not from local string literals or casts."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "INotificationRepository.create",
+      "authRule": "No auth rule \u2014 repository interfaces are internal; auth is enforced at the controller/route layer.",
+      "idempotent": false,
+      "errorSemantics": "Returns the created Notification with enum-typed `type` and `status` fields. The input parameter's `type` and `status` fields must accept `NotificationType` and `NotificationStatus` enum values respectively."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The `Notification.type` field type MUST be `NotificationType` as defined and exported from `src/shared/types/index.ts`. The entity must import and use the enum, not a string literal or locally-defined type.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The `Notification.status` field type MUST be `NotificationStatus` as defined and exported from `src/shared/types/index.ts`. The entity must import and use the enum, not a string literal or locally-defined type.",
+      "referencePath": "src/shared/types/index.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/leave-request/leave-request.model.ts (INotificationService is referenced in ILeaveRequestService constructor \u2014 Phase 6 implementation)",
+      "why": "The leave-request service depends on INotificationService. When Phase 6 implements LeaveRequestService, it will consume the fixed Notification entity with enum-typed fields. No action needed now \u2014 the fix is forward-compatible."
+    }
+  ]
+}
