@@ -1,0 +1,133 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "employee",
+      "leave-policy"
+    ],
+    "affectedLayers": [
+      "repository"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "PgEmployeeRepository class exists at src/modules/employee/employee.repository.ts and satisfies the IEmployeeRepository interface from ./employee.model.ts (all six methods present with matching signatures)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "PgEmployeeRepository uses the pg Pool exported from src/shared/db/connection.ts (imports `pool` and calls pool.query) \u2014 no inline pg.Pool construction, no direct pg.Client, no other connection mechanism",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All six PgEmployeeRepository methods use parameterized queries ($1, $2, \u2026) \u2014 no string concatenation or template-literal interpolation of values into SQL",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "PgEmployeeRepository.softDelete(id) sets deleted_at = NOW() (or equivalent current timestamp) on the matching row and returns Promise<void> \u2014 does not physically delete the row",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "PgEmployeeRepository.findAll() returns only rows where deleted_at IS NULL (soft-deleted employees are excluded)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "PgLeavePolicyRepository class exists at src/modules/leave-policy/leave-policy.repository.ts and satisfies the ILeavePolicyRepository interface from ./leave-policy.model.ts (all five methods present with matching signatures)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "PgLeavePolicyRepository uses the pg Pool exported from src/shared/db/connection.ts \u2014 no inline pool construction or alternative connection",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All five PgLeavePolicyRepository methods use parameterized queries \u2014 no string concatenation or template-literal interpolation of values into SQL",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "PgLeavePolicyRepository.findAllActive() returns only rows where is_active = true",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Both repository classes MUST import the pg Pool from src/shared/db/connection.ts (import { pool } from '../../shared/db/connection' or equivalent relative path) \u2014 no other database connection mechanism is permitted (HARNESS.json constraint: no-direct-db-outside-repository, GP-001)",
+    "All SQL queries MUST use parameterized placeholders ($1, $2, \u2026) \u2014 never concatenate or interpolate values into query strings (prevents SQL injection)",
+    "Repository methods MUST NOT use `any` type \u2014 use `unknown` with type guards where needed (HARNESS.json constraint: no-any)",
+    "Repository implementations MUST NOT import or depend on any service, controller, or route module \u2014 they depend only on their own model file and the shared db connection"
+  ],
+  "outOfScope": [
+    "Sub-phase 2/3: LeavePolicy Service \u2014 src/modules/leave-policy/leave-policy.service.ts (produced by a sibling sub-phase)",
+    "Sub-phase 3/3: Unit Tests for Repositories & Service \u2014 tests/unit/modules/employee/employee.repository.spec.ts, tests/unit/modules/leave-policy/leave-policy.repository.spec.ts, tests/unit/modules/leave-policy/leave-policy.service.spec.ts (produced by a sibling sub-phase)"
+  ],
+  "ambiguities": [
+    {
+      "description": "Column-name mapping convention: the Employee/LeavePolicy entity interfaces use camelCase (e.g., employeeNumber, firstName, leaveType, policyName) while the DB tables use snake_case (employee_number, first_name, leave_type, policy_name). Should the repository perform this mapping inline in each method, or extract a shared mapper?",
+      "options": [
+        "Inline mapping in each method (simpler, no extra file)",
+        "Extract a private toRow/fromRow mapper per repository class"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "An Employee row is never physically deleted \u2014 softDelete sets deleted_at to the current timestamp; findAll and findById must exclude rows where deleted_at IS NOT NULL"
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "A LeavePolicy's isActive flag controls visibility in findAllActive \u2014 only policies with isActive = true are returned; inactive policies remain in the database but are excluded from active queries"
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IEmployeeRepository.findById",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns null when no matching row exists (not found is not an error)"
+    },
+    {
+      "operation": "IEmployeeRepository.findByEmployeeNumber",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns null when no matching row exists"
+    },
+    {
+      "operation": "ILeavePolicyRepository.findById",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns null when no matching row exists"
+    },
+    {
+      "operation": "ILeavePolicyRepository.findByLeaveType",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns null when no matching row exists"
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "PgEmployeeRepository MUST implement the exact IEmployeeRepository interface declared in src/modules/employee/employee.model.ts \u2014 method names, parameter types, and return types must match exactly (findById, findByEmployeeNumber, findAll, create, update, softDelete)",
+      "referencePath": "src/modules/employee/employee.model.ts"
+    },
+    {
+      "requirement": "PgLeavePolicyRepository MUST implement the exact ILeavePolicyRepository interface declared in src/modules/leave-policy/leave-policy.model.ts \u2014 method names, parameter types, and return types must match exactly (findById, findByLeaveType, findAllActive, create, update)",
+      "referencePath": "src/modules/leave-policy/leave-policy.model.ts"
+    },
+    {
+      "requirement": "Both repositories MUST import and use the `pool` export from src/shared/db/connection.ts \u2014 no other database connection mechanism, no duplicate pool creation",
+      "referencePath": "src/shared/db/connection.ts"
+    }
+  ],
+  "integrationPoints": []
+}
