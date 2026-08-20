@@ -1,22 +1,32 @@
-# Implement this phase: Phase 2: Balance & Audit Log (part 1/2)
+# Implement this phase: Phase 2: Balance & Audit Log (part 2/2)
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/3350baf6-9bd5-4cac-b688-f263972317f9/5`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/3350baf6-9bd5-4cac-b688-f263972317f9/6`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the Balance and AuditLog domain models with their repository/service interfaces. This is the models+interfaces slice only — NO concrete implementations.
+Implement the concrete repository classes for Balance and AuditLog, plus the Balance service, controller, and routes. This phase depends on the models/interfaces from part 1/2.
 
-Read these files before generating: `src/shared/types/index.ts` (for BalanceStatus enum), `src/modules/employee/employee.model.ts` (for Employee reference pattern).
+Read these files before generating: `src/modules/balance/balance.model.ts`, `src/modules/audit-log/audit-log.model.ts`, `src/shared/db/connection.ts`, `src/app.ts`.
 
 Files to create:
 
-1. `src/modules/balance/balance.model.ts` — Define the `Balance` entity interface with canonical fields: id, employeeId, leaveType, totalEntitlement, usedDays, remainingDays, fiscalYear, status (BalanceStatus), createdAt, updatedAt. Define `IBalanceRepository` interface with methods: findByEmployeeId(employeeId: string), findByEmployeeIdAndLeaveType(employeeId: string, leaveType: string), findByEmployeeIdAndFiscalYear(employeeId: string, fiscalYear: number), create(balance: Omit<Balance, 'id' | 'createdAt' | 'updatedAt'>), update(id: string, data: Partial<Balance>), deductDays(id: string, days: number). Define `IBalanceService` interface with methods: getBalance(employeeId: string, leaveType: string), hasSufficientBalance(employeeId: string, leaveType: string, requestedDays: number), deductBalance(employeeId: string, leaveType: string, days: number).
+1. `src/modules/balance/balance.repository.ts` — Implement `PgBalanceRepository` satisfying `IBalanceRepository`. Use pg Pool. Methods: findByEmployeeId, findByEmployeeIdAndLeaveType, findByEmployeeIdAndFiscalYear, create, update, deductDays (UPDATE remaining_days = remaining_days - $days, used_days = used_days + $days, set status to 'exhausted' if remaining reaches 0). Import from `./balance.model.ts`.
 
-2. `src/modules/audit-log/audit-log.model.ts` — Define the `AuditLog` entity interface with fields: id, entityType (string), entityId (string), action (string), performedBy (string), changes (Record<string, unknown>), createdAt (Date). Define `IAuditLogRepository` interface with methods: findByEntity(entityType: string, entityId: string), create(entry: Omit<AuditLog, 'id' | 'createdAt'>), findAll(filters?: { entityType?: string; performedBy?: string; fromDate?: Date; toDate?: Date }).
+2. `src/modules/balance/balance.service.ts` — Implement `BalanceService` satisfying `IBalanceService`. Constructor takes `IBalanceRepository`. getBalance delegates to repo, hasSufficientBalance checks remainingDays >= requestedDays, deductBalance delegates to repo.deductDays. [BINDING RULE: Calendar days inclusive — the service must accept the pre-calculated day count; the calculation itself lives in the leave-request module.]
 
-No tests in this phase — tests come in part 2/2.
+3. `src/modules/balance/balance.controller.ts` — Fastify route handlers: getBalance (GET /balance/:employeeId/:leaveType), getBalances (GET /balance/:employeeId). Import BalanceService.
+
+4. `src/modules/balance/balance.routes.ts` — Register Fastify routes for the balance controller. Export a plugin function.
+
+5. `src/modules/audit-log/audit-log.repository.ts` — Implement `PgAuditLogRepository` satisfying `IAuditLogRepository`. Use pg Pool. Methods: findByEntity, create, findAll with optional filters.
+
+6. `tests/unit/modules/balance/balance.repository.spec.ts` — Jest tests for PgBalanceRepository (mock pg Pool).
+   `tests/unit/modules/balance/balance.service.spec.ts` — Jest tests for BalanceService (mock IBalanceRepository).
+   `tests/unit/modules/audit-log/audit-log.repository.spec.ts` — Jest tests for PgAuditLogRepository.
+
+Note: The balance routes should be registered in `src/app.ts` in a follow-up integration phase or as part of this phase if the app.ts already supports plugin registration.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -35,22 +45,6 @@ The entities below are shared, cross-module DATA CONTRACTS. Implement each one w
     - status: string
     - createdAt: Date
     - updatedAt: Date
-
-## Constraints & consistency
-You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
-### Reuse & consistency — match these exactly
-- The Balance entity's status field must use the BalanceStatus enum imported from src/shared/types/index.ts — not a string literal, not a locally redefined enum. (see `src/shared/types/index.ts`)
-- The Omit pattern for create methods must match the pattern established in IEmployeeRepository.create: Omit<Entity, auto-generated fields>. For Balance, auto-generated fields are 'id' | 'createdAt' | 'updatedAt'. For AuditLog, they are 'id' | 'createdAt'. (see `src/modules/employee/employee.model.ts`)
-### Entity invariants — enforce these
-- Reuse or extend `Balance`: remainingDays must always equal totalEntitlement - usedDays. Any mutation to usedDays or totalEntitlement must recalculate remainingDays accordingly. The status must be 'active' when remainingDays > 0 and 'exhausted' when remainingDays <= 0.
-- Reuse or extend `AuditLog`: Every AuditLog entry must be immutable after creation — id, entityType, entityId, action, performedBy, changes, and createdAt are set once at creation and never updated. There is no update method on IAuditLogRepository.
-- Reuse or extend `Balance`: A Balance is uniquely identified by the composite of (employeeId, leaveType, fiscalYear). No two Balance records may share the same combination of these three fields.
-### Interface contract — expose these operations (their shape is yours)
-- IBalanceRepository.deductDays — Must throw BalanceNotFoundError if no balance row matches the given id. Must throw InsufficientBalanceError if remainingDays < days. Must atomically decrement remainingDays and increment usedDays, and transition status to 'exhausted' when remainingDays reaches 0.
-- IBalanceService.deductBalance — Must locate the Balance by employeeId + leaveType (delegating to repository), then delegate to repository.deductDays. Must propagate InsufficientBalanceError and BalanceNotFoundError from the repository layer. Must return the updated Balance.
-- IAuditLogRepository.create — Must validate that entityType, entityId, action, and performedBy are non-empty strings before persisting. Must throw AuditLogValidationError on invalid input. Must return the created AuditLog with generated id and createdAt.
-### Integration points — connect to these
-- src/shared/types/index.ts — Balance entity imports BalanceStatus enum from shared types. AuditLog entity conceptually depends on shared types for consistency with the module ecosystem, though it currently uses only primitive types.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
