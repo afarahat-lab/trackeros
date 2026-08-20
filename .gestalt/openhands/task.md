@@ -1,3 +1,11 @@
+# Continue the previous attempt (it hit the iteration limit before finishing)
+
+A prior code-agent attempt on this work dir (`/tmp/gestalt/phase/3350baf6-9bd5-4cac-b688-f263972317f9/6`) was stopped after reaching its iteration limit. Its work is ALREADY on disk here — do NOT restart from scratch or re-read everything; build on what exists. It made 0 file edit(s). Its last verification PASSED (`cd /tmp/gestalt/phase/3350baf6-9bd5-4cac-b688-f263972317f9/6 && npm run build 2>&1`).
+
+Finish the task now: fix any failing build/type-check/tests, then RUN the build and the tests and fix anything still failing. Stop as soon as the build and tests pass. The full original task (with all mandatory constraints) follows for reference.
+
+---
+
 # Implement this phase: Phase 2: Balance & Audit Log (part 2/2)
 
 You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/3350baf6-9bd5-4cac-b688-f263972317f9/6`. Do not clone anything; work only in this directory.
@@ -45,6 +53,25 @@ The entities below are shared, cross-module DATA CONTRACTS. Implement each one w
     - status: string
     - createdAt: Date
     - updatedAt: Date
+
+## Constraints & consistency
+You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
+### Reuse & consistency — match these exactly
+- PgBalanceRepository must import and use the `pool` from `src/shared/db/connection.ts` — no other database connection or pool instance (see `src/shared/db/connection.ts`)
+- Balance entity interface, IBalanceRepository, IBalanceService, and error classes (InsufficientBalanceError, BalanceNotFoundError) must match the definitions in balance.model.ts — all implementations import from this file (see `src/modules/balance/balance.model.ts`)
+- AuditLog entity interface and IAuditLogRepository must match the definitions in audit-log.model.ts — PgAuditLogRepository imports from this file (see `src/modules/audit-log/audit-log.model.ts`)
+- BalanceStatus enum values ('active', 'exhausted') must be imported from src/shared/types/index.ts — no hardcoded string literals for status values in repository or service logic (see `src/shared/types/index.ts`)
+### Entity invariants — enforce these
+- Reuse or extend `Balance`: remainingDays = totalEntitlement - usedDays must hold after every mutation. The deductDays operation must update both usedDays and remainingDays atomically in a single UPDATE statement. Status must transition to 'exhausted' when remainingDays reaches ≤ 0.
+- Reuse or extend `AuditLog`: Every AuditLog record is immutable after creation — there is no update or delete method on IAuditLogRepository. The `changes` field captures a snapshot of what changed (Record<string, unknown>). Records are always returned ordered by created_at DESC.
+### Interface contract — expose these operations (their shape is yours)
+- IBalanceRepository.deductDays — Returns null when the balance row does not exist (caller must handle). The SQL CASE expression handles the exhausted transition; no application-level status check is needed.
+- IBalanceService.deductBalance — Throws BalanceNotFoundError (code: NOT_FOUND) when no balance exists for the employeeId+leaveType pair or when repo.deductDays returns null. Throws InsufficientBalanceError (code: INSUFFICIENT_BALANCE) when remainingDays < days. Both errors extend Error and carry a `code` property for HTTP mapping.
+- IBalanceService.hasSufficientBalance — idempotent; Returns boolean — never throws. Returns false when balance does not exist or remainingDays < requestedDays. Returns true when remainingDays >= requestedDays.
+- IAuditLogRepository.findAll — idempotent; Accepts optional filters object with entityType, performedBy, fromDate, toDate. All filters are optional and combined with AND. Returns empty array when no records match. Never throws for invalid/missing filters — filters are simply ignored if undefined.
+### Integration points — connect to these
+- src/app.ts — balanceRoutes plugin must be registered via app.register(balanceRoutes) in a follow-up integration phase — currently only uptimeRoutes is registered
+- src/modules/leave-request/leave-request.service.ts (Phase 3) — LeaveRequestService will consume IBalanceService.hasSufficientBalance and IBalanceService.deductBalance during submit/approve workflows, and IAuditLogRepository.create for audit trail entries
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
