@@ -1,0 +1,81 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-request",
+      "notification"
+    ],
+    "affectedLayers": [
+      "domain-model",
+      "repository-interface",
+      "service-interface",
+      "validation"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The `LeaveRequest` entity interface is defined in `src/modules/leave-request/leave-request.model.ts` with all canonical fields: id, employeeId, leaveType (LeaveType), startDate (Date), endDate (Date), reason (string | undefined), status (LeaveStatus), approvedBy (string | null), approvedAt (Date | null), rejectionReason (string | undefined), createdAt (Date), updatedAt (Date).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `ILeaveRequestRepository` interface exposes: findById, findByEmployeeId, findByStatus, findByManagerId, create, update, and updateStatus \u2014 with updateStatus documenting allowed state transitions (DRAFT\u2192SUBMITTED, SUBMITTED\u2192APPROVED|REJECTED, SUBMITTED|APPROVED\u2192CANCELLED; REJECTED/CANCELLED are terminal).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `ILeaveRequestService` interface exposes: submit (accepts CreateLeaveRequestDto, throws LeaveRequestValidationError for invalid input), approve (throws LeaveRequestNotFoundError), reject (throws LeaveRequestNotFoundError + LeaveRequestValidationError for empty reason), cancel (enforces self-cancellation: employeeId must match), getById, getByEmployee, getPendingForManager.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `CreateLeaveRequestDto` is defined with fields: employeeId (string), leaveType (LeaveType), startDate (Date), endDate (Date), reason (string, optional).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Zod validation schemas exist: `createLeaveRequestSchema` validates all required fields and enforces `startDate <= endDate` via `.refine()`; `updateLeaveRequestSchema` allows partial updates with optional fields.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Domain error classes `LeaveRequestNotFoundError` (code: 'NOT_FOUND') and `LeaveRequestValidationError` (code: 'VALIDATION_ERROR') are defined and exported.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `Notification` entity interface is defined in `src/modules/notification/notification.model.ts` with all canonical fields: id, recipientId, type (NotificationType), title, message, relatedEntityType (string | null), relatedEntityId (string | null), status (NotificationStatus), createdAt (Date), readAt (Date | null).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `INotificationRepository` interface exposes: findByRecipientId, findByRecipientIdAndStatus, create, updateStatus.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `INotificationService` interface exposes: notifyLeaveSubmitted, notifyLeaveApproved, notifyLeaveRejected, notifyLeaveCancelled (each accepting a LeaveRequest and returning a Notification), getNotifications, markAsRead.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "This phase produces ONLY models, interfaces, DTOs, error classes, and Zod schemas \u2014 NO concrete repository/service/controller/route implementations. Those come in Phase 6 (part 2/2).",
+    "No tests are produced in this phase. Tests for LeaveRequest and Notification modules are deferred to Phase 6 (part 2/2).",
+    "All database access in future implementations must go through the repository interfaces defined here (GP-001). No inline SQL or direct DB calls in services or controllers.",
+    "All state-changing operations (submit, approve, reject, cancel) must write an audit record (GP-002). The service interfaces document this contract; the concrete implementations in Phase 6 will fulfil it via IAuditLogRepository."
+  ],
+  "outOfScope": [],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "A LeaveRequest MUST always have a valid status from the LeaveStatus enum. The status lifecycle is: DRAFT \u2192 SUBMITTED \u2192 APPROVED | REJECTED; SUBMITTED | APPROVED \u2192 CANCELLED. REJECTED and CANCELLED are terminal states \u2014 no further transitions are permitted. The updateStatus repository method is the sole mutator of status and must enforce these transitions."
+    }
+  ],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [],
+  "integrationPoints": []
+}
