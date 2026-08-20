@@ -1,0 +1,108 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared-types",
+      "employee",
+      "leave-policy"
+    ],
+    "affectedLayers": [
+      "model",
+      "interface"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "All six shared enums (LeaveType, LeaveStatus, EmploymentStatus, BalanceStatus, NotificationType, NotificationStatus) are defined and exported from `src/shared/types/index.ts` with the exact member names and values specified in the reconciled architecture.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `Employee` entity interface in `src/modules/employee/employee.model.ts` declares all canonical fields (id, employeeNumber, firstName, lastName, email, managerId, department, hireDate, terminationDate, employmentStatus, createdAt, updatedAt, deletedAt) with correct types \u2014 including `employmentStatus` typed as `EmploymentStatus` enum, not a plain string.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `IEmployeeRepository` interface declares all six methods \u2014 findById, findByEmployeeNumber, findAll, create, update, softDelete \u2014 with correct signatures: findById returns `Promise<Employee | null>`, create accepts `Omit<Employee, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt'>`, softDelete returns `Promise<void>`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `LeavePolicy` entity interface in `src/modules/leave-policy/leave-policy.model.ts` declares all canonical fields (id, policyName, leaveType, entitlementDays, accrualRate, maxAccumulation, minimumNoticeDays, requiresManagerApproval, isActive, createdAt, updatedAt) with `leaveType` typed as `LeaveType` enum and optional fields (`accrualRate`, `maxAccumulation`) typed as `number | undefined`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `ILeavePolicyRepository` interface declares all five methods \u2014 findById, findByLeaveType, findAllActive, create, update \u2014 with `findByLeaveType` accepting `LeaveType` enum and `findAllActive` returning `Promise<LeavePolicy[]>`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `ILeavePolicyService` interface declares both methods \u2014 `getPolicyForLeaveType(leaveType: LeaveType): Promise<LeavePolicy | null>` and `validateEntitlement(employeeId: string, leaveType: LeaveType, requestedDays: number): Promise<boolean>` \u2014 with `leaveType` typed as `LeaveType` enum.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No concrete implementations \u2014 this phase produces only type definitions (enums, interfaces). No repository classes, service classes, controllers, or routes are created.",
+    "No tests are written in this phase \u2014 tests are deferred to Phase 1 part 2/2.",
+    "All enum member names and values must match the reconciled architecture exactly \u2014 no additions, removals, or renames."
+  ],
+  "outOfScope": [
+    "Concrete repository implementations (PgEmployeeRepository, PgLeavePolicyRepository) \u2014 deferred to Phase 1 part 2/2.",
+    "LeavePolicyService concrete implementation \u2014 deferred to Phase 1 part 2/2.",
+    "Unit tests for any module \u2014 deferred to Phase 1 part 2/2."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "Every Employee MUST have a unique `employeeNumber` and a unique `email`. The `employmentStatus` MUST be one of the `EmploymentStatus` enum values. `deletedAt` being non-null signals a soft-deleted record; soft-deleted employees MUST be excluded from `findAll` results."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "For any given `leaveType`, at most one active (`isActive = true`) LeavePolicy may exist at a time. `entitlementDays` MUST be a positive integer. `minimumNoticeDays` MUST be a non-negative integer. `requiresManagerApproval` defaults to `true` when not explicitly set."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IEmployeeRepository.softDelete",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Calling softDelete on an already soft-deleted employee MUST succeed silently (no-op) rather than throwing."
+    },
+    {
+      "operation": "ILeavePolicyService.validateEntitlement",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns `false` (not an error) when the requested days exceed the policy's entitlementDays, or when no active policy exists for the given leaveType. Returns `true` only when an active policy exists AND requestedDays <= entitlementDays."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The `LeaveType` enum imported in `src/modules/leave-policy/leave-policy.model.ts` MUST be the same `LeaveType` exported from `src/shared/types/index.ts` \u2014 no local redefinition or divergence.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The `EmploymentStatus` enum imported in `src/modules/employee/employee.model.ts` MUST be the same `EmploymentStatus` exported from `src/shared/types/index.ts` \u2014 no local redefinition or divergence.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The `Employee` entity interface MUST match the reconciled architecture's Employee attributes (id, employeeNumber, firstName, lastName, email, managerId, department, hireDate, terminationDate, employmentStatus, createdAt, updatedAt, deletedAt) \u2014 no missing fields, no extra fields.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "The `LeavePolicy` entity interface MUST match the reconciled architecture's LeavePolicy attributes (id, policyName, leaveType, entitlementDays, accrualRate, maxAccumulation, minimumNoticeDays, requiresManagerApproval, isActive, createdAt, updatedAt) \u2014 no missing fields, no extra fields.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts",
+      "why": "Consumed by both employee and leave-policy modules for enum imports (EmploymentStatus, LeaveType). Will also be consumed by balance, leave-request, notification, and audit-log modules in later phases."
+    }
+  ]
+}
