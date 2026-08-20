@@ -1,3 +1,5 @@
+import { EmploymentStatus } from '../../shared/types';
+
 export interface Employee {
   id: string;
   employeeNumber: string;
@@ -8,7 +10,7 @@ export interface Employee {
   department: string | null;
   hireDate: Date;
   terminationDate: Date | null;
-  employmentStatus: string;
+  employmentStatus: EmploymentStatus;
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
@@ -20,5 +22,5 @@ export interface IEmployeeRepository {
   findAll(): Promise<Employee[]>;
   create(employee: Omit<Employee, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt'>): Promise<Employee>;
   update(id: string, data: Partial<Employee>): Promise<Employee | null>;
-  softDelete(id: string): Promise<boolean>;
+  softDelete(id: string): Promise<void>;
 }
