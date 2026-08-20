@@ -20,6 +20,7 @@ src/modules/employee/employee.model.ts          — Employee entity + IEmployeeR
 src/modules/employee/employee.repository.ts     — PgEmployeeRepository (pg Pool, parameterized queries, snake_case↔camelCase mapping)
 src/modules/leave-policy/leave-policy.model.ts  — LeavePolicy entity + ILeavePolicyRepository + ILeavePolicyService interfaces
 src/modules/leave-policy/leave-policy.repository.ts — PgLeavePolicyRepository (pg Pool, parameterized queries, snake_case↔camelCase mapping)
+src/modules/leave-policy/leave-policy.service.ts — LeavePolicyService (stateless, delegates to ILeavePolicyRepository)
 src/modules/status/                             — System status module (model, service interface, service)
 src/modules/uptime/                             — Uptime health-check module (model, service interface, service, routes)
 src/shared/types/index.ts                       — Shared enums: LeaveType, LeaveStatus, EmploymentStatus, BalanceStatus, NotificationType, NotificationStatus
@@ -91,7 +92,7 @@ Modular monolith built with TypeScript, Fastify, PostgreSQL. The leave managemen
 - **Transaction**: Multi-step writes (approve/cancel) use a caller-owned transaction. Repository methods accept an optional `pg.PoolClient`; the service acquires a client, runs `BEGIN`, passes it to repositories, then `COMMIT`/`ROLLBACK`.
 
 ## Phased Implementation
-1. **Foundation**: shared-types, employee, leave-policy (models + repositories done; service + tests deferred)
+1. **Foundation**: shared-types, employee, leave-policy (models + repositories + service done; tests deferred)
 2. **Balance & Audit**: balance module, audit-log module
 3. **Core Workflow**: leave-request module, notification module
 
