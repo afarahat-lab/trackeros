@@ -6,12 +6,12 @@ import { NotificationType, NotificationStatus } from '../../shared/types';
 export interface Notification {
   id: string;
   recipientId: string;
-  type: NotificationType;
+  type: string;
   title: string;
   message: string;
   relatedEntityType: string | null;
   relatedEntityId: string | null;
-  status: NotificationStatus;
+  status: string;
   createdAt: Date;
   readAt: Date | null;
 }
