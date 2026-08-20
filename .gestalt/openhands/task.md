@@ -1,26 +1,33 @@
-# Implement this phase: Phase 2: Balance & Audit Log (part 1/2)
+# Fix specific quality-gate violations: Phase 2: Balance & Audit Log (part 1/2)
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/3350baf6-9bd5-4cac-b688-f263972317f9/5`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/fix/3350baf6-9bd5-4cac-b688-f263972317f9/5/1`. Do not clone anything; work only in this directory.
 
-## What to build
-(no phase architecture provided — infer from the success criteria below)
+You are fixing SPECIFIC violations the quality gate found in EXISTING, already-committed files. Make the targeted edits listed below — do NOT refactor, regenerate, or change unrelated code.
 
-## Success criteria
-Create the Balance and AuditLog domain models with their repository/service interfaces. This is the models+interfaces slice only — NO concrete implementations.
+The files ALREADY EXIST. You MUST edit them in place with the `str_replace_editor` tool. Reading or viewing a file is NOT sufficient — you have NOT finished until you have edited EVERY file listed below.
 
-Read these files before generating: `src/shared/types/index.ts` (for BalanceStatus enum), `src/modules/employee/employee.model.ts` (for Employee reference pattern).
-
-Files to create:
-
-1. `src/modules/balance/balance.model.ts` — Define the `Balance` entity interface with canonical fields: id, employeeId, leaveType, totalEntitlement, usedDays, remainingDays, fiscalYear, status (BalanceStatus), createdAt, updatedAt. Define `IBalanceRepository` interface with methods: findByEmployeeId(employeeId: string), findByEmployeeIdAndLeaveType(employeeId: string, leaveType: string), findByEmployeeIdAndFiscalYear(employeeId: string, fiscalYear: number), create(balance: Omit<Balance, 'id' | 'createdAt' | 'updatedAt'>), update(id: string, data: Partial<Balance>), deductDays(id: string, days: number). Define `IBalanceService` interface with methods: getBalance(employeeId: string, leaveType: string), hasSufficientBalance(employeeId: string, leaveType: string, requestedDays: number), deductBalance(employeeId: string, leaveType: string, days: number).
-
-2. `src/modules/audit-log/audit-log.model.ts` — Define the `AuditLog` entity interface with fields: id, entityType (string), entityId (string), action (string), performedBy (string), changes (Record<string, unknown>), createdAt (Date). Define `IAuditLogRepository` interface with methods: findByEntity(entityType: string, entityId: string), create(entry: Omit<AuditLog, 'id' | 'createdAt'>), findAll(filters?: { entityType?: string; performedBy?: string; fromDate?: Date; toDate?: Date }).
-
-No tests in this phase — tests come in part 2/2.
-
-## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
-These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
-- Calendar days inclusive: start_date through end_date, all days count toward used_days (weekends and public holidays included). end_date is inclusive. [BINDING RULE — operator decision resolving: How are leave days counted — are start_date and end_date inclusive, and do weekends/public holidays count toward the used-days total?; apply everywhere these apply, not in one place only]
+## Constraints & consistency
+You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
+### Reuse & consistency — match these exactly
+- `PgBalanceRepository` must follow the same pattern as `PgEmployeeRepository` and `PgLeavePolicyRepository`: import `pool` from `src/shared/db/connection.ts`, use a `mapRowToBalance` function for snake_case→camelCase conversion, use a `COLUMN_MAP` lookup for dynamic UPDATE SET clause construction, and use parameterized `$1, $2, …` placeholders. (see `src/modules/employee/employee.repository.ts`)
+- `PgAuditLogRepository` must follow the same pattern as `PgEmployeeRepository`: import `pool` from `src/shared/db/connection.ts`, use a `mapRowToAuditLog` function for snake_case→camelCase conversion, and use parameterized `$1, $2, …` placeholders. (see `src/modules/employee/employee.repository.ts`)
+- `BalanceService` must match the pattern of `LeavePolicyService`: stateless class, constructor receives the repository interface, methods delegate to the repository and apply domain logic (throwing typed errors for not-found/invalid states). (see `src/modules/leave-policy/leave-policy.service.ts`)
+- The `Balance` entity interface, `IBalanceRepository`, `IBalanceService`, and error classes (`InsufficientBalanceError`, `BalanceNotFoundError`) already exist in `balance.model.ts` and must not be modified — the concrete implementations must satisfy these interfaces exactly as declared. (see `src/modules/balance/balance.model.ts`)
+- The `AuditLog` entity interface, `IAuditLogRepository`, and `AuditLogValidationError` already exist in `audit-log.model.ts` and must not be modified — the concrete implementation must satisfy these interfaces exactly as declared. (see `src/modules/audit-log/audit-log.model.ts`)
+- The `BalanceStatus` enum (`active`, `exhausted`) from `src/shared/types/index.ts` must be used for the `Balance.status` field — no hardcoded string literals. (see `src/shared/types/index.ts`)
+### Entity invariants — enforce these
+- Reuse or extend `Balance`: `remainingDays` must always equal `totalEntitlement - usedDays`. Any mutation to `usedDays` (via `deductDays`) must update `remainingDays` in the same atomic operation. When `remainingDays` reaches 0, `status` must transition to `BalanceStatus.exhausted`.
+- Reuse or extend `AuditLog`: Every `AuditLog` record must have a non-empty `entityType`, `entityId`, `action`, and `performedBy`. The `changes` field must be a plain object (not an array, not null) — it captures the before/after diff of the state change.
+### Interface contract — expose these operations (their shape is yours)
+- IBalanceRepository.deductDays — Throws `BalanceNotFoundError` (code `NOT_FOUND`) when no balance row matches the given `id`. Throws `InsufficientBalanceError` (code `INSUFFICIENT_BALANCE`) when `remainingDays < days`. Returns the updated `Balance` on success — never returns null.
+- IBalanceService.getBalance — Throws `BalanceNotFoundError` (code `NOT_FOUND`) when no balance exists for the given employee and leave type. Returns `Balance` on success — never returns null.
+- IBalanceService.deductBalance — Throws `BalanceNotFoundError` when no balance exists for the given employee and leave type. Throws `InsufficientBalanceError` when `remainingDays < days`. Returns the updated `Balance` on success.
+- IAuditLogRepository.create — Throws `AuditLogValidationError` (code `VALIDATION_ERROR`) when required fields (`entityType`, `entityId`, `action`, `performedBy`) are missing or empty. Returns the created `AuditLog` on success.
+### Integration points — connect to these
+- src/shared/db/connection.ts — Both `PgBalanceRepository` and `PgAuditLogRepository` must import the `pool` from this module for all database operations, following the same pattern as `PgEmployeeRepository` and `PgLeavePolicyRepository`.
+- src/shared/types/index.ts — `BalanceStatus` enum (`active`, `exhausted`) is used by `Balance.status` and must be imported by the balance repository and service for the exhaustion transition logic.
+- src/modules/balance/balance.model.ts — The concrete `PgBalanceRepository`, `BalanceService`, `BalanceController`, and balance routes all import their interfaces and entity types from this file. Must not be modified — only consumed.
+- src/modules/audit-log/audit-log.model.ts — The concrete `PgAuditLogRepository` imports `IAuditLogRepository`, `AuditLog`, and `AuditLogValidationError` from this file. Must not be modified — only consumed.
 
 ## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
 The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
@@ -36,30 +43,16 @@ The entities below are shared, cross-module DATA CONTRACTS. Implement each one w
     - createdAt: Date
     - updatedAt: Date
 
-## Constraints & consistency
-You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
-### Reuse & consistency — match these exactly
-- The `Balance.status` field must use the `BalanceStatus` enum imported from `src/shared/types/index.ts` — matching the pattern used by `Employee.employmentStatus` (EmploymentStatus enum) and `LeavePolicy.leaveType` (LeaveType enum). (see `src/shared/types/index.ts`)
-- The `Balance.leaveType` field must be typed as `string` (not the `LeaveType` enum) — matching the reconciled architecture specification where `leaveType` is `string` on the Balance entity, even though `LeavePolicy.leaveType` uses the `LeaveType` enum. (see `.gestalt/architecture/reconciled.json`)
-- The `create` method parameter type must follow the exact `Omit` pattern established by `IEmployeeRepository.create`: omit server-assigned fields (`id`, timestamps). For Balance: `Omit<Balance, 'id' | 'createdAt' | 'updatedAt'>`. For AuditLog: `Omit<AuditLog, 'id' | 'createdAt'>` (AuditLog has no `updatedAt`). (see `src/modules/employee/employee.model.ts`)
-### Entity invariants — enforce these
-- Reuse or extend `Balance`: `remainingDays` must always equal `totalEntitlement - usedDays`. Any operation that modifies `usedDays` (via `deductDays` or `update`) must maintain this invariant. The `status` field must be `BalanceStatus.active` when `remainingDays > 0` and `BalanceStatus.exhausted` when `remainingDays === 0`.
-- Reuse or extend `AuditLog`: AuditLog records are immutable once created — there is no `update` or `delete` method on `IAuditLogRepository`. The `changes` field captures the full state delta as a `Record<string, unknown>` and must never be null or undefined.
-### Interface contract — expose these operations (their shape is yours)
-- IBalanceRepository.deductDays — Must reject with a typed error when `days` exceeds `remainingDays` (INSUFFICIENT_BALANCE). Must reject when the balance `status` is already `exhausted`. Must reject when the balance is not found (NOT_FOUND).
-- IBalanceService.deductBalance — Must reject with a typed error when no balance exists for the given employee + leaveType combination (NOT_FOUND). Must reject when `days` exceeds available `remainingDays` (INSUFFICIENT_BALANCE). On success, returns the updated Balance with decremented remainingDays and incremented usedDays.
-- IBalanceService.hasSufficientBalance — idempotent; Returns `false` (not an error) when no balance record exists for the given employee + leaveType. Returns `false` when `remainingDays < requestedDays`. Returns `true` only when a balance exists and `remainingDays >= requestedDays`.
-- IAuditLogRepository.create — Must reject with a typed error when required fields (`entityType`, `entityId`, `action`, `performedBy`, `changes`) are missing or invalid. On success, returns the created AuditLog with server-assigned `id` and `createdAt`.
-### Integration points — connect to these
-- src/shared/types/index.ts — Balance entity imports `BalanceStatus` enum. The `status` field is typed as `BalanceStatus`, not a plain string.
-- src/modules/employee/employee.model.ts — Both Balance and AuditLog entities reference employees: `Balance.employeeId` is a string referencing an Employee `id`, and `AuditLog.performedBy` is a string referencing the employee who performed the action. The repository `create` parameter pattern (`Omit<Entity, 'id' | 'createdAt' | 'updatedAt'>`) is also derived from `IEmployeeRepository`.
-
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
 - Use unknown with type guards instead of any (rule: `no-any`)
 - Database calls must go through repository pattern (rule: `no-direct-db-outside-repository`)
 - No hardcoded passwords, API keys, or tokens (rule: `no-hardcoded-secrets`)
 - Do not add @gestalt/* packages as project dependencies — these are Gestalt platform internals not available on npm (rule: `no-gestalt-internal-deps`)
+
+## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
+These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
+- Calendar days inclusive: start_date through end_date, all days count toward used_days (weekends and public holidays included). end_date is inclusive. [BINDING RULE — operator decision resolving: How are leave days counted — are start_date and end_date inclusive, and do weekends/public holidays count toward the used-days total?; apply everywhere these apply, not in one place only]
 
 ## Architecture & constraint rules the quality gate enforces (satisfy these now)
 The quality gate judges your code against the rules below and BLOCKS the phase on any violation — a violation it rates critical escalates to a human with no automatic retry. These are the same rules the gate checks, so comply up front rather than leaving them for the gate:
@@ -85,21 +78,38 @@ These are the project's non-negotiable invariants. A violation is a GOLDEN_PRINC
 - GP-006 — Error handling: No unhandled promise rejections. All async errors are caught and handled.
 
 ## Project stack & references
-Before writing code, read the referenced files below (those present in the working directory) to learn the project's language, framework, test runner, and conventions, and the cross-cutting rules your code must satisfy — then follow the existing repository conventions:
+Before making the edits below, read the referenced files (those present in the working directory) to learn the project's architecture, conventions, and the cross-cutting rules your fix must still satisfy — then keep the edits consistent with them:
 - `HARNESS.json`
 - `docs/ARCHITECTURE.md`
 - `docs/GOLDEN_PRINCIPLES.md`
 - `AGENTS.md`
 - `PLAN.md`
 
+## Required edits
+
+### Edit 1
+File: src/modules/balance/balance.model.ts
+Line: 42
+Offending code: `deductDays(id: string, days: number): Promise<Balance>;`
+Rule violated: review/spec-conformance
+Action (do this now): Edit `src/modules/balance/balance.model.ts` at line 42 in place to fix the `review/spec-conformance` violation.
+What the quality gate found — apply this: [review/spec-conformance] Success criterion #2 specifies return type `Promise<Balance | null>` for `IBalanceRepository.deductDays`, but the code declares `Promise<Balance>`. Note: the DOMAIN.md and the interface constraints (which require throwing on NOT_FOUND rather than returning null) both support `Promise<Balance>`, so the code is consistent with the domain model — the success criterion appears to have the wrong nullability.
+
+### Edit 2
+File: src/modules/balance/balance.model.ts
+Line: 47
+Offending code: `getBalance(employeeId: string, leaveType: string): Promise<Balance>;`
+Rule violated: review/spec-conformance
+Action (do this now): Edit `src/modules/balance/balance.model.ts` at line 47 in place to fix the `review/spec-conformance` violation.
+What the quality gate found — apply this: [review/spec-conformance] Success criterion #3 specifies return type `Promise<Balance | null>` for `IBalanceService.getBalance`, but the code declares `Promise<Balance>`. The DOMAIN.md also documents `Promise<Balance>` (non-nullable), so the code is consistent with the domain model — the success criterion appears to have the wrong nullability.
+
 ## Verify before you finish (MANDATORY)
-The code you write MUST compile and its tests MUST pass — a compilation or type error must NEVER be left for CI to find. Before you declare this task done:
-- Read the project's build / type-check / test commands from `package.json` (scripts) and `HARNESS.json`.
-- Install dependencies if they are not already installed, then RUN the type-check / build (e.g. `npm run build` or `tsc --noEmit`) AND the tests (e.g. `npm test`) for the files this phase touches.
-- FIX every compilation error, type error, and failing test you introduced — including in test files — and re-run until they pass.
+After making the edits above, the code MUST still compile and its tests MUST pass — a compilation/type error, or a test your change breaks, must NEVER be left for CI or the quality gate to find. Before you declare this task done:
+- Read the project's build / type-check / test commands from `package.json` (scripts) and `HARNESS.json`, install dependencies if they are not already installed, then RUN the type-check / build (e.g. `npm run build` or `tsc --noEmit`) AND the tests (e.g. `npm test`).
+- FIX every compilation error, type error, and failing test that YOUR edits introduced — including updating a test whose expectation your change legitimately invalidated (e.g. a new required field, a new status code such as 401/403 from an added authorization check, added input validation) — and re-run until they pass.
 - Only when the build and the tests pass may you consider the task complete. If a dependency install genuinely cannot be made to work, say so explicitly in your final message rather than declaring success on unverified code.
 
 ## Constraints (mandatory)
-- Write and modify source files ONLY. Do NOT run `git commit`, `git push`, `git add`, or any other git command. The platform handles all git operations. (Running the build / type-check / tests above is expected and encouraged — that is NOT a git operation.)
-- Do not create a new repository or change the git remote.
-- Stay within the scope of this phase; do not implement deferred/later work.
+- Keep the change SURGICAL: make the required edits above and fix only what they broke (compile/type errors and the tests they invalidated). Do NOT refactor, regenerate, or change unrelated code, and do not add / delete / rename source files beyond what a required edit — or a test-fix for it — needs.
+- Do NOT run `git commit`, `git push`, `git add`, or any git command. The platform handles all git operations. (Running the build / type-check / tests above is expected and encouraged — that is NOT a git operation.)
+- When the listed edits are made and the build + tests pass, stop.
