@@ -1,0 +1,114 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "balance",
+      "audit-log"
+    ],
+    "affectedLayers": [
+      "model"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The `Balance` entity interface is defined in `src/modules/balance/balance.model.ts` with exactly these fields: `id: string`, `employeeId: string`, `leaveType: string`, `totalEntitlement: number`, `usedDays: number`, `remainingDays: number`, `fiscalYear: number`, `status: BalanceStatus`, `createdAt: Date`, `updatedAt: Date` \u2014 where `BalanceStatus` is imported from `src/shared/types`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `IBalanceRepository` interface is defined in `src/modules/balance/balance.model.ts` with exactly these async methods: `findByEmployeeId(employeeId: string): Promise<Balance[]>`, `findByEmployeeIdAndLeaveType(employeeId: string, leaveType: string): Promise<Balance | null>`, `findByEmployeeIdAndFiscalYear(employeeId: string, fiscalYear: number): Promise<Balance[]>`, `create(balance: Omit<Balance, 'id' | 'createdAt' | 'updatedAt'>): Promise<Balance>`, `update(id: string, data: Partial<Balance>): Promise<Balance | null>`, `deductDays(id: string, days: number): Promise<Balance | null>`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `IBalanceService` interface is defined in `src/modules/balance/balance.model.ts` with exactly these async methods: `getBalance(employeeId: string, leaveType: string): Promise<Balance | null>`, `hasSufficientBalance(employeeId: string, leaveType: string, requestedDays: number): Promise<boolean>`, `deductBalance(employeeId: string, leaveType: string, days: number): Promise<Balance>`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `AuditLog` entity interface is defined in `src/modules/audit-log/audit-log.model.ts` with exactly these fields: `id: string`, `entityType: string`, `entityId: string`, `action: string`, `performedBy: string`, `changes: Record<string, unknown>`, `createdAt: Date`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `IAuditLogRepository` interface is defined in `src/modules/audit-log/audit-log.model.ts` with exactly these async methods: `findByEntity(entityType: string, entityId: string): Promise<AuditLog[]>`, `create(entry: Omit<AuditLog, 'id' | 'createdAt'>): Promise<AuditLog>`, `findAll(filters?: { entityType?: string; performedBy?: string; fromDate?: Date; toDate?: Date }): Promise<AuditLog[]>`.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "This phase produces ONLY TypeScript interfaces \u2014 no concrete classes, no implementations, no tests, no controllers, no routes, no database migrations, no app.ts registration. The two files created must contain exclusively: entity interfaces, repository interfaces, and (for balance) a service interface.",
+    "All repository and service methods must return `Promise<T>` \u2014 every method is asynchronous, consistent with the existing `IEmployeeRepository`, `ILeavePolicyRepository`, and `ILeavePolicyService` patterns.",
+    "The `Balance` entity must NOT include a `deletedAt` field \u2014 neither the reconciled architecture nor PLAN.md specifies soft-delete for Balance. The `AuditLog` entity must NOT include a `deletedAt` field \u2014 audit records are immutable and never soft-deleted.",
+    "The `create` method parameter type for both repositories must follow the established pattern: `Omit<Entity, 'id' | 'createdAt' | 'updatedAt'>` \u2014 matching `IEmployeeRepository.create` and `ILeavePolicyRepository.create`. The `AuditLog` create omits only `'id' | 'createdAt'` since AuditLog has no `updatedAt`."
+  ],
+  "outOfScope": [
+    "Concrete repository implementations (PgBalanceRepository, PgAuditLogRepository) \u2014 deferred to Phase 4 (part 2/2).",
+    "Balance service implementation, controller, and routes \u2014 deferred to Phase 4 (part 2/2).",
+    "All unit tests \u2014 deferred to Phase 4 (part 2/2)."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "Balance",
+      "mustExistOrExtend": true,
+      "invariant": "`remainingDays` must always equal `totalEntitlement - usedDays`. Any operation that modifies `usedDays` (via `deductDays` or `update`) must maintain this invariant. The `status` field must be `BalanceStatus.active` when `remainingDays > 0` and `BalanceStatus.exhausted` when `remainingDays === 0`."
+    },
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "AuditLog records are immutable once created \u2014 there is no `update` or `delete` method on `IAuditLogRepository`. The `changes` field captures the full state delta as a `Record<string, unknown>` and must never be null or undefined."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IBalanceRepository.deductDays",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Must reject with a typed error when `days` exceeds `remainingDays` (INSUFFICIENT_BALANCE). Must reject when the balance `status` is already `exhausted`. Must reject when the balance is not found (NOT_FOUND)."
+    },
+    {
+      "operation": "IBalanceService.deductBalance",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Must reject with a typed error when no balance exists for the given employee + leaveType combination (NOT_FOUND). Must reject when `days` exceeds available `remainingDays` (INSUFFICIENT_BALANCE). On success, returns the updated Balance with decremented remainingDays and incremented usedDays."
+    },
+    {
+      "operation": "IBalanceService.hasSufficientBalance",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns `false` (not an error) when no balance record exists for the given employee + leaveType. Returns `false` when `remainingDays < requestedDays`. Returns `true` only when a balance exists and `remainingDays >= requestedDays`."
+    },
+    {
+      "operation": "IAuditLogRepository.create",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Must reject with a typed error when required fields (`entityType`, `entityId`, `action`, `performedBy`, `changes`) are missing or invalid. On success, returns the created AuditLog with server-assigned `id` and `createdAt`."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The `Balance.status` field must use the `BalanceStatus` enum imported from `src/shared/types/index.ts` \u2014 matching the pattern used by `Employee.employmentStatus` (EmploymentStatus enum) and `LeavePolicy.leaveType` (LeaveType enum).",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The `Balance.leaveType` field must be typed as `string` (not the `LeaveType` enum) \u2014 matching the reconciled architecture specification where `leaveType` is `string` on the Balance entity, even though `LeavePolicy.leaveType` uses the `LeaveType` enum.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "The `create` method parameter type must follow the exact `Omit` pattern established by `IEmployeeRepository.create`: omit server-assigned fields (`id`, timestamps). For Balance: `Omit<Balance, 'id' | 'createdAt' | 'updatedAt'>`. For AuditLog: `Omit<AuditLog, 'id' | 'createdAt'>` (AuditLog has no `updatedAt`).",
+      "referencePath": "src/modules/employee/employee.model.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts",
+      "why": "Balance entity imports `BalanceStatus` enum. The `status` field is typed as `BalanceStatus`, not a plain string."
+    },
+    {
+      "target": "src/modules/employee/employee.model.ts",
+      "why": "Both Balance and AuditLog entities reference employees: `Balance.employeeId` is a string referencing an Employee `id`, and `AuditLog.performedBy` is a string referencing the employee who performed the action. The repository `create` parameter pattern (`Omit<Entity, 'id' | 'createdAt' | 'updatedAt'>`) is also derived from `IEmployeeRepository`."
+    }
+  ]
+}
