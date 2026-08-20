@@ -1,0 +1,117 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared-types",
+      "employee",
+      "leave-policy"
+    ],
+    "affectedLayers": [
+      "model",
+      "interface"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "All six shared enums (LeaveType, LeaveStatus, EmploymentStatus, BalanceStatus, NotificationType, NotificationStatus) are defined and exported from `src/shared/types/index.ts` with the exact member names specified in the reconciled architecture",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `Employee` interface in `src/modules/employee/employee.model.ts` declares all canonical fields (id, employeeNumber, firstName, lastName, email, managerId, department, hireDate, terminationDate, employmentStatus, createdAt, updatedAt, deletedAt) with correct types, and `employmentStatus` uses the `EmploymentStatus` enum type (not bare `string`)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `IEmployeeRepository` interface declares all six methods \u2014 findById, findByEmployeeNumber, findAll, create, update, softDelete \u2014 with correct signatures returning `Promise<Employee | null>`, `Promise<Employee[]>`, or `Promise<void>` as appropriate",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `LeavePolicy` interface in `src/modules/leave-policy/leave-policy.model.ts` declares all canonical fields (id, policyName, leaveType, entitlementDays, accrualRate, maxAccumulation, minimumNoticeDays, requiresManagerApproval, isActive, createdAt, updatedAt) with correct types, and `leaveType` uses the `LeaveType` enum type",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `ILeavePolicyRepository` interface declares all five methods (findById, findByLeaveType, findAllActive, create, update) and the `ILeavePolicyService` interface declares both methods (getPolicyForLeaveType, validateEntitlement), with `LeaveType` enum used for the `leaveType` parameter in each",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The project compiles cleanly with `tsc --noEmit` (strict TypeScript: no implicit any, strict null checks) \u2014 no type errors from the three created files or their cross-references",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No concrete implementations \u2014 this phase produces only type definitions, interfaces, and enums. No repository classes, service classes, controllers, or routes may be created",
+    "No tests in this phase \u2014 tests are deferred to Phase 1 part 2/2",
+    "All enum member names must match the reconciled architecture exactly (e.g., `leave_submitted` not `LEAVE_SUBMITTED`, `annual` not `ANNUAL`)",
+    "The `LeaveType` enum must be imported from `../../shared/types` (relative from `src/modules/leave-policy/`) \u2014 no re-declaration or divergent import path"
+  ],
+  "outOfScope": [
+    "Concrete repository implementations (PgEmployeeRepository, PgLeavePolicyRepository) \u2014 deferred to Phase 1 part 2/2",
+    "Jest unit tests for any module \u2014 deferred to Phase 1 part 2/2"
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "Every Employee MUST have a unique `employeeNumber` and a unique `email`. The `employmentStatus` MUST be one of the `EmploymentStatus` enum values. `deletedAt` being non-null signals a soft-deleted record; soft-deleted employees MUST be excluded from `findAll` results"
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "Soft-delete semantics: setting `deletedAt` to a non-null value marks the Employee as deleted. The `findAll()` repository method MUST exclude records where `deletedAt IS NOT NULL`. The `softDelete(id)` method MUST set `deletedAt` to the current timestamp rather than physically removing the row"
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "Each `LeavePolicy` MUST have a unique `leaveType` among active policies. `entitlementDays` MUST be a positive integer. `minimumNoticeDays` MUST be >= 0. `requiresManagerApproval` defaults to `true` when not explicitly set. Only policies with `isActive === true` are considered for leave validation"
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IEmployeeRepository.findAll",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an empty array (not null, not an error) when no active employees exist. Must exclude soft-deleted records (deletedAt IS NOT NULL)"
+    },
+    {
+      "operation": "IEmployeeRepository.softDelete",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Idempotent: calling softDelete on an already soft-deleted employee succeeds silently (no error). Calling on a non-existent id may either succeed silently or throw NOT_FOUND \u2014 the interface does not prescribe which, but the implementation must be consistent"
+    },
+    {
+      "operation": "ILeavePolicyService.validateEntitlement",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns `false` (not throws) when the requested days exceed the policy's entitlementDays. Returns `false` when no active policy exists for the given leaveType. Returns `true` only when an active policy exists AND requestedDays <= entitlementDays"
+    },
+    {
+      "operation": "ILeavePolicyRepository.findByLeaveType",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns `null` when no policy exists for the given LeaveType \u2014 does not throw. The caller is responsible for handling the missing-policy case"
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The `LeaveType` enum used in `LeavePolicy.leaveType` and all `ILeavePolicyRepository`/`ILeavePolicyService` method signatures MUST be the single canonical `LeaveType` exported from `src/shared/types/index.ts` \u2014 no local redefinition or string literal substitution",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The `EmploymentStatus` enum used in `Employee.employmentStatus` MUST be the single canonical `EmploymentStatus` exported from `src/shared/types/index.ts` \u2014 no local redefinition or string literal substitution",
+      "referencePath": "src/shared/types/index.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts",
+      "why": "Both `src/modules/employee/employee.model.ts` and `src/modules/leave-policy/leave-policy.model.ts` import enums from this module. It is the single source of truth for all domain enumerations used across the leave management system"
+    }
+  ]
+}
