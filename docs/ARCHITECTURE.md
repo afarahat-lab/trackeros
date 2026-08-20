@@ -25,6 +25,10 @@ src/modules/status/                             — System status module (model,
 src/modules/uptime/                             — Uptime health-check module (model, service interface, service, routes)
 src/shared/types/index.ts                       — Shared enums: LeaveType, LeaveStatus, EmploymentStatus, BalanceStatus, NotificationType, NotificationStatus
 src/shared/db/connection.ts                     — PostgreSQL pool (pg)
+
+tests/unit/modules/employee/employee.repository.spec.ts       — Jest tests for PgEmployeeRepository (mock pg Pool)
+tests/unit/modules/leave-policy/leave-policy.repository.spec.ts — Jest tests for PgLeavePolicyRepository (mock pg Pool)
+tests/unit/modules/leave-policy/leave-policy.service.spec.ts   — Jest tests for LeavePolicyService (mock ILeavePolicyRepository)
 ```
 
 ## Key patterns
@@ -36,6 +40,11 @@ src/shared/db/connection.ts                     — PostgreSQL pool (pg)
   snake_case database rows to camelCase entity objects, and a
   `COLUMN_MAP` lookup for dynamic UPDATE SET clause construction.
   All queries use parameterized placeholders (`$1`, `$2`, …).
+- Tests use Jest with `ts-jest` preset. Repository tests mock the pg
+  `Pool` from `src/shared/db/connection` via `jest.mock`. Service tests
+  mock the repository interface directly. Test helpers (`makeEmployeeRow`,
+  `makeEmployee`, `makePolicyRow`, `makePolicy`) produce canonical test
+  fixtures.
 
 ## Dependency rules
 
@@ -92,7 +101,7 @@ Modular monolith built with TypeScript, Fastify, PostgreSQL. The leave managemen
 - **Transaction**: Multi-step writes (approve/cancel) use a caller-owned transaction. Repository methods accept an optional `pg.PoolClient`; the service acquires a client, runs `BEGIN`, passes it to repositories, then `COMMIT`/`ROLLBACK`.
 
 ## Phased Implementation
-1. **Foundation**: shared-types, employee, leave-policy (models + repositories + service done; tests deferred)
+1. **Foundation**: shared-types, employee, leave-policy (models + repositories + service + tests done)
 2. **Balance & Audit**: balance module, audit-log module
 3. **Core Workflow**: leave-request module, notification module
 
