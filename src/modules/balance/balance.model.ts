@@ -37,7 +37,7 @@ export interface IBalanceRepository {
   findByEmployeeIdAndFiscalYear(employeeId: string, fiscalYear: number): Promise<Balance[]>;
   create(balance: Omit<Balance, 'id' | 'createdAt' | 'updatedAt'>): Promise<Balance>;
   update(id: string, data: Partial<Balance>): Promise<Balance | null>;
-  deductDays(id: string, days: number): Promise<Balance | null>;
+  deductDays(id: string, days: number): Promise<Balance>;
 }
 
 export interface IBalanceService {
