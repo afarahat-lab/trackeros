@@ -1,0 +1,57 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-request"
+    ],
+    "affectedLayers": [
+      "model",
+      "validation"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "All five occurrences of `z.date()` in `src/modules/leave-request/leave-request.model.ts` are replaced with `z.coerce.date()` \u2014 specifically: `startDate` and `endDate` in `createLeaveRequestSchema` (lines 60-61), `startDate` and `endDate` in `updateLeaveRequestSchema` (lines 74-75), and `approvedAt` in `updateLeaveRequestSchema` (line 85).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`createLeaveRequestSchema` accepts ISO 8601 date strings (e.g. `\"2025-06-01\"`) for `startDate` and `endDate` and coerces them to `Date` objects, while still accepting native `Date` objects.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`updateLeaveRequestSchema` accepts ISO 8601 date strings for `startDate`, `endDate`, and `approvedAt` and coerces them to `Date` objects, while still accepting native `Date` objects and respecting the `.optional()` / `.nullable()` modifiers.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The `.refine()` on `createLeaveRequestSchema` that enforces `startDate <= endDate` must continue to work correctly \u2014 `z.coerce.date()` produces `Date` objects, so the comparison logic is unchanged.",
+    "No other Zod schema in the codebase is affected \u2014 only the five `z.date()` calls in `src/modules/leave-request/leave-request.model.ts` are changed."
+  ],
+  "outOfScope": [
+    "Changes to the `LeaveRequest` entity interface or `CreateLeaveRequestDto` interface \u2014 these already type date fields as `Date` and remain correct."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest (validation schemas)",
+      "mustExistOrExtend": true,
+      "invariant": "The `createLeaveRequestSchema` and `updateLeaveRequestSchema` must accept ISO 8601 date strings from JSON request bodies and coerce them to `Date` objects, satisfying GP-003 (input validation at API boundaries) without rejecting valid HTTP payloads."
+    }
+  ],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [
+    {
+      "requirement": "The coerced `Date` objects produced by `z.coerce.date()` must be compatible with the `LeaveRequest` entity interface and `CreateLeaveRequestDto` interface, both of which type `startDate`, `endDate`, and `approvedAt` as `Date`.",
+      "referencePath": "src/modules/leave-request/leave-request.model.ts"
+    },
+    {
+      "requirement": "The `.refine()` validation `startDate <= endDate` must continue to pass when both fields are provided as ISO strings (e.g. `\"2025-06-01\"` and `\"2025-06-05\"`) and fail when `startDate` is after `endDate`.",
+      "referencePath": "src/modules/leave-request/leave-request.model.ts"
+    }
+  ],
+  "integrationPoints": []
+}
