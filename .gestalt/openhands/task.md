@@ -46,6 +46,29 @@ The entities below are shared, cross-module DATA CONTRACTS. Implement each one w
     - createdAt: Date
     - updatedAt: Date
 
+## Constraints & consistency
+You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
+### Reuse & consistency — match these exactly
+- PgBalanceRepository must import pool from src/shared/db/connection (not create its own Pool instance). (see `src/shared/db/connection.ts`)
+- PgAuditLogRepository must import pool from src/shared/db/connection (not create its own Pool instance). (see `src/shared/db/connection.ts`)
+- Balance entity, IBalanceRepository, IBalanceService, InsufficientBalanceError, and BalanceNotFoundError must be imported from ./balance.model.ts — not redefined. (see `src/modules/balance/balance.model.ts`)
+- AuditLog entity, IAuditLogRepository, and AuditLogValidationError must be imported from ./audit-log.model.ts — not redefined. (see `src/modules/audit-log/audit-log.model.ts`)
+- BalanceStatus enum must be imported from src/shared/types/index.ts — not redefined locally. (see `src/shared/types/index.ts`)
+### Entity invariants — enforce these
+- Reuse or extend `Balance`: remainingDays = totalEntitlement - usedDays must hold after every state change. deductDays is the only operation that mutates usedDays/remainingDays; it must decrement remainingDays and increment usedDays by the same amount atomically.
+- Reuse or extend `Balance`: status transitions: active → exhausted when remainingDays reaches 0 or below. The transition is computed in SQL (CASE WHEN remaining_days - $days <= 0 THEN 'exhausted' ELSE status END) and must never be set to 'exhausted' while remainingDays > 0.
+- Reuse or extend `AuditLog`: Every AuditLog record is immutable after creation — no update or delete methods exist on IAuditLogRepository. The create method is the only write path.
+### Interface contract — expose these operations (their shape is yours)
+- IBalanceRepository.deductDays — Returns null when the balance row does not exist (id not found). The caller (BalanceService) is responsible for translating null into BalanceNotFoundError.
+- IBalanceService.deductBalance — Throws BalanceNotFoundError (code: NOT_FOUND) when no balance exists for the given employeeId+leaveType or when deductDays returns null. Throws InsufficientBalanceError (code: INSUFFICIENT_BALANCE) when remainingDays < days. Accepts a pre-calculated day count; the service does NOT compute days from dates — that responsibility lives in the leave-request module.
+- IBalanceService.hasSufficientBalance — idempotent; Returns false (not an error) when the balance does not exist. Returns false when remainingDays < requestedDays. Returns true only when remainingDays >= requestedDays.
+- IAuditLogRepository.findAll — idempotent; All filter parameters are optional. When no filters are provided, returns all audit logs ordered by created_at DESC. Dynamic WHERE clause construction uses indexed placeholders ($1, $2, …) built incrementally.
+### Integration points — connect to these
+- src/shared/db/connection.ts (pg Pool) — Both PgBalanceRepository and PgAuditLogRepository depend on the shared pg Pool for all database operations.
+- src/modules/balance/balance.model.ts (IBalanceRepository, IBalanceService, error classes) — PgBalanceRepository implements IBalanceRepository; BalanceService implements IBalanceService and consumes IBalanceRepository; BalanceController consumes BalanceService. The leave-request module (Phase 3) will consume IBalanceService for balance checks and deductions.
+- src/modules/audit-log/audit-log.model.ts (IAuditLogRepository) — PgAuditLogRepository implements IAuditLogRepository. The leave-request module (Phase 3) will consume IAuditLogRepository to write audit records for all state-changing operations.
+- src/app.ts (Fastify instance) — The balance routes plugin is exported and ready for registration via app.register(balanceRoutes) in a follow-up integration phase.
+
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
 - Use unknown with type guards instead of any (rule: `no-any`)
