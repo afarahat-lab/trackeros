@@ -1,0 +1,67 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "notification"
+    ],
+    "affectedLayers": [
+      "model"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The Notification entity's `type` field is typed as `NotificationType` enum (not `string`), matching the already-imported enum at line 2 of notification.model.ts",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The Notification entity's `status` field is typed as `NotificationStatus` enum (not `string`), matching the already-imported enum at line 2 of notification.model.ts",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`tsc --noEmit` passes with zero type errors \u2014 the changed field types must not introduce any new compilation errors in notification.model.ts or any file that imports Notification",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Only the `type` and `status` field types in the `Notification` entity interface change \u2014 no other field, interface method signature, import, or export may be modified",
+    "The existing imports `import { NotificationType, NotificationStatus } from '../../shared/types'` at line 2 of notification.model.ts must remain unchanged \u2014 they are already correct and in use by the repository/service interfaces"
+  ],
+  "outOfScope": [
+    "Any changes to `INotificationRepository` or `INotificationService` interfaces \u2014 they already use the correct enum types",
+    "Creating or modifying any test files \u2014 no tests exist for the notification module yet (tests come in Phase 6)"
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "The `type` field must always be one of the `NotificationType` enum values: `leave_submitted`, `leave_approved`, `leave_rejected`, `leave_cancelled`"
+    },
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "The `status` field must always be one of the `NotificationStatus` enum values: `pending`, `sent`, `read`, `archived`"
+    }
+  ],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [
+    {
+      "requirement": "The Notification entity's `type` field type must match the `NotificationType` enum already used by `INotificationRepository.findByRecipientIdAndStatus` (parameter `status: NotificationStatus`) and `INotificationService` method doc-comments (which reference `NotificationType.leave_submitted`, etc.) in the same file",
+      "referencePath": "src/modules/notification/notification.model.ts"
+    },
+    {
+      "requirement": "The Notification entity must follow the same pattern as the sibling LeaveRequest entity, which already uses enum types (`LeaveType`, `LeaveStatus`) for its `leaveType` and `status` fields rather than plain `string`",
+      "referencePath": "src/modules/leave-request/leave-request.model.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/leave-request/leave-request.model.ts (type-only import of Notification via LeaveRequest)",
+      "why": "The `INotificationService` interface in notification.model.ts imports `LeaveRequest` as a type-only import. The LeaveRequest entity already uses enum types correctly, so no change is needed there \u2014 but the type-check must verify that the cross-module type dependency remains sound after the Notification entity fields are corrected"
+    }
+  ]
+}
