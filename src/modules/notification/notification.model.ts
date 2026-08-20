@@ -1,17 +1,17 @@
 import type { LeaveRequest } from '../leave-request/leave-request.model';
-import { NotificationType, NotificationStatus } from '../../shared/types';
+import { NotificationStatus } from '../../shared/types';
 
 // ---- Entity ----
 
 export interface Notification {
   id: string;
   recipientId: string;
-  type: NotificationType;
+  type: string;
   title: string;
   message: string;
   relatedEntityType: string | null;
   relatedEntityId: string | null;
-  status: NotificationStatus;
+  status: string;
   createdAt: Date;
   readAt: Date | null;
 }
