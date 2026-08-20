@@ -1,30 +1,34 @@
-# Implement this phase: Phase 1: Foundation – Shared types, Employee, LeavePolicy (part 1/2)
+# Continue the previous attempt (it hit the iteration limit before finishing)
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/3350baf6-9bd5-4cac-b688-f263972317f9/1`. Do not clone anything; work only in this directory.
+A prior code-agent attempt on this work dir (`/tmp/gestalt/phase/3350baf6-9bd5-4cac-b688-f263972317f9/2`) was stopped after reaching its iteration limit. Its work is ALREADY on disk here — do NOT restart from scratch or re-read everything; build on what exists. It made 8 file edit(s). Its last verification PASSED (`cd /tmp/gestalt/phase/3350baf6-9bd5-4cac-b688-f263972317f9/2 && npx jest --passWithNoTests 2>&1`).
+
+Finish the task now: fix any failing build/type-check/tests, then RUN the build and the tests and fix anything still failing. Stop as soon as the build and tests pass. The full original task (with all mandatory constraints) follows for reference.
+
+---
+
+# Implement this phase: Phase 1: Foundation – Shared types, Employee, LeavePolicy (part 2/2)
+
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/3350baf6-9bd5-4cac-b688-f263972317f9/2`. Do not clone anything; work only in this directory.
 
 ## What to build
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the foundational shared enums and the Employee + LeavePolicy domain models with their repository/service interfaces. This is the models+interfaces slice only — NO concrete implementations.
+Implement the concrete repository classes for Employee and LeavePolicy, plus the LeavePolicy service. This phase depends on the models/interfaces from part 1/2 — read those files before generating any code.
 
 Files to create:
 
-1. `src/shared/types/index.ts` — Define and export all shared enums with EXACT names from the architecture:
-   - `LeaveType` enum: `annual`, `sick`, `emergency`
-   - `LeaveStatus` enum: `draft`, `submitted`, `approved`, `rejected`, `cancelled`
-   - `EmploymentStatus` enum: `active`, `inactive`, `terminated`
-   - `BalanceStatus` enum: `active`, `exhausted`
-   - `NotificationType` enum: `leave_submitted`, `leave_approved`, `leave_rejected`, `leave_cancelled`
-   - `NotificationStatus` enum: `pending`, `sent`, `read`, `archived`
+1. `src/modules/employee/employee.repository.ts` — Implement `PgEmployeeRepository` class that satisfies `IEmployeeRepository`. Use the pg Pool from `src/shared/db/connection.ts`. Methods: findById (SELECT by id), findByEmployeeNumber (SELECT by employee_number), findAll (SELECT all where deleted_at IS NULL), create (INSERT returning *), update (UPDATE by id returning *), softDelete (UPDATE deleted_at = NOW()). Use parameterized queries. Import `Employee` and `IEmployeeRepository` from `./employee.model.ts`.
 
-2. `src/modules/employee/employee.model.ts` — Define the `Employee` entity interface with the canonical fields: id, employeeNumber, firstName, lastName, email, managerId (string | null), department (string | null), hireDate (Date), terminationDate (Date | null), employmentStatus (string), createdAt (Date), updatedAt (Date), deletedAt (Date | null). Also define the `IEmployeeRepository` interface with methods: findById(id: string), findByEmployeeNumber(employeeNumber: string), findAll(), create(employee: Omit<Employee, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt'>), update(id: string, data: Partial<Employee>), softDelete(id: string).
+2. `src/modules/leave-policy/leave-policy.repository.ts` — Implement `PgLeavePolicyRepository` class that satisfies `ILeavePolicyRepository`. Use the pg Pool from `src/shared/db/connection.ts`. Methods: findById, findByLeaveType (SELECT by leave_type), findAllActive (SELECT where is_active = true), create, update. Import `LeavePolicy` and `ILeavePolicyRepository` from `./leave-policy.model.ts`.
 
-3. `src/modules/leave-policy/leave-policy.model.ts` — Define the `LeavePolicy` entity interface with the canonical fields: id, policyName, leaveType, entitlementDays, accrualRate (number | undefined), maxAccumulation (number | undefined), minimumNoticeDays, requiresManagerApproval, isActive, createdAt, updatedAt. Also define `ILeavePolicyRepository` interface with methods: findById, findByLeaveType, findAllActive, create, update. Also define `ILeavePolicyService` interface with methods: getPolicyForLeaveType(leaveType: string), validateEntitlement(employeeId: string, leaveType: string, requestedDays: number).
+3. `src/modules/leave-policy/leave-policy.service.ts` — Implement `LeavePolicyService` class that satisfies `ILeavePolicyService`. Constructor takes `ILeavePolicyRepository`. Implement getPolicyForLeaveType (delegates to repo.findByLeaveType), validateEntitlement (looks up policy, checks requestedDays <= entitlementDays, returns boolean). Import interfaces from `./leave-policy.model.ts`.
 
-Import `LeaveType` from `../../shared/types` (relative from src/modules/leave-policy/) for the leaveType field typing.
+4. `tests/unit/modules/employee/employee.repository.spec.ts` — Jest unit tests for PgEmployeeRepository. Mock the pg Pool. Test findById returns employee, findByEmployeeNumber, findAll excludes soft-deleted, create inserts, update modifies, softDelete sets deletedAt.
 
-No tests in this phase — tests come in part 2/2.
+5. `tests/unit/modules/leave-policy/leave-policy.repository.spec.ts` — Jest unit tests for PgLeavePolicyRepository. Mock the pg Pool. Test all CRUD methods.
+
+6. `tests/unit/modules/leave-policy/leave-policy.service.spec.ts` — Jest unit tests for LeavePolicyService. Mock ILeavePolicyRepository. Test getPolicyForLeaveType delegates correctly, validateEntitlement returns true/false based on entitlementDays vs requestedDays.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -62,19 +66,21 @@ The entities below are shared, cross-module DATA CONTRACTS. Implement each one w
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- The `LeaveType` enum used in `LeavePolicy.leaveType` and all `ILeavePolicyRepository`/`ILeavePolicyService` method signatures MUST be the single canonical `LeaveType` exported from `src/shared/types/index.ts` — no local redefinition or string literal substitution (see `src/shared/types/index.ts`)
-- The `EmploymentStatus` enum used in `Employee.employmentStatus` MUST be the single canonical `EmploymentStatus` exported from `src/shared/types/index.ts` — no local redefinition or string literal substitution (see `src/shared/types/index.ts`)
+- PgEmployeeRepository must satisfy the IEmployeeRepository interface defined in src/modules/employee/employee.model.ts — all method signatures, parameter types, and return types must match exactly. (see `src/modules/employee/employee.model.ts`)
+- PgLeavePolicyRepository must satisfy the ILeavePolicyRepository interface defined in src/modules/leave-policy/leave-policy.model.ts — all method signatures, parameter types, and return types must match exactly. (see `src/modules/leave-policy/leave-policy.model.ts`)
+- LeavePolicyService must satisfy the ILeavePolicyService interface defined in src/modules/leave-policy/leave-policy.model.ts — getPolicyForLeaveType accepts LeaveType (not string), validateEntitlement accepts (employeeId: string, leaveType: LeaveType, requestedDays: number) and returns Promise<boolean>. (see `src/modules/leave-policy/leave-policy.model.ts`)
+- Both repository implementations must import and use the pool export from src/shared/db/connection.ts — no other database connection mechanism. (see `src/shared/db/connection.ts`)
+- Database column names in SQL queries must use snake_case matching the reconciled architecture table schemas: employees (id, employee_number, first_name, last_name, email, manager_id, department, hire_date, termination_date, employment_status, created_at, updated_at, deleted_at); leave_policies (id, policy_name, leave_type, entitlement_days, accrual_rate, max_accumulation, minimum_notice_days, requires_manager_approval, is_active, created_at, updated_at). (see `.gestalt/architecture/reconciled.json`)
 ### Entity invariants — enforce these
-- Reuse or extend `Employee`: Every Employee MUST have a unique `employeeNumber` and a unique `email`. The `employmentStatus` MUST be one of the `EmploymentStatus` enum values. `deletedAt` being non-null signals a soft-deleted record; soft-deleted employees MUST be excluded from `findAll` results
-- Reuse or extend `Employee`: Soft-delete semantics: setting `deletedAt` to a non-null value marks the Employee as deleted. The `findAll()` repository method MUST exclude records where `deletedAt IS NOT NULL`. The `softDelete(id)` method MUST set `deletedAt` to the current timestamp rather than physically removing the row
-- Reuse or extend `LeavePolicy`: Each `LeavePolicy` MUST have a unique `leaveType` among active policies. `entitlementDays` MUST be a positive integer. `minimumNoticeDays` MUST be >= 0. `requiresManagerApproval` defaults to `true` when not explicitly set. Only policies with `isActive === true` are considered for leave validation
+- Reuse or extend `Employee (as returned by PgEmployeeRepository)`: findAll() must never return rows where deletedAt IS NOT NULL. softDelete(id) must set deletedAt to a non-null timestamp but must not physically remove the row. create() returns a row where id, createdAt, updatedAt are populated and deletedAt is null.
+- Reuse or extend `LeavePolicy (as returned by PgLeavePolicyRepository)`: findAllActive() must only return policies where isActive is true. findByLeaveType must match on the leave_type column using the LeaveType enum value. create() returns a row where id, createdAt, updatedAt are populated.
 ### Interface contract — expose these operations (their shape is yours)
-- IEmployeeRepository.findAll — Returns an empty array (not null, not an error) when no active employees exist. Must exclude soft-deleted records (deletedAt IS NOT NULL)
-- IEmployeeRepository.softDelete — idempotent; Idempotent: calling softDelete on an already soft-deleted employee succeeds silently (no error). Calling on a non-existent id may either succeed silently or throw NOT_FOUND — the interface does not prescribe which, but the implementation must be consistent
-- ILeavePolicyService.validateEntitlement — Returns `false` (not throws) when the requested days exceed the policy's entitlementDays. Returns `false` when no active policy exists for the given leaveType. Returns `true` only when an active policy exists AND requestedDays <= entitlementDays
-- ILeavePolicyRepository.findByLeaveType — Returns `null` when no policy exists for the given LeaveType — does not throw. The caller is responsible for handling the missing-policy case
+- IEmployeeRepository.findAll — idempotent; Returns empty array (not null, not error) when no non-deleted employees exist.
+- IEmployeeRepository.softDelete — idempotent; Must not throw if the employee is already soft-deleted or does not exist — the UPDATE simply affects zero rows and returns void.
+- ILeavePolicyService.validateEntitlement — idempotent; Returns false (not throws) when no policy exists for the given leaveType. Returns false when requestedDays > entitlementDays. Returns true only when a policy exists AND requestedDays <= entitlementDays.
+- IEmployeeRepository.update / ILeavePolicyRepository.update — Returns null when no row with the given id exists (not-found semantics). The caller decides whether to treat null as an error.
 ### Integration points — connect to these
-- src/shared/types/index.ts — Both `src/modules/employee/employee.model.ts` and `src/modules/leave-policy/leave-policy.model.ts` import enums from this module. It is the single source of truth for all domain enumerations used across the leave management system
+- src/shared/db/connection.ts (pg Pool) — Both PgEmployeeRepository and PgLeavePolicyRepository import the shared pool to execute parameterized SQL queries.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
