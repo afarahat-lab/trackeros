@@ -84,37 +84,39 @@ Represents leave balance data managed by the `balance` module, including tracked
 |-------|------|----------|
 | id | string | true |
 | employeeId | string | true |
-| policyId | string | true |
+| leaveType | string | true |
 | totalEntitlement | number | true |
 | usedDays | number | true |
 | remainingDays | number | true |
 | fiscalYear | number | true |
-| status | string | true |
+| status | BalanceStatus | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
 **Relationships**
 - `Employee` — many-to-one
-- `LeavePolicy` — many-to-one
 
-### LeaveBalance
+### IBalanceRepository
 
-| Field | Type | Required |
-|-------|------|----------|
-| id | string | true |
-| employeeId | string | true |
-| policyId | string | true |
-| totalEntitlement | number | true |
-| usedDays | number | true |
-| remainingDays | number | true |
-| fiscalYear | number | true |
-| status | string | true |
-| createdAt | Date | true |
-| updatedAt | Date | true |
+Interface for balance persistence. Methods:
+- `findByEmployeeId(employeeId: string): Promise<Balance[]>`
+- `findByEmployeeIdAndLeaveType(employeeId: string, leaveType: string): Promise<Balance | null>`
+- `findByEmployeeIdAndFiscalYear(employeeId: string, fiscalYear: number): Promise<Balance[]>`
+- `create(balance: Omit<Balance, 'id' | 'createdAt' | 'updatedAt'>): Promise<Balance>`
+- `update(id: string, data: Partial<Balance>): Promise<Balance | null>`
+- `deductDays(id: string, days: number): Promise<Balance>`
 
-**Relationships**
-- `Employee` — many-to-one
-- `LeavePolicy` — many-to-one
+### IBalanceService
+
+Interface for balance business logic. Methods:
+- `getBalance(employeeId: string, leaveType: string): Promise<Balance>`
+- `hasSufficientBalance(employeeId: string, leaveType: string, requestedDays: number): Promise<boolean>`
+- `deductBalance(employeeId: string, leaveType: string, days: number): Promise<Balance>`
+
+### Error classes
+
+- `InsufficientBalanceError` — code: `'INSUFFICIENT_BALANCE'`
+- `BalanceNotFoundError` — code: `'NOT_FOUND'`
 
 ## employee
 
@@ -133,7 +135,7 @@ Represents employee data managed by the `employee` module, including employee re
 | department | string \| null | false |
 | hireDate | Date | true |
 | terminationDate | Date \| null | false |
-| employmentStatus | 'ACTIVE' \| 'INACTIVE' \| 'TERMINATED' | true |
+| employmentStatus | EmploymentStatus | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 | deletedAt | Date \| null | false |
@@ -142,17 +144,17 @@ Represents employee data managed by the `employee` module, including employee re
 
 Represents leave policy data managed by the `policy` module, including policy definitions, rules, and leave entitlement configurations.
 
-### Policy
+### LeavePolicy
 
 | Field | Type | Required |
 |-------|------|----------|
 | id | string | true |
 | policyName | string | true |
-| leaveType | string | true |
+| leaveType | LeaveType | true |
 | entitlementDays | number | true |
-| accrualRate | number | false |
-| maxAccumulation | number | false |
-| minimumNoticeDays | number | false |
+| accrualRate | number \| undefined | false |
+| maxAccumulation | number \| undefined | false |
+| minimumNoticeDays | number | true |
 | requiresManagerApproval | boolean | true |
 | isActive | boolean | true |
 | createdAt | Date | true |
@@ -165,25 +167,6 @@ Represents leave policy data managed by the `policy` module, including policy de
 | annual | Annual leave |
 | sick | Sick leave |
 | emergency | Emergency leave |
-| unpaid | Unpaid leave |
-| maternity | Maternity leave |
-| paternity | Paternity leave |
-
-### LeavePolicy
-
-| Field | Type | Required |
-|-------|------|----------|
-| id | string | true |
-| policyName | string | true |
-| leaveType | string | true |
-| entitlementDays | number | true |
-| accrualRate | number | false |
-| maxAccumulation | number | false |
-| minimumNoticeDays | number | false |
-| requiresManagerApproval | boolean | true |
-| isActive | boolean | true |
-| createdAt | Date | true |
-| updatedAt | Date | true |
 
 ## notification
 
@@ -208,21 +191,6 @@ Represents notification data managed by the `notification` module, including not
 
 Represents audit data managed by the `audit` module, including audit records, change history, and activity tracking information.
 
-### Audit
-
-| Field | Type | Required |
-|-------|------|----------|
-| id | string | true |
-| entityType | string | true |
-| entityId | string | true |
-| action | 'CREATE' \| 'UPDATE' \| 'DELETE' \| 'APPROVE' \| 'REJECT' | true |
-| oldValues | Record<string, any> \| null | false |
-| newValues | Record<string, any> \| null | false |
-| performedBy | string \| null | false |
-| performedAt | Date | true |
-| createdAt | Date | true |
-| updatedAt | Date | true |
-
 ### AuditLog
 
 | Field | Type | Required |
@@ -230,36 +198,21 @@ Represents audit data managed by the `audit` module, including audit records, ch
 | id | string | true |
 | entityType | string | true |
 | entityId | string | true |
-| action | 'CREATE' \| 'UPDATE' \| 'DELETE' \| 'APPROVE' \| 'REJECT' | true |
-| oldValues | Record<string, any> \| null | false |
-| newValues | Record<string, any> \| null | false |
-| performedBy | string \| null | false |
-| performedAt | Date | true |
-
-### AuditRecord
-
-| Field | Type | Required |
-|-------|------|----------|
-| entity_type | string | true |
-| entity_id | string | true |
 | action | string | true |
-| changed_by | string \| null | false |
-| old_values | Record<string, any> \| null | false |
-| new_values | Record<string, any> \| null | false |
-| ip_address | string \| null | false |
-| user_agent | string \| null | false |
+| performedBy | string | true |
+| changes | Record<string, unknown> | true |
+| createdAt | Date | true |
 
-### AuditServiceInterface
+### IAuditLogRepository
 
-| Field | Type | Required |
-|-------|------|----------|
-| id | string | true |
-| action | string | true |
-| resourceType | string | true |
-| resourceId | string | true |
-| actorId | string | true |
-| timestamp | Date | true |
-| metadata | Record<string, unknown> \| null | false |
+Interface for audit log persistence. Methods:
+- `findByEntity(entityType: string, entityId: string): Promise<AuditLog[]>`
+- `create(entry: Omit<AuditLog, 'id' | 'createdAt'>): Promise<AuditLog>`
+- `findAll(filters?: { entityType?: string; performedBy?: string; fromDate?: Date; toDate?: Date }): Promise<AuditLog[]>`
+
+### Error classes
+
+- `AuditLogValidationError` — code: `'VALIDATION_ERROR'`
 
 ## validation
 

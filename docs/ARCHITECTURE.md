@@ -21,6 +21,8 @@ src/modules/employee/employee.repository.ts     — PgEmployeeRepository (pg Poo
 src/modules/leave-policy/leave-policy.model.ts  — LeavePolicy entity + ILeavePolicyRepository + ILeavePolicyService interfaces
 src/modules/leave-policy/leave-policy.repository.ts — PgLeavePolicyRepository (pg Pool, parameterized queries, snake_case↔camelCase mapping)
 src/modules/leave-policy/leave-policy.service.ts — LeavePolicyService (stateless, delegates to ILeavePolicyRepository)
+src/modules/balance/balance.model.ts            — Balance entity + IBalanceRepository + IBalanceService interfaces + error classes (InsufficientBalanceError, BalanceNotFoundError)
+src/modules/audit-log/audit-log.model.ts        — AuditLog entity + IAuditLogRepository interface + AuditLogValidationError
 src/modules/status/                             — System status module (model, service interface, service)
 src/modules/uptime/                             — Uptime health-check module (model, service interface, service, routes)
 src/shared/types/index.ts                       — Shared enums: LeaveType, LeaveStatus, EmploymentStatus, BalanceStatus, NotificationType, NotificationStatus
@@ -45,6 +47,10 @@ tests/unit/modules/leave-policy/leave-policy.service.spec.ts   — Jest tests fo
   mock the repository interface directly. Test helpers (`makeEmployeeRow`,
   `makeEmployee`, `makePolicyRow`, `makePolicy`) produce canonical test
   fixtures.
+- Domain error classes carry a `code` property for HTTP mapping
+  (e.g. `InsufficientBalanceError.code = 'INSUFFICIENT_BALANCE'`,
+  `BalanceNotFoundError.code = 'NOT_FOUND'`,
+  `AuditLogValidationError.code = 'VALIDATION_ERROR'`).
 
 ## Dependency rules
 
@@ -74,10 +80,10 @@ Modular monolith built with TypeScript, Fastify, PostgreSQL. The leave managemen
 | shared-types | src/shared/types/ | Enums: LeaveType, LeaveStatus, EmploymentStatus, BalanceStatus, NotificationType, NotificationStatus |
 | employee | src/modules/employee/ | Employee entity, repository |
 | leave-policy | src/modules/leave-policy/ | LeavePolicy entity, repository, service |
-| balance | src/modules/balance/ | Balance entity, repository, service, controller, routes |
+| balance | src/modules/balance/ | Balance entity, repository interface, service interface, error classes (models+interfaces only — no concrete implementations yet) |
 | leave-request | src/modules/leave-request/ | LeaveRequest entity, repository, service, controller, routes, validation |
 | notification | src/modules/notification/ | Notification entity, repository, service |
-| audit-log | src/modules/audit-log/ | AuditLog entity, repository |
+| audit-log | src/modules/audit-log/ | AuditLog entity, repository interface, error class (models+interfaces only — no concrete implementation yet) |
 
 ## Dependency Map
 - leave-request → shared-types, balance, leave-policy, employee, notification, audit-log
@@ -102,7 +108,7 @@ Modular monolith built with TypeScript, Fastify, PostgreSQL. The leave managemen
 
 ## Phased Implementation
 1. **Foundation**: shared-types, employee, leave-policy (models + repositories + service + tests done)
-2. **Balance & Audit**: balance module, audit-log module
+2. **Balance & Audit**: balance module (models+interfaces done), audit-log module (models+interfaces done) — concrete implementations pending
 3. **Core Workflow**: leave-request module, notification module
 
 ## Open Question
