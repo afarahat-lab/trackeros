@@ -1,0 +1,136 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "employee",
+      "leave-policy"
+    ],
+    "affectedLayers": [
+      "repository",
+      "service",
+      "tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "PgEmployeeRepository implements all 6 methods of IEmployeeRepository: findById returns Employee | null, findByEmployeeNumber returns Employee | null, findAll returns Employee[] excluding soft-deleted rows (WHERE deleted_at IS NULL), create INSERTs and returns the full Employee row, update UPDATEs by id and returns the full Employee row (or null if not found), softDelete sets deleted_at = NOW() and returns void.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "PgLeavePolicyRepository implements all 5 methods of ILeavePolicyRepository: findById returns LeavePolicy | null, findByLeaveType returns LeavePolicy | null (filtered by leave_type), findAllActive returns LeavePolicy[] (WHERE is_active = true), create INSERTs and returns the full LeavePolicy row, update UPDATEs by id and returns the full LeavePolicy row (or null if not found).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "LeavePolicyService implements ILeavePolicyService: getPolicyForLeaveType delegates to ILeavePolicyRepository.findByLeaveType and returns the result; validateEntitlement calls findByLeaveType, then returns true if requestedDays <= policy.entitlementDays, false otherwise (also false if no policy found for the leave type).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All SQL queries in both repository implementations use parameterized queries ($1, $2, \u2026) \u2014 no string interpolation or template-literal concatenation of user-supplied values into SQL text.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Unit tests exist for all three implementation files: employee.repository.spec.ts (6 methods tested with mocked pg Pool), leave-policy.repository.spec.ts (5 methods tested with mocked pg Pool), leave-policy.service.spec.ts (getPolicyForLeaveType delegation + validateEntitlement true/false branches tested with mocked ILeavePolicyRepository).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The project compiles with tsc --noEmit and all Jest tests pass (npm test) after this phase's files are added.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access MUST go through the repository pattern (GP-001). The service class (LeavePolicyService) MUST NOT import or use the pg Pool directly \u2014 it only calls ILeavePolicyRepository methods.",
+    "The LeavePolicyService constructor MUST accept ILeavePolicyRepository (dependency injection), not instantiate the repository internally.",
+    "Repository implementations MUST import the pg Pool from src/shared/db/connection.ts (the single shared pool export named 'pool'). No new Pool instances may be created.",
+    "No 'any' type \u2014 use 'unknown' with type guards where needed (HARNESS.json constraint no-any).",
+    "Tests MUST mock the pg Pool (not require a real database). Repository tests mock pool.query; service tests mock ILeavePolicyRepository.",
+    "All async errors must be caught and handled \u2014 no unhandled promise rejections (GP-006). Repository methods must propagate errors via rejected promises (no silent catch-and-swallow)."
+  ],
+  "outOfScope": [
+    "Audit logging (GP-002) \u2014 the repository and service implementations in this phase do NOT write audit records. Audit-log integration is deferred to Phase 4 (Balance & Audit Log part 2/2) and Phase 6 (Leave Request & Notification part 2/2).",
+    "RBAC enforcement (GP-005) \u2014 this phase has no controllers, routes, or HTTP handlers. RBAC is deferred to phases that introduce Fastify route handlers."
+  ],
+  "ambiguities": [
+    {
+      "description": "How should repository create() methods generate the id field? The model interfaces omit 'id' from the create parameter, so the repository must generate it. Options: (a) use crypto.randomUUID() in the repository, (b) use PostgreSQL DEFAULT gen_random_uuid() in the table schema and let the database generate it, (c) use a UUID library. The PLAN.md and model interfaces are silent on this.",
+      "options": [
+        "crypto.randomUUID() in the repository",
+        "PostgreSQL DEFAULT gen_random_uuid() in table schema",
+        "uuid library (e.g. uuid.v4)"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "Employee (as returned by PgEmployeeRepository)",
+      "mustExistOrExtend": true,
+      "invariant": "findAll() must never return rows where deletedAt IS NOT NULL. softDelete(id) must set deletedAt to a non-null timestamp but must not physically remove the row. create() returns a row where id, createdAt, updatedAt are populated and deletedAt is null."
+    },
+    {
+      "entity": "LeavePolicy (as returned by PgLeavePolicyRepository)",
+      "mustExistOrExtend": true,
+      "invariant": "findAllActive() must only return policies where isActive is true. findByLeaveType must match on the leave_type column using the LeaveType enum value. create() returns a row where id, createdAt, updatedAt are populated."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IEmployeeRepository.findAll",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns empty array (not null, not error) when no non-deleted employees exist."
+    },
+    {
+      "operation": "IEmployeeRepository.softDelete",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Must not throw if the employee is already soft-deleted or does not exist \u2014 the UPDATE simply affects zero rows and returns void."
+    },
+    {
+      "operation": "ILeavePolicyService.validateEntitlement",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns false (not throws) when no policy exists for the given leaveType. Returns false when requestedDays > entitlementDays. Returns true only when a policy exists AND requestedDays <= entitlementDays."
+    },
+    {
+      "operation": "IEmployeeRepository.update / ILeavePolicyRepository.update",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns null when no row with the given id exists (not-found semantics). The caller decides whether to treat null as an error."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "PgEmployeeRepository must satisfy the IEmployeeRepository interface defined in src/modules/employee/employee.model.ts \u2014 all method signatures, parameter types, and return types must match exactly.",
+      "referencePath": "src/modules/employee/employee.model.ts"
+    },
+    {
+      "requirement": "PgLeavePolicyRepository must satisfy the ILeavePolicyRepository interface defined in src/modules/leave-policy/leave-policy.model.ts \u2014 all method signatures, parameter types, and return types must match exactly.",
+      "referencePath": "src/modules/leave-policy/leave-policy.model.ts"
+    },
+    {
+      "requirement": "LeavePolicyService must satisfy the ILeavePolicyService interface defined in src/modules/leave-policy/leave-policy.model.ts \u2014 getPolicyForLeaveType accepts LeaveType (not string), validateEntitlement accepts (employeeId: string, leaveType: LeaveType, requestedDays: number) and returns Promise<boolean>.",
+      "referencePath": "src/modules/leave-policy/leave-policy.model.ts"
+    },
+    {
+      "requirement": "Both repository implementations must import and use the pool export from src/shared/db/connection.ts \u2014 no other database connection mechanism.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "Database column names in SQL queries must use snake_case matching the reconciled architecture table schemas: employees (id, employee_number, first_name, last_name, email, manager_id, department, hire_date, termination_date, employment_status, created_at, updated_at, deleted_at); leave_policies (id, policy_name, leave_type, entitlement_days, accrual_rate, max_accumulation, minimum_notice_days, requires_manager_approval, is_active, created_at, updated_at).",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/db/connection.ts (pg Pool)",
+      "why": "Both PgEmployeeRepository and PgLeavePolicyRepository import the shared pool to execute parameterized SQL queries."
+    }
+  ]
+}
