@@ -1,0 +1,73 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "balance",
+      "audit-log"
+    ],
+    "affectedLayers": [
+      "domain-model",
+      "repository-interface",
+      "service-interface"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The `Balance` entity interface is defined and importable from `src/modules/balance/balance.model.ts` with all canonical fields: id, employeeId, leaveType, totalEntitlement, usedDays, remainingDays, fiscalYear, status (typed as BalanceStatus), createdAt, updatedAt",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `IBalanceRepository` interface is defined with all six methods: findByEmployeeId, findByEmployeeIdAndLeaveType, findByEmployeeIdAndFiscalYear, create, update, deductDays \u2014 each with the correct parameter and return types matching the PLAN.md specification",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `IBalanceService` interface is defined with three methods: getBalance(employeeId, leaveType), hasSufficientBalance(employeeId, leaveType, requestedDays), deductBalance(employeeId, leaveType, days) \u2014 each with correct signatures",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Domain error classes `InsufficientBalanceError` (code: 'INSUFFICIENT_BALANCE') and `BalanceNotFoundError` (code: 'NOT_FOUND') are defined and exportable from the balance module",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `AuditLog` entity interface is defined and importable from `src/modules/audit-log/audit-log.model.ts` with all canonical fields: id, entityType, entityId, action, performedBy, changes (Record<string, unknown>), createdAt (Date)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `IAuditLogRepository` interface is defined with three methods: findByEntity(entityType, entityId), create(entry), findAll(filters?) \u2014 each with correct parameter and return types",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `AuditLogValidationError` class (code: 'VALIDATION_ERROR') is defined and exportable from the audit-log module",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "TypeScript compilation succeeds with `tsc --noEmit` \u2014 all interface files are valid TypeScript with no type errors, no use of `any`, and strict null checks pass",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No concrete implementations \u2014 this phase produces only TypeScript interfaces, entity types, and error classes. No repository classes, no service classes, no database queries, no HTTP routes, no controllers",
+    "The `Balance` entity's `status` field must be typed as `BalanceStatus` (imported from `src/shared/types`), not as a plain string",
+    "The `AuditLog.changes` field must be typed as `Record<string, unknown>`, not `any` \u2014 per the HARNESS.json `no-any` constraint",
+    "Error classes must extend `Error` and expose a `code` property (string literal) for HTTP mapping \u2014 matching the pattern established by existing error classes in the codebase",
+    "Repository interfaces must return `Promise<T>` for all methods \u2014 all data access is asynchronous (PostgreSQL-backed)"
+  ],
+  "outOfScope": [
+    "Concrete repository implementations (PgBalanceRepository, PgAuditLogRepository) \u2014 deferred to Phase 4 (part 2/2)",
+    "Concrete service implementation (BalanceService) \u2014 deferred to Phase 4 (part 2/2)"
+  ],
+  "ambiguities": [],
+  "entityInvariants": [],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [],
+  "integrationPoints": []
+}
