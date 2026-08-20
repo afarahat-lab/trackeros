@@ -1,0 +1,122 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "employee",
+      "leave-policy"
+    ],
+    "affectedLayers": [
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "tests/unit/modules/employee/employee.repository.spec.ts exists and contains Jest unit tests for PgEmployeeRepository that mock the pg Pool (imported from src/shared/db/connection.ts). Tests cover: findById returns Employee when row exists, findById returns null when no row, findByEmployeeNumber returns Employee when row exists, findByEmployeeNumber returns null when no row, findAll returns only rows where deleted_at IS NULL, create executes INSERT with correct parameterized values and returns the mapped Employee, update executes dynamic UPDATE with correct SET clauses and returns the mapped Employee, update returns null when no row matches, softDelete executes UPDATE setting deleted_at = NOW() for the given id.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "tests/unit/modules/leave-policy/leave-policy.repository.spec.ts exists and contains Jest unit tests for PgLeavePolicyRepository that mock the pg Pool. Tests cover: findById returns LeavePolicy when row exists, findById returns null when no row, findByLeaveType returns LeavePolicy when matching row exists, findByLeaveType returns null when no match, findAllActive returns only rows where is_active = true, create executes INSERT with correct parameterized values and returns the mapped LeavePolicy, update executes dynamic UPDATE with correct SET clauses and returns the mapped LeavePolicy, update returns null when no row matches.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "tests/unit/modules/leave-policy/leave-policy.service.spec.ts exists and contains Jest unit tests for LeavePolicyService that mock ILeavePolicyRepository. Tests cover: getPolicyForLeaveType delegates to repository.findByLeaveType with the same leaveType argument and returns its result, validateEntitlement returns true when policy exists and requestedDays <= entitlementDays, validateEntitlement returns false when policy exists and requestedDays > entitlementDays, validateEntitlement returns false when no policy exists for the given leaveType (repository returns null).",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All tests must use Jest as the test framework (per HARNESS.json stack.testFramework). Tests must mock the pg Pool \u2014 no real database connection. Tests must not import or depend on files owned by sibling sub-phases (employee.repository.ts, leave-policy.repository.ts, leave-policy.service.ts are sibling deliverables, not prerequisites for this sub-phase).",
+    "Tests must mock the pg Pool (imported from src/shared/db/connection.ts) \u2014 no real database connection. Tests must use Jest mocking (jest.mock or manual mocks). Each test file must import the concrete repository/service class under test from the sibling sub-phase files (employee.repository.ts, leave-policy.repository.ts, leave-policy.service.ts) and mock only the external dependency (pg Pool for repositories, ILeavePolicyRepository for the service).",
+    "Test files import the concrete classes under test from the sibling sub-phase deliverables (PgEmployeeRepository from src/modules/employee/employee.repository.ts, PgLeavePolicyRepository from src/modules/leave-policy/leave-policy.repository.ts, LeavePolicyService from src/modules/leave-policy/leave-policy.service.ts) and the interfaces from the part-1/2 model files (IEmployeeRepository, ILeavePolicyRepository, ILeavePolicyService). The tests mock only the external dependency layer (pg Pool for repositories, ILeavePolicyRepository for the service) \u2014 never the class under test itself."
+  ],
+  "outOfScope": [
+    "Implementation files (employee.repository.ts, leave-policy.repository.ts, leave-policy.service.ts) \u2014 these are owned by sibling sub-phases 1/3 and 2/3 and must already exist before this sub-phase runs.",
+    "Integration tests, E2E tests, or any test that requires a running database \u2014 this phase is unit tests only."
+  ],
+  "ambiguities": [
+    {
+      "description": "The validateEntitlement method signature includes employeeId but the current LeavePolicyService implementation does not use it \u2014 it only checks requestedDays against the policy's entitlementDays. The test must pass employeeId as an argument (matching the interface contract) even though the current implementation ignores it. Future phases may add per-employee balance checks.",
+      "options": [
+        "Test passes employeeId but does not assert on it being used",
+        "Test omits employeeId (would break the interface contract)",
+        "Test verifies employeeId is passed through to a future balance check"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "Soft-delete semantics: findAll() and findById() must exclude rows where deleted_at IS NOT NULL. The softDelete() method sets deleted_at = NOW() without physically removing the row."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "findAllActive() returns only policies where is_active = true. findByLeaveType() returns at most one policy per leave type (the active one)."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "PgEmployeeRepository.findById",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns Employee when row exists; returns null when no matching non-deleted row found. Must filter deleted_at IS NULL."
+    },
+    {
+      "operation": "PgEmployeeRepository.findAll",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns array of Employee (empty array when no non-deleted rows). Must filter deleted_at IS NULL."
+    },
+    {
+      "operation": "PgEmployeeRepository.softDelete",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Sets deleted_at = NOW() for the given id. Returns void. Does not throw if the id does not exist \u2014 it is a no-op in that case."
+    },
+    {
+      "operation": "LeavePolicyService.validateEntitlement",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns boolean. Returns false when no policy exists for the given leaveType. Returns false when requestedDays > policy.entitlementDays. Returns true when requestedDays <= policy.entitlementDays. Never throws."
+    },
+    {
+      "operation": "LeavePolicyService.getPolicyForLeaveType",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Delegates to repository.findByLeaveType(leaveType). Returns the LeavePolicy or null. Never throws."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Employee repository tests must mock the pg Pool and verify that PgEmployeeRepository satisfies the IEmployeeRepository interface contract defined in src/modules/employee/employee.model.ts \u2014 every method signature (findById, findByEmployeeNumber, findAll, create, update, softDelete) must be tested.",
+      "referencePath": "src/modules/employee/employee.model.ts"
+    },
+    {
+      "requirement": "LeavePolicyService tests must mock ILeavePolicyRepository and verify that LeavePolicyService satisfies the ILeavePolicyService interface contract defined in src/modules/leave-policy/leave-policy.model.ts \u2014 both methods (getPolicyForLeaveType, validateEntitlement) must be tested.",
+      "referencePath": "src/modules/leave-policy/leave-policy.model.ts"
+    },
+    {
+      "requirement": "LeavePolicy repository tests must mock the pg Pool and verify that PgLeavePolicyRepository satisfies the ILeavePolicyRepository interface contract defined in src/modules/leave-policy/leave-policy.model.ts \u2014 every method signature (findById, findByLeaveType, findAllActive, create, update) must be tested.",
+      "referencePath": "src/modules/leave-policy/leave-policy.model.ts"
+    },
+    {
+      "requirement": "All test files must use the same Jest configuration and conventions as the project (per HARNESS.json stack.testFramework = Jest). Test file naming must follow the pattern <name>.spec.ts under tests/unit/modules/<module>/.",
+      "referencePath": "HARNESS.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/db/connection.ts (pg Pool)",
+      "why": "Repository tests must mock the pg Pool exported from this module. The mock must intercept pool.query() calls and return synthetic pg QueryResult objects with rows shaped as the repository's internal Row interfaces."
+    },
+    {
+      "target": "src/modules/leave-policy/leave-policy.model.ts (ILeavePolicyRepository interface)",
+      "why": "LeavePolicyService tests must mock ILeavePolicyRepository \u2014 the service's only constructor dependency. The mock must implement findByLeaveType to return synthetic LeavePolicy objects or null."
+    }
+  ]
+}
