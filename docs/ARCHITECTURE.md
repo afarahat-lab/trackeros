@@ -30,6 +30,8 @@ src/modules/audit-log/audit-log.model.ts        — AuditLog entity + IAuditLogR
 src/modules/audit-log/audit-log.repository.ts   — PgAuditLogRepository (pg Pool, parameterized queries, dynamic filter construction for findAll)
 src/modules/leave-request/leave-request.model.ts — LeaveRequest entity + CreateLeaveRequestDto + ILeaveRequestRepository + ILeaveRequestService interfaces + error classes (LeaveRequestNotFoundError, LeaveRequestValidationError) + Zod validation schemas (createLeaveRequestSchema, updateLeaveRequestSchema)
 src/modules/notification/notification.model.ts  — Notification entity + INotificationRepository + INotificationService interfaces
+src/modules/notification/notification.repository.ts — PgNotificationRepository (pg Pool, parameterized queries, snake_case↔camelCase mapping)
+src/modules/notification/notification.service.ts — NotificationService (stateless, delegates to INotificationRepository; defines NotificationNotFoundError)
 src/modules/status/                             — System status module (model, service interface, service)
 src/modules/uptime/                             — Uptime health-check module (model, service interface, service, routes)
 src/shared/types/index.ts                       — Shared enums: LeaveType, LeaveStatus, EmploymentStatus, BalanceStatus, NotificationType, NotificationStatus
@@ -63,7 +65,8 @@ tests/unit/modules/audit-log/audit-log.repository.spec.ts      — Jest tests fo
   `BalanceNotFoundError.code = 'NOT_FOUND'`,
   `AuditLogValidationError.code = 'VALIDATION_ERROR'`,
   `LeaveRequestNotFoundError.code = 'NOT_FOUND'`,
-  `LeaveRequestValidationError.code = 'VALIDATION_ERROR'`).
+  `LeaveRequestValidationError.code = 'VALIDATION_ERROR'`,
+  `NotificationNotFoundError.code = 'NOT_FOUND'`).
 
 ## Dependency rules
 
@@ -95,7 +98,7 @@ Modular monolith built with TypeScript, Fastify, PostgreSQL. The leave managemen
 | leave-policy | src/modules/leave-policy/ | LeavePolicy entity, repository, service |
 | balance | src/modules/balance/ | Balance entity, repository, service, controller, routes, error classes |
 | leave-request | src/modules/leave-request/ | LeaveRequest entity, repository interface, service interface, DTOs, Zod schemas, error classes |
-| notification | src/modules/notification/ | Notification entity, repository interface, service interface |
+| notification | src/modules/notification/ | Notification entity, repository, service, error class |
 | audit-log | src/modules/audit-log/ | AuditLog entity, repository, error class |
 
 ## Dependency Map
@@ -123,7 +126,7 @@ Modular monolith built with TypeScript, Fastify, PostgreSQL. The leave managemen
 1. **Foundation**: shared-types, employee, leave-policy (models + repositories + service + tests done)
 2. **Balance & Audit**: balance module (models, repository, service, controller, routes, tests done), audit-log module (models, repository, tests done)
 3. **Core Workflow — Models**: leave-request module (model, DTOs, repository interface, service interface, Zod schemas, error classes done), notification module (model, repository interface, service interface done)
-4. **Core Workflow — Implementations**: leave-request repository, service, controller, routes; notification repository, service (pending)
+4. **Core Workflow — Implementations (partial)**: notification repository + service done; leave-request repository, service, controller, routes still pending
 
 ## Implementation Notes
 - Balance routes are defined as a Fastify plugin (`balanceRoutes`) but are **not yet registered** in `src/app.ts` — integration will happen in a follow-up phase.
@@ -134,6 +137,8 @@ Modular monolith built with TypeScript, Fastify, PostgreSQL. The leave managemen
 - `ILeaveRequestService` methods document their error contracts: `submit` throws `LeaveRequestValidationError` for invalid input plus domain errors for business rule violations; `approve`/`reject` throw `LeaveRequestNotFoundError`; `cancel` enforces self-cancellation (employeeId must match).
 - `createLeaveRequestSchema` uses Zod `.refine()` to enforce `startDate <= endDate`.
 - `Notification` model imports `LeaveRequest` as a **type-only** import from `../leave-request/leave-request.model` — this is a cross-module dependency for the service interface signatures only.
+- `PgNotificationRepository` uses `randomUUID()` from `crypto` for id generation on create, and `COALESCE($3, read_at)` in `updateStatus` to preserve the existing `read_at` when no explicit value is provided.
+- `NotificationService` defines `NotificationNotFoundError` (code `NOT_FOUND`) thrown by `markAsRead` when the notification id is not found. Each `notify*` method constructs a human-readable message with date formatting via `toISOString().split('T')[0]` and sets `status` to `NotificationStatus.pending`.
 
 ## Open Question
 - Day-counting semantics (inclusive calendar days vs business days) – see open questions list.

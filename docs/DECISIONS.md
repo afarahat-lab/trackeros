@@ -53,3 +53,21 @@ Key design decisions:
 - `createLeaveRequestSchema` uses Zod `.refine()` for startDate ≤ endDate validation
 - `Notification` model imports `LeaveRequest` as a **type-only** import — the first cross-module dependency at the model layer
 - Error classes follow the established `code` property pattern for HTTP mapping
+
+## ADR-003 — Notification repository & service implementations
+
+Date: 2026-06-10
+Status: Accepted
+
+Decision: Implemented the concrete repository and service for the notification module. This is a partial implementation of Phase 3 part 2/2 — the leave-request implementations (repository, service, controller, routes) remain pending.
+
+Files created:
+- `src/modules/notification/notification.repository.ts` — PgNotificationRepository implementing INotificationRepository
+- `src/modules/notification/notification.service.ts` — NotificationService implementing INotificationService, plus NotificationNotFoundError
+
+Key design decisions:
+- `PgNotificationRepository` uses `randomUUID()` from Node's `crypto` module for id generation on create (consistent with other repository implementations)
+- `updateStatus` uses `COALESCE($3, read_at)` in SQL to preserve the existing `read_at` value when no explicit `readAt` is provided — avoids overwriting a previously-set read timestamp
+- `NotificationService` defines `NotificationNotFoundError` (code `'NOT_FOUND'`) thrown by `markAsRead` when the notification id is not found
+- Each `notify*` method constructs human-readable messages with date formatting via `toISOString().split('T')[0]` and sets initial `status` to `NotificationStatus.pending`
+- No tests were created in this phase — the plan prescribed tests for notification repository and service, but they were not generated

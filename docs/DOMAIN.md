@@ -222,6 +222,10 @@ Interface for notification business logic. Methods:
 
 Each `notify*` method sets `relatedEntityType` to `'leave_request'`, `relatedEntityId` to the leave request's id, and `recipientId` to the leave request's employeeId.
 
+### Error classes
+
+- `NotificationNotFoundError` — code: `'NOT_FOUND'`; thrown by `NotificationService.markAsRead` when the notification id is not found
+
 ## audit
 
 Represents audit data managed by the `audit-log` module, including audit records, change history, and activity tracking information.
