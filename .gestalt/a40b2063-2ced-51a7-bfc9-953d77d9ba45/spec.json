@@ -1,0 +1,149 @@
+{
+  "scope": {
+    "affectedDomains": [],
+    "affectedLayers": [],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "PgLeaveRequestRepository implements all ILeaveRequestRepository methods (findById, findByEmployeeId, findByStatus, findByManagerId, create, update, updateStatus) using parameterized queries against the `leave_requests` table, with snake_case\u2194camelCase mapping via a mapRowTo* function",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findByManagerId uses a JOIN query: SELECT lr.* FROM leave_requests lr JOIN employees e ON lr.employee_id = e.id WHERE e.manager_id = $1, returning LeaveRequest[]",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "updateStatus enforces the allowed state transitions: DRAFT\u2192SUBMITTED, SUBMITTED\u2192APPROVED|REJECTED, SUBMITTED|APPROVED\u2192CANCELLED; sets approvedBy/approvedAt when transitioning to 'approved'; sets rejectionReason when transitioning to 'rejected'; rejects invalid transitions",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "LeaveRequestService.submit validates the DTO via createLeaveRequestSchema, calls policyService.validateEntitlement, calculates days using the binding rule (endDate.getTime() - startDate.getTime()) / (1000*60*60*24) + 1, checks balanceService.hasSufficientBalance, creates the request with status 'submitted', calls notificationService.notifyLeaveSubmitted, and writes an audit log entry",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "LeaveRequestService.approve verifies the request exists and is in 'submitted' status, updates status to 'approved' with approvedBy/approvedAt, calls balanceService.deductBalance, calls notificationService.notifyLeaveApproved, and writes an audit log entry",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "LeaveRequestService.reject verifies the request exists and is in 'submitted' status, validates rejectionReason is non-empty, updates status to 'rejected' with rejectionReason, calls notificationService.notifyLeaveRejected, and writes an audit log entry",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "LeaveRequestService.cancel verifies the request exists, enforces self-cancellation (employeeId must match request.employeeId), verifies current status is 'submitted' or 'approved', updates status to 'cancelled', calls notificationService.notifyLeaveCancelled, and writes an audit log entry",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "LeaveRequestService.getById, getByEmployee, and getPendingForManager delegate directly to the corresponding repository methods without additional business logic",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "PgNotificationRepository implements all INotificationRepository methods (findByRecipientId, findByRecipientIdAndStatus, create, updateStatus) using parameterized queries against the `notifications` table, with snake_case\u2194camelCase mapping",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "NotificationService.notifyLeaveSubmitted/Approved/Rejected/Cancelled each create a Notification with the correct NotificationType, recipientId=leaveRequest.employeeId, relatedEntityType='leave_request', relatedEntityId=leaveRequest.id, and status='pending'",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "NotificationService.markAsRead updates the notification status to 'read' and sets readAt to the current timestamp",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "LeaveRequest controller handlers validate request bodies against the Zod schemas from leave-request.model.ts (createLeaveRequestSchema for submit, updateLeaveRequestSchema for updates) and return standard error responses with the correct error codes (NOT_FOUND, VALIDATION_ERROR, INSUFFICIENT_BALANCE) matching the error contract",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Leave-request routes are registered as a Fastify plugin in src/app.ts alongside the existing uptimeRoutes",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "All database access must go through repository classes \u2014 no inline SQL in services or controllers (GP-001)",
+    "Every state-changing operation (submit, approve, reject, cancel) must write an audit log record via IAuditLogRepository (GP-002)",
+    "All controller inputs must be validated via Zod schemas before processing (GP-003)",
+    "Repository implementations must use parameterized queries ($1, $2, \u2026) \u2014 no string interpolation of user-supplied values into SQL"
+  ],
+  "outOfScope": [],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "A LeaveRequest's status must follow the allowed lifecycle: DRAFT\u2192SUBMITTED, SUBMITTED\u2192APPROVED|REJECTED, SUBMITTED|APPROVED\u2192CANCELLED. REJECTED and CANCELLED are terminal states \u2014 no further transitions are permitted."
+    },
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "A Notification is created with status 'pending'. It transitions to 'read' when markAsRead is called (which also sets readAt). The 'sent' and 'archived' statuses are reserved for future phases."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "ILeaveRequestService.submit",
+      "authRule": "Caller must be authenticated; the employeeId in the DTO must match the authenticated user's id unless the caller has manager/hr_admin role",
+      "idempotent": false,
+      "errorSemantics": "Throws LeaveRequestValidationError (code: VALIDATION_ERROR) for invalid DTO; throws domain error (code: INSUFFICIENT_BALANCE) when balance check fails; throws domain error when policy validation fails"
+    },
+    {
+      "operation": "ILeaveRequestService.approve",
+      "authRule": "Caller must have manager or hr_admin role; the approverId must match the authenticated user's id",
+      "idempotent": false,
+      "errorSemantics": "Throws LeaveRequestNotFoundError (code: NOT_FOUND) if request does not exist; throws domain error if request is not in 'submitted' status"
+    },
+    {
+      "operation": "ILeaveRequestService.reject",
+      "authRule": "Caller must have manager or hr_admin role; the approverId must match the authenticated user's id",
+      "idempotent": false,
+      "errorSemantics": "Throws LeaveRequestNotFoundError (code: NOT_FOUND) if request does not exist; throws LeaveRequestValidationError (code: VALIDATION_ERROR) if reason is empty; throws domain error if request is not in 'submitted' status"
+    },
+    {
+      "operation": "ILeaveRequestService.cancel",
+      "authRule": "Caller must be authenticated; the employeeId must match the authenticated user's id (self-cancellation only)",
+      "idempotent": false,
+      "errorSemantics": "Throws LeaveRequestNotFoundError (code: NOT_FOUND) if request does not exist; throws domain error if employeeId does not match request.employeeId; throws domain error if request is not in 'submitted' or 'approved' status"
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Repository implementations must follow the same pattern as PgBalanceRepository and PgAuditLogRepository: import `pool` from `../../shared/db/connection`, define a `*Row` interface for snake_case DB rows, implement a `mapRowTo*` function, and use parameterized queries throughout",
+      "referencePath": "src/modules/balance/balance.repository.ts"
+    },
+    {
+      "requirement": "Service implementations must follow the same pattern as BalanceService: constructor receives repository interfaces via dependency injection, methods delegate to repositories and throw typed domain errors (with `.code` property) for business rule violations",
+      "referencePath": "src/modules/balance/balance.service.ts"
+    },
+    {
+      "requirement": "Controller and routes must follow the same pattern as BalanceController and balanceRoutes: controller class with arrow-function handlers, routes file that instantiates dependencies and registers them as a Fastify plugin",
+      "referencePath": "src/modules/balance/balance.routes.ts"
+    },
+    {
+      "requirement": "The leave-request routes plugin must be registered in src/app.ts via `app.register(leaveRequestRoutes)` alongside the existing `app.register(uptimeRoutes)`, following the same pattern",
+      "referencePath": "src/app.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/balance/balance.model.ts \u2014 IBalanceService",
+      "why": "LeaveRequestService.submit calls hasSufficientBalance; LeaveRequestService.approve calls deductBalance"
+    },
+    {
+      "target": "src/modules/leave-policy/leave-policy.model.ts \u2014 ILeavePolicyService",
+      "why": "LeaveRequestService.submit calls validateEntitlement to check policy rules before creating the request"
+    }
+  ]
+}
