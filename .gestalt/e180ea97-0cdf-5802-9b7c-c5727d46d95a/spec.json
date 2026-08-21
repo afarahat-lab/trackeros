@@ -1,0 +1,138 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-request"
+    ],
+    "affectedLayers": [
+      "repository",
+      "service"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "PgLeaveRequestRepository implements every method of ILeaveRequestRepository: findById returns LeaveRequest | null, findByEmployeeId returns LeaveRequest[], findByStatus returns LeaveRequest[], findByManagerId returns LeaveRequest[] via JOIN with employees on manager_id, create inserts and returns the new LeaveRequest, update applies a partial update and returns LeaveRequest | null, updateStatus sets status + conditionally approvedBy/approvedAt/rejectionReason and returns LeaveRequest | null.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "LeaveRequestService implements every method of ILeaveRequestService: submit validates entitlement, calculates inclusive calendar days, checks balance, creates request with status 'submitted', notifies, and audits; approve transitions status to 'approved' with approvedBy/approvedAt, deducts balance, notifies, and audits; reject transitions status to 'rejected' with rejectionReason, notifies, and audits; cancel transitions status to 'cancelled' only from 'submitted' or 'approved', notifies, and audits; getById/getByEmployee/getPendingForManager delegate to repository.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "submit calculates leave days using the binding rule: (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24) + 1 (inclusive calendar days).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Every state-changing service method (submit, approve, reject, cancel) writes an audit log entry via IAuditLogRepository.create with entityType='leave_request', the request id, the action name, the performer id, and a changes object capturing relevant before/after state.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "cancel enforces self-cancellation: throws a domain error if the caller's employeeId does not match the request's employeeId.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "approve and reject throw a domain error if the request is not in 'submitted' status. cancel throws a domain error if the request is not in 'submitted' or 'approved' status. reject throws LeaveRequestValidationError if reason is empty.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository must use the shared pg Pool imported from `src/shared/db/connection.ts` \u2014 no inline pool creation, no direct pg imports beyond the shared connection module.",
+    "Repository must use parameterized queries with $1, $2, \u2026 placeholders \u2014 never string interpolation for values.",
+    "Repository must map snake_case database rows to camelCase entity objects via a mapRowTo* function, and use a COLUMN_MAP lookup for dynamic UPDATE SET clause construction \u2014 matching the pattern established by PgBalanceRepository and PgAuditLogRepository.",
+    "Repository must NOT accept an optional PoolClient for transaction support \u2014 use the shared pool directly, matching the pattern in all existing repositories (no transaction support yet).",
+    "Repository must NOT enforce business rules (state transitions, balance checks, self-cancellation) \u2014 it only executes SQL. The service layer validates business rules before calling the repository."
+  ],
+  "outOfScope": [
+    "Unit and integration tests for PgLeaveRequestRepository and LeaveRequestService \u2014 these are produced in Phase 3c: LeaveRequest Controller, Routes & All Tests.",
+    "LeaveRequest controller (leave-request.controller.ts) and routes (leave-request.routes.ts) \u2014 these are produced in Phase 3c.",
+    "Notification repository and service files (notification.repository.ts, notification.service.ts) \u2014 these already exist from Phase 3a and are consumed as dependencies, not created here."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "A LeaveRequest's lifecycle is: DRAFT \u2192 SUBMITTED \u2192 APPROVED | REJECTED, and SUBMITTED | APPROVED \u2192 CANCELLED. REJECTED and CANCELLED are terminal states \u2014 no further transitions are permitted. The service must enforce these transitions; the repository must not."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "startDate must be on or before endDate. This is enforced by the Zod createLeaveRequestSchema.refine() at the boundary, but the service's submit method must also validate the DTO via that schema before processing."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "ILeaveRequestRepository.updateStatus",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns null when no request with the given id exists (caller maps to LeaveRequestNotFoundError). Does not validate state transitions \u2014 the service layer owns that responsibility."
+    },
+    {
+      "operation": "ILeaveRequestService.submit",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws LeaveRequestValidationError if the DTO fails createLeaveRequestSchema validation. Throws domain errors from ILeavePolicyService.validateEntitlement or IBalanceService.hasSufficientBalance (e.g. InsufficientBalanceError). Order of operations: validate DTO \u2192 calculate days \u2192 validateEntitlement \u2192 hasSufficientBalance \u2192 create request (status='submitted') \u2192 notifyLeaveSubmitted \u2192 audit log."
+    },
+    {
+      "operation": "ILeaveRequestService.approve",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws LeaveRequestNotFoundError if the request does not exist. Throws a domain error if the request status is not 'submitted'. On success: updates status to 'approved', sets approvedBy=approverId and approvedAt=now, calls balanceService.deductBalance, calls notificationService.notifyLeaveApproved, writes audit log."
+    },
+    {
+      "operation": "ILeaveRequestService.reject",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws LeaveRequestNotFoundError if the request does not exist. Throws LeaveRequestValidationError if reason is empty. Throws a domain error if the request status is not 'submitted'. On success: updates status to 'rejected', sets rejectionReason, calls notificationService.notifyLeaveRejected, writes audit log."
+    },
+    {
+      "operation": "ILeaveRequestService.cancel",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws LeaveRequestNotFoundError if the request does not exist. Throws a domain error if the request status is not 'submitted' or 'approved'. Throws a domain error if employeeId does not match the request's employeeId (self-cancellation only). On success: updates status to 'cancelled', calls notificationService.notifyLeaveCancelled, writes audit log."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "PgLeaveRequestRepository must follow the same patterns as PgBalanceRepository and PgAuditLogRepository: import pool from '../../shared/db/connection', define a Row interface with snake_case columns, a mapRowTo* function, a COLUMN_MAP for dynamic UPDATE, use parameterized $1/$2 queries, and use randomUUID() from crypto for id generation on create.",
+      "referencePath": "src/modules/balance/balance.repository.ts"
+    },
+    {
+      "requirement": "LeaveRequestService must accept constructor dependencies matching the exact interfaces: ILeaveRequestRepository (from ./leave-request.model), ILeavePolicyService (from ../leave-policy/leave-policy.model), IBalanceService (from ../balance/balance.model), INotificationService (from ../notification/notification.model), IAuditLogRepository (from ../audit-log/audit-log.model).",
+      "referencePath": "src/modules/leave-request/leave-request.model.ts"
+    },
+    {
+      "requirement": "The day-counting formula must match the binding rule in reconciled.json: (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24) + 1 \u2014 inclusive calendar days. This must be applied in the submit method before calling validateEntitlement and hasSufficientBalance.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "The findByManagerId query must use the JOIN pattern: SELECT lr.* FROM leave_requests lr JOIN employees e ON lr.employee_id = e.id WHERE e.manager_id = $1 \u2014 as documented in the ILeaveRequestRepository interface.",
+      "referencePath": "src/modules/leave-request/leave-request.model.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/leave-policy/leave-policy.model.ts \u2014 ILeavePolicyService",
+      "why": "LeaveRequestService.submit calls validateEntitlement(employeeId, leaveType, calculatedDays) to check policy compliance before creating the request."
+    },
+    {
+      "target": "src/modules/notification/notification.model.ts \u2014 INotificationService",
+      "why": "LeaveRequestService calls notifyLeaveSubmitted, notifyLeaveApproved, notifyLeaveRejected, notifyLeaveCancelled for each lifecycle transition."
+    },
+    {
+      "target": "src/modules/balance/balance.model.ts \u2014 IBalanceService",
+      "why": "LeaveRequestService.submit calls hasSufficientBalance; LeaveRequestService.approve calls deductBalance."
+    },
+    {
+      "target": "src/modules/audit-log/audit-log.model.ts \u2014 IAuditLogRepository",
+      "why": "LeaveRequestService calls auditLogRepository.create for every state-changing operation (submit, approve, reject, cancel) to satisfy GP-002."
+    }
+  ]
+}
