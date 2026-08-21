@@ -84,7 +84,15 @@ export const updateLeaveRequestSchema = z.object({
   approvedBy: z.string().nullable().optional(),
   approvedAt: z.coerce.date().nullable().optional(),
   rejectionReason: z.string().optional(),
-});
+}).refine(
+  (data) => {
+    if (data.startDate !== undefined && data.endDate !== undefined) {
+      return data.startDate <= data.endDate;
+    }
+    return true;
+  },
+  { message: 'startDate must be on or before endDate' },
+);
 
 // ---- Repository interface ----
 
