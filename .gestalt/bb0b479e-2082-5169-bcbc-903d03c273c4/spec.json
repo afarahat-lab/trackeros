@@ -1,0 +1,111 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "notification"
+    ],
+    "affectedLayers": [
+      "repository",
+      "service"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "PgNotificationRepository implements all four methods of INotificationRepository (findByRecipientId, findByRecipientIdAndStatus, create, updateStatus) using parameterized SQL queries against the `notifications` table via the pg Pool from `src/shared/db/connection.ts`",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "PgNotificationRepository.create accepts an Omit<Notification, 'id' | 'createdAt'> input, INSERTs a row into the notifications table, and returns the created Notification with id and createdAt populated",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "PgNotificationRepository.updateStatus updates the status (and optionally readAt) of a notification row by id, returns the updated Notification, and returns null when no row matches the id",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "NotificationService implements all six methods of INotificationService (notifyLeaveSubmitted, notifyLeaveApproved, notifyLeaveRejected, notifyLeaveCancelled, getNotifications, markAsRead) and its constructor accepts an INotificationRepository",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Each notify* method creates a Notification via the repository with the correct NotificationType, a non-empty title, a non-empty message, relatedEntityType set to 'leave_request', and relatedEntityId set to the leaveRequest.id from the argument",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "NotificationService.markAsRead delegates to repository.updateStatus with status NotificationStatus.read and sets readAt to the current timestamp; getNotifications delegates to repository.findByRecipientId",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database queries must use parameterized placeholders ($1, $2, \u2026) \u2014 no string interpolation of user-supplied values into SQL",
+    "Repository must import the pg Pool from `src/shared/db/connection.ts` (not create its own pool or connection)",
+    "Repository must use a snake_case\u2194camelCase mapping pattern (mapRowToNotification function) consistent with PgBalanceRepository and PgAuditLogRepository",
+    "NotificationService must not import or depend on any leave-request implementation file \u2014 it only depends on notification.model.ts (which type-imports LeaveRequest) and the INotificationRepository interface"
+  ],
+  "outOfScope": [
+    "Unit/integration tests for notification.repository.ts and notification.service.ts \u2014 these are produced in Phase 3c: LeaveRequest Controller, Routes & All Tests",
+    "LeaveRequest repository, service, controller, routes \u2014 these are produced in sibling sub-phase 3b",
+    "Notification controller, routes, or any HTTP surface \u2014 the notification module has no controller/routes in this phase"
+  ],
+  "ambiguities": [
+    {
+      "description": "The initial NotificationStatus for newly created notifications is not explicitly specified. The Notification entity requires a status field, and the create input is Omit<Notification, 'id' | 'createdAt'> \u2014 so status must be provided. The natural default is 'pending' (not yet delivered) or 'sent' (created and delivered).",
+      "options": [
+        "Set initial status to NotificationStatus.pending",
+        "Set initial status to NotificationStatus.sent"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "Every Notification must have a non-empty recipientId, a valid NotificationType, a non-empty title, a non-empty message, and a valid NotificationStatus. relatedEntityType and relatedEntityId are both set together or both null \u2014 never one without the other."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "INotificationRepository.create",
+      "authRule": "none \u2014 repository layer has no auth; auth is enforced at the controller/middleware layer",
+      "idempotent": false,
+      "errorSemantics": "Must propagate database errors (e.g. constraint violations) as rejected promises \u2014 no silent catch-and-swallow"
+    },
+    {
+      "operation": "INotificationService.markAsRead",
+      "authRule": "none at service layer \u2014 caller (controller) must enforce that the requesting user owns the notification",
+      "idempotent": true,
+      "errorSemantics": "Must throw or propagate an error if the notification does not exist (repository returns null \u2192 service throws a domain error)"
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Repository must follow the same snake_case\u2194camelCase mapping pattern as PgBalanceRepository (mapRowToBalance) and PgAuditLogRepository (mapRowToAuditLog) \u2014 define a NotificationRow interface and a mapRowToNotification function",
+      "referencePath": "src/modules/balance/balance.repository.ts"
+    },
+    {
+      "requirement": "NotificationService must match the INotificationService interface signatures exactly as declared in notification.model.ts \u2014 each notify* method accepts a LeaveRequest and returns Promise<Notification>, getNotifications accepts recipientId and returns Promise<Notification[]>, markAsRead accepts id and returns Promise<Notification>",
+      "referencePath": "src/modules/notification/notification.model.ts"
+    },
+    {
+      "requirement": "The notifications table name and column names must match the reconciled architecture: table `notifications` with columns id, recipient_id, type, title, message, related_entity_type, related_entity_id, status, created_at, read_at",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/db/connection.ts \u2014 the pg Pool instance (named `pool`) used by all repository implementations",
+      "why": "PgNotificationRepository must import and use this shared pool for all database operations"
+    },
+    {
+      "target": "src/modules/notification/notification.model.ts \u2014 the Notification entity, INotificationRepository, and INotificationService interfaces",
+      "why": "Both PgNotificationRepository and NotificationService must import and satisfy these interfaces exactly"
+    }
+  ]
+}
