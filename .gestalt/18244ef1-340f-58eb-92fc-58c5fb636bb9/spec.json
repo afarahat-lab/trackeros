@@ -1,0 +1,188 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave-request",
+      "notification"
+    ],
+    "affectedLayers": [
+      "model",
+      "interface"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The `LeaveRequest` entity interface is exported from `src/modules/leave-request/leave-request.model.ts` with all canonical fields: id, employeeId, leaveType (typed as `LeaveType`), startDate, endDate, reason, status (typed as `LeaveStatus`), approvedBy, approvedAt, rejectionReason, createdAt, updatedAt \u2014 matching the reconciled architecture entity definition.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `ILeaveRequestRepository` interface declares all required methods: `findById`, `findByEmployeeId`, `findByStatus`, `findByManagerId`, `create`, `update`, and `updateStatus` \u2014 with signatures matching the phase specification and the `updateStatus` JSDoc documenting the allowed state transitions (DRAFT\u2192SUBMITTED, SUBMITTED\u2192APPROVED|REJECTED, SUBMITTED|APPROVED\u2192CANCELLED).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `ILeaveRequestService` interface declares all required methods: `submit`, `approve`, `reject`, `cancel`, `getById`, `getByEmployee`, `getPendingForManager` \u2014 each with JSDoc documenting its error contract (e.g., `submit` throws `LeaveRequestValidationError`; `approve`/`reject` throw `LeaveRequestNotFoundError`; `cancel` enforces self-cancellation).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `CreateLeaveRequestDto` interface is exported with fields: employeeId (string), leaveType (LeaveType), startDate (Date), endDate (Date), reason (string, optional).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `createLeaveRequestSchema` Zod schema validates that employeeId is a non-empty string, leaveType is one of the three `LeaveType` enum values, startDate and endDate are coerced to Date, reason is an optional string, and `startDate <= endDate` via `.refine()`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `updateLeaveRequestSchema` Zod schema allows partial updates with optional fields: leaveType, startDate, endDate, reason, status, approvedBy, approvedAt, rejectionReason \u2014 all optional.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Domain error classes `LeaveRequestNotFoundError` (code: `'NOT_FOUND'`) and `LeaveRequestValidationError` (code: `'VALIDATION_ERROR'`) are exported from `leave-request.model.ts`, following the same pattern as `BalanceNotFoundError` and `InsufficientBalanceError` in the balance module.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `Notification` entity interface is exported from `src/modules/notification/notification.model.ts` with all canonical fields: id, recipientId, type (typed as `NotificationType`), title, message, relatedEntityType, relatedEntityId, status (typed as `NotificationStatus`), createdAt, readAt \u2014 matching the reconciled architecture entity definition.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `INotificationRepository` interface declares all required methods: `findByRecipientId`, `findByRecipientIdAndStatus`, `create`, `updateStatus` \u2014 with signatures matching the phase specification.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `INotificationService` interface declares all required methods: `notifyLeaveSubmitted`, `notifyLeaveApproved`, `notifyLeaveRejected`, `notifyLeaveCancelled`, `getNotifications`, `markAsRead` \u2014 each `notify*` method accepts a `LeaveRequest` parameter and returns `Promise<Notification>`, with JSDoc documenting that `relatedEntityType` is set to `'leave_request'` and `relatedEntityId` to `leaveRequest.id`.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "This phase produces ONLY interfaces, DTOs, Zod schemas, and error classes \u2014 NO concrete repository or service implementations. The files `leave-request.repository.ts`, `leave-request.service.ts`, `leave-request.controller.ts`, `leave-request.routes.ts`, `notification.repository.ts`, and `notification.service.ts` are out of scope for this phase and belong to Phase 6 (part 2/2).",
+    "No test files are produced in this phase. Tests for the leave-request and notification modules belong to Phase 6 (part 2/2).",
+    "The `Notification` model's import of `LeaveRequest` from `../leave-request/leave-request.model` MUST be a type-only import (`import type { LeaveRequest }`). This prevents a runtime circular dependency when the notification service is later consumed by the leave-request service.",
+    "All enum-typed fields must use the shared enum types from `src/shared/types/index.ts` \u2014 `LeaveType`, `LeaveStatus`, `NotificationType`, `NotificationStatus` \u2014 not string literals. The Zod schemas must use `z.enum()` with the enum values, not `z.string()`.",
+    "Error classes must follow the established pattern from the balance module: extend `Error`, expose a readonly `code` property (e.g., `'NOT_FOUND'`, `'VALIDATION_ERROR'`), and set `this.name` to the class name in the constructor."
+  ],
+  "outOfScope": [
+    "Concrete repository implementations (`PgLeaveRequestRepository`, `PgNotificationRepository`) \u2014 these belong to Phase 6 (part 2/2).",
+    "Concrete service implementations (`LeaveRequestService`, `NotificationService`) \u2014 these belong to Phase 6 (part 2/2).",
+    "Controller and route definitions (`LeaveRequestController`, `LeaveRequest routes`, notification routes) \u2014 these belong to Phase 6 (part 2/2)."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "A LeaveRequest's `status` field governs its lifecycle. The only allowed transitions are: DRAFT \u2192 SUBMITTED; SUBMITTED \u2192 APPROVED | REJECTED; SUBMITTED | APPROVED \u2192 CANCELLED. REJECTED and CANCELLED are terminal states \u2014 no further transitions are permitted from either. The `updateStatus` repository method is the sole mutator of status and must enforce these transitions."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "When a LeaveRequest transitions to APPROVED, `approvedBy` must be set to the approver's employee ID and `approvedAt` must be set to the current timestamp. When transitioning to REJECTED, `rejectionReason` must be a non-empty string. When transitioning to CANCELLED, the `employeeId` of the caller must match the request's `employeeId` (self-cancellation only)."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "`startDate` must be on or before `endDate`. This is enforced by the `createLeaveRequestSchema` Zod `.refine()` and must also be enforced by any update path that modifies dates."
+    },
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "Every Notification created by the `INotificationService.notify*` methods must have `relatedEntityType` set to `'leave_request'` and `relatedEntityId` set to the `LeaveRequest.id` that triggered the event. The `type` field must match the corresponding `NotificationType` enum value for the lifecycle event."
+    },
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "A Notification's `status` transitions from its initial value (typically `pending` or `sent`) to `read` when `markAsRead` is called. The `readAt` timestamp must be set to the current time when the status transitions to `read`."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "ILeaveRequestRepository.updateStatus",
+      "authRule": "No auth rule at the repository layer \u2014 authorization is enforced at the service/controller layer.",
+      "idempotent": false,
+      "errorSemantics": "Returns `null` when no request with the given id exists (caller must throw `LeaveRequestNotFoundError`). Must reject invalid state transitions \u2014 the implementation in part 2/2 must throw a domain error for disallowed transitions."
+    },
+    {
+      "operation": "ILeaveRequestService.submit",
+      "authRule": "Caller identity is passed via the DTO's employeeId field; the service layer in part 2/2 must verify the authenticated user matches or has HR admin role.",
+      "idempotent": false,
+      "errorSemantics": "Throws `LeaveRequestValidationError` for schema validation failures. Throws domain errors for business rule violations: insufficient balance (propagated from IBalanceService), inactive employee, overlapping request, or policy violation."
+    },
+    {
+      "operation": "ILeaveRequestService.approve",
+      "authRule": "The approverId must be the manager of the employee who submitted the request (or an HR admin). Enforced at the service layer in part 2/2.",
+      "idempotent": false,
+      "errorSemantics": "Throws `LeaveRequestNotFoundError` if the request does not exist. Throws a domain error if the request is not in 'submitted' status."
+    },
+    {
+      "operation": "ILeaveRequestService.reject",
+      "authRule": "The approverId must be the manager of the employee who submitted the request (or an HR admin). Enforced at the service layer in part 2/2.",
+      "idempotent": false,
+      "errorSemantics": "Throws `LeaveRequestNotFoundError` if the request does not exist. Throws a domain error if the request is not in 'submitted' status. Throws `LeaveRequestValidationError` if the rejection reason is empty."
+    },
+    {
+      "operation": "ILeaveRequestService.cancel",
+      "authRule": "Self-cancellation only: the employeeId parameter must match the request's employeeId. Enforced at the service layer in part 2/2.",
+      "idempotent": false,
+      "errorSemantics": "Throws `LeaveRequestNotFoundError` if the request does not exist. Throws a domain error if the request is not in 'submitted' or 'approved' status. Throws a domain error if employeeId does not match the request's employeeId."
+    },
+    {
+      "operation": "INotificationService.markAsRead",
+      "authRule": "The caller must be the notification's recipient. Enforced at the service layer in part 2/2.",
+      "idempotent": true,
+      "errorSemantics": "If the notification is already in 'read' status, the operation should succeed without error (idempotent). If the notification does not exist, throws a domain error."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The `LeaveRequest.leaveType` field must use the `LeaveType` enum imported from `src/shared/types/index.ts`. The `LeaveRequest.status` field must use the `LeaveStatus` enum from the same module. No string literals for these fields.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The `Notification.type` field must use the `NotificationType` enum and `Notification.status` must use the `NotificationStatus` enum, both imported from `src/shared/types/index.ts`.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "Error classes (`LeaveRequestNotFoundError`, `LeaveRequestValidationError`) must follow the exact same pattern as `BalanceNotFoundError` and `InsufficientBalanceError` in `src/modules/balance/balance.model.ts`: extend `Error`, expose a readonly `code` property, set `this.name` in the constructor.",
+      "referencePath": "src/modules/balance/balance.model.ts"
+    },
+    {
+      "requirement": "The `ILeaveRequestService` interface's `submit` method must accept a `CreateLeaveRequestDto` and the service implementation in part 2/2 must calculate leave duration using the binding rule: calendar days inclusive \u2014 `(endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24) + 1`. This rule is documented in the reconciled architecture and must be applied consistently.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "The `ILeaveRequestRepository.updateStatus` method's allowed state transitions (DRAFT\u2192SUBMITTED, SUBMITTED\u2192APPROVED|REJECTED, SUBMITTED|APPROVED\u2192CANCELLED) must match the lifecycle documented in the reconciled architecture's `LeaveRequest` entity purpose: \"Tracks the full lifecycle from draft through approval/rejection to cancellation.\"",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts",
+      "why": "Both `leave-request.model.ts` and `notification.model.ts` import shared enums (`LeaveType`, `LeaveStatus`, `NotificationType`, `NotificationStatus`) from this module. All enum-typed fields in entities, DTOs, and Zod schemas depend on these exact enum definitions."
+    },
+    {
+      "target": "src/modules/employee/employee.model.ts",
+      "why": "`LeaveRequest.employeeId` references an Employee. The `ILeaveRequestRepository.findByManagerId` method requires joining on `Employee.managerId`. The `ILeaveRequestService` must validate that the employee exists and is active before allowing submission."
+    },
+    {
+      "target": "src/modules/leave-policy/leave-policy.model.ts",
+      "why": "`ILeaveRequestService.submit` must call `ILeavePolicyService.validateEntitlement` to check that the requested leave type is valid and the requested days do not exceed the policy's entitlement. The `LeaveRequest.leaveType` must correspond to a `LeavePolicy.leaveType`."
+    },
+    {
+      "target": "src/modules/balance/balance.model.ts",
+      "why": "`ILeaveRequestService.submit` must call `IBalanceService.hasSufficientBalance` before creating the request. `ILeaveRequestService.approve` must call `IBalanceService.deductBalance` to decrement used days. `ILeaveRequestService.cancel` (of an approved request) must restore balance days."
+    },
+    {
+      "target": "src/modules/audit-log/audit-log.model.ts",
+      "why": "Every state-changing operation in `ILeaveRequestService` (submit, approve, reject, cancel) must write an audit record via `IAuditLogRepository.create`, per GP-002."
+    }
+  ]
+}
