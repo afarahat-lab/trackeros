@@ -1,32 +1,39 @@
 # Continue the previous attempt (it hit the iteration limit before finishing)
 
-A prior code-agent attempt on this work dir (`/tmp/gestalt/phase/3350baf6-9bd5-4cac-b688-f263972317f9/8`) was stopped after reaching its iteration limit. Its work is ALREADY on disk here — do NOT restart from scratch or re-read everything; build on what exists. It made 2 file edit(s). Its last verification PASSED (`cd /tmp/gestalt/phase/3350baf6-9bd5-4cac-b688-f263972317f9/8 && npm run build 2>&1`).
+A prior code-agent attempt on this work dir (`/tmp/gestalt/phase/3350baf6-9bd5-4cac-b688-f263972317f9/9`) was stopped after reaching its iteration limit. Its work is ALREADY on disk here — do NOT restart from scratch or re-read everything; build on what exists. It made 5 file edit(s). Its last verification PASSED (`cd /tmp/gestalt/phase/3350baf6-9bd5-4cac-b688-f263972317f9/9 && npm test 2>&1`).
 
 Finish the task now: fix any failing build/type-check/tests, then RUN the build and the tests and fix anything still failing. Stop as soon as the build and tests pass. The full original task (with all mandatory constraints) follows for reference.
 
 ---
 
-# Implement this phase: Phase 3a: Notification Repository & Service
+# Implement this phase: Phase 3b: LeaveRequest Repository & Service
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/3350baf6-9bd5-4cac-b688-f263972317f9/8`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/3350baf6-9bd5-4cac-b688-f263972317f9/9`. Do not clone anything; work only in this directory.
 
 ## What to build
-PgNotificationRepository compiles and correctly implements all INotificationRepository methods using pg Pool
-NotificationService compiles and correctly implements all INotificationService methods, delegating to the repository
-Both files import only from already-existing sources (notification.model.ts, db/connection.ts, shared/types)
+PgLeaveRequestRepository compiles and correctly implements all ILeaveRequestRepository methods using pg Pool, including findByManagerId with JOIN
+LeaveRequestService compiles and correctly implements all ILeaveRequestService methods with proper business logic (submit, approve, reject, cancel, getById, getByEmployee, getPendingForManager)
+Calendar days calculation uses the binding rule: (endDate.getTime() - startDate.getTime()) / (1000*60*60*24) + 1
+cancel only allows cancellation when current status is 'submitted' or 'approved'
+All dependencies are injected via constructor and imported from already-existing model files
 
 ## Success criteria
-Implement the concrete Notification repository and service. These have no dependency on leave-request implementation files — they only depend on `notification.model.ts` (from part 1/2) and `db/connection.ts`.
+Implement the concrete LeaveRequest repository and service. Depends on `leave-request.model.ts` (from part 1/2), `balance.model.ts`, `leave-policy.model.ts`, `audit-log.model.ts`, `notification.model.ts` (for INotificationService), and `db/connection.ts`. The Notification service from Phase 3a is already available.
 
 Files to create:
-1. `src/modules/notification/notification.repository.ts` — Implement `PgNotificationRepository` satisfying `INotificationRepository`. Use pg Pool. Methods: findByRecipientId, findByRecipientIdAndStatus, create, updateStatus.
-2. `src/modules/notification/notification.service.ts` — Implement `NotificationService` satisfying `INotificationService`. Constructor takes `INotificationRepository`. Each notify* method creates a Notification with appropriate type, title, message, relatedEntityType='leave_request', relatedEntityId=leaveRequest.id. getNotifications delegates to repo, markAsRead updates status to 'read'.
+1. `src/modules/leave-request/leave-request.repository.ts` — Implement `PgLeaveRequestRepository` satisfying `ILeaveRequestRepository`. Use pg Pool. Methods: findById, findByEmployeeId, findByStatus, findByManagerId (JOIN with employee table on manager_id), create, update, updateStatus (UPDATE status, approvedBy, approvedAt, rejectionReason as appropriate). Import from `./leave-request.model.ts`.
+2. `src/modules/leave-request/leave-request.service.ts` — Implement `LeaveRequestService` satisfying `ILeaveRequestService`. Constructor takes `ILeaveRequestRepository`, `ILeavePolicyService`, `IBalanceService`, `INotificationService`, `IAuditLogRepository`.
+   - `submit`: validate via policy service (validateEntitlement), calculate days using [BINDING RULE: Calendar days inclusive — (endDate.getTime() - startDate.getTime()) / (1000*60*60*24) + 1], check balance via balanceService.hasSufficientBalance, create request with status 'submitted', call notificationService.notifyLeaveSubmitted, log audit.
+   - `approve`: update status to 'approved', set approvedBy/approvedAt, call balanceService.deductBalance, call notificationService.notifyLeaveApproved, log audit.
+   - `reject`: update status to 'rejected', set rejectionReason, call notificationService.notifyLeaveRejected, log audit.
+   - `cancel`: update status to 'cancelled' (only if current status is 'submitted' or 'approved'), call notificationService.notifyLeaveCancelled, log audit.
+   - `getById`, `getByEmployee`, `getPendingForManager`: delegate to repository.
 
-Read before generating: `src/modules/notification/notification.model.ts`, `src/shared/db/connection.ts`, `src/shared/types/index.ts`.
+Read before generating: `src/modules/leave-request/leave-request.model.ts`, `src/modules/balance/balance.model.ts`, `src/modules/leave-policy/leave-policy.model.ts`, `src/modules/audit-log/audit-log.model.ts`, `src/modules/notification/notification.model.ts`, `src/shared/db/connection.ts`, `src/shared/types/index.ts`.
 
 ## Owned by SIBLING sub-phases (OUT OF SCOPE for this sub-phase)
 This is ONE sub-phase of a split phase. The deliverables below belong to sibling sub-phases — do NOT create them here, do NOT list them as success criteria, and this sub-phase MUST NOT be gated on their presence (they are produced by a sibling, not missing):
-- "Phase 3b: LeaveRequest Repository & Service": src/modules/leave-request/leave-request.repository.ts, src/modules/leave-request/leave-request.service.ts
+- "Phase 3a: Notification Repository & Service": src/modules/notification/notification.repository.ts, src/modules/notification/notification.service.ts
 - "Phase 3c: LeaveRequest Controller, Routes & All Tests": src/modules/leave-request/leave-request.controller.ts, src/modules/leave-request/leave-request.routes.ts, tests/unit/modules/leave-request/leave-request.repository.spec.ts, tests/unit/modules/leave-request/leave-request.service.spec.ts, tests/unit/modules/notification/notification.repository.spec.ts, tests/unit/modules/notification/notification.service.spec.ts
 
 In particular, UNIT/INTEGRATION TESTS are OUT OF SCOPE for this sub-phase — they are produced in: Phase 3c: LeaveRequest Controller, Routes & All Tests. Do not create test files here, do not require test existence or coverage as a success criterion, and do not fail the gate for missing tests.
@@ -37,32 +44,41 @@ These are resolved, feature-wide decisions. Wherever this phase touches the conc
 
 ## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
 The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
-- `Notification` — the entity MUST have exactly these fields:
+- `LeaveRequest` — the entity MUST have exactly these fields:
     - id: string
-    - recipientId: string
-    - type: string
-    - title: string
-    - message: string
-    - relatedEntityType: string | null
-    - relatedEntityId: string | null
-    - status: string
+    - employeeId: string
+    - leaveType: string
+    - startDate: Date
+    - endDate: Date
+    - reason: string | undefined
+    - status: LeaveRequestStatus
+    - approvedBy: string | null
+    - approvedAt: Date | null
+    - rejectionReason: string | undefined
     - createdAt: Date
-    - readAt: Date | null
+    - updatedAt: Date
 
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- Repository must follow the same snake_case↔camelCase mapping pattern as PgBalanceRepository (mapRowToBalance) and PgAuditLogRepository (mapRowToAuditLog) — define a NotificationRow interface and a mapRowToNotification function (see `src/modules/balance/balance.repository.ts`)
-- NotificationService must match the INotificationService interface signatures exactly as declared in notification.model.ts — each notify* method accepts a LeaveRequest and returns Promise<Notification>, getNotifications accepts recipientId and returns Promise<Notification[]>, markAsRead accepts id and returns Promise<Notification> (see `src/modules/notification/notification.model.ts`)
-- The notifications table name and column names must match the reconciled architecture: table `notifications` with columns id, recipient_id, type, title, message, related_entity_type, related_entity_id, status, created_at, read_at (see `.gestalt/architecture/reconciled.json`)
+- PgLeaveRequestRepository must follow the same patterns as PgBalanceRepository and PgAuditLogRepository: import pool from '../../shared/db/connection', define a Row interface with snake_case columns, a mapRowTo* function, a COLUMN_MAP for dynamic UPDATE, use parameterized $1/$2 queries, and use randomUUID() from crypto for id generation on create. (see `src/modules/balance/balance.repository.ts`)
+- LeaveRequestService must accept constructor dependencies matching the exact interfaces: ILeaveRequestRepository (from ./leave-request.model), ILeavePolicyService (from ../leave-policy/leave-policy.model), IBalanceService (from ../balance/balance.model), INotificationService (from ../notification/notification.model), IAuditLogRepository (from ../audit-log/audit-log.model). (see `src/modules/leave-request/leave-request.model.ts`)
+- The day-counting formula must match the binding rule in reconciled.json: (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24) + 1 — inclusive calendar days. This must be applied in the submit method before calling validateEntitlement and hasSufficientBalance. (see `.gestalt/architecture/reconciled.json`)
+- The findByManagerId query must use the JOIN pattern: SELECT lr.* FROM leave_requests lr JOIN employees e ON lr.employee_id = e.id WHERE e.manager_id = $1 — as documented in the ILeaveRequestRepository interface. (see `src/modules/leave-request/leave-request.model.ts`)
 ### Entity invariants — enforce these
-- Reuse or extend `Notification`: Every Notification must have a non-empty recipientId, a valid NotificationType, a non-empty title, a non-empty message, and a valid NotificationStatus. relatedEntityType and relatedEntityId are both set together or both null — never one without the other.
+- Reuse or extend `LeaveRequest`: A LeaveRequest's lifecycle is: DRAFT → SUBMITTED → APPROVED | REJECTED, and SUBMITTED | APPROVED → CANCELLED. REJECTED and CANCELLED are terminal states — no further transitions are permitted. The service must enforce these transitions; the repository must not.
+- Reuse or extend `LeaveRequest`: startDate must be on or before endDate. This is enforced by the Zod createLeaveRequestSchema.refine() at the boundary, but the service's submit method must also validate the DTO via that schema before processing.
 ### Interface contract — expose these operations (their shape is yours)
-- INotificationRepository.create — none — repository layer has no auth; auth is enforced at the controller/middleware layer; Must propagate database errors (e.g. constraint violations) as rejected promises — no silent catch-and-swallow
-- INotificationService.markAsRead — none at service layer — caller (controller) must enforce that the requesting user owns the notification; idempotent; Must throw or propagate an error if the notification does not exist (repository returns null → service throws a domain error)
+- ILeaveRequestRepository.updateStatus — Returns null when no request with the given id exists (caller maps to LeaveRequestNotFoundError). Does not validate state transitions — the service layer owns that responsibility.
+- ILeaveRequestService.submit — Throws LeaveRequestValidationError if the DTO fails createLeaveRequestSchema validation. Throws domain errors from ILeavePolicyService.validateEntitlement or IBalanceService.hasSufficientBalance (e.g. InsufficientBalanceError). Order of operations: validate DTO → calculate days → validateEntitlement → hasSufficientBalance → create request (status='submitted') → notifyLeaveSubmitted → audit log.
+- ILeaveRequestService.approve — Throws LeaveRequestNotFoundError if the request does not exist. Throws a domain error if the request status is not 'submitted'. On success: updates status to 'approved', sets approvedBy=approverId and approvedAt=now, calls balanceService.deductBalance, calls notificationService.notifyLeaveApproved, writes audit log.
+- ILeaveRequestService.reject — Throws LeaveRequestNotFoundError if the request does not exist. Throws LeaveRequestValidationError if reason is empty. Throws a domain error if the request status is not 'submitted'. On success: updates status to 'rejected', sets rejectionReason, calls notificationService.notifyLeaveRejected, writes audit log.
+- ILeaveRequestService.cancel — Throws LeaveRequestNotFoundError if the request does not exist. Throws a domain error if the request status is not 'submitted' or 'approved'. Throws a domain error if employeeId does not match the request's employeeId (self-cancellation only). On success: updates status to 'cancelled', calls notificationService.notifyLeaveCancelled, writes audit log.
 ### Integration points — connect to these
-- src/shared/db/connection.ts — the pg Pool instance (named `pool`) used by all repository implementations — PgNotificationRepository must import and use this shared pool for all database operations
-- src/modules/notification/notification.model.ts — the Notification entity, INotificationRepository, and INotificationService interfaces — Both PgNotificationRepository and NotificationService must import and satisfy these interfaces exactly
+- src/modules/leave-policy/leave-policy.model.ts — ILeavePolicyService — LeaveRequestService.submit calls validateEntitlement(employeeId, leaveType, calculatedDays) to check policy compliance before creating the request.
+- src/modules/notification/notification.model.ts — INotificationService — LeaveRequestService calls notifyLeaveSubmitted, notifyLeaveApproved, notifyLeaveRejected, notifyLeaveCancelled for each lifecycle transition.
+- src/modules/balance/balance.model.ts — IBalanceService — LeaveRequestService.submit calls hasSufficientBalance; LeaveRequestService.approve calls deductBalance.
+- src/modules/audit-log/audit-log.model.ts — IAuditLogRepository — LeaveRequestService calls auditLogRepository.create for every state-changing operation (submit, approve, reject, cancel) to satisfy GP-002.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
