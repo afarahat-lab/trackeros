@@ -1,0 +1,96 @@
+{
+  "scope": {
+    "affectedDomains": [],
+    "affectedLayers": [],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "`PgNotificationRepository` class exists and satisfies the `INotificationRepository` interface \u2014 all four methods (`findByRecipientId`, `findByRecipientIdAndStatus`, `create`, `updateStatus`) are implemented with correct signatures matching the interface.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`PgNotificationRepository.create` accepts `Omit<Notification, 'id' | 'createdAt'>`, executes an `INSERT INTO notifications (...) VALUES (...) RETURNING *` with parameterized placeholders, and returns the persisted `Notification` with generated `id` and `createdAt`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`PgNotificationRepository.findByRecipientId` queries `notifications` table by `recipient_id` and returns all matching rows as `Notification[]` (empty array when none match).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`PgNotificationRepository.findByRecipientIdAndStatus` queries by both `recipient_id` and `status` and returns matching `Notification[]`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`PgNotificationRepository.updateStatus` executes `UPDATE notifications SET status = $2, read_at = $3, ... WHERE id = $1 RETURNING *` and returns the updated `Notification`, or `null` when no row matches the id.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`NotificationService` class exists and satisfies the `INotificationService` interface \u2014 all six methods (`notifyLeaveSubmitted`, `notifyLeaveApproved`, `notifyLeaveRejected`, `notifyLeaveCancelled`, `getNotifications`, `markAsRead`) are implemented with correct signatures.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Each `notify*` method calls `repository.create` with a notification object where `type` is the correct `NotificationType` enum value, `relatedEntityType` is `'leave_request'`, `relatedEntityId` is `leaveRequest.id`, `recipientId` is `leaveRequest.employeeId`, and `status` is `NotificationStatus.pending`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`NotificationService.getNotifications(recipientId)` delegates to `repository.findByRecipientId(recipientId)` and returns the result.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`NotificationService.markAsRead(id)` calls `repository.updateStatus(id, NotificationStatus.read, new Date())` and throws a generic `Error` (e.g. `new Error('Notification not found')`) if the repository returns `null`.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database queries must use parameterized placeholders (`$1`, `$2`, \u2026) \u2014 no string interpolation of values into SQL.",
+    "The repository must import `pool` from `../../shared/db/connection` \u2014 no other database connection mechanism.",
+    "The repository must define a `NotificationRow` interface with snake_case column names and a `mapRowToNotification` function converting to camelCase `Notification` \u2014 matching the pattern of `PgBalanceRepository` and `PgAuditLogRepository`.",
+    "The service constructor must accept `INotificationRepository` \u2014 no other dependencies.",
+    "The service must be stateless \u2014 it delegates all persistence to the repository and holds no mutable state.",
+    "The `LeaveRequest` type must be imported as a type-only import (`import type { LeaveRequest } from '../leave-request/leave-request.model'`) \u2014 matching the pattern already established in `notification.model.ts`."
+  ],
+  "outOfScope": [
+    "Unit/integration tests for notification repository and service \u2014 these are produced in Phase 3c (LeaveRequest Controller, Routes & All Tests).",
+    "LeaveRequest repository, service, controller, and routes \u2014 these are produced in sibling sub-phases 3b and 3c.",
+    "Notification controller, routes, or any HTTP surface \u2014 the notification module has no controller/routes in the current architecture."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "Every Notification created through the repository has a generated `id` (string) and `createdAt` (Date) assigned by the database \u2014 the caller supplies only `recipientId`, `type`, `title`, `message`, `relatedEntityType`, `relatedEntityId`, `status`, and `readAt`."
+    },
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "A Notification's `status` transitions from `pending` (on creation by a notify* method) to `read` (via `markAsRead`). The `readAt` field is `null` until the notification is marked as read, at which point it is set to the current timestamp."
+    },
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "When created via a `notify*` service method, `relatedEntityType` is always `'leave_request'` and `relatedEntityId` is always the `leaveRequest.id` \u2014 notifications are always tied to a specific leave request."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "INotificationRepository.create",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Must return the fully-hydrated Notification (with id and createdAt). If the database insert fails, the error propagates to the caller \u2014 the repository does not catch or transform it."
+    }
+  ],
+  "consistencyRequirements": [],
+  "integrationPoints": []
+}
