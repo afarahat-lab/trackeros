@@ -1,26 +1,26 @@
-# Implement this phase: Sub-phase 1: Employee module implementation
+# Implement this phase: Sub-phase 2: Audit module implementation and shared types update
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/da3cebcf-aae0-446c-b943-05fc4169a665/2`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/da3cebcf-aae0-446c-b943-05fc4169a665/3`. Do not clone anything; work only in this directory.
 
 You are the IMPLEMENTATION agent, not a planner. The platform measures your work EXCLUSIVELY by the files you create or modify in this working tree (`git status`). Ending your turn with a plan, a summary, or an announcement of what you are 'about to' do — without having actually edited files — is a FAILURE: a turn that leaves the working tree untouched is discarded. Explore only as much as you need, then MAKE the edits with your file-editing tool. Never end your turn before the files exist on disk.
 
 ## What to build
 All three files compile without errors via `tsc --noEmit`
-EmployeeRepository correctly implements IEmployeeRepository with findById, findByEmail, findByDepartment methods using the shared pg pool
-EmployeeService correctly implements IEmployeeService and delegates all calls to IEmployeeRepository
-Barrel index.ts re-exports all five symbols: Employee, IEmployeeRepository, EmployeeRepository, IEmployeeService, EmployeeService
+AuditService correctly implements IAuditService with a record method that inserts into audit_records table using the shared pg pool and returns the created AuditRecord
+Barrel index.ts re-exports AuditRecord, IAuditService, and AuditService
+src/shared/types/index.ts re-exports AuditAction alongside existing exports
 
 ## Success criteria
-Create the concrete EmployeeRepository, EmployeeService, and barrel export for the employee module. Depends on interfaces and models from part 1 (already present).
+Create the concrete AuditService, its barrel export, and update the shared types barrel. Depends on interfaces and models from part 1 (already present) and the shared db connection.
 
-Files to create:
-- `src/modules/employee/employee.repository.ts` — Implement `EmployeeRepository` class implementing `IEmployeeRepository`. Uses the shared `pool` from `src/shared/db/connection.ts` for PostgreSQL queries. Methods: `findById`, `findByEmail`, `findByDepartment`. Import `IEmployeeRepository` from `./employee.repository.interface` and `Employee` from `./employee.model`.
-- `src/modules/employee/employee.service.ts` — Implement `EmployeeService` class implementing `IEmployeeService`. Constructor takes `IEmployeeRepository`. Methods delegate to repository. Import `IEmployeeService` from `./employee.service.interface`, `IEmployeeRepository` from `./employee.repository.interface`, `Employee` from `./employee.model`.
-- `src/modules/employee/index.ts` — Barrel export re-exporting: `Employee`, `IEmployeeRepository`, `EmployeeRepository`, `IEmployeeService`, `EmployeeService`.
+Files to create/update:
+- `src/modules/audit/audit.service.ts` — Implement `AuditService` class implementing `IAuditService`. Constructor takes the shared `pool` from `src/shared/db/connection.ts`. The `record` method inserts into an `audit_records` table and returns the created `AuditRecord`. Import `IAuditService` from `./audit.service.interface`, `AuditRecord` from `./audit.model`, `AuditAction` from `../../shared/types`.
+- `src/modules/audit/index.ts` — Barrel export re-exporting: `AuditRecord`, `IAuditService`, `AuditService`.
+- `src/shared/types/index.ts` — Update the barrel to also re-export `AuditAction` (already defined in part 1; ensure it's exported).
 
 ## Owned by SIBLING sub-phases (OUT OF SCOPE for this sub-phase)
 This is ONE sub-phase of a split phase. The deliverables below belong to sibling sub-phases — do NOT create them here, do NOT list them as success criteria, and this sub-phase MUST NOT be gated on their presence (they are produced by a sibling, not missing):
-- "Sub-phase 2: Audit module implementation and shared types update": src/modules/audit/audit.service.ts, src/modules/audit/index.ts, src/shared/types/index.ts
+- "Sub-phase 1: Employee module implementation": src/modules/employee/employee.repository.ts, src/modules/employee/employee.service.ts, src/modules/employee/index.ts
 - "Sub-phase 3: Unit tests for employee and audit modules": tests/unit/modules/employee/employee.repository.test.ts, tests/unit/modules/audit/audit.service.test.ts
 
 In particular, UNIT/INTEGRATION TESTS are OUT OF SCOPE for this sub-phase — they are produced in: Sub-phase 3: Unit tests for employee and audit modules. Do not create test files here, do not require test existence or coverage as a success criterion, and do not fail the gate for missing tests.
@@ -61,19 +61,17 @@ scope decision, not an oversight. [BINDING RULE — operator decision resolving:
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- EmployeeRepository must implement IEmployeeRepository from employee.repository.interface.ts — all method signatures must match exactly (see `src/modules/employee/employee.repository.interface.ts`)
-- EmployeeRepository query result mapping must produce objects matching the Employee interface shape (id, fullName, email, department, managerId, createdAt, updatedAt) with correct types (see `src/modules/employee/employee.model.ts`)
-- EmployeeRepository must import and use the exported `pool` from src/shared/db/connection.ts — no other pool or client creation (see `src/shared/db/connection.ts`)
-- Barrel index at src/modules/employee/index.ts must follow the same re-export pattern as src/modules/uptime/index.ts: named re-exports using `export { Thing } from './thing.file'` syntax (see `src/modules/uptime/index.ts`)
+- The `AuditService` constructor signature must match the pattern established by `EmployeeRepository`: accept the shared `pool` import from `src/shared/db/connection.ts` as a constructor parameter (not import it internally as a module-level side-effect) (see `src/modules/employee/employee.repository.ts`)
+- The `record` method signature must exactly match `IAuditService.record`: accept `Omit<AuditRecord, 'id' | 'createdAt'>` and return `Promise<AuditRecord>` (see `src/modules/audit/audit.service.interface.ts`)
+- The `AuditRecord` type used in the service implementation must be the one from `./audit.model` — no local redefinition or structural divergence (see `src/modules/audit/audit.model.ts`)
+- The `src/modules/audit/index.ts` barrel export must follow the same re-export pattern as `src/modules/employee/index.ts`: named re-exports of the model, interface, and implementation (see `src/modules/employee/index.ts`)
 ### Entity invariants — enforce these
-- Reuse or extend `EmployeeRepository`: Must implement IEmployeeRepository exactly — all three methods (findById, findByEmail, findByDepartment) must be present with signatures matching the interface. The class must be the default or named export usable as a constructor.
-- Reuse or extend `EmployeeService`: Must implement IEmployeeService exactly — both methods (getEmployeeById, getEmployeeByEmail) must be present with signatures matching the interface. Constructor must accept IEmployeeRepository. Methods must delegate to the injected repository, not contain business logic.
+- Reuse or extend `AuditRecord`: Every `AuditRecord` returned by `record()` must have a non-empty `id` (UUID), a non-empty `createdAt` (Date), and all caller-supplied fields (`entityType`, `entityId`, `action`, `performedBy`, `changes`) preserved exactly as passed
+- Reuse or extend `AuditRecord`: `AuditRecord.action` must be one of the `AuditAction` enum values — the type system enforces this at compile time; the implementation must not widen or coerce the action field
 ### Interface contract — expose these operations (their shape is yours)
-- EmployeeRepository.findById — idempotent; Returns null when no row matches the given id — does not throw
-- EmployeeRepository.findByEmail — idempotent; Returns null when no row matches the given email — does not throw
-- EmployeeRepository.findByDepartment — idempotent; Returns empty array when no employees match the department — does not throw
+- IAuditService.record — No auth enforcement at this layer — the AuditService is a low-level infrastructure service; RBAC is enforced by the callers (controllers/services) that invoke `record`; Must reject with a typed error if the database insert fails (e.g. connection error, constraint violation); must not silently swallow errors
 ### Integration points — connect to these
-- src/shared/db/connection.ts (shared pool) — EmployeeRepository requires the PostgreSQL pool for all database queries
+- src/shared/db/connection.ts — AuditService uses the shared PostgreSQL pool for inserting audit records
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
