@@ -1,0 +1,85 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "audit",
+      "shared-types"
+    ],
+    "affectedLayers": [
+      "service",
+      "barrel-export"
+    ],
+    "isBreakingChange": true,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "`AuditService` class exists in `src/modules/audit/audit.service.ts`, implements `IAuditService`, and its constructor accepts the shared `pool` (imported from `src/shared/db/connection.ts`) \u2014 not `IAuditRepository`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`AuditService.record()` executes `INSERT INTO audit_records` via the shared pool, using `gen_random_uuid()` for `id`, `NOW()` for `created_at`, and a `RETURNING` clause with snake_case\u2192camelCase column aliases (`entity_type AS \"entityType\"`, `entity_id AS \"entityId\"`, `performed_by AS \"performedBy\"`, `created_at AS \"createdAt\"`), and returns the inserted `AuditRecord`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`src/modules/audit/index.ts` barrel exports exactly three symbols: `AuditRecord`, `IAuditService`, `AuditService`. It does NOT export `IAuditRepository` or `AuditRepository`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`src/shared/types/index.ts` exports `AuditAction` enum (already present; verified). No changes needed to this file \u2014 the barrel already satisfies the requirement.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The project compiles cleanly: `npm run build` (which runs `tsc --noEmit` equivalent) passes with zero type errors.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No `any` types anywhere in the implementation \u2014 use `unknown` with type guards if needed (HARNESS constraint `no-any`).",
+    "TypeScript strict mode: `strict: true`, `target: ES2022`, `module: commonjs`, `rootDir: ./src`, `outDir: ./dist` per `tsconfig.json`.",
+    "The reconciled architecture (`.gestalt/architecture/reconciled.json`) is authoritative: the audit module has NO repository. `AuditService` takes `pool` directly and performs its own SQL. This overrides HARNESS constraint `no-direct-db-outside-repository` and GP-001 for the audit module specifically.",
+    "The `record` method must use parameterized queries (`$1, $2, ...`) \u2014 never string interpolation \u2014 for all values passed to the SQL statement."
+  ],
+  "outOfScope": [
+    "Unit tests for the audit module \u2014 these are produced in \"Sub-phase 3: Unit tests for employee and audit modules\". Do not create `tests/unit/modules/audit/audit.service.test.ts` or any other test file.",
+    "Employee module implementation (`employee.repository.ts`, `employee.service.ts`, `employee/index.ts`) \u2014 these are produced in \"Sub-phase 1: Employee module implementation\".",
+    "Creation or modification of `IAuditRepository`, `AuditRepository`, or `audit.repository.interface.ts` / `audit.repository.ts` \u2014 these are artifacts of a prior design being replaced. The audit module must NOT use a repository.",
+    "Database migration for the `audit_records` table \u2014 the table is assumed to exist. This phase only implements the service that inserts into it."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "AuditRecord",
+      "mustExistOrExtend": true,
+      "invariant": "Every `AuditRecord` inserted by `AuditService.record()` must have `id` generated server-side via `gen_random_uuid()` and `createdAt` set to the database's `NOW()` \u2014 the caller provides neither field (matching the `Omit<AuditRecord, 'id' | 'createdAt'>` input type)."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IAuditService.record(record: Omit<AuditRecord, 'id' | 'createdAt'>): Promise<AuditRecord>",
+      "authRule": "No auth enforcement at this layer \u2014 the audit service is a passive recorder called by other services; the caller is responsible for providing the correct `performedBy` value.",
+      "idempotent": false,
+      "errorSemantics": "If the database insert fails (e.g., constraint violation, connection error), the promise rejects with the underlying error \u2014 the service does not swallow or transform errors."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "`AuditService` must import `pool` from `src/shared/db/connection.ts` \u2014 the same singleton `Pool` instance used by all other modules. No separate connection or pool creation.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "`AuditService` must implement `IAuditService` from `./audit.service.interface.ts` \u2014 the `record` method signature must match exactly: `record(record: Omit<AuditRecord, 'id' | 'createdAt'>): Promise<AuditRecord>`.",
+      "referencePath": "src/modules/audit/audit.service.interface.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "AuditService imports the shared `pool` singleton for all database operations."
+    }
+  ]
+}
