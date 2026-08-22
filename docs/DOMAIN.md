@@ -34,7 +34,7 @@ Represents a leave record managed by the `leave` module, including leave request
 | startDate | Date | true |
 | endDate | Date | true |
 | reason | string \| undefined | false |
-| status | LeaveRequestStatus | true |
+| status | LeaveStatus | true |
 | approvedBy | string \| null | false |
 | approvedAt | Date \| null | false |
 | createdAt | Date | true |
@@ -65,7 +65,7 @@ Represents a leave record managed by the `leave` module, including leave request
 
 | Field | Type | Required |
 |-------|------|----------|
-| status | LeaveRequestStatus | false |
+| status | LeaveStatus | false |
 | leaveTypeId | string | false |
 | startDateFrom | Date | false |
 | startDateTo | Date | false |
@@ -125,18 +125,12 @@ Represents employee data managed by the `employee` module, including employee re
 | Field | Type | Required |
 |-------|------|----------|
 | id | string | true |
-| employeeNumber | string | true |
-| firstName | string | true |
-| lastName | string | true |
+| fullName | string | true |
 | email | string | true |
+| department | string | true |
 | managerId | string \| null | false |
-| department | string \| null | false |
-| hireDate | Date | true |
-| terminationDate | Date \| null | false |
-| employmentStatus | 'ACTIVE' \| 'INACTIVE' \| 'TERMINATED' | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
-| deletedAt | Date \| null | false |
 
 ## policy
 
@@ -208,20 +202,29 @@ Represents notification data managed by the `notification` module, including not
 
 Represents audit data managed by the `audit` module, including audit records, change history, and activity tracking information.
 
-### Audit
+### AuditAction
+
+| Value | Description |
+|-------|-------------|
+| CREATE | Entity created |
+| SUBMIT | Entity submitted |
+| UPDATE | Entity updated |
+| DELETE | Entity deleted |
+| APPROVE | Entity approved |
+| REJECT | Entity rejected |
+| CANCEL | Entity cancelled |
+
+### AuditRecord
 
 | Field | Type | Required |
 |-------|------|----------|
 | id | string | true |
 | entityType | string | true |
 | entityId | string | true |
-| action | 'CREATE' \| 'UPDATE' \| 'DELETE' \| 'APPROVE' \| 'REJECT' | true |
-| oldValues | Record<string, any> \| null | false |
-| newValues | Record<string, any> \| null | false |
-| performedBy | string \| null | false |
-| performedAt | Date | true |
+| action | AuditAction | true |
+| performedBy | string | true |
+| changes | Record\<string, unknown\> \| null | false |
 | createdAt | Date | true |
-| updatedAt | Date | true |
 
 ### AuditLog
 
@@ -231,23 +234,10 @@ Represents audit data managed by the `audit` module, including audit records, ch
 | entityType | string | true |
 | entityId | string | true |
 | action | 'CREATE' \| 'UPDATE' \| 'DELETE' \| 'APPROVE' \| 'REJECT' | true |
-| oldValues | Record<string, any> \| null | false |
-| newValues | Record<string, any> \| null | false |
+| oldValues | Record\<string, any\> \| null | false |
+| newValues | Record\<string, any\> \| null | false |
 | performedBy | string \| null | false |
 | performedAt | Date | true |
-
-### AuditRecord
-
-| Field | Type | Required |
-|-------|------|----------|
-| entity_type | string | true |
-| entity_id | string | true |
-| action | string | true |
-| changed_by | string \| null | false |
-| old_values | Record<string, any> \| null | false |
-| new_values | Record<string, any> \| null | false |
-| ip_address | string \| null | false |
-| user_agent | string \| null | false |
 
 ### AuditServiceInterface
 
@@ -259,7 +249,7 @@ Represents audit data managed by the `audit` module, including audit records, ch
 | resourceId | string | true |
 | actorId | string | true |
 | timestamp | Date | true |
-| metadata | Record<string, unknown> \| null | false |
+| metadata | Record\<string, unknown\> \| null | false |
 
 ## validation
 

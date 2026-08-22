@@ -16,22 +16,12 @@ The architecture is modular, with a clear separation of concerns between models,
 ## Module structure
 
 ```
-src/modules/leave/leave.{model,repository,service,controller,routes}.ts
-src/modules/balance/balance.{model,repository,service,controller,routes}.ts
-src/modules/employee/employee.{model,repository,service,controller,routes}.ts
-src/modules/policy/policy.{model,repository,service,controller,routes}.ts
-src/modules/notification/notification.{model,repository,service,controller,routes}.ts
-src/modules/LeaveStatus/    — LeaveStatus module
-src/modules/BaseEntity/    — BaseEntity module
-src/modules/LeaveRequest/    — LeaveRequest module
-src/modules/LeaveType/    — LeaveType module
-src/modules/LeavePolicy/    — LeavePolicy module
-src/modules/AuditLog/    — AuditLog module
-src/modules/AuditRecord/    — AuditRecord module
-src/modules/AuditServiceInterface/    — AuditServiceInterface module
-src/shared/db connection.ts
-src/shared/base repository.ts
-src/shared/error types.ts
+src/modules/employee/employee.{model,repository.interface,service.interface}.ts
+src/modules/audit/audit.{model,service.interface}.ts
+src/modules/status/    — System status module (health-check)
+src/modules/uptime/    — Uptime module
+src/shared/db/connection.ts
+src/shared/types/index.ts    — Shared enums (LeaveType, LeaveStatus, AuditAction)
 ```
 
 ## Key patterns
