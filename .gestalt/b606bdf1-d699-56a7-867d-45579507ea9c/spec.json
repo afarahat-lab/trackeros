@@ -1,0 +1,117 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "employee"
+    ],
+    "affectedLayers": [
+      "repository",
+      "service",
+      "module-public-api"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "EmployeeRepository class exists at src/modules/employee/employee.repository.ts and implements IEmployeeRepository (all three methods: findById, findByEmail, findByDepartment are present with correct signatures)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "EmployeeService class exists at src/modules/employee/employee.service.ts and implements IEmployeeService (both methods: getEmployeeById, getEmployeeByEmail are present with correct signatures)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "EmployeeService constructor accepts IEmployeeRepository and delegates getEmployeeById \u2192 repository.findById, getEmployeeByEmail \u2192 repository.findByEmail",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "EmployeeRepository uses the shared pool from src/shared/db/connection.ts for all PostgreSQL queries",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All SQL queries use snake_case column names and map results to the camelCase Employee interface fields",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Barrel index at src/modules/employee/index.ts re-exports all five symbols: Employee, IEmployeeRepository, EmployeeRepository, IEmployeeService, EmployeeService",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All three files pass tsc --noEmit with strict TypeScript configuration (no implicit any, strict null checks)",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Must use the shared pool from src/shared/db/connection.ts \u2014 no other database connection or client may be created (GP-001, HARNESS constraint no-direct-db-outside-repository)",
+    "No use of `any` type \u2014 use `unknown` with type guards if needed (HARNESS constraint no-any)"
+  ],
+  "outOfScope": [
+    "Unit tests for employee.repository.ts and employee.service.ts \u2014 these are produced in sibling sub-phase 3",
+    "Audit module implementation (audit.service.ts, audit/index.ts) \u2014 these are produced in sibling sub-phase 2",
+    "Shared types update (src/shared/types/index.ts) \u2014 produced in sibling sub-phase 2"
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "EmployeeRepository",
+      "mustExistOrExtend": true,
+      "invariant": "Must implement IEmployeeRepository exactly \u2014 all three methods (findById, findByEmail, findByDepartment) must be present with signatures matching the interface. The class must be the default or named export usable as a constructor."
+    },
+    {
+      "entity": "EmployeeService",
+      "mustExistOrExtend": true,
+      "invariant": "Must implement IEmployeeService exactly \u2014 both methods (getEmployeeById, getEmployeeByEmail) must be present with signatures matching the interface. Constructor must accept IEmployeeRepository. Methods must delegate to the injected repository, not contain business logic."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "EmployeeRepository.findById",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns null when no row matches the given id \u2014 does not throw"
+    },
+    {
+      "operation": "EmployeeRepository.findByEmail",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns null when no row matches the given email \u2014 does not throw"
+    },
+    {
+      "operation": "EmployeeRepository.findByDepartment",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns empty array when no employees match the department \u2014 does not throw"
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "EmployeeRepository must implement IEmployeeRepository from employee.repository.interface.ts \u2014 all method signatures must match exactly",
+      "referencePath": "src/modules/employee/employee.repository.interface.ts"
+    },
+    {
+      "requirement": "EmployeeRepository query result mapping must produce objects matching the Employee interface shape (id, fullName, email, department, managerId, createdAt, updatedAt) with correct types",
+      "referencePath": "src/modules/employee/employee.model.ts"
+    },
+    {
+      "requirement": "EmployeeRepository must import and use the exported `pool` from src/shared/db/connection.ts \u2014 no other pool or client creation",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "Barrel index at src/modules/employee/index.ts must follow the same re-export pattern as src/modules/uptime/index.ts: named re-exports using `export { Thing } from './thing.file'` syntax",
+      "referencePath": "src/modules/uptime/index.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/db/connection.ts (shared pool)",
+      "why": "EmployeeRepository requires the PostgreSQL pool for all database queries"
+    }
+  ]
+}
