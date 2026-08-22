@@ -1,0 +1,111 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "audit",
+      "shared-types"
+    ],
+    "affectedLayers": [
+      "service",
+      "barrel-export"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "`AuditService` class exists in `src/modules/audit/audit.service.ts` and implements `IAuditService` from `./audit.service.interface`",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`AuditService` constructor accepts the shared `pool` (from `src/shared/db/connection.ts`) as its dependency",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`AuditService.record()` inserts a row into the `audit_records` table and returns the created `AuditRecord` with `id` and `createdAt` populated",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`src/modules/audit/index.ts` barrel re-exports `AuditRecord`, `IAuditService`, and `AuditService`",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`src/shared/types/index.ts` barrel re-exports `AuditAction` (already defined in the file; ensure it is present in the export list)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All new and modified files pass `tsc --noEmit` (strict TypeScript, no implicit any, strict null checks)",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "AuditService must NOT import or depend on any module other than `src/shared/db/connection.ts`, `./audit.service.interface`, `./audit.model`, and `../../shared/types` \u2014 it is a foundational module with zero internal module dependencies per the reconciled architecture dependency map",
+    "The `record` method must generate a unique `id` (UUID) and set `createdAt` to the current timestamp server-side \u2014 the caller provides `Omit<AuditRecord, 'id' | 'createdAt'>` and the implementation fills those two fields",
+    "The `record` method must use parameterized queries (e.g. `$1, $2, \u2026`) \u2014 no string concatenation or template interpolation of values into SQL, per the no-hardcoded-secrets and SQL-injection-prevention constraints",
+    "The `audit_records` table insert must map the `AuditRecord` fields to snake_case column names consistent with the existing `EmployeeRepository` pattern (`entity_type`, `entity_id`, `performed_by`, `created_at`)"
+  ],
+  "outOfScope": [
+    "Unit tests for `AuditService` \u2014 these belong to sibling sub-phase \"Sub-phase 3: Unit tests for employee and audit modules\"",
+    "Employee module implementation files (`employee.repository.ts`, `employee.service.ts`, `employee/index.ts`) \u2014 these belong to sibling sub-phase \"Sub-phase 1: Employee module implementation\"",
+    "Database migration for the `audit_records` table \u2014 the table is assumed to exist; this phase only implements the service that writes to it"
+  ],
+  "ambiguities": [
+    {
+      "description": "The PLAN says \"Constructor takes the shared `pool` from `src/shared/db/connection.ts`\" (suggesting constructor injection), but the existing `EmployeeRepository` imports `pool` at module level as a side-effect import. Which pattern should `AuditService` follow?",
+      "options": [
+        "Constructor injection: accept `pool` as a constructor parameter (testable, matches PLAN wording)",
+        "Module-level import: import { pool } directly (matches EmployeeRepository precedent, simpler)"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "AuditRecord",
+      "mustExistOrExtend": true,
+      "invariant": "Every `AuditRecord` returned by `record()` must have a non-empty `id` (UUID), a non-empty `createdAt` (Date), and all caller-supplied fields (`entityType`, `entityId`, `action`, `performedBy`, `changes`) preserved exactly as passed"
+    },
+    {
+      "entity": "AuditRecord",
+      "mustExistOrExtend": true,
+      "invariant": "`AuditRecord.action` must be one of the `AuditAction` enum values \u2014 the type system enforces this at compile time; the implementation must not widen or coerce the action field"
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IAuditService.record",
+      "authRule": "No auth enforcement at this layer \u2014 the AuditService is a low-level infrastructure service; RBAC is enforced by the callers (controllers/services) that invoke `record`",
+      "idempotent": false,
+      "errorSemantics": "Must reject with a typed error if the database insert fails (e.g. connection error, constraint violation); must not silently swallow errors"
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The `AuditService` constructor signature must match the pattern established by `EmployeeRepository`: accept the shared `pool` import from `src/shared/db/connection.ts` as a constructor parameter (not import it internally as a module-level side-effect)",
+      "referencePath": "src/modules/employee/employee.repository.ts"
+    },
+    {
+      "requirement": "The `record` method signature must exactly match `IAuditService.record`: accept `Omit<AuditRecord, 'id' | 'createdAt'>` and return `Promise<AuditRecord>`",
+      "referencePath": "src/modules/audit/audit.service.interface.ts"
+    },
+    {
+      "requirement": "The `AuditRecord` type used in the service implementation must be the one from `./audit.model` \u2014 no local redefinition or structural divergence",
+      "referencePath": "src/modules/audit/audit.model.ts"
+    },
+    {
+      "requirement": "The `src/modules/audit/index.ts` barrel export must follow the same re-export pattern as `src/modules/employee/index.ts`: named re-exports of the model, interface, and implementation",
+      "referencePath": "src/modules/employee/index.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "AuditService uses the shared PostgreSQL pool for inserting audit records"
+    }
+  ]
+}
