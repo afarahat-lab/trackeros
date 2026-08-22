@@ -1,33 +1,29 @@
-# Implement this phase: Phase 1: Shared types and foundational modules (part 1/2)
+# Implement this phase: Sub-phase 1: Employee module implementation
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/da3cebcf-aae0-446c-b943-05fc4169a665/1`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/da3cebcf-aae0-446c-b943-05fc4169a665/2`. Do not clone anything; work only in this directory.
 
 You are the IMPLEMENTATION agent, not a planner. The platform measures your work EXCLUSIVELY by the files you create or modify in this working tree (`git status`). Ending your turn with a plan, a summary, or an announcement of what you are 'about to' do — without having actually edited files — is a FAILURE: a turn that leaves the working tree untouched is discarded. Explore only as much as you need, then MAKE the edits with your file-editing tool. Never end your turn before the files exist on disk.
 
 ## What to build
-(no phase architecture provided — infer from the success criteria below)
+All three files compile without errors via `tsc --noEmit`
+EmployeeRepository correctly implements IEmployeeRepository with findById, findByEmail, findByDepartment methods using the shared pg pool
+EmployeeService correctly implements IEmployeeService and delegates all calls to IEmployeeRepository
+Barrel index.ts re-exports all five symbols: Employee, IEmployeeRepository, EmployeeRepository, IEmployeeService, EmployeeService
 
 ## Success criteria
-Create the models and interfaces layer for the foundational modules. This phase produces ONLY type definitions and interfaces — no concrete implementations.
+Create the concrete EmployeeRepository, EmployeeService, and barrel export for the employee module. Depends on interfaces and models from part 1 (already present).
 
 Files to create:
+- `src/modules/employee/employee.repository.ts` — Implement `EmployeeRepository` class implementing `IEmployeeRepository`. Uses the shared `pool` from `src/shared/db/connection.ts` for PostgreSQL queries. Methods: `findById`, `findByEmail`, `findByDepartment`. Import `IEmployeeRepository` from `./employee.repository.interface` and `Employee` from `./employee.model`.
+- `src/modules/employee/employee.service.ts` — Implement `EmployeeService` class implementing `IEmployeeService`. Constructor takes `IEmployeeRepository`. Methods delegate to repository. Import `IEmployeeService` from `./employee.service.interface`, `IEmployeeRepository` from `./employee.repository.interface`, `Employee` from `./employee.model`.
+- `src/modules/employee/index.ts` — Barrel export re-exporting: `Employee`, `IEmployeeRepository`, `EmployeeRepository`, `IEmployeeService`, `EmployeeService`.
 
-1. `src/shared/types/index.ts` — Define and export three enums exactly as specified:
-   - `LeaveType` enum: `'annual' | 'sick' | 'emergency' | 'unpaid' | 'maternity' | 'paternity'`
-   - `LeaveStatus` enum: `'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED'`
-   - `AuditAction` enum: `'CREATE' | 'SUBMIT' | 'UPDATE' | 'DELETE' | 'APPROVE' | 'REJECT' | 'CANCEL'`
+## Owned by SIBLING sub-phases (OUT OF SCOPE for this sub-phase)
+This is ONE sub-phase of a split phase. The deliverables below belong to sibling sub-phases — do NOT create them here, do NOT list them as success criteria, and this sub-phase MUST NOT be gated on their presence (they are produced by a sibling, not missing):
+- "Sub-phase 2: Audit module implementation and shared types update": src/modules/audit/audit.service.ts, src/modules/audit/index.ts, src/shared/types/index.ts
+- "Sub-phase 3: Unit tests for employee and audit modules": tests/unit/modules/employee/employee.repository.test.ts, tests/unit/modules/audit/audit.service.test.ts
 
-2. `src/modules/employee/employee.model.ts` — Define and export the `Employee` entity interface with these exact fields: `id: string`, `fullName: string`, `email: string`, `department: string`, `managerId: string | null`, `createdAt: Date`, `updatedAt: Date`.
-
-3. `src/modules/employee/employee.repository.interface.ts` — Define and export `IEmployeeRepository` interface with methods: `findById(id: string): Promise<Employee | null>`, `findByEmail(email: string): Promise<Employee | null>`, `findByDepartment(department: string): Promise<Employee[]>`. Import `Employee` from `./employee.model`.
-
-4. `src/modules/employee/employee.service.interface.ts` — Define and export `IEmployeeService` interface with methods: `getEmployeeById(id: string): Promise<Employee | null>`, `getEmployeeByEmail(email: string): Promise<Employee | null>`. Import `Employee` from `./employee.model`.
-
-5. `src/modules/audit/audit.model.ts` — Define and export the `AuditRecord` entity interface with these exact fields: `id: string`, `entityType: string`, `entityId: string`, `action: AuditAction`, `performedBy: string`, `changes: Record<string, unknown> | null`, `createdAt: Date`. Import `AuditAction` from `../../shared/types`.
-
-6. `src/modules/audit/audit.service.interface.ts` — Define and export `IAuditService` interface with method: `record(record: Omit<AuditRecord, 'id' | 'createdAt'>): Promise<AuditRecord>`. Import `AuditRecord` from `./audit.model`.
-
-No barrel exports (index.ts) in this phase — those come in part 2 with the implementations. No tests in this phase. All files must pass `tsc --noEmit`.
+In particular, UNIT/INTEGRATION TESTS are OUT OF SCOPE for this sub-phase — they are produced in: Sub-phase 3: Unit tests for employee and audit modules. Do not create test files here, do not require test existence or coverage as a success criterion, and do not fail the gate for missing tests.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -61,6 +57,23 @@ LeaveBalance record. Do not special-case emergency anywhere in the balance logic
 and do NOT add any document-tracking entity. The LeaveRequest lifecycle is exactly:
 PENDING -> APPROVED | REJECTED, and PENDING | APPROVED -> CANCELLED. This is a deliberate
 scope decision, not an oversight. [BINDING RULE — operator decision resolving: How is the number of leave days derived from startDate and endDate? Is the range inclusive of both start and end (days = endDate - startDate + 1), exclusive of end (days = endDate - startDate), or measured in business/calendar days? This affects balance deduction, sufficiency checks, and entitlement comparisons across every LeaveRequest operation.; Can an employee have multiple APPROVED LeaveRequests with overlapping date ranges? If not, should the overlap check be enforced at submission time or at approval time?; Does emergency leave draw from the annual leave balance, or does it have a separate entitlement pool? If separate, what is the default entitlement and does it reset per fiscal year or per incident?; Should sick leave require documentation (e.g., doctor's note) after a certain number of consecutive days? If so, what is the threshold and how is it enforced?; How are leave days counted for balance deduction — are start_date and end_date inclusive (i.e. `end_date - start_date + 1`), or exclusive? Are weekends and public holidays excluded from the day count?; apply everywhere these apply, not in one place only]
+
+## Constraints & consistency
+You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
+### Reuse & consistency — match these exactly
+- EmployeeRepository must implement IEmployeeRepository from employee.repository.interface.ts — all method signatures must match exactly (see `src/modules/employee/employee.repository.interface.ts`)
+- EmployeeRepository query result mapping must produce objects matching the Employee interface shape (id, fullName, email, department, managerId, createdAt, updatedAt) with correct types (see `src/modules/employee/employee.model.ts`)
+- EmployeeRepository must import and use the exported `pool` from src/shared/db/connection.ts — no other pool or client creation (see `src/shared/db/connection.ts`)
+- Barrel index at src/modules/employee/index.ts must follow the same re-export pattern as src/modules/uptime/index.ts: named re-exports using `export { Thing } from './thing.file'` syntax (see `src/modules/uptime/index.ts`)
+### Entity invariants — enforce these
+- Reuse or extend `EmployeeRepository`: Must implement IEmployeeRepository exactly — all three methods (findById, findByEmail, findByDepartment) must be present with signatures matching the interface. The class must be the default or named export usable as a constructor.
+- Reuse or extend `EmployeeService`: Must implement IEmployeeService exactly — both methods (getEmployeeById, getEmployeeByEmail) must be present with signatures matching the interface. Constructor must accept IEmployeeRepository. Methods must delegate to the injected repository, not contain business logic.
+### Interface contract — expose these operations (their shape is yours)
+- EmployeeRepository.findById — idempotent; Returns null when no row matches the given id — does not throw
+- EmployeeRepository.findByEmail — idempotent; Returns null when no row matches the given email — does not throw
+- EmployeeRepository.findByDepartment — idempotent; Returns empty array when no employees match the department — does not throw
+### Integration points — connect to these
+- src/shared/db/connection.ts (shared pool) — EmployeeRepository requires the PostgreSQL pool for all database queries
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
