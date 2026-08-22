@@ -1,0 +1,130 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "employee",
+      "audit",
+      "shared-types"
+    ],
+    "affectedLayers": [
+      "repository",
+      "service",
+      "barrel-exports",
+      "tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "`EmployeeRepository` class implements `IEmployeeRepository` and queries the `employees` table via the shared `pool` from `src/shared/db/connection.ts`. `findById` returns `Employee | null`, `findByEmail` returns `Employee | null`, `findByDepartment` returns `Employee[]`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`EmployeeService` class implements `IEmployeeService`, accepts `IEmployeeRepository` in its constructor, and delegates `getEmployeeById` \u2192 `repository.findById` and `getEmployeeByEmail` \u2192 `repository.findByEmail`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`AuditService` class implements `IAuditService`, accepts the shared `pool` in its constructor. The `record` method generates a UUID `id` and sets `createdAt` to `new Date()`, inserts into the `audit_records` table, and returns the created `AuditRecord`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Barrel `src/modules/employee/index.ts` re-exports `Employee`, `IEmployeeRepository`, `EmployeeRepository`, `IEmployeeService`, `EmployeeService`. Barrel `src/modules/audit/index.ts` re-exports `AuditRecord`, `IAuditService`, `AuditService`. `src/shared/types/index.ts` already exports `AuditAction` (no change needed).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests exist at `tests/unit/modules/employee/employee.repository.test.ts` and `tests/unit/modules/audit/audit.service.test.ts`. The pg `pool` is mocked via `jest.mock`. All tests pass with `npx jest`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All new and existing source files pass `tsc --noEmit` with strict TypeScript settings (no implicit any, strict null checks).",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access MUST go through the repository pattern (GP-001). `EmployeeRepository` uses `pool` directly \u2014 no inline SQL in `EmployeeService`. `AuditService` is the exception per the architectural decision: it uses `pool` directly as the audit mechanism itself, with no separate repository interface.",
+    "Modules MUST import from each other ONLY via their `index.ts` barrel files (GP-001 / AGENTS.md rule 1). No deep imports like `../employee/employee.repository.interface` from outside the employee module.",
+    "No `any` type \u2014 use `unknown` with type guards instead (HARNESS.json constraint `no-any`).",
+    "No hardcoded secrets, passwords, API keys, or tokens (HARNESS.json constraint `no-hardcoded-secrets`).",
+    "`AuditService.record` MUST generate `id` via `crypto.randomUUID()` and set `createdAt` to `new Date()` \u2014 these fields are omitted from the input per the `Omit<AuditRecord, 'id' | 'createdAt'>` signature."
+  ],
+  "outOfScope": [
+    "Controllers, routes, HTTP handlers, and Fastify plugin registration for employee or audit modules \u2014 deferred to later phases when the API surface is built."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "Employee entities are read-only in this phase. The repository only exposes finder methods (`findById`, `findByEmail`, `findByDepartment`). No create/update/delete operations exist yet."
+    },
+    {
+      "entity": "AuditRecord",
+      "mustExistOrExtend": true,
+      "invariant": "Every `AuditRecord` is immutable once created. The `record` method is the only write path; there is no update or delete. `id` and `createdAt` are always server-generated (never caller-supplied)."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "EmployeeRepository.findById",
+      "authRule": "No auth at repository layer \u2014 auth is enforced at the controller/route layer per GP-005.",
+      "idempotent": true,
+      "errorSemantics": "Returns `null` when no row matches the given `id` \u2014 never throws for a missing row."
+    },
+    {
+      "operation": "EmployeeRepository.findByEmail",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns `null` when no row matches the given email \u2014 never throws for a missing row."
+    },
+    {
+      "operation": "EmployeeRepository.findByDepartment",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns an empty array `[]` when no employees match the department \u2014 never returns `null`."
+    },
+    {
+      "operation": "AuditService.record",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Each call creates a new `AuditRecord` with a fresh UUID. Fails with a database error if the insert violates constraints (e.g., missing required fields). Never silently drops the record."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "`EmployeeRepository` MUST import and use the shared `pool` from `src/shared/db/connection.ts` \u2014 no separate pool or connection.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "`AuditService` MUST import and use the shared `pool` from `src/shared/db/connection.ts` \u2014 no separate pool or connection.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "`EmployeeService` MUST implement `IEmployeeService` as defined in `src/modules/employee/employee.service.interface.ts` \u2014 matching the exact method signatures (`getEmployeeById`, `getEmployeeByEmail`) and return types.",
+      "referencePath": "src/modules/employee/employee.service.interface.ts"
+    },
+    {
+      "requirement": "`EmployeeRepository` MUST implement `IEmployeeRepository` as defined in `src/modules/employee/employee.repository.interface.ts` \u2014 matching the exact method signatures (`findById`, `findByEmail`, `findByDepartment`) and return types.",
+      "referencePath": "src/modules/employee/employee.repository.interface.ts"
+    },
+    {
+      "requirement": "The `employees` table queried by `EmployeeRepository` MUST have columns matching the `Employee` interface: `id`, `full_name` (maps to `fullName`), `email`, `department`, `manager_id` (maps to `managerId`), `created_at` (maps to `createdAt`), `updated_at` (maps to `updatedAt`). Snake_case column names in SQL map to camelCase in the TypeScript interface.",
+      "referencePath": "src/modules/employee/employee.model.ts"
+    },
+    {
+      "requirement": "The `audit_records` table queried by `AuditService` MUST have columns matching the `AuditRecord` interface: `id`, `entity_type` (maps to `entityType`), `entity_id` (maps to `entityId`), `action`, `performed_by` (maps to `performedBy`), `changes`, `created_at` (maps to `createdAt`). Snake_case column names in SQL map to camelCase in the TypeScript interface.",
+      "referencePath": "src/modules/audit/audit.model.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "Both `EmployeeRepository` and `AuditService` import the shared `pool` for all PostgreSQL queries. This is the single database connection point for the entire application."
+    }
+  ]
+}
