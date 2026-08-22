@@ -17,7 +17,7 @@ The architecture is modular, with a clear separation of concerns between models,
 
 ```
 src/modules/employee/employee.{model,repository.interface,repository,service.interface,service}.ts + index.ts
-src/modules/audit/audit.{model,service.interface,service}.ts + index.ts
+src/modules/audit/audit.{model,repository.interface,repository,service.interface,service}.ts + index.ts
 src/modules/status/    — System status module (health-check)
 src/modules/uptime/    — Uptime module
 src/shared/db/connection.ts
@@ -73,7 +73,7 @@ The leave management module enables employees to apply for annual, sick, emergen
 |--------|------|------------------|
 | `shared-types` | `src/shared/types/` | `LeaveType`, `LeaveStatus`, `AuditAction` enums |
 | `employee` | `src/modules/employee/` | Employee entity, repository, service (identity, manager lookup, active check) |
-| `audit` | `src/modules/audit/` | Audit record entity, service (GP-002 compliance) |
+| `audit` | `src/modules/audit/` | Audit record entity, repository, service (GP-002 compliance) |
 | `leave-policy` | `src/modules/leave-policy/` | LeavePolicy entity, LeaveType reference data, repositories, service |
 | `leave-balance` | `src/modules/leave-balance/` | LeaveBalance entity, repository, service (deduct, restore, initialize) |
 | `leave-request` | `src/modules/leave-request/` | LeaveRequest entity, repository, service (submit, approve, reject, cancel) |
@@ -105,8 +105,8 @@ audit → shared-types
 ### Implementation Status
 
 - **Shared types** (`src/shared/types/index.ts`): ✅ `LeaveType`, `LeaveStatus`, `AuditAction` enums.
-- **Employee module** (`src/modules/employee/`): ✅ Model, repository interface, repository implementation (`EmployeeRepository` — `findById`, `findByEmail`, `findByDepartment` via shared `pool`), service interface, service implementation (`EmployeeService` — `getEmployeeById`, `getEmployeeByEmail`), barrel export.
-- **Audit module** (`src/modules/audit/`): ✅ Model (`AuditRecord`), service interface (`IAuditService.record`), service implementation (`AuditService` — constructor-injected `Pool`, `record()` inserts into `audit_records` with `gen_random_uuid()` and `NOW()`, parameterized query), barrel export.
+- **Employee module** (`src/modules/employee/`): ✅ Model, repository interface, repository implementation (`EmployeeRepository` — `findById`, `findByEmail`, `findByDepartment` via shared `pool`), service interface, service implementation (`EmployeeService` — `getEmployeeById`, `getEmployeeByEmail`, constructor-injected `IEmployeeRepository`), barrel export.
+- **Audit module** (`src/modules/audit/`): ✅ Model (`AuditRecord`), repository interface (`IAuditRepository.insert` — accepts optional `PoolClient` for transaction support), repository implementation (`AuditRepository` — inserts into `audit_records` with `gen_random_uuid()` and `NOW()`, parameterized query, supports optional client), service interface (`IAuditService.record`), service implementation (`AuditService` — constructor-injected `IAuditRepository`, delegates `record()` to `auditRepository.insert()`), barrel export.
 
 ### Open Questions (Require Human Decision)
 
