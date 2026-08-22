@@ -106,7 +106,7 @@ audit → shared-types
 
 - **Shared types** (`src/shared/types/index.ts`): ✅ `LeaveType`, `LeaveStatus`, `AuditAction` enums.
 - **Employee module** (`src/modules/employee/`): ✅ Model, repository interface, repository implementation (`EmployeeRepository` — `findById`, `findByEmail`, `findByDepartment` via shared `pool`), service interface, service implementation (`EmployeeService` — `getEmployeeById`, `getEmployeeByEmail`, constructor-injected `IEmployeeRepository`), barrel export.
-- **Audit module** (`src/modules/audit/`): ✅ Model (`AuditRecord`), repository interface (`IAuditRepository.insert` — accepts optional `PoolClient` for transaction support), repository implementation (`AuditRepository` — inserts into `audit_records` with `gen_random_uuid()` and `NOW()`, parameterized query, supports optional client), service interface (`IAuditService.record`), service implementation (`AuditService` — constructor-injected `IAuditRepository`, delegates `record()` to `auditRepository.insert()`), barrel export.
+- **Audit module** (`src/modules/audit/`): ✅ Model (`AuditRecord`), repository interface (`IAuditRepository.insert` — accepts optional `PoolClient` for transaction support), repository implementation (`AuditRepository` — inserts into `audit_records` with `gen_random_uuid()` and `NOW()`, parameterized query, supports optional client), service interface (`IAuditService.record`), service implementation (`AuditService` — accepts `Pool` in constructor, internally creates `AuditRepository`, delegates `record()` to `auditRepository.insert()`), barrel export.
 
 ### Open Questions (Require Human Decision)
 
