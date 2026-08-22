@@ -1,6 +1,14 @@
-# Implement this phase: Phase 1: Shared types and foundational modules (part 1/2)
+# Continue the previous attempt (it hit the iteration limit before finishing)
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/da3cebcf-aae0-446c-b943-05fc4169a665/1`. Do not clone anything; work only in this directory.
+A prior code-agent attempt on this work dir (`/tmp/gestalt/phase/da3cebcf-aae0-446c-b943-05fc4169a665/2`) was stopped after reaching its iteration limit. Its work is ALREADY on disk here — do NOT restart from scratch or re-read everything; build on what exists. It made 8 file edit(s). Its last verification PASSED (`cd /tmp/gestalt/phase/da3cebcf-aae0-446c-b943-05fc4169a665/2 && npx jest --passWithNoTests 2>&1`).
+
+Finish the task now: fix any failing build/type-check/tests, then RUN the build and the tests and fix anything still failing. Stop as soon as the build and tests pass. The full original task (with all mandatory constraints) follows for reference.
+
+---
+
+# Implement this phase: Phase 1: Shared types and foundational modules (part 2/2)
+
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/da3cebcf-aae0-446c-b943-05fc4169a665/2`. Do not clone anything; work only in this directory.
 
 You are the IMPLEMENTATION agent, not a planner. The platform measures your work EXCLUSIVELY by the files you create or modify in this working tree (`git status`). Ending your turn with a plan, a summary, or an announcement of what you are 'about to' do — without having actually edited files — is a FAILURE: a turn that leaves the working tree untouched is discarded. Explore only as much as you need, then MAKE the edits with your file-editing tool. Never end your turn before the files exist on disk.
 
@@ -8,26 +16,23 @@ You are the IMPLEMENTATION agent, not a planner. The platform measures your work
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the models and interfaces layer for the foundational modules. This phase produces ONLY type definitions and interfaces — no concrete implementations.
+Create the concrete implementations and barrel exports for the employee and audit modules. This phase depends on the models/interfaces from part 1.
 
 Files to create:
 
-1. `src/shared/types/index.ts` — Define and export three enums exactly as specified:
-   - `LeaveType` enum: `'annual' | 'sick' | 'emergency' | 'unpaid' | 'maternity' | 'paternity'`
-   - `LeaveStatus` enum: `'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED'`
-   - `AuditAction` enum: `'CREATE' | 'SUBMIT' | 'UPDATE' | 'DELETE' | 'APPROVE' | 'REJECT' | 'CANCEL'`
+1. `src/modules/employee/employee.repository.ts` — Implement `EmployeeRepository` class implementing `IEmployeeRepository`. Uses the shared `pool` from `src/shared/db/connection.ts` for PostgreSQL queries. Methods: `findById`, `findByEmail`, `findByDepartment`. Import `IEmployeeRepository` from `./employee.repository.interface` and `Employee` from `./employee.model`.
 
-2. `src/modules/employee/employee.model.ts` — Define and export the `Employee` entity interface with these exact fields: `id: string`, `fullName: string`, `email: string`, `department: string`, `managerId: string | null`, `createdAt: Date`, `updatedAt: Date`.
+2. `src/modules/employee/employee.service.ts` — Implement `EmployeeService` class implementing `IEmployeeService`. Constructor takes `IEmployeeRepository`. Methods delegate to repository. Import `IEmployeeService` from `./employee.service.interface`, `IEmployeeRepository` from `./employee.repository.interface`, `Employee` from `./employee.model`.
 
-3. `src/modules/employee/employee.repository.interface.ts` — Define and export `IEmployeeRepository` interface with methods: `findById(id: string): Promise<Employee | null>`, `findByEmail(email: string): Promise<Employee | null>`, `findByDepartment(department: string): Promise<Employee[]>`. Import `Employee` from `./employee.model`.
+3. `src/modules/employee/index.ts` — Barrel export: `Employee`, `IEmployeeRepository`, `EmployeeRepository`, `IEmployeeService`, `EmployeeService`.
 
-4. `src/modules/employee/employee.service.interface.ts` — Define and export `IEmployeeService` interface with methods: `getEmployeeById(id: string): Promise<Employee | null>`, `getEmployeeByEmail(email: string): Promise<Employee | null>`. Import `Employee` from `./employee.model`.
+4. `src/modules/audit/audit.service.ts` — Implement `AuditService` class implementing `IAuditService`. Constructor takes the shared `pool` from `src/shared/db/connection.ts`. The `record` method inserts into an `audit_records` table and returns the created `AuditRecord`. Import `IAuditService` from `./audit.service.interface`, `AuditRecord` from `./audit.model`, `AuditAction` from `../../shared/types`.
 
-5. `src/modules/audit/audit.model.ts` — Define and export the `AuditRecord` entity interface with these exact fields: `id: string`, `entityType: string`, `entityId: string`, `action: AuditAction`, `performedBy: string`, `changes: Record<string, unknown> | null`, `createdAt: Date`. Import `AuditAction` from `../../shared/types`.
+5. `src/modules/audit/index.ts` — Barrel export: `AuditRecord`, `IAuditService`, `AuditService`.
 
-6. `src/modules/audit/audit.service.interface.ts` — Define and export `IAuditService` interface with method: `record(record: Omit<AuditRecord, 'id' | 'createdAt'>): Promise<AuditRecord>`. Import `AuditRecord` from `./audit.model`.
+6. `src/shared/types/index.ts` — Update the barrel to also re-export `AuditAction` (already defined in part 1; ensure it's exported).
 
-No barrel exports (index.ts) in this phase — those come in part 2 with the implementations. No tests in this phase. All files must pass `tsc --noEmit`.
+Include Jest unit tests in `tests/unit/modules/employee/employee.repository.test.ts` and `tests/unit/modules/audit/audit.service.test.ts`. Mock the pg pool. All files must pass `tsc --noEmit` and `npx jest`.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -61,6 +66,26 @@ LeaveBalance record. Do not special-case emergency anywhere in the balance logic
 and do NOT add any document-tracking entity. The LeaveRequest lifecycle is exactly:
 PENDING -> APPROVED | REJECTED, and PENDING | APPROVED -> CANCELLED. This is a deliberate
 scope decision, not an oversight. [BINDING RULE — operator decision resolving: How is the number of leave days derived from startDate and endDate? Is the range inclusive of both start and end (days = endDate - startDate + 1), exclusive of end (days = endDate - startDate), or measured in business/calendar days? This affects balance deduction, sufficiency checks, and entitlement comparisons across every LeaveRequest operation.; Can an employee have multiple APPROVED LeaveRequests with overlapping date ranges? If not, should the overlap check be enforced at submission time or at approval time?; Does emergency leave draw from the annual leave balance, or does it have a separate entitlement pool? If separate, what is the default entitlement and does it reset per fiscal year or per incident?; Should sick leave require documentation (e.g., doctor's note) after a certain number of consecutive days? If so, what is the threshold and how is it enforced?; How are leave days counted for balance deduction — are start_date and end_date inclusive (i.e. `end_date - start_date + 1`), or exclusive? Are weekends and public holidays excluded from the day count?; apply everywhere these apply, not in one place only]
+
+## Constraints & consistency
+You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
+### Reuse & consistency — match these exactly
+- `EmployeeRepository` MUST import and use the shared `pool` from `src/shared/db/connection.ts` — no separate pool or connection. (see `src/shared/db/connection.ts`)
+- `AuditService` MUST import and use the shared `pool` from `src/shared/db/connection.ts` — no separate pool or connection. (see `src/shared/db/connection.ts`)
+- `EmployeeService` MUST implement `IEmployeeService` as defined in `src/modules/employee/employee.service.interface.ts` — matching the exact method signatures (`getEmployeeById`, `getEmployeeByEmail`) and return types. (see `src/modules/employee/employee.service.interface.ts`)
+- `EmployeeRepository` MUST implement `IEmployeeRepository` as defined in `src/modules/employee/employee.repository.interface.ts` — matching the exact method signatures (`findById`, `findByEmail`, `findByDepartment`) and return types. (see `src/modules/employee/employee.repository.interface.ts`)
+- The `employees` table queried by `EmployeeRepository` MUST have columns matching the `Employee` interface: `id`, `full_name` (maps to `fullName`), `email`, `department`, `manager_id` (maps to `managerId`), `created_at` (maps to `createdAt`), `updated_at` (maps to `updatedAt`). Snake_case column names in SQL map to camelCase in the TypeScript interface. (see `src/modules/employee/employee.model.ts`)
+- The `audit_records` table queried by `AuditService` MUST have columns matching the `AuditRecord` interface: `id`, `entity_type` (maps to `entityType`), `entity_id` (maps to `entityId`), `action`, `performed_by` (maps to `performedBy`), `changes`, `created_at` (maps to `createdAt`). Snake_case column names in SQL map to camelCase in the TypeScript interface. (see `src/modules/audit/audit.model.ts`)
+### Entity invariants — enforce these
+- Reuse or extend `Employee`: Employee entities are read-only in this phase. The repository only exposes finder methods (`findById`, `findByEmail`, `findByDepartment`). No create/update/delete operations exist yet.
+- Reuse or extend `AuditRecord`: Every `AuditRecord` is immutable once created. The `record` method is the only write path; there is no update or delete. `id` and `createdAt` are always server-generated (never caller-supplied).
+### Interface contract — expose these operations (their shape is yours)
+- EmployeeRepository.findById — No auth at repository layer — auth is enforced at the controller/route layer per GP-005.; idempotent; Returns `null` when no row matches the given `id` — never throws for a missing row.
+- EmployeeRepository.findByEmail — idempotent; Returns `null` when no row matches the given email — never throws for a missing row.
+- EmployeeRepository.findByDepartment — idempotent; Returns an empty array `[]` when no employees match the department — never returns `null`.
+- AuditService.record — Each call creates a new `AuditRecord` with a fresh UUID. Fails with a database error if the insert violates constraints (e.g., missing required fields). Never silently drops the record.
+### Integration points — connect to these
+- src/shared/db/connection.ts — Both `EmployeeRepository` and `AuditService` import the shared `pool` for all PostgreSQL queries. This is the single database connection point for the entire application.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
