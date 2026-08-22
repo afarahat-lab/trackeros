@@ -1,0 +1,83 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "audit"
+    ],
+    "affectedLayers": [
+      "service",
+      "barrel-export"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The barrel export `src/modules/audit/index.ts` exports exactly three symbols: `AuditRecord`, `IAuditService`, `AuditService`. It does NOT export `IAuditRepository` or `AuditRepository`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`AuditService` has zero imports from `audit.repository.interface` or `audit.repository`. Its only imports are from `src/shared/db/connection.ts`, `./audit.service.interface`, `./audit.model`, and `../../shared/types`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`AuditService.record()` executes `INSERT INTO audit_records` directly via the shared `pool` (or an optional `PoolClient` passed for transaction support). It does NOT delegate to any repository.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Files `src/modules/audit/audit.repository.interface.ts` and `src/modules/audit/audit.repository.ts` are deleted \u2014 they must not exist after this phase.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The audit module has NO repository. `AuditService` takes the shared `pool` (or `PoolClient`) directly and performs its own SQL. This is an intentional architectural decision recorded in the reconciled architecture: the audit module owns only `AuditRecord`, `IAuditService`, and `AuditService`.",
+    "`AuditService` must accept an optional `PoolClient` parameter on `record()` so callers can pass a transaction client. When a client is provided, the service uses it for the INSERT and does NOT release it. When omitted, the service uses the shared pool directly.",
+    "The `IAuditService` interface must NOT change its method signature in a way that breaks existing consumers. The `record()` method must still accept `Omit<AuditRecord, 'id' | 'createdAt'>` and return `Promise<AuditRecord>`. The optional transaction client may be added as a second parameter."
+  ],
+  "outOfScope": [
+    "Creation or modification of `IAuditRepository`, `AuditRepository`, `audit.repository.interface.ts`, or `audit.repository.ts` \u2014 these are artifacts of a prior design being replaced. The audit module must NOT use a repository."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "AuditRecord",
+      "mustExistOrExtend": true,
+      "invariant": "Every `AuditRecord` is immutable after creation \u2014 it has no update or delete operations. Its `id` is generated server-side (via `gen_random_uuid()` in SQL) and `createdAt` is set to the insertion timestamp (via `NOW()`)."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IAuditService.record",
+      "authRule": "No auth enforcement at this layer \u2014 the audit service is a cross-cutting utility called by other services that have already performed authorization. The caller is responsible for populating `performedBy` with the authenticated user's ID.",
+      "idempotent": false,
+      "errorSemantics": "If the INSERT fails (e.g., constraint violation, connection error), the error propagates to the caller. The service does not swallow or transform database errors."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The `AuditRecord` entity shape (fields: `id`, `entityType`, `entityId`, `action`, `performedBy`, `changes`, `createdAt`) must match the definition in `src/modules/audit/audit.model.ts` \u2014 no fields added, removed, or renamed.",
+      "referencePath": "src/modules/audit/audit.model.ts"
+    },
+    {
+      "requirement": "The `AuditAction` enum used in `AuditRecord.action` must be imported from `src/shared/types/index.ts` \u2014 the same source used by all other modules. No local redefinition.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The SQL INSERT in `AuditService.record()` must use the same column names and parameterized query pattern as the existing `AuditRepository.insert()`: `INSERT INTO audit_records (id, entity_type, entity_id, action, performed_by, changes, created_at) VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, NOW()) RETURNING ...` with the same column-to-property aliasing (`entity_type AS \"entityType\"`, etc.).",
+      "referencePath": "src/modules/audit/audit.repository.ts"
+    },
+    {
+      "requirement": "The shared pool import must use the same path and named export as every other module: `import { pool } from '../../shared/db/connection'`.",
+      "referencePath": "src/shared/db/connection.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "AuditService uses the shared PostgreSQL pool for its INSERT \u2014 the same pool every other module uses."
+    }
+  ]
+}
