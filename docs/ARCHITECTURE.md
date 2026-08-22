@@ -17,7 +17,7 @@ The architecture is modular, with a clear separation of concerns between models,
 
 ```
 src/modules/employee/employee.{model,repository.interface,repository,service.interface,service}.ts + index.ts
-src/modules/audit/audit.{model,service.interface}.ts
+src/modules/audit/audit.{model,service.interface,service}.ts + index.ts
 src/modules/status/    — System status module (health-check)
 src/modules/uptime/    — Uptime module
 src/shared/db/connection.ts
@@ -106,7 +106,7 @@ audit → shared-types
 
 - **Shared types** (`src/shared/types/index.ts`): ✅ `LeaveType`, `LeaveStatus`, `AuditAction` enums.
 - **Employee module** (`src/modules/employee/`): ✅ Model, repository interface, repository implementation (`EmployeeRepository` — `findById`, `findByEmail`, `findByDepartment` via shared `pool`), service interface, service implementation (`EmployeeService` — `getEmployeeById`, `getEmployeeByEmail`), barrel export.
-- **Audit module** (`src/modules/audit/`): ✅ Model (`AuditRecord`), service interface (`IAuditService.record`). ⬜ Service implementation and barrel export deferred.
+- **Audit module** (`src/modules/audit/`): ✅ Model (`AuditRecord`), service interface (`IAuditService.record`), service implementation (`AuditService` — constructor-injected `Pool`, `record()` inserts into `audit_records` with `gen_random_uuid()` and `NOW()`, parameterized query), barrel export.
 
 ### Open Questions (Require Human Decision)
 
