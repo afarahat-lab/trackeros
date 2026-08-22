@@ -1,29 +1,33 @@
-# Implement this phase: Sub-phase 2: Audit module implementation and shared types update
+# Continue the previous attempt (it hit the iteration limit before finishing)
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/da3cebcf-aae0-446c-b943-05fc4169a665/3`. Do not clone anything; work only in this directory.
+A prior code-agent attempt on this work dir (`/tmp/gestalt/phase/da3cebcf-aae0-446c-b943-05fc4169a665/4`) was stopped after reaching its iteration limit. Its work is ALREADY on disk here — do NOT restart from scratch or re-read everything; build on what exists. It made 9 file edit(s). Its last verification PASSED (`cd /tmp/gestalt/phase/da3cebcf-aae0-446c-b943-05fc4169a665/4 && timeout 120 npx jest tests/unit/ --no-cache --verbose --forceExit 2>&1 || echo "EXIT_CODE=$?"`).
+
+Finish the task now: fix any failing build/type-check/tests, then RUN the build and the tests and fix anything still failing. Stop as soon as the build and tests pass. The full original task (with all mandatory constraints) follows for reference.
+
+---
+
+# Implement this phase: Sub-phase 3: Unit tests for employee and audit modules
+
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/da3cebcf-aae0-446c-b943-05fc4169a665/4`. Do not clone anything; work only in this directory.
 
 You are the IMPLEMENTATION agent, not a planner. The platform measures your work EXCLUSIVELY by the files you create or modify in this working tree (`git status`). Ending your turn with a plan, a summary, or an announcement of what you are 'about to' do — without having actually edited files — is a FAILURE: a turn that leaves the working tree untouched is discarded. Explore only as much as you need, then MAKE the edits with your file-editing tool. Never end your turn before the files exist on disk.
 
 ## What to build
-All three files compile without errors via `tsc --noEmit`
-AuditService correctly implements IAuditService with a record method that inserts into audit_records table using the shared pg pool and returns the created AuditRecord
-Barrel index.ts re-exports AuditRecord, IAuditService, and AuditService
-src/shared/types/index.ts re-exports AuditAction alongside existing exports
+All test files compile and pass via `npx jest`
+employee.repository.test.ts mocks the pg pool and tests findById, findByEmail, findByDepartment methods of EmployeeRepository
+audit.service.test.ts mocks the pg pool and tests the record method of AuditService, verifying correct insert and return of AuditRecord
 
 ## Success criteria
-Create the concrete AuditService, its barrel export, and update the shared types barrel. Depends on interfaces and models from part 1 (already present) and the shared db connection.
+Create Jest unit tests for the EmployeeRepository and AuditService implementations. Mock the pg pool. Depends on all implementation files from sub-phases 1 and 2.
 
-Files to create/update:
-- `src/modules/audit/audit.service.ts` — Implement `AuditService` class implementing `IAuditService`. Constructor takes the shared `pool` from `src/shared/db/connection.ts`. The `record` method inserts into an `audit_records` table and returns the created `AuditRecord`. Import `IAuditService` from `./audit.service.interface`, `AuditRecord` from `./audit.model`, `AuditAction` from `../../shared/types`.
-- `src/modules/audit/index.ts` — Barrel export re-exporting: `AuditRecord`, `IAuditService`, `AuditService`.
-- `src/shared/types/index.ts` — Update the barrel to also re-export `AuditAction` (already defined in part 1; ensure it's exported).
+Files to create:
+- `tests/unit/modules/employee/employee.repository.test.ts` — Unit tests for EmployeeRepository. Mock the shared pg pool. Test findById, findByEmail, findByDepartment methods with various scenarios (found, not found, error cases).
+- `tests/unit/modules/audit/audit.service.test.ts` — Unit tests for AuditService. Mock the shared pg pool. Test the record method, verifying correct SQL insert and that the returned AuditRecord matches expectations.
 
 ## Owned by SIBLING sub-phases (OUT OF SCOPE for this sub-phase)
 This is ONE sub-phase of a split phase. The deliverables below belong to sibling sub-phases — do NOT create them here, do NOT list them as success criteria, and this sub-phase MUST NOT be gated on their presence (they are produced by a sibling, not missing):
 - "Sub-phase 1: Employee module implementation": src/modules/employee/employee.repository.ts, src/modules/employee/employee.service.ts, src/modules/employee/index.ts
-- "Sub-phase 3: Unit tests for employee and audit modules": tests/unit/modules/employee/employee.repository.test.ts, tests/unit/modules/audit/audit.service.test.ts
-
-In particular, UNIT/INTEGRATION TESTS are OUT OF SCOPE for this sub-phase — they are produced in: Sub-phase 3: Unit tests for employee and audit modules. Do not create test files here, do not require test existence or coverage as a success criterion, and do not fail the gate for missing tests.
+- "Sub-phase 2: Audit module implementation and shared types update": src/modules/audit/audit.service.ts, src/modules/audit/index.ts, src/shared/types/index.ts
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -60,15 +64,13 @@ scope decision, not an oversight. [BINDING RULE — operator decision resolving:
 
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
-### Reuse & consistency — match these exactly
-- `AuditService` must import `pool` from `src/shared/db/connection.ts` — the same singleton `Pool` instance used by all other modules. No separate connection or pool creation. (see `src/shared/db/connection.ts`)
-- `AuditService` must implement `IAuditService` from `./audit.service.interface.ts` — the `record` method signature must match exactly: `record(record: Omit<AuditRecord, 'id' | 'createdAt'>): Promise<AuditRecord>`. (see `src/modules/audit/audit.service.interface.ts`)
 ### Entity invariants — enforce these
-- Reuse or extend `AuditRecord`: Every `AuditRecord` inserted by `AuditService.record()` must have `id` generated server-side via `gen_random_uuid()` and `createdAt` set to the database's `NOW()` — the caller provides neither field (matching the `Omit<AuditRecord, 'id' | 'createdAt'>` input type).
+- Reuse or extend `Employee`: Any Employee object returned by the repository under test must satisfy the `Employee` interface shape defined in `src/modules/employee/employee.model.ts`: all six fields (`id`, `fullName`, `email`, `department`, `managerId`, `createdAt`, `updatedAt`) are present with correct types. The test mock data must conform to this shape.
+- Reuse or extend `AuditRecord`: Any AuditRecord returned by `AuditService.record` must satisfy the `AuditRecord` interface defined in `src/modules/audit/audit.model.ts`: all seven fields (`id`, `entityType`, `entityId`, `action`, `performedBy`, `changes`, `createdAt`) are present with correct types. The `id` is a non-empty string (generated by the database), `createdAt` is a Date, and `action` is a valid `AuditAction` enum value.
 ### Interface contract — expose these operations (their shape is yours)
-- IAuditService.record(record: Omit<AuditRecord, 'id' | 'createdAt'>): Promise<AuditRecord> — No auth enforcement at this layer — the audit service is a passive recorder called by other services; the caller is responsible for providing the correct `performedBy` value.; If the database insert fails (e.g., constraint violation, connection error), the promise rejects with the underlying error — the service does not swallow or transform errors.
-### Integration points — connect to these
-- src/shared/db/connection.ts — AuditService imports the shared `pool` singleton for all database operations.
+- EmployeeRepository.findById — Returns `Employee | null`. Never throws for a missing row — returns `null`. Propagates database errors (e.g. connection failure) as rejected promises.
+- EmployeeRepository.findByEmail — Returns `Employee | null`. Never throws for a missing row — returns `null`. Propagates database errors as rejected promises.
+- EmployeeRepository.findByDepartment — Returns `Employee[]`. An empty department returns an empty array `[]`, never `null`. Propagates database errors as rejected promises.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
