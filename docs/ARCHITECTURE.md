@@ -16,7 +16,7 @@ The architecture is modular, with a clear separation of concerns between models,
 ## Module structure
 
 ```
-src/modules/employee/employee.{model,repository.interface,service.interface}.ts
+src/modules/employee/employee.{model,repository.interface,repository,service.interface,service}.ts + index.ts
 src/modules/audit/audit.{model,service.interface}.ts
 src/modules/status/    — System status module (health-check)
 src/modules/uptime/    — Uptime module
@@ -101,6 +101,12 @@ audit → shared-types
 2. **Phase 2** — Leave policy (reference data and rules).
 3. **Phase 3** — Leave balance (entitlement tracking, atomic deduction/restoration).
 4. **Phase 4** — Leave request (full lifecycle, all business rules).
+
+### Implementation Status
+
+- **Shared types** (`src/shared/types/index.ts`): ✅ `LeaveType`, `LeaveStatus`, `AuditAction` enums.
+- **Employee module** (`src/modules/employee/`): ✅ Model, repository interface, repository implementation (`EmployeeRepository` — `findById`, `findByEmail`, `findByDepartment` via shared `pool`), service interface, service implementation (`EmployeeService` — `getEmployeeById`, `getEmployeeByEmail`), barrel export.
+- **Audit module** (`src/modules/audit/`): ✅ Model (`AuditRecord`), service interface (`IAuditService.record`). ⬜ Service implementation and barrel export deferred.
 
 ### Open Questions (Require Human Decision)
 
