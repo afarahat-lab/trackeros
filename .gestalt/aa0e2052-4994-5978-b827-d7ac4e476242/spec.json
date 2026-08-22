@@ -1,0 +1,64 @@
+{
+  "scope": {
+    "affectedDomains": [],
+    "affectedLayers": [],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The three shared enums \u2014 LeaveType (annual|sick|emergency|unpaid|maternity|paternity), LeaveStatus (DRAFT|SUBMITTED|APPROVED|REJECTED|CANCELLED), and AuditAction (CREATE|SUBMIT|UPDATE|DELETE|APPROVE|REJECT|CANCEL) \u2014 are defined as TypeScript enums and exported from `src/shared/types/index.ts` with exactly those member names and string values.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `Employee` entity interface is defined and exported from `src/modules/employee/employee.model.ts` with exactly these fields: `id: string`, `fullName: string`, `email: string`, `department: string`, `managerId: string | null`, `createdAt: Date`, `updatedAt: Date`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `IEmployeeRepository` interface is defined and exported from `src/modules/employee/employee.repository.interface.ts` with methods `findById(id: string): Promise<Employee | null>`, `findByEmail(email: string): Promise<Employee | null>`, and `findByDepartment(department: string): Promise<Employee[]>`, importing `Employee` from `./employee.model`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `IEmployeeService` interface is defined and exported from `src/modules/employee/employee.service.interface.ts` with methods `getEmployeeById(id: string): Promise<Employee | null>` and `getEmployeeByEmail(email: string): Promise<Employee | null>`, importing `Employee` from `./employee.model`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `IAuditService` interface is defined and exported from `src/modules/audit/audit.service.interface.ts` with method `record(record: Omit<AuditRecord, 'id' | 'createdAt'>): Promise<AuditRecord>`, importing `AuditRecord` from `./audit.model`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `AuditRecord` entity interface is defined and exported from `src/modules/audit/audit.model.ts` with exactly these fields: `id: string`, `entityType: string`, `entityId: string`, `action: AuditAction`, `performedBy: string`, `changes: Record<string, unknown> | null`, `createdAt: Date`, importing `AuditAction` from `../../shared/types`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All six files pass `tsc --noEmit` with the project's strict TypeScript configuration (strict: true, no implicit any, strict null checks) and produce zero type errors.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No barrel exports (index.ts) in the employee or audit modules \u2014 barrel exports are deferred to Phase 1 part 2.",
+    "No concrete implementations \u2014 this phase produces ONLY type definitions and interfaces. No classes, no database queries, no service logic.",
+    "No tests in this phase \u2014 tests are deferred to Phase 1 part 2.",
+    "The `no-any` constraint from HARNESS.json applies: `AuditRecord.changes` must use `Record<string, unknown>`, not `any`.",
+    "The three enums (LeaveType, LeaveStatus, AuditAction) must be TypeScript `enum` declarations, not string literal union types \u2014 the reconciled architecture explicitly calls them enumerations and the chief-architect-agent confirmed they should be runtime + type enums.",
+    "All imports must use relative paths matching the dependency map: employee \u2192 shared-types, audit \u2192 shared-types. No cross-imports between employee and audit modules."
+  ],
+  "outOfScope": [
+    "Concrete repository implementations (EmployeeRepository, PgLeaveRequestRepository, etc.) \u2014 deferred to Phase 1 part 2 and later phases.",
+    "Concrete service implementations (EmployeeService, AuditService, etc.) \u2014 deferred to Phase 1 part 2 and later phases.",
+    "Barrel exports (index.ts) for employee and audit modules \u2014 deferred to Phase 1 part 2.",
+    "Leave policy, leave balance, and leave request modules \u2014 these are Phase 2, 3, and 4 respectively."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [],
+  "integrationPoints": []
+}
