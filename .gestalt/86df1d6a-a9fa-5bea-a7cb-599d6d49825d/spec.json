@@ -1,0 +1,117 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "audit",
+      "notification"
+    ],
+    "affectedLayers": [
+      "module-public-api",
+      "unit-tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "Barrel file at `src/modules/audit/index.ts` re-exports all public symbols: `AuditLog` and `IAuditRepository` from `audit.model.ts`, `AuditRepository` from `audit.repository.ts`, and `AuditService` from `audit.service.ts` \u2014 following the exact re-export pattern of `src/modules/employee/index.ts` and `src/modules/policy/index.ts`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Barrel file at `src/modules/notification/index.ts` re-exports all public symbols: `Notification` and `INotificationRepository` from `notification.model.ts`, `NotificationRepository` from `notification.repository.ts`, and `NotificationService` from `notification.service.ts` \u2014 following the exact re-export pattern of `src/modules/employee/index.ts` and `src/modules/policy/index.ts`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Unit test file `tests/unit/modules/audit/audit.service.spec.ts` exists and passes. It mocks `IAuditRepository` using `jest.Mocked<IAuditRepository>` with fresh mocks per test (following the pattern in `employee.service.spec.ts`). Tests: (a) `log()` calls `repository.create` with the entry and returns the created `AuditLog`; (b) `getEntityHistory()` calls `repository.findByEntity` with correct `entityType` and `entityId` and returns results; (c) `getUserActions()` calls `repository.findByPerformer` with correct `performedBy` and optional `limit`, and returns results.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Unit test file `tests/unit/modules/notification/notification.service.spec.ts` exists and passes. It mocks `INotificationRepository` using `jest.Mocked<INotificationRepository>` with fresh mocks per test. Tests: (a) `send()` calls `repository.create` with correct fields (`recipientId`, `title`, `body`, `type`, `metadata` defaulting to `null` when omitted) and returns the created `Notification`; (b) `getForUser()` calls `repository.findByRecipient` with correct `recipientId` and optional `limit`, and returns results; (c) `markRead()` calls `repository.markAsRead` with correct `id`.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Barrel files must use named re-exports only (no `export * from` wildcards), matching the pattern in `src/modules/employee/index.ts` and `src/modules/policy/index.ts`.",
+    "Unit tests must import from the barrel file (`modules/audit/audit.service` \u2192 `AuditService`, `modules/audit/audit.model` \u2192 `IAuditRepository`/`AuditLog`), not from internal source files directly, matching the import style in `employee.service.spec.ts` and `policy.service.spec.ts`.",
+    "Test mocks must use `jest.Mocked<T>` for the repository interface and `jest.fn()` for each method, with `beforeEach` resetting mocks to a fresh state \u2014 matching the pattern in existing service spec files.",
+    "No new dependencies may be added to `package.json` \u2014 Jest and ts-jest are already configured and sufficient."
+  ],
+  "outOfScope": [
+    "Controllers, routes, HTTP handlers, or any HTTP surface for audit or notification modules \u2014 these are deferred per ARCHITECTURE.md.",
+    "Database migrations for `audit_logs` or `notifications` tables \u2014 assumed to exist.",
+    "Integration tests or end-to-end tests \u2014 only unit tests for the service layer are in scope for this sub-phase."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "AuditLog records are immutable \u2014 the repository exposes only `create`, `findByEntity`, and `findByPerformer`; no update or delete operations exist. The `performedAt` timestamp is set by the repository on creation, not by the caller."
+    },
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "Notifications are immutable after creation except for the `isRead` field, which transitions exactly once from `false` to `true` via `markAsRead`. The `markAsRead` operation is idempotent \u2014 calling it on an already-read notification is safe and produces no error. If the notification does not exist, the operation silently does nothing (no throw)."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "AuditService.log(entry)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Delegates directly to IAuditRepository.create. No domain errors thrown by the service itself \u2014 any errors propagate from the repository layer."
+    },
+    {
+      "operation": "AuditService.getEntityHistory(entityType, entityId)",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Read-only, delegates to IAuditRepository.findByEntity. Returns empty array when no records exist."
+    },
+    {
+      "operation": "AuditService.getUserActions(performedBy, limit?)",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Read-only, delegates to IAuditRepository.findByPerformer. Optional `limit` parameter is passed through to the repository. Returns empty array when no records exist."
+    },
+    {
+      "operation": "NotificationService.send(recipientId, title, body, type, metadata?)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Delegates to INotificationRepository.create. `metadata` defaults to `null` when omitted. No domain errors thrown by the service itself."
+    },
+    {
+      "operation": "NotificationService.getForUser(recipientId, limit?)",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Read-only, delegates to INotificationRepository.findByRecipient. Optional `limit` parameter is passed through. Returns empty array when no notifications exist."
+    },
+    {
+      "operation": "NotificationService.markRead(id)",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Delegates to INotificationRepository.markAsRead. Idempotent \u2014 safe to call on already-read notifications. Does not throw if the notification does not exist."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Barrel file `src/modules/audit/index.ts` must follow the exact named-export pattern of `src/modules/employee/index.ts`: export model interfaces/types from the model file, repository class from the repository file, and service class from the service file \u2014 no wildcard re-exports.",
+      "referencePath": "src/modules/employee/index.ts"
+    },
+    {
+      "requirement": "Barrel file `src/modules/notification/index.ts` must follow the exact named-export pattern of `src/modules/employee/index.ts`: export model interfaces/types from the model file, repository class from the repository file, and service class from the service file \u2014 no wildcard re-exports.",
+      "referencePath": "src/modules/employee/index.ts"
+    },
+    {
+      "requirement": "Audit service unit tests must follow the structure of `tests/unit/modules/employee/employee.service.spec.ts`: `jest.Mocked<IAuditRepository>` mock with `jest.fn()` per method, `beforeEach` creating fresh mocks, and tests verifying correct delegation arguments and return values.",
+      "referencePath": "tests/unit/modules/employee/employee.service.spec.ts"
+    },
+    {
+      "requirement": "Notification service unit tests must follow the structure of `tests/unit/modules/employee/employee.service.spec.ts`: `jest.Mocked<INotificationRepository>` mock with `jest.fn()` per method, `beforeEach` creating fresh mocks, and tests verifying correct delegation arguments and return values.",
+      "referencePath": "tests/unit/modules/employee/employee.service.spec.ts"
+    }
+  ],
+  "integrationPoints": []
+}
