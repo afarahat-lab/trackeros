@@ -1,6 +1,15 @@
-# Implement this phase: Phase 3: Policy module
+# Continue the previous attempt (it hit the iteration limit before finishing)
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/e735cca3-597e-44fe-9270-69c735e34133/3`. Do not clone anything; work only in this directory.
+A prior code-agent attempt on this work dir (`/tmp/gestalt/phase/e735cca3-597e-44fe-9270-69c735e34133/4`) was stopped after reaching its iteration limit. Its work is ALREADY on disk here — do NOT restart from scratch or re-read everything; build on what exists. It made 17 file edit(s). Its last verification FAILED (`cd /tmp/gestalt/phase/e735cca3-597e-44fe-9270-69c735e34133/4 && npx jest --testPathPattern="employee" 2>&1`):
+1b[22m\x1b[39m\x1b[27m\x1b[0m \x1b[1m...\x1b[22m\n\x1b[0m\x1b[7m\x1b[33m\x1b[1m RUNS \x1b[22m\x1b[39m\x1b[27m\x1b[0m \x1b[1m...\x1b[22m\n\n\x1b[1mTest Suites: \x1b[22m0 of 2 total\n\x1b[1mTests:       \x1b[22m0 total\n\x1b[1mSnapshots:   \x1b[22m0 total\n\x1b[1mTime:\x1b[22m        158 s\x1b[K\x1b[1A\x1b[K\x1b[1A\x1b[K\x1b[1A\x1b[K\x1b[1A\x1b[K\x1b[1A\x1b[K\x1b[1A\x1b[K\x1b[1A\n\x1b[0m\x1b[7m\x1b[33m\x1b[1m RUNS \x1b[22m\x1b[39m\x1b[27m\x1b[0m \x1b[1m...\x1b[22m\n\x1b[0m\x1b[7m\x1b[33m\x1b[1m RUNS \x1b[22m\x1b[39m\x1b[27m\x1b[0m \x1b[1m...\x1b[22m\n\n\x1b[1mTest Suites: \x1b[22m0 of 2 total\n\x1b[1mTests:       \x1b[22m0 total\n\x1b[1mSnapshots:   \x1b[22m0 total\n\x1b[1mTime:\x1b[22m        161 s\x1b[K\x1b[1A\x1b[K\x1b[1A\x1b[K\x1b[1A\x1b[K\x1b[1A\x1b[K\x1b[1A\x1b[K\x1b[1A\x1b[K\x1b[1A'}]
+
+Finish the task now: fix any failing build/type-check/tests, then RUN the build and the tests and fix anything still failing. Stop as soon as the build and tests pass. The full original task (with all mandatory constraints) follows for reference.
+
+---
+
+# Implement this phase: Phase 4: Audit & Notification modules
+
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/e735cca3-597e-44fe-9270-69c735e34133/4`. Do not clone anything; work only in this directory.
 
 You are the IMPLEMENTATION agent, not a planner. The platform measures your work EXCLUSIVELY by the files you create or modify in this working tree (`git status`). Ending your turn with a plan, a summary, or an announcement of what you are 'about to' do — without having actually edited files — is a FAILURE: a turn that leaves the working tree untouched is discarded. Explore only as much as you need, then MAKE the edits with your file-editing tool. Never end your turn before the files exist on disk.
 
@@ -8,26 +17,40 @@ You are the IMPLEMENTATION agent, not a planner. The platform measures your work
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Build the policy module under `src/modules/policy/`. This phase depends on Phase 1's shared types.
+Build the audit and notification modules. This phase depends on Phase 1's shared types.
 
 Read these existing files before generating:
-- `src/shared/types/leave.types.ts` (from Phase 1) — for `LeaveType`, `BaseEntity`
+- `src/shared/types/leave.types.ts` (from Phase 1) — for `AuditAction`, `BaseEntity`
 - `src/shared/db/connection.ts` — for the PostgreSQL pool
 - `tsconfig.json` — for path resolution
 
-Create approximately 4 files:
+Create approximately 8 files across two modules:
 
-1. **`src/modules/policy/policy.model.ts`** — Define and export:
-   - `LeavePolicy` entity with the canonical fields: `id: string`, `policyName: string`, `leaveType: LeaveType`, `entitlementDays: number`, `accrualRate: number | undefined`, `maxAccumulation: number | undefined`, `minimumNoticeDays: number | undefined`, `requiresManagerApproval: boolean`, `isActive: boolean`, `createdAt: Date`, `updatedAt: Date`
-   - `IPolicyRepository` interface declaring: `findById(id: string): Promise<LeavePolicy | null>`, `findByLeaveType(leaveType: LeaveType): Promise<LeavePolicy | null>`, `findAllActive(): Promise<LeavePolicy[]>`, `create(policy: Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeavePolicy>`, `update(id: string, data: Partial<LeavePolicy>): Promise<LeavePolicy | null>`
+**Audit module (`src/modules/audit/`):**
 
-2. **`src/modules/policy/policy.repository.ts`** — Implement `PolicyRepository` class implementing `IPolicyRepository` using the `pool` from `src/shared/db/connection.ts`. Table name: `leave_policies`.
+1. **`src/modules/audit/audit.model.ts`** — Define and export:
+   - `AuditLog` entity with canonical fields: `id: string`, `entityType: string`, `entityId: string`, `action: string`, `oldValues: Record<string, unknown> | null`, `newValues: Record<string, unknown> | null`, `performedBy: string`, `performedAt: Date`
+   - `IAuditRepository` interface: `create(entry: Omit<AuditLog, 'id' | 'performedAt'>): Promise<AuditLog>`, `findByEntity(entityType: string, entityId: string): Promise<AuditLog[]>`, `findByPerformer(performedBy: string, limit?: number): Promise<AuditLog[]>`
 
-3. **`src/modules/policy/policy.service.ts`** — Implement `PolicyService` class with methods: `getById`, `getByLeaveType`, `getAllActive`, `create`, `update`, `getEntitlementForType(leaveType: LeaveType): Promise<number>` (returns `entitlementDays` for the active policy of that type, or throws if none found).
+2. **`src/modules/audit/audit.repository.ts`** — Implement `AuditRepository` using `pool`. Table: `audit_logs`.
 
-4. **`src/modules/policy/index.ts`** — Barrel file.
+3. **`src/modules/audit/audit.service.ts`** — Implement `AuditService` with methods: `log(entry)`, `getEntityHistory(entityType, entityId)`, `getUserActions(performedBy, limit)`. The `log` method auto-sets `performedAt` to `new Date()`.
 
-Include Jest unit tests in `tests/unit/modules/policy/policy.service.spec.ts`.
+4. **`src/modules/audit/index.ts`** — Barrel file.
+
+**Notification module (`src/modules/notification/`):**
+
+5. **`src/modules/notification/notification.model.ts`** — Define and export:
+   - `Notification` entity: `id: string`, `recipientId: string`, `title: string`, `body: string`, `type: 'EMAIL' | 'IN_APP'`, `isRead: boolean`, `metadata: Record<string, unknown> | null`, `createdAt: Date`
+   - `INotificationRepository` interface: `create(notification: Omit<Notification, 'id' | 'createdAt' | 'isRead'>): Promise<Notification>`, `findByRecipient(recipientId: string, limit?: number): Promise<Notification[]>`, `markAsRead(id: string): Promise<void>`
+
+6. **`src/modules/notification/notification.repository.ts`** — Implement `NotificationRepository` using `pool`. Table: `notifications`.
+
+7. **`src/modules/notification/notification.service.ts`** — Implement `NotificationService` with methods: `send(recipientId, title, body, type, metadata?)`, `getForUser(recipientId, limit?)`, `markRead(id)`.
+
+8. **`src/modules/notification/index.ts`** — Barrel file.
+
+Include Jest unit tests in `tests/unit/modules/audit/audit.service.spec.ts` and `tests/unit/modules/notification/notification.service.spec.ts`.
 
 ## Your iteration budget — and how to get more (READ BEFORE YOU START)
 
@@ -93,19 +116,18 @@ binding wherever they apply):
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- The `LeavePolicy` entity must use the `LeaveType` enum imported from `shared/types/leave.types.ts` — not a locally redefined enum or string literal union. (see `src/shared/types/leave.types.ts`)
-- The `PolicyRepository` must use the shared `pool` exported from `src/shared/db/connection.ts` — not create its own connection or pool. (see `src/shared/db/connection.ts`)
-- The `PolicyRepository.mapRow` method must follow the same pattern as `EmployeeRepository.mapRow`: accept `DbRow` (typed as `Record<string, unknown>`), convert snake_case column names to camelCase entity fields, and cast each value to the expected TypeScript type. (see `src/modules/employee/employee.repository.ts`)
-- The `PolicyService` constructor must accept `IPolicyRepository` via dependency injection, matching the `EmployeeService` pattern (`constructor(private readonly employeeRepo: IEmployeeRepository)`). (see `src/modules/employee/employee.service.ts`)
-- Unit tests must use `jest.Mocked<IPolicyRepository>` for the mock repository and a factory function (e.g., `makeMockPolicy`) for creating test `LeavePolicy` objects, following the pattern in the employee service tests. (see `tests/unit/modules/employee/employee.service.spec.ts`)
+- AuditLog.action must be validated against the AuditAction enum values from `src/shared/types/leave.types.ts` (see `src/shared/types/leave.types.ts`)
+- Repository implementations must follow the established pattern from EmployeeRepository and PolicyRepository: private mapRow method converting snake_case DB columns to camelCase entity fields, parameterized SQL with $1/$2 placeholders, RETURNING * on INSERT, and dynamic UPDATE with a fieldMap array (see `src/modules/employee/employee.repository.ts`)
+- Service classes must follow the constructor-injection pattern: accept the repository interface as a constructor parameter, never instantiate the repository internally (see `src/modules/employee/employee.service.ts`)
 ### Entity invariants — enforce these
-- Reuse or extend `LeavePolicy`: `leaveType` must be unique across all policies — enforced by the unique index on `leave_type` in the `leave_policies` table. At most one policy (active or inactive) may exist per `LeaveType` value.
-- Reuse or extend `LeavePolicy`: `entitlementDays` must be a positive integer. A policy with zero or negative entitlement is invalid — the service must reject such values on `create` and `update`.
-- Reuse or extend `LeavePolicy`: `isActive` is a boolean flag. Only one policy per `LeaveType` may be active at a time (enforced by the unique index on `leave_type` — since there is at most one row per type, there can be at most one active row per type). Deactivating a policy (`isActive: false`) does not delete it; it remains queryable by `findById` and `findByLeaveType` but is excluded from `findAllActive`.
+- Reuse or extend `AuditLog`: AuditLog records are immutable once created — no update or delete operations exist on the repository or service
+- Reuse or extend `AuditLog`: The `action` field must be constrained to values from the `AuditAction` enum defined in `src/shared/types/leave.types.ts`
+- Reuse or extend `Notification`: A newly created Notification always has isRead=false and createdAt set to the current timestamp at creation time
+- Reuse or extend `Notification`: The `type` field must be exactly 'EMAIL' or 'IN_APP' — no other values are valid
 ### Interface contract — expose these operations (their shape is yours)
-- PolicyService.getEntitlementForType(leaveType: LeaveType): Promise<number> — No auth enforcement at this layer — auth is deferred to the controller/routes phase.; idempotent; Throws a domain error (e.g., `PolicyNotFoundError`) when no active policy exists for the given `LeaveType`. The error must include the `leaveType` value in its message.
-- PolicyService.create(data: Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeavePolicy> — No auth enforcement at this layer — auth is deferred to the controller/routes phase.; Must validate that `entitlementDays > 0` before delegating to repository. Must propagate any unique-constraint violation from the repository (duplicate `leaveType`) as a domain error.
-- PolicyService.update(id: string, data: Partial<LeavePolicy>): Promise<LeavePolicy | null> — No auth enforcement at this layer — auth is deferred to the controller/routes phase.; If `entitlementDays` is provided in `data`, it must be validated as > 0. Throws a domain error (e.g., `PolicyNotFoundError`) when no policy with the given `id` exists.
+- AuditService.log(entry) — Must throw a typed domain error if the repository create fails (e.g. database constraint violation); must not silently swallow errors
+- NotificationService.markRead(id) — idempotent; Must throw a typed domain error (e.g. NotificationNotFoundError) if no notification with the given id exists; calling markRead on an already-read notification is a no-op (idempotent)
+- NotificationService.send(recipientId, title, body, type, metadata?) — Must throw a typed domain error if type is not 'EMAIL' or 'IN_APP'; must throw if title or body is empty
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
