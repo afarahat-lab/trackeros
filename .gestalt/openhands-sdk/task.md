@@ -1,6 +1,6 @@
-# Implement this phase: Phase 2: Employee module
+# Implement this phase: Phase 3: Policy module
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/e735cca3-597e-44fe-9270-69c735e34133/2`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/e735cca3-597e-44fe-9270-69c735e34133/3`. Do not clone anything; work only in this directory.
 
 You are the IMPLEMENTATION agent, not a planner. The platform measures your work EXCLUSIVELY by the files you create or modify in this working tree (`git status`). Ending your turn with a plan, a summary, or an announcement of what you are 'about to' do — without having actually edited files — is a FAILURE: a turn that leaves the working tree untouched is discarded. Explore only as much as you need, then MAKE the edits with your file-editing tool. Never end your turn before the files exist on disk.
 
@@ -8,26 +8,26 @@ You are the IMPLEMENTATION agent, not a planner. The platform measures your work
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Build the employee module under `src/modules/employee/`. This phase depends on Phase 1's shared types.
+Build the policy module under `src/modules/policy/`. This phase depends on Phase 1's shared types.
 
 Read these existing files before generating:
-- `src/shared/types/leave.types.ts` (from Phase 1) — for `BaseEntity`
+- `src/shared/types/leave.types.ts` (from Phase 1) — for `LeaveType`, `BaseEntity`
 - `src/shared/db/connection.ts` — for the PostgreSQL pool
 - `tsconfig.json` — for path resolution
 
 Create approximately 4 files:
 
-1. **`src/modules/employee/employee.model.ts`** — Define and export:
-   - `Employee` entity with the canonical fields: `id: string`, `employeeNumber: string`, `firstName: string`, `lastName: string`, `email: string`, `managerId: string | null`, `department: string | null`, `hireDate: Date`, `terminationDate: Date | null`, `employmentStatus: 'ACTIVE' | 'INACTIVE' | 'TERMINATED'`, `createdAt: Date`, `updatedAt: Date`, `deletedAt: Date | null`
-   - `IEmployeeRepository` interface declaring: `findById(id: string): Promise<Employee | null>`, `findByEmployeeNumber(employeeNumber: string): Promise<Employee | null>`, `findAll(): Promise<Employee[]>`, `findByManagerId(managerId: string): Promise<Employee[]>`, `create(employee: Omit<Employee, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt'>): Promise<Employee>`, `update(id: string, data: Partial<Employee>): Promise<Employee | null>`, `softDelete(id: string): Promise<void>`
+1. **`src/modules/policy/policy.model.ts`** — Define and export:
+   - `LeavePolicy` entity with the canonical fields: `id: string`, `policyName: string`, `leaveType: LeaveType`, `entitlementDays: number`, `accrualRate: number | undefined`, `maxAccumulation: number | undefined`, `minimumNoticeDays: number | undefined`, `requiresManagerApproval: boolean`, `isActive: boolean`, `createdAt: Date`, `updatedAt: Date`
+   - `IPolicyRepository` interface declaring: `findById(id: string): Promise<LeavePolicy | null>`, `findByLeaveType(leaveType: LeaveType): Promise<LeavePolicy | null>`, `findAllActive(): Promise<LeavePolicy[]>`, `create(policy: Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeavePolicy>`, `update(id: string, data: Partial<LeavePolicy>): Promise<LeavePolicy | null>`
 
-2. **`src/modules/employee/employee.repository.ts`** — Implement `EmployeeRepository` class implementing `IEmployeeRepository` using the `pool` from `src/shared/db/connection.ts`. Use parameterized SQL queries via `pg`. Table name: `employees`.
+2. **`src/modules/policy/policy.repository.ts`** — Implement `PolicyRepository` class implementing `IPolicyRepository` using the `pool` from `src/shared/db/connection.ts`. Table name: `leave_policies`.
 
-3. **`src/modules/employee/employee.service.ts`** — Implement `EmployeeService` class with methods: `getById`, `getByEmployeeNumber`, `getAll`, `getSubordinates`, `create`, `update`, `terminate`. Depends on `IEmployeeRepository` injected via constructor.
+3. **`src/modules/policy/policy.service.ts`** — Implement `PolicyService` class with methods: `getById`, `getByLeaveType`, `getAllActive`, `create`, `update`, `getEntitlementForType(leaveType: LeaveType): Promise<number>` (returns `entitlementDays` for the active policy of that type, or throws if none found).
 
-4. **`src/modules/employee/index.ts`** — Barrel file re-exporting the model, repository, and service.
+4. **`src/modules/policy/index.ts`** — Barrel file.
 
-Include Jest unit tests in `tests/unit/modules/employee/employee.service.spec.ts` (mock the repository).
+Include Jest unit tests in `tests/unit/modules/policy/policy.service.spec.ts`.
 
 ## Your iteration budget — and how to get more (READ BEFORE YOU START)
 
@@ -90,43 +90,22 @@ binding wherever they apply):
   do NOT add any document-tracking entity. The LeaveRequest lifecycle is exactly:
   PENDING -> APPROVED | REJECTED, and PENDING | APPROVED -> CANCELLED. [BINDING RULE — operator decision resolving: Should leave day counting exclude weekends and/or public holidays, or use pure calendar days as currently specified?; How is the "year" boundary for leave_balances defined — calendar year (Jan 1 – Dec 31), fiscal year, or employee-specific anniversary year?; apply everywhere these apply, not in one place only]
 
-## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
-The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
-- `Employee` — the entity MUST have exactly these fields:
-    - id: string
-    - employeeNumber: string
-    - firstName: string
-    - lastName: string
-    - email: string
-    - managerId: string | null
-    - department: string | null
-    - hireDate: Date
-    - terminationDate: Date | null
-    - employmentStatus: 'ACTIVE' | 'INACTIVE' | 'TERMINATED'
-    - createdAt: Date
-    - updatedAt: Date
-    - deletedAt: Date | null
-
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- The `Employee` entity must carry `id`, `createdAt`, `updatedAt` matching the shape of `BaseEntity` from Phase 1, plus a `deletedAt` for soft-delete. The `id` type must be `string`. (see `src/shared/types/leave.types.ts`)
-- The repository must import and use the `pool` export from `src/shared/db/connection.ts` — no other database connection may be created. (see `src/shared/db/connection.ts`)
-- Module imports must resolve via `baseUrl: "./src"` as configured in `tsconfig.json`. Paths like `shared/db/connection` and `shared/types/leave.types` must be used, not relative `../../shared/...` paths. (see `tsconfig.json`)
-- The `employmentStatus` field must use the string literal union `'ACTIVE' | 'INACTIVE' | 'TERMINATED'` — matching the Employee lifecycle defined in the reconciled architecture. (see `.gestalt/architecture/reconciled.json`)
+- The `LeavePolicy` entity must use the `LeaveType` enum imported from `shared/types/leave.types.ts` — not a locally redefined enum or string literal union. (see `src/shared/types/leave.types.ts`)
+- The `PolicyRepository` must use the shared `pool` exported from `src/shared/db/connection.ts` — not create its own connection or pool. (see `src/shared/db/connection.ts`)
+- The `PolicyRepository.mapRow` method must follow the same pattern as `EmployeeRepository.mapRow`: accept `DbRow` (typed as `Record<string, unknown>`), convert snake_case column names to camelCase entity fields, and cast each value to the expected TypeScript type. (see `src/modules/employee/employee.repository.ts`)
+- The `PolicyService` constructor must accept `IPolicyRepository` via dependency injection, matching the `EmployeeService` pattern (`constructor(private readonly employeeRepo: IEmployeeRepository)`). (see `src/modules/employee/employee.service.ts`)
+- Unit tests must use `jest.Mocked<IPolicyRepository>` for the mock repository and a factory function (e.g., `makeMockPolicy`) for creating test `LeavePolicy` objects, following the pattern in the employee service tests. (see `tests/unit/modules/employee/employee.service.spec.ts`)
 ### Entity invariants — enforce these
-- Reuse or extend `Employee`: Lifecycle: `employmentStatus` transitions ACTIVE ↔ INACTIVE → TERMINATED. TERMINATED is terminal — once set, it must not revert to ACTIVE or INACTIVE through normal service methods. When `employmentStatus` is set to `'TERMINATED'`, `terminationDate` must be set to the current timestamp.
-- Reuse or extend `Employee`: `employeeNumber` must be unique across all non-soft-deleted employees. The repository's `findByEmployeeNumber` and `create` methods are the enforcement points — `create` must reject a duplicate `employeeNumber` with a typed error.
-- Reuse or extend `Employee`: Soft-delete: `deletedAt` being non-null means the employee is logically deleted. Repository queries (`findById`, `findByEmployeeNumber`, `findAll`, `findByManagerId`) must exclude rows where `deletedAt IS NOT NULL` unless explicitly documented otherwise.
+- Reuse or extend `LeavePolicy`: `leaveType` must be unique across all policies — enforced by the unique index on `leave_type` in the `leave_policies` table. At most one policy (active or inactive) may exist per `LeaveType` value.
+- Reuse or extend `LeavePolicy`: `entitlementDays` must be a positive integer. A policy with zero or negative entitlement is invalid — the service must reject such values on `create` and `update`.
+- Reuse or extend `LeavePolicy`: `isActive` is a boolean flag. Only one policy per `LeaveType` may be active at a time (enforced by the unique index on `leave_type` — since there is at most one row per type, there can be at most one active row per type). Deactivating a policy (`isActive: false`) does not delete it; it remains queryable by `findById` and `findByLeaveType` but is excluded from `findAllActive`.
 ### Interface contract — expose these operations (their shape is yours)
-- IEmployeeRepository.findById — idempotent; Returns `null` when no non-deleted employee matches the id — does not throw.
-- IEmployeeRepository.findByEmployeeNumber — idempotent; Returns `null` when no non-deleted employee matches the employeeNumber — does not throw.
-- IEmployeeRepository.softDelete — idempotent; Sets `deletedAt` to current timestamp. Idempotent — calling twice on the same id is a no-op after the first call. Does not throw if the employee is already deleted or does not exist.
-- IEmployeeRepository.create — Must reject duplicate `employeeNumber` with a typed error (e.g. a domain error or a specific exception the service can catch). Must return the fully-hydrated `Employee` including generated `id`, `createdAt`, `updatedAt`.
-- EmployeeService.terminate — Must set `employmentStatus` to `'TERMINATED'` and `terminationDate` to `new Date()`. Must throw a typed error if the employee is not found. Must reject if the employee is already TERMINATED.
-### Integration points — connect to these
-- src/shared/types/leave.types.ts — Employee entity extends/composes with BaseEntity shape (id, createdAt, updatedAt).
-- src/shared/db/connection.ts — EmployeeRepository uses the shared PostgreSQL pool for all queries.
+- PolicyService.getEntitlementForType(leaveType: LeaveType): Promise<number> — No auth enforcement at this layer — auth is deferred to the controller/routes phase.; idempotent; Throws a domain error (e.g., `PolicyNotFoundError`) when no active policy exists for the given `LeaveType`. The error must include the `leaveType` value in its message.
+- PolicyService.create(data: Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeavePolicy> — No auth enforcement at this layer — auth is deferred to the controller/routes phase.; Must validate that `entitlementDays > 0` before delegating to repository. Must propagate any unique-constraint violation from the repository (duplicate `leaveType`) as a domain error.
+- PolicyService.update(id: string, data: Partial<LeavePolicy>): Promise<LeavePolicy | null> — No auth enforcement at this layer — auth is deferred to the controller/routes phase.; If `entitlementDays` is provided in `data`, it must be validated as > 0. Throws a domain error (e.g., `PolicyNotFoundError`) when no policy with the given `id` exists.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
