@@ -22,6 +22,12 @@ src/modules/employee/
   employee.service.ts        — EmployeeService (getById, getByEmployeeNumber, getAll, getSubordinates, create, update, terminate)
   index.ts                   — barrel re-export
 
+src/modules/policy/
+  policy.model.ts            — LeavePolicy entity, IPolicyRepository, PolicyNotFoundError, DuplicateLeaveTypeError
+  policy.repository.ts       — PolicyRepository (pg pool, parameterized SQL, duplicate detection on create)
+  policy.service.ts          — PolicyService (getById, getByLeaveType, getAllActive, create, update, getEntitlementForType)
+  index.ts                   — barrel re-export
+
 src/modules/status/
   status.model.ts            — SystemStatus entity
   status.service.interface.ts
@@ -47,7 +53,6 @@ src/shared/
 ```
 src/modules/leave/           — leave orchestration (Phase 6)
 src/modules/balance/         — leave balances (Phase 5)
-src/modules/policy/          — leave policies (Phase 3)
 src/modules/audit/           — audit logging (Phase 4)
 src/modules/notification/    — notifications (Phase 4)
 ```
@@ -94,6 +99,37 @@ src/modules/notification/    — notifications (Phase 4)
 - RBAC enforcement, JWT auth guards.
 - Audit logging of employee mutations (GP-002 applies to LeaveRequest/LeaveBalance per reconciled architecture).
 - Termination cascade logic (belongs to leave module, Phase 6).
+
+## Policy module (Phase 3 — built)
+
+### Entity
+
+- **LeavePolicy** — rules per leave type. Fields: `id`, `policyName`, `leaveType` (`LeaveType` enum), `entitlementDays`, `accrualRate` (`number | undefined`), `maxAccumulation` (`number | undefined`), `minimumNoticeDays` (`number | undefined`), `requiresManagerApproval`, `isActive`, `createdAt`, `updatedAt`. Extends `BaseEntity`.
+- **Uniqueness**: `leaveType` must be unique across all policies. `create()` rejects duplicates with `DuplicateLeaveTypeError`.
+
+### Repository
+
+- `PolicyRepository` implements `IPolicyRepository`. All queries use parameterized SQL via the shared `pool` from `src/shared/db/connection.ts`. Table: `leave_policies`.
+- Methods: `findById`, `findByLeaveType`, `findAllActive`, `create`, `update`.
+- `create` checks for existing policy with the same `leaveType` before inserting; throws `DuplicateLeaveTypeError` on conflict.
+- `update` uses dynamic column mapping (`fieldMap`) to build SET clauses from the provided partial data; sets `updated_at = NOW()`.
+- Private `mapRow` helper converts snake_case DB rows to camelCase domain objects.
+
+### Service
+
+- `PolicyService` depends on `IPolicyRepository` (constructor injection).
+- Methods: `getById`, `getByLeaveType`, `getAllActive`, `create`, `update`, `getEntitlementForType`.
+- `create` validates `entitlementDays > 0` before delegating to repository.
+- `update` validates `entitlementDays > 0` if provided; checks policy existence first; delegates to repository.
+- `getEntitlementForType(leaveType)` looks up the policy by leave type, verifies it is active, and returns `entitlementDays`. Throws `PolicyNotFoundError` if no active policy exists for the type.
+- Domain errors: `PolicyNotFoundError`, `DuplicateLeaveTypeError`.
+
+### What was deferred
+
+- Controller, routes, HTTP handlers — no HTTP surface exists yet.
+- Database migration for `leave_policies` table — assumed to exist.
+- RBAC enforcement, JWT auth guards.
+- Audit logging of policy mutations (GP-002 applies to LeaveRequest/LeaveBalance per reconciled architecture).
 
 <!-- gestalt:architecture feature=e735cca3-597e-44fe-9270-69c735e34133 START -->
 ## Leave Management Module — Reconciled Architecture
