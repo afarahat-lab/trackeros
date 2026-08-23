@@ -1,0 +1,124 @@
+{
+  "scope": {
+    "affectedDomains": [],
+    "affectedLayers": [],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The `LeavePolicy` entity is defined and exported from `policy.model.ts` with exactly these fields: `id: string`, `policyName: string`, `leaveType: LeaveType`, `entitlementDays: number`, `accrualRate: number | undefined`, `maxAccumulation: number | undefined`, `minimumNoticeDays: number | undefined`, `requiresManagerApproval: boolean`, `isActive: boolean`, `createdAt: Date`, `updatedAt: Date` \u2014 with `id`, `createdAt`, `updatedAt` included inline (not via `extends BaseEntity`), matching the employee module pattern.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `IPolicyRepository` interface declares exactly these five methods: `findById(id: string): Promise<LeavePolicy | null>`, `findByLeaveType(leaveType: LeaveType): Promise<LeavePolicy | null>`, `findAllActive(): Promise<LeavePolicy[]>`, `create(policy: Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeavePolicy>`, `update(id: string, data: Partial<LeavePolicy>): Promise<LeavePolicy | null>`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`PolicyRepository` implements `IPolicyRepository` using the shared `pool` from `src/shared/db/connection.ts`, targeting the `leave_policies` table. All queries use parameterized SQL. A private `mapRow(row: DbRow): LeavePolicy` method converts snake_case columns to camelCase entity fields.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`PolicyService` exposes six methods: `getById(id)`, `getByLeaveType(leaveType)`, `getAllActive()`, `create(data)`, `update(id, data)`, and `getEntitlementForType(leaveType)`. The constructor accepts `IPolicyRepository` via dependency injection.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`getEntitlementForType(leaveType)` returns the `entitlementDays` of the active policy for the given `LeaveType`. If no active policy exists for that type, it throws a domain error (e.g., `PolicyNotFoundError`).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`findAllActive()` returns only policies where `isActive === true`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`findByLeaveType(leaveType)` returns a single `LeavePolicy` or `null` \u2014 never an array \u2014 because the `leave_type` column has a unique index guaranteeing at most one policy per leave type.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests in `tests/unit/modules/policy/policy.service.spec.ts` use `jest.Mocked<IPolicyRepository>` and factory functions for mock `LeavePolicy` entities, following the same pattern as `tests/unit/modules/employee/employee.service.spec.ts`. Tests cover: `getById` (found and not-found), `getByLeaveType` (found and not-found), `getAllActive` (returns active only), `create` (delegates to repo), `update` (found and not-found), `getEntitlementForType` (returns entitlementDays when active policy exists, throws when none found).",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access must go through `PolicyRepository` \u2014 no inline SQL or direct pool usage in `PolicyService` or any other file. This satisfies GP-001 (Repository pattern).",
+    "The policy module must only import from `src/shared/types/` (for `LeaveType`) and `src/shared/db/connection.ts` (for the `pool`). It must not import from any other module (`employee`, `balance`, `leave`, `audit`, `notification`). This matches the reconciled architecture dependency map: `policy \u2192 shared-types`.",
+    "No controller, routes, or HTTP handlers in this phase. The policy module exposes only model, repository, service, and barrel exports. Controller/routes are deferred to a later phase.",
+    "All TypeScript files must compile under strict mode (`tsc --noEmit` passes). No use of `any` \u2014 use `unknown` with type guards instead (per HARNESS.json constraint `no-any`).",
+    "Imports must use non-relative paths from the `src/` base (e.g., `shared/types/leave.types`, `shared/db/connection`) as configured by `baseUrl: \"./src\"` in `tsconfig.json` and `moduleDirectories: ['node_modules', 'src']` in `jest.config.js`."
+  ],
+  "outOfScope": [
+    "Controller, routes, and HTTP handlers for the policy module \u2014 deferred to a later phase. No Fastify plugins, no `policy.controller.ts`, no `policy.routes.ts`.",
+    "RBAC enforcement, JWT auth guards, or `requireRole(...)` middleware on policy operations \u2014 deferred to the controller/routes phase.",
+    "Audit logging of policy mutations \u2014 GP-002 applies to `LeaveRequest` and `LeaveBalance` per the reconciled architecture, not to `LeavePolicy`. Policy audit logging is not in scope for this phase.",
+    "Database migration for the leave_policies table \u2014 the table is assumed to exist with the schema defined in the reconciled architecture."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "`leaveType` must be unique across all policies \u2014 enforced by the unique index on `leave_type` in the `leave_policies` table. At most one policy (active or inactive) may exist per `LeaveType` value."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "`entitlementDays` must be a positive integer. A policy with zero or negative entitlement is invalid \u2014 the service must reject such values on `create` and `update`."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "`isActive` is a boolean flag. Only one policy per `LeaveType` may be active at a time (enforced by the unique index on `leave_type` \u2014 since there is at most one row per type, there can be at most one active row per type). Deactivating a policy (`isActive: false`) does not delete it; it remains queryable by `findById` and `findByLeaveType` but is excluded from `findAllActive`."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "PolicyService.getEntitlementForType(leaveType: LeaveType): Promise<number>",
+      "authRule": "No auth enforcement at this layer \u2014 auth is deferred to the controller/routes phase.",
+      "idempotent": true,
+      "errorSemantics": "Throws a domain error (e.g., `PolicyNotFoundError`) when no active policy exists for the given `LeaveType`. The error must include the `leaveType` value in its message."
+    },
+    {
+      "operation": "PolicyService.create(data: Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeavePolicy>",
+      "authRule": "No auth enforcement at this layer \u2014 auth is deferred to the controller/routes phase.",
+      "idempotent": false,
+      "errorSemantics": "Must validate that `entitlementDays > 0` before delegating to repository. Must propagate any unique-constraint violation from the repository (duplicate `leaveType`) as a domain error."
+    },
+    {
+      "operation": "PolicyService.update(id: string, data: Partial<LeavePolicy>): Promise<LeavePolicy | null>",
+      "authRule": "No auth enforcement at this layer \u2014 auth is deferred to the controller/routes phase.",
+      "idempotent": false,
+      "errorSemantics": "If `entitlementDays` is provided in `data`, it must be validated as > 0. Throws a domain error (e.g., `PolicyNotFoundError`) when no policy with the given `id` exists."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The `LeavePolicy` entity must use the `LeaveType` enum imported from `shared/types/leave.types.ts` \u2014 not a locally redefined enum or string literal union.",
+      "referencePath": "src/shared/types/leave.types.ts"
+    },
+    {
+      "requirement": "The `PolicyRepository` must use the shared `pool` exported from `src/shared/db/connection.ts` \u2014 not create its own connection or pool.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "The `PolicyRepository.mapRow` method must follow the same pattern as `EmployeeRepository.mapRow`: accept `DbRow` (typed as `Record<string, unknown>`), convert snake_case column names to camelCase entity fields, and cast each value to the expected TypeScript type.",
+      "referencePath": "src/modules/employee/employee.repository.ts"
+    },
+    {
+      "requirement": "The `PolicyService` constructor must accept `IPolicyRepository` via dependency injection, matching the `EmployeeService` pattern (`constructor(private readonly employeeRepo: IEmployeeRepository)`).",
+      "referencePath": "src/modules/employee/employee.service.ts"
+    },
+    {
+      "requirement": "Unit tests must use `jest.Mocked<IPolicyRepository>` for the mock repository and a factory function (e.g., `makeMockPolicy`) for creating test `LeavePolicy` objects, following the pattern in the employee service tests.",
+      "referencePath": "tests/unit/modules/employee/employee.service.spec.ts"
+    }
+  ],
+  "integrationPoints": []
+}
