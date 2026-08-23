@@ -1,0 +1,43 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared-types"
+    ],
+    "affectedLayers": [
+      "types",
+      "tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "`BaseEntity` in `src/shared/types/leave.types.ts` is a type alias (`export type BaseEntity = { id: string; createdAt: Date; updatedAt: Date }`) \u2014 not an interface. Verified by reading the file and confirming the `type` keyword is present and the `interface` keyword is absent.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The test file at `tests/unit/shared/types/leave.types.spec.ts` is renamed to `tests/unit/shared/types/leave.types.test.ts`. The file contents are unchanged. Verified by confirming the old path does not exist and the new path does, and that the test file content is identical to the original.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The `BaseEntity` type alias must preserve the exact same shape as the original interface: `{ id: string; createdAt: Date; updatedAt: Date }`. No fields may be added, removed, or have their types changed.",
+    "The barrel file `src/shared/types/index.ts` must continue to re-export `BaseEntity` as a type (`export type { BaseEntity } from './leave.types'`). The existing `export type` syntax already works for both interfaces and type aliases, so no change is needed in the barrel file \u2014 but the re-export must remain functional after the change."
+  ],
+  "outOfScope": [
+    "Adding, removing, or modifying any enum values (LeaveRequestStatus, LeaveType, AuditAction) \u2014 only the BaseEntity keyword change and file rename are in scope.",
+    "Modifying the test file contents \u2014 the rename is purely a filesystem operation; the test assertions, imports, and describe/it blocks must remain identical."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [
+    {
+      "requirement": "The `BaseEntity` type alias must be structurally identical to the original interface so that any future consumer that imports `BaseEntity` (e.g., `Employee`, `LeavePolicy`, `LeaveBalance`, `LeaveRequest`, `AuditLog` entities) can extend or intersect with it without breakage. The shape `{ id: string; createdAt: Date; updatedAt: Date }` must not change.",
+      "referencePath": "src/shared/types/leave.types.ts"
+    }
+  ],
+  "integrationPoints": []
+}
