@@ -34,6 +34,12 @@ src/modules/audit/
   audit.service.ts           — AuditService (log, getEntityHistory, getUserActions)
   (no index.ts barrel yet)
 
+src/modules/notification/
+  notification.model.ts      — Notification entity, INotificationRepository interface
+  notification.repository.ts — NotificationRepository (pg pool, parameterized SQL, snake_case column mapping)
+  notification.service.ts    — NotificationService (send, getForUser, markRead)
+  (no index.ts barrel yet)
+
 src/modules/status/
   status.model.ts            — SystemStatus entity
   status.service.interface.ts
@@ -59,7 +65,6 @@ src/shared/
 ```
 src/modules/leave/           — leave orchestration (Phase 6)
 src/modules/balance/         — leave balances (Phase 5)
-src/modules/notification/    — notifications (Phase 4, deferred)
 ```
 
 ## Key patterns
@@ -136,7 +141,7 @@ src/modules/notification/    — notifications (Phase 4, deferred)
 - RBAC enforcement, JWT auth guards.
 - Audit logging of policy mutations (GP-002 applies to LeaveRequest/LeaveBalance per reconciled architecture).
 
-## Audit module (Phase 4 — partially built)
+## Audit module (Phase 4a — partially built)
 
 ### Entity
 
@@ -163,9 +168,40 @@ src/modules/notification/    — notifications (Phase 4, deferred)
 
 - Barrel file (`index.ts`) — not yet created.
 - Unit tests — not yet written.
-- Notification module — entirely deferred (no files created under `src/modules/notification/`).
 - Controller, routes, HTTP handlers — no HTTP surface exists yet.
 - Database migration for `audit_logs` table — assumed to exist.
+
+## Notification module (Phase 4b — partially built)
+
+### Entity
+
+- **Notification** — a message sent to a user. Fields: `id`, `recipientId`, `title`, `body`, `type` (`'EMAIL' | 'IN_APP'`), `isRead`, `metadata` (`Record<string, unknown> | null`), `createdAt`.
+- **Immutability**: Notifications are immutable after creation except for the `isRead` field, which transitions exactly once from `false` to `true` via `markAsRead`. There is no update or delete operation.
+- **No BaseEntity**: The `Notification` entity does NOT extend `BaseEntity` — it has its own `id` and `createdAt` fields but no `updatedAt`.
+
+### Repository
+
+- `NotificationRepository` implements `INotificationRepository`. All queries use parameterized SQL via the shared `pool` from `src/shared/db/connection.ts`. Table: `notifications`.
+- Methods: `create`, `findByRecipient`, `markAsRead`.
+- `create` generates `id` via `randomUUID()`, sets `isRead` to `false`, sets `createdAt` to `new Date()`. Serializes `metadata` to JSON for storage when non-null.
+- `findByRecipient` returns notifications for a given recipient, ordered by `created_at DESC`, with an optional `LIMIT`. Returns an empty array (not null) when no notifications exist.
+- `markAsRead` sets `is_read = true` for the row identified by `id`. Idempotent — calling on an already-read notification is safe and produces no error. If the row does not exist, the UPDATE affects zero rows but does not throw.
+- Private `mapRow` helper converts snake_case DB columns to camelCase domain objects.
+
+### Service
+
+- `NotificationService` depends on `INotificationRepository` (constructor injection).
+- Methods: `send(recipientId, title, body, type, metadata?)`, `getForUser(recipientId, limit?)`, `markRead(id)`.
+- `send` delegates to `repository.create` — thin delegation with no additional business logic.
+- `getForUser` delegates to `repository.findByRecipient`.
+- `markRead` delegates to `repository.markAsRead`.
+
+### What was deferred
+
+- Barrel file (`index.ts`) — not yet created (belongs to sub-phase 4c).
+- Unit tests — not yet written (belongs to sub-phase 4c).
+- Controller, routes, HTTP handlers — no HTTP surface exists yet.
+- Database migration for `notifications` table — assumed to exist.
 
 <!-- gestalt:architecture feature=e735cca3-597e-44fe-9270-69c735e34133 START -->
 ## Leave Management Module — Reconciled Architecture
