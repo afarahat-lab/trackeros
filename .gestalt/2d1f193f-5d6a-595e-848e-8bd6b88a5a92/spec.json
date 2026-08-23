@@ -1,0 +1,149 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "employee"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository",
+      "service"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The `Employee` entity is exported from `employee.model.ts` with all canonical fields: `id`, `employeeNumber`, `firstName`, `lastName`, `email`, `managerId`, `department`, `hireDate`, `terminationDate`, `employmentStatus` (union of `'ACTIVE' | 'INACTIVE' | 'TERMINATED'`), `createdAt`, `updatedAt`, `deletedAt` \u2014 all with correct TypeScript types.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `IEmployeeRepository` interface is exported from `employee.model.ts` declaring all seven methods: `findById`, `findByEmployeeNumber`, `findAll`, `findByManagerId`, `create`, `update`, `softDelete` \u2014 with correct signatures matching the phase spec.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`EmployeeRepository` implements `IEmployeeRepository` and every method uses parameterized SQL queries via the `pg` pool from `src/shared/db/connection.ts` \u2014 no string concatenation or template interpolation for SQL values.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`EmployeeService` exposes methods `getById`, `getByEmployeeNumber`, `getAll`, `getSubordinates`, `create`, `update`, `terminate` \u2014 each delegating to the injected `IEmployeeRepository` and returning the documented types.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`EmployeeService.terminate(id)` sets `employmentStatus` to `'TERMINATED'` and sets `terminationDate` to the current date \u2014 not just a generic update.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`softDelete(id)` sets `deletedAt` to the current timestamp rather than removing the row \u2014 satisfying soft-delete semantics.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The barrel file `src/modules/employee/index.ts` re-exports `Employee`, `IEmployeeRepository`, `EmployeeRepository`, and `EmployeeService`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests in `tests/unit/modules/employee/employee.service.spec.ts` mock `IEmployeeRepository` and cover: `getById` returns employee or null, `getByEmployeeNumber` returns employee or null, `getAll` returns array, `getSubordinates` returns array filtered by managerId, `create` returns new employee, `update` returns updated employee or null, `terminate` sets TERMINATED status + terminationDate.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access MUST go through `EmployeeRepository` \u2014 no inline SQL or direct `pool.query()` calls in `EmployeeService` or any other file (GP-001, HARNESS constraint `no-direct-db-outside-repository`).",
+    "The `Employee` entity MUST extend or be compatible with `BaseEntity` from `src/shared/types/leave.types.ts` \u2014 it carries `id`, `createdAt`, `updatedAt` plus a soft-delete `deletedAt`.",
+    "No `any` type \u2014 use `unknown` with type guards where needed (HARNESS constraint `no-any`).",
+    "All async errors must be caught and handled \u2014 no unhandled promise rejections (GP-006). Repository methods must propagate errors; service methods must not silently swallow them.",
+    "The `employees` table is assumed to exist \u2014 this phase does NOT create or migrate it. Repository queries target the `employees` table name exactly.",
+    "Imports from `src/shared/` must use the `baseUrl`-relative path (e.g. `shared/db/connection`, `shared/types/leave.types`) as configured in `tsconfig.json`."
+  ],
+  "outOfScope": [
+    "Controller, routes, or HTTP handlers for the employee module \u2014 deferred to a later phase.",
+    "Database migration for the `employees` table \u2014 the table is assumed to exist.",
+    "RBAC enforcement, JWT auth guards, or `requireRole(...)` middleware \u2014 no HTTP surface exists in this phase.",
+    "Audit logging of employee mutations \u2014 GP-002 applies to state-changing operations on LeaveRequest and LeaveBalance per the reconciled architecture; employee CRUD auditing is not in scope for this phase.",
+    "Termination cascade logic (auto-rejecting leave requests, closing balances) \u2014 that belongs to the leave module in Phase 6."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "Lifecycle: `employmentStatus` transitions ACTIVE \u2194 INACTIVE \u2192 TERMINATED. TERMINATED is terminal \u2014 once set, it must not revert to ACTIVE or INACTIVE through normal service methods. When `employmentStatus` is set to `'TERMINATED'`, `terminationDate` must be set to the current timestamp."
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "`employeeNumber` must be unique across all non-soft-deleted employees. The repository's `findByEmployeeNumber` and `create` methods are the enforcement points \u2014 `create` must reject a duplicate `employeeNumber` with a typed error."
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "Soft-delete: `deletedAt` being non-null means the employee is logically deleted. Repository queries (`findById`, `findByEmployeeNumber`, `findAll`, `findByManagerId`) must exclude rows where `deletedAt IS NOT NULL` unless explicitly documented otherwise."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IEmployeeRepository.findById",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns `null` when no non-deleted employee matches the id \u2014 does not throw."
+    },
+    {
+      "operation": "IEmployeeRepository.findByEmployeeNumber",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns `null` when no non-deleted employee matches the employeeNumber \u2014 does not throw."
+    },
+    {
+      "operation": "IEmployeeRepository.softDelete",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Sets `deletedAt` to current timestamp. Idempotent \u2014 calling twice on the same id is a no-op after the first call. Does not throw if the employee is already deleted or does not exist."
+    },
+    {
+      "operation": "IEmployeeRepository.create",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Must reject duplicate `employeeNumber` with a typed error (e.g. a domain error or a specific exception the service can catch). Must return the fully-hydrated `Employee` including generated `id`, `createdAt`, `updatedAt`."
+    },
+    {
+      "operation": "EmployeeService.terminate",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Must set `employmentStatus` to `'TERMINATED'` and `terminationDate` to `new Date()`. Must throw a typed error if the employee is not found. Must reject if the employee is already TERMINATED."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The `Employee` entity must carry `id`, `createdAt`, `updatedAt` matching the shape of `BaseEntity` from Phase 1, plus a `deletedAt` for soft-delete. The `id` type must be `string`.",
+      "referencePath": "src/shared/types/leave.types.ts"
+    },
+    {
+      "requirement": "The repository must import and use the `pool` export from `src/shared/db/connection.ts` \u2014 no other database connection may be created.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "Module imports must resolve via `baseUrl: \"./src\"` as configured in `tsconfig.json`. Paths like `shared/db/connection` and `shared/types/leave.types` must be used, not relative `../../shared/...` paths.",
+      "referencePath": "tsconfig.json"
+    },
+    {
+      "requirement": "The `employmentStatus` field must use the string literal union `'ACTIVE' | 'INACTIVE' | 'TERMINATED'` \u2014 matching the Employee lifecycle defined in the reconciled architecture.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/leave.types.ts",
+      "why": "Employee entity extends/composes with BaseEntity shape (id, createdAt, updatedAt)."
+    },
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "EmployeeRepository uses the shared PostgreSQL pool for all queries."
+    }
+  ]
+}
