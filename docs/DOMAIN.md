@@ -7,8 +7,8 @@ Base entity providing common fields for domain models.
 | Field | Type | Required |
 |-------|------|----------|
 | id | string | true |
-| created_at | Date | true |
-| updated_at | Date | true |
+| createdAt | Date | true |
+| updatedAt | Date | true |
 
 ## leave
 
