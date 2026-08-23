@@ -1,38 +1,38 @@
-# Implement this phase: Sub-phase 4a: Audit module implementation
+# Implement this phase: Sub-phase 4b: Notification module implementation
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/e735cca3-597e-44fe-9270-69c735e34133/4`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/e735cca3-597e-44fe-9270-69c735e34133/5`. Do not clone anything; work only in this directory.
 
 You are the IMPLEMENTATION agent, not a planner. The platform measures your work EXCLUSIVELY by the files you create or modify in this working tree (`git status`). Ending your turn with a plan, a summary, or an announcement of what you are 'about to' do — without having actually edited files — is a FAILURE: a turn that leaves the working tree untouched is discarded. Explore only as much as you need, then MAKE the edits with your file-editing tool. Never end your turn before the files exist on disk.
 
 ## What to build
-audit.model.ts exports AuditLog entity type with all canonical fields (id, entityType, entityId, action, oldValues, newValues, performedBy, performedAt)
-audit.model.ts exports IAuditRepository interface with create, findByEntity, and findByPerformer method signatures
-audit.repository.ts exports AuditRepository class implementing IAuditRepository using the shared pool
-audit.repository.ts create() generates a UUID id and sets performedAt to new Date()
-audit.service.ts exports AuditService class with log(), getEntityHistory(), and getUserActions() methods
-AuditService accepts AuditRepository via constructor and delegates all data access to it
+notification.model.ts exports Notification entity type with all canonical fields (id, recipientId, title, body, type, isRead, metadata, createdAt)
+notification.model.ts exports INotificationRepository interface with create, findByRecipient, and markAsRead method signatures
+notification.repository.ts exports NotificationRepository class implementing INotificationRepository using the shared pool
+notification.repository.ts create() generates a UUID id, sets isRead to false, and sets createdAt to new Date()
+notification.service.ts exports NotificationService class with send(), getForUser(), and markRead() methods
+NotificationService accepts NotificationRepository via constructor and delegates all data access to it
 
 ## Success criteria
-Build the Audit module's model, repository, and service. Depends on Phase 1's shared types (`src/shared/types/leave.types.ts`) and the DB connection pool (`src/shared/db/connection.ts`).
+Build the Notification module's model, repository, and service. Depends on Phase 1's shared types (`src/shared/types/leave.types.ts`) and the DB connection pool (`src/shared/db/connection.ts`). Independent of sub-phase 4a.
 
 Create exactly 3 files:
 
-1. **`src/modules/audit/audit.model.ts`** — Define and export:
-   - `AuditLog` entity: `id: string`, `entityType: string`, `entityId: string`, `action: string`, `oldValues: Record<string, unknown> | null`, `newValues: Record<string, unknown> | null`, `performedBy: string`, `performedAt: Date`
-   - `IAuditRepository` interface: `create(entry: Omit<AuditLog, 'id' | 'performedAt'>): Promise<AuditLog>`, `findByEntity(entityType: string, entityId: string): Promise<AuditLog[]>`, `findByPerformer(performedBy: string, limit?: number): Promise<AuditLog[]>`
+1. **`src/modules/notification/notification.model.ts`** — Define and export:
+   - `Notification` entity: `id: string`, `recipientId: string`, `title: string`, `body: string`, `type: 'EMAIL' | 'IN_APP'`, `isRead: boolean`, `metadata: Record<string, unknown> | null`, `createdAt: Date`
+   - `INotificationRepository` interface: `create(notification: Omit<Notification, 'id' | 'createdAt' | 'isRead'>): Promise<Notification>`, `findByRecipient(recipientId: string, limit?: number): Promise<Notification[]>`, `markAsRead(id: string): Promise<void>`
 
-2. **`src/modules/audit/audit.repository.ts`** — Implement `AuditRepository` class using the PostgreSQL `pool`. Table name: `audit_logs`. Must implement `IAuditRepository`. Generate UUIDs for `id`, auto-set `performedAt` to `new Date()` on create.
+2. **`src/modules/notification/notification.repository.ts`** — Implement `NotificationRepository` class using the PostgreSQL `pool`. Table name: `notifications`. Must implement `INotificationRepository`. Generate UUIDs for `id`, auto-set `isRead` to `false` and `createdAt` to `new Date()` on create.
 
-3. **`src/modules/audit/audit.service.ts`** — Implement `AuditService` class that takes `AuditRepository` via constructor. Methods:
-   - `log(entry: Omit<AuditLog, 'id' | 'performedAt'>): Promise<AuditLog>` — delegates to repository
-   - `getEntityHistory(entityType: string, entityId: string): Promise<AuditLog[]>`
-   - `getUserActions(performedBy: string, limit?: number): Promise<AuditLog[]>`
+3. **`src/modules/notification/notification.service.ts`** — Implement `NotificationService` class that takes `NotificationRepository` via constructor. Methods:
+   - `send(recipientId: string, title: string, body: string, type: 'EMAIL' | 'IN_APP', metadata?: Record<string, unknown>): Promise<Notification>`
+   - `getForUser(recipientId: string, limit?: number): Promise<Notification[]>`
+   - `markRead(id: string): Promise<void>`
 
 No barrel file or tests in this sub-phase.
 
 ## Owned by SIBLING sub-phases (OUT OF SCOPE for this sub-phase)
 This is ONE sub-phase of a split phase. The deliverables below belong to sibling sub-phases — do NOT create them here, do NOT list them as success criteria, and this sub-phase MUST NOT be gated on their presence (they are produced by a sibling, not missing):
-- "Sub-phase 4b: Notification module implementation": src/modules/notification/notification.model.ts, src/modules/notification/notification.repository.ts, src/modules/notification/notification.service.ts
+- "Sub-phase 4a: Audit module implementation": src/modules/audit/audit.model.ts, src/modules/audit/audit.repository.ts, src/modules/audit/audit.service.ts
 - "Sub-phase 4c: Barrel files and unit tests": src/modules/audit/index.ts, src/modules/notification/index.ts, tests/unit/modules/audit/audit.service.spec.ts, tests/unit/modules/notification/notification.service.spec.ts
 
 In particular, UNIT/INTEGRATION TESTS are OUT OF SCOPE for this sub-phase — they are produced in: Sub-phase 4c: Barrel files and unit tests. Do not create test files here, do not require test existence or coverage as a success criterion, and do not fail the gate for missing tests.
@@ -98,33 +98,21 @@ binding wherever they apply):
   do NOT add any document-tracking entity. The LeaveRequest lifecycle is exactly:
   PENDING -> APPROVED | REJECTED, and PENDING | APPROVED -> CANCELLED. [BINDING RULE — operator decision resolving: Should leave day counting exclude weekends and/or public holidays, or use pure calendar days as currently specified?; How is the "year" boundary for leave_balances defined — calendar year (Jan 1 – Dec 31), fiscal year, or employee-specific anniversary year?; apply everywhere these apply, not in one place only]
 
-## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
-The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
-- `AuditLog` — the entity MUST have exactly these fields:
-    - id: string
-    - entityType: string
-    - entityId: string
-    - action: string
-    - oldValues: Record<string, unknown> | null
-    - newValues: Record<string, unknown> | null
-    - performedBy: string
-    - performedAt: Date
-
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- The `AuditLog` entity's `action` field uses `string` type, but callers are expected to use values from the `AuditAction` enum defined in `src/shared/types/leave.types.ts`. The repository must not validate or restrict action values — it accepts any string. (see `src/shared/types/leave.types.ts`)
-- The repository's `mapRow` helper must convert snake_case database columns (`entity_type`, `entity_id`, `old_values`, `new_values`, `performed_by`, `performed_at`) to camelCase `AuditLog` fields, following the same pattern used in `EmployeeRepository.mapRow` and `PolicyRepository.mapRow` (see `src/modules/employee/employee.repository.ts`)
-- The `AuditService` constructor must accept `IAuditRepository` (the interface, not the concrete class), matching the dependency injection pattern used by `EmployeeService` and `PolicyService` (see `src/modules/employee/employee.service.ts`)
-- Module imports must use the `baseUrl` path resolution from `tsconfig.json` — e.g., `import { pool } from 'shared/db/connection'` and `import { AuditAction } from 'shared/types/leave.types'` — matching the import style of existing modules (see `tsconfig.json`)
+- The `NotificationRepository` must follow the same structural pattern as `AuditRepository` in `src/modules/audit/audit.repository.ts`: import `pool` from `shared/db/connection`, generate IDs via `randomUUID()` from the `crypto` module, use a private `mapRow` helper converting snake_case DB columns to camelCase, and use parameterized SQL with `RETURNING *` on INSERT. (see `src/modules/audit/audit.repository.ts`)
+- The `NotificationService` must follow the same structural pattern as `AuditService` in `src/modules/audit/audit.service.ts`: constructor-injected repository interface, thin delegation methods with no additional business logic beyond what is specified. (see `src/modules/audit/audit.service.ts`)
+- The `Notification` entity model file must follow the same export pattern as `src/modules/audit/audit.model.ts`: export the entity interface first, then the repository interface — no classes, no runtime code in the model file. (see `src/modules/audit/audit.model.ts`)
 ### Entity invariants — enforce these
-- Reuse or extend `AuditLog`: AuditLog records are immutable once created — no update or delete operations exist on the repository or service. The `id` and `performedAt` fields are always generated at creation time and never supplied by the caller.
+- Reuse or extend `Notification`: A Notification is immutable after creation except for the `isRead` field, which transitions exactly once from `false` to `true` via `markAsRead`. There is no update or delete operation — the repository exposes only `create`, `findByRecipient`, and `markAsRead`.
+- Reuse or extend `Notification`: The `type` field is constrained to the string literal union `'EMAIL' | 'IN_APP'` — no other values are valid.
 ### Interface contract — expose these operations (their shape is yours)
-- IAuditRepository.create — Must throw if the database insert fails (e.g., constraint violation, connection error). Must not silently swallow errors.
-- IAuditRepository.findByEntity — idempotent; Returns empty array when no matching audit records exist — never null. Ordered by `performedAt` descending (most recent first).
-- IAuditRepository.findByPerformer — idempotent; Returns empty array when no matching audit records exist — never null. Ordered by `performedAt` descending. When `limit` is provided, returns at most that many rows; when omitted, returns all matching rows.
+- INotificationRepository.create — Must generate a new UUID for `id`, set `isRead` to `false`, set `createdAt` to `new Date()`, serialize `metadata` to JSON if non-null, and return the fully-hydrated `Notification`. If the database insert fails, the error propagates to the caller — no silent swallowing.
+- INotificationRepository.markAsRead — idempotent; Sets `is_read = true` for the row identified by `id`. If the row does not exist, the operation is a no-op (the UPDATE affects zero rows but does not throw). Idempotent: calling `markAsRead` on an already-read notification is safe and produces no error.
+- INotificationRepository.findByRecipient — idempotent; Returns notifications for the given `recipientId` ordered by `created_at DESC`. When `limit` is provided, caps the result set. Returns an empty array (not null) when no notifications exist for the recipient. Read-only, idempotent.
 ### Integration points — connect to these
-- src/shared/db/connection.ts — AuditRepository uses the shared pg.Pool for all database operations against the audit_logs table
+- src/shared/db/connection.ts — NotificationRepository imports the shared PostgreSQL `pool` for all database operations against the `notifications` table.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
