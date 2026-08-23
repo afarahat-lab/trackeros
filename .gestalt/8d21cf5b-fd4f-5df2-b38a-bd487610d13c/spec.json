@@ -1,0 +1,108 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "audit"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository",
+      "service"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The `AuditLog` entity is defined and exported from `src/modules/audit/audit.model.ts` with exactly these fields: `id: string`, `entityType: string`, `entityId: string`, `action: string`, `oldValues: Record<string, unknown> | null`, `newValues: Record<string, unknown> | null`, `performedBy: string`, `performedAt: Date`",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `IAuditRepository` interface is defined and exported from `src/modules/audit/audit.model.ts` with exactly three methods: `create(entry: Omit<AuditLog, 'id' | 'performedAt'>): Promise<AuditLog>`, `findByEntity(entityType: string, entityId: string): Promise<AuditLog[]>`, `findByPerformer(performedBy: string, limit?: number): Promise<AuditLog[]>`",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`AuditRepository` class in `src/modules/audit/audit.repository.ts` implements `IAuditRepository` and uses the shared `pool` from `src/shared/db/connection.ts` for all database operations against the `audit_logs` table",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "`AuditRepository.create` generates a UUID for `id` via `crypto.randomUUID()`, auto-sets `performedAt` to `new Date()`, inserts a row into `audit_logs`, and returns the persisted `AuditLog`",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "`AuditService` class in `src/modules/audit/audit.service.ts` takes `IAuditRepository` via constructor injection and exposes three methods: `log(entry: Omit<AuditLog, 'id' | 'performedAt'>): Promise<AuditLog>`, `getEntityHistory(entityType: string, entityId: string): Promise<AuditLog[]>`, `getUserActions(performedBy: string, limit?: number): Promise<AuditLog[]>`",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`AuditService.log` delegates to `IAuditRepository.create` and returns the resulting `AuditLog` \u2014 it does not modify the entry beyond what the repository already does",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access MUST go through the repository layer \u2014 `AuditService` must never call `pool` directly (GP-001, HARNESS.json `no-direct-db-outside-repository`)",
+    "No `any` type anywhere \u2014 use `Record<string, unknown>` for `oldValues`/`newValues` and `DbRow = Record<string, unknown>` for database row mapping (HARNESS.json `no-any`)",
+    "UUID generation MUST use Node 20's built-in `crypto.randomUUID()` \u2014 no external uuid package",
+    "All SQL queries MUST use parameterized placeholders (`$1`, `$2`, \u2026) \u2014 never string interpolation or template concatenation"
+  ],
+  "outOfScope": [
+    "Barrel file (`src/modules/audit/index.ts`) \u2014 belongs to sibling sub-phase 4c",
+    "Unit and integration tests for the audit module \u2014 belong to sibling sub-phase 4c (`tests/unit/modules/audit/audit.service.spec.ts`)"
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "AuditLog records are immutable once created \u2014 no update or delete operations exist on the repository or service. The `id` and `performedAt` fields are always generated at creation time and never supplied by the caller."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IAuditRepository.create",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Must throw if the database insert fails (e.g., constraint violation, connection error). Must not silently swallow errors."
+    },
+    {
+      "operation": "IAuditRepository.findByEntity",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns empty array when no matching audit records exist \u2014 never null. Ordered by `performedAt` descending (most recent first)."
+    },
+    {
+      "operation": "IAuditRepository.findByPerformer",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns empty array when no matching audit records exist \u2014 never null. Ordered by `performedAt` descending. When `limit` is provided, returns at most that many rows; when omitted, returns all matching rows."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The `AuditLog` entity's `action` field uses `string` type, but callers are expected to use values from the `AuditAction` enum defined in `src/shared/types/leave.types.ts`. The repository must not validate or restrict action values \u2014 it accepts any string.",
+      "referencePath": "src/shared/types/leave.types.ts"
+    },
+    {
+      "requirement": "The repository's `mapRow` helper must convert snake_case database columns (`entity_type`, `entity_id`, `old_values`, `new_values`, `performed_by`, `performed_at`) to camelCase `AuditLog` fields, following the same pattern used in `EmployeeRepository.mapRow` and `PolicyRepository.mapRow`",
+      "referencePath": "src/modules/employee/employee.repository.ts"
+    },
+    {
+      "requirement": "The `AuditService` constructor must accept `IAuditRepository` (the interface, not the concrete class), matching the dependency injection pattern used by `EmployeeService` and `PolicyService`",
+      "referencePath": "src/modules/employee/employee.service.ts"
+    },
+    {
+      "requirement": "Module imports must use the `baseUrl` path resolution from `tsconfig.json` \u2014 e.g., `import { pool } from 'shared/db/connection'` and `import { AuditAction } from 'shared/types/leave.types'` \u2014 matching the import style of existing modules",
+      "referencePath": "tsconfig.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "AuditRepository uses the shared pg.Pool for all database operations against the audit_logs table"
+    }
+  ]
+}
