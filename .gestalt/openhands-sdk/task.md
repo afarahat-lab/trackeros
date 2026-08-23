@@ -1,6 +1,6 @@
-# Implement this phase: Phase 1: Shared types
+# Implement this phase: Phase 2: Employee module
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/e735cca3-597e-44fe-9270-69c735e34133/1`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/e735cca3-597e-44fe-9270-69c735e34133/2`. Do not clone anything; work only in this directory.
 
 You are the IMPLEMENTATION agent, not a planner. The platform measures your work EXCLUSIVELY by the files you create or modify in this working tree (`git status`). Ending your turn with a plan, a summary, or an announcement of what you are 'about to' do — without having actually edited files — is a FAILURE: a turn that leaves the working tree untouched is discarded. Explore only as much as you need, then MAKE the edits with your file-editing tool. Never end your turn before the files exist on disk.
 
@@ -8,21 +8,26 @@ You are the IMPLEMENTATION agent, not a planner. The platform measures your work
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the shared types module at `src/shared/types/`. This phase has no dependencies on other feature phases.
+Build the employee module under `src/modules/employee/`. This phase depends on Phase 1's shared types.
 
-Create exactly these files:
+Read these existing files before generating:
+- `src/shared/types/leave.types.ts` (from Phase 1) — for `BaseEntity`
+- `src/shared/db/connection.ts` — for the PostgreSQL pool
+- `tsconfig.json` — for path resolution
 
-1. **`src/shared/types/leave.types.ts`** — Define and export the canonical enums and base type:
-   - `LeaveRequestStatus` enum: `DRAFT`, `SUBMITTED`, `APPROVED`, `REJECTED`, `CANCELLED`
-   - `LeaveType` enum: `annual`, `sick`, `emergency`, `unpaid`, `maternity`, `paternity`
-   - `AuditAction` enum: `CREATED`, `UPDATED`, `DELETED`, `APPROVED`, `REJECTED`, `CANCELLED`, `SUBMITTED`
-   - `BaseEntity` type: `{ id: string; createdAt: Date; updatedAt: Date }`
+Create approximately 4 files:
 
-2. **`src/shared/types/index.ts`** — Barrel file that re-exports everything from `leave.types.ts`.
+1. **`src/modules/employee/employee.model.ts`** — Define and export:
+   - `Employee` entity with the canonical fields: `id: string`, `employeeNumber: string`, `firstName: string`, `lastName: string`, `email: string`, `managerId: string | null`, `department: string | null`, `hireDate: Date`, `terminationDate: Date | null`, `employmentStatus: 'ACTIVE' | 'INACTIVE' | 'TERMINATED'`, `createdAt: Date`, `updatedAt: Date`, `deletedAt: Date | null`
+   - `IEmployeeRepository` interface declaring: `findById(id: string): Promise<Employee | null>`, `findByEmployeeNumber(employeeNumber: string): Promise<Employee | null>`, `findAll(): Promise<Employee[]>`, `findByManagerId(managerId: string): Promise<Employee[]>`, `create(employee: Omit<Employee, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt'>): Promise<Employee>`, `update(id: string, data: Partial<Employee>): Promise<Employee | null>`, `softDelete(id: string): Promise<void>`
 
-Existing files to read before generating: `tsconfig.json` (baseUrl is `./src`, so imports like `shared/types/leave.types` resolve).
+2. **`src/modules/employee/employee.repository.ts`** — Implement `EmployeeRepository` class implementing `IEmployeeRepository` using the `pool` from `src/shared/db/connection.ts`. Use parameterized SQL queries via `pg`. Table name: `employees`.
 
-Include Jest unit tests in `tests/unit/shared/types/leave.types.spec.ts` verifying enum values are as expected.
+3. **`src/modules/employee/employee.service.ts`** — Implement `EmployeeService` class with methods: `getById`, `getByEmployeeNumber`, `getAll`, `getSubordinates`, `create`, `update`, `terminate`. Depends on `IEmployeeRepository` injected via constructor.
+
+4. **`src/modules/employee/index.ts`** — Barrel file re-exporting the model, repository, and service.
+
+Include Jest unit tests in `tests/unit/modules/employee/employee.service.spec.ts` (mock the repository).
 
 ## Your iteration budget — and how to get more (READ BEFORE YOU START)
 
@@ -85,17 +90,43 @@ binding wherever they apply):
   do NOT add any document-tracking entity. The LeaveRequest lifecycle is exactly:
   PENDING -> APPROVED | REJECTED, and PENDING | APPROVED -> CANCELLED. [BINDING RULE — operator decision resolving: Should leave day counting exclude weekends and/or public holidays, or use pure calendar days as currently specified?; How is the "year" boundary for leave_balances defined — calendar year (Jan 1 – Dec 31), fiscal year, or employee-specific anniversary year?; apply everywhere these apply, not in one place only]
 
+## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
+The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
+- `Employee` — the entity MUST have exactly these fields:
+    - id: string
+    - employeeNumber: string
+    - firstName: string
+    - lastName: string
+    - email: string
+    - managerId: string | null
+    - department: string | null
+    - hireDate: Date
+    - terminationDate: Date | null
+    - employmentStatus: 'ACTIVE' | 'INACTIVE' | 'TERMINATED'
+    - createdAt: Date
+    - updatedAt: Date
+    - deletedAt: Date | null
+
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- The `LeaveRequestStatus` enum members (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED) must match the domain entity definition in the reconciled architecture — no extra states, no missing states, no renamed states. (see `.gestalt/architecture/reconciled.json → domain_entities[1].attributes`)
-- The `LeaveType` enum members (annual, sick, emergency, unpaid, maternity, paternity) must match the domain entity definition in the reconciled architecture — no extra types, no missing types, no renamed types. (see `.gestalt/architecture/reconciled.json → domain_entities[2].attributes`)
-- The `AuditAction` enum members (CREATED, UPDATED, DELETED, APPROVED, REJECTED, CANCELLED, SUBMITTED) must cover every state transition operation described in the reconciled architecture's business rules — specifically rules 2 (state transitions), 4 (approval), 5 (cancellation), 8 (termination cascade), and 9 (audit requirement). (see `.gestalt/architecture/reconciled.json → business_rules`)
+- The `Employee` entity must carry `id`, `createdAt`, `updatedAt` matching the shape of `BaseEntity` from Phase 1, plus a `deletedAt` for soft-delete. The `id` type must be `string`. (see `src/shared/types/leave.types.ts`)
+- The repository must import and use the `pool` export from `src/shared/db/connection.ts` — no other database connection may be created. (see `src/shared/db/connection.ts`)
+- Module imports must resolve via `baseUrl: "./src"` as configured in `tsconfig.json`. Paths like `shared/db/connection` and `shared/types/leave.types` must be used, not relative `../../shared/...` paths. (see `tsconfig.json`)
+- The `employmentStatus` field must use the string literal union `'ACTIVE' | 'INACTIVE' | 'TERMINATED'` — matching the Employee lifecycle defined in the reconciled architecture. (see `.gestalt/architecture/reconciled.json`)
 ### Entity invariants — enforce these
-- Reuse or extend `LeaveRequestStatus`: The enum defines exactly five states: DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED. These are the only valid states for a LeaveRequest. The allowed transitions are: DRAFT → SUBMITTED; SUBMITTED → APPROVED | REJECTED; DRAFT | SUBMITTED | APPROVED → CANCELLED. REJECTED and CANCELLED are terminal. No other transitions are valid — this is enforced by downstream service logic, but the enum itself must not contain any state outside this set.
-- Reuse or extend `LeaveType`: The enum defines exactly six leave categories: annual, sick, emergency, unpaid, maternity, paternity. Each type carries its own entitlement pool and policy rules. No leave type may be added or removed without a corresponding policy definition.
-- Reuse or extend `AuditAction`: The enum defines exactly seven actions: CREATED, UPDATED, DELETED, APPROVED, REJECTED, CANCELLED, SUBMITTED. Every state-changing operation on LeaveRequest or LeaveBalance must map to one of these actions in the audit record (GP-002).
-- Reuse or extend `BaseEntity`: Every domain entity (LeaveRequest, LeaveBalance, LeavePolicy, Employee, AuditLog) must be structurally compatible with BaseEntity — it must have `id: string`, `createdAt: Date`, and `updatedAt: Date`. This is the canonical base shape; downstream entities satisfy it either by explicit intersection or by declaring the same fields.
+- Reuse or extend `Employee`: Lifecycle: `employmentStatus` transitions ACTIVE ↔ INACTIVE → TERMINATED. TERMINATED is terminal — once set, it must not revert to ACTIVE or INACTIVE through normal service methods. When `employmentStatus` is set to `'TERMINATED'`, `terminationDate` must be set to the current timestamp.
+- Reuse or extend `Employee`: `employeeNumber` must be unique across all non-soft-deleted employees. The repository's `findByEmployeeNumber` and `create` methods are the enforcement points — `create` must reject a duplicate `employeeNumber` with a typed error.
+- Reuse or extend `Employee`: Soft-delete: `deletedAt` being non-null means the employee is logically deleted. Repository queries (`findById`, `findByEmployeeNumber`, `findAll`, `findByManagerId`) must exclude rows where `deletedAt IS NOT NULL` unless explicitly documented otherwise.
+### Interface contract — expose these operations (their shape is yours)
+- IEmployeeRepository.findById — idempotent; Returns `null` when no non-deleted employee matches the id — does not throw.
+- IEmployeeRepository.findByEmployeeNumber — idempotent; Returns `null` when no non-deleted employee matches the employeeNumber — does not throw.
+- IEmployeeRepository.softDelete — idempotent; Sets `deletedAt` to current timestamp. Idempotent — calling twice on the same id is a no-op after the first call. Does not throw if the employee is already deleted or does not exist.
+- IEmployeeRepository.create — Must reject duplicate `employeeNumber` with a typed error (e.g. a domain error or a specific exception the service can catch). Must return the fully-hydrated `Employee` including generated `id`, `createdAt`, `updatedAt`.
+- EmployeeService.terminate — Must set `employmentStatus` to `'TERMINATED'` and `terminationDate` to `new Date()`. Must throw a typed error if the employee is not found. Must reject if the employee is already TERMINATED.
+### Integration points — connect to these
+- src/shared/types/leave.types.ts — Employee entity extends/composes with BaseEntity shape (id, createdAt, updatedAt).
+- src/shared/db/connection.ts — EmployeeRepository uses the shared PostgreSQL pool for all queries.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
