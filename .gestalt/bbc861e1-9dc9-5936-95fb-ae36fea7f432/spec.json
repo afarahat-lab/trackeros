@@ -1,0 +1,142 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "audit",
+      "notification"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository",
+      "service",
+      "tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "AuditLog entity is defined and exported from `src/modules/audit/audit.model.ts` with all canonical fields: id (string), entityType (string), entityId (string), action (string), oldValues (Record&lt;string, unknown&gt; | null), newValues (Record&lt;string, unknown&gt; | null), performedBy (string), performedAt (Date)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "IAuditRepository interface declares create(entry: Omit&lt;AuditLog, 'id' | 'performedAt'&gt;): Promise&lt;AuditLog&gt;, findByEntity(entityType: string, entityId: string): Promise&lt;AuditLog[]&gt;, and findByPerformer(performedBy: string, limit?: number): Promise&lt;AuditLog[]&gt;",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "AuditRepository implements IAuditRepository using the shared pool from `src/shared/db/connection.ts`, targeting the `audit_logs` table with parameterized SQL and snake_case column mapping",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "AuditService.log(entry) auto-sets performedAt to new Date(), delegates to IAuditRepository.create, and returns the created AuditLog",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "AuditService.getEntityHistory(entityType, entityId) returns all AuditLog records for that entity, ordered by performedAt descending",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "AuditService.getUserActions(performedBy, limit?) returns AuditLog records for that performer, ordered by performedAt descending, capped at limit when provided",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Notification entity is defined and exported from `src/modules/notification/notification.model.ts` with all canonical fields: id (string), recipientId (string), title (string), body (string), type ('EMAIL' | 'IN_APP'), isRead (boolean), metadata (Record&lt;string, unknown&gt; | null), createdAt (Date)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "INotificationRepository interface declares create(notification: Omit&lt;Notification, 'id' | 'createdAt' | 'isRead'&gt;): Promise&lt;Notification&gt;, findByRecipient(recipientId: string, limit?: number): Promise&lt;Notification[]&gt;, and markAsRead(id: string): Promise&lt;void&gt;",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "NotificationRepository implements INotificationRepository using the shared pool from `src/shared/db/connection.ts`, targeting the `notifications` table with parameterized SQL and snake_case column mapping",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "NotificationService.send(recipientId, title, body, type, metadata?) creates a Notification with isRead=false and createdAt=now, delegates to INotificationRepository.create, and returns the created Notification",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "NotificationService.getForUser(recipientId, limit?) returns notifications for that recipient ordered by createdAt descending, capped at limit when provided",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "NotificationService.markRead(id) delegates to INotificationRepository.markAsRead; throws a typed domain error (e.g. NotificationNotFoundError) if the notification does not exist",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No use of `any` \u2014 use `unknown` with type guards (HARNESS.json constraint no-any)",
+    "All database access must go through the repository pattern \u2014 no inline SQL in services (GP-001, HARNESS.json no-direct-db-outside-repository)",
+    "No hardcoded secrets, passwords, API keys, or tokens (HARNESS.json no-hardcoded-secrets)"
+  ],
+  "outOfScope": [],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "AuditLog records are immutable once created \u2014 no update or delete operations exist on the repository or service"
+    },
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "The `action` field must be constrained to values from the `AuditAction` enum defined in `src/shared/types/leave.types.ts`"
+    },
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "A newly created Notification always has isRead=false and createdAt set to the current timestamp at creation time"
+    },
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "The `type` field must be exactly 'EMAIL' or 'IN_APP' \u2014 no other values are valid"
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "AuditService.log(entry)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Must throw a typed domain error if the repository create fails (e.g. database constraint violation); must not silently swallow errors"
+    },
+    {
+      "operation": "NotificationService.markRead(id)",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Must throw a typed domain error (e.g. NotificationNotFoundError) if no notification with the given id exists; calling markRead on an already-read notification is a no-op (idempotent)"
+    },
+    {
+      "operation": "NotificationService.send(recipientId, title, body, type, metadata?)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Must throw a typed domain error if type is not 'EMAIL' or 'IN_APP'; must throw if title or body is empty"
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "AuditLog.action must be validated against the AuditAction enum values from `src/shared/types/leave.types.ts`",
+      "referencePath": "src/shared/types/leave.types.ts"
+    },
+    {
+      "requirement": "Repository implementations must follow the established pattern from EmployeeRepository and PolicyRepository: private mapRow method converting snake_case DB columns to camelCase entity fields, parameterized SQL with $1/$2 placeholders, RETURNING * on INSERT, and dynamic UPDATE with a fieldMap array",
+      "referencePath": "src/modules/employee/employee.repository.ts"
+    },
+    {
+      "requirement": "Service classes must follow the constructor-injection pattern: accept the repository interface as a constructor parameter, never instantiate the repository internally",
+      "referencePath": "src/modules/employee/employee.service.ts"
+    }
+  ],
+  "integrationPoints": []
+}
