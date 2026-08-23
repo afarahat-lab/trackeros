@@ -1,0 +1,69 @@
+{
+  "scope": {
+    "affectedDomains": [],
+    "affectedLayers": [],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The `LeaveBalance` entity is defined and exported from `src/modules/balance/balance.model.ts` with all canonical fields: `id`, `employeeId`, `policyId`, `totalEntitlement`, `usedDays`, `pendingDays`, `remainingDays` (derived as `totalEntitlement - usedDays - pendingDays`, never stored), `fiscalYear`, `status` (`'ACTIVE' | 'EXHAUSTED' | 'FROZEN' | 'CLOSED'`), `createdAt`, `updatedAt` \u2014 and it extends `BaseEntity` from `shared/types/leave.types`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `IBalanceRepository` interface declares all seven methods: `findByEmployeeAndYear`, `findByEmployeeYearAndPolicy`, `create`, `update`, `deductPendingDays` (atomic increment of `pendingDays`), `commitDeduction` (atomic move from `pendingDays` to `usedDays`), and `restorePendingDays` (atomic decrement of `pendingDays`).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`BalanceRepository` implements `IBalanceRepository` using the shared `pool` from `src/shared/db/connection.ts`. The `deductPendingDays`, `commitDeduction`, and `restorePendingDays` methods each use a single `UPDATE ... RETURNING *` SQL statement with atomic arithmetic (`pending_days = pending_days + $n`, `used_days = used_days + $n AND pending_days = pending_days - $n`, `pending_days = pending_days - $n`) to prevent race conditions \u2014 no SELECT-then-UPDATE pattern.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`BalanceService.getOrCreateBalance(employeeId, leaveType, fiscalYear)` looks up an existing balance via `findByEmployeeYearAndPolicy`; if none exists, it fetches the active policy via `PolicyService.getByLeaveType` (to obtain both `policyId` and `entitlementDays`), creates a new balance record with `totalEntitlement` set to the policy's `entitlementDays`, `usedDays=0`, `pendingDays=0`, `status='ACTIVE'`, and returns it.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`BalanceService.hasSufficientBalance` returns `true` when `remainingDays >= requestedDays` and `false` otherwise. `remainingDays` is computed as `totalEntitlement - usedDays - pendingDays` from the balance record \u2014 it is never stored.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`BalanceService.reserveDays`, `commitDays`, and `restoreDays` each resolve the correct balance via `getOrCreateBalance` (using `leaveType` to find the policy, then `policyId` + `employeeId` + `fiscalYear` to find the balance), then delegate to the corresponding atomic repository method (`deductPendingDays`, `commitDeduction`, `restorePendingDays`).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The balance module exposes two read endpoints via Fastify route handlers: one for listing balances (filterable by `employeeId` and `year` query parameters) and one for fetching a single balance by `id`. Both return JSON responses.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "Jest unit tests in `tests/unit/modules/balance/balance.service.spec.ts` cover all `BalanceService` methods with mocked `IBalanceRepository` and `PolicyService`. Tests verify: `getOrCreateBalance` creates when none exists and returns existing when found; `hasSufficientBalance` returns true/false correctly; `reserveDays`/`commitDays`/`restoreDays` resolve the correct balance and delegate to the repository; `getBalancesForEmployee` delegates and returns results.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The balance module MUST import from other modules ONLY through their barrel `index.ts` files. Specifically: `PolicyService` and `LeavePolicy` from `modules/policy` (not `modules/policy/policy.service`), `LeaveType`/`BaseEntity` from `shared/types`, and the pool from `shared/db/connection`. No deep-path imports into sibling modules.",
+    "The `fiscalYear` field is a plain integer representing the calendar year (e.g., 2026). It is derived from `startDate.getFullYear()` at the call site (the leave module in Phase 6). The balance module itself does NOT compute fiscal year \u2014 it receives it as a parameter. This is the BINDING calendar-year rule from the reconciled architecture.",
+    "Repository methods that participate in multi-step writes (`deductPendingDays`, `commitDeduction`, `restorePendingDays`, `create`, `update`) MUST accept an optional `client: PoolClient` parameter. When `client` is provided, the method uses it for the query; when omitted, it uses the shared `pool`. This follows the transaction contract established in the reconciled architecture.",
+    "The `leave_balances` table has a unique constraint on `(employee_id, policy_id, fiscal_year)`. The repository's `create` method must handle the case where a concurrent insert creates a duplicate \u2014 either by using `ON CONFLICT` or by catching the unique-violation error and falling back to a lookup. The service's `getOrCreateBalance` must be safe against concurrent callers.",
+    "No circular dependencies. The balance module depends on `shared/types`, `modules/policy`, and `modules/employee`. It does NOT depend on `modules/leave`, `modules/audit`, or `modules/notification`. No module may import from `modules/balance` except `modules/leave` (Phase 6)."
+  ],
+  "outOfScope": [],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "`remainingDays` is ALWAYS derived as `totalEntitlement - usedDays - pendingDays` and MUST NOT be stored in the database. Every read of `remainingDays` must compute it from the persisted fields."
+    }
+  ],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [],
+  "integrationPoints": []
+}
