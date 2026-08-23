@@ -28,6 +28,12 @@ src/modules/policy/
   policy.service.ts          — PolicyService (getById, getByLeaveType, getAllActive, create, update, getEntitlementForType)
   index.ts                   — barrel re-export
 
+src/modules/audit/
+  audit.model.ts             — AuditLog entity, IAuditRepository interface
+  audit.repository.ts        — AuditRepository (pg pool, parameterized SQL, snake_case column mapping)
+  audit.service.ts           — AuditService (log, getEntityHistory, getUserActions)
+  (no index.ts barrel yet)
+
 src/modules/status/
   status.model.ts            — SystemStatus entity
   status.service.interface.ts
@@ -53,8 +59,7 @@ src/shared/
 ```
 src/modules/leave/           — leave orchestration (Phase 6)
 src/modules/balance/         — leave balances (Phase 5)
-src/modules/audit/           — audit logging (Phase 4)
-src/modules/notification/    — notifications (Phase 4)
+src/modules/notification/    — notifications (Phase 4, deferred)
 ```
 
 ## Key patterns
@@ -130,6 +135,37 @@ src/modules/notification/    — notifications (Phase 4)
 - Database migration for `leave_policies` table — assumed to exist.
 - RBAC enforcement, JWT auth guards.
 - Audit logging of policy mutations (GP-002 applies to LeaveRequest/LeaveBalance per reconciled architecture).
+
+## Audit module (Phase 4 — partially built)
+
+### Entity
+
+- **AuditLog** — immutable record of an action on a domain entity. Fields: `id`, `entityType`, `entityId`, `action`, `oldValues` (`Record<string, unknown> | null`), `newValues` (`Record<string, unknown> | null`), `performedBy`, `performedAt`.
+- **Immutability**: No update or delete operations exist on the repository — records are write-once.
+- **Action values**: The `action` field is a string constrained to `AuditAction` enum values (`CREATED`, `UPDATED`, `DELETED`, `APPROVED`, `REJECTED`, `CANCELLED`, `SUBMITTED`) from `src/shared/types/leave.types.ts`. Validation is not enforced at the model layer — callers are expected to pass valid values.
+
+### Repository
+
+- `AuditRepository` implements `IAuditRepository`. All queries use parameterized SQL via the shared `pool` from `src/shared/db/connection.ts`. Table: `audit_logs`.
+- Methods: `create`, `findByEntity`, `findByPerformer`.
+- `create` generates `id` via `randomUUID()` and sets `performedAt` to `new Date()`. Serializes `oldValues`/`newValues` to JSON for storage.
+- `findByEntity` returns all records for a given entity type + ID, ordered by `performed_at DESC`.
+- `findByPerformer` returns records for a given performer, ordered by `performed_at DESC`, with an optional `LIMIT`.
+- Private `mapRow` helper converts snake_case DB columns to camelCase domain objects.
+
+### Service
+
+- `AuditService` depends on `IAuditRepository` (constructor injection).
+- Methods: `log(entry)`, `getEntityHistory(entityType, entityId)`, `getUserActions(performedBy, limit?)`.
+- `log` delegates directly to `IAuditRepository.create` — `performedAt` is set by the repository, not the service.
+
+### What was deferred
+
+- Barrel file (`index.ts`) — not yet created.
+- Unit tests — not yet written.
+- Notification module — entirely deferred (no files created under `src/modules/notification/`).
+- Controller, routes, HTTP handlers — no HTTP surface exists yet.
+- Database migration for `audit_logs` table — assumed to exist.
 
 <!-- gestalt:architecture feature=e735cca3-597e-44fe-9270-69c735e34133 START -->
 ## Leave Management Module — Reconciled Architecture
