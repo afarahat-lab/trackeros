@@ -32,6 +32,8 @@ src/modules/AuditServiceInterface/    — AuditServiceInterface module
 src/shared/db connection.ts
 src/shared/base repository.ts
 src/shared/error types.ts
+src/shared/types/index.ts
+src/shared/types/leave.types.ts
 ```
 
 ## Key patterns
