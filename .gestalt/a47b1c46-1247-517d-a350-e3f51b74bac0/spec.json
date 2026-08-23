@@ -1,0 +1,95 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared-types"
+    ],
+    "affectedLayers": [
+      "types"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The `LeaveRequestStatus` enum is exported from `src/shared/types/leave.types.ts` with exactly five members: `DRAFT`, `SUBMITTED`, `APPROVED`, `REJECTED`, `CANCELLED` \u2014 matching the reconciled architecture lifecycle.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `LeaveType` enum is exported from `src/shared/types/leave.types.ts` with exactly six members: `annual`, `sick`, `emergency`, `unpaid`, `maternity`, `paternity` \u2014 matching the reconciled architecture.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `AuditAction` enum is exported from `src/shared/types/leave.types.ts` with exactly seven members: `CREATED`, `UPDATED`, `DELETED`, `APPROVED`, `REJECTED`, `CANCELLED`, `SUBMITTED` \u2014 covering every state-changing operation the audit module must record.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `BaseEntity` type is exported from `src/shared/types/leave.types.ts` with exactly three fields: `id: string`, `createdAt: Date`, `updatedAt: Date` \u2014 providing the canonical base shape for all domain entities.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The barrel file `src/shared/types/index.ts` re-exports every named export from `leave.types.ts` \u2014 `LeaveRequestStatus`, `LeaveType`, `AuditAction`, and `BaseEntity` \u2014 so that downstream modules can import from `shared/types` without reaching into the internal file.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A Jest unit test file at `tests/unit/shared/types/leave.types.test.ts` verifies that each enum's runtime values match the canonical member names (e.g. `LeaveRequestStatus.DRAFT === 'DRAFT'`, `LeaveType.annual === 'annual'`, `AuditAction.CREATED === 'CREATED'`). The test file uses the `.test.ts` extension matching the existing `jest.config.js` `testMatch` pattern.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The test file MUST use the `.test.ts` extension (not `.spec.ts`) \u2014 the existing `jest.config.js` matches only `**/tests/**/*.test.(ts|js)`. Using `.spec.ts` would cause the test to be silently skipped.",
+    "All TypeScript enums must use string values (not numeric) \u2014 the canonical values are the member names themselves (e.g. `DRAFT = 'DRAFT'`). This ensures serialization consistency across the stack and readable audit records.",
+    "The `BaseEntity` type must be a TypeScript `type` (not an `interface` or `class`) \u2014 it is a structural shape, not a nominal contract. Downstream entities extend it via intersection (`&`) or structural compatibility.",
+    "No `any` type anywhere \u2014 per HARNESS.json constraint `no-any`. Use `unknown` with type guards if needed.",
+    "Imports within `src/shared/types/` must use the `baseUrl`-relative paths (e.g. `shared/types/leave.types`) as configured in `tsconfig.json` (`baseUrl: \"./src\"`)."
+  ],
+  "outOfScope": [
+    "Database tables, migrations, or Knex schema definitions \u2014 this phase is pure TypeScript types with zero runtime dependencies.",
+    "Any domain entity beyond the enums and BaseEntity \u2014 LeaveRequest, LeaveBalance, LeavePolicy, Employee, AuditLog, and Notification entities are defined in their respective module phases (2\u20136).",
+    "Repository interfaces, service interfaces, DTOs, or any runtime logic \u2014 this phase is exclusively type definitions and enum declarations."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequestStatus",
+      "mustExistOrExtend": true,
+      "invariant": "The enum defines exactly five states: DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED. These are the only valid states for a LeaveRequest. The allowed transitions are: DRAFT \u2192 SUBMITTED; SUBMITTED \u2192 APPROVED | REJECTED; DRAFT | SUBMITTED | APPROVED \u2192 CANCELLED. REJECTED and CANCELLED are terminal. No other transitions are valid \u2014 this is enforced by downstream service logic, but the enum itself must not contain any state outside this set."
+    },
+    {
+      "entity": "LeaveType",
+      "mustExistOrExtend": true,
+      "invariant": "The enum defines exactly six leave categories: annual, sick, emergency, unpaid, maternity, paternity. Each type carries its own entitlement pool and policy rules. No leave type may be added or removed without a corresponding policy definition."
+    },
+    {
+      "entity": "AuditAction",
+      "mustExistOrExtend": true,
+      "invariant": "The enum defines exactly seven actions: CREATED, UPDATED, DELETED, APPROVED, REJECTED, CANCELLED, SUBMITTED. Every state-changing operation on LeaveRequest or LeaveBalance must map to one of these actions in the audit record (GP-002)."
+    },
+    {
+      "entity": "BaseEntity",
+      "mustExistOrExtend": true,
+      "invariant": "Every domain entity (LeaveRequest, LeaveBalance, LeavePolicy, Employee, AuditLog) must be structurally compatible with BaseEntity \u2014 it must have `id: string`, `createdAt: Date`, and `updatedAt: Date`. This is the canonical base shape; downstream entities satisfy it either by explicit intersection or by declaring the same fields."
+    }
+  ],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [
+    {
+      "requirement": "The `LeaveRequestStatus` enum members (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED) must match the domain entity definition in the reconciled architecture \u2014 no extra states, no missing states, no renamed states.",
+      "referencePath": ".gestalt/architecture/reconciled.json \u2192 domain_entities[1].attributes"
+    },
+    {
+      "requirement": "The `LeaveType` enum members (annual, sick, emergency, unpaid, maternity, paternity) must match the domain entity definition in the reconciled architecture \u2014 no extra types, no missing types, no renamed types.",
+      "referencePath": ".gestalt/architecture/reconciled.json \u2192 domain_entities[2].attributes"
+    },
+    {
+      "requirement": "The `AuditAction` enum members (CREATED, UPDATED, DELETED, APPROVED, REJECTED, CANCELLED, SUBMITTED) must cover every state transition operation described in the reconciled architecture's business rules \u2014 specifically rules 2 (state transitions), 4 (approval), 5 (cancellation), 8 (termination cascade), and 9 (audit requirement).",
+      "referencePath": ".gestalt/architecture/reconciled.json \u2192 business_rules"
+    }
+  ],
+  "integrationPoints": []
+}
