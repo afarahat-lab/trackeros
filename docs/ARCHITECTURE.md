@@ -48,3 +48,68 @@ src/shared/error types.ts
 - All database access goes through a repository layer — no inline SQL
   / ORM calls in route handlers or business logic
 - No circular dependencies between modules
+
+<!-- gestalt:architecture feature=e735cca3-597e-44fe-9270-69c735e34133 START -->
+## Leave Management Module — Reconciled Architecture
+
+### Domain Entities
+
+- **LeaveRequest** — employee time-off application. Lifecycle: DRAFT → SUBMITTED → {APPROVED | REJECTED}; DRAFT/SUBMITTED/APPROVED → CANCELLED. REJECTED and CANCELLED are terminal.
+- **LeaveRequestStatus** — enum: DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED.
+- **LeaveType** — enum: annual, sick, emergency, unpaid, maternity, paternity.
+- **LeavePolicy** — rules per leave type (entitlement, accrual, notice, approval). Lifecycle: ACTIVE ↔ INACTIVE → ARCHIVED.
+- **LeaveBalance** — employee's entitlement, consumption, and pending days per policy per fiscal year. Lifecycle: ACTIVE ↔ EXHAUSTED (driven by remainingDays), ACTIVE/EXHAUSTED ↔ FROZEN (admin), ACTIVE/EXHAUSTED/FROZEN → CLOSED (year-end, terminal).
+- **Employee** — organisation member; owns balances, submits requests, may act as manager. Lifecycle: ACTIVE ↔ INACTIVE → TERMINATED.
+- **AuditLog** — immutable record of every state transition on LeaveRequest and LeaveBalance.
+
+### Key Business Rules (binding)
+
+1. **Day counting**: requestedDays = (endDate - startDate) + 1 (calendar days, inclusive). Notice period: today (day 0) to startDate (exclusive).
+2. **State transitions**: only the allowed paths listed above; all others invalid.
+3. **Submission validation**: startDate ≥ today, endDate ≥ startDate, employee ACTIVE, sufficient remainingDays (totalEntitlement - usedDays - pendingDays ≥ requestedDays), minimum notice met if policy requires.
+4. **Approval**: only direct manager (or HR admin if no manager) may approve/reject; auto-approve if policy.requiresManagerApproval is false. On APPROVED, move pendingDays → usedDays (atomic).
+5. **Cancellation of APPROVED**: restore usedDays → pendingDays (atomic).
+6. **Overlap prevention**: no two SUBMITTED or APPROVED requests for same employee may overlap (DRAFT excluded).
+7. **Balance lifecycle**: remainingDays = totalEntitlement - usedDays - pendingDays. EXHAUSTED when remainingDays = 0; returns to ACTIVE when > 0.
+8. **Termination cascade**: employee TERMINATED → auto-reject SUBMITTED, cancel future APPROVED, close all balances, each with audit record.
+9. **Audit**: every state transition on LeaveRequest and LeaveBalance writes an AuditLog record.
+
+### Module Structure (modular monolith)
+
+- `src/shared/types/` — shared enums and base types.
+- `src/modules/employee/` — employee entity, repository, service.
+- `src/modules/policy/` — leave policy entity, repository, service.
+- `src/modules/balance/` — leave balance entity, repository, service.
+- `src/modules/leave/` — leave request entity, repository, service, controller, routes (orchestrates all other modules).
+- `src/modules/audit/` — audit log entity, repository, service.
+- `src/modules/notification/` — notification entity, repository, service.
+
+Dependencies flow inward: leave → {balance, policy, employee, audit, notification, shared-types}; balance → {policy, employee, shared-types}; policy → shared-types; employee → shared-types; audit → shared-types; notification → shared-types. No circular dependencies.
+
+### Conceptual Data Model (PostgreSQL)
+
+- **leave_requests** (id, employee_id, leave_type, start_date, end_date, reason, status, approved_by, approved_at, created_at, updated_at). PK: id. FKs: employee_id → employees.id, approved_by → employees.id. Indexes: employee_id, status, leave_type, approved_by, (employee_id, status), (approved_by, status).
+- **leave_balances** (id, employee_id, policy_id, fiscal_year, total_entitlement, used_days, pending_days, carried_over, status, created_at, updated_at). PK: id. FKs: employee_id → employees.id, policy_id → leave_policies.id. Unique index on (employee_id, policy_id, fiscal_year).
+- **leave_policies** (id, policy_name, leave_type, entitlement_days, accrual_rate, max_accumulation, minimum_notice_days, requires_manager_approval, is_active, created_at, updated_at). PK: id. Unique index on leave_type; index on is_active.
+- **employees** table assumed to exist (external module).
+
+### Cross-cutting Contracts
+
+- **Auth**: JWT bearer → `request.user: { id: string; role: 'employee' | 'manager' | 'hr_admin' }`. RBAC enforced by `requireRole(...)` Fastify route guard.
+- **Error response**: `{ error: string; code: string; details?: unknown[] }`. Standard codes: VALIDATION_ERROR (400), UNAUTHORIZED (401), FORBIDDEN (403), NOT_FOUND (404), INSUFFICIENT_BALANCE (422), POLICY_VIOLATION (422).
+- **Transaction**: Repository methods that participate in multi-step writes accept an optional `client: PoolClient`. The service owns the unit of work: acquires client, BEGIN, passes client to all repository calls, COMMIT/ROLLBACK. Key transactions: leave application (create request + deduct pendingDays), approval (update status + release pendingDays + commit usedDays), rejection/cancellation (update status + release pendingDays).
+
+### Recommended Build Phases
+
+1. Shared types (enums, base types)
+2. Employee module
+3. Policy module
+4. Audit & Notification modules (parallel)
+5. Balance module
+6. Leave module (orchestration)
+
+### Open Questions
+
+- Calendar days vs business days for leave counting.
+- Fiscal year boundary definition (calendar, fiscal, anniversary).
+<!-- gestalt:architecture feature=e735cca3-597e-44fe-9270-69c735e34133 END -->
