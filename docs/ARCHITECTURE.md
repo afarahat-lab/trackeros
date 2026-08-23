@@ -32,13 +32,13 @@ src/modules/audit/
   audit.model.ts             — AuditLog entity, IAuditRepository interface
   audit.repository.ts        — AuditRepository (pg pool, parameterized SQL, snake_case column mapping)
   audit.service.ts           — AuditService (log, getEntityHistory, getUserActions)
-  (no index.ts barrel yet)
+  index.ts                   — barrel re-export
 
 src/modules/notification/
   notification.model.ts      — Notification entity, INotificationRepository interface
   notification.repository.ts — NotificationRepository (pg pool, parameterized SQL, snake_case column mapping)
   notification.service.ts    — NotificationService (send, getForUser, markRead)
-  (no index.ts barrel yet)
+  index.ts                   — barrel re-export
 
 src/modules/status/
   status.model.ts            — SystemStatus entity
@@ -58,6 +58,16 @@ src/shared/
   types/
     leave.types.ts           — LeaveRequestStatus, LeaveType, AuditAction enums; BaseEntity type
     index.ts                 — barrel re-export
+
+tests/unit/modules/
+  audit/
+    audit.service.spec.ts    — AuditService unit tests (mocked IAuditRepository)
+  notification/
+    notification.service.spec.ts — NotificationService unit tests (mocked INotificationRepository)
+  employee/
+    employee.service.spec.ts
+  policy/
+    policy.service.spec.ts
 ```
 
 ### Planned modules (not yet built)
@@ -141,7 +151,7 @@ src/modules/balance/         — leave balances (Phase 5)
 - RBAC enforcement, JWT auth guards.
 - Audit logging of policy mutations (GP-002 applies to LeaveRequest/LeaveBalance per reconciled architecture).
 
-## Audit module (Phase 4a — partially built)
+## Audit module (Phase 4a + 4c — built)
 
 ### Entity
 
@@ -164,14 +174,20 @@ src/modules/balance/         — leave balances (Phase 5)
 - Methods: `log(entry)`, `getEntityHistory(entityType, entityId)`, `getUserActions(performedBy, limit?)`.
 - `log` delegates directly to `IAuditRepository.create` — `performedAt` is set by the repository, not the service.
 
+### Barrel file
+
+- `src/modules/audit/index.ts` — named re-exports: `AuditLog` and `IAuditRepository` from `audit.model.ts`, `AuditRepository` from `audit.repository.ts`, `AuditService` from `audit.service.ts`. Follows the same pattern as `src/modules/employee/index.ts`.
+
+### Unit tests
+
+- `tests/unit/modules/audit/audit.service.spec.ts` — mocks `IAuditRepository` via `jest.Mocked<IAuditRepository>` with fresh mocks per test (`beforeEach`). Covers: `log()` delegation, `getEntityHistory()` delegation and empty-result handling, `getUserActions()` delegation with optional `limit` and empty-result handling.
+
 ### What was deferred
 
-- Barrel file (`index.ts`) — not yet created.
-- Unit tests — not yet written.
 - Controller, routes, HTTP handlers — no HTTP surface exists yet.
 - Database migration for `audit_logs` table — assumed to exist.
 
-## Notification module (Phase 4b — partially built)
+## Notification module (Phase 4b + 4c — built)
 
 ### Entity
 
@@ -196,10 +212,16 @@ src/modules/balance/         — leave balances (Phase 5)
 - `getForUser` delegates to `repository.findByRecipient`.
 - `markRead` delegates to `repository.markAsRead`.
 
+### Barrel file
+
+- `src/modules/notification/index.ts` — named re-exports: `Notification` and `INotificationRepository` from `notification.model.ts`, `NotificationRepository` from `notification.repository.ts`, `NotificationService` from `notification.service.ts`. Follows the same pattern as `src/modules/employee/index.ts`.
+
+### Unit tests
+
+- `tests/unit/modules/notification/notification.service.spec.ts` — mocks `INotificationRepository` via `jest.Mocked<INotificationRepository>` with fresh mocks per test (`beforeEach`). Covers: `send()` delegation with and without metadata, `getForUser()` delegation with optional `limit` and empty-result handling, `markRead()` delegation, idempotency, and non-existent notification handling.
+
 ### What was deferred
 
-- Barrel file (`index.ts`) — not yet created (belongs to sub-phase 4c).
-- Unit tests — not yet written (belongs to sub-phase 4c).
 - Controller, routes, HTTP handlers — no HTTP surface exists yet.
 - Database migration for `notifications` table — assumed to exist.
 
