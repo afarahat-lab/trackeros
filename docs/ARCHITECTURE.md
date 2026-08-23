@@ -13,27 +13,43 @@ The architecture is modular, with a clear separation of concerns between models,
 - Frontend: React Native
 - Database: PostgreSQL
 
-## Module structure
+## Module structure (as-built)
 
 ```
-src/modules/leave/leave.{model,repository,service,controller,routes}.ts
-src/modules/balance/balance.{model,repository,service,controller,routes}.ts
-src/modules/employee/employee.{model,repository,service,controller,routes}.ts
-src/modules/policy/policy.{model,repository,service,controller,routes}.ts
-src/modules/notification/notification.{model,repository,service,controller,routes}.ts
-src/modules/LeaveStatus/    — LeaveStatus module
-src/modules/BaseEntity/    — BaseEntity module
-src/modules/LeaveRequest/    — LeaveRequest module
-src/modules/LeaveType/    — LeaveType module
-src/modules/LeavePolicy/    — LeavePolicy module
-src/modules/AuditLog/    — AuditLog module
-src/modules/AuditRecord/    — AuditRecord module
-src/modules/AuditServiceInterface/    — AuditServiceInterface module
-src/shared/db connection.ts
-src/shared/base repository.ts
-src/shared/error types.ts
-src/shared/types/index.ts
-src/shared/types/leave.types.ts
+src/modules/employee/
+  employee.model.ts          — Employee entity, EmploymentStatus, IEmployeeRepository, domain errors
+  employee.repository.ts     — EmployeeRepository (pg pool, parameterized SQL, soft-delete)
+  employee.service.ts        — EmployeeService (getById, getByEmployeeNumber, getAll, getSubordinates, create, update, terminate)
+  index.ts                   — barrel re-export
+
+src/modules/status/
+  status.model.ts            — SystemStatus entity
+  status.service.interface.ts
+  status.service.ts
+  index.ts
+
+src/modules/uptime/
+  uptime.model.ts            — UptimeStatus entity
+  uptime.service.interface.ts
+  uptime.service.ts
+  uptime.routes.ts
+  index.ts
+
+src/shared/
+  db/connection.ts           — PostgreSQL pool (pg)
+  types/
+    leave.types.ts           — LeaveRequestStatus, LeaveType, AuditAction enums; BaseEntity type
+    index.ts                 — barrel re-export
+```
+
+### Planned modules (not yet built)
+
+```
+src/modules/leave/           — leave orchestration (Phase 6)
+src/modules/balance/         — leave balances (Phase 5)
+src/modules/policy/          — leave policies (Phase 3)
+src/modules/audit/           — audit logging (Phase 4)
+src/modules/notification/    — notifications (Phase 4)
 ```
 
 ## Key patterns
@@ -50,6 +66,34 @@ src/shared/types/leave.types.ts
 - All database access goes through a repository layer — no inline SQL
   / ORM calls in route handlers or business logic
 - No circular dependencies between modules
+
+## Employee module (Phase 2 — built)
+
+### Entity
+
+- **Employee** — organisation member. Fields: `id`, `employeeNumber`, `firstName`, `lastName`, `email`, `managerId`, `department`, `hireDate`, `terminationDate`, `employmentStatus` (`'ACTIVE' | 'INACTIVE' | 'TERMINATED'`), `createdAt`, `updatedAt`, `deletedAt`. Extends `BaseEntity` shape (id, createdAt, updatedAt) plus soft-delete.
+- **Lifecycle**: ACTIVE ↔ INACTIVE → TERMINATED. TERMINATED is terminal — once set, it must not revert. `terminate()` sets `employmentStatus` to `'TERMINATED'` and `terminationDate` to now.
+- **Uniqueness**: `employeeNumber` must be unique across non-soft-deleted employees. `create()` rejects duplicates with `DuplicateEmployeeNumberError`.
+- **Soft-delete**: `deletedAt` non-null = logically deleted. All repository queries exclude soft-deleted rows.
+
+### Repository
+
+- `EmployeeRepository` implements `IEmployeeRepository`. All queries use parameterized SQL via the shared `pool` from `src/shared/db/connection.ts`. Table: `employees`.
+- Methods: `findById`, `findByEmployeeNumber`, `findAll`, `findByManagerId`, `create`, `update`, `softDelete`.
+
+### Service
+
+- `EmployeeService` depends on `IEmployeeRepository` (constructor injection).
+- Methods: `getById`, `getByEmployeeNumber`, `getAll`, `getSubordinates`, `create`, `update`, `terminate`.
+- Domain errors: `EmployeeNotFoundError`, `EmployeeAlreadyTerminatedError`, `DuplicateEmployeeNumberError`.
+
+### What was deferred
+
+- Controller, routes, HTTP handlers — no HTTP surface exists yet.
+- Database migration for `employees` table — assumed to exist.
+- RBAC enforcement, JWT auth guards.
+- Audit logging of employee mutations (GP-002 applies to LeaveRequest/LeaveBalance per reconciled architecture).
+- Termination cascade logic (belongs to leave module, Phase 6).
 
 <!-- gestalt:architecture feature=e735cca3-597e-44fe-9270-69c735e34133 START -->
 ## Leave Management Module — Reconciled Architecture
