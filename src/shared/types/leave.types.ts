@@ -25,8 +25,8 @@ export enum AuditAction {
   SUBMITTED = 'SUBMITTED',
 }
 
-export interface BaseEntity {
+export type BaseEntity = {
   id: string;
   createdAt: Date;
   updatedAt: Date;
-}
+};
