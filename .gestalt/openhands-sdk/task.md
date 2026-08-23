@@ -1,41 +1,41 @@
-# Implement this phase: Sub-phase 4b: Notification module implementation
+# Implement this phase: Sub-phase 4c: Barrel files and unit tests
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/e735cca3-597e-44fe-9270-69c735e34133/5`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/e735cca3-597e-44fe-9270-69c735e34133/6`. Do not clone anything; work only in this directory.
 
 You are the IMPLEMENTATION agent, not a planner. The platform measures your work EXCLUSIVELY by the files you create or modify in this working tree (`git status`). Ending your turn with a plan, a summary, or an announcement of what you are 'about to' do — without having actually edited files — is a FAILURE: a turn that leaves the working tree untouched is discarded. Explore only as much as you need, then MAKE the edits with your file-editing tool. Never end your turn before the files exist on disk.
 
 ## What to build
-notification.model.ts exports Notification entity type with all canonical fields (id, recipientId, title, body, type, isRead, metadata, createdAt)
-notification.model.ts exports INotificationRepository interface with create, findByRecipient, and markAsRead method signatures
-notification.repository.ts exports NotificationRepository class implementing INotificationRepository using the shared pool
-notification.repository.ts create() generates a UUID id, sets isRead to false, and sets createdAt to new Date()
-notification.service.ts exports NotificationService class with send(), getForUser(), and markRead() methods
-NotificationService accepts NotificationRepository via constructor and delegates all data access to it
+src/modules/audit/index.ts barrel file re-exports all public symbols from audit.model.ts, audit.repository.ts, and audit.service.ts
+src/modules/notification/index.ts barrel file re-exports all public symbols from notification.model.ts, notification.repository.ts, and notification.service.ts
+tests/unit/modules/audit/audit.service.spec.ts contains Jest unit tests for AuditService.log(), getEntityHistory(), and getUserActions() using a mocked AuditRepository
+tests/unit/modules/notification/notification.service.spec.ts contains Jest unit tests for NotificationService.send(), getForUser(), and markRead() using a mocked NotificationRepository
+All tests pass with npx jest
 
 ## Success criteria
-Build the Notification module's model, repository, and service. Depends on Phase 1's shared types (`src/shared/types/leave.types.ts`) and the DB connection pool (`src/shared/db/connection.ts`). Independent of sub-phase 4a.
+Create barrel index files for both modules and write all unit tests. Depends on sub-phases 4a and 4b being complete.
 
-Create exactly 3 files:
+Create exactly 4 files:
 
-1. **`src/modules/notification/notification.model.ts`** — Define and export:
-   - `Notification` entity: `id: string`, `recipientId: string`, `title: string`, `body: string`, `type: 'EMAIL' | 'IN_APP'`, `isRead: boolean`, `metadata: Record<string, unknown> | null`, `createdAt: Date`
-   - `INotificationRepository` interface: `create(notification: Omit<Notification, 'id' | 'createdAt' | 'isRead'>): Promise<Notification>`, `findByRecipient(recipientId: string, limit?: number): Promise<Notification[]>`, `markAsRead(id: string): Promise<void>`
+1. **`src/modules/audit/index.ts`** — Barrel file re-exporting all public symbols from `audit.model.ts`, `audit.repository.ts`, and `audit.service.ts`.
 
-2. **`src/modules/notification/notification.repository.ts`** — Implement `NotificationRepository` class using the PostgreSQL `pool`. Table name: `notifications`. Must implement `INotificationRepository`. Generate UUIDs for `id`, auto-set `isRead` to `false` and `createdAt` to `new Date()` on create.
+2. **`src/modules/notification/index.ts`** — Barrel file re-exporting all public symbols from `notification.model.ts`, `notification.repository.ts`, and `notification.service.ts`.
 
-3. **`src/modules/notification/notification.service.ts`** — Implement `NotificationService` class that takes `NotificationRepository` via constructor. Methods:
-   - `send(recipientId: string, title: string, body: string, type: 'EMAIL' | 'IN_APP', metadata?: Record<string, unknown>): Promise<Notification>`
-   - `getForUser(recipientId: string, limit?: number): Promise<Notification[]>`
-   - `markRead(id: string): Promise<void>`
+3. **`tests/unit/modules/audit/audit.service.spec.ts`** — Jest unit tests for `AuditService`:
+   - Mock `AuditRepository` using `jest.fn()`
+   - Test `log()`: verifies repository.create is called and returns the created AuditLog
+   - Test `getEntityHistory()`: verifies repository.findByEntity is called with correct args and returns results
+   - Test `getUserActions()`: verifies repository.findByPerformer is called with correct args (including optional limit) and returns results
 
-No barrel file or tests in this sub-phase.
+4. **`tests/unit/modules/notification/notification.service.spec.ts`** — Jest unit tests for `NotificationService`:
+   - Mock `NotificationRepository` using `jest.fn()`
+   - Test `send()`: verifies repository.create is called with correct fields and returns the created Notification
+   - Test `getForUser()`: verifies repository.findByRecipient is called with correct args (including optional limit) and returns results
+   - Test `markRead()`: verifies repository.markAsRead is called with correct id
 
 ## Owned by SIBLING sub-phases (OUT OF SCOPE for this sub-phase)
 This is ONE sub-phase of a split phase. The deliverables below belong to sibling sub-phases — do NOT create them here, do NOT list them as success criteria, and this sub-phase MUST NOT be gated on their presence (they are produced by a sibling, not missing):
 - "Sub-phase 4a: Audit module implementation": src/modules/audit/audit.model.ts, src/modules/audit/audit.repository.ts, src/modules/audit/audit.service.ts
-- "Sub-phase 4c: Barrel files and unit tests": src/modules/audit/index.ts, src/modules/notification/index.ts, tests/unit/modules/audit/audit.service.spec.ts, tests/unit/modules/notification/notification.service.spec.ts
-
-In particular, UNIT/INTEGRATION TESTS are OUT OF SCOPE for this sub-phase — they are produced in: Sub-phase 4c: Barrel files and unit tests. Do not create test files here, do not require test existence or coverage as a success criterion, and do not fail the gate for missing tests.
+- "Sub-phase 4b: Notification module implementation": src/modules/notification/notification.model.ts, src/modules/notification/notification.repository.ts, src/modules/notification/notification.service.ts
 
 ## Your iteration budget — and how to get more (READ BEFORE YOU START)
 
@@ -101,18 +101,20 @@ binding wherever they apply):
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- The `NotificationRepository` must follow the same structural pattern as `AuditRepository` in `src/modules/audit/audit.repository.ts`: import `pool` from `shared/db/connection`, generate IDs via `randomUUID()` from the `crypto` module, use a private `mapRow` helper converting snake_case DB columns to camelCase, and use parameterized SQL with `RETURNING *` on INSERT. (see `src/modules/audit/audit.repository.ts`)
-- The `NotificationService` must follow the same structural pattern as `AuditService` in `src/modules/audit/audit.service.ts`: constructor-injected repository interface, thin delegation methods with no additional business logic beyond what is specified. (see `src/modules/audit/audit.service.ts`)
-- The `Notification` entity model file must follow the same export pattern as `src/modules/audit/audit.model.ts`: export the entity interface first, then the repository interface — no classes, no runtime code in the model file. (see `src/modules/audit/audit.model.ts`)
+- Barrel file `src/modules/audit/index.ts` must follow the exact named-export pattern of `src/modules/employee/index.ts`: export model interfaces/types from the model file, repository class from the repository file, and service class from the service file — no wildcard re-exports. (see `src/modules/employee/index.ts`)
+- Barrel file `src/modules/notification/index.ts` must follow the exact named-export pattern of `src/modules/employee/index.ts`: export model interfaces/types from the model file, repository class from the repository file, and service class from the service file — no wildcard re-exports. (see `src/modules/employee/index.ts`)
+- Audit service unit tests must follow the structure of `tests/unit/modules/employee/employee.service.spec.ts`: `jest.Mocked<IAuditRepository>` mock with `jest.fn()` per method, `beforeEach` creating fresh mocks, and tests verifying correct delegation arguments and return values. (see `tests/unit/modules/employee/employee.service.spec.ts`)
+- Notification service unit tests must follow the structure of `tests/unit/modules/employee/employee.service.spec.ts`: `jest.Mocked<INotificationRepository>` mock with `jest.fn()` per method, `beforeEach` creating fresh mocks, and tests verifying correct delegation arguments and return values. (see `tests/unit/modules/employee/employee.service.spec.ts`)
 ### Entity invariants — enforce these
-- Reuse or extend `Notification`: A Notification is immutable after creation except for the `isRead` field, which transitions exactly once from `false` to `true` via `markAsRead`. There is no update or delete operation — the repository exposes only `create`, `findByRecipient`, and `markAsRead`.
-- Reuse or extend `Notification`: The `type` field is constrained to the string literal union `'EMAIL' | 'IN_APP'` — no other values are valid.
+- Reuse or extend `AuditLog`: AuditLog records are immutable — the repository exposes only `create`, `findByEntity`, and `findByPerformer`; no update or delete operations exist. The `performedAt` timestamp is set by the repository on creation, not by the caller.
+- Reuse or extend `Notification`: Notifications are immutable after creation except for the `isRead` field, which transitions exactly once from `false` to `true` via `markAsRead`. The `markAsRead` operation is idempotent — calling it on an already-read notification is safe and produces no error. If the notification does not exist, the operation silently does nothing (no throw).
 ### Interface contract — expose these operations (their shape is yours)
-- INotificationRepository.create — Must generate a new UUID for `id`, set `isRead` to `false`, set `createdAt` to `new Date()`, serialize `metadata` to JSON if non-null, and return the fully-hydrated `Notification`. If the database insert fails, the error propagates to the caller — no silent swallowing.
-- INotificationRepository.markAsRead — idempotent; Sets `is_read = true` for the row identified by `id`. If the row does not exist, the operation is a no-op (the UPDATE affects zero rows but does not throw). Idempotent: calling `markAsRead` on an already-read notification is safe and produces no error.
-- INotificationRepository.findByRecipient — idempotent; Returns notifications for the given `recipientId` ordered by `created_at DESC`. When `limit` is provided, caps the result set. Returns an empty array (not null) when no notifications exist for the recipient. Read-only, idempotent.
-### Integration points — connect to these
-- src/shared/db/connection.ts — NotificationRepository imports the shared PostgreSQL `pool` for all database operations against the `notifications` table.
+- AuditService.log(entry) — Delegates directly to IAuditRepository.create. No domain errors thrown by the service itself — any errors propagate from the repository layer.
+- AuditService.getEntityHistory(entityType, entityId) — idempotent; Read-only, delegates to IAuditRepository.findByEntity. Returns empty array when no records exist.
+- AuditService.getUserActions(performedBy, limit?) — idempotent; Read-only, delegates to IAuditRepository.findByPerformer. Optional `limit` parameter is passed through to the repository. Returns empty array when no records exist.
+- NotificationService.send(recipientId, title, body, type, metadata?) — Delegates to INotificationRepository.create. `metadata` defaults to `null` when omitted. No domain errors thrown by the service itself.
+- NotificationService.getForUser(recipientId, limit?) — idempotent; Read-only, delegates to INotificationRepository.findByRecipient. Optional `limit` parameter is passed through. Returns empty array when no notifications exist.
+- NotificationService.markRead(id) — idempotent; Delegates to INotificationRepository.markAsRead. Idempotent — safe to call on already-read notifications. Does not throw if the notification does not exist.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
