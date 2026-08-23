@@ -1,0 +1,106 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "notification"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository",
+      "service"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The file `src/modules/notification/notification.model.ts` exists and exports the `Notification` entity interface with exactly these fields: `id: string`, `recipientId: string`, `title: string`, `body: string`, `type: 'EMAIL' | 'IN_APP'`, `isRead: boolean`, `metadata: Record<string, unknown> | null`, `createdAt: Date`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The file `src/modules/notification/notification.model.ts` exports the `INotificationRepository` interface declaring exactly three methods: `create(notification: Omit<Notification, 'id' | 'createdAt' | 'isRead'>): Promise<Notification>`, `findByRecipient(recipientId: string, limit?: number): Promise<Notification[]>`, and `markAsRead(id: string): Promise<void>`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The file `src/modules/notification/notification.repository.ts` exports a `NotificationRepository` class that implements `INotificationRepository`. It imports `pool` from `src/shared/db/connection.ts` and uses parameterized SQL queries against the `notifications` table. The `create` method generates an `id` via `randomUUID()`, sets `isRead` to `false`, sets `createdAt` to `new Date()`, and returns the persisted `Notification`. The class includes a private `mapRow` helper that converts snake_case DB column names to camelCase domain properties.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The file `src/modules/notification/notification.service.ts` exports a `NotificationService` class that accepts `INotificationRepository` via constructor injection. It exposes three methods: `send(recipientId: string, title: string, body: string, type: 'EMAIL' | 'IN_APP', metadata?: Record<string, unknown>): Promise<Notification>` which delegates to `repository.create`, `getForUser(recipientId: string, limit?: number): Promise<Notification[]>` which delegates to `repository.findByRecipient`, and `markRead(id: string): Promise<void>` which delegates to `repository.markAsRead`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `NotificationRepository.create` method serializes the `metadata` field to JSON for storage (via `JSON.stringify`) when non-null, and the `mapRow` helper deserializes it back to `Record<string, unknown>` on read.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access MUST go through the repository layer \u2014 the service must not import `pool` or execute SQL directly (GP-001, `no-direct-db-outside-repository`).",
+    "The `metadata` field must be typed as `Record<string, unknown>` \u2014 never `any` (constraint `no-any`).",
+    "All SQL queries must use parameterized placeholders (`$1`, `$2`, \u2026) \u2014 never string interpolation or template concatenation of user-supplied values.",
+    "The `Notification` entity does NOT extend `BaseEntity` \u2014 it has its own `id` and `createdAt` fields but no `updatedAt` (notifications are immutable once created except for the `isRead` toggle)."
+  ],
+  "outOfScope": [
+    "Barrel file (`src/modules/notification/index.ts`) \u2014 belongs to sub-phase 4c.",
+    "Unit tests (`tests/unit/modules/notification/notification.service.spec.ts`) \u2014 belongs to sub-phase 4c.",
+    "Controller, routes, HTTP handlers, or any Fastify plugin registration for the notification module \u2014 no HTTP surface is in scope for Phase 4.",
+    "Database migration for the `notifications` table \u2014 assumed to exist (same as audit_logs, employees, leave_policies)."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "A Notification is immutable after creation except for the `isRead` field, which transitions exactly once from `false` to `true` via `markAsRead`. There is no update or delete operation \u2014 the repository exposes only `create`, `findByRecipient`, and `markAsRead`."
+    },
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "The `type` field is constrained to the string literal union `'EMAIL' | 'IN_APP'` \u2014 no other values are valid."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "INotificationRepository.create",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Must generate a new UUID for `id`, set `isRead` to `false`, set `createdAt` to `new Date()`, serialize `metadata` to JSON if non-null, and return the fully-hydrated `Notification`. If the database insert fails, the error propagates to the caller \u2014 no silent swallowing."
+    },
+    {
+      "operation": "INotificationRepository.markAsRead",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Sets `is_read = true` for the row identified by `id`. If the row does not exist, the operation is a no-op (the UPDATE affects zero rows but does not throw). Idempotent: calling `markAsRead` on an already-read notification is safe and produces no error."
+    },
+    {
+      "operation": "INotificationRepository.findByRecipient",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns notifications for the given `recipientId` ordered by `created_at DESC`. When `limit` is provided, caps the result set. Returns an empty array (not null) when no notifications exist for the recipient. Read-only, idempotent."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The `NotificationRepository` must follow the same structural pattern as `AuditRepository` in `src/modules/audit/audit.repository.ts`: import `pool` from `shared/db/connection`, generate IDs via `randomUUID()` from the `crypto` module, use a private `mapRow` helper converting snake_case DB columns to camelCase, and use parameterized SQL with `RETURNING *` on INSERT.",
+      "referencePath": "src/modules/audit/audit.repository.ts"
+    },
+    {
+      "requirement": "The `NotificationService` must follow the same structural pattern as `AuditService` in `src/modules/audit/audit.service.ts`: constructor-injected repository interface, thin delegation methods with no additional business logic beyond what is specified.",
+      "referencePath": "src/modules/audit/audit.service.ts"
+    },
+    {
+      "requirement": "The `Notification` entity model file must follow the same export pattern as `src/modules/audit/audit.model.ts`: export the entity interface first, then the repository interface \u2014 no classes, no runtime code in the model file.",
+      "referencePath": "src/modules/audit/audit.model.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "NotificationRepository imports the shared PostgreSQL `pool` for all database operations against the `notifications` table."
+    }
+  ]
+}
