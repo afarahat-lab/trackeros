@@ -1,41 +1,55 @@
-# Implement this phase: Sub-phase 4c: Barrel files and unit tests
+# Continue the previous attempt (it hit the iteration limit before finishing)
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/e735cca3-597e-44fe-9270-69c735e34133/6`. Do not clone anything; work only in this directory.
+A prior code-agent attempt on this work dir (`/tmp/gestalt/phase/e735cca3-597e-44fe-9270-69c735e34133/7`) was stopped after reaching its iteration limit. Its work is ALREADY on disk here — do NOT restart from scratch or re-read everything; build on what exists. It made 15 file edit(s). Its last verification PASSED (`[RESET] cd /tmp/gestalt/phase/e735cca3-597e-44fe-9270-69c735e34133/7 && npm test -- --testPathPattern="balance.service" --no-coverage 2>&1`).
+
+Finish the task now: fix any failing build/type-check/tests, then RUN the build and the tests and fix anything still failing. Stop as soon as the build and tests pass. The full original task (with all mandatory constraints) follows for reference.
+
+---
+
+# Implement this phase: Phase 5: Balance module
+
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/e735cca3-597e-44fe-9270-69c735e34133/7`. Do not clone anything; work only in this directory.
 
 You are the IMPLEMENTATION agent, not a planner. The platform measures your work EXCLUSIVELY by the files you create or modify in this working tree (`git status`). Ending your turn with a plan, a summary, or an announcement of what you are 'about to' do — without having actually edited files — is a FAILURE: a turn that leaves the working tree untouched is discarded. Explore only as much as you need, then MAKE the edits with your file-editing tool. Never end your turn before the files exist on disk.
 
 ## What to build
-src/modules/audit/index.ts barrel file re-exports all public symbols from audit.model.ts, audit.repository.ts, and audit.service.ts
-src/modules/notification/index.ts barrel file re-exports all public symbols from notification.model.ts, notification.repository.ts, and notification.service.ts
-tests/unit/modules/audit/audit.service.spec.ts contains Jest unit tests for AuditService.log(), getEntityHistory(), and getUserActions() using a mocked AuditRepository
-tests/unit/modules/notification/notification.service.spec.ts contains Jest unit tests for NotificationService.send(), getForUser(), and markRead() using a mocked NotificationRepository
-All tests pass with npx jest
+(no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create barrel index files for both modules and write all unit tests. Depends on sub-phases 4a and 4b being complete.
+Build the balance module under `src/modules/balance/`. This phase depends on Phase 1 (shared types), Phase 2 (employee module), and Phase 3 (policy module).
 
-Create exactly 4 files:
+Read these existing files before generating:
+- `src/shared/types/leave.types.ts` (Phase 1) — for `LeaveType`, `BaseEntity`
+- `src/modules/employee/employee.model.ts` (Phase 2) — for `Employee` type reference
+- `src/modules/policy/policy.model.ts` (Phase 3) — for `LeavePolicy`, `IPolicyRepository`
+- `src/modules/policy/policy.service.ts` (Phase 3) — for `PolicyService.getEntitlementForType`
+- `src/shared/db/connection.ts` — for the PostgreSQL pool
+- `tsconfig.json` — for path resolution
 
-1. **`src/modules/audit/index.ts`** — Barrel file re-exporting all public symbols from `audit.model.ts`, `audit.repository.ts`, and `audit.service.ts`.
+Create approximately 6 files:
 
-2. **`src/modules/notification/index.ts`** — Barrel file re-exporting all public symbols from `notification.model.ts`, `notification.repository.ts`, and `notification.service.ts`.
+1. **`src/modules/balance/balance.model.ts`** — Define and export:
+   - `LeaveBalance` entity with canonical fields: `id: string`, `employeeId: string`, `policyId: string`, `totalEntitlement: number`, `usedDays: number`, `pendingDays: number`, `remainingDays: number` (derived: `totalEntitlement - usedDays - pendingDays`), `fiscalYear: number`, `status: 'ACTIVE' | 'EXHAUSTED' | 'FROZEN' | 'CLOSED'`, `createdAt: Date`, `updatedAt: Date`
+   - `IBalanceRepository` interface: `findByEmployeeAndYear(employeeId: string, fiscalYear: number): Promise<LeaveBalance[]>`, `findByEmployeeYearAndPolicy(employeeId: string, fiscalYear: number, policyId: string): Promise<LeaveBalance | null>`, `create(balance: Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeaveBalance>`, `update(id: string, data: Partial<LeaveBalance>): Promise<LeaveBalance | null>`, `deductPendingDays(id: string, days: number): Promise<LeaveBalance | null>` (atomically increments `pendingDays`), `commitDeduction(id: string, days: number): Promise<LeaveBalance | null>` (atomically moves `days` from `pendingDays` to `usedDays`), `restorePendingDays(id: string, days: number): Promise<LeaveBalance | null>` (atomically decrements `pendingDays`)
 
-3. **`tests/unit/modules/audit/audit.service.spec.ts`** — Jest unit tests for `AuditService`:
-   - Mock `AuditRepository` using `jest.fn()`
-   - Test `log()`: verifies repository.create is called and returns the created AuditLog
-   - Test `getEntityHistory()`: verifies repository.findByEntity is called with correct args and returns results
-   - Test `getUserActions()`: verifies repository.findByPerformer is called with correct args (including optional limit) and returns results
+2. **`src/modules/balance/balance.repository.ts`** — Implement `BalanceRepository` using `pool`. Table: `leave_balances`. The `deductPendingDays`, `commitDeduction`, and `restorePendingDays` methods must use `UPDATE ... RETURNING *` with atomic arithmetic in SQL to prevent race conditions.
 
-4. **`tests/unit/modules/notification/notification.service.spec.ts`** — Jest unit tests for `NotificationService`:
-   - Mock `NotificationRepository` using `jest.fn()`
-   - Test `send()`: verifies repository.create is called with correct fields and returns the created Notification
-   - Test `getForUser()`: verifies repository.findByRecipient is called with correct args (including optional limit) and returns results
-   - Test `markRead()`: verifies repository.markAsRead is called with correct id
+3. **`src/modules/balance/balance.service.ts`** — Implement `BalanceService` with methods:
+   - `getOrCreateBalance(employeeId: string, leaveType: LeaveType, fiscalYear: number): Promise<LeaveBalance>` — looks up existing balance or creates one by fetching the policy entitlement via `PolicyService.getEntitlementForType`
+   - `getBalancesForEmployee(employeeId: string, fiscalYear: number): Promise<LeaveBalance[]>`
+   - `hasSufficientBalance(employeeId: string, leaveType: LeaveType, fiscalYear: number, requestedDays: number): Promise<boolean>` — checks `remainingDays >= requestedDays`
+   - `reserveDays(employeeId: string, leaveType: LeaveType, fiscalYear: number, days: number): Promise<LeaveBalance>` — calls `deductPendingDays`
+   - `commitDays(employeeId: string, leaveType: LeaveType, fiscalYear: number, days: number): Promise<LeaveBalance>` — calls `commitDeduction`
+   - `restoreDays(employeeId: string, leaveType: LeaveType, fiscalYear: number, days: number): Promise<LeaveBalance>` — calls `restorePendingDays`
+   - Fiscal year is derived as the calendar year of the leave request's `startDate` (e.g., `startDate.getFullYear()`). This is the BINDING calendar-year rule.
 
-## Owned by SIBLING sub-phases (OUT OF SCOPE for this sub-phase)
-This is ONE sub-phase of a split phase. The deliverables below belong to sibling sub-phases — do NOT create them here, do NOT list them as success criteria, and this sub-phase MUST NOT be gated on their presence (they are produced by a sibling, not missing):
-- "Sub-phase 4a: Audit module implementation": src/modules/audit/audit.model.ts, src/modules/audit/audit.repository.ts, src/modules/audit/audit.service.ts
-- "Sub-phase 4b: Notification module implementation": src/modules/notification/notification.model.ts, src/modules/notification/notification.repository.ts, src/modules/notification/notification.service.ts
+4. **`src/modules/balance/balance.controller.ts`** — Fastify route handlers: `getBalances` (GET `/balances?employeeId=&year=`), `getBalance` (GET `/balances/:id`).
+
+5. **`src/modules/balance/balance.routes.ts`** — Fastify plugin registering balance routes.
+
+6. **`src/modules/balance/index.ts`** — Barrel file.
+
+Include Jest unit tests in `tests/unit/modules/balance/balance.service.spec.ts` (mock `IBalanceRepository` and `PolicyService`).
 
 ## Your iteration budget — and how to get more (READ BEFORE YOU START)
 
@@ -100,21 +114,8 @@ binding wherever they apply):
 
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
-### Reuse & consistency — match these exactly
-- Barrel file `src/modules/audit/index.ts` must follow the exact named-export pattern of `src/modules/employee/index.ts`: export model interfaces/types from the model file, repository class from the repository file, and service class from the service file — no wildcard re-exports. (see `src/modules/employee/index.ts`)
-- Barrel file `src/modules/notification/index.ts` must follow the exact named-export pattern of `src/modules/employee/index.ts`: export model interfaces/types from the model file, repository class from the repository file, and service class from the service file — no wildcard re-exports. (see `src/modules/employee/index.ts`)
-- Audit service unit tests must follow the structure of `tests/unit/modules/employee/employee.service.spec.ts`: `jest.Mocked<IAuditRepository>` mock with `jest.fn()` per method, `beforeEach` creating fresh mocks, and tests verifying correct delegation arguments and return values. (see `tests/unit/modules/employee/employee.service.spec.ts`)
-- Notification service unit tests must follow the structure of `tests/unit/modules/employee/employee.service.spec.ts`: `jest.Mocked<INotificationRepository>` mock with `jest.fn()` per method, `beforeEach` creating fresh mocks, and tests verifying correct delegation arguments and return values. (see `tests/unit/modules/employee/employee.service.spec.ts`)
 ### Entity invariants — enforce these
-- Reuse or extend `AuditLog`: AuditLog records are immutable — the repository exposes only `create`, `findByEntity`, and `findByPerformer`; no update or delete operations exist. The `performedAt` timestamp is set by the repository on creation, not by the caller.
-- Reuse or extend `Notification`: Notifications are immutable after creation except for the `isRead` field, which transitions exactly once from `false` to `true` via `markAsRead`. The `markAsRead` operation is idempotent — calling it on an already-read notification is safe and produces no error. If the notification does not exist, the operation silently does nothing (no throw).
-### Interface contract — expose these operations (their shape is yours)
-- AuditService.log(entry) — Delegates directly to IAuditRepository.create. No domain errors thrown by the service itself — any errors propagate from the repository layer.
-- AuditService.getEntityHistory(entityType, entityId) — idempotent; Read-only, delegates to IAuditRepository.findByEntity. Returns empty array when no records exist.
-- AuditService.getUserActions(performedBy, limit?) — idempotent; Read-only, delegates to IAuditRepository.findByPerformer. Optional `limit` parameter is passed through to the repository. Returns empty array when no records exist.
-- NotificationService.send(recipientId, title, body, type, metadata?) — Delegates to INotificationRepository.create. `metadata` defaults to `null` when omitted. No domain errors thrown by the service itself.
-- NotificationService.getForUser(recipientId, limit?) — idempotent; Read-only, delegates to INotificationRepository.findByRecipient. Optional `limit` parameter is passed through. Returns empty array when no notifications exist.
-- NotificationService.markRead(id) — idempotent; Delegates to INotificationRepository.markAsRead. Idempotent — safe to call on already-read notifications. Does not throw if the notification does not exist.
+- Reuse or extend `LeaveBalance`: `remainingDays` is ALWAYS derived as `totalEntitlement - usedDays - pendingDays` and MUST NOT be stored in the database. Every read of `remainingDays` must compute it from the persisted fields.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
