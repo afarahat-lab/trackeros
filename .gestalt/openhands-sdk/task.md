@@ -1,33 +1,41 @@
-# Implement this phase: Phase 3: Policy module
+# Implement this phase: Sub-phase 4a: Audit module implementation
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/e735cca3-597e-44fe-9270-69c735e34133/3`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/e735cca3-597e-44fe-9270-69c735e34133/4`. Do not clone anything; work only in this directory.
 
 You are the IMPLEMENTATION agent, not a planner. The platform measures your work EXCLUSIVELY by the files you create or modify in this working tree (`git status`). Ending your turn with a plan, a summary, or an announcement of what you are 'about to' do — without having actually edited files — is a FAILURE: a turn that leaves the working tree untouched is discarded. Explore only as much as you need, then MAKE the edits with your file-editing tool. Never end your turn before the files exist on disk.
 
 ## What to build
-(no phase architecture provided — infer from the success criteria below)
+audit.model.ts exports AuditLog entity type with all canonical fields (id, entityType, entityId, action, oldValues, newValues, performedBy, performedAt)
+audit.model.ts exports IAuditRepository interface with create, findByEntity, and findByPerformer method signatures
+audit.repository.ts exports AuditRepository class implementing IAuditRepository using the shared pool
+audit.repository.ts create() generates a UUID id and sets performedAt to new Date()
+audit.service.ts exports AuditService class with log(), getEntityHistory(), and getUserActions() methods
+AuditService accepts AuditRepository via constructor and delegates all data access to it
 
 ## Success criteria
-Build the policy module under `src/modules/policy/`. This phase depends on Phase 1's shared types.
+Build the Audit module's model, repository, and service. Depends on Phase 1's shared types (`src/shared/types/leave.types.ts`) and the DB connection pool (`src/shared/db/connection.ts`).
 
-Read these existing files before generating:
-- `src/shared/types/leave.types.ts` (from Phase 1) — for `LeaveType`, `BaseEntity`
-- `src/shared/db/connection.ts` — for the PostgreSQL pool
-- `tsconfig.json` — for path resolution
+Create exactly 3 files:
 
-Create approximately 4 files:
+1. **`src/modules/audit/audit.model.ts`** — Define and export:
+   - `AuditLog` entity: `id: string`, `entityType: string`, `entityId: string`, `action: string`, `oldValues: Record<string, unknown> | null`, `newValues: Record<string, unknown> | null`, `performedBy: string`, `performedAt: Date`
+   - `IAuditRepository` interface: `create(entry: Omit<AuditLog, 'id' | 'performedAt'>): Promise<AuditLog>`, `findByEntity(entityType: string, entityId: string): Promise<AuditLog[]>`, `findByPerformer(performedBy: string, limit?: number): Promise<AuditLog[]>`
 
-1. **`src/modules/policy/policy.model.ts`** — Define and export:
-   - `LeavePolicy` entity with the canonical fields: `id: string`, `policyName: string`, `leaveType: LeaveType`, `entitlementDays: number`, `accrualRate: number | undefined`, `maxAccumulation: number | undefined`, `minimumNoticeDays: number | undefined`, `requiresManagerApproval: boolean`, `isActive: boolean`, `createdAt: Date`, `updatedAt: Date`
-   - `IPolicyRepository` interface declaring: `findById(id: string): Promise<LeavePolicy | null>`, `findByLeaveType(leaveType: LeaveType): Promise<LeavePolicy | null>`, `findAllActive(): Promise<LeavePolicy[]>`, `create(policy: Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeavePolicy>`, `update(id: string, data: Partial<LeavePolicy>): Promise<LeavePolicy | null>`
+2. **`src/modules/audit/audit.repository.ts`** — Implement `AuditRepository` class using the PostgreSQL `pool`. Table name: `audit_logs`. Must implement `IAuditRepository`. Generate UUIDs for `id`, auto-set `performedAt` to `new Date()` on create.
 
-2. **`src/modules/policy/policy.repository.ts`** — Implement `PolicyRepository` class implementing `IPolicyRepository` using the `pool` from `src/shared/db/connection.ts`. Table name: `leave_policies`.
+3. **`src/modules/audit/audit.service.ts`** — Implement `AuditService` class that takes `AuditRepository` via constructor. Methods:
+   - `log(entry: Omit<AuditLog, 'id' | 'performedAt'>): Promise<AuditLog>` — delegates to repository
+   - `getEntityHistory(entityType: string, entityId: string): Promise<AuditLog[]>`
+   - `getUserActions(performedBy: string, limit?: number): Promise<AuditLog[]>`
 
-3. **`src/modules/policy/policy.service.ts`** — Implement `PolicyService` class with methods: `getById`, `getByLeaveType`, `getAllActive`, `create`, `update`, `getEntitlementForType(leaveType: LeaveType): Promise<number>` (returns `entitlementDays` for the active policy of that type, or throws if none found).
+No barrel file or tests in this sub-phase.
 
-4. **`src/modules/policy/index.ts`** — Barrel file.
+## Owned by SIBLING sub-phases (OUT OF SCOPE for this sub-phase)
+This is ONE sub-phase of a split phase. The deliverables below belong to sibling sub-phases — do NOT create them here, do NOT list them as success criteria, and this sub-phase MUST NOT be gated on their presence (they are produced by a sibling, not missing):
+- "Sub-phase 4b: Notification module implementation": src/modules/notification/notification.model.ts, src/modules/notification/notification.repository.ts, src/modules/notification/notification.service.ts
+- "Sub-phase 4c: Barrel files and unit tests": src/modules/audit/index.ts, src/modules/notification/index.ts, tests/unit/modules/audit/audit.service.spec.ts, tests/unit/modules/notification/notification.service.spec.ts
 
-Include Jest unit tests in `tests/unit/modules/policy/policy.service.spec.ts`.
+In particular, UNIT/INTEGRATION TESTS are OUT OF SCOPE for this sub-phase — they are produced in: Sub-phase 4c: Barrel files and unit tests. Do not create test files here, do not require test existence or coverage as a success criterion, and do not fail the gate for missing tests.
 
 ## Your iteration budget — and how to get more (READ BEFORE YOU START)
 
@@ -90,22 +98,33 @@ binding wherever they apply):
   do NOT add any document-tracking entity. The LeaveRequest lifecycle is exactly:
   PENDING -> APPROVED | REJECTED, and PENDING | APPROVED -> CANCELLED. [BINDING RULE — operator decision resolving: Should leave day counting exclude weekends and/or public holidays, or use pure calendar days as currently specified?; How is the "year" boundary for leave_balances defined — calendar year (Jan 1 – Dec 31), fiscal year, or employee-specific anniversary year?; apply everywhere these apply, not in one place only]
 
+## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
+The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
+- `AuditLog` — the entity MUST have exactly these fields:
+    - id: string
+    - entityType: string
+    - entityId: string
+    - action: string
+    - oldValues: Record<string, unknown> | null
+    - newValues: Record<string, unknown> | null
+    - performedBy: string
+    - performedAt: Date
+
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- The `LeavePolicy` entity must use the `LeaveType` enum imported from `shared/types/leave.types.ts` — not a locally redefined enum or string literal union. (see `src/shared/types/leave.types.ts`)
-- The `PolicyRepository` must use the shared `pool` exported from `src/shared/db/connection.ts` — not create its own connection or pool. (see `src/shared/db/connection.ts`)
-- The `PolicyRepository.mapRow` method must follow the same pattern as `EmployeeRepository.mapRow`: accept `DbRow` (typed as `Record<string, unknown>`), convert snake_case column names to camelCase entity fields, and cast each value to the expected TypeScript type. (see `src/modules/employee/employee.repository.ts`)
-- The `PolicyService` constructor must accept `IPolicyRepository` via dependency injection, matching the `EmployeeService` pattern (`constructor(private readonly employeeRepo: IEmployeeRepository)`). (see `src/modules/employee/employee.service.ts`)
-- Unit tests must use `jest.Mocked<IPolicyRepository>` for the mock repository and a factory function (e.g., `makeMockPolicy`) for creating test `LeavePolicy` objects, following the pattern in the employee service tests. (see `tests/unit/modules/employee/employee.service.spec.ts`)
+- The `AuditLog` entity's `action` field uses `string` type, but callers are expected to use values from the `AuditAction` enum defined in `src/shared/types/leave.types.ts`. The repository must not validate or restrict action values — it accepts any string. (see `src/shared/types/leave.types.ts`)
+- The repository's `mapRow` helper must convert snake_case database columns (`entity_type`, `entity_id`, `old_values`, `new_values`, `performed_by`, `performed_at`) to camelCase `AuditLog` fields, following the same pattern used in `EmployeeRepository.mapRow` and `PolicyRepository.mapRow` (see `src/modules/employee/employee.repository.ts`)
+- The `AuditService` constructor must accept `IAuditRepository` (the interface, not the concrete class), matching the dependency injection pattern used by `EmployeeService` and `PolicyService` (see `src/modules/employee/employee.service.ts`)
+- Module imports must use the `baseUrl` path resolution from `tsconfig.json` — e.g., `import { pool } from 'shared/db/connection'` and `import { AuditAction } from 'shared/types/leave.types'` — matching the import style of existing modules (see `tsconfig.json`)
 ### Entity invariants — enforce these
-- Reuse or extend `LeavePolicy`: `leaveType` must be unique across all policies — enforced by the unique index on `leave_type` in the `leave_policies` table. At most one policy (active or inactive) may exist per `LeaveType` value.
-- Reuse or extend `LeavePolicy`: `entitlementDays` must be a positive integer. A policy with zero or negative entitlement is invalid — the service must reject such values on `create` and `update`.
-- Reuse or extend `LeavePolicy`: `isActive` is a boolean flag. Only one policy per `LeaveType` may be active at a time (enforced by the unique index on `leave_type` — since there is at most one row per type, there can be at most one active row per type). Deactivating a policy (`isActive: false`) does not delete it; it remains queryable by `findById` and `findByLeaveType` but is excluded from `findAllActive`.
+- Reuse or extend `AuditLog`: AuditLog records are immutable once created — no update or delete operations exist on the repository or service. The `id` and `performedAt` fields are always generated at creation time and never supplied by the caller.
 ### Interface contract — expose these operations (their shape is yours)
-- PolicyService.getEntitlementForType(leaveType: LeaveType): Promise<number> — No auth enforcement at this layer — auth is deferred to the controller/routes phase.; idempotent; Throws a domain error (e.g., `PolicyNotFoundError`) when no active policy exists for the given `LeaveType`. The error must include the `leaveType` value in its message.
-- PolicyService.create(data: Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeavePolicy> — No auth enforcement at this layer — auth is deferred to the controller/routes phase.; Must validate that `entitlementDays > 0` before delegating to repository. Must propagate any unique-constraint violation from the repository (duplicate `leaveType`) as a domain error.
-- PolicyService.update(id: string, data: Partial<LeavePolicy>): Promise<LeavePolicy | null> — No auth enforcement at this layer — auth is deferred to the controller/routes phase.; If `entitlementDays` is provided in `data`, it must be validated as > 0. Throws a domain error (e.g., `PolicyNotFoundError`) when no policy with the given `id` exists.
+- IAuditRepository.create — Must throw if the database insert fails (e.g., constraint violation, connection error). Must not silently swallow errors.
+- IAuditRepository.findByEntity — idempotent; Returns empty array when no matching audit records exist — never null. Ordered by `performedAt` descending (most recent first).
+- IAuditRepository.findByPerformer — idempotent; Returns empty array when no matching audit records exist — never null. Ordered by `performedAt` descending. When `limit` is provided, returns at most that many rows; when omitted, returns all matching rows.
+### Integration points — connect to these
+- src/shared/db/connection.ts — AuditRepository uses the shared pg.Pool for all database operations against the audit_logs table
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
