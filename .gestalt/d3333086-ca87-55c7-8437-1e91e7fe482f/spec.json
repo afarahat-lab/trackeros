@@ -1,0 +1,160 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "balance"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The `LeaveBalance` entity is defined and exported from `balance.model.ts` with fields: `id`, `employeeId`, `policyId`, `totalEntitlement`, `usedDays`, `pendingDays`, `remainingDays` (derived getter returning `totalEntitlement - usedDays - pendingDays`, not stored), `fiscalYear`, `status` (`'ACTIVE' | 'EXHAUSTED' | 'FROZEN' | 'CLOSED'`), `createdAt`, `updatedAt`. Extends `BaseEntity`. Does NOT include a `carriedOver` field.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `IBalanceRepository` interface is defined and exported from `balance.model.ts` declaring: `findByEmployeeAndYear(employeeId: string, fiscalYear: number): Promise<LeaveBalance[]>`, `findByEmployeeYearAndPolicy(employeeId: string, fiscalYear: number, policyId: string): Promise<LeaveBalance | null>`, `create(balance: Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeaveBalance>`, `update(id: string, data: Partial<LeaveBalance>): Promise<LeaveBalance | null>`, `deductPendingDays(id: string, days: number, client?: PoolClient): Promise<LeaveBalance | null>`, `commitDeduction(id: string, days: number, client?: PoolClient): Promise<LeaveBalance | null>`, `restorePendingDays(id: string, days: number, client?: PoolClient): Promise<LeaveBalance | null>`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`BalanceRepository` implements `IBalanceRepository` using the shared `pool` from `src/shared/db/connection.ts`. Table: `leave_balances`. All queries use parameterized SQL. A private `mapRow(row: DbRow): LeaveBalance` helper converts snake_case DB columns to camelCase. The `remainingDays` field is NOT read from the DB \u2014 it is computed in `mapRow` as `totalEntitlement - usedDays - pendingDays`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`deductPendingDays(id, days)` atomically increments `pendingDays` by `days` using `UPDATE leave_balances SET pending_days = pending_days + $1, updated_at = NOW() WHERE id = $2 RETURNING *`. Returns the updated `LeaveBalance` or `null` if the row does not exist.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`commitDeduction(id, days)` atomically moves `days` from `pendingDays` to `usedDays` using `UPDATE leave_balances SET pending_days = pending_days - $1, used_days = used_days + $1, updated_at = NOW() WHERE id = $2 RETURNING *`. Returns the updated `LeaveBalance` or `null` if the row does not exist.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`restorePendingDays(id, days)` atomically decrements `pendingDays` by `days` using `UPDATE leave_balances SET pending_days = pending_days - $1, updated_at = NOW() WHERE id = $2 RETURNING *`. Returns the updated `LeaveBalance` or `null` if the row does not exist.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`deductPendingDays`, `commitDeduction`, and `restorePendingDays` each accept an optional `client: PoolClient` parameter. When provided, the method uses that client for the query instead of the shared pool, enabling the caller to orchestrate multi-step transactions.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`create(balance)` inserts a row into `leave_balances` with columns: `employee_id`, `policy_id`, `total_entitlement`, `used_days`, `pending_days`, `fiscal_year`, `status`. The `id` is generated via `randomUUID()`. `usedDays` and `pendingDays` default to `0` if not provided. Returns the created `LeaveBalance`.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The `LeaveBalance` entity MUST extend `BaseEntity` from `src/shared/types/leave.types.ts` (providing `id`, `createdAt`, `updatedAt`).",
+    "The `remainingDays` field MUST be a derived getter (`get remainingDays(): number { return this.totalEntitlement - this.usedDays - this.pendingDays; }`) \u2014 it is NOT stored in the database and NOT read from any DB column. The `mapRow` helper computes it from the stored `total_entitlement`, `used_days`, and `pending_days` columns.",
+    "The `carried_over` column exists in the `leave_balances` table (per reconciled architecture) but MUST NOT be mapped to the `LeaveBalance` entity. The repository's `mapRow` must not read it, and no query may write to it.",
+    "All repository methods MUST use parameterized SQL (`$1`, `$2`, \u2026) \u2014 never string interpolation or template concatenation for values.",
+    "The repository MUST import `pool` from `src/shared/db/connection.ts` using the path `shared/db/connection` (matching the existing pattern in employee, policy, audit, and notification repositories).",
+    "Domain errors defined in `balance.model.ts` MUST extend `Error`, set `this.name` to the error class name in the constructor, and follow the naming convention `XxxError` (e.g., `BalanceNotFoundError`).",
+    "The `DbRow` type alias (`type DbRow = Record<string, unknown>`) MUST be used for all query result rows, matching the pattern in every existing repository.",
+    "The `update` method MUST use a dynamic field-map pattern (array of `[column_name, entityKey]` tuples) to build the SET clause, matching the pattern in `EmployeeRepository.update` and `PolicyRepository.update`. It MUST set `updated_at = NOW()` on every update."
+  ],
+  "outOfScope": [
+    "Unit tests (`tests/unit/modules/balance/balance.service.spec.ts` and any other test files) \u2014 these are produced by sibling sub-phase 5c.",
+    "`BalanceService`, `BalanceController`, `balance.routes.ts`, and the barrel `index.ts` \u2014 these are produced by sibling sub-phase 5b.",
+    "Database migration for the `leave_balances` table \u2014 assumed to exist per the reconciled architecture."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "`remainingDays` is always `totalEntitlement - usedDays - pendingDays`. It is a derived getter, never stored. The entity's `status` is driven by `remainingDays`: when `remainingDays === 0`, status transitions to `EXHAUSTED`; when `remainingDays > 0` and status was `EXHAUSTED`, it returns to `ACTIVE`. Status `FROZEN` is set externally (admin action). Status `CLOSED` is terminal (year-end)."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "A `LeaveBalance` is uniquely identified by the combination `(employeeId, policyId, fiscalYear)`. No two balance records may exist for the same employee, policy, and fiscal year. The repository's `create` method should rely on the database unique constraint on `(employee_id, policy_id, fiscal_year)` to enforce this."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "`usedDays` and `pendingDays` must never be negative. The atomic SQL operations (`deductPendingDays`, `commitDeduction`, `restorePendingDays`) must guard against negative values \u2014 the UPDATE should include a WHERE clause (e.g., `WHERE pending_days >= $1`) to prevent the operation if it would produce a negative result, returning `null` in that case."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IBalanceRepository.findByEmployeeAndYear",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns an empty array (never null) when no balances exist for the given employee and fiscal year."
+    },
+    {
+      "operation": "IBalanceRepository.findByEmployeeYearAndPolicy",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns `null` when no balance exists for the given employee, fiscal year, and policy combination. Does not throw."
+    },
+    {
+      "operation": "IBalanceRepository.deductPendingDays",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the updated `LeaveBalance` on success. Returns `null` if the balance row does not exist OR if the operation would cause `pendingDays` to become negative (guarded by `WHERE pending_days >= $days` in the UPDATE). Does not throw."
+    },
+    {
+      "operation": "IBalanceRepository.commitDeduction",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the updated `LeaveBalance` on success. Returns `null` if the balance row does not exist OR if the operation would cause `pendingDays` to become negative (guarded by `WHERE pending_days >= $days` in the UPDATE). Does not throw."
+    },
+    {
+      "operation": "IBalanceRepository.restorePendingDays",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the updated `LeaveBalance` on success. Returns `null` if the balance row does not exist OR if the operation would cause `pendingDays` to become negative (guarded by `WHERE pending_days >= $days` in the UPDATE). Does not throw."
+    },
+    {
+      "operation": "IBalanceRepository.create",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the created `LeaveBalance`. The repository generates `id` via `randomUUID()` and sets `createdAt`/`updatedAt` via database defaults (`NOW()`)."
+    },
+    {
+      "operation": "IBalanceRepository.update",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns the updated `LeaveBalance` on success. Returns `null` if no row with the given `id` exists. Does not throw."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The `DbRow` type alias (`type DbRow = Record<string, unknown>`) and the private `mapRow(row: DbRow): LeaveBalance` helper pattern MUST match the existing repositories: `EmployeeRepository.mapRow` (src/modules/employee/employee.repository.ts), `PolicyRepository.mapRow` (src/modules/policy/policy.repository.ts), and `AuditRepository.mapRow` (src/modules/audit/audit.repository.ts).",
+      "referencePath": "src/modules/employee/employee.repository.ts"
+    },
+    {
+      "requirement": "The `update` method's dynamic field-map pattern MUST match `EmployeeRepository.update` (src/modules/employee/employee.repository.ts) and `PolicyRepository.update` (src/modules/policy/policy.repository.ts): an array of `[column_name, entityKey]` tuples, building SET clauses with positional parameters, appending `updated_at = NOW()`, and returning the updated row via `RETURNING *`.",
+      "referencePath": "src/modules/employee/employee.repository.ts"
+    },
+    {
+      "requirement": "Domain error classes MUST follow the pattern in `src/modules/employee/employee.model.ts` and `src/modules/policy/policy.model.ts`: extend `Error`, set `this.name` to the class name in the constructor, accept a descriptive identifier parameter, and produce a human-readable message.",
+      "referencePath": "src/modules/employee/employee.model.ts"
+    },
+    {
+      "requirement": "The `LeaveBalance` entity MUST extend `BaseEntity` from `src/shared/types/leave.types.ts`, matching how `Employee` extends `BaseEntity` in `src/modules/employee/employee.model.ts` and `LeavePolicy` extends `BaseEntity` in `src/modules/policy/policy.model.ts`.",
+      "referencePath": "src/shared/types/leave.types.ts"
+    },
+    {
+      "requirement": "The `pool` import path MUST be `shared/db/connection` (not a relative path), matching every existing repository: `EmployeeRepository` (src/modules/employee/employee.repository.ts), `PolicyRepository` (src/modules/policy/policy.repository.ts), `AuditRepository` (src/modules/audit/audit.repository.ts).",
+      "referencePath": "src/modules/employee/employee.repository.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/leave.types.ts",
+      "why": "Imports `BaseEntity` for the `LeaveBalance` entity to extend. No other shared type imports needed."
+    }
+  ]
+}
