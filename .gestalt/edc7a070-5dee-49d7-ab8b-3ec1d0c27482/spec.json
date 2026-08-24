@@ -1,0 +1,95 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "balance"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "Every method declared in `IBalanceRepository` (`findById`, `findByEmployeeAndYear`, `findByEmployeeYearAndPolicy`, `create`, `update`, `deductPendingDays`, `commitDeduction`, `restorePendingDays`) accepts an optional `client?: PoolClient` parameter as its last argument.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "When a `client` is passed to any `BalanceRepository` method, the method executes its query using that client (not the shared pool), enabling the caller to orchestrate multi-step transactions.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "When no `client` is passed, every `BalanceRepository` method continues to use the shared `pool` for single-step operations \u2014 backward compatibility is preserved.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`BalanceRepository.create` detects duplicate `(employee_id, policy_id, fiscal_year)` insertions and throws a typed domain error (e.g. `DuplicateBalanceError`) instead of letting a raw PostgreSQL unique-violation error propagate.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The `client` parameter must be typed as `PoolClient` from the `pg` package (the same type already used by `src/shared/db/connection.ts`).",
+    "Duplicate detection in `create` must use either `ON CONFLICT (employee_id, policy_id, fiscal_year) DO NOTHING` with a follow-up SELECT, or catch the unique-violation error code (`23505`) from PostgreSQL \u2014 no pre-query check-then-insert pattern that would create a TOCTOU race.",
+    "The `IBalanceRepository` interface change is additive \u2014 all existing method signatures remain callable without a `client` argument. No existing call site in `BalanceService` or tests may break."
+  ],
+  "outOfScope": [
+    "Adding `client?: PoolClient` to any repository interface other than `IBalanceRepository` (e.g. `IEmployeeRepository`, `IPolicyRepository`, `IAuditRepository`, `INotificationRepository`) \u2014 those are deferred to later phases.",
+    "Modifying `BalanceService` to pass a `client` to repository methods or to orchestrate transactions \u2014 this phase only adds the capability to the repository interface and implementation; the service continues to call without a client."
+  ],
+  "ambiguities": [
+    {
+      "description": "The name of the duplicate-balance error type is not specified in PLAN.md or the reconciled architecture. The code agent must choose a name (e.g. `DuplicateBalanceError`) consistent with the existing pattern: `DuplicateLeaveTypeError` in policy, `DuplicateEmployeeNumberError` in employee.",
+      "options": [
+        "DuplicateBalanceError",
+        "BalanceAlreadyExistsError",
+        "DuplicateLeaveBalanceError"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "A `LeaveBalance` is uniquely identified by the composite `(employeeId, policyId, fiscalYear)`. No two balance records may exist with the same triple. The repository `create` method must enforce this by rejecting duplicates with a typed domain error."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IBalanceRepository.create",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws a typed domain error (e.g. `DuplicateBalanceError`) when a balance already exists for the same `(employeeId, policyId, fiscalYear)` triple. Must not leak raw PostgreSQL error codes to callers."
+    },
+    {
+      "operation": "IBalanceRepository (all methods)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Every method accepts an optional trailing `client?: PoolClient` parameter. When provided, the query executes on that client; when omitted, the method uses the shared pool. The `client` parameter is always the last argument."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The `client?: PoolClient` parameter pattern must match the transaction contract defined in `.gestalt/architecture/reconciled.json`: \"Repository methods that participate in multi-step writes accept an optional `client: PoolClient` parameter. When omitted, the method acquires its own connection from the shared pool for single-step operations.\"",
+      "referencePath": ".gestalt/architecture/reconciled.json \u2192 transaction_contract"
+    },
+    {
+      "requirement": "The `IBalanceRepository` interface must remain consistent with the existing `BalanceService` usage \u2014 all service methods (`getOrCreateBalance`, `reserveDays`, `commitDays`, `restoreDays`, `hasSufficientBalance`, `getBalancesForEmployee`, `getById`) call repository methods without a `client` argument today and must continue to compile and pass tests.",
+      "referencePath": "src/modules/balance/balance.service.ts"
+    },
+    {
+      "requirement": "The `BalanceRepository` implementation must continue to use the shared `pool` from `src/shared/db/connection.ts` as its default connection source when no `client` is provided.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "The duplicate-handling pattern in `create` must be consistent with the existing `PolicyRepository.create` approach (which throws `DuplicateLeaveTypeError`), but must use a race-condition-free mechanism (`ON CONFLICT` or error-code catch) rather than a pre-check-then-insert pattern.",
+      "referencePath": "src/modules/policy/policy.repository.ts"
+    }
+  ],
+  "integrationPoints": []
+}
