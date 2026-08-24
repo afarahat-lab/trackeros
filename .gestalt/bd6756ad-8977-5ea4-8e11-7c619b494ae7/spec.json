@@ -1,0 +1,110 @@
+{
+  "scope": {
+    "affectedDomains": [],
+    "affectedLayers": [],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "BalanceService is implemented with constructor injection of IBalanceRepository and PolicyService, and exposes these methods: getOrCreateBalance, getBalancesForEmployee, hasSufficientBalance, reserveDays, commitDays, restoreDays",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "getOrCreateBalance(employeeId, leaveType, fiscalYear) looks up an existing balance via IBalanceRepository.findByEmployeeYearAndPolicy; if none exists, it calls PolicyService.getEntitlementForType(leaveType) to get the entitlement, resolves the policyId via PolicyService.getByLeaveType, and creates a new balance with totalEntitlement set to the policy entitlement, usedDays=0, pendingDays=0, status='ACTIVE'",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "hasSufficientBalance(employeeId, leaveType, fiscalYear, requestedDays) returns true when remainingDays >= requestedDays, false otherwise; returns false (not throws) when no balance exists for the given employee/type/year",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "reserveDays delegates to IBalanceRepository.deductPendingDays; commitDays delegates to IBalanceRepository.commitDeduction; restoreDays delegates to IBalanceRepository.restorePendingDays \u2014 each resolves the balance via findByEmployeeYearAndPolicy first, throws BalanceNotFoundError if not found, and returns the updated LeaveBalance",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "BalanceController exposes route handlers that delegate to BalanceService; handlers extract and validate inputs from the Fastify request, call the service, and return the result or a typed error response matching the error_response_contract (NOT_FOUND, VALIDATION_ERROR, etc.)",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "BalanceRoutes is a Fastify plugin that registers balance endpoints; RBAC is enforced via requireRole guard at the route level (not inline in handlers) \u2014 GET endpoints require at least 'employee' role",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "Barrel file src/modules/balance/index.ts re-exports LeaveBalance, IBalanceRepository, BalanceNotFoundError, DuplicateBalanceError from balance.model.ts; BalanceRepository from balance.repository.ts; BalanceService from balance.service.ts; BalanceController from balance.controller.ts; balanceRoutes from balance.routes.ts \u2014 following the same pattern as employee/index.ts and policy/index.ts",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "BalanceService must depend on IBalanceRepository and PolicyService via constructor injection \u2014 never import or instantiate concrete repository or service classes directly",
+    "All database access goes through IBalanceRepository \u2014 BalanceService must never import pool or execute SQL directly (GP-001)",
+    "BalanceController must not contain business logic \u2014 it delegates to BalanceService and only handles request parsing, response formatting, and error mapping",
+    "Fiscal year is derived as the calendar year of the leave request's startDate (startDate.getFullYear()) \u2014 this is the binding calendar-year rule from the reconciled business rules",
+    "BalanceService must import PolicyService from src/modules/policy/index.ts (the barrel), not from its internal file \u2014 per the module dependency rule",
+    "No use of `any` type \u2014 use `unknown` with type guards where needed (HARNESS constraint no-any)"
+  ],
+  "outOfScope": [
+    "Unit tests for BalanceService \u2014 these belong to sibling sub-phase Phase 5c",
+    "Balance model (balance.model.ts) and repository (balance.repository.ts) \u2014 these belong to sibling sub-phase Phase 5a and already exist",
+    "Audit logging of balance mutations \u2014 GP-002 applies to LeaveRequest and LeaveBalance per reconciled architecture, but the audit integration is wired in Phase 6 (Leave module), not here",
+    "Transaction orchestration (PoolClient passing, BEGIN/COMMIT/ROLLBACK) \u2014 the BalanceService methods are single-step operations; multi-step transactions spanning balance + leave_request belong to Phase 6"
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "remainingDays = totalEntitlement - usedDays - pendingDays (derived, never stored). Status derives from remainingDays: ACTIVE when > 0, EXHAUSTED when = 0, unless overridden by FROZEN or CLOSED (which are terminal overrides). The BalanceService must never set _status directly to ACTIVE or EXHAUSTED \u2014 those are derived; it may only set FROZEN or CLOSED explicitly."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "The combination (employeeId, policyId, fiscalYear) is unique. getOrCreateBalance must never create a duplicate \u2014 it must check existence first. The repository's create method already enforces this with DuplicateBalanceError, but the service must not rely on the error for normal flow."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "pendingDays must never exceed (totalEntitlement - usedDays). The repository's deductPendingDays enforces this atomically; the service must not bypass this guard."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "BalanceService.getOrCreateBalance",
+      "authRule": "No auth enforcement at service layer \u2014 RBAC is enforced at the route level by requireRole guard",
+      "idempotent": true,
+      "errorSemantics": "Throws PolicyNotFoundError if no active policy exists for the leaveType. Throws BalanceNotFoundError only if the repository returns null on a lookup that should succeed (internal consistency)."
+    },
+    {
+      "operation": "BalanceService.hasSufficientBalance",
+      "authRule": "No auth enforcement at service layer",
+      "idempotent": true,
+      "errorSemantics": "Returns false (never throws) when no balance exists or remainingDays < requestedDays. Returns true when remainingDays >= requestedDays."
+    },
+    {
+      "operation": "BalanceService.reserveDays / commitDays / restoreDays",
+      "authRule": "No auth enforcement at service layer",
+      "idempotent": false,
+      "errorSemantics": "Each resolves the balance via findByEmployeeYearAndPolicy; throws BalanceNotFoundError if no balance exists. Delegates to the corresponding atomic repository method. Returns null from repository as BalanceNotFoundError. The repository may return null if the atomic guard fails (e.g., insufficient remaining for reserveDays); the service must surface this as a distinct error (e.g., 'Insufficient balance for reservation')."
+    },
+    {
+      "operation": "BalanceController route handlers (getBalances, getBalance)",
+      "authRule": "RBAC enforced by requireRole guard at route registration \u2014 minimum 'employee' role for GET endpoints",
+      "idempotent": true,
+      "errorSemantics": "Returns error responses matching the error_response_contract: 404 with NOT_FOUND for missing balances, 400 with VALIDATION_ERROR for invalid query params. Never leaks internal error details to the client."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "BalanceService must use PolicyService.getEntitlementForType(leaveType) to resolve entitlement when creating a new balance \u2014 must match the exact signature: (leaveType: LeaveType) => Promise<number>, which throws PolicyNotFoundError if no active policy exists",
+      "referencePath": "src/modules/policy/policy.service.ts"
+    }
+  ],
+  "integrationPoints": []
+}
