@@ -1,3 +1,4 @@
+import { PoolClient } from 'pg';
 import { LeaveType, BaseEntity } from 'shared/types/leave.types';
 
 export type BalanceStatus = 'ACTIVE' | 'EXHAUSTED' | 'FROZEN' | 'CLOSED';
@@ -29,32 +30,45 @@ export class InsufficientBalanceError extends Error {
   }
 }
 
+export class DuplicateBalanceError extends Error {
+  constructor(employeeId: string, policyId: string, fiscalYear: number) {
+    super(
+      `A balance already exists for employee ${employeeId}, policy ${policyId}, fiscal year ${fiscalYear}`
+    );
+    this.name = 'DuplicateBalanceError';
+  }
+}
+
 export interface IBalanceRepository {
-  findById(id: string): Promise<LeaveBalance | null>;
+  findById(id: string, client?: PoolClient): Promise<LeaveBalance | null>;
 
   findByEmployeeAndYear(
     employeeId: string,
-    fiscalYear: number
+    fiscalYear: number,
+    client?: PoolClient
   ): Promise<LeaveBalance[]>;
 
   findByEmployeeYearAndPolicy(
     employeeId: string,
     fiscalYear: number,
-    policyId: string
+    policyId: string,
+    client?: PoolClient
   ): Promise<LeaveBalance | null>;
 
   create(
-    balance: Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt' | 'remainingDays'>
+    balance: Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt' | 'remainingDays'>,
+    client?: PoolClient
   ): Promise<LeaveBalance>;
 
   update(
     id: string,
-    data: Partial<LeaveBalance>
+    data: Partial<LeaveBalance>,
+    client?: PoolClient
   ): Promise<LeaveBalance | null>;
 
-  deductPendingDays(id: string, days: number): Promise<LeaveBalance | null>;
+  deductPendingDays(id: string, days: number, client?: PoolClient): Promise<LeaveBalance | null>;
 
-  commitDeduction(id: string, days: number): Promise<LeaveBalance | null>;
+  commitDeduction(id: string, days: number, client?: PoolClient): Promise<LeaveBalance | null>;
 
-  restorePendingDays(id: string, days: number): Promise<LeaveBalance | null>;
+  restorePendingDays(id: string, days: number, client?: PoolClient): Promise<LeaveBalance | null>;
 }

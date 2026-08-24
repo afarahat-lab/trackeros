@@ -4,6 +4,7 @@ export {
   IBalanceRepository,
   BalanceNotFoundError,
   InsufficientBalanceError,
+  DuplicateBalanceError,
 } from './balance.model';
 
 export { BalanceRepository } from './balance.repository';

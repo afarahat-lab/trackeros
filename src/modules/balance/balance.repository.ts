@@ -1,10 +1,12 @@
 import { randomUUID } from 'crypto';
+import { PoolClient } from 'pg';
 import { pool } from 'shared/db/connection';
 import {
   LeaveBalance,
   IBalanceRepository,
   BalanceStatus,
   BalanceNotFoundError,
+  DuplicateBalanceError,
 } from './balance.model';
 
 type DbRow = Record<string, unknown>;
@@ -12,9 +14,11 @@ type DbRow = Record<string, unknown>;
 export class BalanceRepository implements IBalanceRepository {
   async findByEmployeeAndYear(
     employeeId: string,
-    fiscalYear: number
+    fiscalYear: number,
+    client?: PoolClient
   ): Promise<LeaveBalance[]> {
-    const result = await pool.query(
+    const db = client ?? pool;
+    const result = await db.query(
       'SELECT * FROM leave_balances WHERE employee_id = $1 AND fiscal_year = $2',
       [employeeId, fiscalYear]
     );
@@ -24,9 +28,11 @@ export class BalanceRepository implements IBalanceRepository {
   async findByEmployeeYearAndPolicy(
     employeeId: string,
     fiscalYear: number,
-    policyId: string
+    policyId: string,
+    client?: PoolClient
   ): Promise<LeaveBalance | null> {
-    const result = await pool.query(
+    const db = client ?? pool;
+    const result = await db.query(
       'SELECT * FROM leave_balances WHERE employee_id = $1 AND fiscal_year = $2 AND policy_id = $3',
       [employeeId, fiscalYear, policyId]
     );
@@ -35,14 +41,17 @@ export class BalanceRepository implements IBalanceRepository {
   }
 
   async create(
-    balance: Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt' | 'remainingDays'>
+    balance: Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt' | 'remainingDays'>,
+    client?: PoolClient
   ): Promise<LeaveBalance> {
+    const db = client ?? pool;
     const id = randomUUID();
-    const result = await pool.query(
+    const result = await db.query(
       `INSERT INTO leave_balances (
         id, employee_id, policy_id, total_entitlement, used_days,
         pending_days, fiscal_year, status
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      ON CONFLICT (employee_id, policy_id, fiscal_year) DO NOTHING
       RETURNING *`,
       [
         id,
@@ -55,13 +64,23 @@ export class BalanceRepository implements IBalanceRepository {
         balance.status,
       ]
     );
-    return this.mapRow((result.rows as DbRow[])[0]);
+    const rows = result.rows as DbRow[];
+    if (rows.length === 0) {
+      throw new DuplicateBalanceError(
+        balance.employeeId,
+        balance.policyId,
+        balance.fiscalYear
+      );
+    }
+    return this.mapRow(rows[0]);
   }
 
   async update(
     id: string,
-    data: Partial<LeaveBalance>
+    data: Partial<LeaveBalance>,
+    client?: PoolClient
   ): Promise<LeaveBalance | null> {
+    const db = client ?? pool;
     const clauses: string[] = [];
     const values: unknown[] = [];
     let idx = 1;
@@ -83,13 +102,13 @@ export class BalanceRepository implements IBalanceRepository {
     }
 
     if (clauses.length === 0) {
-      return this.findById(id);
+      return this.findById(id, client);
     }
 
     clauses.push('updated_at = NOW()');
     values.push(id);
 
-    const result = await pool.query(
+    const result = await db.query(
       `UPDATE leave_balances SET ${clauses.join(', ')} WHERE id = $${idx} RETURNING *`,
       values
     );
@@ -100,9 +119,11 @@ export class BalanceRepository implements IBalanceRepository {
 
   async deductPendingDays(
     id: string,
-    days: number
+    days: number,
+    client?: PoolClient
   ): Promise<LeaveBalance | null> {
-    const result = await pool.query(
+    const db = client ?? pool;
+    const result = await db.query(
       `UPDATE leave_balances
        SET pending_days = pending_days + $1,
            updated_at = NOW()
@@ -116,9 +137,11 @@ export class BalanceRepository implements IBalanceRepository {
 
   async commitDeduction(
     id: string,
-    days: number
+    days: number,
+    client?: PoolClient
   ): Promise<LeaveBalance | null> {
-    const result = await pool.query(
+    const db = client ?? pool;
+    const result = await db.query(
       `UPDATE leave_balances
        SET pending_days = pending_days - $1,
            used_days = used_days + $1,
@@ -133,9 +156,11 @@ export class BalanceRepository implements IBalanceRepository {
 
   async restorePendingDays(
     id: string,
-    days: number
+    days: number,
+    client?: PoolClient
   ): Promise<LeaveBalance | null> {
-    const result = await pool.query(
+    const db = client ?? pool;
+    const result = await db.query(
       `UPDATE leave_balances
        SET pending_days = pending_days - $1,
            updated_at = NOW()
@@ -147,8 +172,9 @@ export class BalanceRepository implements IBalanceRepository {
     return rows.length === 0 ? null : this.mapRow(rows[0]);
   }
 
-  async findById(id: string): Promise<LeaveBalance | null> {
-    const result = await pool.query(
+  async findById(id: string, client?: PoolClient): Promise<LeaveBalance | null> {
+    const db = client ?? pool;
+    const result = await db.query(
       'SELECT * FROM leave_balances WHERE id = $1',
       [id]
     );
