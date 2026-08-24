@@ -1,0 +1,138 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "balance"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The `LeaveBalance` entity class exists at `src/modules/balance/balance.model.ts` with all canonical fields: `id`, `employeeId`, `policyId`, `totalEntitlement`, `usedDays`, `pendingDays`, `fiscalYear`, `status` (of type `BalanceStatus`), `createdAt`, `updatedAt`, and a derived `remainingDays` getter computing `totalEntitlement - usedDays - pendingDays`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `IBalanceRepository` interface is declared in `src/modules/balance/balance.model.ts` with all seven methods: `findByEmployeeAndYear`, `findByEmployeeYearAndPolicy`, `create`, `update`, `deductPendingDays`, `commitDeduction`, `restorePendingDays`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `BalanceRepository` class at `src/modules/balance/balance.repository.ts` implements `IBalanceRepository` using the shared `pool` from `src/shared/db/connection.ts` and the `leave_balances` table.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`BalanceRepository.deductPendingDays(id, days)` atomically **increments** `pending_days` (i.e., `pending_days = pending_days + $1`) with a guard ensuring the result does not exceed `total_entitlement - used_days`, and returns the updated `LeaveBalance` or `null` if the guard fails or the row does not exist. The method must NOT decrement `pending_days`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`BalanceRepository.commitDeduction(id, days)` atomically moves `days` from `pending_days` to `used_days` (`used_days = used_days + $1, pending_days = pending_days - $1`) with a guard `pending_days >= $1`, returning the updated `LeaveBalance` or `null`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`BalanceRepository.restorePendingDays(id, days)` atomically decrements `pending_days` (`pending_days = pending_days - $1`) with a guard `pending_days >= $1`, returning the updated `LeaveBalance` or `null`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All three atomic methods (`deductPendingDays`, `commitDeduction`, `restorePendingDays`) use a single `UPDATE ... RETURNING *` statement \u2014 no SELECT-then-UPDATE pattern \u2014 to prevent race conditions.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`BalanceRepository.create` generates `id` via `randomUUID()`, inserts into `leave_balances` with all required columns, and returns the created `LeaveBalance`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`BalanceRepository.update` uses a dynamic field-map pattern to build SET clauses from partial data, sets `updated_at = NOW()`, and returns the updated `LeaveBalance` or `null` if no row matches.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `LeaveBalance` entity's `status` getter derives `EXHAUSTED` when `remainingDays === 0` and `ACTIVE` when `remainingDays > 0`, unless the stored status is `FROZEN` or `CLOSED` (which are preserved as-is).",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access in `BalanceRepository` must use parameterized SQL via the shared `pool` from `src/shared/db/connection.ts` \u2014 no inline SQL in any other layer (GP-001).",
+    "The `deductPendingDays` method must increment `pending_days`, not decrement. The semantics are: reserving days for a pending leave request increases `pendingDays`, which reduces `remainingDays`. This matches the PLAN.md, ARCHITECTURE.md, and reconciled architecture business rules.",
+    "The `mapRow` private helper must NOT read a `carried_over` column from the DB row. The `carried_over` column may exist in the `leave_balances` table per the reconciled architecture but is intentionally not mapped to the entity.",
+    "The `remainingDays` property must be a class getter (derived), never stored in the database and never read from any DB column."
+  ],
+  "outOfScope": [
+    "`BalanceService`, `BalanceController`, `balance.routes.ts`, and the barrel `index.ts` \u2014 these belong to Phase 5b (sibling sub-phase).",
+    "Unit tests for the balance module \u2014 these belong to Phase 5c (sibling sub-phase).",
+    "Database migration for the `leave_balances` table \u2014 assumed to exist.",
+    "Optional `client: PoolClient` parameter on atomic methods for transaction orchestration \u2014 not yet implemented in this phase."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "`remainingDays` is always derived as `totalEntitlement - usedDays - pendingDays` and is never stored. The `status` getter reflects `EXHAUSTED` when `remainingDays === 0` and `ACTIVE` when `remainingDays > 0`, unless the stored `_status` is `FROZEN` or `CLOSED` (which are preserved). The combination `(employeeId, policyId, fiscalYear)` is unique \u2014 `create` must reject duplicates with `DuplicateBalanceError`."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "Lifecycle: ACTIVE \u2194 EXHAUSTED (driven by `remainingDays`), ACTIVE/EXHAUSTED \u2194 FROZEN (admin), ACTIVE/EXHAUSTED/FROZEN \u2192 CLOSED (year-end, terminal). CLOSED is terminal \u2014 once set, it must not revert."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IBalanceRepository.deductPendingDays",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns `null` if the balance row does not exist or if the guard fails (increment would cause `pending_days` to exceed `total_entitlement - used_days`). Does not throw."
+    },
+    {
+      "operation": "IBalanceRepository.commitDeduction",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns `null` if the balance row does not exist or if `pending_days < days` (guard prevents negative pending). Does not throw."
+    },
+    {
+      "operation": "IBalanceRepository.restorePendingDays",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns `null` if the balance row does not exist or if `pending_days < days` (guard prevents negative pending). Does not throw."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "`LeaveBalance` must extend `BaseEntity` from `src/shared/types/leave.types.ts` (providing `id`, `createdAt`, `updatedAt`).",
+      "referencePath": "src/shared/types/leave.types.ts"
+    },
+    {
+      "requirement": "The `BalanceStatus` type must be `'ACTIVE' | 'EXHAUSTED' | 'FROZEN' | 'CLOSED'`, matching the reconciled architecture entity definition.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "The `deductPendingDays` semantics must match PLAN.md and ARCHITECTURE.md: it atomically increments `pending_days` to reserve days for a pending leave request. The current implementation decrements, which contradicts all documentation.",
+      "referencePath": "PLAN.md"
+    },
+    {
+      "requirement": "The `restorePendingDays` method must decrement `pending_days` (release reserved days). The current implementation already does this correctly \u2014 it must be preserved.",
+      "referencePath": "PLAN.md"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "BalanceRepository imports the shared PostgreSQL pool for all database operations."
+    },
+    {
+      "target": "src/shared/types/leave.types.ts",
+      "why": "LeaveBalance entity extends BaseEntity from shared types; BalanceStatus type is defined locally but must align with the reconciled architecture."
+    }
+  ]
+}
