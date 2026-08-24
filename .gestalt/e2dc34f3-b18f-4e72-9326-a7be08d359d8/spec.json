@@ -1,0 +1,104 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "balance"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "`deductPendingDays` atomically increments `pending_days` (not decrements): the SQL must be `SET pending_days = pending_days + $1` with guard `pending_days + $1 >= 0`, matching ARCHITECTURE.md line 247",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All three atomic methods \u2014 `deductPendingDays`, `commitDeduction`, `restorePendingDays` \u2014 accept an optional `client: PoolClient` parameter. When provided, the method uses `client.query` instead of `pool.query`; when omitted, it uses the shared pool. Both the `IBalanceRepository` interface and `BalanceRepository` implementation reflect this.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`commitDeduction` and `restorePendingDays` implementations remain correct: `commitDeduction` atomically moves days from `pending_days` to `used_days` (`used_days + $1`, `pending_days - $1`, guard `pending_days >= $1`); `restorePendingDays` atomically decrements `pending_days` (`pending_days - $1`, guard `pending_days >= $1`)",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`PoolClient` is imported from `pg` in `balance.repository.ts` (alongside the existing `pool` import from `shared/db/connection`)",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access must go through the repository layer (GP-001). The optional `client: PoolClient` parameter must not bypass the repository pattern \u2014 callers still go through `IBalanceRepository` methods.",
+    "The `deductPendingDays` guard condition must remain `pending_days + $1 >= 0` (not `pending_days >= $1`), because the operation increments `pending_days` and the guard prevents the balance from going negative after the increment.",
+    "No `any` type \u2014 use `unknown` with type guards where needed (HARNESS.json constraint `no-any`).",
+    "Strict TypeScript: no implicit any, strict null checks. The optional `client` parameter must be typed as `PoolClient | undefined` (or `PoolClient?`), not `any`."
+  ],
+  "outOfScope": [
+    "Building `BalanceService`, controller, routes, or barrel `index.ts` \u2014 these are deferred to Phase 5b per PLAN.md and ARCHITECTURE.md.",
+    "Unit tests for the balance module \u2014 deferred to Phase 5c per PLAN.md."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "`pending_days` must never be negative. The `deductPendingDays` guard (`pending_days + $1 >= 0`) and `restorePendingDays` guard (`pending_days >= $1`) enforce this atomically in SQL."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "`used_days` must never be negative. The `commitDeduction` guard (`pending_days >= $1`) ensures `used_days` only increases when there are sufficient pending days to move."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IBalanceRepository.deductPendingDays",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns `null` if the balance row does not exist or the guard `pending_days + $1 >= 0` fails. Does not throw."
+    },
+    {
+      "operation": "IBalanceRepository.commitDeduction",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns `null` if the balance row does not exist or the guard `pending_days >= $1` fails. Does not throw."
+    },
+    {
+      "operation": "IBalanceRepository.restorePendingDays",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns `null` if the balance row does not exist or the guard `pending_days >= $1` fails. Does not throw."
+    },
+    {
+      "operation": "IBalanceRepository.deductPendingDays, IBalanceRepository.commitDeduction, IBalanceRepository.restorePendingDays",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "All three methods accept an optional `client: PoolClient` parameter. When `client` is provided, the method uses `client.query(...)`; otherwise it uses the shared `pool.query(...)`. The method signature, SQL logic, and return type are otherwise unchanged."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The `IBalanceRepository` interface in `balance.model.ts` must declare the optional `client: PoolClient` parameter on `deductPendingDays`, `commitDeduction`, and `restorePendingDays` with the same signature as the implementation in `balance.repository.ts`.",
+      "referencePath": "src/modules/balance/balance.model.ts"
+    },
+    {
+      "requirement": "The `deductPendingDays` SQL must match the spec in ARCHITECTURE.md line 247: `SET pending_days = pending_days + $1` with guard `pending_days + $1 >= 0`.",
+      "referencePath": "docs/ARCHITECTURE.md"
+    },
+    {
+      "requirement": "The transaction contract in `.gestalt/architecture/reconciled.json` requires that repository methods participating in multi-step writes accept an optional `client: PoolClient`. All three atomic methods (`deductPendingDays`, `commitDeduction`, `restorePendingDays`) must satisfy this contract.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "The `pool` export is already used by `BalanceRepository`. The new optional `client: PoolClient` parameter must be compatible with the same `pg` Pool/PoolClient types from this shared module."
+    }
+  ]
+}
