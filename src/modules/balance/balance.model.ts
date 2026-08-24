@@ -1,3 +1,4 @@
+import { PoolClient } from 'pg';
 import { BaseEntity } from 'shared/types/leave.types';
 
 export type BalanceStatus = 'ACTIVE' | 'EXHAUSTED' | 'FROZEN' | 'CLOSED';
@@ -83,7 +84,7 @@ export interface IBalanceRepository {
     id: string,
     data: Partial<LeaveBalance>
   ): Promise<LeaveBalance | null>;
-  deductPendingDays(id: string, days: number): Promise<LeaveBalance | null>;
-  commitDeduction(id: string, days: number): Promise<LeaveBalance | null>;
-  restorePendingDays(id: string, days: number): Promise<LeaveBalance | null>;
+  deductPendingDays(id: string, days: number, client?: PoolClient): Promise<LeaveBalance | null>;
+  commitDeduction(id: string, days: number, client?: PoolClient): Promise<LeaveBalance | null>;
+  restorePendingDays(id: string, days: number, client?: PoolClient): Promise<LeaveBalance | null>;
 }

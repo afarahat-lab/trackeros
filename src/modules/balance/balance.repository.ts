@@ -1,3 +1,4 @@
+import { PoolClient } from 'pg';
 import { pool } from 'shared/db/connection';
 import {
   LeaveBalance,
@@ -107,13 +108,15 @@ export class BalanceRepository implements IBalanceRepository {
 
   async deductPendingDays(
     id: string,
-    days: number
+    days: number,
+    client?: PoolClient
   ): Promise<LeaveBalance | null> {
-    const result = await pool.query(
+    const executor = client ?? pool;
+    const result = await executor.query(
       `UPDATE leave_balances
-       SET pending_days = pending_days - $1,
+       SET pending_days = pending_days + $1,
            updated_at = NOW()
-       WHERE id = $2 AND pending_days >= $1
+       WHERE id = $2 AND pending_days + $1 >= 0
        RETURNING *`,
       [days, id]
     );
@@ -124,9 +127,11 @@ export class BalanceRepository implements IBalanceRepository {
 
   async commitDeduction(
     id: string,
-    days: number
+    days: number,
+    client?: PoolClient
   ): Promise<LeaveBalance | null> {
-    const result = await pool.query(
+    const executor = client ?? pool;
+    const result = await executor.query(
       `UPDATE leave_balances
        SET used_days = used_days + $1,
            pending_days = pending_days - $1,
@@ -142,9 +147,11 @@ export class BalanceRepository implements IBalanceRepository {
 
   async restorePendingDays(
     id: string,
-    days: number
+    days: number,
+    client?: PoolClient
   ): Promise<LeaveBalance | null> {
-    const result = await pool.query(
+    const executor = client ?? pool;
+    const result = await executor.query(
       `UPDATE leave_balances
        SET pending_days = pending_days - $1,
            updated_at = NOW()
