@@ -3,6 +3,7 @@ import {
   LeaveBalance,
   IBalanceRepository,
   BalanceStatus,
+  DuplicateBalanceError,
 } from './balance.model';
 import { randomUUID } from 'crypto';
 
@@ -39,6 +40,19 @@ export class BalanceRepository implements IBalanceRepository {
   async create(
     data: Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt'>
   ): Promise<LeaveBalance> {
+    const existing = await this.findByEmployeeYearAndPolicy(
+      data.employeeId,
+      data.fiscalYear,
+      data.policyId
+    );
+    if (existing) {
+      throw new DuplicateBalanceError(
+        data.employeeId,
+        data.policyId,
+        data.fiscalYear
+      );
+    }
+
     const id = randomUUID();
 
     const result = await pool.query(
@@ -111,9 +125,10 @@ export class BalanceRepository implements IBalanceRepository {
   ): Promise<LeaveBalance | null> {
     const result = await pool.query(
       `UPDATE leave_balances
-       SET pending_days = pending_days - $1,
+       SET pending_days = pending_days + $1,
            updated_at = NOW()
-       WHERE id = $2 AND pending_days >= $1
+       WHERE id = $2
+         AND (pending_days + $1) <= (total_entitlement - used_days)
        RETURNING *`,
       [days, id]
     );
