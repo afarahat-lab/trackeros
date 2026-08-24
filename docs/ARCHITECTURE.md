@@ -232,8 +232,9 @@ src/modules/leave/           — leave orchestration (Phase 6)
 
 ### Entity
 
-- **LeaveBalance** — employee's entitlement, consumption, and pending days per policy per fiscal year. Fields: `id`, `employeeId`, `policyId`, `totalEntitlement`, `usedDays`, `pendingDays`, `fiscalYear`, `status` (`BalanceStatus`: `'ACTIVE' | 'EXHAUSTED' | 'FROZEN' | 'CLOSED'`), `createdAt`, `updatedAt`. Extends `BaseEntity`.
+- **LeaveBalance** — employee's entitlement, consumption, and pending days per policy per fiscal year. Fields: `id`, `employeeId`, `policyId`, `totalEntitlement`, `usedDays`, `pendingDays`, `fiscalYear`, `status` (`BalanceStatus`: `'ACTIVE' | 'EXHAUSTED' | 'FROZEN' | 'CLOSED'`), `createdAt`, `updatedAt`. Implements `BaseEntity`.
 - **Derived field**: `remainingDays` is a class getter (`get remainingDays(): number { return this.totalEntitlement - this.usedDays - this.pendingDays; }`) — it is NOT stored in the database and NOT read from any DB column.
+- **Derived status**: The `status` getter returns the stored `_status` when it is `FROZEN` or `CLOSED` (these override the derivation). Otherwise, it derives from `remainingDays`: `0` → `EXHAUSTED`, `> 0` → `ACTIVE`. The stored `_status` field holds the last explicitly-set value; the getter reconciles it with the current `remainingDays` at read time.
 - **Uniqueness**: The combination `(employeeId, policyId, fiscalYear)` is unique. `DuplicateBalanceError` exists for this constraint.
 - **Lifecycle**: ACTIVE ↔ EXHAUSTED (driven by `remainingDays`), ACTIVE/EXHAUSTED ↔ FROZEN (admin), ACTIVE/EXHAUSTED/FROZEN → CLOSED (year-end, terminal).
 - **No `carriedOver` field**: The `carried_over` column may exist in the `leave_balances` table (per reconciled architecture) but is NOT mapped to the entity.
@@ -242,9 +243,9 @@ src/modules/leave/           — leave orchestration (Phase 6)
 
 - `BalanceRepository` implements `IBalanceRepository`. All queries use parameterized SQL via the shared `pool` from `src/shared/db/connection.ts`. Table: `leave_balances`.
 - Methods: `findByEmployeeAndYear`, `findByEmployeeYearAndPolicy`, `create`, `update`, `deductPendingDays`, `commitDeduction`, `restorePendingDays`.
-- `create` generates `id` via `randomUUID()`. Inserts: `employee_id`, `policy_id`, `total_entitlement`, `used_days`, `pending_days`, `fiscal_year`, `status`. Returns the created `LeaveBalance`.
+- `create` generates `id` via `randomUUID()`. Checks for duplicate `(employeeId, policyId, fiscalYear)` before inserting; throws `DuplicateBalanceError` on conflict. Inserts: `employee_id`, `policy_id`, `total_entitlement`, `used_days`, `pending_days`, `fiscal_year`, `status`. Returns the created `LeaveBalance`.
 - `update` uses dynamic field-map pattern (array of `[column_name, entityKey]` tuples) to build SET clauses; sets `updated_at = NOW()`. Returns `null` if no row matches.
-- `deductPendingDays(id, days)` — atomic increment: `UPDATE leave_balances SET pending_days = pending_days + $1, updated_at = NOW() WHERE id = $2 AND pending_days + $1 >= 0 RETURNING *`. Returns `null` if the row does not exist or the guard fails.
+- `deductPendingDays(id, days)` — atomic increment with entitlement guard: `UPDATE leave_balances SET pending_days = pending_days + $1, updated_at = NOW() WHERE id = $2 AND (pending_days + $1) <= (total_entitlement - used_days) RETURNING *`. Returns `null` if the row does not exist or the guard fails (i.e., the deduction would exceed remaining entitlement).
 - `commitDeduction(id, days)` — atomic move from pending to used: `UPDATE leave_balances SET used_days = used_days + $1, pending_days = pending_days - $1, updated_at = NOW() WHERE id = $2 AND pending_days >= $1 RETURNING *`. Returns `null` if the row does not exist or the guard fails.
 - `restorePendingDays(id, days)` — atomic decrement: `UPDATE leave_balances SET pending_days = pending_days - $1, updated_at = NOW() WHERE id = $2 AND pending_days >= $1 RETURNING *`. Returns `null` if the row does not exist or the guard fails.
 - All three atomic methods use a single `UPDATE ... RETURNING *` — no SELECT-then-UPDATE pattern, preventing race conditions.
