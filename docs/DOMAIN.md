@@ -76,26 +76,16 @@ Represents a leave record managed by the `leave` module, including leave request
 
 ## balance
 
-Represents leave balance data managed by the `balance` module, including tracked entitlement, accrual, and remaining leave amounts.
+Represents leave balance data managed by the `balance` module, including tracked entitlement, consumption, and pending days.
 
-### Balance
+### BalanceStatus
 
-| Field | Type | Required |
-|-------|------|----------|
-| id | string | true |
-| employeeId | string | true |
-| policyId | string | true |
-| totalEntitlement | number | true |
-| usedDays | number | true |
-| remainingDays | number | true |
-| fiscalYear | number | true |
-| status | string | true |
-| createdAt | Date | true |
-| updatedAt | Date | true |
-
-**Relationships**
-- `Employee` — many-to-one
-- `LeavePolicy` — many-to-one
+| Value | Description |
+|-------|-------------|
+| ACTIVE | Balance is active and usable |
+| EXHAUSTED | remainingDays = 0 |
+| FROZEN | Admin-frozen, no new requests |
+| CLOSED | Year-end closed (terminal) |
 
 ### LeaveBalance
 
@@ -106,15 +96,39 @@ Represents leave balance data managed by the `balance` module, including tracked
 | policyId | string | true |
 | totalEntitlement | number | true |
 | usedDays | number | true |
-| remainingDays | number | true |
+| pendingDays | number | true |
+| remainingDays | number (derived getter) | true |
 | fiscalYear | number | true |
-| status | string | true |
+| status | BalanceStatus | true |
 | createdAt | Date | true |
 | updatedAt | Date | true |
+
+**Derived field**: `remainingDays` is a class getter (`get remainingDays(): number { return this.totalEntitlement - this.usedDays - this.pendingDays; }`) — NOT stored in the database.
 
 **Relationships**
 - `Employee` — many-to-one
 - `LeavePolicy` — many-to-one
+
+**Uniqueness**: `(employeeId, policyId, fiscalYear)` must be unique.
+
+### IBalanceRepository
+
+| Method | Signature |
+|--------|-----------|
+| findByEmployeeAndYear | `(employeeId: string, fiscalYear: number) => Promise<LeaveBalance[]>` |
+| findByEmployeeYearAndPolicy | `(employeeId: string, fiscalYear: number, policyId: string) => Promise<LeaveBalance \| null>` |
+| create | `(data: Omit<LeaveBalance, 'id' \| 'createdAt' \| 'updatedAt'>) => Promise<LeaveBalance>` |
+| update | `(id: string, data: Partial<LeaveBalance>) => Promise<LeaveBalance \| null>` |
+| deductPendingDays | `(id: string, days: number) => Promise<LeaveBalance \| null>` — atomic increment of pendingDays |
+| commitDeduction | `(id: string, days: number) => Promise<LeaveBalance \| null>` — atomic move pendingDays → usedDays |
+| restorePendingDays | `(id: string, days: number) => Promise<LeaveBalance \| null>` — atomic decrement of pendingDays |
+
+### Domain errors
+
+| Error | Description |
+|-------|-------------|
+| BalanceNotFoundError | No balance found for the given identifier |
+| DuplicateBalanceError | A balance already exists for the given (employeeId, policyId, fiscalYear) |
 
 ## employee
 
