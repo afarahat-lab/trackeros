@@ -2,6 +2,7 @@ import { pool } from 'shared/db/connection';
 import {
   LeaveBalance,
   IBalanceRepository,
+  CreateBalanceData,
   BalanceStatus,
   DuplicateBalanceError,
 } from './balance.model';
@@ -37,9 +38,7 @@ export class BalanceRepository implements IBalanceRepository {
     return this.mapRow(rows[0]);
   }
 
-  async create(
-    data: Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt'>
-  ): Promise<LeaveBalance> {
+  async create(data: CreateBalanceData): Promise<LeaveBalance> {
     const existing = await this.findByEmployeeYearAndPolicy(
       data.employeeId,
       data.fiscalYear,
@@ -172,7 +171,7 @@ export class BalanceRepository implements IBalanceRepository {
     return this.mapRow(rows[0]);
   }
 
-  private async findById(id: string): Promise<LeaveBalance | null> {
+  async findById(id: string): Promise<LeaveBalance | null> {
     const result = await pool.query(
       'SELECT * FROM leave_balances WHERE id = $1',
       [id]

@@ -2,6 +2,16 @@ import { BaseEntity } from 'shared/types/leave.types';
 
 export type BalanceStatus = 'ACTIVE' | 'EXHAUSTED' | 'FROZEN' | 'CLOSED';
 
+export type CreateBalanceData = {
+  employeeId: string;
+  policyId: string;
+  totalEntitlement: number;
+  usedDays: number;
+  pendingDays: number;
+  fiscalYear: number;
+  status: BalanceStatus;
+};
+
 export class LeaveBalance implements BaseEntity {
   id: string;
   employeeId: string;
@@ -67,6 +77,7 @@ export class DuplicateBalanceError extends Error {
 }
 
 export interface IBalanceRepository {
+  findById(id: string): Promise<LeaveBalance | null>;
   findByEmployeeAndYear(
     employeeId: string,
     fiscalYear: number
@@ -76,9 +87,7 @@ export interface IBalanceRepository {
     fiscalYear: number,
     policyId: string
   ): Promise<LeaveBalance | null>;
-  create(
-    data: Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt'>
-  ): Promise<LeaveBalance>;
+  create(data: CreateBalanceData): Promise<LeaveBalance>;
   update(
     id: string,
     data: Partial<LeaveBalance>

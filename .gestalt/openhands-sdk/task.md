@@ -1,22 +1,35 @@
-# Implement this phase: Phase 5a: Balance model and repository
+# Continue the previous attempt (it hit the iteration limit before finishing)
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/e735cca3-597e-44fe-9270-69c735e34133/7`. Do not clone anything; work only in this directory.
+A prior code-agent attempt on this work dir (`/tmp/gestalt/phase/e735cca3-597e-44fe-9270-69c735e34133/8`) was stopped after reaching its iteration limit. Its work is ALREADY on disk here — do NOT restart from scratch or re-read everything; build on what exists. It made 13 file edit(s). Its last verification FAILED (`cd /tmp/gestalt/phase/e735cca3-597e-44fe-9270-69c735e34133/8 && npx jest --passWithNoTests 2>&1`):
+2m0 total\n\x1b[1mSnapshots:   \x1b[22m0 total\n\x1b[1mTime:\x1b[22m        49 s\x1b[K\x1b[1A\x1b[K\x1b[1A\x1b[K\x1b[1A\x1b[K\x1b[1A\x1b[K\x1b[1A\x1b[K\x1b[1A\x1b[K\x1b[1A\x1b[K\x1b[1A\x1b[K\x1b[1A\x1b[K\x1b[1A\n\x1b[0m\x1b[7m\x1b[33m\x1b[1m RUNS \x1b[22m\x1b[39m\x1b[27m\x1b[0m \x1b[1m...\x1b[22m\n\x1b[0m\x1b[7m\x1b[33m\x1b[1m RUNS \x1b[22m\x1b[39m\x1b[27m\x1b[0m \x1b[1m...\x1b[22m\n\x1b[0m\x1b[7m\x1b[33m\x1b[1m RUNS \x1b[22m\x1b[39m\x1b[27m\x1b[0m \x1b[1m...\x1b[22m\n\x1b[0m\x1b[7m\x1b[33m\x1b[1m RUNS \x1b[22m\x1b[39m\x1b[27m\x1b[0m \x1b[1m...\x1b[22m\n\x1b[0m\x1b[7m\x1b[33m\x1b[1m RUNS \x1b[22m\x1b[39m\x1b[27m\x1b[0m \x1b[1m...\x1b[22m\n\n\x1b[1mTest Suites: \x1b[22m0 of 5 total\n\x1b[1mTests:       \x1b[22m0 total\n\x1b[1mSnapshots:   \x1b[22m0 total\n\x1b[1mTime:\x1b[22m        57 s'}]
+
+Finish the task now: fix any failing build/type-check/tests, then RUN the build and the tests and fix anything still failing. Stop as soon as the build and tests pass. The full original task (with all mandatory constraints) follows for reference.
+
+---
+
+# Implement this phase: Phase 5b: Balance service, controller, routes, and barrel
+
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/e735cca3-597e-44fe-9270-69c735e34133/8`. Do not clone anything; work only in this directory.
 
 You are the IMPLEMENTATION agent, not a planner. The platform measures your work EXCLUSIVELY by the files you create or modify in this working tree (`git status`). Ending your turn with a plan, a summary, or an announcement of what you are 'about to' do — without having actually edited files — is a FAILURE: a turn that leaves the working tree untouched is discarded. Explore only as much as you need, then MAKE the edits with your file-editing tool. Never end your turn before the files exist on disk.
 
 ## What to build
-`LeaveBalance` entity is exported with all canonical fields including the derived `remainingDays` getter
-`IBalanceRepository` interface is exported with all specified method signatures (`findByEmployeeAndYear`, `findByEmployeeYearAndPolicy`, `create`, `update`, `deductPendingDays`, `commitDeduction`, `restorePendingDays`)
-`BalanceRepository` class implements `IBalanceRepository` using the shared PostgreSQL pool against the `leave_balances` table
-`deductPendingDays`, `commitDeduction`, and `restorePendingDays` use `UPDATE ... RETURNING *` with atomic arithmetic to prevent race conditions
-Code compiles without errors (`tsc --noEmit` passes for these two files)
+`BalanceService` is exported with methods: `getOrCreateBalance`, `getBalancesForEmployee`, `hasSufficientBalance`, `reserveDays`, `commitDays`, `restoreDays`
+`getOrCreateBalance` fetches policy entitlement via `PolicyService.getEntitlementForType` when creating a new balance
+Fiscal year is derived as `startDate.getFullYear()` (calendar-year rule)
+`hasSufficientBalance` correctly checks `remainingDays >= requestedDays`
+`reserveDays` / `commitDays` / `restoreDays` delegate to the corresponding repository atomic methods
+`BalanceController` exports `getBalances` (GET `/balances?employeeId=&year=`) and `getBalance` (GET `/balances/:id`)
+`balanceRoutes` is a Fastify plugin registering the two GET routes
+`index.ts` barrel re-exports all public symbols from the module
+Code compiles without errors (`tsc --noEmit` passes for all four files)
 
 ## Success criteria
-Create the `LeaveBalance` entity, `IBalanceRepository` interface, and the PostgreSQL-backed `BalanceRepository` implementation. Depends on Phase 1 (shared types), Phase 2 (employee model), and Phase 3 (policy model).
+Build `BalanceService` (business logic for balance lifecycle), `BalanceController` (Fastify route handlers), `BalanceRoutes` (Fastify plugin), and the barrel file. Depends on Phase 5a (model + repository) and Phase 3 (PolicyService).
 
 ## Owned by SIBLING sub-phases (OUT OF SCOPE for this sub-phase)
 This is ONE sub-phase of a split phase. The deliverables below belong to sibling sub-phases — do NOT create them here, do NOT list them as success criteria, and this sub-phase MUST NOT be gated on their presence (they are produced by a sibling, not missing):
-- "Phase 5b: Balance service, controller, routes, and barrel": src/modules/balance/balance.service.ts, src/modules/balance/balance.controller.ts, src/modules/balance/balance.routes.ts, src/modules/balance/index.ts
+- "Phase 5a: Balance model and repository": src/modules/balance/balance.model.ts, src/modules/balance/balance.repository.ts
 - "Phase 5c: Balance module unit tests": tests/unit/modules/balance/balance.service.spec.ts
 
 In particular, UNIT/INTEGRATION TESTS are OUT OF SCOPE for this sub-phase — they are produced in: Phase 5c: Balance module unit tests. Do not create test files here, do not require test existence or coverage as a success criterion, and do not fail the gate for missing tests.
@@ -82,38 +95,19 @@ binding wherever they apply):
   do NOT add any document-tracking entity. The LeaveRequest lifecycle is exactly:
   PENDING -> APPROVED | REJECTED, and PENDING | APPROVED -> CANCELLED. [BINDING RULE — operator decision resolving: Should leave day counting exclude weekends and/or public holidays, or use pure calendar days as currently specified?; How is the "year" boundary for leave_balances defined — calendar year (Jan 1 – Dec 31), fiscal year, or employee-specific anniversary year?; apply everywhere these apply, not in one place only]
 
-## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
-The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
-- `LeaveBalance` — the entity MUST have exactly these fields:
-    - id: string
-    - employeeId: string
-    - policyId: string
-    - totalEntitlement: number
-    - usedDays: number
-    - pendingDays: number
-    - remainingDays: number (derived: totalEntitlement - usedDays - pendingDays)
-    - fiscalYear: number
-    - status: 'ACTIVE' | 'EXHAUSTED' | 'FROZEN' | 'CLOSED'
-    - createdAt: Date
-    - updatedAt: Date
-
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- `LeaveBalance` must extend `BaseEntity` from `src/shared/types/leave.types.ts` (providing `id`, `createdAt`, `updatedAt`). (see `src/shared/types/leave.types.ts`)
-- The `BalanceStatus` type must be `'ACTIVE' | 'EXHAUSTED' | 'FROZEN' | 'CLOSED'`, matching the reconciled architecture entity definition. (see `.gestalt/architecture/reconciled.json`)
-- The `deductPendingDays` semantics must match PLAN.md and ARCHITECTURE.md: it atomically increments `pending_days` to reserve days for a pending leave request. The current implementation decrements, which contradicts all documentation. (see `PLAN.md`)
-- The `restorePendingDays` method must decrement `pending_days` (release reserved days). The current implementation already does this correctly — it must be preserved. (see `PLAN.md`)
+- BalanceService must use PolicyService.getEntitlementForType(leaveType) to resolve entitlement when creating a new balance — must match the exact signature: (leaveType: LeaveType) => Promise<number>, which throws PolicyNotFoundError if no active policy exists (see `src/modules/policy/policy.service.ts`)
 ### Entity invariants — enforce these
-- Reuse or extend `LeaveBalance`: `remainingDays` is always derived as `totalEntitlement - usedDays - pendingDays` and is never stored. The `status` getter reflects `EXHAUSTED` when `remainingDays === 0` and `ACTIVE` when `remainingDays > 0`, unless the stored `_status` is `FROZEN` or `CLOSED` (which are preserved). The combination `(employeeId, policyId, fiscalYear)` is unique — `create` must reject duplicates with `DuplicateBalanceError`.
-- Reuse or extend `LeaveBalance`: Lifecycle: ACTIVE ↔ EXHAUSTED (driven by `remainingDays`), ACTIVE/EXHAUSTED ↔ FROZEN (admin), ACTIVE/EXHAUSTED/FROZEN → CLOSED (year-end, terminal). CLOSED is terminal — once set, it must not revert.
+- Reuse or extend `LeaveBalance`: remainingDays = totalEntitlement - usedDays - pendingDays (derived, never stored). Status derives from remainingDays: ACTIVE when > 0, EXHAUSTED when = 0, unless overridden by FROZEN or CLOSED (which are terminal overrides). The BalanceService must never set _status directly to ACTIVE or EXHAUSTED — those are derived; it may only set FROZEN or CLOSED explicitly.
+- Reuse or extend `LeaveBalance`: The combination (employeeId, policyId, fiscalYear) is unique. getOrCreateBalance must never create a duplicate — it must check existence first. The repository's create method already enforces this with DuplicateBalanceError, but the service must not rely on the error for normal flow.
+- Reuse or extend `LeaveBalance`: pendingDays must never exceed (totalEntitlement - usedDays). The repository's deductPendingDays enforces this atomically; the service must not bypass this guard.
 ### Interface contract — expose these operations (their shape is yours)
-- IBalanceRepository.deductPendingDays — Returns `null` if the balance row does not exist or if the guard fails (increment would cause `pending_days` to exceed `total_entitlement - used_days`). Does not throw.
-- IBalanceRepository.commitDeduction — Returns `null` if the balance row does not exist or if `pending_days < days` (guard prevents negative pending). Does not throw.
-- IBalanceRepository.restorePendingDays — Returns `null` if the balance row does not exist or if `pending_days < days` (guard prevents negative pending). Does not throw.
-### Integration points — connect to these
-- src/shared/db/connection.ts — BalanceRepository imports the shared PostgreSQL pool for all database operations.
-- src/shared/types/leave.types.ts — LeaveBalance entity extends BaseEntity from shared types; BalanceStatus type is defined locally but must align with the reconciled architecture.
+- BalanceService.getOrCreateBalance — No auth enforcement at service layer — RBAC is enforced at the route level by requireRole guard; idempotent; Throws PolicyNotFoundError if no active policy exists for the leaveType. Throws BalanceNotFoundError only if the repository returns null on a lookup that should succeed (internal consistency).
+- BalanceService.hasSufficientBalance — No auth enforcement at service layer; idempotent; Returns false (never throws) when no balance exists or remainingDays < requestedDays. Returns true when remainingDays >= requestedDays.
+- BalanceService.reserveDays / commitDays / restoreDays — No auth enforcement at service layer; Each resolves the balance via findByEmployeeYearAndPolicy; throws BalanceNotFoundError if no balance exists. Delegates to the corresponding atomic repository method. Returns null from repository as BalanceNotFoundError. The repository may return null if the atomic guard fails (e.g., insufficient remaining for reserveDays); the service must surface this as a distinct error (e.g., 'Insufficient balance for reservation').
+- BalanceController route handlers (getBalances, getBalance) — RBAC enforced by requireRole guard at route registration — minimum 'employee' role for GET endpoints; idempotent; Returns error responses matching the error_response_contract: 404 with NOT_FOUND for missing balances, 400 with VALIDATION_ERROR for invalid query params. Never leaks internal error details to the client.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
