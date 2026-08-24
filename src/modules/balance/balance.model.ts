@@ -10,7 +10,7 @@ export class LeaveBalance implements BaseEntity {
   usedDays: number;
   pendingDays: number;
   fiscalYear: number;
-  status: BalanceStatus;
+  private _status: BalanceStatus;
   createdAt: Date;
   updatedAt: Date;
 
@@ -33,13 +33,20 @@ export class LeaveBalance implements BaseEntity {
     this.usedDays = data.usedDays;
     this.pendingDays = data.pendingDays;
     this.fiscalYear = data.fiscalYear;
-    this.status = data.status;
+    this._status = data.status;
     this.createdAt = data.createdAt;
     this.updatedAt = data.updatedAt;
   }
 
   get remainingDays(): number {
     return this.totalEntitlement - this.usedDays - this.pendingDays;
+  }
+
+  get status(): BalanceStatus {
+    if (this._status === 'FROZEN' || this._status === 'CLOSED') {
+      return this._status;
+    }
+    return this.remainingDays === 0 ? 'EXHAUSTED' : 'ACTIVE';
   }
 }
 

@@ -111,9 +111,9 @@ export class BalanceRepository implements IBalanceRepository {
   ): Promise<LeaveBalance | null> {
     const result = await pool.query(
       `UPDATE leave_balances
-       SET pending_days = pending_days + $1,
+       SET pending_days = pending_days - $1,
            updated_at = NOW()
-       WHERE id = $2 AND pending_days + $1 >= 0
+       WHERE id = $2 AND pending_days >= $1
        RETURNING *`,
       [days, id]
     );
