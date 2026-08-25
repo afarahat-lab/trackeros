@@ -22,6 +22,13 @@ src/modules/employee/
   employee.service.interface.ts  — IEmployeeService
   employee.service.ts            — EmployeeService implementation
 
+src/modules/policy/
+  policy.model.ts                — LeavePolicy entity interface (extends BaseEntity)
+  policy.repository.interface.ts — IPolicyRepository
+  policy.service.interface.ts    — IPolicyService
+  policy.service.ts              — PolicyService implementation
+  index.ts                       — Barrel re-export
+
 src/modules/uptime/
   uptime.model.ts
   uptime.service.interface.ts
@@ -53,6 +60,13 @@ src/shared/db/connection.ts      — PostgreSQL pool (pg)
 - All database access goes through a repository layer — no inline SQL
   / ORM calls in route handlers or business logic
 - No circular dependencies between modules
+
+## Import conventions
+
+- `tsconfig.json` sets `baseUrl: "./src"`, so module imports use
+  non-relative paths (e.g. `import { LeaveType } from 'shared/types'`
+  rather than `../../shared/types/index.ts`). This is the canonical
+  style for all modules built so far.
 
 <!-- gestalt:architecture feature=2a5d3d87-ce68-4c51-a1e4-6c85bde3c2fd START -->
 # Leave Management Module — Reconciled Architecture
@@ -119,7 +133,7 @@ Dependencies flow inward: leave → {employee, policy, balance, audit} → share
 
 ## Phased Build Order
 1. Shared types + Employee module ✅
-2. Policy module
+2. Policy module ✅
 3. Balance module
 4. Audit module
 5. Leave module (core)
@@ -161,4 +175,15 @@ Dependencies flow inward: leave → {employee, policy, balance, audit} → share
 - `IEmployeeService`: getById, getByEmployeeNumber, getSubordinates, isActive
 - `EmployeeService`: delegates to repository; `isActive` checks `employmentStatus === 'ACTIVE' && deletedAt === null`
 - No barrel `index.ts` yet — imports are direct from individual files
+
+## Phase 2 Implementation Notes
+
+### Policy module (`src/modules/policy/`)
+- `LeavePolicy` extends `BaseEntity` from `shared/types`. Fields: `policyName`, `leaveType: LeaveType`, `entitlementDays`, `accrualRate: number | undefined`, `maxAccumulation: number | undefined`, `minimumNoticeDays: number | undefined`, `requiresManagerApproval: boolean`, `isActive: boolean`.
+- `IPolicyRepository`: findById, findByLeaveType, findActive, findActiveByLeaveType, create, update.
+- `IPolicyService`: getById, getByLeaveType (delegates to findActiveByLeaveType), getAllActive, validatePolicyExists (throws if not found or `isActive === false`).
+- `PolicyService`: constructor takes `IPolicyRepository`; all methods delegate to repository.
+- Barrel `index.ts` re-exports `LeavePolicy`, `IPolicyRepository`, `IPolicyService`, `PolicyService`.
+- Imports use `baseUrl`-based paths (e.g. `'shared/types'`, `'modules/policy/...'`), consistent with the `tsconfig.json` `baseUrl: "./src"` setting.
+- Tests at `tests/unit/modules/policy/policy.service.spec.ts` mock the repository and cover all service methods including the two error branches of `validatePolicyExists`.
 <!-- gestalt:architecture feature=2a5d3d87-ce68-4c51-a1e4-6c85bde3c2fd END -->
