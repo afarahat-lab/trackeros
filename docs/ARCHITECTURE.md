@@ -13,25 +13,30 @@ The architecture is modular, with a clear separation of concerns between models,
 - Frontend: React Native
 - Database: PostgreSQL
 
-## Module structure
+## Module structure (as built)
 
 ```
-src/modules/leave/leave.{model,repository,service,controller,routes}.ts
-src/modules/balance/balance.{model,repository,service,controller,routes}.ts
-src/modules/employee/employee.{model,repository,service,controller,routes}.ts
-src/modules/policy/policy.{model,repository,service,controller,routes}.ts
-src/modules/notification/notification.{model,repository,service,controller,routes}.ts
-src/modules/LeaveStatus/    — LeaveStatus module
-src/modules/BaseEntity/    — BaseEntity module
-src/modules/LeaveRequest/    — LeaveRequest module
-src/modules/LeaveType/    — LeaveType module
-src/modules/LeavePolicy/    — LeavePolicy module
-src/modules/AuditLog/    — AuditLog module
-src/modules/AuditRecord/    — AuditRecord module
-src/modules/AuditServiceInterface/    — AuditServiceInterface module
-src/shared/db connection.ts
-src/shared/base repository.ts
-src/shared/error types.ts
+src/modules/employee/
+  employee.model.ts              — Employee entity interface
+  employee.repository.interface.ts — IEmployeeRepository
+  employee.service.interface.ts  — IEmployeeService
+  employee.service.ts            — EmployeeService implementation
+
+src/modules/uptime/
+  uptime.model.ts
+  uptime.service.interface.ts
+  uptime.service.ts
+  uptime.routes.ts
+  index.ts
+
+src/modules/status/
+  status.model.ts
+  status.service.interface.ts
+  status.service.ts
+  index.ts
+
+src/shared/types/index.ts        — LeaveType, LeaveStatus, BaseEntity, UserRole
+src/shared/db/connection.ts      — PostgreSQL pool (pg)
 ```
 
 ## Key patterns
@@ -113,7 +118,7 @@ Fields: id, entity_type, entity_id, action, old_values, new_values, performed_by
 Dependencies flow inward: leave → {employee, policy, balance, audit} → shared-types. No circular dependencies.
 
 ## Phased Build Order
-1. Shared types + Employee module
+1. Shared types + Employee module ✅
 2. Policy module
 3. Balance module
 4. Audit module
@@ -141,4 +146,19 @@ Dependencies flow inward: leave → {employee, policy, balance, audit} → share
 3. Half-day leave support (full-day only vs flags vs DateTime).
 4. RemainingDays computation (derived vs stored).
 5. Fiscal-year carry-over and accrual rules.
+
+## Phase 1 Implementation Notes
+
+### Shared types (`src/shared/types/index.ts`)
+- `LeaveType`: type alias `'annual' | 'sick' | 'emergency' | 'unpaid' | 'maternity' | 'paternity'` (not an enum — type alias chosen for simpler JSON serialization)
+- `LeaveStatus`: enum with values `DRAFT`, `PENDING`, `APPROVED`, `REJECTED`, `CANCELLED`
+- `BaseEntity`: interface `{ id: string; createdAt: Date; updatedAt: Date }`
+- `UserRole`: type alias `'employee' | 'manager' | 'hr_admin'` (not an enum)
+
+### Employee module (`src/modules/employee/`)
+- `Employee` interface does NOT extend `BaseEntity` — it declares its own `id`, `createdAt`, `updatedAt` plus the additional `deletedAt` field
+- `IEmployeeRepository`: findById, findByEmployeeNumber, findByEmail, findByManagerId, create, update, softDelete
+- `IEmployeeService`: getById, getByEmployeeNumber, getSubordinates, isActive
+- `EmployeeService`: delegates to repository; `isActive` checks `employmentStatus === 'ACTIVE' && deletedAt === null`
+- No barrel `index.ts` yet — imports are direct from individual files
 <!-- gestalt:architecture feature=2a5d3d87-ce68-4c51-a1e4-6c85bde3c2fd END -->
