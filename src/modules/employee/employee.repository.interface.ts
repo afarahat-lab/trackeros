@@ -1,0 +1,11 @@
+import { Employee } from './employee.model';
+
+export interface IEmployeeRepository {
+  findById(id: string): Promise<Employee | null>;
+  findByEmployeeNumber(employeeNumber: string): Promise<Employee | null>;
+  findByEmail(email: string): Promise<Employee | null>;
+  findByManagerId(managerId: string): Promise<Employee[]>;
+  create(employee: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'>): Promise<Employee>;
+  update(id: string, data: Partial<Employee>): Promise<Employee>;
+  softDelete(id: string): Promise<void>;
+}
