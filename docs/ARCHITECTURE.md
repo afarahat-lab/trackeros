@@ -29,6 +29,13 @@ src/modules/policy/
   policy.service.ts              — PolicyService implementation
   index.ts                       — Barrel re-export
 
+src/modules/balance/
+  balance.model.ts               — LeaveBalance entity interface
+  balance.repository.interface.ts — IBalanceRepository
+  balance.service.interface.ts   — IBalanceService
+  balance.service.ts             — BalanceService implementation
+  index.ts                       — Barrel re-export
+
 src/modules/uptime/
   uptime.model.ts
   uptime.service.interface.ts
@@ -134,7 +141,7 @@ Dependencies flow inward: leave → {employee, policy, balance, audit} → share
 ## Phased Build Order
 1. Shared types + Employee module ✅
 2. Policy module ✅
-3. Balance module
+3. Balance module ✅
 4. Audit module
 5. Leave module (core)
 
@@ -186,4 +193,16 @@ Dependencies flow inward: leave → {employee, policy, balance, audit} → share
 - Barrel `index.ts` re-exports `LeavePolicy`, `IPolicyRepository`, `IPolicyService`, `PolicyService`.
 - Imports use `baseUrl`-based paths (e.g. `'shared/types'`, `'modules/policy/...'`), consistent with the `tsconfig.json` `baseUrl: "./src"` setting.
 - Tests at `tests/unit/modules/policy/policy.service.spec.ts` mock the repository and cover all service methods including the two error branches of `validatePolicyExists`.
+
+## Phase 3 Implementation Notes
+
+### Balance module (`src/modules/balance/`)
+- `LeaveBalance` does NOT extend `BaseEntity` — it declares its own `id`, `createdAt`, `updatedAt` fields directly, consistent with the Employee module pattern. Fields: `employeeId`, `policyId`, `entitlementDays`, `usedDays`, `pendingDays`, `year` (plain integer, e.g. 2026), `status: 'ACTIVE' | 'EXHAUSTED' | 'CLOSED'`.
+- **Three-counter model**: `entitlementDays`, `usedDays`, `pendingDays`. There is NO `remainingDays` column — available days are always derived as `entitlementDays - usedDays - pendingDays`.
+- `IBalanceRepository`: findById, findByEmployeeAndYear, findByEmployeePolicyAndYear, create, updateCounters (atomic counter update: takes `usedDays` and `pendingDays` absolute values), getOrCreateForYear.
+- `IBalanceService`: getAvailableDays (derived), hasSufficientBalance, reserveDays (SUBMIT: `pendingDays += days`), commitDays (APPROVE: `pendingDays -= days, usedDays += days`), releaseDays (REJECT/CANCEL PENDING: `pendingDays -= days`), restoreDays (CANCEL APPROVED: `usedDays -= days`), getOrCreateBalance.
+- `BalanceService`: constructor takes `IBalanceRepository`. All counter operations validate that no counter goes negative before calling `updateCounters`. Uses a private `getBalanceForOperation` helper that throws if no balance record exists.
+- Barrel `index.ts` re-exports `LeaveBalance`, `IBalanceRepository`, `IBalanceService`, `BalanceService`.
+- Imports use `baseUrl`-based paths (e.g. `'modules/balance/balance.service'`), consistent with the `tsconfig.json` `baseUrl: "./src"` setting.
+- Tests at `tests/unit/modules/balance/balance.service.spec.ts` mock the repository and cover all service methods: getOrCreateBalance delegation, getAvailableDays derivation (including null-balance → 0), hasSufficientBalance (below/above/exact), reserveDays (success + overflow guard), commitDays (success + insufficient-pending guard), releaseDays (success + insufficient-pending guard), restoreDays (success + insufficient-used guard), and the private getBalanceForOperation null-balance error path.
 <!-- gestalt:architecture feature=2a5d3d87-ce68-4c51-a1e4-6c85bde3c2fd END -->
