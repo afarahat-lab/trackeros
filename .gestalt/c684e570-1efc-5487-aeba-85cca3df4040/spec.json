@@ -1,0 +1,49 @@
+{
+  "scope": {
+    "affectedDomains": [],
+    "affectedLayers": [],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The `LeaveBalance` entity interface exists at `src/modules/balance/balance.model.ts` with the exact canonical fields: `id`, `employeeId`, `policyId`, `entitlementDays`, `usedDays`, `pendingDays`, `year` (plain integer), `status` (`'ACTIVE' | 'EXHAUSTED' | 'CLOSED'`), `createdAt`, `updatedAt` \u2014 and extends `BaseEntity` from `shared/types`. There is NO `remainingDays` field.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`IBalanceRepository` interface at `src/modules/balance/balance.repository.interface.ts` declares all six methods: `findById`, `findByEmployeeAndYear`, `findByEmployeePolicyAndYear`, `create`, `updateCounters(id, usedDays, pendingDays)` (accepting absolute values), and `getOrCreateForYear`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`IBalanceService` interface at `src/modules/balance/balance.service.interface.ts` declares all seven methods: `getAvailableDays`, `hasSufficientBalance`, `reserveDays`, `commitDays`, `releaseDays`, `restoreDays`, and `getOrCreateBalance`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`BalanceService` at `src/modules/balance/balance.service.ts` implements `IBalanceService` with constructor injection of `IBalanceRepository`. `getAvailableDays` derives `entitlementDays - usedDays - pendingDays` \u2014 never reads a stored `remainingDays`. All four counter transitions (`reserveDays`, `commitDays`, `releaseDays`, `restoreDays`) enforce non-negative guards and throw an Error if a counter would go negative.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Barrel file `src/modules/balance/index.ts` re-exports `LeaveBalance`, `IBalanceRepository`, `IBalanceService`, and `BalanceService`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests at `tests/unit/modules/balance/balance.service.spec.ts` mock `IBalanceRepository` using `jest.Mocked<IBalanceRepository>` and cover: `getAvailableDays` derivation, `hasSufficientBalance` true/false, `reserveDays` success and insufficient-balance rejection, `commitDays` success and insufficient-pending rejection, `releaseDays` success and insufficient-pending rejection, `restoreDays` success and insufficient-used rejection, `getOrCreateBalance` delegation.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The `LeaveBalance` entity MUST NOT contain a `remainingDays` field. Availability is always derived as `entitlementDays - usedDays - pendingDays` at every call site via `getAvailableDays`."
+  ],
+  "outOfScope": [],
+  "ambiguities": [],
+  "entityInvariants": [],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [],
+  "integrationPoints": []
+}
