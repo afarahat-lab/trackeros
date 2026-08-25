@@ -1,0 +1,134 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "audit"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository-interface",
+      "service-interface",
+      "service",
+      "tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The `AuditAction` enum exposes exactly five members: `CREATE`, `UPDATE`, `DELETE`, `APPROVE`, `REJECT` \u2014 each a distinct string value matching its member name.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `AuditRecord` entity interface declares exactly the canonical fields: `id: string`, `entityType: string`, `entityId: string`, `action: AuditAction`, `oldValues: Record<string, unknown> | null`, `newValues: Record<string, unknown> | null`, `performedBy: string`, `performedAt: Date`, `createdAt: Date` \u2014 no extra fields, no missing fields.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`IAuditRepository.create` accepts `Omit<AuditRecord, 'id' | 'createdAt'>` and returns a fully populated `AuditRecord` (with `id` and `createdAt` assigned by the repository).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`IAuditRepository.findByEntity(entityType, entityId)` returns all `AuditRecord[]` matching that entity type and ID, ordered by `performedAt` descending (most recent first).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`IAuditRepository.findByPerformer(performedBy, limit?)` returns `AuditRecord[]` for that performer, capped at `limit` when provided.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`IAuditRepository.findByDateRange(startDate, endDate)` returns all `AuditRecord[]` whose `performedAt` falls within the inclusive range `[startDate, endDate]`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`IAuditService.log(record)` accepts `Omit<AuditRecord, 'id' | 'createdAt' | 'performedAt'>`, automatically sets `performedAt` to `new Date()`, delegates to `repository.create`, and returns the resulting `AuditRecord`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`IAuditService.getHistory(entityType, entityId)` delegates to `repository.findByEntity(entityType, entityId)` and returns the result unchanged.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests at `tests/unit/modules/audit/audit.service.spec.ts` mock `IAuditRepository` and cover: `log` sets `performedAt` and delegates to `repository.create`; `getHistory` delegates to `repository.findByEntity`; the `performedAt` value is a `Date` instance close to `now` (within a reasonable tolerance).",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "AuditRecord does NOT extend BaseEntity \u2014 it declares its own `id` and `createdAt` fields directly, consistent with Employee and LeaveBalance patterns. It imports BaseEntity only for type reference.",
+    "No barrel `index.ts` is created for the audit module. The leave module (Phase 5) imports directly from individual files: `../audit/audit.model`, `../audit/audit.repository.interface`, `../audit/audit.service.interface`.",
+    "Source files use relative imports (e.g., `../../shared/types/index.ts`, `./audit.model`). Test files use `baseUrl`-based imports (e.g., `modules/audit/audit.service`), consistent with the Balance module pattern from Phase 3.",
+    "The `AuditAction` enum must be a TypeScript `enum` (not a type alias), consistent with `LeaveStatus` and the reconciled architecture specification.",
+    "`AuditService` constructor takes exactly one dependency: `IAuditRepository`. No other dependencies are injected."
+  ],
+  "outOfScope": [
+    "Concrete Knex repository implementation (`AuditRepository` class) \u2014 deferred to a later infrastructure phase. This phase defines only the interface.",
+    "Audit module routes, controllers, or HTTP surface \u2014 the audit module has no public API. It is consumed only internally by the leave service (Phase 5)."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "AuditRecord",
+      "mustExistOrExtend": true,
+      "invariant": "Every AuditRecord is immutable after creation \u2014 no update or delete operations exist on the repository interface. Once written, an audit record is a permanent, append-only log entry."
+    },
+    {
+      "entity": "AuditRecord",
+      "mustExistOrExtend": true,
+      "invariant": "`performedAt` is always set by the service layer (never by the caller) to the exact timestamp when the audited action occurred. `createdAt` is always set by the repository layer (never by the caller or service) to the exact timestamp when the record was persisted."
+    },
+    {
+      "entity": "AuditRecord",
+      "mustExistOrExtend": true,
+      "invariant": "`oldValues` and `newValues` are independently nullable: both may be null (e.g., CREATE has no oldValues), both may be present (e.g., UPDATE), or one may be null while the other is present (e.g., DELETE has oldValues but null newValues). No cross-field validation couples them."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IAuditService.log",
+      "authRule": "No auth enforcement at this layer \u2014 the audit service is a pure domain service. Auth is enforced at the route/controller layer by the calling module (leave service).",
+      "idempotent": false,
+      "errorSemantics": "Throws if the underlying repository.create fails (e.g., DB constraint violation). No domain-level validation beyond type safety \u2014 the service trusts the caller to supply valid data."
+    },
+    {
+      "operation": "IAuditService.getHistory",
+      "authRule": "No auth enforcement at this layer. The caller is responsible for ensuring the requester is authorised to view the entity's audit trail.",
+      "idempotent": true,
+      "errorSemantics": "Returns an empty array (not null, not an error) when no audit records exist for the given entity. Throws only on infrastructure failures (DB down)."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The `AuditRecord` entity must import `BaseEntity` from `../../shared/types/index.ts` (the same file and path used by Employee, Policy, and Balance modules), even though AuditRecord does not extend it.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "Test file must follow the same factory-function + `jest.Mocked<>` pattern used by `tests/unit/modules/balance/balance.service.spec.ts`: a `makeAuditRecord(overrides)` factory, `jest.Mocked<IAuditRepository>` for the mock, and `beforeEach` to instantiate a fresh `AuditService` with the mock.",
+      "referencePath": "tests/unit/modules/balance/balance.service.spec.ts"
+    },
+    {
+      "requirement": "The `AuditService` class must follow the same constructor-injection pattern as `BalanceService`, `PolicyService`, and `EmployeeService`: a single repository dependency passed via constructor, stored as a `private readonly` field, with all public methods delegating to it.",
+      "referencePath": "src/modules/balance/balance.service.ts"
+    },
+    {
+      "requirement": "The `IAuditRepository` interface must follow the same `Omit<Entity, 'id' | 'createdAt'>` pattern for `create` as `IBalanceRepository`, `IPolicyRepository`, and `IEmployeeRepository` \u2014 the repository owns `id` and `createdAt` generation.",
+      "referencePath": "src/modules/balance/balance.repository.interface.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts",
+      "why": "AuditRecord imports BaseEntity for type reference (does not extend it). This is the sole external dependency of the audit module in this phase."
+    },
+    {
+      "target": "src/modules/leave/leave.service.ts (Phase 5)",
+      "why": "The leave service will import `IAuditRepository` and `IAuditService` (or `AuditService`) from the audit module to log every state transition (submit, approve, reject, cancel) per GP-002."
+    }
+  ]
+}
