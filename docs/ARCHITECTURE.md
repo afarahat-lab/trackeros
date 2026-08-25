@@ -36,6 +36,12 @@ src/modules/balance/
   balance.service.ts             — BalanceService implementation
   index.ts                       — Barrel re-export
 
+src/modules/audit/
+  audit.model.ts                 — AuditAction enum, AuditRecord entity interface
+  audit.repository.interface.ts  — IAuditRepository
+  audit.service.interface.ts     — IAuditService
+  audit.service.ts               — AuditService implementation
+
 src/modules/uptime/
   uptime.model.ts
   uptime.service.interface.ts
@@ -142,7 +148,7 @@ Dependencies flow inward: leave → {employee, policy, balance, audit} → share
 1. Shared types + Employee module ✅
 2. Policy module ✅
 3. Balance module ✅
-4. Audit module
+4. Audit module ✅
 5. Leave module (core)
 
 ## Cross-Cutting Contracts
@@ -205,4 +211,16 @@ Dependencies flow inward: leave → {employee, policy, balance, audit} → share
 - Barrel `index.ts` re-exports `LeaveBalance`, `IBalanceRepository`, `IBalanceService`, `BalanceService`.
 - Imports use `baseUrl`-based paths (e.g. `'modules/balance/balance.service'`), consistent with the `tsconfig.json` `baseUrl: "./src"` setting.
 - Tests at `tests/unit/modules/balance/balance.service.spec.ts` mock the repository and cover all service methods: getOrCreateBalance delegation, getAvailableDays derivation (including null-balance → 0), hasSufficientBalance (below/above/exact), reserveDays (success + overflow guard), commitDays (success + insufficient-pending guard), releaseDays (success + insufficient-pending guard), restoreDays (success + insufficient-used guard), and the private getBalanceForOperation null-balance error path.
+
+## Phase 4 Implementation Notes
+
+### Audit module (`src/modules/audit/`)
+- `AuditAction`: enum with values `CREATE`, `UPDATE`, `DELETE`, `APPROVE`, `REJECT`.
+- `AuditRecord` interface declares its own `id`, `createdAt` fields directly (does not extend `BaseEntity`, consistent with Employee and Balance patterns). Fields: `id`, `entityType`, `entityId`, `action: AuditAction`, `oldValues: Record<string, unknown> | null`, `newValues: Record<string, unknown> | null`, `performedBy`, `performedAt`, `createdAt`.
+- `IAuditRepository`: create, findByEntity, findByPerformer (with optional `limit`), findByDateRange.
+- `IAuditService`: log (auto-sets `performedAt` to `new Date()`), getHistory (delegates to `findByEntity`).
+- `AuditService`: constructor takes `IAuditRepository`. `log` spreads input and sets `performedAt` before delegating to `repository.create`. `getHistory` delegates to `repository.findByEntity`.
+- No barrel `index.ts` — the audit module is consumed only by the leave service (Phase 5) for logging state transitions; imports will be direct from individual files.
+- Imports use `baseUrl`-based paths (e.g. `'modules/audit/audit.service'`), consistent with the `tsconfig.json` `baseUrl: "./src"` setting.
+- Tests at `tests/unit/modules/audit/audit.service.spec.ts` mock the repository and cover: log sets `performedAt` and delegates to `repository.create`, log propagates repository errors, getHistory delegates to `findByEntity`, getHistory returns empty array when no records, getHistory propagates repository errors.
 <!-- gestalt:architecture feature=2a5d3d87-ce68-4c51-a1e4-6c85bde3c2fd END -->
