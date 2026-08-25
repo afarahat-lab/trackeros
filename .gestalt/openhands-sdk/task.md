@@ -1,6 +1,6 @@
-# Implement this phase: Phase 1: Shared types + Employee module (~5 files)
+# Implement this phase: Phase 2: Policy module (~5 files)
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/2a5d3d87-ce68-4c51-a1e4-6c85bde3c2fd/1`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/2a5d3d87-ce68-4c51-a1e4-6c85bde3c2fd/2`. Do not clone anything; work only in this directory.
 
 You are the IMPLEMENTATION agent, not a planner. The platform measures your work EXCLUSIVELY by the files you create or modify in this working tree (`git status`). Ending your turn with a plan, a summary, or an announcement of what you are 'about to' do — without having actually edited files — is a FAILURE: a turn that leaves the working tree untouched is discarded. Explore only as much as you need, then MAKE the edits with your file-editing tool. Never end your turn before the files exist on disk.
 
@@ -8,27 +8,25 @@ You are the IMPLEMENTATION agent, not a planner. The platform measures your work
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the shared types and the employee module together.
+Create the policy module — model, repository interface, service interface, and service implementation.
+
+**This phase depends on:** `src/shared/types/index.ts` from Phase 1 — read it before generating any code that references `LeaveType`.
 
 **Files to create:**
 
-1. `src/shared/types/index.ts` — Define and export ALL shared types in one barrel file:
-   - `LeaveType` enum: `'annual' | 'sick' | 'emergency' | 'unpaid' | 'maternity' | 'paternity'`
-   - `LeaveStatus` enum: `DRAFT | PENDING | APPROVED | REJECTED | CANCELLED` (NOTE: the binding rules use PENDING, not SUBMITTED — this is authoritative)
-   - `BaseEntity` interface: `{ id: string; createdAt: Date; updatedAt: Date }`
-   - `UserRole` enum: `employee | manager | hr_admin`
+1. `src/modules/policy/policy.model.ts` — Define the `LeavePolicy` entity interface with the EXACT canonical fields: `id: string, policyName: string, leaveType: LeaveType, entitlementDays: number, accrualRate: number | undefined, maxAccumulation: number | undefined, minimumNoticeDays: number | undefined, requiresManagerApproval: boolean, isActive: boolean, createdAt: Date, updatedAt: Date`. Import `LeaveType` from `../../shared/types/index.ts`. Also import `BaseEntity` from `../../shared/types/index.ts` and extend it.
 
-2. `src/modules/employee/employee.model.ts` — Define the `Employee` entity interface with the EXACT canonical fields: `id: string, employeeNumber: string, firstName: string, lastName: string, email: string, managerId: string | null, department: string | null, hireDate: Date, terminationDate: Date | null, employmentStatus: 'ACTIVE' | 'INACTIVE' | 'TERMINATED', createdAt: Date, updatedAt: Date, deletedAt: Date | null`. Import `BaseEntity` from `../../shared/types/index.ts`.
+2. `src/modules/policy/policy.repository.interface.ts` — Define `IPolicyRepository` interface with methods: `findById(id: string): Promise<LeavePolicy | null>`, `findByLeaveType(leaveType: LeaveType): Promise<LeavePolicy[]>`, `findActive(): Promise<LeavePolicy[]>`, `findActiveByLeaveType(leaveType: LeaveType): Promise<LeavePolicy | null>`, `create(policy: Omit<LeavePolicy, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeavePolicy>`, `update(id: string, data: Partial<LeavePolicy>): Promise<LeavePolicy>`. Import `LeavePolicy` from `./policy.model` and `LeaveType` from `../../shared/types/index.ts`.
 
-3. `src/modules/employee/employee.repository.interface.ts` — Define `IEmployeeRepository` interface with methods: `findById(id: string): Promise<Employee | null>`, `findByEmployeeNumber(employeeNumber: string): Promise<Employee | null>`, `findByEmail(email: string): Promise<Employee | null>`, `findByManagerId(managerId: string): Promise<Employee[]>`, `create(employee: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'>): Promise<Employee>`, `update(id: string, data: Partial<Employee>): Promise<Employee>`, `softDelete(id: string): Promise<void>`. Import `Employee` from `./employee.model`.
+3. `src/modules/policy/policy.service.interface.ts` — Define `IPolicyService` interface with methods: `getById(id: string): Promise<LeavePolicy | null>`, `getByLeaveType(leaveType: LeaveType): Promise<LeavePolicy | null>` (returns the active policy for that type), `getAllActive(): Promise<LeavePolicy[]>`, `validatePolicyExists(policyId: string): Promise<LeavePolicy>` (throws if not found/inactive). Import `LeavePolicy` from `./policy.model` and `LeaveType` from `../../shared/types/index.ts`.
 
-4. `src/modules/employee/employee.service.interface.ts` — Define `IEmployeeService` interface with methods: `getById(id: string): Promise<Employee | null>`, `getByEmployeeNumber(employeeNumber: string): Promise<Employee | null>`, `getSubordinates(managerId: string): Promise<Employee[]>`, `isActive(id: string): Promise<boolean>`. Import `Employee` from `./employee.model`.
+4. `src/modules/policy/policy.service.ts` — Implement `PolicyService` class implementing `IPolicyService`. Constructor takes `IPolicyRepository`. `getByLeaveType` delegates to `findActiveByLeaveType`. `validatePolicyExists` fetches by id and throws an Error if null or `isActive === false`. Import from `./policy.model`, `./policy.repository.interface`, `./policy.service.interface`.
 
-5. `src/modules/employee/employee.service.ts` — Implement `EmployeeService` class implementing `IEmployeeService`. Constructor takes `IEmployeeRepository`. All methods delegate to the repository. `isActive` checks `employmentStatus === 'ACTIVE'` and `deletedAt === null`. Import from `./employee.model`, `./employee.repository.interface`, `./employee.service.interface`.
+5. `src/modules/policy/index.ts` — Barrel file re-exporting `LeavePolicy`, `IPolicyRepository`, `IPolicyService`, `PolicyService`.
 
-**Tests:** Include Jest unit tests at `tests/unit/modules/employee/employee.service.spec.ts` mocking the repository.
+**Tests:** Include Jest unit tests at `tests/unit/modules/policy/policy.service.spec.ts` mocking the repository.
 
-**Dependencies:** None — this is the first phase. The existing `src/shared/db/connection.ts` is available for reference but not modified.
+**Binding rules note:** The `minimumNoticeDays` field on `LeavePolicy` will be used later by the leave module for notice-period enforcement. The `entitlementDays` field drives balance creation.
 
 ## Your iteration budget — and how to get more (READ BEFORE YOU START)
 
@@ -130,22 +128,21 @@ STANDING DECISIONS carried forward from earlier runs of this feature (unchanged)
   record must run all three through the SAME transaction client, in ONE transaction, so a
   failure rolls back the whole thing. [BINDING RULE — operator decision resolving: What is the fiscal year start month? The domain currently assumes January (calendar year). Many organisations use April or July. This affects which fiscalYear a leave request maps to for balance lookups.; Should the system prevent overlapping leave requests for the same employee? If so, what states count as "active" for overlap detection (APPROVED only, or SUBMITTED + APPROVED)?; Should the system support half-day leave requests? The current model uses Date for startDate/endDate, implying full-day granularity.; How should remainingDays be computed — as a derived field (totalEntitlement - usedDays) or as a stored column that is updated on every deduction/restoration?; What are the fiscal-year boundary rules for balance carry-over and accrual? Should unused days carry over to the next fiscal year, and if so, up to what cap?; How are leave days counted — calendar days or business days (Mon–Fri excluding holidays)?; apply everywhere these apply, not in one place only]
 
-## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
-The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
-- `Employee` — the entity MUST have exactly these fields:
-    - id: string
-    - employeeNumber: string
-    - firstName: string
-    - lastName: string
-    - email: string
-    - managerId: string | null
-    - department: string | null
-    - hireDate: Date
-    - terminationDate: Date | null
-    - employmentStatus: 'ACTIVE' | 'INACTIVE' | 'TERMINATED'
-    - createdAt: Date
-    - updatedAt: Date
-    - deletedAt: Date | null
+## Constraints & consistency
+You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
+### Reuse & consistency — match these exactly
+- The `LeaveType` type alias used in `LeavePolicy.leaveType` and all repository/service method signatures MUST be the exact same type imported from `../../shared/types/index.ts` — the canonical definition at `src/shared/types/index.ts` line 1: `export type LeaveType = 'annual' | 'sick' | 'emergency' | 'unpaid' | 'maternity' | 'paternity'`. No local redefinition, no enum conversion. (see `src/shared/types/index.ts`)
+- The `BaseEntity` interface extended by `LeavePolicy` MUST be the exact interface from `src/shared/types/index.ts` lines 8-12: `{ id: string; createdAt: Date; updatedAt: Date }`. The `LeavePolicy` entity must not redeclare `id`, `createdAt`, or `updatedAt` — it inherits them via `extends BaseEntity`. (see `src/shared/types/index.ts`)
+- The test file structure and mocking pattern MUST match the existing `tests/unit/modules/employee/employee.service.spec.ts`: use `jest.Mocked<IPolicyRepository>`, a factory function for `LeavePolicy` test fixtures, `beforeEach` to reset mocks, and the same describe/it nesting style. (see `tests/unit/modules/employee/employee.service.spec.ts`)
+- The barrel export pattern in `src/modules/policy/index.ts` MUST match the existing pattern in `src/modules/uptime/index.ts`: named re-exports of the entity interface, repository interface, service interface, and service class. No default exports. (see `src/modules/uptime/index.ts`)
+### Entity invariants — enforce these
+- Reuse or extend `LeavePolicy`: A LeavePolicy has exactly one `leaveType` from the `LeaveType` union. The `isActive` boolean governs whether the policy can be used for leave requests — only active policies are returned by `findActive`/`findActiveByLeaveType` and pass `validatePolicyExists`. The `entitlementDays` field is a positive integer that drives balance creation in Phase 3. The `minimumNoticeDays` field, when defined, will be enforced by the leave module at submission time. The `requiresManagerApproval` boolean will gate auto-approval logic in Phase 5.
+### Interface contract — expose these operations (their shape is yours)
+- IPolicyRepository.findActiveByLeaveType — No auth rule at the repository layer — auth is enforced at the service/route layer in later phases.; idempotent; Returns null when no active policy exists for the given leaveType — never throws.
+- IPolicyService.validatePolicyExists — No auth rule at the service layer in this phase — auth enforcement is deferred to route guards in Phase 5.; idempotent; Throws an Error (not a domain-specific error type) when the policy is not found OR when `isActive === false`. The error message must distinguish between the two cases. This method is a guard used by downstream modules (leave, balance) to assert policy validity before proceeding.
+- IPolicyService.getByLeaveType — No auth rule at the service layer in this phase.; idempotent; Returns the single active policy for the given leaveType, or null if none exists. Delegates to `findActiveByLeaveType` on the repository. Never throws.
+### Integration points — connect to these
+- src/modules/balance/ (Phase 3) — The balance module will use `IPolicyRepository.findActiveByLeaveType` or `IPolicyService.getByLeaveType` to look up the active policy for a leave type and read `entitlementDays` to initialize a `LeaveBalance` record. It will also call `IPolicyService.validatePolicyExists` as a guard before balance operations.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
