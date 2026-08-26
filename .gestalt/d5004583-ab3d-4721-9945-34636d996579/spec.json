@@ -1,0 +1,165 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave",
+      "balance",
+      "audit"
+    ],
+    "affectedLayers": [
+      "service",
+      "repository-interface",
+      "service-interface"
+    ],
+    "isBreakingChange": true,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "LeaveService constructor depends on IBalanceService (not IBalanceRepository). All counter mutations in submit/approve/reject/cancel delegate to BalanceService methods (reserveDays/commitDays/releaseDays/restoreDays) rather than calling IBalanceRepository.updateCounters directly.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Every BalanceService mutating method (reserveDays, commitDays, releaseDays, restoreDays) accepts an optional last parameter `client?: PoolClient` and passes it through to IBalanceRepository.updateCounters. When omitted, the method uses the shared pool exactly as it does today \u2014 no existing call site needs changing.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "IBalanceRepository.updateCounters signature accepts an optional `client?: PoolClient` last parameter. When provided, the repository uses it for the query; when omitted, it uses the shared pool.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "ILeaveRequestRepository.updateStatus and create accept an optional `client?: PoolClient` last parameter, passed through to the underlying query.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "IAuditRepository.create accepts an optional `client?: PoolClient` last parameter, passed through to the underlying query.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "LeaveService.submit, approve, reject, and cancel each acquire a PoolClient, execute BEGIN, pass the same client to every repository/service call within the operation (balance counter mutation, leave status transition, audit record write), and execute COMMIT on success or ROLLBACK on any error.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "LeaveService.submit resolves the active policy via IPolicyRepository.findActiveByLeaveType and stores that active policy's id on the created LeaveRequest (not the raw dto.policyId), so the request's policyId always matches the policy used for balance operations.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Negative-guard checks (counter-would-go-below-zero) exist in exactly one place: BalanceService. LeaveService never calls IBalanceRepository.updateCounters directly and never duplicates the negative-guard logic.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The transaction contract from the reconciled architecture is the single mechanism for multi-step atomic writes: repository methods accept optional `client?: PoolClient`; the service acquires a client, runs BEGIN, passes it through, and COMMITs/ROLLBACKs. Do NOT introduce a second transaction abstraction, decorator, or ambient/async-local context.",
+    "LeaveService must NOT import or depend on IBalanceRepository. All balance counter operations go through IBalanceService. The leave module's dependency on the balance module is through IBalanceService only.",
+    "The optional client parameter is always the LAST parameter in every method signature that accepts it. No method signature reordering of existing required parameters.",
+    "LeaveService.submit must store the active policy's id (from IPolicyRepository.findActiveByLeaveType) on the created LeaveRequest, not the raw dto.policyId. The request's policyId must match the policy used for balance operations."
+  ],
+  "outOfScope": [
+    "Concrete Knex repository implementations \u2014 the leave module continues using stub repositories in routes; this phase only fixes the service-layer defects (dependency inversion, transaction handling, policy resolution).",
+    "Adding RBAC enforcement (requireRole guards) to leave routes \u2014 the routes already exist with stub repos and will be hardened in a later phase.",
+    "Changing the counter semantics or the three-counter model \u2014 the entitlementDays/usedDays/pendingDays model and the derived availableDays computation are binding and unchanged."
+  ],
+  "ambiguities": [
+    {
+      "description": "Should IBalanceService.getOrCreateBalance also accept the optional client parameter? The operator's decision explicitly lists reserveDays/commitDays/releaseDays/restoreDays as the methods that take the client. However, getOrCreateBalance can create a balance row (a mutation), and in the submit flow it runs before the counter reservation \u2014 if the entire submit should be transactional, the balance creation should participate too. Without it, a submit that creates a balance then fails on request creation would leave an orphaned balance row.",
+      "options": [
+        "A: getOrCreateBalance also accepts optional client \u2014 balance creation participates in the transaction",
+        "B: getOrCreateBalance does NOT accept client \u2014 balance creation happens outside the transaction; orphaned balance rows are acceptable (they will be reused on the next submit attempt)"
+      ],
+      "impactIfWrong": "medium"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "No counter (entitlementDays, usedDays, pendingDays) may go below zero. Any transition that would cause a negative counter is an error, not a clamp. This guard exists exclusively in BalanceService \u2014 never duplicated in LeaveService or any other module."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "The policyId stored on a LeaveRequest must reference the active policy resolved at submission time (via findActiveByLeaveType), not the raw dto.policyId. This ensures the request's policy reference is consistent with the balance record used for counter operations."
+    },
+    {
+      "entity": "LeaveRequest (transactional)",
+      "mustExistOrExtend": true,
+      "invariant": "Every mutating operation on a LeaveRequest (submit, approve, reject, cancel) that also mutates balance counters and writes an audit record must execute all three mutations within a single database transaction. A failure in any one must roll back all three."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IBalanceService.reserveDays",
+      "authRule": "No auth \u2014 internal service method",
+      "idempotent": false,
+      "errorSemantics": "Throws if available balance insufficient (entitlementDays - usedDays - pendingDays < days). Accepts optional client?: PoolClient as last parameter."
+    },
+    {
+      "operation": "IBalanceService.commitDays",
+      "authRule": "No auth \u2014 internal service method",
+      "idempotent": false,
+      "errorSemantics": "Throws if pendingDays < days. Accepts optional client?: PoolClient as last parameter."
+    },
+    {
+      "operation": "IBalanceService.releaseDays",
+      "authRule": "No auth \u2014 internal service method",
+      "idempotent": false,
+      "errorSemantics": "Throws if pendingDays < days. Accepts optional client?: PoolClient as last parameter."
+    },
+    {
+      "operation": "IBalanceService.restoreDays",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws if usedDays < days. Accepts optional client?: PoolClient as last parameter."
+    },
+    {
+      "operation": "IBalanceRepository.updateCounters",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Atomic counter update. Accepts optional client?: PoolClient as last parameter. When client is provided, uses it for the query; when omitted, uses the shared pool."
+    },
+    {
+      "operation": "ILeaveRequestRepository.updateStatus",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Accepts optional client?: PoolClient as last parameter for transaction participation."
+    },
+    {
+      "operation": "ILeaveRequestRepository.create",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Accepts optional client?: PoolClient as last parameter for transaction participation."
+    },
+    {
+      "operation": "IAuditRepository.create",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Accepts optional client?: PoolClient as last parameter for transaction participation."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The transaction contract in .gestalt/architecture/reconciled.json: \"Repository methods that participate in multi-step writes accept an optional client?: PoolClient parameter. The calling service owns the unit of work: it acquires a client from the pool, executes BEGIN, passes the client to every repository call in the operation, then executes COMMIT or ROLLBACK.\" This is the single mechanism \u2014 no second transaction abstraction.",
+      "referencePath": ".gestalt/architecture/reconciled.json \u2192 transaction_contract"
+    },
+    {
+      "requirement": "The three-counter model from the reconciled architecture business rules: entitlementDays, usedDays, pendingDays. availableDays is always derived as entitlementDays - usedDays - pendingDays and never stored. Counter semantics: SUBMIT reserves into pendingDays, APPROVE moves pending\u2192used, REJECT/CANCEL-pending releases, CANCEL-approved restores used. No counter may go negative.",
+      "referencePath": ".gestalt/architecture/reconciled.json \u2192 business_rules item 4"
+    },
+    {
+      "requirement": "The leave module's dependency on the balance module must be through IBalanceService only, matching the dependency map in the reconciled architecture: leave \u2192 balance. The current code's direct dependency on IBalanceRepository violates this boundary.",
+      "referencePath": ".gestalt/architecture/reconciled.json \u2192 dependency_map (leave \u2192 balance)"
+    },
+    {
+      "requirement": "The countLeaveDays helper in src/modules/leave/leave.model.ts is the single canonical day-count function. Every call site in the leave service must use it \u2014 no inline re-derivation. This is already the case in the current code and must remain so after the refactor.",
+      "referencePath": "src/modules/leave/leave.model.ts \u2192 countLeaveDays"
+    }
+  ],
+  "integrationPoints": []
+}
