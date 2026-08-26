@@ -1,8 +1,9 @@
+import type { PoolClient } from 'pg';
 import { FastifyInstance } from 'fastify';
 import { LeaveService } from './leave.service';
 import { CreateLeaveRequestDto, LeaveRequest, LeaveRequestQueryParams } from './leave.model';
 import { ILeaveRequestRepository } from './leave.repository.interface';
-import { IBalanceRepository } from 'modules/balance/balance.repository.interface';
+import { IBalanceService } from 'modules/balance/balance.service.interface';
 import { IAuditRepository } from 'modules/audit/audit.repository.interface';
 import { IPolicyRepository } from 'modules/policy/policy.repository.interface';
 import { LeaveStatus, LeaveType } from 'shared/types';
@@ -15,31 +16,30 @@ export async function leaveRoutes(fastify: FastifyInstance): Promise<void> {
     findById: (_id: string) => Promise.resolve(null),
     findByEmployee: (_employeeId: string, _queryParams?: LeaveRequestQueryParams) => Promise.resolve([] as LeaveRequest[]),
     findApprovedOverlapping: (_employeeId: string, _startDate: Date, _endDate: Date, _excludeRequestId?: string) => Promise.resolve([] as LeaveRequest[]),
-    create: (request: Omit<LeaveRequest, 'id' | 'createdAt' | 'updatedAt'>) =>
+    create: (request: Omit<LeaveRequest, 'id' | 'createdAt' | 'updatedAt'>, _client?: PoolClient) =>
       Promise.resolve({ id: 'stub-id', ...request, createdAt: new Date(), updatedAt: new Date() }),
     update: (id: string, data: Partial<LeaveRequest>) =>
       Promise.resolve({ id, ...data, createdAt: new Date(), updatedAt: new Date() } as LeaveRequest),
-    updateStatus: (id: string, status: LeaveStatus, _approvedBy?: string | null, _approvedAt?: Date | null) =>
+    updateStatus: (id: string, status: LeaveStatus, _approvedBy?: string | null, _approvedAt?: Date | null, _client?: PoolClient) =>
       Promise.resolve({ id, status, createdAt: new Date(), updatedAt: new Date() } as LeaveRequest),
   };
 
-  const balanceRepoStub: IBalanceRepository = {
-    findById: (_id: string) => Promise.resolve(null),
-    findByEmployeeAndYear: (_employeeId: string, _year: number) => Promise.resolve([] as LeaveBalance[]),
-    findByEmployeePolicyAndYear: (_employeeId: string, _policyId: string, _year: number) => Promise.resolve(null),
-    create: (balance: Omit<LeaveBalance, 'id' | 'createdAt' | 'updatedAt'>) =>
-      Promise.resolve({ id: 'stub-balance-id', ...balance, createdAt: new Date(), updatedAt: new Date() }),
-    updateCounters: (id: string, usedDays: number, pendingDays: number) =>
-      Promise.resolve({ id, usedDays, pendingDays, createdAt: new Date(), updatedAt: new Date() } as LeaveBalance),
-    getOrCreateForYear: (employeeId: string, policyId: string, year: number, entitlementDays: number) =>
+  const balanceServiceStub: IBalanceService = {
+    getAvailableDays: (_employeeId: string, _policyId: string, _year: number) => Promise.resolve(20),
+    hasSufficientBalance: (_employeeId: string, _policyId: string, _year: number, _requestedDays: number) => Promise.resolve(true),
+    reserveDays: (_employeeId: string, _policyId: string, _year: number, _days: number, _client?: PoolClient) => Promise.resolve(),
+    commitDays: (_employeeId: string, _policyId: string, _year: number, _days: number, _client?: PoolClient) => Promise.resolve(),
+    releaseDays: (_employeeId: string, _policyId: string, _year: number, _days: number, _client?: PoolClient) => Promise.resolve(),
+    restoreDays: (_employeeId: string, _policyId: string, _year: number, _days: number, _client?: PoolClient) => Promise.resolve(),
+    getOrCreateBalance: (_employeeId: string, _policyId: string, _year: number, _entitlementDays: number) =>
       Promise.resolve({
         id: 'stub-balance-id',
-        employeeId,
-        policyId,
-        entitlementDays,
+        employeeId: _employeeId,
+        policyId: _policyId,
+        entitlementDays: _entitlementDays,
         usedDays: 0,
         pendingDays: 0,
-        year,
+        year: _year,
         status: 'ACTIVE' as const,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -47,7 +47,7 @@ export async function leaveRoutes(fastify: FastifyInstance): Promise<void> {
   };
 
   const auditRepoStub: IAuditRepository = {
-    create: (record: Omit<AuditRecord, 'id' | 'createdAt'>) =>
+    create: (record: Omit<AuditRecord, 'id' | 'createdAt'>, _client?: PoolClient) =>
       Promise.resolve({ id: 'stub-audit-id', ...record, createdAt: new Date() }),
     findByEntity: (_entityType: string, _entityId: string) => Promise.resolve([] as AuditRecord[]),
     findByPerformer: (_performedBy: string, _limit?: number) => Promise.resolve([] as AuditRecord[]),
@@ -65,7 +65,7 @@ export async function leaveRoutes(fastify: FastifyInstance): Promise<void> {
       Promise.resolve({ id, ...data, createdAt: new Date(), updatedAt: new Date() } as LeavePolicy),
   };
 
-  const leaveService = new LeaveService(leaveRepoStub, balanceRepoStub, auditRepoStub, policyRepoStub);
+  const leaveService = new LeaveService(leaveRepoStub, balanceServiceStub, auditRepoStub, policyRepoStub);
 
   fastify.post('/leave', async (request, reply) => {
     try {

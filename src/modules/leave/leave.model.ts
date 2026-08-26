@@ -1,6 +1,7 @@
-import { LeaveStatus, BaseEntity } from 'shared/types';
+import { LeaveStatus } from 'shared/types';
 
-export interface LeaveRequest extends BaseEntity {
+export interface LeaveRequest {
+  id: string;
   employeeId: string;
   policyId: string;
   startDate: Date;
@@ -9,6 +10,8 @@ export interface LeaveRequest extends BaseEntity {
   status: LeaveStatus;
   approvedBy: string | null;
   approvedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface CreateLeaveRequestDto {

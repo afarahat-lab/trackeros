@@ -1,8 +1,10 @@
+import type { PoolClient } from 'pg';
+import { pool } from 'shared/db/connection';
 import { LeaveStatus } from 'shared/types';
 import { LeaveRequest, CreateLeaveRequestDto, LeaveRequestQueryParams, countLeaveDays } from './leave.model';
 import { ILeaveService } from './leave.service.interface';
 import { ILeaveRequestRepository } from './leave.repository.interface';
-import { IBalanceRepository } from 'modules/balance/balance.repository.interface';
+import { IBalanceService } from 'modules/balance/balance.service.interface';
 import { IAuditRepository } from 'modules/audit/audit.repository.interface';
 import { IPolicyRepository } from 'modules/policy/policy.repository.interface';
 import { AuditAction } from 'modules/audit/audit.model';
@@ -10,7 +12,7 @@ import { AuditAction } from 'modules/audit/audit.model';
 export class LeaveService implements ILeaveService {
   constructor(
     private readonly leaveRepo: ILeaveRequestRepository,
-    private readonly balanceRepo: IBalanceRepository,
+    private readonly balanceService: IBalanceService,
     private readonly auditRepo: IAuditRepository,
     private readonly policyRepo: IPolicyRepository,
   ) {}
@@ -23,14 +25,13 @@ export class LeaveService implements ILeaveService {
     const days = countLeaveDays(dto.startDate, dto.endDate);
     const year = dto.startDate.getFullYear();
 
-    const referencedPolicy = await this.policyRepo.findById(dto.policyId);
-    if (!referencedPolicy) {
+    const policy = await this.policyRepo.findById(dto.policyId);
+    if (!policy) {
       throw new Error('Policy not found');
     }
 
-    const policy = await this.policyRepo.findActiveByLeaveType(referencedPolicy.leaveType);
-    if (!policy) {
-      throw new Error('Active leave policy not found');
+    if (!policy.isActive) {
+      throw new Error('Policy is not active');
     }
 
     if (policy.minimumNoticeDays !== undefined && policy.minimumNoticeDays > 0) {
@@ -41,44 +42,49 @@ export class LeaveService implements ILeaveService {
       }
     }
 
-    const balance = await this.balanceRepo.getOrCreateForYear(dto.employeeId, policy.id, year, policy.entitlementDays);
+    const client: PoolClient = await pool.connect();
+    try {
+      await client.query('BEGIN');
 
-    const available = balance.entitlementDays - balance.usedDays - balance.pendingDays;
-    if (available < days) {
-      throw new Error('Insufficient leave balance');
-    }
+      await this.balanceService.getOrCreateBalance(dto.employeeId, policy.id, year, policy.entitlementDays);
+      await this.balanceService.reserveDays(dto.employeeId, policy.id, year, days, client);
 
-    await this.balanceRepo.updateCounters(balance.id, balance.usedDays, balance.pendingDays + days);
-
-    const request = await this.leaveRepo.create({
-      employeeId: dto.employeeId,
-      policyId: dto.policyId,
-      startDate: dto.startDate,
-      endDate: dto.endDate,
-      reason: dto.reason,
-      status: LeaveStatus.PENDING,
-      approvedBy: null,
-      approvedAt: null,
-    });
-
-    await this.auditRepo.create({
-      entityType: 'LeaveRequest',
-      entityId: request.id,
-      action: AuditAction.CREATE,
-      oldValues: null,
-      newValues: {
+      const request = await this.leaveRepo.create({
         employeeId: dto.employeeId,
-        policyId: dto.policyId,
-        startDate: dto.startDate.toISOString(),
-        endDate: dto.endDate.toISOString(),
-        days,
+        policyId: policy.id,
+        startDate: dto.startDate,
+        endDate: dto.endDate,
+        reason: dto.reason,
         status: LeaveStatus.PENDING,
-      },
-      performedBy: dto.employeeId,
-      performedAt: new Date(),
-    });
+        approvedBy: null,
+        approvedAt: null,
+      }, client);
 
-    return request;
+      await this.auditRepo.create({
+        entityType: 'LeaveRequest',
+        entityId: request.id,
+        action: AuditAction.CREATE,
+        oldValues: null,
+        newValues: {
+          employeeId: dto.employeeId,
+          policyId: policy.id,
+          startDate: dto.startDate.toISOString(),
+          endDate: dto.endDate.toISOString(),
+          days,
+          status: LeaveStatus.PENDING,
+        },
+        performedBy: dto.employeeId,
+        performedAt: new Date(),
+      }, client);
+
+      await client.query('COMMIT');
+      return request;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   async approve(requestId: string, approverId: string): Promise<LeaveRequest> {
@@ -104,31 +110,37 @@ export class LeaveService implements ILeaveService {
       throw new Error('Overlapping approved leave request exists');
     }
 
-    const balance = await this.balanceRepo.findByEmployeePolicyAndYear(request.employeeId, request.policyId, year);
-    if (!balance) {
-      throw new Error('No leave balance found');
-    }
-
-    const available = balance.entitlementDays - balance.usedDays - balance.pendingDays;
+    const available = await this.balanceService.getAvailableDays(request.employeeId, request.policyId, year);
     if (available < days) {
       throw new Error('Insufficient leave balance');
     }
 
-    await this.balanceRepo.updateCounters(balance.id, balance.usedDays + days, balance.pendingDays - days);
+    const client: PoolClient = await pool.connect();
+    try {
+      await client.query('BEGIN');
 
-    const updated = await this.leaveRepo.updateStatus(requestId, LeaveStatus.APPROVED, approverId, new Date());
+      await this.balanceService.commitDays(request.employeeId, request.policyId, year, days, client);
 
-    await this.auditRepo.create({
-      entityType: 'LeaveRequest',
-      entityId: requestId,
-      action: AuditAction.APPROVE,
-      oldValues: { status: LeaveStatus.PENDING },
-      newValues: { status: LeaveStatus.APPROVED, approvedBy: approverId, days },
-      performedBy: approverId,
-      performedAt: new Date(),
-    });
+      const updated = await this.leaveRepo.updateStatus(requestId, LeaveStatus.APPROVED, approverId, new Date(), client);
 
-    return updated;
+      await this.auditRepo.create({
+        entityType: 'LeaveRequest',
+        entityId: requestId,
+        action: AuditAction.APPROVE,
+        oldValues: { status: LeaveStatus.PENDING },
+        newValues: { status: LeaveStatus.APPROVED, approvedBy: approverId, days },
+        performedBy: approverId,
+        performedAt: new Date(),
+      }, client);
+
+      await client.query('COMMIT');
+      return updated;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   async reject(requestId: string, rejectorId: string): Promise<LeaveRequest> {
@@ -144,26 +156,32 @@ export class LeaveService implements ILeaveService {
     const days = countLeaveDays(request.startDate, request.endDate);
     const year = request.startDate.getFullYear();
 
-    const balance = await this.balanceRepo.findByEmployeePolicyAndYear(request.employeeId, request.policyId, year);
-    if (!balance) {
-      throw new Error('No leave balance found');
+    const client: PoolClient = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      await this.balanceService.releaseDays(request.employeeId, request.policyId, year, days, client);
+
+      const updated = await this.leaveRepo.updateStatus(requestId, LeaveStatus.REJECTED, null, null, client);
+
+      await this.auditRepo.create({
+        entityType: 'LeaveRequest',
+        entityId: requestId,
+        action: AuditAction.REJECT,
+        oldValues: { status: LeaveStatus.PENDING },
+        newValues: { status: LeaveStatus.REJECTED, rejectedBy: rejectorId, days },
+        performedBy: rejectorId,
+        performedAt: new Date(),
+      }, client);
+
+      await client.query('COMMIT');
+      return updated;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
     }
-
-    await this.balanceRepo.updateCounters(balance.id, balance.usedDays, balance.pendingDays - days);
-
-    const updated = await this.leaveRepo.updateStatus(requestId, LeaveStatus.REJECTED, null, null);
-
-    await this.auditRepo.create({
-      entityType: 'LeaveRequest',
-      entityId: requestId,
-      action: AuditAction.REJECT,
-      oldValues: { status: LeaveStatus.PENDING },
-      newValues: { status: LeaveStatus.REJECTED, rejectedBy: rejectorId, days },
-      performedBy: rejectorId,
-      performedAt: new Date(),
-    });
-
-    return updated;
   }
 
   async cancel(requestId: string, employeeId: string): Promise<LeaveRequest> {
@@ -180,34 +198,62 @@ export class LeaveService implements ILeaveService {
     const year = request.startDate.getFullYear();
 
     if (request.status === LeaveStatus.PENDING) {
-      const balance = await this.balanceRepo.findByEmployeePolicyAndYear(request.employeeId, request.policyId, year);
-      if (!balance) {
-        throw new Error('No leave balance found');
+      const client: PoolClient = await pool.connect();
+      try {
+        await client.query('BEGIN');
+
+        await this.balanceService.releaseDays(request.employeeId, request.policyId, year, days, client);
+
+        const updated = await this.leaveRepo.updateStatus(requestId, LeaveStatus.CANCELLED, null, null, client);
+
+        await this.auditRepo.create({
+          entityType: 'LeaveRequest',
+          entityId: requestId,
+          action: AuditAction.DELETE,
+          oldValues: { status: request.status },
+          newValues: { status: LeaveStatus.CANCELLED, cancelledBy: employeeId, days },
+          performedBy: employeeId,
+          performedAt: new Date(),
+        }, client);
+
+        await client.query('COMMIT');
+        return updated;
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
       }
-      await this.balanceRepo.updateCounters(balance.id, balance.usedDays, balance.pendingDays - days);
     } else if (request.status === LeaveStatus.APPROVED) {
-      const balance = await this.balanceRepo.findByEmployeePolicyAndYear(request.employeeId, request.policyId, year);
-      if (!balance) {
-        throw new Error('No leave balance found');
+      const client: PoolClient = await pool.connect();
+      try {
+        await client.query('BEGIN');
+
+        await this.balanceService.restoreDays(request.employeeId, request.policyId, year, days, client);
+
+        const updated = await this.leaveRepo.updateStatus(requestId, LeaveStatus.CANCELLED, null, null, client);
+
+        await this.auditRepo.create({
+          entityType: 'LeaveRequest',
+          entityId: requestId,
+          action: AuditAction.DELETE,
+          oldValues: { status: request.status },
+          newValues: { status: LeaveStatus.CANCELLED, cancelledBy: employeeId, days },
+          performedBy: employeeId,
+          performedAt: new Date(),
+        }, client);
+
+        await client.query('COMMIT');
+        return updated;
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
       }
-      await this.balanceRepo.updateCounters(balance.id, balance.usedDays - days, balance.pendingDays);
     } else {
       throw new Error('Cannot cancel request in current status');
     }
-
-    const updated = await this.leaveRepo.updateStatus(requestId, LeaveStatus.CANCELLED, null, null);
-
-    await this.auditRepo.create({
-      entityType: 'LeaveRequest',
-      entityId: requestId,
-      action: AuditAction.DELETE,
-      oldValues: { status: request.status },
-      newValues: { status: LeaveStatus.CANCELLED, cancelledBy: employeeId, days },
-      performedBy: employeeId,
-      performedAt: new Date(),
-    });
-
-    return updated;
   }
 
   async getById(requestId: string): Promise<LeaveRequest | null> {
