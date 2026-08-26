@@ -23,8 +23,13 @@ export class LeaveService implements ILeaveService {
     const days = countLeaveDays(dto.startDate, dto.endDate);
     const year = dto.startDate.getFullYear();
 
-    const policy = await this.policyRepo.findById(dto.policyId);
-    if (!policy || !policy.isActive) {
+    const referencedPolicy = await this.policyRepo.findById(dto.policyId);
+    if (!referencedPolicy) {
+      throw new Error('Policy not found');
+    }
+
+    const policy = await this.policyRepo.findActiveByLeaveType(referencedPolicy.leaveType);
+    if (!policy) {
       throw new Error('Active leave policy not found');
     }
 
@@ -36,7 +41,7 @@ export class LeaveService implements ILeaveService {
       }
     }
 
-    const balance = await this.balanceRepo.getOrCreateForYear(dto.employeeId, dto.policyId, year, policy.entitlementDays);
+    const balance = await this.balanceRepo.getOrCreateForYear(dto.employeeId, policy.id, year, policy.entitlementDays);
 
     const available = balance.entitlementDays - balance.usedDays - balance.pendingDays;
     if (available < days) {

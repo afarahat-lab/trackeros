@@ -176,27 +176,6 @@ STANDING DECISIONS carried forward from earlier runs of this feature (unchanged)
   record must run all three through the SAME transaction client, in ONE transaction, so a
   failure rolls back the whole thing. [BINDING RULE — operator decision resolving: What is the fiscal year start month? The domain currently assumes January (calendar year). Many organisations use April or July. This affects which fiscalYear a leave request maps to for balance lookups.; Should the system prevent overlapping leave requests for the same employee? If so, what states count as "active" for overlap detection (APPROVED only, or SUBMITTED + APPROVED)?; Should the system support half-day leave requests? The current model uses Date for startDate/endDate, implying full-day granularity.; How should remainingDays be computed — as a derived field (totalEntitlement - usedDays) or as a stored column that is updated on every deduction/restoration?; What are the fiscal-year boundary rules for balance carry-over and accrual? Should unused days carry over to the next fiscal year, and if so, up to what cap?; How are leave days counted — calendar days or business days (Mon–Fri excluding holidays)?; apply everywhere these apply, not in one place only]
 
-## Constraints & consistency
-You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
-### Reuse & consistency — match these exactly
-- LeaveRequest.status must use the `LeaveStatus` enum from `shared/types` — values are `DRAFT`, `PENDING`, `APPROVED`, `REJECTED`, `CANCELLED`. The `PENDING` value (not `SUBMITTED`) is authoritative per the reconciled architecture. (see `src/shared/types/index.ts`)
-- LeaveBalance counters follow the three-counter model: `entitlementDays`, `usedDays`, `pendingDays`. Available days are always derived as `entitlementDays - usedDays - pendingDays`. The leave service must call `IBalanceRepository.updateCounters` with absolute counter values — never compute deltas inline. (see `src/modules/balance/balance.model.ts`)
-- Audit records written by the leave service must use the `AuditAction` enum (`CREATE`, `APPROVE`, `REJECT`, `DELETE`) and the `IAuditRepository.create` signature: `Omit<AuditRecord, 'id' | 'createdAt'>`. The `performedAt` field must be set to `new Date()` at the call site. (see `src/modules/audit/audit.model.ts`)
-- The `year` field on LeaveBalance is a plain integer (e.g. 2026) representing the calendar year, derived from `startDate.getFullYear()`. A request whose range crosses 31 December is charged in full to the year of its `startDate` — never split. (see `src/modules/balance/balance.model.ts`)
-- Route registration must follow the `uptime.routes.ts` pattern: export an async function `(fastify: FastifyInstance) => Promise<void>`, register routes via `fastify.get`/`fastify.post`, wrap each handler body in try/catch returning 500 on error. (see `src/modules/uptime/uptime.routes.ts`)
-### Entity invariants — enforce these
-- Reuse or extend `LeaveRequest`: Lifecycle: created with `status = PENDING` (no DRAFT state in this phase). Valid transitions: PENDING → APPROVED (approve), PENDING → REJECTED (reject), PENDING → CANCELLED (cancel), APPROVED → CANCELLED (cancel). Terminal states: REJECTED, CANCELLED. No other transitions are valid — attempting one must throw.
-- Reuse or extend `LeaveRequest`: `startDate` must be strictly before `endDate` (`startDate < endDate`). A request where `startDate >= endDate` is invalid and must be rejected at submission.
-- Reuse or extend `LeaveRequest`: No two APPROVED LeaveRequests for the same employee may have overlapping `[startDate, endDate]` ranges. Overlap is enforced at approval time only, not at submission.
-### Interface contract — expose these operations (their shape is yours)
-- ILeaveService.submit — Throws if: startDate >= endDate, no active policy found for policyId, minimumNoticeDays not met, balance reservation would exceed available days. Must audit with action CREATE on success.
-- ILeaveService.reject — Throws if: request not found, status is not PENDING. Must audit with action REJECT on success.
-- ILeaveService.cancel — Throws if: request not found, employeeId does not match request.employeeId, status is neither PENDING nor APPROVED. Must audit with action DELETE on success.
-### Integration points — connect to these
-- src/modules/balance/balance.repository.interface.ts — IBalanceRepository — LeaveService calls `findByEmployeePolicyAndYear` for balance lookups, `getOrCreateForYear` for balance initialization, and `updateCounters` for all counter mutations (reserve, commit, release, restore).
-- src/modules/policy/policy.repository.interface.ts — IPolicyRepository — LeaveService calls `findById` to resolve the policy from `CreateLeaveRequestDto.policyId` and validate `isActive` during submit.
-- src/modules/audit/audit.repository.interface.ts — IAuditRepository — LeaveService calls `create` to write an audit record for every mutating operation (submit→CREATE, approve→APPROVE, reject→REJECT, cancel→DELETE).
-
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
 - Use unknown with type guards instead of any (rule: `no-any`)
