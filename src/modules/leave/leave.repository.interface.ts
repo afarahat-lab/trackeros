@@ -1,5 +1,5 @@
-import { LeaveStatus } from 'shared/types';
 import { LeaveRequest, LeaveRequestQueryParams } from './leave.model';
+import { LeaveStatus } from '../../shared/types/index';
 
 export interface ILeaveRequestRepository {
   findById(id: string): Promise<LeaveRequest | null>;

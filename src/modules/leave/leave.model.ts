@@ -1,6 +1,8 @@
-import { LeaveStatus, BaseEntity } from 'shared/types';
+import { LeaveStatus } from '../../shared/types/index';
+import { BaseEntity } from '../../shared/types/index';
 
-export interface LeaveRequest extends BaseEntity {
+export interface LeaveRequest {
+  id: string;
   employeeId: string;
   policyId: string;
   startDate: Date;
@@ -9,6 +11,8 @@ export interface LeaveRequest extends BaseEntity {
   status: LeaveStatus;
   approvedBy: string | null;
   approvedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface CreateLeaveRequestDto {
@@ -33,12 +37,14 @@ export interface LeaveRequestQueryParams {
 }
 
 /**
- * Count calendar days inclusive of both ends.
- * SINGLE canonical day-count function — every call site MUST use this.
+ * BINDING RULE #6: The SINGLE canonical day-count function.
+ * Counts calendar days INCLUSIVE of both startDate and endDate.
+ * days = endDate - startDate + 1
+ * No weekend/holiday exclusion.
+ * Every call site in the service MUST use this — never inline the arithmetic.
  */
 export function countLeaveDays(startDate: Date, endDate: Date): number {
   const msPerDay = 1000 * 60 * 60 * 24;
-  const start = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
-  const end = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
-  return Math.floor((end.getTime() - start.getTime()) / msPerDay) + 1;
+  const diffMs = endDate.getTime() - startDate.getTime();
+  return Math.floor(diffMs / msPerDay) + 1;
 }

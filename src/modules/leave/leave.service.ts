@@ -1,11 +1,16 @@
-import { LeaveStatus } from 'shared/types';
-import { LeaveRequest, CreateLeaveRequestDto, LeaveRequestQueryParams, countLeaveDays } from './leave.model';
-import { ILeaveService } from './leave.service.interface';
+import { LeaveStatus } from '../../shared/types/index';
+import { AuditAction } from '../audit/audit.model';
+import { IBalanceRepository } from '../balance/balance.repository.interface';
+import { IAuditRepository } from '../audit/audit.repository.interface';
+import { IPolicyRepository } from '../policy/policy.repository.interface';
 import { ILeaveRequestRepository } from './leave.repository.interface';
-import { IBalanceRepository } from 'modules/balance/balance.repository.interface';
-import { IAuditRepository } from 'modules/audit/audit.repository.interface';
-import { IPolicyRepository } from 'modules/policy/policy.repository.interface';
-import { AuditAction } from 'modules/audit/audit.model';
+import { ILeaveService } from './leave.service.interface';
+import {
+  LeaveRequest,
+  CreateLeaveRequestDto,
+  LeaveRequestQueryParams,
+  countLeaveDays,
+} from './leave.model';
 
 export class LeaveService implements ILeaveService {
   constructor(
@@ -27,28 +32,38 @@ export class LeaveService implements ILeaveService {
     if (!referencedPolicy) {
       throw new Error('Policy not found');
     }
+    if (!referencedPolicy.isActive) {
+      throw new Error('Policy not found');
+    }
 
     const policy = await this.policyRepo.findActiveByLeaveType(referencedPolicy.leaveType);
     if (!policy) {
       throw new Error('Active leave policy not found');
     }
 
-    if (policy.minimumNoticeDays !== undefined && policy.minimumNoticeDays > 0) {
-      const today = new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
-      const daysUntilStart = Math.floor((dto.startDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-      if (daysUntilStart < policy.minimumNoticeDays) {
+    if (policy.minimumNoticeDays !== undefined) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const noticeDays = countLeaveDays(today, dto.startDate);
+      if (noticeDays < policy.minimumNoticeDays) {
         throw new Error('Minimum notice period not met');
       }
     }
 
-    const balance = await this.balanceRepo.getOrCreateForYear(dto.employeeId, policy.id, year, policy.entitlementDays);
+    const balance = await this.balanceRepo.getOrCreateForYear(
+      dto.employeeId,
+      dto.policyId,
+      year,
+      policy.entitlementDays,
+    );
 
     const available = balance.entitlementDays - balance.usedDays - balance.pendingDays;
     if (available < days) {
       throw new Error('Insufficient leave balance');
     }
 
-    await this.balanceRepo.updateCounters(balance.id, balance.usedDays, balance.pendingDays + days);
+    balance.pendingDays += days;
+    await this.balanceRepo.updateCounters(balance.id, balance.usedDays, balance.pendingDays);
 
     const request = await this.leaveRepo.create({
       employeeId: dto.employeeId,
@@ -69,8 +84,8 @@ export class LeaveService implements ILeaveService {
       newValues: {
         employeeId: dto.employeeId,
         policyId: dto.policyId,
-        startDate: dto.startDate.toISOString(),
-        endDate: dto.endDate.toISOString(),
+        startDate: dto.startDate,
+        endDate: dto.endDate,
         days,
         status: LeaveStatus.PENDING,
       },
@@ -104,7 +119,11 @@ export class LeaveService implements ILeaveService {
       throw new Error('Overlapping approved leave request exists');
     }
 
-    const balance = await this.balanceRepo.findByEmployeePolicyAndYear(request.employeeId, request.policyId, year);
+    const balance = await this.balanceRepo.findByEmployeePolicyAndYear(
+      request.employeeId,
+      request.policyId,
+      year,
+    );
     if (!balance) {
       throw new Error('No leave balance found');
     }
@@ -114,9 +133,16 @@ export class LeaveService implements ILeaveService {
       throw new Error('Insufficient leave balance');
     }
 
-    await this.balanceRepo.updateCounters(balance.id, balance.usedDays + days, balance.pendingDays - days);
+    balance.pendingDays -= days;
+    balance.usedDays += days;
+    await this.balanceRepo.updateCounters(balance.id, balance.usedDays, balance.pendingDays);
 
-    const updated = await this.leaveRepo.updateStatus(requestId, LeaveStatus.APPROVED, approverId, new Date());
+    const updated = await this.leaveRepo.updateStatus(
+      requestId,
+      LeaveStatus.APPROVED,
+      approverId,
+      new Date(),
+    );
 
     await this.auditRepo.create({
       entityType: 'LeaveRequest',
@@ -144,14 +170,24 @@ export class LeaveService implements ILeaveService {
     const days = countLeaveDays(request.startDate, request.endDate);
     const year = request.startDate.getFullYear();
 
-    const balance = await this.balanceRepo.findByEmployeePolicyAndYear(request.employeeId, request.policyId, year);
+    const balance = await this.balanceRepo.findByEmployeePolicyAndYear(
+      request.employeeId,
+      request.policyId,
+      year,
+    );
     if (!balance) {
       throw new Error('No leave balance found');
     }
 
-    await this.balanceRepo.updateCounters(balance.id, balance.usedDays, balance.pendingDays - days);
+    balance.pendingDays -= days;
+    await this.balanceRepo.updateCounters(balance.id, balance.usedDays, balance.pendingDays);
 
-    const updated = await this.leaveRepo.updateStatus(requestId, LeaveStatus.REJECTED, null, null);
+    const updated = await this.leaveRepo.updateStatus(
+      requestId,
+      LeaveStatus.REJECTED,
+      null,
+      null,
+    );
 
     await this.auditRepo.create({
       entityType: 'LeaveRequest',
@@ -180,22 +216,37 @@ export class LeaveService implements ILeaveService {
     const year = request.startDate.getFullYear();
 
     if (request.status === LeaveStatus.PENDING) {
-      const balance = await this.balanceRepo.findByEmployeePolicyAndYear(request.employeeId, request.policyId, year);
+      const balance = await this.balanceRepo.findByEmployeePolicyAndYear(
+        request.employeeId,
+        request.policyId,
+        year,
+      );
       if (!balance) {
         throw new Error('No leave balance found');
       }
-      await this.balanceRepo.updateCounters(balance.id, balance.usedDays, balance.pendingDays - days);
+      balance.pendingDays -= days;
+      await this.balanceRepo.updateCounters(balance.id, balance.usedDays, balance.pendingDays);
     } else if (request.status === LeaveStatus.APPROVED) {
-      const balance = await this.balanceRepo.findByEmployeePolicyAndYear(request.employeeId, request.policyId, year);
+      const balance = await this.balanceRepo.findByEmployeePolicyAndYear(
+        request.employeeId,
+        request.policyId,
+        year,
+      );
       if (!balance) {
         throw new Error('No leave balance found');
       }
-      await this.balanceRepo.updateCounters(balance.id, balance.usedDays - days, balance.pendingDays);
+      balance.usedDays -= days;
+      await this.balanceRepo.updateCounters(balance.id, balance.usedDays, balance.pendingDays);
     } else {
       throw new Error('Cannot cancel request in current status');
     }
 
-    const updated = await this.leaveRepo.updateStatus(requestId, LeaveStatus.CANCELLED, null, null);
+    const updated = await this.leaveRepo.updateStatus(
+      requestId,
+      LeaveStatus.CANCELLED,
+      null,
+      null,
+    );
 
     await this.auditRepo.create({
       entityType: 'LeaveRequest',
@@ -215,9 +266,9 @@ export class LeaveService implements ILeaveService {
   }
 
   async query(params: LeaveRequestQueryParams): Promise<LeaveRequest[]> {
-    if (params.employeeId) {
-      return this.leaveRepo.findByEmployee(params.employeeId, params);
+    if (!params.employeeId) {
+      return [];
     }
-    return [];
+    return this.leaveRepo.findByEmployee(params.employeeId, params);
   }
 }
