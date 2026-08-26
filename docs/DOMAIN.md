@@ -7,8 +7,8 @@ Base entity providing common fields for domain models.
 | Field | Type | Required |
 |-------|------|----------|
 | id | string | true |
-| created_at | Date | true |
-| updated_at | Date | true |
+| createdAt | Date | true |
+| updatedAt | Date | true |
 
 ## leave
 
@@ -25,6 +25,8 @@ Represents a leave record managed by the `leave` module, including leave request
 | CANCELLED | Leave request has been cancelled |
 
 ### LeaveRequest
+
+Extends `BaseEntity`.
 
 | Field | Type | Required |
 |-------|------|----------|
@@ -138,6 +140,8 @@ Represents leave policy data managed by the `policy` module, including policy de
 | paternity | Paternity leave |
 
 ### LeavePolicy
+
+Extends `BaseEntity`.
 
 | Field | Type | Required |
 |-------|------|----------|

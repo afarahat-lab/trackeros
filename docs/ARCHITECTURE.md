@@ -236,7 +236,7 @@ Dependencies flow inward: leave → {employee, policy, balance, audit} → share
 ### Leave module (`src/modules/leave/`)
 
 #### leave.model.ts
-- `LeaveRequest` interface does NOT extend `BaseEntity` — declares its own `id`, `createdAt`, `updatedAt` (consistent with Employee, Balance, Audit patterns). Fields: `employeeId`, `policyId`, `startDate`, `endDate`, `reason: string | undefined`, `status: LeaveStatus`, `approvedBy: string | null`, `approvedAt: Date | null`.
+- `LeaveRequest` interface extends `BaseEntity` from `shared/types`. Fields: `employeeId`, `policyId`, `startDate`, `endDate`, `reason: string | undefined`, `status: LeaveStatus`, `approvedBy: string | null`, `approvedAt: Date | null`.
 - `CreateLeaveRequestDto`: `employeeId`, `policyId`, `startDate`, `endDate`, `reason?`.
 - `UpdateLeaveRequestDto`: `startDate?`, `endDate?`, `reason?`.
 - `LeaveRequestQueryParams`: `employeeId?`, `status?`, `startDate?`, `endDate?`.
@@ -250,7 +250,7 @@ Dependencies flow inward: leave → {employee, policy, balance, audit} → share
 
 #### leave.service.ts
 - `LeaveService` implements `ILeaveService`. Constructor takes four repository dependencies: `ILeaveRequestRepository`, `IBalanceRepository`, `IAuditRepository`, `IPolicyRepository`.
-- **`submit`**: validates `startDate < endDate` (throws if `>=`), computes days via `countLeaveDays`, derives year from `startDate.getFullYear()`, looks up active policy via `policyRepo.findById` (throws if null or inactive), checks minimum notice period if `policy.minimumNoticeDays` is set, gets-or-creates balance, checks balance sufficiency (`entitlementDays - usedDays - pendingDays >= days`), reserves days (`pendingDays += days`), creates request with `status = PENDING`, audits with `AuditAction.CREATE`.
+- **`submit`**: validates `startDate < endDate` (throws if `>=`), computes days via `countLeaveDays`, derives year from `startDate.getFullYear()`, looks up the referenced policy via `policyRepo.findById` (throws if null), then resolves the active policy for that leave type via `policyRepo.findActiveByLeaveType` (throws if null), checks minimum notice period if `policy.minimumNoticeDays` is set, gets-or-creates balance, checks balance sufficiency (`entitlementDays - usedDays - pendingDays >= days`), reserves days (`pendingDays += days`), creates request with `status = PENDING`, audits with `AuditAction.CREATE`.
 - **`approve`**: fetches request, validates `status === PENDING`, overlap check via `findApprovedOverlapping`, balance sufficiency check, commits days (`usedDays += days, pendingDays -= days`), updates status to `APPROVED` with `approvedBy` and `approvedAt`, audits with `AuditAction.APPROVE`.
 - **`reject`**: fetches request, validates `status === PENDING`, releases days (`pendingDays -= days`), updates status to `REJECTED`, audits with `AuditAction.REJECT`.
 - **`cancel`**: fetches request, validates `employeeId` matches owner, branches on status: PENDING → release days (`pendingDays -= days`), APPROVED → restore days (`usedDays -= days`), other statuses → throw. Updates status to `CANCELLED`, audits with `AuditAction.DELETE`.
