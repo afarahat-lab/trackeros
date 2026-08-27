@@ -1,0 +1,65 @@
+{
+  "scope": {
+    "affectedDomains": [],
+    "affectedLayers": [],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "`countLeaveDays(startDate, endDate)` normalizes both dates to midnight and returns `Math.floor((end - start) / msPerDay) + 1` \u2014 an inclusive calendar-day count with no weekend/holiday exclusion. This is the single canonical day-count function exported from `leave.model.ts`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`submit` validates `startDate < endDate` (throws on `>=`), looks up an active policy via `policyRepo.findById` (throws if null or `isActive === false`), enforces `minimumNoticeDays` when set, gets-or-creates a balance, checks `entitlementDays - usedDays - pendingDays >= days`, reserves days via `updateCounters(id, usedDays, pendingDays + days)`, creates the request with `status = PENDING`, and writes an audit record with `AuditAction.CREATE`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`approve` fetches the request, validates `status === PENDING`, runs `findApprovedOverlapping` (throws if any results), checks balance sufficiency (`available >= days`), commits days via `updateCounters(id, usedDays + days, pendingDays - days)`, sets `status = APPROVED` with `approvedBy` and `approvedAt`, and writes an audit record with `AuditAction.APPROVE`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`reject` fetches the request, validates `status === PENDING`, releases days via `updateCounters(id, usedDays, pendingDays - days)`, sets `status = REJECTED`, and writes an audit record with `AuditAction.REJECT`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`cancel` validates `employeeId` matches the request owner, then branches: PENDING \u2192 releases days (`pendingDays -= days`), APPROVED \u2192 restores days (`usedDays -= days`), any other status \u2192 throws. Sets `status = CANCELLED` and writes an audit record with `AuditAction.DELETE`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Every mutating method (`submit`, `approve`, `reject`, `cancel`) calls `countLeaveDays` from `./leave.model` \u2014 no inline day-count arithmetic exists in the service.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Every mutating method writes exactly one audit record via `auditRepo.create` with the correct `entityType: 'LeaveRequest'`, `entityId`, `action`, `performedBy`, and `performedAt` set to `new Date()`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`getById` delegates to `leaveRepo.findById` and returns the result (or null). `query` delegates to `leaveRepo.findByEmployee` when `employeeId` is provided; returns `[]` otherwise.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "LeaveService constructor MUST accept exactly four repository interfaces: ILeaveRequestRepository, IBalanceRepository, IAuditRepository, IPolicyRepository. It does NOT depend on IBalanceService or IAuditService \u2014 balance counter updates go directly through IBalanceRepository.updateCounters.",
+    "The balance model uses THREE counters: entitlementDays, usedDays, pendingDays. Available days are ALWAYS derived as `entitlementDays - usedDays - pendingDays`. No `remainingDays` column exists. The leave service must never compute availability any other way.",
+    "No counter may go negative. The leave service must validate sufficiency before every counter mutation. The balance repository's `updateCounters` receives absolute counter values; the service computes the new values and passes them.",
+    "The leave year is the CALENDAR year. `year` is derived from `startDate.getFullYear()`. A request crossing 31 December is charged in full to the year of its startDate \u2014 never split.",
+    "LeaveRequest does NOT extend BaseEntity \u2014 it declares its own `id`, `createdAt`, `updatedAt` fields directly, consistent with Employee, Balance, and Audit patterns. Only LeavePolicy extends BaseEntity."
+  ],
+  "outOfScope": [
+    "Concrete Knex/PostgreSQL repository implementations \u2014 the routes use in-memory stub repositories; real database-backed repositories are deferred to a later phase."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [],
+  "integrationPoints": []
+}

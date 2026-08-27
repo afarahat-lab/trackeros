@@ -1,6 +1,6 @@
-# Implement this phase: Phase 4: Audit module (~4 files)
+# Implement this phase: Phase 5: Leave module (core) (~5 files)
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/2a5d3d87-ce68-4c51-a1e4-6c85bde3c2fd/4`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/2a5d3d87-ce68-4c51-a1e4-6c85bde3c2fd/5`. Do not clone anything; work only in this directory.
 
 You are the IMPLEMENTATION agent, not a planner. The platform measures your work EXCLUSIVELY by the files you create or modify in this working tree (`git status`). Ending your turn with a plan, a summary, or an announcement of what you are 'about to' do — without having actually edited files — is a FAILURE: a turn that leaves the working tree untouched is discarded. Explore only as much as you need, then MAKE the edits with your file-editing tool. Never end your turn before the files exist on disk.
 
@@ -8,38 +8,73 @@ You are the IMPLEMENTATION agent, not a planner. The platform measures your work
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the audit module — model, repository interface, service interface, and service implementation.
+Create the leave module — model (with DTOs + day-count helper), repository interface, service interface, service implementation, and routes.
 
-**This phase depends on:**
-- `src/shared/types/index.ts` from Phase 1 — for `BaseEntity`
-
-Read it before generating any code.
+**This phase depends on ALL prior phases. Read these files before generating any code:**
+- `src/shared/types/index.ts` from Phase 1 — for `LeaveStatus`, `LeaveType`, `BaseEntity`
+- `src/modules/employee/employee.model.ts` from Phase 1 — for `Employee`
+- `src/modules/policy/policy.model.ts` from Phase 2 — for `LeavePolicy`
+- `src/modules/balance/balance.model.ts` from Phase 3 — for `LeaveBalance`
+- `src/modules/balance/balance.repository.interface.ts` from Phase 3 — for `IBalanceRepository`
+- `src/modules/balance/balance.service.interface.ts` from Phase 3 — for `IBalanceService`
+- `src/modules/audit/audit.model.ts` from Phase 4 — for `AuditRecord`, `AuditAction`
+- `src/modules/audit/audit.repository.interface.ts` from Phase 4 — for `IAuditRepository`
+- `src/modules/audit/audit.service.interface.ts` from Phase 4 — for `IAuditService`
 
 **Files to create:**
 
-1. `src/modules/audit/audit.model.ts` — Define:
-   - `AuditAction` enum: `CREATE | UPDATE | DELETE | APPROVE | REJECT`
-   - `AuditRecord` entity interface with the EXACT canonical fields: `id: string, entityType: string, entityId: string, action: AuditAction, oldValues: Record<string, unknown> | null, newValues: Record<string, unknown> | null, performedBy: string, performedAt: Date, createdAt: Date`. Import `BaseEntity` from `../../shared/types/index.ts`.
+1. `src/modules/leave/leave.model.ts` — Define:
+   - `LeaveRequest` entity interface with EXACT canonical fields: `id: string, employeeId: string, policyId: string, startDate: Date, endDate: Date, reason: string | undefined, status: LeaveStatus, approvedBy: string | null, approvedAt: Date | null, createdAt: Date, updatedAt: Date`. Import `LeaveStatus` from `../../shared/types/index.ts` and `BaseEntity` from `../../shared/types/index.ts`.
+   - `CreateLeaveRequestDto`: `employeeId: string, policyId: string, startDate: Date, endDate: Date, reason?: string`
+   - `UpdateLeaveRequestDto`: `startDate?: Date, endDate?: Date, reason?: string`
+   - `LeaveRequestQueryParams`: `employeeId?: string, status?: LeaveStatus, startDate?: Date, endDate?: Date`
+   - **`countLeaveDays(startDate: Date, endDate: Date): number`** — BINDING RULE #6: exported helper computing `endDate - startDate + 1` (inclusive, calendar days, no weekend/holiday exclusion). This is the SINGLE canonical day-count function; every call site in the service MUST use it.
 
-2. `src/modules/audit/audit.repository.interface.ts` — Define `IAuditRepository` interface with methods:
-   - `create(record: Omit<AuditRecord, 'id' | 'createdAt'>): Promise<AuditRecord>`
-   - `findByEntity(entityType: string, entityId: string): Promise<AuditRecord[]>`
-   - `findByPerformer(performedBy: string, limit?: number): Promise<AuditRecord[]>`
-   - `findByDateRange(startDate: Date, endDate: Date): Promise<AuditRecord[]>`
+2. `src/modules/leave/leave.repository.interface.ts` — Define `ILeaveRequestRepository` interface with methods:
+   - `findById(id: string): Promise<LeaveRequest | null>`
+   - `findByEmployee(employeeId: string, queryParams?: LeaveRequestQueryParams): Promise<LeaveRequest[]>`
+   - `findApprovedOverlapping(employeeId: string, startDate: Date, endDate: Date, excludeRequestId?: string): Promise<LeaveRequest[]>` — for overlap detection at approval time
+   - `create(request: Omit<LeaveRequest, 'id' | 'createdAt' | 'updatedAt'>): Promise<LeaveRequest>`
+   - `update(id: string, data: Partial<LeaveRequest>): Promise<LeaveRequest>`
+   - `updateStatus(id: string, status: LeaveStatus, approvedBy?: string | null, approvedAt?: Date | null): Promise<LeaveRequest>`
+   Import `LeaveRequest`, `LeaveRequestQueryParams` from `./leave.model`, `LeaveStatus` from `../../shared/types/index.ts`.
 
-   Import `AuditRecord` from `./audit.model`.
+3. `src/modules/leave/leave.service.interface.ts` — Define `ILeaveService` interface with methods:
+   - `submit(dto: CreateLeaveRequestDto): Promise<LeaveRequest>` — creates DRAFT→PENDING, reserves days, audits
+   - `approve(requestId: string, approverId: string): Promise<LeaveRequest>` — PENDING→APPROVED with overlap check + balance sufficiency, commits days, audits
+   - `reject(requestId: string, rejectorId: string): Promise<LeaveRequest>` — PENDING→REJECTED, releases days, audits
+   - `cancel(requestId: string, employeeId: string): Promise<LeaveRequest>` — PENDING→CANCELLED (releases) or APPROVED→CANCELLED (restores), audits
+   - `getById(requestId: string): Promise<LeaveRequest | null>`
+   - `query(params: LeaveRequestQueryParams): Promise<LeaveRequest[]>`
+   Import `LeaveRequest`, `CreateLeaveRequestDto`, `LeaveRequestQueryParams` from `./leave.model`.
 
-3. `src/modules/audit/audit.service.interface.ts` — Define `IAuditService` interface with methods:
-   - `log(record: Omit<AuditRecord, 'id' | 'createdAt' | 'performedAt'>): Promise<AuditRecord>` — sets `performedAt` to `new Date()` automatically
-   - `getHistory(entityType: string, entityId: string): Promise<AuditRecord[]>`
+4. `src/modules/leave/leave.service.ts` — Implement `LeaveService` class implementing `ILeaveService`. Constructor takes: `ILeaveRequestRepository`, `IBalanceRepository`, `IAuditRepository`, `IPolicyRepository`.
 
-   Import `AuditRecord` from `./audit.model`.
+   **BINDING RULES implemented in this file:**
 
-4. `src/modules/audit/audit.service.ts` — Implement `AuditService` class implementing `IAuditService`. Constructor takes `IAuditRepository`. The `log` method sets `performedAt: new Date()` and delegates to `repository.create`. Import from `./audit.model`, `./audit.repository.interface`, `./audit.service.interface`.
+   **`submit`:** Validate `startDate < endDate`. Compute `days = countLeaveDays(startDate, endDate)`. Determine `year = startDate.getFullYear()`. Look up active policy via `IPolicyRepository.findActiveByLeaveType` — if none, throw. Validate minimum notice: if `policy.minimumNoticeDays` is set, `startDate - today >= minimumNoticeDays`. Get or create balance for `(employeeId, policyId, year, policy.entitlementDays)`. Reserve days on balance: `pendingDays += days`. Create LeaveRequest with `status = PENDING`. Audit with action `CREATE`. All in one logical flow.
 
-**Tests:** Include Jest unit tests at `tests/unit/modules/audit/audit.service.spec.ts` mocking the repository.
+   **`approve`:** Fetch request, validate `status === PENDING`. Compute `days = countLeaveDays(request.startDate, request.endDate)`. Determine `year = request.startDate.getFullYear()`. **Overlap check:** call `findApprovedOverlapping(employeeId, startDate, endDate, requestId)` — if any results, throw Error. **Balance sufficiency:** check `availableDays >= days` via balance. Commit days: `pendingDays -= days, usedDays += days`. Update request: `status = APPROVED, approvedBy = approverId, approvedAt = new Date()`. Audit with action `APPROVE`.
 
-**Note:** No barrel `index.ts` is created in this phase — the leave module (Phase 5) will import directly from the individual files. The audit module is consumed only by the leave service for logging state transitions.
+   **`reject`:** Fetch request, validate `status === PENDING`. Compute `days = countLeaveDays(...)`. Release days: `pendingDays -= days`. Update request: `status = REJECTED`. Audit with action `REJECT`.
+
+   **`cancel`:** Fetch request, validate `employeeId` matches `request.employeeId`. If `status === PENDING`: compute days, release days (`pendingDays -= days`), set `status = CANCELLED`. If `status === APPROVED`: compute days, restore days (`usedDays -= days`), set `status = CANCELLED`. Otherwise throw. Audit with action `DELETE` (or a generic cancel audit).
+
+   **Every mutating method** uses `countLeaveDays` from `./leave.model` — never inline day-count arithmetic.
+
+   Import from: `./leave.model`, `./leave.repository.interface`, `./leave.service.interface`, `../../shared/types/index.ts`, `../balance/balance.repository.interface`, `../audit/audit.repository.interface`, `../policy/policy.repository.interface`.
+
+5. `src/modules/leave/leave.routes.ts` — Fastify route registration following the existing `uptime.routes.ts` pattern. Register routes under prefix `/leave`:
+   - `POST /leave` — submit a leave request (body: CreateLeaveRequestDto)
+   - `GET /leave/:id` — get by id
+   - `GET /leave` — query with query string params (employeeId, status, startDate, endDate)
+   - `POST /leave/:id/approve` — approve (body: { approverId: string })
+   - `POST /leave/:id/reject` — reject (body: { rejectorId: string })
+   - `POST /leave/:id/cancel` — cancel (body: { employeeId: string })
+
+   Instantiate `LeaveService` with stub/mock repositories for now (the concrete Knex implementations come in a later phase). Each handler wraps in try/catch returning 500 on error. Import `LeaveService` from `./leave.service`, `CreateLeaveRequestDto` from `./leave.model`.
+
+**Tests:** Include Jest unit tests at `tests/unit/modules/leave/leave.service.spec.ts` mocking all four repository dependencies. Test: submit creates PENDING request and reserves days; approve with no overlap and sufficient balance succeeds; approve with overlap throws; approve with insufficient balance throws; reject releases days; cancel on PENDING releases days; cancel on APPROVED restores days; cancel on REJECTED throws; countLeaveDays returns correct inclusive count.
 
 ## Your iteration budget — and how to get more (READ BEFORE YOU START)
 
@@ -140,24 +175,6 @@ STANDING DECISIONS carried forward from earlier runs of this feature (unchanged)
 - Every operation that changes a LeaveRequest status AND balance counters AND writes an audit
   record must run all three through the SAME transaction client, in ONE transaction, so a
   failure rolls back the whole thing. [BINDING RULE — operator decision resolving: What is the fiscal year start month? The domain currently assumes January (calendar year). Many organisations use April or July. This affects which fiscalYear a leave request maps to for balance lookups.; Should the system prevent overlapping leave requests for the same employee? If so, what states count as "active" for overlap detection (APPROVED only, or SUBMITTED + APPROVED)?; Should the system support half-day leave requests? The current model uses Date for startDate/endDate, implying full-day granularity.; How should remainingDays be computed — as a derived field (totalEntitlement - usedDays) or as a stored column that is updated on every deduction/restoration?; What are the fiscal-year boundary rules for balance carry-over and accrual? Should unused days carry over to the next fiscal year, and if so, up to what cap?; How are leave days counted — calendar days or business days (Mon–Fri excluding holidays)?; apply everywhere these apply, not in one place only]
-
-## Constraints & consistency
-You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
-### Reuse & consistency — match these exactly
-- The `AuditRecord` entity must import `BaseEntity` from `../../shared/types/index.ts` (the same file and path used by Employee, Policy, and Balance modules), even though AuditRecord does not extend it. (see `src/shared/types/index.ts`)
-- Test file must follow the same factory-function + `jest.Mocked<>` pattern used by `tests/unit/modules/balance/balance.service.spec.ts`: a `makeAuditRecord(overrides)` factory, `jest.Mocked<IAuditRepository>` for the mock, and `beforeEach` to instantiate a fresh `AuditService` with the mock. (see `tests/unit/modules/balance/balance.service.spec.ts`)
-- The `AuditService` class must follow the same constructor-injection pattern as `BalanceService`, `PolicyService`, and `EmployeeService`: a single repository dependency passed via constructor, stored as a `private readonly` field, with all public methods delegating to it. (see `src/modules/balance/balance.service.ts`)
-- The `IAuditRepository` interface must follow the same `Omit<Entity, 'id' | 'createdAt'>` pattern for `create` as `IBalanceRepository`, `IPolicyRepository`, and `IEmployeeRepository` — the repository owns `id` and `createdAt` generation. (see `src/modules/balance/balance.repository.interface.ts`)
-### Entity invariants — enforce these
-- Reuse or extend `AuditRecord`: Every AuditRecord is immutable after creation — no update or delete operations exist on the repository interface. Once written, an audit record is a permanent, append-only log entry.
-- Reuse or extend `AuditRecord`: `performedAt` is always set by the service layer (never by the caller) to the exact timestamp when the audited action occurred. `createdAt` is always set by the repository layer (never by the caller or service) to the exact timestamp when the record was persisted.
-- Reuse or extend `AuditRecord`: `oldValues` and `newValues` are independently nullable: both may be null (e.g., CREATE has no oldValues), both may be present (e.g., UPDATE), or one may be null while the other is present (e.g., DELETE has oldValues but null newValues). No cross-field validation couples them.
-### Interface contract — expose these operations (their shape is yours)
-- IAuditService.log — No auth enforcement at this layer — the audit service is a pure domain service. Auth is enforced at the route/controller layer by the calling module (leave service).; Throws if the underlying repository.create fails (e.g., DB constraint violation). No domain-level validation beyond type safety — the service trusts the caller to supply valid data.
-- IAuditService.getHistory — No auth enforcement at this layer. The caller is responsible for ensuring the requester is authorised to view the entity's audit trail.; idempotent; Returns an empty array (not null, not an error) when no audit records exist for the given entity. Throws only on infrastructure failures (DB down).
-### Integration points — connect to these
-- src/shared/types/index.ts — AuditRecord imports BaseEntity for type reference (does not extend it). This is the sole external dependency of the audit module in this phase.
-- src/modules/leave/leave.service.ts (Phase 5) — The leave service will import `IAuditRepository` and `IAuditService` (or `AuditService`) from the audit module to log every state transition (submit, approve, reject, cancel) per GP-002.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:

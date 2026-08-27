@@ -1,0 +1,141 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave",
+      "balance",
+      "policy",
+      "audit"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository-interface",
+      "service-interface",
+      "service",
+      "routes",
+      "tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "large"
+  },
+  "successCriteria": [
+    {
+      "description": "`countLeaveDays(startDate, endDate)` returns `endDate - startDate + 1` (inclusive, calendar days, no weekend/holiday exclusion) and is the single exported helper in `leave.model.ts` \u2014 every day-count call site in the service imports and uses it, never inlining the arithmetic.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`submit(dto)` validates `startDate < endDate`, looks up the active policy via `IPolicyRepository.findById(policyId)` and checks `isActive`, enforces `minimumNoticeDays` when set, computes `year = startDate.getFullYear()`, gets-or-creates a balance, reserves days via `IBalanceRepository.updateCounters` (pendingDays += days), creates a LeaveRequest with `status = PENDING`, and writes an audit record with action `CREATE` \u2014 all in one logical flow.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`approve(requestId, approverId)` fetches the request, validates `status === PENDING`, computes days via `countLeaveDays`, checks for approved overlapping requests via `findApprovedOverlapping` (throws if any exist), verifies balance sufficiency (`availableDays >= days`), commits days (`pendingDays -= days, usedDays += days`), sets `status = APPROVED, approvedBy = approverId, approvedAt = new Date()`, and writes an audit record with action `APPROVE`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`reject(requestId, rejectorId)` fetches the request, validates `status === PENDING`, computes days via `countLeaveDays`, releases days (`pendingDays -= days`), sets `status = REJECTED`, and writes an audit record with action `REJECT`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`cancel(requestId, employeeId)` validates `employeeId` matches `request.employeeId`. If `status === PENDING`: releases days (`pendingDays -= days`), sets `status = CANCELLED`. If `status === APPROVED`: restores days (`usedDays -= days`), sets `status = CANCELLED`. Any other status throws. Writes an audit record with action `DELETE`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`getById(requestId)` delegates to `ILeaveRequestRepository.findById` and returns the result; `query(params)` delegates to `ILeaveRequestRepository.findByEmployee` with the query params.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Every mutating operation (submit, approve, reject, cancel) that changes a LeaveRequest status AND balance counters AND writes an audit record must run all three through the same transaction \u2014 a failure in any step rolls back the entire operation.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "LeaveService constructor takes four repository interfaces directly: `ILeaveRequestRepository`, `IBalanceRepository`, `IAuditRepository`, `IPolicyRepository` \u2014 not services. The leave service calls `IBalanceRepository.updateCounters` directly for counter mutations rather than going through `IBalanceService`.",
+    "The `submit` method resolves the policy via `IPolicyRepository.findById(policyId)` (since `CreateLeaveRequestDto` carries `policyId`, not `leaveType`) and validates `isActive === true`. It does NOT use `findActiveByLeaveType`.",
+    "No counter may go negative. Any balance counter transition that would take a counter below zero must throw an Error \u2014 never clamp or silently ignore.",
+    "All imports in the leave module must use `baseUrl`-based non-relative paths (e.g. `'shared/types'`, `'modules/balance/balance.repository.interface'`), consistent with `tsconfig.json` `baseUrl: \"./src\"` and all existing modules."
+  ],
+  "outOfScope": [
+    "Concrete Knex/PostgreSQL repository implementations \u2014 the routes file uses stub/mock repositories; real implementations come in a later phase.",
+    "RBAC enforcement on routes (requireRole guards) \u2014 deferred to a later phase; this phase's routes accept identity parameters (approverId, employeeId) in the request body."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "Lifecycle: created with `status = PENDING` (no DRAFT state in this phase). Valid transitions: PENDING \u2192 APPROVED (approve), PENDING \u2192 REJECTED (reject), PENDING \u2192 CANCELLED (cancel), APPROVED \u2192 CANCELLED (cancel). Terminal states: REJECTED, CANCELLED. No other transitions are valid \u2014 attempting one must throw."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "`startDate` must be strictly before `endDate` (`startDate < endDate`). A request where `startDate >= endDate` is invalid and must be rejected at submission."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "No two APPROVED LeaveRequests for the same employee may have overlapping `[startDate, endDate]` ranges. Overlap is enforced at approval time only, not at submission."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "ILeaveService.submit",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws if: startDate >= endDate, no active policy found for policyId, minimumNoticeDays not met, balance reservation would exceed available days. Must audit with action CREATE on success."
+    },
+    {
+      "operation": "ILeaveService.reject",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws if: request not found, status is not PENDING. Must audit with action REJECT on success."
+    },
+    {
+      "operation": "ILeaveService.cancel",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws if: request not found, employeeId does not match request.employeeId, status is neither PENDING nor APPROVED. Must audit with action DELETE on success."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "LeaveRequest.status must use the `LeaveStatus` enum from `shared/types` \u2014 values are `DRAFT`, `PENDING`, `APPROVED`, `REJECTED`, `CANCELLED`. The `PENDING` value (not `SUBMITTED`) is authoritative per the reconciled architecture.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "LeaveBalance counters follow the three-counter model: `entitlementDays`, `usedDays`, `pendingDays`. Available days are always derived as `entitlementDays - usedDays - pendingDays`. The leave service must call `IBalanceRepository.updateCounters` with absolute counter values \u2014 never compute deltas inline.",
+      "referencePath": "src/modules/balance/balance.model.ts"
+    },
+    {
+      "requirement": "Audit records written by the leave service must use the `AuditAction` enum (`CREATE`, `APPROVE`, `REJECT`, `DELETE`) and the `IAuditRepository.create` signature: `Omit<AuditRecord, 'id' | 'createdAt'>`. The `performedAt` field must be set to `new Date()` at the call site.",
+      "referencePath": "src/modules/audit/audit.model.ts"
+    },
+    {
+      "requirement": "The `year` field on LeaveBalance is a plain integer (e.g. 2026) representing the calendar year, derived from `startDate.getFullYear()`. A request whose range crosses 31 December is charged in full to the year of its `startDate` \u2014 never split.",
+      "referencePath": "src/modules/balance/balance.model.ts"
+    },
+    {
+      "requirement": "Route registration must follow the `uptime.routes.ts` pattern: export an async function `(fastify: FastifyInstance) => Promise<void>`, register routes via `fastify.get`/`fastify.post`, wrap each handler body in try/catch returning 500 on error.",
+      "referencePath": "src/modules/uptime/uptime.routes.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/balance/balance.repository.interface.ts \u2014 IBalanceRepository",
+      "why": "LeaveService calls `findByEmployeePolicyAndYear` for balance lookups, `getOrCreateForYear` for balance initialization, and `updateCounters` for all counter mutations (reserve, commit, release, restore)."
+    },
+    {
+      "target": "src/modules/policy/policy.repository.interface.ts \u2014 IPolicyRepository",
+      "why": "LeaveService calls `findById` to resolve the policy from `CreateLeaveRequestDto.policyId` and validate `isActive` during submit."
+    },
+    {
+      "target": "src/modules/audit/audit.repository.interface.ts \u2014 IAuditRepository",
+      "why": "LeaveService calls `create` to write an audit record for every mutating operation (submit\u2192CREATE, approve\u2192APPROVE, reject\u2192REJECT, cancel\u2192DELETE)."
+    }
+  ]
+}

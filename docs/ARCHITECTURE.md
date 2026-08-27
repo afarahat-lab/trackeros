@@ -42,6 +42,13 @@ src/modules/audit/
   audit.service.interface.ts     — IAuditService
   audit.service.ts               — AuditService implementation
 
+src/modules/leave/
+  leave.model.ts                 — LeaveRequest entity, DTOs, countLeaveDays helper
+  leave.repository.interface.ts  — ILeaveRequestRepository
+  leave.service.interface.ts     — ILeaveService
+  leave.service.ts               — LeaveService implementation
+  leave.routes.ts                — Fastify route registration (stub repos)
+
 src/modules/uptime/
   uptime.model.ts
   uptime.service.interface.ts
@@ -149,7 +156,7 @@ Dependencies flow inward: leave → {employee, policy, balance, audit} → share
 2. Policy module ✅
 3. Balance module ✅
 4. Audit module ✅
-5. Leave module (core)
+5. Leave module (core) ✅
 
 ## Cross-Cutting Contracts
 
@@ -223,4 +230,48 @@ Dependencies flow inward: leave → {employee, policy, balance, audit} → share
 - No barrel `index.ts` — the audit module is consumed only by the leave service (Phase 5) for logging state transitions; imports will be direct from individual files.
 - Imports use `baseUrl`-based paths (e.g. `'modules/audit/audit.service'`), consistent with the `tsconfig.json` `baseUrl: "./src"` setting.
 - Tests at `tests/unit/modules/audit/audit.service.spec.ts` mock the repository and cover: log sets `performedAt` and delegates to `repository.create`, log propagates repository errors, getHistory delegates to `findByEntity`, getHistory returns empty array when no records, getHistory propagates repository errors.
+
+## Phase 5 Implementation Notes
+
+### Leave module (`src/modules/leave/`)
+
+#### leave.model.ts
+- `LeaveRequest` interface extends `BaseEntity` from `shared/types`. Fields: `employeeId`, `policyId`, `startDate`, `endDate`, `reason: string | undefined`, `status: LeaveStatus`, `approvedBy: string | null`, `approvedAt: Date | null`.
+- `CreateLeaveRequestDto`: `employeeId`, `policyId`, `startDate`, `endDate`, `reason?`.
+- `UpdateLeaveRequestDto`: `startDate?`, `endDate?`, `reason?`.
+- `LeaveRequestQueryParams`: `employeeId?`, `status?`, `startDate?`, `endDate?`.
+- **`countLeaveDays(startDate, endDate): number`** — canonical day-count helper: normalizes dates to midnight, computes `(end - start) / msPerDay + 1`. Every call site in the service uses this function.
+
+#### leave.repository.interface.ts
+- `ILeaveRequestRepository`: findById, findByEmployee, findApprovedOverlapping (for overlap detection at approval time, accepts optional `excludeRequestId`), create, update, updateStatus.
+
+#### leave.service.interface.ts
+- `ILeaveService`: submit, approve, reject, cancel, getById, query.
+
+#### leave.service.ts
+- `LeaveService` implements `ILeaveService`. Constructor takes four repository dependencies: `ILeaveRequestRepository`, `IBalanceRepository`, `IAuditRepository`, `IPolicyRepository`.
+- **`submit`**: validates `startDate < endDate` (throws if `>=`), computes days via `countLeaveDays`, derives year from `startDate.getFullYear()`, looks up the referenced policy via `policyRepo.findById` (throws if null), then resolves the active policy for that leave type via `policyRepo.findActiveByLeaveType` (throws if null), checks minimum notice period if `policy.minimumNoticeDays` is set, gets-or-creates balance, checks balance sufficiency (`entitlementDays - usedDays - pendingDays >= days`), reserves days (`pendingDays += days`), creates request with `status = PENDING`, audits with `AuditAction.CREATE`.
+- **`approve`**: fetches request, validates `status === PENDING`, overlap check via `findApprovedOverlapping`, balance sufficiency check, commits days (`usedDays += days, pendingDays -= days`), updates status to `APPROVED` with `approvedBy` and `approvedAt`, audits with `AuditAction.APPROVE`.
+- **`reject`**: fetches request, validates `status === PENDING`, releases days (`pendingDays -= days`), updates status to `REJECTED`, audits with `AuditAction.REJECT`.
+- **`cancel`**: fetches request, validates `employeeId` matches owner, branches on status: PENDING → release days (`pendingDays -= days`), APPROVED → restore days (`usedDays -= days`), other statuses → throw. Updates status to `CANCELLED`, audits with `AuditAction.DELETE`.
+- **`getById`**: delegates to `leaveRepo.findById`.
+- **`query`**: if `employeeId` provided, delegates to `leaveRepo.findByEmployee`; otherwise returns `[]`.
+- All mutating methods use `countLeaveDays` from `./leave.model` — never inline day-count arithmetic.
+- All mutating methods write an audit record (GP-002).
+
+#### leave.routes.ts
+- Fastify plugin registering routes under `/leave` prefix:
+  - `POST /leave` — submit (body: `CreateLeaveRequestDto`), returns 201
+  - `GET /leave/:id` — get by id, returns 404 if not found
+  - `GET /leave` — query with query string params
+  - `POST /leave/:id/approve` — approve (body: `{ approverId }`)
+  - `POST /leave/:id/reject` — reject (body: `{ rejectorId }`)
+  - `POST /leave/:id/cancel` — cancel (body: `{ employeeId }`)
+- Uses **stub repositories** (in-memory mocks) for all four dependencies — concrete Knex implementations come in a later phase.
+- All handlers wrapped in try/catch returning 500 on error with `{ error: 'Internal Server Error' }`.
+- No barrel `index.ts` for the leave module.
+
+#### Tests
+- `tests/unit/modules/leave/leave.service.spec.ts` — Jest unit tests mocking all four repository dependencies.
+- Covers: `countLeaveDays` (inclusive count, same-day, consecutive), `submit` (startDate >= endDate, no active policy, inactive policy, insufficient balance, successful submit with day reservation and audit), `approve` (not found, not PENDING, overlapping, insufficient balance, successful approve with counter commit and audit), `reject` (not found, not PENDING, successful release and audit), `cancel` (not found, wrong owner, PENDING release, APPROVED restore, REJECTED throws, CANCELLED throws), `getById` (delegation, null), `query` (with employeeId, without employeeId).
 <!-- gestalt:architecture feature=2a5d3d87-ce68-4c51-a1e4-6c85bde3c2fd END -->

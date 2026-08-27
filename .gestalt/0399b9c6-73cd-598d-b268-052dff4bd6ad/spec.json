@@ -1,0 +1,65 @@
+{
+  "scope": {
+    "affectedDomains": [],
+    "affectedLayers": [],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "`countLeaveDays(startDate, endDate)` returns the inclusive calendar-day count `(endDate - startDate) + 1`, normalizing both dates to midnight. Same-day returns 1, consecutive days returns 2.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`submit(dto)` validates `startDate < endDate`, resolves the active policy via a two-step lookup (findById then findActiveByLeaveType), enforces minimum notice when `policy.minimumNoticeDays` is set, checks balance sufficiency (`entitlementDays - usedDays - pendingDays >= days`), reserves days (`pendingDays += days`), creates the request with `status = PENDING`, and writes an audit record with action `CREATE`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`approve(requestId, approverId)` validates the request exists and is `PENDING`, detects overlapping APPROVED requests for the same employee via `findApprovedOverlapping` (throws if any), checks balance sufficiency, commits days (`usedDays += days, pendingDays -= days`), sets `status = APPROVED` with `approvedBy` and `approvedAt`, and writes an audit record with action `APPROVE`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`reject(requestId, rejectorId)` validates the request exists and is `PENDING`, releases days (`pendingDays -= days`), sets `status = REJECTED`, and writes an audit record with action `REJECT`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`cancel(requestId, employeeId)` validates the request exists and the caller owns it. On `PENDING`: releases days (`pendingDays -= days`). On `APPROVED`: restores days (`usedDays -= days`). On any other status: throws. Sets `status = CANCELLED` and writes an audit record with action `DELETE`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Every mutating method (`submit`, `approve`, `reject`, `cancel`) uses the single canonical `countLeaveDays` helper from `leave.model` \u2014 no inline day-count arithmetic exists anywhere in the service.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Every mutating method writes exactly one audit record (GP-002) with `entityType = 'LeaveRequest'`, the correct `AuditAction`, and `performedBy` set to the acting user.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`getById(requestId)` delegates to `leaveRepo.findById` and returns the result (or null). `query(params)` delegates to `leaveRepo.findByEmployee` when `employeeId` is present; returns `[]` otherwise.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Routes are registered as a Fastify plugin under prefix `/leave` with six endpoints (POST submit, GET by id, GET query, POST approve, POST reject, POST cancel), each wrapped in try/catch returning 500 on error. The service is instantiated with stub repositories.",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "LeaveService depends on repository interfaces directly (ILeaveRequestRepository, IBalanceRepository, IAuditRepository, IPolicyRepository), not on service classes \u2014 consistent with the task specification and the existing codebase pattern.",
+    "The `submit` method performs a two-step policy lookup: first `policyRepo.findById(dto.policyId)` to confirm the referenced policy exists, then `policyRepo.findActiveByLeaveType(referencedPolicy.leaveType)` to resolve the active policy for that leave type. The original `dto.policyId` is stored on the request; the active policy's `entitlementDays` drives balance creation."
+  ],
+  "outOfScope": [],
+  "ambiguities": [],
+  "entityInvariants": [],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [],
+  "integrationPoints": []
+}
