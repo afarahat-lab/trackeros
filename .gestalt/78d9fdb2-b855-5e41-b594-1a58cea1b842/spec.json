@@ -1,0 +1,122 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared-types"
+    ],
+    "affectedLayers": [
+      "domain"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "src/shared/types/enums.ts exports LeaveTypeCode, LeaveRequestStatus, and UserRole as string-literal enums with EXACTLY the canonical members: LeaveTypeCode = annual|sick|emergency|unpaid|maternity|paternity; LeaveRequestStatus = DRAFT|SUBMITTED|APPROVED|REJECTED|CANCELLED; UserRole = employee|manager|hr_admin.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/shared/types/dtos.ts exports LeaveRequestDTO, LeaveBalanceDTO, and a FiscalYear value type where FiscalYear is a plain integer calendar year (e.g. 2026) with no configurable start month.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "LeaveBalanceDTO exposes the derived availability shape (entitlementDays, usedDays, pendingDays) and does NOT expose a stored remainingDays field.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/shared/types/errors.ts exports shared error types including NotFoundError, ValidationError, InsufficientBalanceError, and OverlapError.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests exist under tests/unit/shared/types/ covering the exact enum member values and the LeaveBalanceDTO/LeaveRequestDTO/FiscalYear shape, and they pass via the project's Jest config.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The shared-types module is a dependency leaf: none of its three files import from any other module (src/modules/*, src/shared/db/*), so it compiles standalone under tsc --noEmit.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Enums must be string-literal union types / const enums, NOT numeric enums; LeaveRequestStatus members are uppercase string literals, LeaveTypeCode and UserRole members are lowercase string literals.",
+    "FiscalYear is a plain integer calendar year with NO configurable fiscal-year start month, no carry-over, and no accrual (binding rule 2).",
+    "LeaveBalanceDTO must expose entitlementDays, usedDays, pendingDays and never a stored remainingDays field; availability is derived as entitlementDays - usedDays - pendingDays.",
+    "shared-types has no dependencies on other modules \u2014 it is the leaf every other module imports from (dependency map: all modules -> shared-types).",
+    "Follow project TypeScript/Jest conventions: strict true, commonjs, target ES2022, rootDir ./src, baseUrl ./src; named exports; interface-based models; no-any (use unknown + type guards); no @gestalt/* deps; no hardcoded secrets.",
+    "Only the three specified files (enums.ts, dtos.ts, errors.ts) plus their tests are in scope; no barrel index.ts is required for shared-types."
+  ],
+  "outOfScope": [],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveTypeCode",
+      "mustExistOrExtend": true,
+      "invariant": "Its value set is exactly the six canonical members (annual, sick, emergency, unpaid, maternity, paternity) \u2014 no additional or missing members."
+    },
+    {
+      "entity": "LeaveRequestStatus",
+      "mustExistOrExtend": true,
+      "invariant": "Its value set is exactly the five canonical uppercase members (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED) matching the LeaveRequest lifecycle DRAFT -> SUBMITTED -> APPROVED/REJECTED/CANCELLED."
+    },
+    {
+      "entity": "UserRole",
+      "mustExistOrExtend": true,
+      "invariant": "Its value set is exactly the three canonical members (employee, manager, hr_admin) matching the auth contract request.user.role."
+    },
+    {
+      "entity": "FiscalYear",
+      "mustExistOrExtend": true,
+      "invariant": "A plain integer calendar year (e.g. 2026); there is no fiscal-year start month, no carry-over, and no accrual."
+    },
+    {
+      "entity": "LeaveBalanceDTO",
+      "mustExistOrExtend": true,
+      "invariant": "Exposes the derived availability shape (entitlementDays, usedDays, pendingDays) and never a stored remainingDays field; availability is derived, not stored."
+    },
+    {
+      "entity": "LeaveRequestDTO",
+      "mustExistOrExtend": true,
+      "invariant": "A pure data shape for a leave request with no owned logic; its status field is typed to LeaveRequestStatus."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "Shared error types (NotFoundError, ValidationError, InsufficientBalanceError, OverlapError) must be constructible/throwable and carry the error contract shape { error: string; code: string }.",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Errors map to the cross-cutting contract: validation -> 400, auth -> 401, authorization -> 403, not found -> 404, insufficient balance/policy violation -> 422."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Enum member names and values must match the canonical definitions declared in the reconciled architecture's shared-types module ownership (LeaveTypeCode, LeaveRequestStatus, UserRole).",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "LeaveBalanceDTO must expose entitlementDays/usedDays/pendingDays (never remainingDays) and FiscalYear must be a plain integer calendar year, matching binding rule 2 and the balance counter semantics.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "Error types must conform to the error response contract { error: string; code: string } with the documented HTTP status mapping.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "The module must live at src/shared/types/ (the exact path the Module Boundaries declare) and be a dependency leaf with no imports from other modules.",
+      "referencePath": "docs/ARCHITECTURE.md"
+    },
+    {
+      "requirement": "TypeScript/Jest conventions (strict, commonjs, ES2022, rootDir ./src, baseUrl ./src, named exports, no-any) must be followed as declared in the harness.",
+      "referencePath": "HARNESS.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/leave, balance, employee, policy, leave-type, notification, audit (future phases)",
+      "why": "Every domain module imports its enums, DTOs, and error types from shared-types; this phase establishes the canonical source they will all depend on."
+    }
+  ]
+}
