@@ -16,22 +16,17 @@ The architecture is modular, with a clear separation of concerns between models,
 ## Module structure
 
 ```
-src/modules/leave/leave.{model,repository,service,controller,routes}.ts
-src/modules/balance/balance.{model,repository,service,controller,routes}.ts
-src/modules/employee/employee.{model,repository,service,controller,routes}.ts
-src/modules/policy/policy.{model,repository,service,controller,routes}.ts
-src/modules/notification/notification.{model,repository,service,controller,routes}.ts
-src/modules/LeaveStatus/    — LeaveStatus module
-src/modules/BaseEntity/    — BaseEntity module
-src/modules/LeaveRequest/    — LeaveRequest module
-src/modules/LeaveType/    — LeaveType module
-src/modules/LeavePolicy/    — LeavePolicy module
-src/modules/AuditLog/    — AuditLog module
-src/modules/AuditRecord/    — AuditRecord module
-src/modules/AuditServiceInterface/    — AuditServiceInterface module
-src/shared/db connection.ts
-src/shared/base repository.ts
+src/modules/audit/audit.model.ts + index.ts
+src/modules/balance/balance.model.ts + index.ts
+src/modules/employee/employee.model.ts + index.ts
+src/modules/leave-type/leave-type.model.ts + index.ts
+src/modules/policy/policy.model.ts + index.ts
+src/modules/status/    — status module (model, service interface, service)
+src/modules/uptime/    — uptime module (model, routes, service interface, service)
+src/shared/db/connection.ts
 src/shared/types/    — shared-types module (enums, dtos, errors, index)
+src/app.ts
+src/index.ts
 ```
 
 ## Key patterns
@@ -82,6 +77,65 @@ The module has no dependencies on other modules (it is the leaf). Unit
 tests live under `tests/unit/shared/types/` and cover the exact enum
 member values, the DTO shapes (including the absence of `remainingDays`),
 and the error contract.
+
+## Implemented — leaf modules (Phase 2 part 1)
+
+This phase built ONLY the entity models + repository/service interfaces
+for the five leaf modules — no concrete repository/service
+implementations, no controllers/routes, no tests (those are later
+parts). Each module owns a single `*.model.ts` (entity + interfaces
+co-located) plus an `index.ts` barrel that is its public entry point.
+
+Every repository/service interface accepts an optional `PoolClient` as
+its LAST parameter (the unit-of-work client); when omitted, concrete
+implementations will use the shared pool from `src/shared/db/connection.ts`.
+
+- `src/modules/employee/` — `EmploymentStatus` union
+  (`'ACTIVE' | 'INACTIVE' | 'TERMINATED'`); `Employee` entity (id,
+  employeeNumber, firstName, lastName, email, managerId `string|null`,
+  department `string|null`, hireDate, terminationDate `Date|null`,
+  employmentStatus); `CreateEmployeeInput` / `UpdateEmployeeInput`;
+  `IEmployeeRepository` (create/update/findById/findByEmployeeNumber/
+  findByEmail/list) and `IEmployeeService` (create/update/terminate/
+  findById/findByEmployeeNumber).
+- `src/modules/leave-type/` — `LeaveType` entity reusing the shared
+  `LeaveTypeCode` type imported from `src/shared/types/` (not a
+  redeclared literal); `ILeaveTypeRepository` (create/update/findById/
+  findByCode/findActive).
+- `src/modules/policy/` — `LeavePolicy` entity (policyName, leaveTypeId,
+  entitlementDays, accrualRate `number|null`, maxAccumulation
+  `number|null`, minimumNoticeDays `number|null`,
+  requiresManagerApproval, isActive, createdAt, updatedAt);
+  `CreateLeavePolicyInput` / `UpdateLeavePolicyInput`;
+  `ILeavePolicyRepository` (create/update/findById/findByLeaveTypeId/
+  findActive) and `IPolicyService` (create/update/findById/deactivate).
+- `src/modules/balance/` — `BalanceStatus` union
+  (`'ACTIVE' | 'EXHAUSTED' | 'CLOSED'`); `LeaveBalance` entity (id,
+  employeeId, policyId, fiscalYear, totalEntitlement, usedDays,
+  pendingDays, remainingDays, status, createdAt, updatedAt). The
+  `remainingDays` field is documented as DERIVED
+  (`totalEntitlement - usedDays - pendingDays`) and never independently
+  persisted. `ILeaveBalanceRepository` (create/update/findById/
+  findByEmployeePolicyAndYear/findByEmployeeAndYear) and `IBalanceService`
+  (getAvailableDays/reserve/approve/reject/cancel — `cancel` takes the
+  request status `'PENDING' | 'APPROVED'` to distinguish release vs
+  restore).
+- `src/modules/audit/` — `AuditAction` 7-value union
+  (`'CREATE' | 'UPDATE' | 'DELETE' | 'APPROVE' | 'REJECT' | 'CANCEL' |
+  'SUBMIT'`); `AuditLog` entity (id, entityType, entityId, action,
+  oldValues/newValues `Record<string, unknown> | null`, performedBy
+  `string|null`, performedAt); `AuditLogInput`; `IAuditLogRepository`
+  (create/findById/findByEntity) and `IAuditService` (record).
+
+The five leaf modules depend only on `src/shared/types/` (and the `pg`
+`PoolClient` type) — no cross-module imports in this phase.
+
+Note on divergence: the phase spec's single-file-layout constraint said
+"no barrels in this phase", but each module ships an `index.ts` barrel
+because the project's module-boundary rule requires imports to go
+through a module's public entry point. The barrels are the public
+surface; the entity + interfaces still live together in the single
+`*.model.ts` file as specified.
 
 <!-- gestalt:architecture feature=dd1a6d9f-1b67-4054-9579-5cb7ccee58f3 START -->
 # Leave Management Module — Reconciled Architecture
