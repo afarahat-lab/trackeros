@@ -1,6 +1,14 @@
-# Implement this phase: Phase 3 — Notification module (~3 files)
+# Continue the previous attempt (it hit the iteration limit before finishing)
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/dd1a6d9f-1b67-4054-9579-5cb7ccee58f3/5`. Do not clone anything; work only in this directory.
+A prior code-agent attempt on this work dir (`/tmp/gestalt/phase/dd1a6d9f-1b67-4054-9579-5cb7ccee58f3/6`) was stopped after reaching its iteration limit. Its work is ALREADY on disk here — do NOT restart from scratch or re-read everything; build on what exists. It made 17 file edit(s). Its last verification PASSED (`cd /tmp/gestalt/phase/dd1a6d9f-1b67-4054-9579-5cb7ccee58f3/6 && ls node_modules >/dev/null 2>&1 && echo "deps present" || echo "no deps"; npm run build 2>&1 | head -60`).
+
+Finish the task now: fix any failing build/type-check/tests, then RUN the build and the tests and fix anything still failing. Stop as soon as the build and tests pass. The full original task (with all mandatory constraints) follows for reference.
+
+---
+
+# Implement this phase: Phase 4 — Leave module (orchestrator) + routes/controller (~6 files)
+
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/dd1a6d9f-1b67-4054-9579-5cb7ccee58f3/6`. Do not clone anything; work only in this directory.
 
 You are the IMPLEMENTATION agent, not a planner. The platform measures your work EXCLUSIVELY by the files you create or modify in this working tree (`git status`). Ending your turn with a plan, a summary, or an announcement of what you are 'about to' do — without having actually edited files — is a FAILURE: a turn that leaves the working tree untouched is discarded. Explore only as much as you need, then MAKE the edits with your file-editing tool. Never end your turn before the files exist on disk.
 
@@ -8,13 +16,15 @@ You are the IMPLEMENTATION agent, not a planner. The platform measures your work
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the notification module under src/modules/notification/ (the exact path its Module Boundary declares).
+Create the leave module (the orchestrator) under src/modules/leave/ plus its controller and routes.
 
-- src/modules/notification/notification.model.ts — Notification entity with EXACT fields: id, recipientId, type, title, message, relatedEntityType (string|null), relatedEntityId (string|null), status ('PENDING'|'SENT'|'READ'|'ARCHIVED'), createdAt, readAt (Date|null). Also declare INotificationRepository and INotificationService interfaces.
-- src/modules/notification/notification.repository.ts — PgNotificationRepository implementing INotificationRepository, using the shared pool from src/shared/db/connection.ts (optional client param as last argument).
-- src/modules/notification/notification.service.ts — NotificationService implementing INotificationService.
+- src/modules/leave/leave.model.ts — LeaveRequest entity with EXACT fields: id, employeeId, leaveTypeId, startDate, endDate, reason (string|undefined), status (LeaveRequestStatus), approvedBy, approvedAt, rejectedBy, rejectedAt, rejectionReason, cancelledBy, cancelledAt, createdAt, updatedAt. Also declare ILeaveRequestRepository and ILeaveService. Implement the shared helper countLeaveDays(startDate, endDate) HERE (binding rule 1): returns endDate - startDate + 1 (calendar days, inclusive of both ends, no weekend/holiday exclusion). This is the ONLY day-count implementation — every call site uses it.
+- src/modules/leave/leave.repository.ts — PgLeaveRequestRepository (optional client param as last argument).
+- src/modules/leave/leave.service.ts — LeaveService orchestrating submit/approve/reject/cancel. Compute n via countLeaveDays once per operation. On APPROVE: enforce sufficiency (n <= availableDays) and overlap (no intersecting APPROVED request for the same employee, regardless of leave type) in the same place. Derive the balance year from startDate once (binding rule 4 — a request crossing 31 Dec is charged in full to its startDate's year; never split). Every status change + balance counter change + audit write runs through the SAME unit-of-work client in ONE transaction (pass the client through to balance and audit services).
+- src/modules/leave/leave.controller.ts and src/modules/leave/leave.routes.ts — Fastify routes/controller.
+- Register the routes in src/app.ts (read it first; it currently registers uptimeRoutes).
 
-Include Jest unit tests in tests/unit/modules/notification/ (mock the pg pool). This phase depends on src/shared/db/connection.ts and src/shared/types/errors.ts from Phase 1 — read them before generating code.
+Include Jest unit tests in tests/unit/modules/leave/ (mock repositories/services). This phase depends on: src/shared/types/* (Phase 1), the balance service + audit service (Phase 2 part 2), and the notification service (Phase 3) — read src/modules/balance/balance.service.ts, src/modules/audit/audit.service.ts, src/modules/notification/notification.service.ts, and src/app.ts before generating code that references them.
 
 ## Your iteration budget — and how to get more (READ BEFORE YOU START)
 
@@ -111,42 +121,35 @@ OVERLAP: no overlapping APPROVED leave for the same employee, enforced at APPROV
 submission) in the same place as the sufficiency check. Overlap = any intersection of the
 [startDate, endDate] range with an existing APPROVED request, regardless of leave type. [BINDING RULE — operator decision resolving: Should leave duration be measured in calendar days or business (working) days, and should weekends/public holidays be excluded from the count?; How is the fiscal year boundary defined for balance accrual and carry-over, and is unused annual leave carried over or forfeited?; Should sick and emergency leave be deducted from the same annual entitlement pool or tracked as separate balances, and do they require manager approval?; Can a leave request span multiple fiscal years, and if so how is the duration split across the two balances?; What is the rounding direction and precision for remaining_days when entitlement is fractional (accrual_rate present) or when used_days is fractional?; How is the fiscal year boundary defined for balance accrual and carry-over (e.g. calendar year Jan 1–Dec 31 vs. a company-specific fiscal year), and is unused annual leave carried over or forfeited?; How are leave days counted when computing used_days and remaining_days (e.g. inclusive vs exclusive of end_date, half-day support, weekend/holiday exclusion, rounding direction)?; How are leave days counted for a request spanning partial days or weekends/holidays?; How is the fiscal year derived for a leave request?; What is the rounding rule for partial-day balances (e.g. half-day leave)?; apply everywhere these apply, not in one place only]
 
-## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
-The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
-- `Notification` — the entity MUST have exactly these fields:
-    - id: string
-    - recipientId: string
-    - type: string
-    - title: string
-    - message: string
-    - relatedEntityType: string | null
-    - relatedEntityId: string | null
-    - status: 'PENDING' | 'SENT' | 'READ' | 'ARCHIVED'
-    - createdAt: Date
-    - readAt: Date | null
-
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- Reuse the shared pg Pool exported from src/shared/db/connection.ts as the default DB executor; do not create a new Pool. (see `src/shared/db/connection.ts`)
-- Match the audit module's model/repository/service/index layout, interface-in-model convention, optional-client-as-last-param pattern, snake_case row mapping with type-guard fallback, and service id/timestamp/null-coercion behavior. (see `src/modules/audit/audit.model.ts`)
-- Match the audit test conventions: jest.mock the shared connection pool, mock the repository interface, and assert mapping/null/passthrough/id/timestamp behavior with no real DB access. (see `tests/unit/modules/audit/audit.service.test.ts`)
-- Use the shared error types (e.g. NotFoundError) from src/shared/types/errors.ts for typed error semantics rather than ad-hoc errors. (see `src/shared/types/errors.ts`)
-- The Notification entity fields and status union must match the reconciled architecture's Notification entity and the notifications conceptual table (recipient_id FK -> employees.id; indexes on recipient_id, status, and (related_entity_type, related_entity_id)). (see `.gestalt/architecture/reconciled.json`)
+- Reuse the shared LeaveRequestStatus and LeaveTypeCode types (and UserRole for auth) from src/shared/types/ — do not redeclare literal unions. (see `src/shared/types/enums.ts`)
+- Reuse the shared error classes (ValidationError, NotFoundError, InsufficientBalanceError, OverlapError, AuthorizationError) and their { error, code } contract; do not introduce new error shapes. (see `src/shared/types/errors.ts`)
+- Drive all balance counter transitions through BalanceService (reserve/approve/reject/cancel) with the day count n passed as a parameter; never mutate counters directly and never duplicate negative guards. (see `src/modules/balance/balance.service.ts`)
+- Write audit records via AuditService.record with the correct AuditAction (SUBMIT/APPROVE/REJECT/CANCEL) and pass the same unit-of-work client. (see `src/modules/audit/audit.service.ts`)
+- Emit lifecycle notifications via NotificationService.notify (recipient, type, title, message, related entity) passing the same client where the notification participates in the transaction. (see `src/modules/notification/notification.service.ts`)
+- Match the IBalanceService method signatures (reserve/approve/reject/cancel with optional PoolClient last) and the derived availability formula when calling balance operations. (see `src/modules/balance/balance.model.ts`)
+- Match the IAuditService.record signature and AuditLogInput shape (entityType, entityId, action, oldValues/newValues, performedBy) when writing audit records. (see `src/modules/audit/audit.model.ts`)
+- Register leave routes in src/app.ts alongside the existing uptimeRoutes registration, following the same Fastify plugin registration pattern. (see `src/app.ts`)
 ### Entity invariants — enforce these
-- Reuse or extend `Notification`: A Notification is created with status 'PENDING' and readAt null; its status may only ever be one of PENDING, SENT, READ, ARCHIVED, and readAt is set only when the notification transitions to READ (otherwise null).
-- Reuse or extend `Notification`: relatedEntityType and relatedEntityId are either both present (a link to a related entity such as a leave request) or both null; they are never partially set.
-- Reuse or extend `Notification`: recipientId references an existing employee (conceptual FK recipient_id -> employees.id); createdAt is immutable once written.
+- Reuse or extend `LeaveRequest`: Lifecycle is DRAFT -> SUBMITTED -> APPROVED | REJECTED | CANCELLED; a request may be cancelled from SUBMITTED or APPROVED only. Status transitions are driven exclusively by the service operations (submit/approve/reject/cancel), and each transition records the corresponding actor/timestamp fields (approvedBy/At, rejectedBy/At/rejectionReason, cancelledBy/At).
+- Reuse or extend `LeaveRequest`: startDate must be on or before endDate; the day count n = countLeaveDays(startDate, endDate) is always >= 1 and is the single source of truth for reservation/deduction/sufficiency.
+- Reuse or extend `LeaveRequest`: No two APPROVED requests for the same employee may have intersecting [startDate, endDate] ranges, regardless of leave type; this is enforced at approval time.
+- Reuse or extend `LeaveBalance`: availableDays = totalEntitlement - usedDays - pendingDays is always derived, never stored; the leave module never writes remainingDays directly and never mutates counters except through BalanceService.
 ### Interface contract — expose these operations (their shape is yours)
-- create(notification, client?) — Persists a notification row and returns the persisted Notification; accepts an optional PoolClient as the last argument for unit-of-work participation.
-- findById(id, client?) — Returns the Notification or null when no row matches; accepts an optional PoolClient as the last argument.
-- findByRecipient(recipientId, client?) — Returns notifications for a recipient (optionally filtered by status), ordered newest-first; accepts an optional PoolClient as the last argument.
-- updateStatus(id, status, client?) — Transitions a notification's status (e.g. PENDING->SENT, SENT->READ, ->ARCHIVED) and sets readAt when transitioning to READ; accepts an optional PoolClient as the last argument.
-- notify(input, client?) — Service operation that builds a Notification (generating id and createdAt, coercing absent optionals to null) and persists it via the repository, passing the optional client through.
+- submit — employee (own request); Invalid input (missing employeeId/leaveTypeId, startDate > endDate) -> ValidationError (400); unknown employee/leaveType -> NotFoundError (404); insufficient balance at reserve -> InsufficientBalanceError (422).
+- approve — manager or hr_admin (no self-approval); Not found -> NotFoundError (404); insufficient balance (n > availableDays) -> InsufficientBalanceError (422); overlapping APPROVED request -> OverlapError (422, POLICY_VIOLATION); unauthorized -> AuthorizationError (403).
+- reject — manager or hr_admin; Not found -> NotFoundError (404); rejecting a non-SUBMITTED request -> ValidationError (400); unauthorized -> AuthorizationError (403).
+- cancel — employee (own request); Not found -> NotFoundError (404); cancelling a request not in SUBMITTED or APPROVED -> ValidationError (400); unauthorized -> AuthorizationError (403).
 ### Integration points — connect to these
-- src/shared/db/connection.ts — Shared pg Pool used as the default executor for all repository queries.
-- src/shared/types/errors.ts — Shared typed error classes (e.g. NotFoundError) for repository/service error semantics.
-- pg PoolClient type — Optional last-parameter client for unit-of-work participation in the leave orchestrator's transaction (Phase 6).
+- src/modules/balance/balance.service.ts (BalanceService) — Orchestrates reserve/approve/reject/cancel counter transitions with the computed day count n; the only place negative guards live.
+- src/modules/audit/audit.service.ts (AuditService) — Writes an immutable audit record for every state-changing operation within the same transaction.
+- src/modules/notification/notification.service.ts (NotificationService) — Emits lifecycle notifications (submitted/approved/rejected/cancelled) to employees/managers.
+- src/modules/leave-type/leave-type.model.ts (ILeaveTypeRepository) — Resolves the leave type (code, requiresManagerApproval, isActive) for a request.
+- src/modules/policy/policy.model.ts (ILeavePolicyRepository) — Resolves the entitlement/policy for the leave type to locate the correct balance.
+- src/modules/employee/employee.model.ts (IEmployeeRepository) — Resolves the employee and their manager for approval routing and self-approval prevention.
+- src/shared/db/connection.ts — Shared pg pool used as the default when no unit-of-work client is passed; the service owns BEGIN/COMMIT/ROLLBACK.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
