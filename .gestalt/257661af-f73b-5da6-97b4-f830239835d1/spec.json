@@ -1,0 +1,179 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "employee",
+      "leave-type",
+      "policy",
+      "balance",
+      "audit"
+    ],
+    "affectedLayers": [
+      "tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "Jest unit tests exist under tests/unit/modules/{employee,leave-type,policy,balance,audit}/ named *.test.ts, and the full suite passes with the pg pool mocked (no real database connection is opened).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "BalanceService counter transitions are covered and asserted: reserve (pendingDays += n), approve (pendingDays -= n, usedDays += n), reject pending (pendingDays -= n), cancel pending (pendingDays -= n), cancel approved (usedDays -= n).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The derived availability formula is asserted: getAvailableDays returns totalEntitlement - usedDays - pendingDays, and the repository mapRow derives remainingDays the same way (never read from a stored column).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Negative-guard behavior is asserted: every transition that would take a counter below zero (reserve/approve/reject/cancel with days exceeding the relevant counter, or negative days) throws InsufficientBalanceError and never clamps the counter to zero.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Repository tests assert snake_case\u2192camelCase row mapping and the documented fallbacks: employmentStatus\u2192'ACTIVE', unknown leave-type code\u2192LeaveTypeCode.UNPAID, unknown audit action\u2192'UPDATE', and balance remainingDays derived from the three counters.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Service tests assert validation/error behavior: EmployeeService.create rejects missing required fields and duplicate employeeNumber (ValidationError); PolicyService.create rejects missing policyName/leaveTypeId and negative entitlementDays (ValidationError); not-found paths throw NotFoundError; BalanceService not-found throws NotFoundError.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Tests must mock src/shared/db/connection.ts (jest.mock) and stub pool.query; no real PostgreSQL connection may be opened. Repositories accept an optional PoolClient as the last parameter, so tests may pass a stub client to bypass the pool.",
+    "Tests must import concrete classes and shared types via relative paths to src/... (e.g. ../../../../src/...), matching the existing tests/unit/shared/types/errors.test.ts convention and jest.config.js (testMatch '**/tests/**/*.test.(ts|js)', moduleDirectories ['node_modules','src']).",
+    "Assertions must match the actual method signatures and return shapes of the part-2 implementations (e.g. BalanceService.cancel takes requestStatus 'PENDING'|'APPROVED'; repository methods take optional client as last param; services default-construct concrete repositories).",
+    "No leave-type service exists \u2014 only PgLeaveTypeRepository is tested under tests/unit/modules/leave-type/. No test may assume a leave-type service."
+  ],
+  "outOfScope": [
+    "The leave module orchestrator (LeaveService, countLeaveDays, overlap detection, transaction wiring across leave_requests/leave_balances/audit_logs) \u2014 Phase 4.",
+    "Controllers, routes, RBAC guards, and any HTTP surface for the five leaf modules.",
+    "The notification module and its tests (Phase 3).",
+    "Integration tests against a real database; this phase is unit tests only with a mocked pool."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "remainingDays is always derived as totalEntitlement - usedDays - pendingDays and never persisted; the repository's INSERT/UPDATE omit remaining_days and mapRow recomputes it."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "No counter (usedDays, pendingDays) may go negative; a transition that would take one below zero throws InsufficientBalanceError rather than clamping. Negative guards live only in BalanceService."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "On every write, status is recomputed: CLOSED is preserved; otherwise EXHAUSTED when remainingDays <= 0, else ACTIVE."
+    },
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "AuditLog is immutable: the repository exposes only create/read (no update/delete), and AuditService.record sets performedAt at write time and allows performedBy to be null."
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "employmentStatus is one of ACTIVE|INACTIVE|TERMINATED; on read, an unknown status falls back to 'ACTIVE'. terminate() transitions to TERMINATED and sets terminationDate (defaulting to now)."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "entitlementDays must be non-negative (create and update reject negative values with ValidationError); deactivate() sets isActive=false without deleting."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "BalanceService.reserve(balanceId, days)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws NotFoundError if balance missing; InsufficientBalanceError if days < 0 or days > availableDays. On success pendingDays += days."
+    },
+    {
+      "operation": "BalanceService.approve(balanceId, days)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws NotFoundError if balance missing; InsufficientBalanceError if days < 0 or pendingDays < days. On success pendingDays -= days and usedDays += days."
+    },
+    {
+      "operation": "BalanceService.reject(balanceId, days)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws NotFoundError if balance missing; InsufficientBalanceError if days < 0 or pendingDays < days. On success pendingDays -= days."
+    },
+    {
+      "operation": "BalanceService.cancel(balanceId, days, requestStatus)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws NotFoundError if balance missing; InsufficientBalanceError if days < 0, or if the relevant counter (pendingDays for PENDING, usedDays for APPROVED) is below days. On success PENDING releases pendingDays -= days; APPROVED restores usedDays -= days."
+    },
+    {
+      "operation": "BalanceService.getAvailableDays(balance)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Pure derivation totalEntitlement - usedDays - pendingDays; never reads a stored remainingDays."
+    },
+    {
+      "operation": "EmployeeService.create(input)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws ValidationError if employeeNumber/firstName/lastName/email missing, or if employeeNumber already exists. On success creates with a generated id."
+    },
+    {
+      "operation": "PolicyService.create(input)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws ValidationError if policyName or leaveTypeId missing, or entitlementDays < 0. On success creates with generated id and createdAt/updatedAt set to now."
+    },
+    {
+      "operation": "AuditService.record(input)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Sets performedAt at write time, coerces oldValues/newValues/performedBy to null when absent, and persists via repository.create."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Balance counter semantics and derived availability must match the BalanceService implementation exactly (reserve/approve/reject/cancel transitions, negative guards, status recomputation).",
+      "referencePath": "src/modules/balance/balance.service.ts"
+    },
+    {
+      "requirement": "Repository row mapping and fallbacks (employmentStatus\u2192ACTIVE, leave-type code\u2192UNPAID, audit action\u2192UPDATE, balance remainingDays derived) must match the concrete repository mapRow implementations.",
+      "referencePath": "src/modules/balance/balance.repository.ts"
+    },
+    {
+      "requirement": "Error types and their code/statusCode (ValidationError 400, NotFoundError 404, InsufficientBalanceError 422) must be asserted against the shared error classes.",
+      "referencePath": "src/shared/types/errors.ts"
+    },
+    {
+      "requirement": "LeaveTypeCode values (including UNPAID fallback) must be asserted against the shared enum.",
+      "referencePath": "src/shared/types/enums.ts"
+    },
+    {
+      "requirement": "The pg pool must be mocked via jest.mock on the connection module; repositories default to the shared pool when no client is passed.",
+      "referencePath": "src/shared/db/connection.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "The pg pool every repository defaults to; must be mocked so no real DB access occurs."
+    },
+    {
+      "target": "src/shared/types/errors.ts",
+      "why": "Error classes asserted in service tests (ValidationError, NotFoundError, InsufficientBalanceError)."
+    },
+    {
+      "target": "src/shared/types/enums.ts",
+      "why": "LeaveTypeCode (incl. UNPAID fallback) asserted in leave-type repository tests."
+    }
+  ]
+}
