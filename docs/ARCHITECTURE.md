@@ -137,6 +137,75 @@ through a module's public entry point. The barrels are the public
 surface; the entity + interfaces still live together in the single
 `*.model.ts` file as specified.
 
+## Implemented — leaf modules (Phase 2 part 2): concrete repositories + services
+
+This phase added the concrete repository + service implementations for
+the five leaf modules (no controllers/routes, no tests — those are later
+parts). Each module's `index.ts` barrel now also re-exports its concrete
+classes.
+
+**Data access shape (divergence note):** the concrete repositories use
+raw `pg` parameterized SQL queries (via `pool.query`), NOT Knex. The
+HARNESS description mentions "Knex migrations + a thin repository
+layer", but the phase spec explicitly left the query-builder choice open
+("either, as long as it goes through the repository layer"). The
+implementation chose raw parameterized `pg` queries; all access still
+goes through the repository layer (GP-001).
+
+Every repository method accepts an optional `PoolClient` as its LAST
+parameter and defaults to the shared `pool` from
+`src/shared/db/connection.ts` when omitted. Each repository maps snake_case
+DB rows to camelCase entities via a private `mapRow` helper and uses
+`unknown`-style type guards (e.g. `isEmploymentStatus`,
+`isLeaveTypeCode`, `isAuditAction`) rather than `any`.
+
+- `src/modules/employee/` — `PgEmployeeRepository` (create/update/
+  findById/findByEmployeeNumber/findByEmail/list) and `EmployeeService`.
+  `EmployeeService.create` validates required fields and rejects a
+  duplicate `employeeNumber`; `update` merges onto the current entity;
+  `terminate` transitions to `TERMINATED` and records a `terminationDate`
+  (defaulting to now).
+- `src/modules/leave-type/` — `PgLeaveTypeRepository` only (no service in
+  this phase). `code` is validated against the shared `LeaveTypeCode`
+  values; unknown codes fall back to `UNPAID` on read.
+- `src/modules/policy/` — `PgLeavePolicyRepository` and `PolicyService`.
+  `create` validates `policyName`/`leaveTypeId` presence and
+  `entitlementDays >= 0`; `deactivate` sets `isActive=false` without
+  deleting.
+- `src/modules/balance/` — `PgLeaveBalanceRepository` and `BalanceService`.
+  The repository's `COLUMNS` list and INSERT/UPDATE statements omit
+  `remaining_days` entirely — it is never persisted; `mapRow` derives it
+  as `totalEntitlement - usedDays - pendingDays`.
+- `src/modules/audit/` — `PgAuditLogRepository` and `AuditService`.
+  `AuditService.record` sets `performedAt` at write time and allows
+  `performedBy` to be null; the repository exposes only create/read
+  (no update/delete) — the audit log is immutable.
+
+**BalanceService counter semantics** (the binding rule, implemented in
+exactly one place):
+
+- `getAvailableDays(balance)` is a pure derivation
+  `totalEntitlement - usedDays - pendingDays`; it never reads a stored
+  `remainingDays`.
+- `reserve(balanceId, days)` — `pendingDays += days`; throws
+  `InsufficientBalanceError` if `days < 0` or `days > availableDays`
+  (sufficiency is enforced at reserve time as well as at approval).
+- `approve(balanceId, days)` — `pendingDays -= days`, `usedDays += days`;
+  throws if `days < 0` or `pendingDays < days`.
+- `reject(balanceId, days)` — `pendingDays -= days`; throws if `days < 0`
+  or `pendingDays < days`.
+- `cancel(balanceId, days, requestStatus)` — for `'PENDING'` releases
+  `pendingDays -= days`; for `'APPROVED'` restores `usedDays -= days`;
+  throws if the relevant counter would go below zero.
+- No counter may go negative — a transition that would go below zero
+  throws (never clamps). The negative guards live ONLY in `BalanceService`.
+- On every write, `persist` recomputes `remainingDays` in memory and
+  recomputes `status` (`CLOSED` is preserved; otherwise `EXHAUSTED` when
+  `remainingDays <= 0`, else `ACTIVE`), then calls `repository.update`.
+
+The five leaf modules still depend only on `src/shared/types/` and the
+`pg` `PoolClient` type — no cross-module imports.
+
 <!-- gestalt:architecture feature=dd1a6d9f-1b67-4054-9579-5cb7ccee58f3 START -->
 # Leave Management Module — Reconciled Architecture
 
