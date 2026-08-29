@@ -1,20 +1,28 @@
-# Implement this phase: Phase 3 — Notification module (~3 files)
+# Implement this phase: Phase 4a — Leave model + repository
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/dd1a6d9f-1b67-4054-9579-5cb7ccee58f3/5`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/dd1a6d9f-1b67-4054-9579-5cb7ccee58f3/6`. Do not clone anything; work only in this directory.
 
 You are the IMPLEMENTATION agent, not a planner. The platform measures your work EXCLUSIVELY by the files you create or modify in this working tree (`git status`). Ending your turn with a plan, a summary, or an announcement of what you are 'about to' do — without having actually edited files — is a FAILURE: a turn that leaves the working tree untouched is discarded. Explore only as much as you need, then MAKE the edits with your file-editing tool. Never end your turn before the files exist on disk.
 
 ## What to build
-(no phase architecture provided — infer from the success criteria below)
+src/modules/leave/leave.model.ts exists and defines LeaveRequest with the exact listed fields, ILeaveRequestRepository, ILeaveService, and the countLeaveDays helper returning endDate - startDate + 1.
+src/modules/leave/leave.repository.ts exists and implements ILeaveRequestRepository with an optional client param as the last argument.
+Both files compile against src/shared/types/* without referencing files that do not yet exist.
 
 ## Success criteria
-Create the notification module under src/modules/notification/ (the exact path its Module Boundary declares).
+Create the foundational leave module files.
 
-- src/modules/notification/notification.model.ts — Notification entity with EXACT fields: id, recipientId, type, title, message, relatedEntityType (string|null), relatedEntityId (string|null), status ('PENDING'|'SENT'|'READ'|'ARCHIVED'), createdAt, readAt (Date|null). Also declare INotificationRepository and INotificationService interfaces.
-- src/modules/notification/notification.repository.ts — PgNotificationRepository implementing INotificationRepository, using the shared pool from src/shared/db/connection.ts (optional client param as last argument).
-- src/modules/notification/notification.service.ts — NotificationService implementing INotificationService.
+- src/modules/leave/leave.model.ts — LeaveRequest entity with EXACT fields: id, employeeId, leaveTypeId, startDate, endDate, reason (string|undefined), status (LeaveRequestStatus), approvedBy, approvedAt, rejectedBy, rejectedAt, rejectionReason, cancelledBy, cancelledAt, createdAt, updatedAt. Declare ILeaveRequestRepository and ILeaveService interfaces. Implement the shared helper countLeaveDays(startDate, endDate) HERE (binding rule 1): returns endDate - startDate + 1 (calendar days, inclusive of both ends, no weekend/holiday exclusion). This is the ONLY day-count implementation — every call site uses it.
+- src/modules/leave/leave.repository.ts — PgLeaveRequestRepository (optional client param as last argument).
 
-Include Jest unit tests in tests/unit/modules/notification/ (mock the pg pool). This phase depends on src/shared/db/connection.ts and src/shared/types/errors.ts from Phase 1 — read them before generating code.
+Read src/shared/types/* (Phase 1) before generating code that references them. Do NOT create the service, controller, routes, or tests in this sub-phase.
+
+## Owned by SIBLING sub-phases (OUT OF SCOPE for this sub-phase)
+This is ONE sub-phase of a split phase. The deliverables below belong to sibling sub-phases — do NOT create them here, do NOT list them as success criteria, and this sub-phase MUST NOT be gated on their presence (they are produced by a sibling, not missing):
+- "Phase 4b — Leave service + controller + routes + app registration": src/modules/leave/leave.service.ts, src/modules/leave/leave.controller.ts, src/modules/leave/leave.routes.ts, src/app.ts
+- "Phase 4c — Leave module unit tests": tests/unit/modules/leave/leave.service.test.ts, tests/unit/modules/leave/leave.model.test.ts
+
+In particular, UNIT/INTEGRATION TESTS are OUT OF SCOPE for this sub-phase — they are produced in: Phase 4c — Leave module unit tests. Do not create test files here, do not require test existence or coverage as a success criterion, and do not fail the gate for missing tests.
 
 ## Your iteration budget — and how to get more (READ BEFORE YOU START)
 
@@ -113,40 +121,43 @@ submission) in the same place as the sufficiency check. Overlap = any intersecti
 
 ## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
 The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
-- `Notification` — the entity MUST have exactly these fields:
+- `LeaveRequest` — the entity MUST have exactly these fields:
     - id: string
-    - recipientId: string
-    - type: string
-    - title: string
-    - message: string
-    - relatedEntityType: string | null
-    - relatedEntityId: string | null
-    - status: 'PENDING' | 'SENT' | 'READ' | 'ARCHIVED'
+    - employeeId: string
+    - leaveTypeId: string
+    - startDate: Date
+    - endDate: Date
+    - reason: string | undefined
+    - status: LeaveRequestStatus
+    - approvedBy: string | null
+    - approvedAt: Date | null
+    - rejectedBy: string | null
+    - rejectedAt: Date | null
+    - rejectionReason: string | null
+    - cancelledBy: string | null
+    - cancelledAt: Date | null
     - createdAt: Date
-    - readAt: Date | null
+    - updatedAt: Date
 
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- Reuse the shared pg Pool exported from src/shared/db/connection.ts as the default DB executor; do not create a new Pool. (see `src/shared/db/connection.ts`)
-- Match the audit module's model/repository/service/index layout, interface-in-model convention, optional-client-as-last-param pattern, snake_case row mapping with type-guard fallback, and service id/timestamp/null-coercion behavior. (see `src/modules/audit/audit.model.ts`)
-- Match the audit test conventions: jest.mock the shared connection pool, mock the repository interface, and assert mapping/null/passthrough/id/timestamp behavior with no real DB access. (see `tests/unit/modules/audit/audit.service.test.ts`)
-- Use the shared error types (e.g. NotFoundError) from src/shared/types/errors.ts for typed error semantics rather than ad-hoc errors. (see `src/shared/types/errors.ts`)
-- The Notification entity fields and status union must match the reconciled architecture's Notification entity and the notifications conceptual table (recipient_id FK -> employees.id; indexes on recipient_id, status, and (related_entity_type, related_entity_id)). (see `.gestalt/architecture/reconciled.json`)
+- The LeaveRequest.status field must reuse the shared LeaveRequestStatus type (const object + string-literal union) exactly as declared, with members DRAFT/SUBMITTED/APPROVED/REJECTED/CANCELLED — do not redeclare a local literal. (see `src/shared/types/enums.ts`)
+- The repository's optional-client pattern must match the leaf repositories: every method takes an optional PoolClient as its LAST parameter and defaults to the shared pool when omitted. (see `src/modules/balance/balance.repository.ts`)
+- The repository must use the shared pool export (not a new Pool instance) and the snake_case→camelCase mapRow convention with unknown-style type guards. (see `src/shared/db/connection.ts`)
+- The LeaveRequest entity shape must match the reconciled architecture's LeaveRequest attributes (id, employeeId, leaveTypeId, startDate, endDate, reason, status, approvedBy/At, rejectedBy/At/rejectionReason, cancelledBy/At, createdAt, updatedAt) and the leave_requests conceptual table columns. (see `.gestalt/architecture/reconciled.json`)
 ### Entity invariants — enforce these
-- Reuse or extend `Notification`: A Notification is created with status 'PENDING' and readAt null; its status may only ever be one of PENDING, SENT, READ, ARCHIVED, and readAt is set only when the notification transitions to READ (otherwise null).
-- Reuse or extend `Notification`: relatedEntityType and relatedEntityId are either both present (a link to a related entity such as a leave request) or both null; they are never partially set.
-- Reuse or extend `Notification`: recipientId references an existing employee (conceptual FK recipient_id -> employees.id); createdAt is immutable once written.
+- Reuse or extend `LeaveRequest`: Lifecycle: DRAFT -> SUBMITTED -> APPROVED | REJECTED | CANCELLED; the status field is the shared LeaveRequestStatus union. The approval/rejection/cancellation actor+timestamp fields (approvedBy/approvedAt, rejectedBy/rejectedAt/rejectionReason, cancelledBy/cancelledAt) are null until the corresponding transition occurs, and are mutually exclusive with each other (only the set matching the current status is populated).
+- Reuse or extend `LeaveRequest`: startDate and endDate are Dates with startDate <= endDate; the request's duration is always computed via countLeaveDays (calendar days inclusive of both ends), never re-derived inline.
+- Reuse or extend `countLeaveDays`: The single shared day-count helper: returns endDate - startDate + 1 calendar days, inclusive of both ends, with no weekend/holiday exclusion. It is the only day-count implementation; every call site imports it.
 ### Interface contract — expose these operations (their shape is yours)
-- create(notification, client?) — Persists a notification row and returns the persisted Notification; accepts an optional PoolClient as the last argument for unit-of-work participation.
-- findById(id, client?) — Returns the Notification or null when no row matches; accepts an optional PoolClient as the last argument.
-- findByRecipient(recipientId, client?) — Returns notifications for a recipient (optionally filtered by status), ordered newest-first; accepts an optional PoolClient as the last argument.
-- updateStatus(id, status, client?) — Transitions a notification's status (e.g. PENDING->SENT, SENT->READ, ->ARCHIVED) and sets readAt when transitioning to READ; accepts an optional PoolClient as the last argument.
-- notify(input, client?) — Service operation that builds a Notification (generating id and createdAt, coercing absent optionals to null) and persists it via the repository, passing the optional client through.
+- ILeaveRequestRepository — persistence operations for LeaveRequest (create/update/read by id and by employee, and any query needed for overlap detection). — Reads return the entity or null/empty when absent; writes return the persisted entity. No business validation or balance/audit side effects belong here — repository is persistence-only.
+- ILeaveService — the leave lifecycle operations (submit/approve/reject/cancel) that the orchestrator will implement. — State-changing operations must eventually write an audit record (GP-002) and run status + balance + audit through one unit-of-work client in one transaction; negative guards live only in BalanceService, never duplicated here.
+- countLeaveDays(startDate, endDate) — Pure, deterministic function of its two Date arguments; returns an integer >= 1 for valid ranges.
 ### Integration points — connect to these
-- src/shared/db/connection.ts — Shared pg Pool used as the default executor for all repository queries.
-- src/shared/types/errors.ts — Shared typed error classes (e.g. NotFoundError) for repository/service error semantics.
-- pg PoolClient type — Optional last-parameter client for unit-of-work participation in the leave orchestrator's transaction (Phase 6).
+- src/shared/types/ (enums.ts, errors.ts, index.ts) — LeaveRequestStatus type for the status field; shared error types are available for the service (Phase 4b) to throw.
+- src/shared/db/connection.ts — Shared pg pool used as the default executor when no client is passed to repository methods.
+- src/modules/balance/ (balance.model.ts, balance.repository.ts) — The leave service (Phase 4b) will call BalanceService with the day count n computed by countLeaveDays; the repository's optional-client pattern is the template for PgLeaveRequestRepository.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
