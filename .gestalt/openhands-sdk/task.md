@@ -1,6 +1,6 @@
-# Implement this phase: Phase 2 — Leaf modules: employee, leave-type, policy, balance, audit (part 3/3)
+# Implement this phase: Phase 3 — Notification module (~3 files)
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/dd1a6d9f-1b67-4054-9579-5cb7ccee58f3/4`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/dd1a6d9f-1b67-4054-9579-5cb7ccee58f3/5`. Do not clone anything; work only in this directory.
 
 You are the IMPLEMENTATION agent, not a planner. The platform measures your work EXCLUSIVELY by the files you create or modify in this working tree (`git status`). Ending your turn with a plan, a summary, or an announcement of what you are 'about to' do — without having actually edited files — is a FAILURE: a turn that leaves the working tree untouched is discarded. Explore only as much as you need, then MAKE the edits with your file-editing tool. Never end your turn before the files exist on disk.
 
@@ -8,11 +8,13 @@ You are the IMPLEMENTATION agent, not a planner. The platform measures your work
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Build ONLY the Jest unit tests for the five leaf modules' repositories and services. Place tests under tests/unit/modules/employee/, tests/unit/modules/leave-type/, tests/unit/modules/policy/, tests/unit/modules/balance/, tests/unit/modules/audit/.
+Create the notification module under src/modules/notification/ (the exact path its Module Boundary declares).
 
-Coverage must include the binding balance counter transitions: reserve on SUBMIT (pendingDays += n), approve (pendingDays -= n, usedDays += n), reject pending (pendingDays -= n), cancel pending (pendingDays -= n), cancel approved (usedDays -= n); the derived availability formula (availableDays = entitlementDays - usedDays - pendingDays); and the negative-guard behavior (a transition that would take a counter below zero throws, never clamps). Mock the pg pool (src/shared/db/connection.ts) — no real database access.
+- src/modules/notification/notification.model.ts — Notification entity with EXACT fields: id, recipientId, type, title, message, relatedEntityType (string|null), relatedEntityId (string|null), status ('PENDING'|'SENT'|'READ'|'ARCHIVED'), createdAt, readAt (Date|null). Also declare INotificationRepository and INotificationService interfaces.
+- src/modules/notification/notification.repository.ts — PgNotificationRepository implementing INotificationRepository, using the shared pool from src/shared/db/connection.ts (optional client param as last argument).
+- src/modules/notification/notification.service.ts — NotificationService implementing INotificationService.
 
-This phase depends on the concrete implementations from part 2 (src/modules/employee/employee.repository.ts + employee.service.ts, src/modules/leave-type/leave-type.repository.ts, src/modules/policy/policy.repository.ts + policy.service.ts, src/modules/balance/balance.repository.ts + balance.service.ts, src/modules/audit/audit.repository.ts + audit.service.ts) — read them before writing tests so assertions match the actual method signatures.
+Include Jest unit tests in tests/unit/modules/notification/ (mock the pg pool). This phase depends on src/shared/db/connection.ts and src/shared/types/errors.ts from Phase 1 — read them before generating code.
 
 ## Your iteration budget — and how to get more (READ BEFORE YOU START)
 
@@ -111,46 +113,40 @@ submission) in the same place as the sufficiency check. Overlap = any intersecti
 
 ## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
 The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
-- `Employee` — the entity MUST have exactly these fields:
+- `Notification` — the entity MUST have exactly these fields:
     - id: string
-    - employeeNumber: string
-    - firstName: string
-    - lastName: string
-    - email: string
-    - managerId: string | null
-    - department: string | null
-    - hireDate: Date
-    - terminationDate: Date | null
-    - employmentStatus: 'ACTIVE' | 'INACTIVE' | 'TERMINATED'
+    - recipientId: string
+    - type: string
+    - title: string
+    - message: string
+    - relatedEntityType: string | null
+    - relatedEntityId: string | null
+    - status: 'PENDING' | 'SENT' | 'READ' | 'ARCHIVED'
+    - createdAt: Date
+    - readAt: Date | null
 
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- Balance counter semantics and derived availability must match the BalanceService implementation exactly (reserve/approve/reject/cancel transitions, negative guards, status recomputation). (see `src/modules/balance/balance.service.ts`)
-- Repository row mapping and fallbacks (employmentStatus→ACTIVE, leave-type code→UNPAID, audit action→UPDATE, balance remainingDays derived) must match the concrete repository mapRow implementations. (see `src/modules/balance/balance.repository.ts`)
-- Error types and their code/statusCode (ValidationError 400, NotFoundError 404, InsufficientBalanceError 422) must be asserted against the shared error classes. (see `src/shared/types/errors.ts`)
-- LeaveTypeCode values (including UNPAID fallback) must be asserted against the shared enum. (see `src/shared/types/enums.ts`)
-- The pg pool must be mocked via jest.mock on the connection module; repositories default to the shared pool when no client is passed. (see `src/shared/db/connection.ts`)
+- Reuse the shared pg Pool exported from src/shared/db/connection.ts as the default DB executor; do not create a new Pool. (see `src/shared/db/connection.ts`)
+- Match the audit module's model/repository/service/index layout, interface-in-model convention, optional-client-as-last-param pattern, snake_case row mapping with type-guard fallback, and service id/timestamp/null-coercion behavior. (see `src/modules/audit/audit.model.ts`)
+- Match the audit test conventions: jest.mock the shared connection pool, mock the repository interface, and assert mapping/null/passthrough/id/timestamp behavior with no real DB access. (see `tests/unit/modules/audit/audit.service.test.ts`)
+- Use the shared error types (e.g. NotFoundError) from src/shared/types/errors.ts for typed error semantics rather than ad-hoc errors. (see `src/shared/types/errors.ts`)
+- The Notification entity fields and status union must match the reconciled architecture's Notification entity and the notifications conceptual table (recipient_id FK -> employees.id; indexes on recipient_id, status, and (related_entity_type, related_entity_id)). (see `.gestalt/architecture/reconciled.json`)
 ### Entity invariants — enforce these
-- Reuse or extend `LeaveBalance`: remainingDays is always derived as totalEntitlement - usedDays - pendingDays and never persisted; the repository's INSERT/UPDATE omit remaining_days and mapRow recomputes it.
-- Reuse or extend `LeaveBalance`: No counter (usedDays, pendingDays) may go negative; a transition that would take one below zero throws InsufficientBalanceError rather than clamping. Negative guards live only in BalanceService.
-- Reuse or extend `LeaveBalance`: On every write, status is recomputed: CLOSED is preserved; otherwise EXHAUSTED when remainingDays <= 0, else ACTIVE.
-- Reuse or extend `AuditLog`: AuditLog is immutable: the repository exposes only create/read (no update/delete), and AuditService.record sets performedAt at write time and allows performedBy to be null.
-- Reuse or extend `Employee`: employmentStatus is one of ACTIVE|INACTIVE|TERMINATED; on read, an unknown status falls back to 'ACTIVE'. terminate() transitions to TERMINATED and sets terminationDate (defaulting to now).
-- Reuse or extend `LeavePolicy`: entitlementDays must be non-negative (create and update reject negative values with ValidationError); deactivate() sets isActive=false without deleting.
+- Reuse or extend `Notification`: A Notification is created with status 'PENDING' and readAt null; its status may only ever be one of PENDING, SENT, READ, ARCHIVED, and readAt is set only when the notification transitions to READ (otherwise null).
+- Reuse or extend `Notification`: relatedEntityType and relatedEntityId are either both present (a link to a related entity such as a leave request) or both null; they are never partially set.
+- Reuse or extend `Notification`: recipientId references an existing employee (conceptual FK recipient_id -> employees.id); createdAt is immutable once written.
 ### Interface contract — expose these operations (their shape is yours)
-- BalanceService.reserve(balanceId, days) — Throws NotFoundError if balance missing; InsufficientBalanceError if days < 0 or days > availableDays. On success pendingDays += days.
-- BalanceService.approve(balanceId, days) — Throws NotFoundError if balance missing; InsufficientBalanceError if days < 0 or pendingDays < days. On success pendingDays -= days and usedDays += days.
-- BalanceService.reject(balanceId, days) — Throws NotFoundError if balance missing; InsufficientBalanceError if days < 0 or pendingDays < days. On success pendingDays -= days.
-- BalanceService.cancel(balanceId, days, requestStatus) — Throws NotFoundError if balance missing; InsufficientBalanceError if days < 0, or if the relevant counter (pendingDays for PENDING, usedDays for APPROVED) is below days. On success PENDING releases pendingDays -= days; APPROVED restores usedDays -= days.
-- BalanceService.getAvailableDays(balance) — Pure derivation totalEntitlement - usedDays - pendingDays; never reads a stored remainingDays.
-- EmployeeService.create(input) — Throws ValidationError if employeeNumber/firstName/lastName/email missing, or if employeeNumber already exists. On success creates with a generated id.
-- PolicyService.create(input) — Throws ValidationError if policyName or leaveTypeId missing, or entitlementDays < 0. On success creates with generated id and createdAt/updatedAt set to now.
-- AuditService.record(input) — Sets performedAt at write time, coerces oldValues/newValues/performedBy to null when absent, and persists via repository.create.
+- create(notification, client?) — Persists a notification row and returns the persisted Notification; accepts an optional PoolClient as the last argument for unit-of-work participation.
+- findById(id, client?) — Returns the Notification or null when no row matches; accepts an optional PoolClient as the last argument.
+- findByRecipient(recipientId, client?) — Returns notifications for a recipient (optionally filtered by status), ordered newest-first; accepts an optional PoolClient as the last argument.
+- updateStatus(id, status, client?) — Transitions a notification's status (e.g. PENDING->SENT, SENT->READ, ->ARCHIVED) and sets readAt when transitioning to READ; accepts an optional PoolClient as the last argument.
+- notify(input, client?) — Service operation that builds a Notification (generating id and createdAt, coercing absent optionals to null) and persists it via the repository, passing the optional client through.
 ### Integration points — connect to these
-- src/shared/db/connection.ts — The pg pool every repository defaults to; must be mocked so no real DB access occurs.
-- src/shared/types/errors.ts — Error classes asserted in service tests (ValidationError, NotFoundError, InsufficientBalanceError).
-- src/shared/types/enums.ts — LeaveTypeCode (incl. UNPAID fallback) asserted in leave-type repository tests.
+- src/shared/db/connection.ts — Shared pg Pool used as the default executor for all repository queries.
+- src/shared/types/errors.ts — Shared typed error classes (e.g. NotFoundError) for repository/service error semantics.
+- pg PoolClient type — Optional last-parameter client for unit-of-work participation in the leave orchestrator's transaction (Phase 6).
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
