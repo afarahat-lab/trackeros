@@ -1,0 +1,63 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "repository"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "src/modules/leave/leave.repository.ts imports LeaveRequestStatus from the shared types barrel ('../../shared/types') and not from any internal enums file or from '../../shared/types/enums'.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The project typechecks and builds cleanly (tsc --noEmit / npm run build) with the barrel import in place, confirming LeaveRequestStatus is resolvable through '../../shared/types'.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "No internal enums file exists under src/modules/leave/ (the module has no local LeaveRequestStatus definition), so the repository cannot import the enum from a module-local source.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The change must not alter the runtime behavior of PgLeaveRequestRepository \u2014 the enum values (DRAFT/SUBMITTED/APPROVED/REJECTED/CANCELLED) and the isLeaveRequestStatus guard must remain identical.",
+    "The import must resolve through the shared types barrel ('../../shared/types'), not through a direct path to '../../shared/types/enums' or any module-local enums file.",
+    "No new files may be introduced in src/modules/leave/ for this phase; the phase is import-path-only and must not add a local enums module."
+  ],
+  "outOfScope": [
+    "Updating src/modules/leave-type/leave-type.repository.ts to import LeaveTypeCode from the shared types barrel instead of '../../shared/types/enums' \u2014 deferred/out of scope for this phase.",
+    "Any change to the LeaveRequestStatus enum definition, its values, or the shared types barrel's re-export structure."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequestStatus",
+      "mustExistOrExtend": true,
+      "invariant": "The enum's value set (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED) and its string literal values must remain unchanged; the repository's isLeaveRequestStatus guard and DRAFT fallback in mapRow must continue to behave identically."
+    }
+  ],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [
+    {
+      "requirement": "The import in leave.repository.ts must resolve to the same LeaveRequestStatus symbol re-exported by the shared types barrel, matching the barrel's re-export of LeaveRequestStatus from './enums'.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The import style must match the sibling modules leave.model.ts and leave.service.ts, which already import LeaveRequestStatus from '../../shared/types'.",
+      "referencePath": "src/modules/leave/leave.service.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts (shared types barrel)",
+      "why": "The repository's LeaveRequestStatus import must resolve through this barrel, which re-exports the enum from './enums'."
+    }
+  ]
+}
