@@ -1,0 +1,145 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "domain",
+      "data-access"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "src/modules/leave/leave.model.ts exports a LeaveRequest entity whose fields are exactly: id, employeeId, leaveTypeId, startDate, endDate, reason (string|undefined), status (LeaveRequestStatus), approvedBy, approvedAt, rejectedBy, rejectedAt, rejectionReason, cancelledBy, cancelledAt, createdAt, updatedAt \u2014 no additional fields.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "leave.model.ts exports a single shared helper countLeaveDays(startDate, endDate) that returns endDate - startDate + 1 (calendar days, inclusive of both ends, no weekend/holiday exclusion).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "leave.model.ts declares the ILeaveRequestRepository and ILeaveService interfaces (method signatures only, no implementations).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/modules/leave/leave.repository.ts exports PgLeaveRequestRepository implementing ILeaveRequestRepository, with every method accepting an optional PoolClient as its LAST parameter and defaulting to the shared pool from src/shared/db/connection.ts when omitted.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The LeaveRequest entity's status field is typed as the shared LeaveRequestStatus imported from src/shared/types/ (not a locally redeclared literal), and the module compiles under strict TypeScript (tsc --noEmit) with no implicit any.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "PgLeaveRequestRepository maps snake_case DB rows (leave_requests table) to the camelCase LeaveRequest entity, including the nullable approvedBy/approvedAt/rejectedBy/rejectedAt/rejectionReason/cancelledBy/cancelledAt columns.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "countLeaveDays is the ONLY day-count implementation in the codebase \u2014 no call site (including future service code) may re-derive the count inline; it must be imported from the leave module.",
+    "All database access goes through the repository layer (GP-001) \u2014 PgLeaveRequestRepository uses parameterized SQL via the shared pool/client; no inline SQL in models or elsewhere.",
+    "Import every shared type from src/shared/types/ (its public entry point), never from a generic or internal location; the LeaveRequestStatus type must be the shared one.",
+    "Use unknown with type guards instead of any (HARNESS no-any rule); strict null checks apply.",
+    "Do NOT create the service, controller, routes, app registration, or tests in this sub-phase \u2014 those belong to sibling sub-phases 4b and 4c."
+  ],
+  "outOfScope": [
+    "src/modules/leave/leave.service.ts (LeaveService orchestration of submit/approve/reject/cancel, sufficiency/overlap checks, transaction wiring) \u2014 Phase 4b.",
+    "src/modules/leave/leave.controller.ts, leave.routes.ts, and src/app.ts route registration \u2014 Phase 4b.",
+    "Unit/integration tests (tests/unit/modules/leave/*) \u2014 Phase 4c.",
+    "Any balance counter mutation, sufficiency/overlap enforcement, audit writes, or notification fanout \u2014 these are service-layer (Phase 4b) responsibilities, not model/repository concerns."
+  ],
+  "ambiguities": [
+    {
+      "description": "Whether the leave module ships an index.ts barrel in this sub-phase (the architecture's module-boundary rule requires imports through a public entry point, but the phase spec lists only leave.model.ts and leave.repository.ts).",
+      "options": [
+        "Ship index.ts barrel re-exporting the entity, interfaces, countLeaveDays, and PgLeaveRequestRepository (consistent with all prior modules)",
+        "No barrel in this sub-phase; add it in Phase 4b when the service/controller/routes are created"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "The exact method set of ILeaveRequestRepository (e.g. whether it exposes a findByEmployeeAndDateRange or findApprovedOverlapping query for overlap detection, vs. leaving overlap filtering to the service).",
+      "options": [
+        "Repository exposes a dedicated overlap query (findApprovedOverlapping) so the service can enforce overlap at approval",
+        "Repository exposes only generic create/update/findById/findByEmployee and the service filters in memory"
+      ],
+      "impactIfWrong": "medium"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "Lifecycle: DRAFT -> SUBMITTED -> APPROVED | REJECTED | CANCELLED; the status field is the shared LeaveRequestStatus union. The approval/rejection/cancellation actor+timestamp fields (approvedBy/approvedAt, rejectedBy/rejectedAt/rejectionReason, cancelledBy/cancelledAt) are null until the corresponding transition occurs, and are mutually exclusive with each other (only the set matching the current status is populated)."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "startDate and endDate are Dates with startDate <= endDate; the request's duration is always computed via countLeaveDays (calendar days inclusive of both ends), never re-derived inline."
+    },
+    {
+      "entity": "countLeaveDays",
+      "mustExistOrExtend": true,
+      "invariant": "The single shared day-count helper: returns endDate - startDate + 1 calendar days, inclusive of both ends, with no weekend/holiday exclusion. It is the only day-count implementation; every call site imports it."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "ILeaveRequestRepository \u2014 persistence operations for LeaveRequest (create/update/read by id and by employee, and any query needed for overlap detection).",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Reads return the entity or null/empty when absent; writes return the persisted entity. No business validation or balance/audit side effects belong here \u2014 repository is persistence-only."
+    },
+    {
+      "operation": "ILeaveService \u2014 the leave lifecycle operations (submit/approve/reject/cancel) that the orchestrator will implement.",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "State-changing operations must eventually write an audit record (GP-002) and run status + balance + audit through one unit-of-work client in one transaction; negative guards live only in BalanceService, never duplicated here."
+    },
+    {
+      "operation": "countLeaveDays(startDate, endDate)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Pure, deterministic function of its two Date arguments; returns an integer >= 1 for valid ranges."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The LeaveRequest.status field must reuse the shared LeaveRequestStatus type (const object + string-literal union) exactly as declared, with members DRAFT/SUBMITTED/APPROVED/REJECTED/CANCELLED \u2014 do not redeclare a local literal.",
+      "referencePath": "src/shared/types/enums.ts"
+    },
+    {
+      "requirement": "The repository's optional-client pattern must match the leaf repositories: every method takes an optional PoolClient as its LAST parameter and defaults to the shared pool when omitted.",
+      "referencePath": "src/modules/balance/balance.repository.ts"
+    },
+    {
+      "requirement": "The repository must use the shared pool export (not a new Pool instance) and the snake_case\u2192camelCase mapRow convention with unknown-style type guards.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "The LeaveRequest entity shape must match the reconciled architecture's LeaveRequest attributes (id, employeeId, leaveTypeId, startDate, endDate, reason, status, approvedBy/At, rejectedBy/At/rejectionReason, cancelledBy/At, createdAt, updatedAt) and the leave_requests conceptual table columns.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/ (enums.ts, errors.ts, index.ts)",
+      "why": "LeaveRequestStatus type for the status field; shared error types are available for the service (Phase 4b) to throw."
+    },
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "Shared pg pool used as the default executor when no client is passed to repository methods."
+    },
+    {
+      "target": "src/modules/balance/ (balance.model.ts, balance.repository.ts)",
+      "why": "The leave service (Phase 4b) will call BalanceService with the day count n computed by countLeaveDays; the repository's optional-client pattern is the template for PgLeaveRequestRepository."
+    }
+  ]
+}
