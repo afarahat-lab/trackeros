@@ -1,0 +1,159 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "employee",
+      "leave-type",
+      "policy",
+      "balance",
+      "audit"
+    ],
+    "affectedLayers": [
+      "domain-model",
+      "interfaces"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "All five model files exist at their exact declared paths (src/modules/employee/employee.model.ts, src/modules/leave-type/leave-type.model.ts, src/modules/policy/policy.model.ts, src/modules/balance/balance.model.ts, src/modules/audit/audit.model.ts), each exporting its entity type and the repository/service interfaces named in the phase scope.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Employee entity exposes exactly the fields id, employeeNumber, firstName, lastName, email, managerId (string|null), department (string|null), hireDate (Date), terminationDate (Date|null), and employmentStatus typed as the union 'ACTIVE'|'INACTIVE'|'TERMINATED'.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "LeaveType.code reuses the shared LeaveTypeCode type imported from src/shared/types/ (not a duplicated inline literal), and LeaveType exposes name, isPaid, requiresManagerApproval, isActive.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "balance.model.ts declares a local BalanceStatus type with exactly the members 'ACTIVE'|'EXHAUSTED'|'CLOSED' and the LeaveBalance entity carries totalEntitlement, usedDays, pendingDays, remainingDays, status, fiscalYear, createdAt, updatedAt.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "AuditLog.action is the 7-value union 'CREATE'|'UPDATE'|'DELETE'|'APPROVE'|'REJECT'|'CANCEL'|'SUBMIT', and oldValues/newValues are typed Record<string, unknown> | null (never bare Record, never any).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Every shared type (LeaveTypeCode, DTOs, error classes) is imported from the src/shared/types/ barrel, and the phase compiles clean under strict TypeScript (tsc --noEmit) with no `any` usage.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "This phase produces ONLY entity models + repository/service interfaces \u2014 no concrete repository/service implementations, no controllers/routes, no tests (those are parts 2 and 3).",
+    "Use `unknown` or typed unions for all dynamic values; never use `any` (HARNESS constraint no-any, severity high).",
+    "Import every shared type from the src/shared/types/ barrel (src/shared/types/ or src/shared/types/index), never from a generic or deep location.",
+    "Follow the task's single-file layout: each module's entity and its interfaces live together in the named *.model.ts file (no separate repository/service files, no barrels in this phase).",
+    "The five leaf modules depend only on shared-types in this phase; no cross-module imports (policy\u2192leave-type is a later-phase concern)."
+  ],
+  "outOfScope": [
+    "Concrete repository implementations (PgEmployeeRepository, PgLeaveTypeRepository, PgLeavePolicyRepository, PgLeaveBalanceRepository, PgAuditLogRepository) \u2014 Phase 2 part 2.",
+    "Concrete service implementations (EmployeeService, PolicyService, BalanceService, AuditService) and the balance counter transition logic (reserve/approve/reject/cancel, negative guards) \u2014 Phase 2 part 2.",
+    "Jest unit tests for the five modules \u2014 Phase 2 part 3.",
+    "The leave module (LeaveRequest entity, countLeaveDays helper, orchestrator service, controller/routes) and the notification module \u2014 later phases.",
+    "Database migrations, SQL schemas, and any actual persistence wiring \u2014 this phase is type/interface-only."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "employmentStatus is restricted to the lifecycle 'ACTIVE' | 'INACTIVE' | 'TERMINATED'; managerId and department are nullable references, terminationDate is nullable and only meaningful when status is TERMINATED."
+    },
+    {
+      "entity": "LeaveType",
+      "mustExistOrExtend": true,
+      "invariant": "code is one of the six canonical LeaveTypeCode members (annual|sick|emergency|unpaid|maternity|paternity) and isActive gates whether the type may be used; isPaid and requiresManagerApproval are per-type semantics."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "A policy references a leaveTypeId and defines entitlementDays; accrualRate, maxAccumulation, and minimumNoticeDays are optional (nullable) and isActive gates applicability; createdAt/updatedAt are tracked."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "A balance is scoped to (employeeId, policyId, fiscalYear) and its status follows the lifecycle 'ACTIVE' | 'EXHAUSTED' | 'CLOSED'; totalEntitlement, usedDays, pendingDays are non-negative counters and remainingDays is derived (availableDays = entitlementDays - usedDays - pendingDays), never independently stored."
+    },
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "AuditLog is immutable (no lifecycle/mutation); every record captures entityType, entityId, one of the 7 actions, oldValues/newValues snapshots (Record<string, unknown> | null), performedBy (nullable), and performedAt."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IEmployeeRepository and IEmployeeService must be declared in employee.model.ts; the service exposes employee lifecycle operations (create/update/terminate/lookup) and the repository exposes persistence operations, both typed against the Employee entity.",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": ""
+    },
+    {
+      "operation": "ILeaveTypeRepository must be declared in leave-type.model.ts exposing typed persistence operations for LeaveType (create/update/find by code/find active).",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": ""
+    },
+    {
+      "operation": "ILeavePolicyRepository and IPolicyService must be declared in policy.model.ts; the service exposes policy lifecycle operations and the repository exposes typed persistence, both against LeavePolicy.",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": ""
+    },
+    {
+      "operation": "ILeaveBalanceRepository and IBalanceService must be declared in balance.model.ts; the service exposes balance operations (reserve/approve/reject/cancel/derive availability) and the repository exposes typed persistence, both against LeaveBalance.",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": ""
+    },
+    {
+      "operation": "IAuditLogRepository and IAuditService must be declared in audit.model.ts; the service exposes an append/record operation for state changes and the repository exposes typed persistence, both against AuditLog.",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": ""
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "LeaveType.code must reuse the shared LeaveTypeCode type (and its const object) rather than redeclaring the literal union.",
+      "referencePath": "src/shared/types/enums.ts"
+    },
+    {
+      "requirement": "Any DTO/error types referenced by the interfaces must match the shared shapes (LeaveBalanceDTO derived availability, AppError subclasses with code/statusCode) \u2014 do not redefine them locally.",
+      "referencePath": "src/shared/types/dtos.ts"
+    },
+    {
+      "requirement": "Error semantics in service interfaces must align with the shared error contract (NotFoundError, ValidationError, InsufficientBalanceError, OverlapError) rather than inventing new error types.",
+      "referencePath": "src/shared/types/errors.ts"
+    },
+    {
+      "requirement": "Entity field names/types must match the reconciled architecture's domain_entities (Employee, LeaveType, LeavePolicy, LeaveBalance, AuditLog) exactly \u2014 no renamed or added fields.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "Module directories and owned artifacts must match the reconciled module boundaries (employee, leave-type, policy, balance, audit under src/modules/).",
+      "referencePath": "docs/ARCHITECTURE.md"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/ (barrel: enums.ts, dtos.ts, errors.ts)",
+      "why": "The sole dependency of all five leaf modules; LeaveTypeCode, DTOs, and error classes are imported from here."
+    },
+    {
+      "target": "src/modules/leave/ (future orchestrator)",
+      "why": "Later phase consumes these entity/interface types to orchestrate submit/approve/reject/cancel across balance and audit."
+    },
+    {
+      "target": "src/shared/db/connection.ts (future)",
+      "why": "Concrete repositories in part 2 will use the shared pool/optional client; interfaces must be shaped to accept an optional unit-of-work client as the last parameter."
+    }
+  ]
+}
