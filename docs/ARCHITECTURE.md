@@ -31,7 +31,7 @@ src/modules/AuditRecord/    — AuditRecord module
 src/modules/AuditServiceInterface/    — AuditServiceInterface module
 src/shared/db connection.ts
 src/shared/base repository.ts
-src/shared/error types.ts
+src/shared/types/    — shared-types module (enums, dtos, errors, index)
 ```
 
 ## Key patterns
@@ -48,6 +48,40 @@ src/shared/error types.ts
 - All database access goes through a repository layer — no inline SQL
   / ORM calls in route handlers or business logic
 - No circular dependencies between modules
+
+## Implemented — shared-types module (Phase 1)
+
+The shared-types module is the dependency leaf every domain module
+imports from. It lives at `src/shared/types/` and is implemented as
+follows:
+
+- `enums.ts` — `LeaveTypeCode`, `LeaveRequestStatus`, and `UserRole`,
+  each declared as a `const` object with `as const` plus a matching
+  string-literal union type (NOT TypeScript `enum` keyword, NOT numeric
+  enums). Canonical members: `LeaveTypeCode` = annual | sick | emergency
+  | unpaid | maternity | paternity; `LeaveRequestStatus` = DRAFT |
+  SUBMITTED | APPROVED | REJECTED | CANCELLED (uppercase); `UserRole` =
+  employee | manager | hr_admin.
+- `dtos.ts` — `FiscalYear` (a plain integer calendar year, e.g. 2026 —
+  no configurable start month, no carry-over, no accrual),
+  `LeaveRequestDTO`, and `LeaveBalanceDTO`. `LeaveBalanceDTO` exposes the
+  derived availability shape (`entitlementDays`, `usedDays`,
+  `pendingDays`) plus `leaveTypeCode` and `fiscalYear`; it never exposes a
+  stored `remainingDays` field.
+- `errors.ts` — an `AppError` base class carrying `code` (an `ErrorCode`
+  string-literal union), `statusCode`, and a `toResponse()` method
+  returning the `{ error, code }` contract. Subclasses:
+  `ValidationError` (400), `AuthenticationError` (401),
+  `AuthorizationError` (403), `NotFoundError` (404),
+  `InsufficientBalanceError` (422), `OverlapError` (422, code
+  `POLICY_VIOLATION`).
+- `index.ts` — the barrel / public entry point re-exporting all of the
+  above (values and types).
+
+The module has no dependencies on other modules (it is the leaf). Unit
+tests live under `tests/unit/shared/types/` and cover the exact enum
+member values, the DTO shapes (including the absence of `remainingDays`),
+and the error contract.
 
 <!-- gestalt:architecture feature=dd1a6d9f-1b67-4054-9579-5cb7ccee58f3 START -->
 # Leave Management Module — Reconciled Architecture
