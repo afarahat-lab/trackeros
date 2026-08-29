@@ -1,0 +1,216 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave",
+      "balance",
+      "audit",
+      "notification",
+      "leave-type",
+      "policy",
+      "employee",
+      "shared-types"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository",
+      "service",
+      "controller",
+      "routes",
+      "tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "large"
+  },
+  "successCriteria": [
+    {
+      "description": "A single exported helper countLeaveDays(startDate, endDate) exists in the leave module and returns endDate - startDate + 1 (calendar days, inclusive of both ends, no weekend/holiday exclusion); every day-count call site in the leave module (submit/approve/reject/cancel, sufficiency, overlap) invokes it rather than re-deriving the count inline.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The LeaveRequest entity, ILeaveRequestRepository, and ILeaveService are declared in src/modules/leave/leave.model.ts with the exact LeaveRequest fields (id, employeeId, leaveTypeId, startDate, endDate, reason, status, approvedBy, approvedAt, rejectedBy, rejectedAt, rejectionReason, cancelledBy, cancelledAt, createdAt, updatedAt) and status typed as the shared LeaveRequestStatus.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The LeaveService exposes submit, approve, reject, and cancel operations; each computes the day count n via countLeaveDays exactly once per operation and drives the corresponding balance transition (reserve on submit, approve on approve, release on reject, release/restore on cancel).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "On approve, the service enforces sufficiency (n <= availableDays) and overlap (no intersecting APPROVED request for the same employee, regardless of leave type) in the same place, throwing InsufficientBalanceError / OverlapError respectively.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The balance fiscal year is derived from startDate exactly once per operation; a request whose range crosses 31 December is charged in full to its startDate's year and never split across two balance records.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Every status change, balance counter change, and audit write for a single operation runs through the SAME unit-of-work client in ONE transaction (client passed through to balance and audit services), so a failure rolls back all three.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The leave routes are registered in src/app.ts (alongside the existing uptimeRoutes) and Jest unit tests exist under tests/unit/modules/leave/ that mock repositories/services with no real database access.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "countLeaveDays is the ONLY day-count implementation in the codebase; no call site may re-derive the count inline (binding rule 1).",
+    "Negative guards for balance counters live ONLY in BalanceService (src/modules/balance/balance.service.ts) and must not be duplicated in the leave module.",
+    "All database access goes through repository interfaces (GP-001); the leave service/controller must not issue SQL or ORM calls directly.",
+    "Every state-changing operation writes an audit record (GP-002) via the audit service within the same transaction.",
+    "RBAC is enforced at the route/middleware level (GP-005), never inline in the service; request.user carries { id, role: UserRole }.",
+    "The leave module imports other modules only through their public entry points (index.ts barrels), never their internals.",
+    "Repository and service methods that participate in a transaction accept an optional PoolClient as the LAST parameter and pass it through; when omitted they use the shared pool from src/shared/db/connection.ts.",
+    "Use unknown with type guards instead of any (no-any constraint); strict TypeScript with no implicit any and strict null checks."
+  ],
+  "outOfScope": [
+    "Weekend/holiday exclusion from the day count, holiday calendars, half-day leave, and fractional-day rounding \u2014 the count is always calendar days inclusive of both ends.",
+    "Configurable fiscal-year start month, employee-anniversary years, carry-over, accrual, and proration \u2014 the leave year is the calendar year and unused days expire at 31 December.",
+    "Splitting a request across two balance years \u2014 a request crossing 31 December is charged in full to its startDate's year.",
+    "Special-casing any leave type (e.g. auto-approval, sick-leave documentation, emergency drawing from annual pool) \u2014 all types follow the same approval lifecycle and separate balances.",
+    "Frontend (React Native) work and the @trackeros/contracts typed REST surface \u2014 this phase is backend-only."
+  ],
+  "ambiguities": [
+    {
+      "description": "Whether lifecycle notifications (via NotificationService) participate in the same transaction as the status/balance/audit writes, or are emitted after commit (fire-and-forget).",
+      "options": [
+        "Notifications join the same unit-of-work client and roll back with the transaction",
+        "Notifications are emitted after successful commit (best-effort, not transactional)"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "Whether the sufficiency check on approve uses the balance's derived availableDays (totalEntitlement - usedDays - pendingDays) or a stricter check that excludes the request's own pending reservation.",
+      "options": [
+        "Use availableDays as-is (pending already includes this request's reservation)",
+        "Exclude this request's own pending days from the check"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "Whether minimumNoticeDays enforcement (from LeavePolicy) is applied at submit time, and whether emergency leave is exempt, given the reconciled binding rules mention it but the phase scope does not explicitly list it.",
+      "options": [
+        "Enforce minimumNoticeDays at submit, exempting emergency leave",
+        "Defer minimumNoticeDays enforcement to a later phase"
+      ],
+      "impactIfWrong": "medium"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "Lifecycle is DRAFT -> SUBMITTED -> APPROVED | REJECTED | CANCELLED; a request may be cancelled from SUBMITTED or APPROVED only. Status transitions are driven exclusively by the service operations (submit/approve/reject/cancel), and each transition records the corresponding actor/timestamp fields (approvedBy/At, rejectedBy/At/rejectionReason, cancelledBy/At)."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "startDate must be on or before endDate; the day count n = countLeaveDays(startDate, endDate) is always >= 1 and is the single source of truth for reservation/deduction/sufficiency."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "No two APPROVED requests for the same employee may have intersecting [startDate, endDate] ranges, regardless of leave type; this is enforced at approval time."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "availableDays = totalEntitlement - usedDays - pendingDays is always derived, never stored; the leave module never writes remainingDays directly and never mutates counters except through BalanceService."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "submit",
+      "authRule": "employee (own request)",
+      "idempotent": false,
+      "errorSemantics": "Invalid input (missing employeeId/leaveTypeId, startDate > endDate) -> ValidationError (400); unknown employee/leaveType -> NotFoundError (404); insufficient balance at reserve -> InsufficientBalanceError (422)."
+    },
+    {
+      "operation": "approve",
+      "authRule": "manager or hr_admin (no self-approval)",
+      "idempotent": false,
+      "errorSemantics": "Not found -> NotFoundError (404); insufficient balance (n > availableDays) -> InsufficientBalanceError (422); overlapping APPROVED request -> OverlapError (422, POLICY_VIOLATION); unauthorized -> AuthorizationError (403)."
+    },
+    {
+      "operation": "reject",
+      "authRule": "manager or hr_admin",
+      "idempotent": false,
+      "errorSemantics": "Not found -> NotFoundError (404); rejecting a non-SUBMITTED request -> ValidationError (400); unauthorized -> AuthorizationError (403)."
+    },
+    {
+      "operation": "cancel",
+      "authRule": "employee (own request)",
+      "idempotent": false,
+      "errorSemantics": "Not found -> NotFoundError (404); cancelling a request not in SUBMITTED or APPROVED -> ValidationError (400); unauthorized -> AuthorizationError (403)."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Reuse the shared LeaveRequestStatus and LeaveTypeCode types (and UserRole for auth) from src/shared/types/ \u2014 do not redeclare literal unions.",
+      "referencePath": "src/shared/types/enums.ts"
+    },
+    {
+      "requirement": "Reuse the shared error classes (ValidationError, NotFoundError, InsufficientBalanceError, OverlapError, AuthorizationError) and their { error, code } contract; do not introduce new error shapes.",
+      "referencePath": "src/shared/types/errors.ts"
+    },
+    {
+      "requirement": "Drive all balance counter transitions through BalanceService (reserve/approve/reject/cancel) with the day count n passed as a parameter; never mutate counters directly and never duplicate negative guards.",
+      "referencePath": "src/modules/balance/balance.service.ts"
+    },
+    {
+      "requirement": "Write audit records via AuditService.record with the correct AuditAction (SUBMIT/APPROVE/REJECT/CANCEL) and pass the same unit-of-work client.",
+      "referencePath": "src/modules/audit/audit.service.ts"
+    },
+    {
+      "requirement": "Emit lifecycle notifications via NotificationService.notify (recipient, type, title, message, related entity) passing the same client where the notification participates in the transaction.",
+      "referencePath": "src/modules/notification/notification.service.ts"
+    },
+    {
+      "requirement": "Match the IBalanceService method signatures (reserve/approve/reject/cancel with optional PoolClient last) and the derived availability formula when calling balance operations.",
+      "referencePath": "src/modules/balance/balance.model.ts"
+    },
+    {
+      "requirement": "Match the IAuditService.record signature and AuditLogInput shape (entityType, entityId, action, oldValues/newValues, performedBy) when writing audit records.",
+      "referencePath": "src/modules/audit/audit.model.ts"
+    },
+    {
+      "requirement": "Register leave routes in src/app.ts alongside the existing uptimeRoutes registration, following the same Fastify plugin registration pattern.",
+      "referencePath": "src/app.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/balance/balance.service.ts (BalanceService)",
+      "why": "Orchestrates reserve/approve/reject/cancel counter transitions with the computed day count n; the only place negative guards live."
+    },
+    {
+      "target": "src/modules/audit/audit.service.ts (AuditService)",
+      "why": "Writes an immutable audit record for every state-changing operation within the same transaction."
+    },
+    {
+      "target": "src/modules/notification/notification.service.ts (NotificationService)",
+      "why": "Emits lifecycle notifications (submitted/approved/rejected/cancelled) to employees/managers."
+    },
+    {
+      "target": "src/modules/leave-type/leave-type.model.ts (ILeaveTypeRepository)",
+      "why": "Resolves the leave type (code, requiresManagerApproval, isActive) for a request."
+    },
+    {
+      "target": "src/modules/policy/policy.model.ts (ILeavePolicyRepository)",
+      "why": "Resolves the entitlement/policy for the leave type to locate the correct balance."
+    },
+    {
+      "target": "src/modules/employee/employee.model.ts (IEmployeeRepository)",
+      "why": "Resolves the employee and their manager for approval routing and self-approval prevention."
+    },
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "Shared pg pool used as the default when no unit-of-work client is passed; the service owns BEGIN/COMMIT/ROLLBACK."
+    }
+  ]
+}
