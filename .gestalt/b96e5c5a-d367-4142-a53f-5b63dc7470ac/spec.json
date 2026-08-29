@@ -1,0 +1,75 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "notification"
+    ],
+    "affectedLayers": [
+      "service"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "For every input, the Notification produced/persisted by NotificationService.notify has relatedEntityType and relatedEntityId either both null or both non-null \u2014 never exactly one set.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "An input where exactly one of relatedEntityType/relatedEntityId is provided is rejected with a ValidationError (code VALIDATION_ERROR, HTTP 400) before any repository.create call is made.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Both-absent and both-present inputs continue to behave as before: both-absent coerces to null/null, both-present preserves the provided values, and the resulting Notification is persisted via repository.create.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A unit test exists covering the exactly-one-field-provided case (both directions: type-only and id-only), asserting rejection; existing both-absent and both-present tests still pass.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The invariant is enforced in NotificationService.notify at the service boundary, not in PgNotificationRepository.create \u2014 the repository persists whatever it is given.",
+    "Rejection must use the existing ValidationError from src/shared/types/errors.ts (code VALIDATION_ERROR, HTTP 400) \u2014 no new error type.",
+    "The Notification entity field types remain string | null for both relatedEntityType and relatedEntityId; the NotificationInput optional-plus-nullable shape is unchanged."
+  ],
+  "outOfScope": [
+    "No change to PgNotificationRepository.create or any repository-level enforcement \u2014 the repository remains a pass-through persister.",
+    "No change to the Notification/NotificationInput model field types or nullability semantics.",
+    "No new error type, no HTTP route/controller changes, and no database schema/migration changes."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "relatedEntityType and relatedEntityId are always both null or both non-null \u2014 a Notification never carries a partially-set related-entity pair."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "NotificationService.notify",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Rejects input where exactly one of relatedEntityType/relatedEntityId is provided by throwing ValidationError (VALIDATION_ERROR, 400) before persisting; otherwise persists and returns the Notification."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Reuse the existing ValidationError class (code VALIDATION_ERROR, statusCode 400) rather than introducing a new error type.",
+      "referencePath": "src/shared/types/errors.ts"
+    },
+    {
+      "requirement": "Match the existing Notification entity field types (relatedEntityType/relatedEntityId: string | null) and NotificationInput optional-plus-nullable shape; do not change the model.",
+      "referencePath": "src/modules/notification/notification.model.ts"
+    },
+    {
+      "requirement": "Preserve the existing notify behavior for valid inputs (id generation, createdAt at write time, status PENDING, readAt null, client passthrough to repository.create).",
+      "referencePath": "src/modules/notification/notification.service.ts"
+    }
+  ],
+  "integrationPoints": []
+}
