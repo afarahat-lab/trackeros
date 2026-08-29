@@ -20,6 +20,7 @@ src/modules/audit/audit.model.ts + index.ts
 src/modules/balance/balance.model.ts + index.ts
 src/modules/employee/employee.model.ts + index.ts
 src/modules/leave-type/leave-type.model.ts + index.ts
+src/modules/notification/    — notification module (model, repository, service, index)
 src/modules/policy/policy.model.ts + index.ts
 src/modules/status/    — status module (model, service interface, service)
 src/modules/uptime/    — uptime module (model, routes, service interface, service)
@@ -232,6 +233,43 @@ transition that would take a counter below zero throws
 `performedAt`-at-write-time behavior, null coercion, and the
 immutability surface (only `create`/`findById`/`findByEntity` — no
 `update`/`delete`).
+
+## Implemented — notification module (Phase 3)
+
+This phase built the notification module under `src/modules/notification/`
+(model + repository + service + `index.ts` barrel) plus its Jest unit
+tests under `tests/unit/modules/notification/`.
+
+- `notification.model.ts` — `NotificationStatus` union
+  (`'PENDING' | 'SENT' | 'READ' | 'ARCHIVED'`); `Notification` entity
+  (id, recipientId, type, title, message, relatedEntityType
+  `string|null`, relatedEntityId `string|null`, status, createdAt,
+  readAt `Date|null`); `NotificationInput` (recipientId, type, title,
+  message, optional relatedEntityType/relatedEntityId);
+  `INotificationRepository` (create/findById/findByRecipient/
+  updateStatus) and `INotificationService` (notify).
+- `notification.repository.ts` — `PgNotificationRepository` using raw
+  parameterized `pg` SQL (same shape as the leaf repositories), optional
+  `PoolClient` as the LAST parameter defaulting to the shared pool, a
+  private `mapRow` snake_case→camelCase helper, and an
+  `isNotificationStatus` type guard that falls back to `PENDING` on an
+  unknown status. `updateStatus` sets `read_at = NOW()` only when
+  transitioning to `READ` and throws `NotFoundError` when no row matches.
+- `notification.service.ts` — `NotificationService` with a single
+  `notify(input, client?)` method. It generates a `randomUUID()` id, sets
+  `createdAt` at write time, forces `status = 'PENDING'` and
+  `readAt = null`, coerces absent related fields to `null`, and delegates
+  to `repository.create` passing the client through. The service exposes
+  only `notify` — the repository's `updateStatus`/`findByRecipient` are
+  not yet surfaced through a service method.
+
+The module depends only on `src/shared/types/` (for `NotFoundError`) and
+`src/shared/db/connection.ts` — no cross-module imports. Unit tests mock
+the shared `pg` pool and cover the `mapRow` status fallback, the
+optional-client passthrough, `findByRecipient` ordering + status filter,
+`updateStatus`'s `read_at` behavior and `NotFoundError`, and the
+service's id/`createdAt` generation, `PENDING`/`readAt=null` defaults,
+null coercion, and client passthrough.
 
 <!-- gestalt:architecture feature=dd1a6d9f-1b67-4054-9579-5cb7ccee58f3 START -->
 # Leave Management Module — Reconciled Architecture
