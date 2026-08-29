@@ -258,18 +258,24 @@ tests under `tests/unit/modules/notification/`.
 - `notification.service.ts` — `NotificationService` with a single
   `notify(input, client?)` method. It generates a `randomUUID()` id, sets
   `createdAt` at write time, forces `status = 'PENDING'` and
-  `readAt = null`, coerces absent related fields to `null`, and delegates
-  to `repository.create` passing the client through. The service exposes
-  only `notify` — the repository's `updateStatus`/`findByRecipient` are
-  not yet surfaced through a service method.
+  `readAt = null`, and delegates to `repository.create` passing the
+  client through. It enforces the related-entity invariant:
+  `relatedEntityType` and `relatedEntityId` must be BOTH present or BOTH
+  absent — a partially-set pair (exactly one provided) throws
+  `ValidationError` (code `VALIDATION_ERROR`, 400) before persisting;
+  otherwise absent fields are coerced to `null`. The service exposes only
+  `notify` — the repository's `updateStatus`/`findByRecipient` are not
+  yet surfaced through a service method.
 
-The module depends only on `src/shared/types/` (for `NotFoundError`) and
-`src/shared/db/connection.ts` — no cross-module imports. Unit tests mock
-the shared `pg` pool and cover the `mapRow` status fallback, the
-optional-client passthrough, `findByRecipient` ordering + status filter,
-`updateStatus`'s `read_at` behavior and `NotFoundError`, and the
-service's id/`createdAt` generation, `PENDING`/`readAt=null` defaults,
-null coercion, and client passthrough.
+The module depends only on `src/shared/types/` (for `NotFoundError` and
+`ValidationError`) and `src/shared/db/connection.ts` — no cross-module
+imports. Unit tests mock the shared `pg` pool and cover the `mapRow`
+status fallback, the optional-client passthrough, `findByRecipient`
+ordering + status filter, `updateStatus`'s `read_at` behavior and
+`NotFoundError`, and the service's id/`createdAt` generation,
+`PENDING`/`readAt=null` defaults, the both-or-null related-entity
+validation (partial pairs rejected with `ValidationError`), and client
+passthrough.
 
 <!-- gestalt:architecture feature=dd1a6d9f-1b67-4054-9579-5cb7ccee58f3 START -->
 # Leave Management Module — Reconciled Architecture
