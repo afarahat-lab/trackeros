@@ -1,0 +1,152 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "notification"
+    ],
+    "affectedLayers": [
+      "domain",
+      "repository",
+      "service",
+      "unit-tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The notification module exists at src/modules/notification/ with notification.model.ts, notification.repository.ts, notification.service.ts, and an index.ts barrel that re-exports the entity, both interfaces, and both concrete classes.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "notification.model.ts declares the Notification entity with exactly these fields and types: id (string), recipientId (string), type (string), title (string), message (string), relatedEntityType (string|null), relatedEntityId (string|null), status ('PENDING'|'SENT'|'READ'|'ARCHIVED'), createdAt (Date), readAt (Date|null) \u2014 no extra or missing fields.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "notification.model.ts declares INotificationRepository and INotificationService interfaces, and PgNotificationRepository implements INotificationRepository while NotificationService implements INotificationService.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "PgNotificationRepository performs all persistence via raw parameterized pg SQL through the shared pool from src/shared/db/connection.ts, with every repository method accepting an optional PoolClient as the last parameter and defaulting to the shared pool when omitted.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository maps snake_case DB columns (recipient_id, related_entity_type, related_entity_id, created_at, read_at) to the camelCase entity fields and coerces null/absent relatedEntityType, relatedEntityId, and readAt to null.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "NotificationService generates ids via randomUUID() and sets createdAt at write time, coercing absent relatedEntityType/relatedEntityId/readAt to null, and passes the optional client through to the repository.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests exist under tests/unit/modules/notification/ that mock the pg pool (jest.mock of src/shared/db/connection) and cover snake_case-to-camelCase mapping, null handling, optional-client passthrough, id generation, and timestamp-at-write-time; the suite passes with no real database access.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Honor no-any: use unknown with type guards instead of any (e.g. for the status union type guard and row mapping).",
+    "Honor no-direct-db-outside-repository: all SQL lives in PgNotificationRepository; the service never touches the pool or issues queries.",
+    "No hardcoded secrets and no @gestalt/* package dependencies.",
+    "Import other modules only through their index.ts barrels; the notification module depends only on shared-types (src/shared/types/) and the pg PoolClient type \u2014 no dependency on leave, balance, audit, employee, policy, or leave-type.",
+    "Use raw parameterized pg SQL (no Knex/ORM) via pool.query, matching the audit repository pattern.",
+    "The status field is restricted to the four-value union 'PENDING'|'SENT'|'READ'|'ARCHIVED'; type is a plain string (not an enum)."
+  ],
+  "outOfScope": [
+    "No HTTP routes, controller, or Fastify registration for notifications \u2014 the leave module (Phase 6) is the only consumer and wires notification fanout.",
+    "No BullMQ/background job or email/push delivery \u2014 status 'SENT' is a state marker only; actual transport is out of scope.",
+    "No Knex migration or schema DDL for the notifications table \u2014 the conceptual table is defined in the reconciled architecture but migration creation is not part of this phase.",
+    "No RBAC/auth guards on notification operations \u2014 authorization is enforced at the consuming route layer, not in this module."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "A Notification is created with status 'PENDING' and readAt null; its status may only ever be one of PENDING, SENT, READ, ARCHIVED, and readAt is set only when the notification transitions to READ (otherwise null)."
+    },
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "relatedEntityType and relatedEntityId are either both present (a link to a related entity such as a leave request) or both null; they are never partially set."
+    },
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "recipientId references an existing employee (conceptual FK recipient_id -> employees.id); createdAt is immutable once written."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "create(notification, client?)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Persists a notification row and returns the persisted Notification; accepts an optional PoolClient as the last argument for unit-of-work participation."
+    },
+    {
+      "operation": "findById(id, client?)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the Notification or null when no row matches; accepts an optional PoolClient as the last argument."
+    },
+    {
+      "operation": "findByRecipient(recipientId, client?)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns notifications for a recipient (optionally filtered by status), ordered newest-first; accepts an optional PoolClient as the last argument."
+    },
+    {
+      "operation": "updateStatus(id, status, client?)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Transitions a notification's status (e.g. PENDING->SENT, SENT->READ, ->ARCHIVED) and sets readAt when transitioning to READ; accepts an optional PoolClient as the last argument."
+    },
+    {
+      "operation": "notify(input, client?)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Service operation that builds a Notification (generating id and createdAt, coercing absent optionals to null) and persists it via the repository, passing the optional client through."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Reuse the shared pg Pool exported from src/shared/db/connection.ts as the default DB executor; do not create a new Pool.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "Match the audit module's model/repository/service/index layout, interface-in-model convention, optional-client-as-last-param pattern, snake_case row mapping with type-guard fallback, and service id/timestamp/null-coercion behavior.",
+      "referencePath": "src/modules/audit/audit.model.ts"
+    },
+    {
+      "requirement": "Match the audit test conventions: jest.mock the shared connection pool, mock the repository interface, and assert mapping/null/passthrough/id/timestamp behavior with no real DB access.",
+      "referencePath": "tests/unit/modules/audit/audit.service.test.ts"
+    },
+    {
+      "requirement": "Use the shared error types (e.g. NotFoundError) from src/shared/types/errors.ts for typed error semantics rather than ad-hoc errors.",
+      "referencePath": "src/shared/types/errors.ts"
+    },
+    {
+      "requirement": "The Notification entity fields and status union must match the reconciled architecture's Notification entity and the notifications conceptual table (recipient_id FK -> employees.id; indexes on recipient_id, status, and (related_entity_type, related_entity_id)).",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "Shared pg Pool used as the default executor for all repository queries."
+    },
+    {
+      "target": "src/shared/types/errors.ts",
+      "why": "Shared typed error classes (e.g. NotFoundError) for repository/service error semantics."
+    },
+    {
+      "target": "pg PoolClient type",
+      "why": "Optional last-parameter client for unit-of-work participation in the leave orchestrator's transaction (Phase 6)."
+    }
+  ]
+}
