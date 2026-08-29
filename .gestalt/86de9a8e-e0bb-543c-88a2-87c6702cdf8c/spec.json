@@ -1,0 +1,212 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "employee",
+      "leave-type",
+      "policy",
+      "balance",
+      "audit"
+    ],
+    "affectedLayers": [
+      "repository",
+      "service"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "All nine concrete files exist and compile: PgEmployeeRepository + EmployeeService, PgLeaveTypeRepository, PgLeavePolicyRepository + PolicyService, PgLeaveBalanceRepository + BalanceService, PgAuditLogRepository + AuditService \u2014 each implementing the interface declared in its module's *.model.ts.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "BalanceService implements the binding counter semantics exactly: availableDays = entitlementDays - usedDays - pendingDays (derived, never stored); SUBMIT n \u2192 pendingDays += n; APPROVE \u2192 pendingDays -= n, usedDays += n; REJECT pending \u2192 pendingDays -= n; CANCEL pending \u2192 pendingDays -= n; CANCEL approved \u2192 usedDays -= n.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A balance transition that would take any counter (usedDays or pendingDays) below zero throws an error (never clamps), and the negative guard exists only in BalanceService \u2014 no other module duplicates it.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Every repository and service method accepts an optional PoolClient as its LAST parameter and passes it through to the underlying data access; when omitted, the shared pool from src/shared/db/connection.ts is used.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "BalanceService methods accept the day count n as a parameter (reserve/approve/reject/cancel take `days`), and do not compute the day count themselves \u2014 the caller computes n via the shared countLeaveDays helper (Phase 4).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Each repository persists and returns the entity it was asked to create/update (create returns the persisted row; update returns the updated row), and lookup methods return the entity or null/[] per the interface contract.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "AuditService.record persists an AuditLog row (via the repository) and returns it; the AuditLog is immutable once written (no update/delete operations exist).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The build gate passes: `npm run build` (tsc --noEmit) succeeds with strict TypeScript and no `any` (use `unknown` + type guards), and no database access occurs outside the repository layer.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No tests in this phase \u2014 unit tests for these modules are Phase 4 (part 3/3).",
+    "No controllers/routes/HTTP surface in this phase \u2014 only repository + service implementations.",
+    "All database access goes through the repository layer (GP-001); services never issue SQL/ORM calls directly.",
+    "No cross-module imports in this phase: the five leaf modules depend only on src/shared/types/ and the pg PoolClient type (per the reconciled dependency map).",
+    "remainingDays is never independently persisted \u2014 it is always derived as totalEntitlement - usedDays - pendingDays.",
+    "Negative guards live ONLY in BalanceService and are never duplicated into callers or other modules.",
+    "Use `unknown` with type guards instead of `any` (HARNESS constraint no-any); no hardcoded secrets; no @gestalt/* packages as dependencies."
+  ],
+  "outOfScope": [
+    "Unit tests for these repositories/services (Phase 4, part 3/3).",
+    "The leave module orchestrator, countLeaveDays helper, controllers, and routes (Phase 4).",
+    "The notification module (Phase 3).",
+    "RBAC enforcement and auth guards \u2014 no HTTP/API boundary exists in this phase.",
+    "Accrual, carry-over, and fiscal-year boundary logic (binding rule 2: none exist)."
+  ],
+  "ambiguities": [
+    {
+      "description": "Whether the concrete repositories use Knex (per HARNESS \"Knex migrations + thin repository layer\") or raw pg queries. The interfaces only expose PoolClient, so the implementation shape is open.",
+      "options": [
+        "Knex query builder",
+        "Raw pg parameterized queries",
+        "Either, as long as it goes through the repository layer"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "description": "Whether the balance service's negative guard should also enforce the sufficiency check (n <= availableDays) at reserve time, or leave sufficiency to the Phase 4 leave orchestrator. The binding rule places the sufficiency check at approval; reserve-time enforcement is unspecified.",
+      "options": [
+        "Enforce n <= availableDays at reserve too",
+        "Only enforce non-negative counters; leave sufficiency to approval (Phase 4)",
+        "Enforce at reserve as a safety net but keep approval as the authoritative check"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "Whether the balance service should recompute/update the derived remainingDays field on the returned entity after a counter change, given the model still carries a remainingDays field (documented as derived, never independently persisted).",
+      "options": [
+        "Return the entity with remainingDays recomputed in-memory",
+        "Return the entity with remainingDays as stored (stale) and rely on getAvailableDays",
+        "Remove/ignore remainingDays on writes"
+      ],
+      "impactIfWrong": "medium"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "usedDays and pendingDays are always non-negative integers; availableDays is always derived as totalEntitlement - usedDays - pendingDays and never stored; a write that would make either counter negative is rejected with an error, never clamped."
+    },
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "Immutable once created \u2014 only create/read operations exist; no update or delete path."
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "employmentStatus is one of ACTIVE | INACTIVE | TERMINATED; terminate() transitions the employee to TERMINATED and records a terminationDate."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "isActive governs eligibility; deactivate() transitions a policy to inactive without deleting it."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "BalanceService.reserve(balanceId, days, client?)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws an error (never clamps) if pendingDays + days would exceed availableDays or go negative; returns the updated LeaveBalance."
+    },
+    {
+      "operation": "BalanceService.approve(balanceId, days, client?)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Moves days from pendingDays to usedDays (pendingDays -= n, usedDays += n); throws if pendingDays would go below zero; returns the updated LeaveBalance."
+    },
+    {
+      "operation": "BalanceService.reject(balanceId, days, client?)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Releases pending days (pendingDays -= n); throws if pendingDays would go below zero; returns the updated LeaveBalance."
+    },
+    {
+      "operation": "BalanceService.cancel(balanceId, days, requestStatus, client?)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "For PENDING releases pendingDays -= n; for APPROVED restores usedDays -= n; throws if the relevant counter would go below zero; returns the updated LeaveBalance."
+    },
+    {
+      "operation": "BalanceService.getAvailableDays(balance)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Pure derivation returning totalEntitlement - usedDays - pendingDays; never reads or writes a stored remainingDays."
+    },
+    {
+      "operation": "AuditService.record(input, client?)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Persists and returns an AuditLog; performedAt is set at write time; performedBy may be null."
+    },
+    {
+      "operation": "EmployeeService.terminate(id, terminationDate?, client?)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Transitions the employee to TERMINATED with a terminationDate; throws NotFoundError if the employee does not exist."
+    },
+    {
+      "operation": "PolicyService.deactivate(id, client?)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Sets isActive=false and returns the updated policy; throws NotFoundError if the policy does not exist."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Concrete classes must implement the exact interface signatures (method names, parameter order, optional PoolClient as last param, return types) declared in each module's *.model.ts.",
+      "referencePath": "src/modules/employee/employee.model.ts, src/modules/leave-type/leave-type.model.ts, src/modules/policy/policy.model.ts, src/modules/balance/balance.model.ts, src/modules/audit/audit.model.ts"
+    },
+    {
+      "requirement": "When the optional client is omitted, use the shared `pool` exported from connection.ts; never create a new Pool.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "Reuse the shared error types (NotFoundError, ValidationError, InsufficientBalanceError, etc.) for all thrown errors; do not introduce ad-hoc error shapes.",
+      "referencePath": "src/shared/types/errors.ts"
+    },
+    {
+      "requirement": "LeaveType.code must use the shared LeaveTypeCode type imported from src/shared/types/ (not a redeclared literal).",
+      "referencePath": "src/shared/types/enums.ts"
+    },
+    {
+      "requirement": "Balance counter semantics must match the binding rule: availableDays = entitlementDays - usedDays - pendingDays, with only the five permitted writes and no negative counters.",
+      "referencePath": ".gestalt/architecture/reconciled.json (business_rules: BALANCE COUNTER SEMANTICS)"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/db/connection.ts (shared pg Pool)",
+      "why": "All repositories default to this pool when no unit-of-work client is passed."
+    },
+    {
+      "target": "src/shared/types/ (enums, dtos, errors)",
+      "why": "Leaf modules import shared types and error classes; the only permitted dependency."
+    },
+    {
+      "target": "pg PoolClient (unit-of-work)",
+      "why": "Optional last parameter threaded through repository and service methods so Phase 4's leave orchestrator can run status change + balance + audit in one transaction."
+    }
+  ]
+}
