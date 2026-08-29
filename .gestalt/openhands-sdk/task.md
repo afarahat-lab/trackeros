@@ -1,6 +1,6 @@
-# Implement this phase: Phase 1 — Shared types & value objects (~3 files)
+# Implement this phase: Phase 2 — Leaf modules: employee, leave-type, policy, balance, audit (part 1/3)
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/dd1a6d9f-1b67-4054-9579-5cb7ccee58f3/1`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/dd1a6d9f-1b67-4054-9579-5cb7ccee58f3/2`. Do not clone anything; work only in this directory.
 
 You are the IMPLEMENTATION agent, not a planner. The platform measures your work EXCLUSIVELY by the files you create or modify in this working tree (`git status`). Ending your turn with a plan, a summary, or an announcement of what you are 'about to' do — without having actually edited files — is a FAILURE: a turn that leaves the working tree untouched is discarded. Explore only as much as you need, then MAKE the edits with your file-editing tool. Never end your turn before the files exist on disk.
 
@@ -8,15 +8,15 @@ You are the IMPLEMENTATION agent, not a planner. The platform measures your work
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the shared-types module under src/shared/types/ (the exact path the architecture's Module Boundaries declare for this module). Create three files:
+Build ONLY the entity models + repository/service interfaces for the five leaf modules (no concrete implementations, no tests — those are parts 2 and 3). Create each file under the exact directory its module declares in the Module Boundaries.
 
-1. src/shared/types/enums.ts — define and export the enums with EXACT canonical names and members: LeaveTypeCode ('annual' | 'sick' | 'emergency' | 'unpaid' | 'maternity' | 'paternity'), LeaveRequestStatus ('DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED'), UserRole ('employee' | 'manager' | 'hr_admin').
+- src/modules/employee/employee.model.ts — Employee entity with EXACT fields: id, employeeNumber, firstName, lastName, email, managerId (string|null), department (string|null), hireDate (Date), terminationDate (Date|null), employmentStatus ('ACTIVE'|'INACTIVE'|'TERMINATED'). Also declare IEmployeeRepository and IEmployeeService interfaces.
+- src/modules/leave-type/leave-type.model.ts — LeaveType entity: id, code ('annual'|'sick'|'emergency'|'unpaid'|'maternity'|'paternity'), name, isPaid, requiresManagerApproval, isActive. Also ILeaveTypeRepository.
+- src/modules/policy/policy.model.ts — LeavePolicy entity: id, policyName, leaveTypeId, entitlementDays, accrualRate (number|null), maxAccumulation (number|null), minimumNoticeDays (number|null), requiresManagerApproval, isActive, createdAt, updatedAt. Also ILeavePolicyRepository and IPolicyService.
+- src/modules/balance/balance.model.ts — LeaveBalance entity: id, employeeId, policyId, fiscalYear (number), totalEntitlement, usedDays, pendingDays, remainingDays, status (BalanceStatus), createdAt, updatedAt. Also BalanceStatus type, ILeaveBalanceRepository, IBalanceService.
+- src/modules/audit/audit.model.ts — AuditLog entity: id, entityType, entityId, action ('CREATE'|'UPDATE'|'DELETE'|'APPROVE'|'REJECT'|'CANCEL'|'SUBMIT'), oldValues (Record|null), newValues (Record|null), performedBy (string|null), performedAt. Also IAuditLogRepository and IAuditService.
 
-2. src/shared/types/dtos.ts — define and export LeaveRequestDTO, LeaveBalanceDTO, and the FiscalYear value type. FiscalYear is a plain integer calendar year (e.g. 2026) — there is NO configurable fiscal-year start month (binding rule 2). LeaveBalanceDTO must expose the derived availability shape (entitlementDays, usedDays, pendingDays) — never a stored remainingDays field.
-
-3. src/shared/types/errors.ts — define and export shared error types (e.g. NotFoundError, ValidationError, InsufficientBalanceError, OverlapError) used across modules.
-
-No dependencies on other modules. Include Jest unit tests in tests/unit/shared/types/ covering enum values and DTO shape.
+This phase depends on src/shared/types/enums.ts, src/shared/types/dtos.ts, src/shared/types/errors.ts from Phase 1 — read them before generating any code that references those types. Import every shared type from src/shared/types/ (never a generic location).
 
 ## Your iteration budget — and how to get more (READ BEFORE YOU START)
 
@@ -113,25 +113,44 @@ OVERLAP: no overlapping APPROVED leave for the same employee, enforced at APPROV
 submission) in the same place as the sufficiency check. Overlap = any intersection of the
 [startDate, endDate] range with an existing APPROVED request, regardless of leave type. [BINDING RULE — operator decision resolving: Should leave duration be measured in calendar days or business (working) days, and should weekends/public holidays be excluded from the count?; How is the fiscal year boundary defined for balance accrual and carry-over, and is unused annual leave carried over or forfeited?; Should sick and emergency leave be deducted from the same annual entitlement pool or tracked as separate balances, and do they require manager approval?; Can a leave request span multiple fiscal years, and if so how is the duration split across the two balances?; What is the rounding direction and precision for remaining_days when entitlement is fractional (accrual_rate present) or when used_days is fractional?; How is the fiscal year boundary defined for balance accrual and carry-over (e.g. calendar year Jan 1–Dec 31 vs. a company-specific fiscal year), and is unused annual leave carried over or forfeited?; How are leave days counted when computing used_days and remaining_days (e.g. inclusive vs exclusive of end_date, half-day support, weekend/holiday exclusion, rounding direction)?; How are leave days counted for a request spanning partial days or weekends/holidays?; How is the fiscal year derived for a leave request?; What is the rounding rule for partial-day balances (e.g. half-day leave)?; apply everywhere these apply, not in one place only]
 
+## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
+The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
+- `Employee` — the entity MUST have exactly these fields:
+    - id: string
+    - employeeNumber: string
+    - firstName: string
+    - lastName: string
+    - email: string
+    - managerId: string | null
+    - department: string | null
+    - hireDate: Date
+    - terminationDate: Date | null
+    - employmentStatus: 'ACTIVE' | 'INACTIVE' | 'TERMINATED'
+
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- Enum member names and values must match the canonical definitions declared in the reconciled architecture's shared-types module ownership (LeaveTypeCode, LeaveRequestStatus, UserRole). (see `.gestalt/architecture/reconciled.json`)
-- LeaveBalanceDTO must expose entitlementDays/usedDays/pendingDays (never remainingDays) and FiscalYear must be a plain integer calendar year, matching binding rule 2 and the balance counter semantics. (see `.gestalt/architecture/reconciled.json`)
-- Error types must conform to the error response contract { error: string; code: string } with the documented HTTP status mapping. (see `.gestalt/architecture/reconciled.json`)
-- The module must live at src/shared/types/ (the exact path the Module Boundaries declare) and be a dependency leaf with no imports from other modules. (see `docs/ARCHITECTURE.md`)
-- TypeScript/Jest conventions (strict, commonjs, ES2022, rootDir ./src, baseUrl ./src, named exports, no-any) must be followed as declared in the harness. (see `HARNESS.json`)
+- LeaveType.code must reuse the shared LeaveTypeCode type (and its const object) rather than redeclaring the literal union. (see `src/shared/types/enums.ts`)
+- Any DTO/error types referenced by the interfaces must match the shared shapes (LeaveBalanceDTO derived availability, AppError subclasses with code/statusCode) — do not redefine them locally. (see `src/shared/types/dtos.ts`)
+- Error semantics in service interfaces must align with the shared error contract (NotFoundError, ValidationError, InsufficientBalanceError, OverlapError) rather than inventing new error types. (see `src/shared/types/errors.ts`)
+- Entity field names/types must match the reconciled architecture's domain_entities (Employee, LeaveType, LeavePolicy, LeaveBalance, AuditLog) exactly — no renamed or added fields. (see `.gestalt/architecture/reconciled.json`)
+- Module directories and owned artifacts must match the reconciled module boundaries (employee, leave-type, policy, balance, audit under src/modules/). (see `docs/ARCHITECTURE.md`)
 ### Entity invariants — enforce these
-- Reuse or extend `LeaveTypeCode`: Its value set is exactly the six canonical members (annual, sick, emergency, unpaid, maternity, paternity) — no additional or missing members.
-- Reuse or extend `LeaveRequestStatus`: Its value set is exactly the five canonical uppercase members (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED) matching the LeaveRequest lifecycle DRAFT -> SUBMITTED -> APPROVED/REJECTED/CANCELLED.
-- Reuse or extend `UserRole`: Its value set is exactly the three canonical members (employee, manager, hr_admin) matching the auth contract request.user.role.
-- Reuse or extend `FiscalYear`: A plain integer calendar year (e.g. 2026); there is no fiscal-year start month, no carry-over, and no accrual.
-- Reuse or extend `LeaveBalanceDTO`: Exposes the derived availability shape (entitlementDays, usedDays, pendingDays) and never a stored remainingDays field; availability is derived, not stored.
-- Reuse or extend `LeaveRequestDTO`: A pure data shape for a leave request with no owned logic; its status field is typed to LeaveRequestStatus.
+- Reuse or extend `Employee`: employmentStatus is restricted to the lifecycle 'ACTIVE' | 'INACTIVE' | 'TERMINATED'; managerId and department are nullable references, terminationDate is nullable and only meaningful when status is TERMINATED.
+- Reuse or extend `LeaveType`: code is one of the six canonical LeaveTypeCode members (annual|sick|emergency|unpaid|maternity|paternity) and isActive gates whether the type may be used; isPaid and requiresManagerApproval are per-type semantics.
+- Reuse or extend `LeavePolicy`: A policy references a leaveTypeId and defines entitlementDays; accrualRate, maxAccumulation, and minimumNoticeDays are optional (nullable) and isActive gates applicability; createdAt/updatedAt are tracked.
+- Reuse or extend `LeaveBalance`: A balance is scoped to (employeeId, policyId, fiscalYear) and its status follows the lifecycle 'ACTIVE' | 'EXHAUSTED' | 'CLOSED'; totalEntitlement, usedDays, pendingDays are non-negative counters and remainingDays is derived (availableDays = entitlementDays - usedDays - pendingDays), never independently stored.
+- Reuse or extend `AuditLog`: AuditLog is immutable (no lifecycle/mutation); every record captures entityType, entityId, one of the 7 actions, oldValues/newValues snapshots (Record<string, unknown> | null), performedBy (nullable), and performedAt.
 ### Interface contract — expose these operations (their shape is yours)
-- Shared error types (NotFoundError, ValidationError, InsufficientBalanceError, OverlapError) must be constructible/throwable and carry the error contract shape { error: string; code: string }. — Errors map to the cross-cutting contract: validation -> 400, auth -> 401, authorization -> 403, not found -> 404, insufficient balance/policy violation -> 422.
+- IEmployeeRepository and IEmployeeService must be declared in employee.model.ts; the service exposes employee lifecycle operations (create/update/terminate/lookup) and the repository exposes persistence operations, both typed against the Employee entity.
+- ILeaveTypeRepository must be declared in leave-type.model.ts exposing typed persistence operations for LeaveType (create/update/find by code/find active).
+- ILeavePolicyRepository and IPolicyService must be declared in policy.model.ts; the service exposes policy lifecycle operations and the repository exposes typed persistence, both against LeavePolicy.
+- ILeaveBalanceRepository and IBalanceService must be declared in balance.model.ts; the service exposes balance operations (reserve/approve/reject/cancel/derive availability) and the repository exposes typed persistence, both against LeaveBalance.
+- IAuditLogRepository and IAuditService must be declared in audit.model.ts; the service exposes an append/record operation for state changes and the repository exposes typed persistence, both against AuditLog.
 ### Integration points — connect to these
-- src/modules/leave, balance, employee, policy, leave-type, notification, audit (future phases) — Every domain module imports its enums, DTOs, and error types from shared-types; this phase establishes the canonical source they will all depend on.
+- src/shared/types/ (barrel: enums.ts, dtos.ts, errors.ts) — The sole dependency of all five leaf modules; LeaveTypeCode, DTOs, and error classes are imported from here.
+- src/modules/leave/ (future orchestrator) — Later phase consumes these entity/interface types to orchestrate submit/approve/reject/cancel across balance and audit.
+- src/shared/db/connection.ts (future) — Concrete repositories in part 2 will use the shared pool/optional client; interfaces must be shaped to accept an optional unit-of-work client as the last parameter.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
