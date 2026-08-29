@@ -1,7 +1,7 @@
 import type { PoolClient } from 'pg';
 
 import { pool } from '../../shared/db/connection';
-import { LeaveRequestStatus } from '../../shared/types/enums';
+import { LeaveRequestStatus } from '../../shared/types';
 import { ILeaveRequestRepository, LeaveRequest } from './leave.model';
 
 const COLUMNS = [
