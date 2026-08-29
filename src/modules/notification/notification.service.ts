@@ -8,6 +8,7 @@ import {
   INotificationService
 } from './notification.model';
 import { PgNotificationRepository } from './notification.repository';
+import { ValidationError } from '../../shared/types/errors';
 
 export class NotificationService implements INotificationService {
   private readonly repository: INotificationRepository;
@@ -22,6 +23,14 @@ export class NotificationService implements INotificationService {
     input: NotificationInput,
     client?: PoolClient
   ): Promise<Notification> {
+    const hasType = input.relatedEntityType != null;
+    const hasId = input.relatedEntityId != null;
+    if (hasType !== hasId) {
+      throw new ValidationError(
+        'relatedEntityType and relatedEntityId must both be provided or both be null'
+      );
+    }
+
     const notification: Notification = {
       id: randomUUID(),
       recipientId: input.recipientId,

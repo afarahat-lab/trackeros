@@ -64,6 +64,22 @@ describe('NotificationService', () => {
     expect(result.relatedEntityId).toBe('req-1');
   });
 
+  it('rejects input where only relatedEntityType is provided', async () => {
+    await expect(
+      service.notify({ ...baseInput(), relatedEntityType: 'LeaveRequest' })
+    ).rejects.toMatchObject({ code: 'VALIDATION_ERROR', statusCode: 400 });
+
+    expect(repository.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects input where only relatedEntityId is provided', async () => {
+    await expect(
+      service.notify({ ...baseInput(), relatedEntityId: 'req-1' })
+    ).rejects.toMatchObject({ code: 'VALIDATION_ERROR', statusCode: 400 });
+
+    expect(repository.create).not.toHaveBeenCalled();
+  });
+
   it('persists via repository.create with the same client passthrough', async () => {
     const client = { query: jest.fn() };
 
