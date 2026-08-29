@@ -1,6 +1,6 @@
-# Implement this phase: Phase 2 — Leaf modules: employee, leave-type, policy, balance, audit (part 2/3)
+# Implement this phase: Phase 2 — Leaf modules: employee, leave-type, policy, balance, audit (part 3/3)
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/dd1a6d9f-1b67-4054-9579-5cb7ccee58f3/3`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/dd1a6d9f-1b67-4054-9579-5cb7ccee58f3/4`. Do not clone anything; work only in this directory.
 
 You are the IMPLEMENTATION agent, not a planner. The platform measures your work EXCLUSIVELY by the files you create or modify in this working tree (`git status`). Ending your turn with a plan, a summary, or an announcement of what you are 'about to' do — without having actually edited files — is a FAILURE: a turn that leaves the working tree untouched is discarded. Explore only as much as you need, then MAKE the edits with your file-editing tool. Never end your turn before the files exist on disk.
 
@@ -8,17 +8,11 @@ You are the IMPLEMENTATION agent, not a planner. The platform measures your work
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Build ONLY the concrete repository + service implementations for the five leaf modules (no tests — part 3). Each file lives in its module's declared directory.
+Build ONLY the Jest unit tests for the five leaf modules' repositories and services. Place tests under tests/unit/modules/employee/, tests/unit/modules/leave-type/, tests/unit/modules/policy/, tests/unit/modules/balance/, tests/unit/modules/audit/.
 
-- src/modules/employee/employee.repository.ts (PgEmployeeRepository) + employee.service.ts (EmployeeService).
-- src/modules/leave-type/leave-type.repository.ts (PgLeaveTypeRepository).
-- src/modules/policy/policy.repository.ts (PgLeavePolicyRepository) + policy.service.ts (PolicyService).
-- src/modules/balance/balance.repository.ts (PgLeaveBalanceRepository) + balance.service.ts (BalanceService).
-- src/modules/audit/audit.repository.ts (PgAuditLogRepository) + audit.service.ts (AuditService).
+Coverage must include the binding balance counter transitions: reserve on SUBMIT (pendingDays += n), approve (pendingDays -= n, usedDays += n), reject pending (pendingDays -= n), cancel pending (pendingDays -= n), cancel approved (usedDays -= n); the derived availability formula (availableDays = entitlementDays - usedDays - pendingDays); and the negative-guard behavior (a transition that would take a counter below zero throws, never clamps). Mock the pg pool (src/shared/db/connection.ts) — no real database access.
 
-BalanceService MUST implement the binding counter semantics: availableDays = entitlementDays - usedDays - pendingDays (ALWAYS derived, never stored). Only permitted writes: SUBMIT n -> pendingDays += n; APPROVE -> pendingDays -= n, usedDays += n; REJECT pending -> pendingDays -= n; CANCEL pending -> pendingDays -= n; CANCEL approved -> usedDays -= n. No counter may go negative — a transition that would go below zero throws an error (never clamps). Negative guards live ONLY in BalanceService. Balance service methods accept the day count n as a parameter (the caller computes n via the shared countLeaveDays helper in the leave module, Phase 4). Repository and service methods take an optional client (unit-of-work) as the LAST parameter and pass it through; when omitted use the shared pool from src/shared/db/connection.ts.
-
-This phase depends on the model/interface files from part 1 (src/modules/employee/employee.model.ts, src/modules/leave-type/leave-type.model.ts, src/modules/policy/policy.model.ts, src/modules/balance/balance.model.ts, src/modules/audit/audit.model.ts) and src/shared/db/connection.ts — read them before generating any code that references their types.
+This phase depends on the concrete implementations from part 2 (src/modules/employee/employee.repository.ts + employee.service.ts, src/modules/leave-type/leave-type.repository.ts, src/modules/policy/policy.repository.ts + policy.service.ts, src/modules/balance/balance.repository.ts + balance.service.ts, src/modules/audit/audit.repository.ts + audit.service.ts) — read them before writing tests so assertions match the actual method signatures.
 
 ## Your iteration budget — and how to get more (READ BEFORE YOU START)
 
@@ -132,29 +126,31 @@ The entities below are shared, cross-module DATA CONTRACTS. Implement each one w
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- Concrete classes must implement the exact interface signatures (method names, parameter order, optional PoolClient as last param, return types) declared in each module's *.model.ts. (see `src/modules/employee/employee.model.ts, src/modules/leave-type/leave-type.model.ts, src/modules/policy/policy.model.ts, src/modules/balance/balance.model.ts, src/modules/audit/audit.model.ts`)
-- When the optional client is omitted, use the shared `pool` exported from connection.ts; never create a new Pool. (see `src/shared/db/connection.ts`)
-- Reuse the shared error types (NotFoundError, ValidationError, InsufficientBalanceError, etc.) for all thrown errors; do not introduce ad-hoc error shapes. (see `src/shared/types/errors.ts`)
-- LeaveType.code must use the shared LeaveTypeCode type imported from src/shared/types/ (not a redeclared literal). (see `src/shared/types/enums.ts`)
-- Balance counter semantics must match the binding rule: availableDays = entitlementDays - usedDays - pendingDays, with only the five permitted writes and no negative counters. (see `.gestalt/architecture/reconciled.json (business_rules: BALANCE COUNTER SEMANTICS)`)
+- Balance counter semantics and derived availability must match the BalanceService implementation exactly (reserve/approve/reject/cancel transitions, negative guards, status recomputation). (see `src/modules/balance/balance.service.ts`)
+- Repository row mapping and fallbacks (employmentStatus→ACTIVE, leave-type code→UNPAID, audit action→UPDATE, balance remainingDays derived) must match the concrete repository mapRow implementations. (see `src/modules/balance/balance.repository.ts`)
+- Error types and their code/statusCode (ValidationError 400, NotFoundError 404, InsufficientBalanceError 422) must be asserted against the shared error classes. (see `src/shared/types/errors.ts`)
+- LeaveTypeCode values (including UNPAID fallback) must be asserted against the shared enum. (see `src/shared/types/enums.ts`)
+- The pg pool must be mocked via jest.mock on the connection module; repositories default to the shared pool when no client is passed. (see `src/shared/db/connection.ts`)
 ### Entity invariants — enforce these
-- Reuse or extend `LeaveBalance`: usedDays and pendingDays are always non-negative integers; availableDays is always derived as totalEntitlement - usedDays - pendingDays and never stored; a write that would make either counter negative is rejected with an error, never clamped.
-- Reuse or extend `AuditLog`: Immutable once created — only create/read operations exist; no update or delete path.
-- Reuse or extend `Employee`: employmentStatus is one of ACTIVE | INACTIVE | TERMINATED; terminate() transitions the employee to TERMINATED and records a terminationDate.
-- Reuse or extend `LeavePolicy`: isActive governs eligibility; deactivate() transitions a policy to inactive without deleting it.
+- Reuse or extend `LeaveBalance`: remainingDays is always derived as totalEntitlement - usedDays - pendingDays and never persisted; the repository's INSERT/UPDATE omit remaining_days and mapRow recomputes it.
+- Reuse or extend `LeaveBalance`: No counter (usedDays, pendingDays) may go negative; a transition that would take one below zero throws InsufficientBalanceError rather than clamping. Negative guards live only in BalanceService.
+- Reuse or extend `LeaveBalance`: On every write, status is recomputed: CLOSED is preserved; otherwise EXHAUSTED when remainingDays <= 0, else ACTIVE.
+- Reuse or extend `AuditLog`: AuditLog is immutable: the repository exposes only create/read (no update/delete), and AuditService.record sets performedAt at write time and allows performedBy to be null.
+- Reuse or extend `Employee`: employmentStatus is one of ACTIVE|INACTIVE|TERMINATED; on read, an unknown status falls back to 'ACTIVE'. terminate() transitions to TERMINATED and sets terminationDate (defaulting to now).
+- Reuse or extend `LeavePolicy`: entitlementDays must be non-negative (create and update reject negative values with ValidationError); deactivate() sets isActive=false without deleting.
 ### Interface contract — expose these operations (their shape is yours)
-- BalanceService.reserve(balanceId, days, client?) — Throws an error (never clamps) if pendingDays + days would exceed availableDays or go negative; returns the updated LeaveBalance.
-- BalanceService.approve(balanceId, days, client?) — Moves days from pendingDays to usedDays (pendingDays -= n, usedDays += n); throws if pendingDays would go below zero; returns the updated LeaveBalance.
-- BalanceService.reject(balanceId, days, client?) — Releases pending days (pendingDays -= n); throws if pendingDays would go below zero; returns the updated LeaveBalance.
-- BalanceService.cancel(balanceId, days, requestStatus, client?) — For PENDING releases pendingDays -= n; for APPROVED restores usedDays -= n; throws if the relevant counter would go below zero; returns the updated LeaveBalance.
-- BalanceService.getAvailableDays(balance) — Pure derivation returning totalEntitlement - usedDays - pendingDays; never reads or writes a stored remainingDays.
-- AuditService.record(input, client?) — Persists and returns an AuditLog; performedAt is set at write time; performedBy may be null.
-- EmployeeService.terminate(id, terminationDate?, client?) — Transitions the employee to TERMINATED with a terminationDate; throws NotFoundError if the employee does not exist.
-- PolicyService.deactivate(id, client?) — Sets isActive=false and returns the updated policy; throws NotFoundError if the policy does not exist.
+- BalanceService.reserve(balanceId, days) — Throws NotFoundError if balance missing; InsufficientBalanceError if days < 0 or days > availableDays. On success pendingDays += days.
+- BalanceService.approve(balanceId, days) — Throws NotFoundError if balance missing; InsufficientBalanceError if days < 0 or pendingDays < days. On success pendingDays -= days and usedDays += days.
+- BalanceService.reject(balanceId, days) — Throws NotFoundError if balance missing; InsufficientBalanceError if days < 0 or pendingDays < days. On success pendingDays -= days.
+- BalanceService.cancel(balanceId, days, requestStatus) — Throws NotFoundError if balance missing; InsufficientBalanceError if days < 0, or if the relevant counter (pendingDays for PENDING, usedDays for APPROVED) is below days. On success PENDING releases pendingDays -= days; APPROVED restores usedDays -= days.
+- BalanceService.getAvailableDays(balance) — Pure derivation totalEntitlement - usedDays - pendingDays; never reads a stored remainingDays.
+- EmployeeService.create(input) — Throws ValidationError if employeeNumber/firstName/lastName/email missing, or if employeeNumber already exists. On success creates with a generated id.
+- PolicyService.create(input) — Throws ValidationError if policyName or leaveTypeId missing, or entitlementDays < 0. On success creates with generated id and createdAt/updatedAt set to now.
+- AuditService.record(input) — Sets performedAt at write time, coerces oldValues/newValues/performedBy to null when absent, and persists via repository.create.
 ### Integration points — connect to these
-- src/shared/db/connection.ts (shared pg Pool) — All repositories default to this pool when no unit-of-work client is passed.
-- src/shared/types/ (enums, dtos, errors) — Leaf modules import shared types and error classes; the only permitted dependency.
-- pg PoolClient (unit-of-work) — Optional last parameter threaded through repository and service methods so Phase 4's leave orchestrator can run status change + balance + audit in one transaction.
+- src/shared/db/connection.ts — The pg pool every repository defaults to; must be mocked so no real DB access occurs.
+- src/shared/types/errors.ts — Error classes asserted in service tests (ValidationError, NotFoundError, InsufficientBalanceError).
+- src/shared/types/enums.ts — LeaveTypeCode (incl. UNPAID fallback) asserted in leave-type repository tests.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
