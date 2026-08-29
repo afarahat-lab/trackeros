@@ -19,6 +19,7 @@ The architecture is modular, with a clear separation of concerns between models,
 src/modules/audit/audit.model.ts + index.ts
 src/modules/balance/balance.model.ts + index.ts
 src/modules/employee/employee.model.ts + index.ts
+src/modules/leave/    — leave module (model, repository, index)
 src/modules/leave-type/leave-type.model.ts + index.ts
 src/modules/notification/    — notification module (model, repository, service, index)
 src/modules/policy/policy.model.ts + index.ts
@@ -276,6 +277,52 @@ ordering + status filter, `updateStatus`'s `read_at` behavior and
 `PENDING`/`readAt=null` defaults, the both-or-null related-entity
 validation (partial pairs rejected with `ValidationError`), and client
 passthrough.
+
+## Implemented — leave module (Phase 4a): model + repository
+
+This phase built the leave module's foundational files under
+`src/modules/leave/` — the entity model, the repository, and the
+`index.ts` barrel. It is the first of three sub-phases for the leave
+orchestrator; the service, controller, routes, app registration, and
+tests are owned by sibling sub-phases (4b and 4c) and are NOT present
+here.
+
+- `leave.model.ts` — `LeaveRequest` entity with exactly the reconciled
+  fields (id, employeeId, leaveTypeId, startDate, endDate, reason
+  `string | undefined`, status `LeaveRequestStatus`, approvedBy/approvedAt,
+  rejectedBy/rejectedAt/rejectionReason, cancelledBy/cancelledAt, createdAt,
+  updatedAt). `status` reuses the shared `LeaveRequestStatus` imported from
+  `src/shared/types/` (not a redeclared literal). Also declares
+  `ILeaveRequestRepository` (create/update/findById/findByEmployee/
+  findApprovedOverlapping) and `ILeaveService` (submit/approve/reject/
+  cancel — interface only, no implementation in this phase).
+- `countLeaveDays(startDate, endDate)` — the single shared day-count
+  helper, implemented HERE (binding rule 1). Returns `endDate - startDate
+  + 1` calendar days inclusive of both ends, with no weekend/holiday
+  exclusion. It normalizes both dates to UTC calendar days (via
+  `Date.UTC`) so time-of-day and daylight-saving transitions never change
+  the result. This is the ONLY day-count implementation — every call site
+  (including the future service) must import it rather than re-derive the
+  count inline.
+- `leave.repository.ts` — `PgLeaveRequestRepository` implementing
+  `ILeaveRequestRepository`, using raw parameterized `pg` SQL against the
+  `leave_requests` table (same shape as the leaf repositories). Every
+  method takes an optional `PoolClient` as its LAST parameter and defaults
+  to the shared `pool` from `src/shared/db/connection.ts` when omitted. A
+  private `mapRow` maps snake_case rows to the camelCase entity, coercing
+  `reason` `null` → `undefined`, and an `isLeaveRequestStatus` type guard
+  falls back to `DRAFT` on an unknown status. `findApprovedOverlapping`
+  is the dedicated overlap query: it returns every `APPROVED` request for
+  the given employee whose `[startDate, endDate]` range intersects the
+  supplied range (regardless of leave type), for the service to enforce
+  overlap at approval time.
+- `index.ts` — the barrel re-exporting `LeaveRequest`,
+  `ILeaveRequestRepository`, `ILeaveService`, `countLeaveDays`, and
+  `PgLeaveRequestRepository`.
+
+The module depends only on `src/shared/types/` (for `LeaveRequestStatus`)
+and `src/shared/db/connection.ts` — no cross-module imports in this
+phase. No service, controller, routes, or tests were created here.
 
 <!-- gestalt:architecture feature=dd1a6d9f-1b67-4054-9579-5cb7ccee58f3 START -->
 # Leave Management Module — Reconciled Architecture
