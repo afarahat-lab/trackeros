@@ -206,6 +206,33 @@ exactly one place):
 The five leaf modules still depend only on `src/shared/types/` and the
 `pg` `PoolClient` type — no cross-module imports.
 
+## Implemented — leaf modules (Phase 2 part 3): unit tests
+
+This phase added the Jest unit tests for the five leaf modules'
+repositories and services. Tests live under
+`tests/unit/modules/{employee,leave-type,policy,balance,audit}/` and mock
+the shared `pg` pool (`src/shared/db/connection.ts`) — no real database
+access. `leave-type` has only a repository test (no service exists yet).
+
+Repository tests assert the snake_case→camelCase `mapRow` contract and
+the type-guard fallbacks on read: unknown `employment_status` → `ACTIVE`,
+unknown `code` → `UNPAID`, unknown `action` → `UPDATE`. They also verify
+the optional-client passthrough (a provided client is used instead of the
+shared pool) and, for balance, that `remaining_days` is never a persisted
+column and `remainingDays` is always recomputed from the counters.
+
+Service tests cover the binding balance counter transitions
+(`reserve`/`approve`/`reject`/`cancel` for both `PENDING` and `APPROVED`),
+the derived availability formula, the negative-guard behavior (a
+transition that would take a counter below zero throws
+`InsufficientBalanceError`, never clamps), and status recomputation
+(`EXHAUSTED` at zero availability, `CLOSED` preserved). They also cover
+`EmployeeService` validation/duplicate rejection/termination,
+`PolicyService` validation/merge/deactivate, and `AuditService`'s
+`performedAt`-at-write-time behavior, null coercion, and the
+immutability surface (only `create`/`findById`/`findByEntity` — no
+`update`/`delete`).
+
 <!-- gestalt:architecture feature=dd1a6d9f-1b67-4054-9579-5cb7ccee58f3 START -->
 # Leave Management Module — Reconciled Architecture
 
