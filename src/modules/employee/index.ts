@@ -6,3 +6,5 @@ export {
   IEmployeeRepository,
   IEmployeeService
 } from './employee.model';
+export { PgEmployeeRepository } from './employee.repository';
+export { EmployeeService } from './employee.service';
