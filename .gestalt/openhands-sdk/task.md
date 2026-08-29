@@ -1,25 +1,28 @@
-# Implement this phase: Phase 4a — Leave model + repository
+# Implement this phase: Phase 4b — Leave service + controller + routes + app registration
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/dd1a6d9f-1b67-4054-9579-5cb7ccee58f3/6`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/dd1a6d9f-1b67-4054-9579-5cb7ccee58f3/7`. Do not clone anything; work only in this directory.
 
 You are the IMPLEMENTATION agent, not a planner. The platform measures your work EXCLUSIVELY by the files you create or modify in this working tree (`git status`). Ending your turn with a plan, a summary, or an announcement of what you are 'about to' do — without having actually edited files — is a FAILURE: a turn that leaves the working tree untouched is discarded. Explore only as much as you need, then MAKE the edits with your file-editing tool. Never end your turn before the files exist on disk.
 
 ## What to build
-src/modules/leave/leave.model.ts exists and defines LeaveRequest with the exact listed fields, ILeaveRequestRepository, ILeaveService, and the countLeaveDays helper returning endDate - startDate + 1.
-src/modules/leave/leave.repository.ts exists and implements ILeaveRequestRepository with an optional client param as the last argument.
-Both files compile against src/shared/types/* without referencing files that do not yet exist.
+src/modules/leave/leave.service.ts exists and implements ILeaveService, computing n via countLeaveDays once per operation and enforcing sufficiency + overlap on APPROVE in the same place.
+Balance year is derived from startDate once; a request crossing 31 Dec is charged in full to its startDate's year.
+Status change, balance counter change, and audit write run through the same unit-of-work client in one transaction.
+src/modules/leave/leave.controller.ts and leave.routes.ts exist and expose Fastify routes for submit/approve/reject/cancel.
+src/app.ts registers the leave routes alongside the existing uptimeRoutes and the app still starts.
 
 ## Success criteria
-Create the foundational leave module files.
+Create the leave orchestrator and HTTP layer.
 
-- src/modules/leave/leave.model.ts — LeaveRequest entity with EXACT fields: id, employeeId, leaveTypeId, startDate, endDate, reason (string|undefined), status (LeaveRequestStatus), approvedBy, approvedAt, rejectedBy, rejectedAt, rejectionReason, cancelledBy, cancelledAt, createdAt, updatedAt. Declare ILeaveRequestRepository and ILeaveService interfaces. Implement the shared helper countLeaveDays(startDate, endDate) HERE (binding rule 1): returns endDate - startDate + 1 (calendar days, inclusive of both ends, no weekend/holiday exclusion). This is the ONLY day-count implementation — every call site uses it.
-- src/modules/leave/leave.repository.ts — PgLeaveRequestRepository (optional client param as last argument).
+- src/modules/leave/leave.service.ts — LeaveService orchestrating submit/approve/reject/cancel. Compute n via countLeaveDays once per operation. On APPROVE: enforce sufficiency (n <= availableDays) and overlap (no intersecting APPROVED request for the same employee, regardless of leave type) in the same place. Derive the balance year from startDate once (binding rule 4 — a request crossing 31 Dec is charged in full to its startDate's year; never split). Every status change + balance counter change + audit write runs through the SAME unit-of-work client in ONE transaction (pass the client through to balance and audit services).
+- src/modules/leave/leave.controller.ts and src/modules/leave/leave.routes.ts — Fastify routes/controller.
+- Register the routes in src/app.ts (read it first; it currently registers uptimeRoutes).
 
-Read src/shared/types/* (Phase 1) before generating code that references them. Do NOT create the service, controller, routes, or tests in this sub-phase.
+Read src/modules/balance/balance.service.ts, src/modules/audit/audit.service.ts, src/modules/notification/notification.service.ts, and src/app.ts before generating code that references them. Do NOT create tests in this sub-phase.
 
 ## Owned by SIBLING sub-phases (OUT OF SCOPE for this sub-phase)
 This is ONE sub-phase of a split phase. The deliverables below belong to sibling sub-phases — do NOT create them here, do NOT list them as success criteria, and this sub-phase MUST NOT be gated on their presence (they are produced by a sibling, not missing):
-- "Phase 4b — Leave service + controller + routes + app registration": src/modules/leave/leave.service.ts, src/modules/leave/leave.controller.ts, src/modules/leave/leave.routes.ts, src/app.ts
+- "Phase 4a — Leave model + repository": src/modules/leave/leave.model.ts, src/modules/leave/leave.repository.ts
 - "Phase 4c — Leave module unit tests": tests/unit/modules/leave/leave.service.test.ts, tests/unit/modules/leave/leave.model.test.ts
 
 In particular, UNIT/INTEGRATION TESTS are OUT OF SCOPE for this sub-phase — they are produced in: Phase 4c — Leave module unit tests. Do not create test files here, do not require test existence or coverage as a success criterion, and do not fail the gate for missing tests.
@@ -119,45 +122,32 @@ OVERLAP: no overlapping APPROVED leave for the same employee, enforced at APPROV
 submission) in the same place as the sufficiency check. Overlap = any intersection of the
 [startDate, endDate] range with an existing APPROVED request, regardless of leave type. [BINDING RULE — operator decision resolving: Should leave duration be measured in calendar days or business (working) days, and should weekends/public holidays be excluded from the count?; How is the fiscal year boundary defined for balance accrual and carry-over, and is unused annual leave carried over or forfeited?; Should sick and emergency leave be deducted from the same annual entitlement pool or tracked as separate balances, and do they require manager approval?; Can a leave request span multiple fiscal years, and if so how is the duration split across the two balances?; What is the rounding direction and precision for remaining_days when entitlement is fractional (accrual_rate present) or when used_days is fractional?; How is the fiscal year boundary defined for balance accrual and carry-over (e.g. calendar year Jan 1–Dec 31 vs. a company-specific fiscal year), and is unused annual leave carried over or forfeited?; How are leave days counted when computing used_days and remaining_days (e.g. inclusive vs exclusive of end_date, half-day support, weekend/holiday exclusion, rounding direction)?; How are leave days counted for a request spanning partial days or weekends/holidays?; How is the fiscal year derived for a leave request?; What is the rounding rule for partial-day balances (e.g. half-day leave)?; apply everywhere these apply, not in one place only]
 
-## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
-The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
-- `LeaveRequest` — the entity MUST have exactly these fields:
-    - id: string
-    - employeeId: string
-    - leaveTypeId: string
-    - startDate: Date
-    - endDate: Date
-    - reason: string | undefined
-    - status: LeaveRequestStatus
-    - approvedBy: string | null
-    - approvedAt: Date | null
-    - rejectedBy: string | null
-    - rejectedAt: Date | null
-    - rejectionReason: string | null
-    - cancelledBy: string | null
-    - cancelledAt: Date | null
-    - createdAt: Date
-    - updatedAt: Date
-
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- The LeaveRequest.status field must reuse the shared LeaveRequestStatus type (const object + string-literal union) exactly as declared, with members DRAFT/SUBMITTED/APPROVED/REJECTED/CANCELLED — do not redeclare a local literal. (see `src/shared/types/enums.ts`)
-- The repository's optional-client pattern must match the leaf repositories: every method takes an optional PoolClient as its LAST parameter and defaults to the shared pool when omitted. (see `src/modules/balance/balance.repository.ts`)
-- The repository must use the shared pool export (not a new Pool instance) and the snake_case→camelCase mapRow convention with unknown-style type guards. (see `src/shared/db/connection.ts`)
-- The LeaveRequest entity shape must match the reconciled architecture's LeaveRequest attributes (id, employeeId, leaveTypeId, startDate, endDate, reason, status, approvedBy/At, rejectedBy/At/rejectionReason, cancelledBy/At, createdAt, updatedAt) and the leave_requests conceptual table columns. (see `.gestalt/architecture/reconciled.json`)
+- The service must call BalanceService.reserve/approve/reject/cancel with the day count n and the unit-of-work client, matching the exact method signatures (balanceId, days, [requestStatus], client?) declared in IBalanceService — do not reimplement counter math. (see `src/modules/balance/balance.model.ts`)
+- The service must call AuditService.record(input, client?) with the AuditLogInput shape (entityType/entityId/action/oldValues/newValues/performedBy) and pass the same unit-of-work client. (see `src/modules/audit/audit.model.ts`)
+- The service must call NotificationService.notify(input, client?) with the NotificationInput shape and honor its both-or-null relatedEntityType/relatedEntityId invariant. (see `src/modules/notification/notification.model.ts`)
+- The service must import countLeaveDays from the leave module and use it as the single day-count source; the returned value is endDate - startDate + 1 inclusive calendar days. (see `src/modules/leave/leave.model.ts`)
+- The service must use the shared error types (ValidationError, NotFoundError, InsufficientBalanceError, OverlapError) and their statusCode/code contract rather than ad-hoc errors. (see `src/shared/types/errors.ts`)
+- Routes must register against the Fastify instance in the same style as uptimeRoutes (async plugin function receiving fastify) and be registered in src/app.ts alongside the existing uptimeRoutes registration. (see `src/app.ts`)
 ### Entity invariants — enforce these
-- Reuse or extend `LeaveRequest`: Lifecycle: DRAFT -> SUBMITTED -> APPROVED | REJECTED | CANCELLED; the status field is the shared LeaveRequestStatus union. The approval/rejection/cancellation actor+timestamp fields (approvedBy/approvedAt, rejectedBy/rejectedAt/rejectionReason, cancelledBy/cancelledAt) are null until the corresponding transition occurs, and are mutually exclusive with each other (only the set matching the current status is populated).
-- Reuse or extend `LeaveRequest`: startDate and endDate are Dates with startDate <= endDate; the request's duration is always computed via countLeaveDays (calendar days inclusive of both ends), never re-derived inline.
-- Reuse or extend `countLeaveDays`: The single shared day-count helper: returns endDate - startDate + 1 calendar days, inclusive of both ends, with no weekend/holiday exclusion. It is the only day-count implementation; every call site imports it.
+- Reuse or extend `LeaveRequest`: Lifecycle transitions are strictly SUBMITTED -> APPROVED | REJECTED, and SUBMITTED | APPROVED -> CANCELLED; approve/reject/cancel must reject requests not in the correct prior state (e.g. approving a non-SUBMITTED request is an error).
+- Reuse or extend `LeaveRequest`: On APPROVE, approvedBy/approvedAt are set; on REJECT, rejectedBy/rejectedAt/rejectionReason are set; on CANCEL, cancelledBy/cancelledAt are set — each transition stamps its actor/timestamp fields and updates updatedAt.
+- Reuse or extend `LeaveBalance`: Counter transitions follow the binding semantics: SUBMIT reserves pendingDays += n; APPROVE moves pendingDays -= n / usedDays += n; REJECT/CANCEL(pending) release pendingDays -= n; CANCEL(approved) restores usedDays -= n — all via BalanceService, never directly.
+- Reuse or extend `AuditLog`: Every state-changing operation (submit/approve/reject/cancel) writes exactly one audit record with the matching action (SUBMIT/APPROVE/REJECT/CANCEL) and the request id as entityId, in the same transaction as the status change.
 ### Interface contract — expose these operations (their shape is yours)
-- ILeaveRequestRepository — persistence operations for LeaveRequest (create/update/read by id and by employee, and any query needed for overlap detection). — Reads return the entity or null/empty when absent; writes return the persisted entity. No business validation or balance/audit side effects belong here — repository is persistence-only.
-- ILeaveService — the leave lifecycle operations (submit/approve/reject/cancel) that the orchestrator will implement. — State-changing operations must eventually write an audit record (GP-002) and run status + balance + audit through one unit-of-work client in one transaction; negative guards live only in BalanceService, never duplicated here.
-- countLeaveDays(startDate, endDate) — Pure, deterministic function of its two Date arguments; returns an integer >= 1 for valid ranges.
+- submit — employee (own request); actorId must equal the request's employeeId; invalid input -> ValidationError (400); unknown employee/leaveType/policy -> NotFoundError (404); insufficient balance -> InsufficientBalanceError (422)
+- approve — manager or hr_admin; no self-approval (actorId must not equal the request's employeeId); not found -> NotFoundError (404); wrong prior state -> ValidationError (400); insufficient balance -> InsufficientBalanceError (422); overlap -> OverlapError (422)
+- reject — manager or hr_admin; not found -> NotFoundError (404); wrong prior state -> ValidationError (400); missing rejectionReason -> ValidationError (400)
+- cancel — employee (own request) or hr_admin; not found -> NotFoundError (404); wrong prior state (not SUBMITTED/APPROVED) -> ValidationError (400)
 ### Integration points — connect to these
-- src/shared/types/ (enums.ts, errors.ts, index.ts) — LeaveRequestStatus type for the status field; shared error types are available for the service (Phase 4b) to throw.
-- src/shared/db/connection.ts — Shared pg pool used as the default executor when no client is passed to repository methods.
-- src/modules/balance/ (balance.model.ts, balance.repository.ts) — The leave service (Phase 4b) will call BalanceService with the day count n computed by countLeaveDays; the repository's optional-client pattern is the template for PgLeaveRequestRepository.
+- src/modules/balance/balance.service.ts (BalanceService) — Orchestrator delegates all counter transitions (reserve/approve/reject/cancel) and sufficiency derivation; negative guards live here only.
+- src/modules/audit/audit.service.ts (AuditService) — Every state-changing operation writes an audit record in the same transaction (GP-002).
+- src/modules/notification/notification.service.ts (NotificationService) — Lifecycle events (submitted/approved/rejected/cancelled) notify the employee/manager.
+- src/modules/leave/leave.repository.ts (PgLeaveRequestRepository) — Persistence of the LeaveRequest aggregate and the findApprovedOverlapping overlap query used at approval.
+- src/shared/db/connection.ts (pool) — Source of the unit-of-work PoolClient for the single transaction spanning status + balance + audit writes.
+- src/app.ts (Fastify app registration) — Leave routes must be registered so endpoints are reachable.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
