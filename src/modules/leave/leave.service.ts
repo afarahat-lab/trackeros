@@ -9,7 +9,7 @@ import {
   OverlapError,
   ValidationError
 } from '../../shared/types/errors';
-import { LeaveRequestStatus } from '../../shared/types';
+import { LeaveRequestStatus, UserRole } from '../../shared/types';
 
 import { IAuditService, AuditService } from '../audit';
 import { IBalanceService, BalanceService, ILeaveBalanceRepository, PgLeaveBalanceRepository, LeaveBalance } from '../balance';
@@ -322,6 +322,7 @@ export class LeaveService implements ILeaveService {
   async cancel(
     requestId: string,
     actorId: string,
+    role: UserRole,
     client?: PoolClient
   ): Promise<LeaveRequest> {
     return this.withClient(client, async (c) => {
@@ -337,7 +338,7 @@ export class LeaveService implements ILeaveService {
           'Only SUBMITTED or APPROVED requests can be cancelled'
         );
       }
-      if (request.employeeId !== actorId) {
+      if (request.employeeId !== actorId && role !== UserRole.HR_ADMIN) {
         throw new AuthorizationError(
           'Only the request owner or an HR admin may cancel a request'
         );

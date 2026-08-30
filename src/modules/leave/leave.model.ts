@@ -1,6 +1,6 @@
 import type { PoolClient } from 'pg';
 
-import { LeaveRequestStatus } from '../../shared/types';
+import { LeaveRequestStatus, UserRole } from '../../shared/types';
 
 export interface LeaveRequest {
   id: string;
@@ -66,6 +66,7 @@ export interface ILeaveService {
   cancel(
     requestId: string,
     actorId: string,
+    role: UserRole,
     client?: PoolClient
   ): Promise<LeaveRequest>;
 }
