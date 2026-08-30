@@ -165,7 +165,7 @@ export class LeaveController {
         );
       }
       const { id } = request.params as LeaveParams;
-      const result = await this.service.cancel(id, user.id);
+      const result = await this.service.cancel(id, user.id, user.role);
       return reply.status(200).send(result);
     } catch (error) {
       return sendError(reply, error);
