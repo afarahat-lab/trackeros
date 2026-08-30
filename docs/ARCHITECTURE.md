@@ -356,10 +356,11 @@ present).
   - `reject` requires `SUBMITTED` status and a non-empty
     `rejectionReason`; `balanceService.reject(n)`, updates to `REJECTED`,
     records a `REJECT` audit entry, and notifies the employee.
-  - `cancel` allows `SUBMITTED` or `APPROVED`; maps the status to
-    `'PENDING'`/`'APPROVED'` for `balanceService.cancel`, updates to
-    `CANCELLED`, records a `CANCEL` audit entry, and notifies the
-    employee.
+  - `cancel` allows `SUBMITTED` or `APPROVED` and permits the request
+    owner or an `HR_ADMIN` (via the `actorRole` argument); maps the
+    status to `'PENDING'`/`'APPROVED'` for `balanceService.cancel`,
+    updates to `CANCELLED`, records a `CANCEL` audit entry, and notifies
+    the employee.
   - `withClient` is the single transaction boundary: when a `PoolClient`
     is passed in, the caller owns the transaction and the service runs
     inside it; otherwise the service opens its own connection and wraps
@@ -404,11 +405,6 @@ implementation chose these shapes; they are documented as built):
   only rejects self-approval and relies on the controller's
   `MANAGER`/`HR_ADMIN` role check; it does not verify the actor is the
   requesting employee's manager.
-- **HR-admin cancel is blocked at the service layer.** The controller
-  allows `HR_ADMIN` to cancel, but `cancel` in the service only permits
-  `request.employeeId === actorId`, so an HR admin cannot cancel another
-  employee's request (the error message mentions HR admin but the check
-  does not implement it).
 
 <!-- gestalt:architecture feature=dd1a6d9f-1b67-4054-9579-5cb7ccee58f3 START -->
 # Leave Management Module — Reconciled Architecture
