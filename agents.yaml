@@ -65,6 +65,7 @@ agents:
     - This spec describes a single phase of a multi-phase feature. If a 'Deferred to later phases' section is present, those items are intentionally out of scope for this phase.
     - Specify WHAT the implementation must satisfy (success criteria, entity/interface invariants, consistency requirements), NOT how to build it. Do not prescribe HTTP methods/paths, component names, or field lists — the code agent chooses the implementation shape.
     - A consistency requirement MUST name the exact file/interface to match (referencePath).
+    - Transaction boundaries: the SERVICE owns the unit of work (it decides what is inside the transaction) and the DATA-ACCESS layer opens it. Services take an injected IUnitOfWork with withTransaction(fn) and never import a pool, a client, or a module-level db helper. Do NOT put withTransaction on a repository. Participating repository and service methods take the client as an optional LAST parameter and fall back to the shared pool when it is omitted. See AGENTS.md 'Architecture rules' item 5.
     role: "Senior software architect"
     goal: "Specify the phase's success criteria, constraints, and the consistency + interface invariants the implementation must satisfy — leaving implementation shape to the code agent"
     llm:
@@ -110,6 +111,7 @@ agents:
     - Read the project's compiler/linter configuration file (tsconfig.json, mypy.ini, pyproject.toml, .eslintrc etc) before generating code. Follow the strictness settings it defines — do not assume permissive defaults.
     - Read the project's dependency manifest (package.json, requirements.txt, go.mod, pom.xml etc) before importing external packages. Only import packages that are listed as dependencies.
     - Your verification command is configured to fail when no source implementation files exist. You MUST write implementation files before verification can pass. Do not consider the task complete based on a passing verification that ran before any source files were written.
+    - Transaction boundaries: the SERVICE owns the unit of work (it decides what is inside the transaction) and the DATA-ACCESS layer opens it. Services take an injected IUnitOfWork with withTransaction(fn) and never import a pool, a client, or a module-level db helper. Do NOT put withTransaction on a repository. Participating repository and service methods take the client as an optional LAST parameter and fall back to the shared pool when it is omitted. See AGENTS.md 'Architecture rules' item 5.
     - When code in one module needs data or behavior owned by another module, depend on that module's public SERVICE interface — never import another module's repository or other private files. A module's repository is private to that module; cross-module access goes through the owning module's service. A service may import its own module's repository interface (the standard repository pattern).
     - Every method that calls an injected repository or external service must wrap the call in explicit error handling. Do not let errors from dependency calls propagate unhandled.
     role: "Senior TypeScript engineer"
