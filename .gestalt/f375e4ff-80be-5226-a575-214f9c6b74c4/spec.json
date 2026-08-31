@@ -1,0 +1,140 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "unit-test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "A Jest test file exists under tests/unit/modules/leave/ that covers countLeaveDays: inclusive calendar-day count (endDate - startDate + 1), UTC-normalized so time-of-day and DST do not change the result, and no weekend/holiday exclusion.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Tests cover submit orchestration: actorId===employeeId and date/leaveTypeId validation reject with ValidationError (400/VALIDATION_ERROR); missing employee/leave-type/active-policy reject with NotFoundError (404/NOT_FOUND); on success balance is found or auto-created from policy entitlement, balanceService.reserve(n) is called, request is created with status SUBMITTED, a SUBMIT audit entry is recorded, and the manager is notified only when managerId is set.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Tests cover approve orchestration: non-SUBMITTED status \u2192 ValidationError; self-approval \u2192 AuthorizationError (403/AUTHORIZATION_ERROR); n > availableDays \u2192 InsufficientBalanceError (422/INSUFFICIENT_BALANCE); intersecting APPROVED request for the same employee (any leave type) \u2192 OverlapError (422/POLICY_VIOLATION); success calls balanceService.approve(n), updates to APPROVED with approvedBy/approvedAt, records APPROVE audit, and notifies the employee.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Tests cover reject and cancel orchestration: reject requires a truthy rejectionReason (ValidationError) and SUBMITTED status, then balanceService.reject(n), REJECTED update, REJECT audit, employee notification; cancel permits SUBMITTED or APPROVED, requires owner or UserRole.HR_ADMIN (else AuthorizationError), maps status to 'PENDING'/'APPROVED' for balanceService.cancel, updates to CANCELLED, records CANCEL audit, and notifies the employee.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Tests verify the balance year is always derived from startDate.getFullYear() \u2014 a request crossing 31 Dec (e.g. 2026-12-30 \u2192 2027-01-02) is charged in full to the start date's year and never split \u2014 across submit/approve/reject/cancel.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Tests verify single-transaction behavior: when unitOfWork.withTransaction is used, the captured client is passed as the last argument to every internal call (requestRepository.update, balanceService.approve/reject/cancel, auditService.record, notificationService.notify); when a caller-owned client is passed in, withTransaction is NOT called and the same client is propagated.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Only test files under tests/unit/modules/leave/ may be created; leave.model.ts, leave.repository.ts, leave.service.ts, leave.controller.ts, leave.routes.ts, and src/app.ts are read-only inputs owned by sibling sub-phases and must not be modified.",
+    "LeaveService must be instantiated with mocks for all 9 constructor dependencies in order (requestRepository, balanceService, balanceRepository, employeeRepository, leaveTypeRepository, policyRepository, auditService, notificationService, unitOfWork) \u2014 omitting any would fall back to a concrete default and break unit isolation.",
+    "Tests must mock the injected interfaces directly (jest.Mocked<IInterface> with jest.fn() per method) and must NOT mock the pg pool or src/shared/db/connection.ts \u2014 LeaveService depends on interfaces, not the pool.",
+    "Tests must follow existing conventions: place under tests/unit/modules/leave/, import source via relative path ../../../../src/..., and use repository.update.mockImplementation(async (b) => b) passthrough where the returned updated entity is asserted.",
+    "Assertions must match the actual error contract in src/shared/types/errors.ts: ValidationError 400/VALIDATION_ERROR, AuthorizationError 403/AUTHORIZATION_ERROR, NotFoundError 404/NOT_FOUND, InsufficientBalanceError 422/INSUFFICIENT_BALANCE, OverlapError 422/POLICY_VIOLATION."
+  ],
+  "outOfScope": [
+    "Creating or modifying src/modules/leave/leave.model.ts, leave.repository.ts, leave.service.ts, leave.controller.ts, leave.routes.ts, and src/app.ts \u2014 these are owned by sibling sub-phases 4a/4b.",
+    "Testing the controller/routes layer (header auth, role checks, JSON schema validation, HTTP status mapping) \u2014 this phase covers only the service and countLeaveDays helper.",
+    "Testing the repository (PgLeaveRequestRepository) SQL/mapRow behavior or mocking the pg pool \u2014 the service tests mock the injected interfaces directly."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "A LeaveRequest transitions SUBMITTED \u2192 APPROVED (with approvedBy/approvedAt) or SUBMITTED \u2192 REJECTED (with rejectedBy/rejectedAt/rejectionReason), and SUBMITTED or APPROVED \u2192 CANCELLED (with cancelledBy/cancelledAt); no other status transitions are permitted by the service."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "Balance counters are mutated only through the injected IBalanceService (reserve/approve/reject/cancel) with the day count n computed once via countLeaveDays; the service never mutates usedDays/pendingDays directly."
+    },
+    {
+      "entity": "LeaveRequest (overlap)",
+      "mustExistOrExtend": true,
+      "invariant": "No two APPROVED requests for the same employee may have intersecting [startDate, endDate] ranges, regardless of leave type \u2014 enforced at approval time via findApprovedOverlapping."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "countLeaveDays(startDate, endDate)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns endDate - startDate + 1 inclusive calendar days, UTC-normalized; no weekend/holiday exclusion; must be the single day-count implementation imported by all call sites."
+    },
+    {
+      "operation": "LeaveService.submit",
+      "authRule": "actorId must equal employeeId (ValidationError otherwise).",
+      "idempotent": false,
+      "errorSemantics": "ValidationError for invalid dates/leaveTypeId; NotFoundError for missing employee/leave-type/active-policy; creates SUBMITTED request and reserves balance."
+    },
+    {
+      "operation": "LeaveService.approve",
+      "authRule": "Self-approval forbidden (AuthorizationError).",
+      "idempotent": false,
+      "errorSemantics": "ValidationError for non-SUBMITTED; InsufficientBalanceError when n > availableDays; OverlapError on intersecting APPROVED request; NotFoundError when balance missing."
+    },
+    {
+      "operation": "LeaveService.cancel",
+      "authRule": "Actor must be the request owner or UserRole.HR_ADMIN (AuthorizationError otherwise).",
+      "idempotent": false,
+      "errorSemantics": "ValidationError for status other than SUBMITTED/APPROVED; maps APPROVED\u2192'APPROVED' else 'PENDING' for balanceService.cancel."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Tests must import and assert against the exact error classes/status codes/codes defined in src/shared/types/errors.ts (ValidationError 400, AuthorizationError 403, NotFoundError 404, InsufficientBalanceError 422, OverlapError 422/POLICY_VIOLATION).",
+      "referencePath": "src/shared/types/errors.ts"
+    },
+    {
+      "requirement": "Tests must use the canonical enum values from src/shared/types/enums.ts (LeaveRequestStatus DRAFT/SUBMITTED/APPROVED/REJECTED/CANCELLED; UserRole employee/manager/hr_admin) rather than redeclaring literals.",
+      "referencePath": "src/shared/types/enums.ts"
+    },
+    {
+      "requirement": "Tests must match the actual method signatures and orchestration order of LeaveService (submit/approve/reject/cancel, countLeaveDays usage, balance-year derivation from startDate.getFullYear(), withUnitOfWork client propagation).",
+      "referencePath": "src/modules/leave/leave.service.ts"
+    },
+    {
+      "requirement": "Tests must mock the exact interface methods LeaveService depends on (ILeaveRequestRepository, IBalanceService, ILeaveBalanceRepository, IEmployeeRepository, ILeaveTypeRepository, ILeavePolicyRepository, IAuditService, INotificationService, IUnitOfWork) with the optional-client-as-last-parameter contract.",
+      "referencePath": "src/modules/leave/leave.model.ts"
+    },
+    {
+      "requirement": "Tests must verify the transaction boundary contract: the service owns the unit of work via injected IUnitOfWork.withTransaction, and every internal call receives the same client as its last argument (or the caller-owned client when passed in).",
+      "referencePath": "src/shared/db/unit-of-work.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/balance/balance.service.ts (IBalanceService)",
+      "why": "LeaveService delegates all balance counter mutations (reserve/approve/reject/cancel) and availability derivation (getAvailableDays) to this service; tests mock it and assert the correct n and requestStatus arguments."
+    },
+    {
+      "target": "src/modules/audit/audit.service.ts (IAuditService)",
+      "why": "Every state-changing operation records an audit entry (SUBMIT/APPROVE/REJECT/CANCEL) via auditService.record with the same transaction client."
+    },
+    {
+      "target": "src/modules/notification/notification.service.ts (INotificationService)",
+      "why": "Each operation notifies the employee (or manager on submit) via notificationService.notify with the same transaction client."
+    },
+    {
+      "target": "src/shared/db/unit-of-work.ts (IUnitOfWork)",
+      "why": "The service owns the transaction boundary through the injected IUnitOfWork; tests capture the client it supplies to assert single-transaction propagation."
+    }
+  ]
+}
