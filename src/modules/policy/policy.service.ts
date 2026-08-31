@@ -16,6 +16,21 @@ export class InvalidLeaveTypeError extends Error {
   }
 }
 
+export class InvalidEntitlementDaysError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'InvalidEntitlementDaysError';
+  }
+}
+
+function assertEntitlementDays(value: number): void {
+  if (!Number.isInteger(value) || value < 0) {
+    throw new InvalidEntitlementDaysError(
+      `entitlementDays must be a non-negative integer, got ${value}`,
+    );
+  }
+}
+
 export class PolicyService implements IPolicyService {
   constructor(
     private readonly policies: PgLeavePolicyRepository,
@@ -28,6 +43,7 @@ export class PolicyService implements IPolicyService {
         `Invalid leave type: ${String(input.leaveType)}`,
       );
     }
+    assertEntitlementDays(input.entitlementDays);
     const now = new Date();
     const policy: LeavePolicy = {
       id: randomUUID(),
@@ -50,6 +66,9 @@ export class PolicyService implements IPolicyService {
     changes: Partial<LeavePolicy>,
     client?: PoolClient,
   ): Promise<LeavePolicy | null> {
+    if (changes.entitlementDays !== undefined) {
+      assertEntitlementDays(changes.entitlementDays);
+    }
     const run = (db: PoolClient): Promise<LeavePolicy | null> =>
       this.policies.update(id, changes, db);
     return client ? run(client) : this.uow.withTransaction(run);
