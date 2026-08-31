@@ -57,14 +57,14 @@ TypeScript, Fastify, PostgreSQL, modular monolith. All repository implementation
 
 ### Canonical decisions
 - Balance entity: `LeaveBalance` (not `Balance`).
-- Leave request status enum: `LeaveStatus` with values `DRAFT`, `SUBMITTED`, `APPROVED`, `REJECTED`, `CANCELLED` (domain lifecycle; `PENDING` is not used).
+- Leave request status enum: `LeaveRequestStatus` with values `PENDING`, `APPROVED`, `REJECTED`, `CANCELLED` (implemented in `src/shared/types/leave-request-status.ts`). NOTE: this supersedes the earlier reconciled name `LeaveStatus` with `DRAFT`/`SUBMITTED` — the implementation chose `LeaveRequestStatus` with `PENDING` as the initial state; `DRAFT`/`SUBMITTED` are not used.
 - Audit entity: `AuditLog` (not `AuditRecord`/`Audit`), table `audit_logs`, repository `AuditLogRepository`/`PgAuditLogRepository`.
 - Repository interfaces: `LeaveRequestRepository`, `LeaveBalanceRepository`, `EmployeeRepository`, `LeavePolicyRepository`, `AuditLogRepository`, `NotificationRepository`; concrete PostgreSQL implementations prefixed `Pg`.
 - Table names are snake_case; domain entity attributes are camelCase.
 - `leave_requests.leave_type_id` is a string enum value (`LeaveType`), not a foreign key to `leave_policies`; the governing policy is resolved by `leave_type` + `is_active`.
 
 ### Domain entities and lifecycle states
-- `LeaveRequest`: `DRAFT`, `SUBMITTED`, `APPROVED`, `REJECTED`, `CANCELLED`
+- `LeaveRequest`: `PENDING`, `APPROVED`, `REJECTED`, `CANCELLED`
 - `LeaveBalance`: `ACTIVE`, `CLOSED`
 - `Employee`: `ACTIVE`, `INACTIVE`, `TERMINATED`
 - `LeavePolicy`: `ACTIVE`, `INACTIVE`
@@ -107,11 +107,11 @@ TypeScript, Fastify, PostgreSQL, modular monolith. All repository implementation
 - **Error response**: Standard error shape `{ error: string; code: string }`. Validation failure → HTTP 400 (`VALIDATION_ERROR`); authentication failure → 401 (`UNAUTHORIZED`); authorization failure → 403 (`FORBIDDEN`); not found → 404 (`NOT_FOUND`). All async errors caught and mapped (GP-006); no unhandled rejections.
 
 ### Recommended phases
-1. **Shared foundations (types + unit of work)** — establish shared enums/DTOs and `IUnitOfWork`; resolves `LeaveStatus` enum conflict. (4 files)
+1. **Shared foundations (types + unit of work)** — ✅ DONE. Established the shared enums/DTOs (`LeaveType`, `LeaveRequestStatus`, `NotificationType`, `AuditAction`, `EntityType`, `LeaveRequestSummary`, `BalanceSnapshot`, `countLeaveDays`) under `src/shared/types/` and the `IUnitOfWork`/`UnitOfWork` contract under `src/shared/db/`. Resolved the status-enum conflict in favor of `LeaveRequestStatus` (`PENDING`/`APPROVED`/`REJECTED`/`CANCELLED`).
 2. **Leaf modules: employee, policy, audit** — innermost domain modules with no cross-module service deps. (15 files)
 3. **balance and notification** — balance depends on audit; both are prerequisites for leave orchestration. (10 files)
 4. **leave orchestration module** — composes balance, notification, audit, employee, and policy inside a single `IUnitOfWork` transaction. (6 files)
 
 ### Open questions
-See the reconciled `openQuestions` list for unresolved foundational semantics (partial-day granularity, remaining_days bounding, shared-types surface, PLAN.md drift).
+See the reconciled `openQuestions` list for unresolved foundational semantics (partial-day granularity, remaining_days bounding, PLAN.md drift). The shared-types surface is now established by Phase 1.
 <!-- gestalt:architecture feature=b07feb33-7931-41ca-b4f7-c3dc02411147 END -->
