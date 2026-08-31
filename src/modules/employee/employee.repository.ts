@@ -84,6 +84,14 @@ export class PgEmployeeRepository implements IEmployeeRepository {
     return toEmployee(result.rows[0]);
   }
 
+  async list(client?: PoolClient): Promise<Employee[]> {
+    const db = client ?? pool;
+    const result = await db.query<EmployeeRow>(
+      `SELECT * FROM employees WHERE deleted_at IS NULL ORDER BY created_at ASC`,
+    );
+    return result.rows.map(toEmployee);
+  }
+
   async findById(id: string, client?: PoolClient): Promise<Employee | null> {
     const db = client ?? pool;
     const result = await db.query<EmployeeRow>(

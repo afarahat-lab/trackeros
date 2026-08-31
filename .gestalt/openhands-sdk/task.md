@@ -1,6 +1,6 @@
-# Implement this phase: Phase 2 — Leaf modules: employee, policy, audit (part 2/3)
+# Implement this phase: Phase 2 — Leaf modules: employee, policy, audit (part 3/3)
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/b07feb33-7931-41ca-b4f7-c3dc02411147/3`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/b07feb33-7931-41ca-b4f7-c3dc02411147/4`. Do not clone anything; work only in this directory.
 
 You are the IMPLEMENTATION agent, not a planner. The platform measures your work EXCLUSIVELY by the files you create or modify in this working tree (`git status`). Ending your turn with a plan, a summary, or an announcement of what you are 'about to' do — without having actually edited files — is a FAILURE: a turn that leaves the working tree untouched is discarded. Explore only as much as you need, then MAKE the edits with your file-editing tool. Never end your turn before the files exist on disk.
 
@@ -8,19 +8,21 @@ You are the IMPLEMENTATION agent, not a planner. The platform measures your work
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Build ONLY the concrete repository + service implementations (layer 2) for the employee, policy, and audit modules. Do NOT build routes or tests in this part.
+Build ONLY the routes + unit tests (layer 3) for the employee, policy, and audit modules.
 
-Create:
-- src/modules/employee/employee.repository.ts: PgEmployeeRepository implementing IEmployeeRepository. Map camelCase TypeScript fields to snake_case DB columns (employee_number, first_name, last_name, manager_id, hire_date, termination_date, employment_status, created_at, updated_at, deleted_at). All SQL goes through the repository only.
-- src/modules/employee/employee.service.ts: EmployeeService implementing IEmployeeService.
-- src/modules/policy/policy.repository.ts: PgLeavePolicyRepository implementing ILeavePolicyRepository (snake_case columns: policy_name, leave_type, entitlement_days, accrual_rate, max_accumulation, minimum_notice_days, requires_manager_approval, is_active).
-- src/modules/policy/policy.service.ts: PolicyService implementing IPolicyService.
-- src/modules/audit/audit.repository.ts: PgAuditLogRepository implementing IAuditLogRepository (persisted table audit_logs; snake_case columns: entity_type, entity_id, old_values, new_values, performed_by, performed_at).
-- src/modules/audit/audit.service.ts: AuditService implementing IAuditService.
+Create Fastify route files:
+- src/modules/employee/employee.routes.ts: register employee endpoints (list/get/create/update) wired to EmployeeService.
+- src/modules/policy/policy.routes.ts: register policy endpoints wired to PolicyService.
+- src/modules/audit/audit.routes.ts: register audit-log query endpoints wired to AuditService.
 
-Update each module's index.ts barrel to export the new implementations.
+Update each module's index.ts barrel to export the routes.
 
-This phase depends on Phase 2 part 1/3 model/interface files (src/modules/employee/employee.model.ts, src/modules/policy/policy.model.ts, src/modules/audit/audit.model.ts) — read them before generating so field names match exactly. Also depends on Phase 1's src/shared/db/unit-of-work.ts and src/shared/db/connection.ts for DB access. Do not reference route files.
+Include Jest unit tests:
+- tests/unit/modules/employee/employee.service.spec.ts
+- tests/unit/modules/policy/policy.service.spec.ts
+- tests/unit/modules/audit/audit.service.spec.ts
+
+This phase depends on Phase 2 parts 1/3 and 2/3 (model, repository, service files under src/modules/employee/, src/modules/policy/, src/modules/audit/) — read them before generating routes/tests so signatures match exactly. Do not reference the leave, balance, or notification modules.
 
 ## Your iteration budget — and how to get more (READ BEFORE YOU START)
 
@@ -137,35 +139,6 @@ The entities below are shared, cross-module DATA CONTRACTS. Implement each one w
     - createdAt: Date
     - updatedAt: Date
     - deletedAt: Date | null
-
-## Constraints & consistency
-You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
-### Reuse & consistency — match these exactly
-- Repository and service implementations must match the exact field names, types, and method signatures already declared in the layer-1 model/interface files (Employee, IEmployeeRepository, IEmployeeService). (see `src/modules/employee/employee.model.ts`)
-- EmployeeService must implement the exact IEmployeeService surface (create/update/terminate/reactivate) and CreateEmployeeInput shape. (see `src/modules/employee/employee.service.interface.ts`)
-- Repository and service implementations must match LeavePolicy and ILeavePolicyRepository field names/types/signatures. (see `src/modules/policy/policy.model.ts`)
-- PolicyService must implement the exact IPolicyService surface and CreateLeavePolicyInput shape. (see `src/modules/policy/policy.service.interface.ts`)
-- Repository and service implementations must match AuditLog, IAuditLogRepository, and AuditLogQuery field names/types/signatures. (see `src/modules/audit/audit.model.ts`)
-- AuditService must implement the exact IAuditService surface and AuditRecordInput shape. (see `src/modules/audit/audit.service.interface.ts`)
-- Services must use the injected IUnitOfWork.withTransaction(fn) contract and never import the pool; participating methods take the client as an optional last parameter. (see `src/shared/db/unit-of-work.ts`)
-- Repositories obtain DB access from the shared pool exported by connection.ts (fallback when no client is passed). (see `src/shared/db/connection.ts`)
-- LeaveType, EntityType, and AuditAction must be imported from the shared types barrel, not redefined locally. (see `src/shared/types/index.ts`)
-### Entity invariants — enforce these
-- Reuse or extend `Employee`: employmentStatus is restricted to 'ACTIVE' | 'INACTIVE' | 'TERMINATED'; terminate() sets status to TERMINATED with a terminationDate, reactivate() restores ACTIVE and clears terminationDate; deletedAt is null for live rows and set on soft-delete.
-- Reuse or extend `LeavePolicy`: isActive is a boolean lifecycle flag; activate()/deactivate() toggle it; entitlementDays is a non-negative integer; leaveType is a valid LeaveType enum value.
-- Reuse or extend `AuditLog`: AuditLog is append-only (no update/delete lifecycle); every record carries a valid EntityType, AuditAction, and performedAt timestamp; oldValues/newValues are JSON-serializable objects or null.
-### Interface contract — expose these operations (their shape is yours)
-- IEmployeeRepository.create / findById / findByEmployeeNumber / findByEmail / update / delete — find* return null (not throw) when no row matches; update returns null when the id does not exist; delete returns boolean success.
-- IEmployeeService.create / update / terminate / reactivate — terminate/reactivate on a non-existent employee return null; invalid employmentStatus transitions are rejected with a typed error rather than silently coerced.
-- ILeavePolicyRepository.create / findById / findByLeaveType / findActiveByLeaveType / update — find* return null when no row matches; findActiveByLeaveType filters isActive=true; update returns null when the id does not exist.
-- IPolicyService.create / update / activate / deactivate / findByLeaveType — activate/deactivate on a non-existent policy return null; create with an invalid LeaveType is rejected with a typed error.
-- IAuditLogRepository.create / findById / findByEntity / findByPerformedAt / query — findById returns null when absent; findByEntity/findByPerformedAt/query return arrays (possibly empty), never null.
-- IAuditService.record / findByEntity / findByPerformedAt — record persists and returns the created AuditLog; read operations return arrays (possibly empty).
-### Integration points — connect to these
-- src/shared/db/connection.ts (pool) — Repositories execute SQL against the shared pg Pool as the default client when none is passed.
-- src/shared/db/unit-of-work.ts (IUnitOfWork) — Services receive IUnitOfWork via constructor to own transaction boundaries for multi-step writes.
-- src/shared/types/index.ts (LeaveType, EntityType, AuditAction) — Policy and audit modules depend on shared enums for typed fields.
-- src/modules/{employee,policy,audit}/index.ts barrels — Barrels must re-export the new repository + service implementations for downstream consumers.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:

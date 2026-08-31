@@ -1,3 +1,5 @@
+import { PoolClient } from 'pg';
+
 export type EmploymentStatus = 'ACTIVE' | 'INACTIVE' | 'TERMINATED';
 
 export interface Employee {
@@ -18,6 +20,7 @@ export interface Employee {
 
 export interface IEmployeeRepository {
   create(employee: Employee): Promise<Employee>;
+  list(client?: PoolClient): Promise<Employee[]>;
   findById(id: string): Promise<Employee | null>;
   findByEmployeeNumber(employeeNumber: string): Promise<Employee | null>;
   findByEmail(email: string): Promise<Employee | null>;

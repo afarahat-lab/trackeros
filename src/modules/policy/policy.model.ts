@@ -1,3 +1,4 @@
+import { PoolClient } from 'pg';
 import { LeaveType } from '../../shared/types';
 
 export interface LeavePolicy {
@@ -16,6 +17,7 @@ export interface LeavePolicy {
 
 export interface ILeavePolicyRepository {
   create(policy: LeavePolicy): Promise<LeavePolicy>;
+  list(client?: PoolClient): Promise<LeavePolicy[]>;
   findById(id: string): Promise<LeavePolicy | null>;
   findByLeaveType(leaveType: LeaveType): Promise<LeavePolicy | null>;
   findActiveByLeaveType(leaveType: LeaveType): Promise<LeavePolicy | null>;

@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import { PoolClient } from 'pg';
 import { IUnitOfWork } from '../../shared/db/unit-of-work';
 import { EntityType } from '../../shared/types';
-import { AuditLog } from './audit.model';
+import { AuditLog, AuditLogQuery } from './audit.model';
 import { PgAuditLogRepository } from './audit.repository';
 import { AuditRecordInput, IAuditService } from './audit.service.interface';
 
@@ -46,5 +46,9 @@ export class AuditService implements IAuditService {
     client?: PoolClient,
   ): Promise<AuditLog[]> {
     return this.auditLogs.findByPerformedAt(from, to, client);
+  }
+
+  async query(query: AuditLogQuery, client?: PoolClient): Promise<AuditLog[]> {
+    return this.auditLogs.query(query, client);
   }
 }

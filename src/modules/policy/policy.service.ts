@@ -102,4 +102,12 @@ export class PolicyService implements IPolicyService {
   ): Promise<LeavePolicy | null> {
     return this.policies.findByLeaveType(leaveType, client);
   }
+
+  async list(client?: PoolClient): Promise<LeavePolicy[]> {
+    return this.policies.list(client);
+  }
+
+  async findById(id: string, client?: PoolClient): Promise<LeavePolicy | null> {
+    return this.policies.findById(id, client);
+  }
 }

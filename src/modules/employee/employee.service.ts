@@ -41,6 +41,17 @@ export class EmployeeService implements IEmployeeService {
     return this.employees.create(employee);
   }
 
+  async list(client?: PoolClient): Promise<Employee[]> {
+    return this.employees.list(client);
+  }
+
+  async findById(
+    id: string,
+    client?: PoolClient,
+  ): Promise<Employee | null> {
+    return this.employees.findById(id, client);
+  }
+
   async update(
     id: string,
     changes: Partial<Employee>,

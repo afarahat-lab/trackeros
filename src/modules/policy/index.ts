@@ -7,3 +7,4 @@ export {
   InvalidLeaveTypeError,
   InvalidEntitlementDaysError,
 } from './policy.service';
+export { policyRoutes } from './policy.routes';

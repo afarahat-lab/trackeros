@@ -61,6 +61,14 @@ export class PgLeavePolicyRepository implements ILeavePolicyRepository {
     return toPolicy(result.rows[0]);
   }
 
+  async list(client?: PoolClient): Promise<LeavePolicy[]> {
+    const db = client ?? pool;
+    const result = await db.query<PolicyRow>(
+      `SELECT * FROM leave_policies WHERE deleted_at IS NULL ORDER BY created_at ASC`,
+    );
+    return result.rows.map(toPolicy);
+  }
+
   async findById(id: string, client?: PoolClient): Promise<LeavePolicy | null> {
     const db = client ?? pool;
     const result = await db.query<PolicyRow>(
