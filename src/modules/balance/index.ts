@@ -7,3 +7,5 @@ export type {
 } from './balance.model';
 export { NegativeBalanceCounterError, computeAvailableDays } from './balance.model';
 export { PgLeaveBalanceRepository } from './balance.repository';
+export { BalanceService } from './balance.service';
+export { balanceRoutes } from './balance.routes';

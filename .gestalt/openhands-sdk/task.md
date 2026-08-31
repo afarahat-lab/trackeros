@@ -1,6 +1,14 @@
-# Implement this phase: Phase 3 — balance and notification (part 1/2)
+# Continue the previous attempt (it hit the iteration limit before finishing)
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/b07feb33-7931-41ca-b4f7-c3dc02411147/5`. Do not clone anything; work only in this directory.
+A prior code-agent attempt on this work dir (`/tmp/gestalt/phase/b07feb33-7931-41ca-b4f7-c3dc02411147/6`) was stopped after reaching its iteration limit. Its work is ALREADY on disk here — do NOT restart from scratch or re-read everything; build on what exists. It made 11 file edit(s). Its last verification PASSED (`cd /tmp/gestalt/phase/b07feb33-7931-41ca-b4f7-c3dc02411147/6 && npx jest tests/unit/modules/notification/notification.service.spec.ts --forceExit 2>&1 | tail -40`).
+
+Finish the task now: fix any failing build/type-check/tests, then RUN the build and the tests and fix anything still failing. Stop as soon as the build and tests pass. The full original task (with all mandatory constraints) follows for reference.
+
+---
+
+# Implement this phase: Phase 3 — balance and notification (part 2/2)
+
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/b07feb33-7931-41ca-b4f7-c3dc02411147/6`. Do not clone anything; work only in this directory.
 
 You are the IMPLEMENTATION agent, not a planner. The platform measures your work EXCLUSIVELY by the files you create or modify in this working tree (`git status`). Ending your turn with a plan, a summary, or an announcement of what you are 'about to' do — without having actually edited files — is a FAILURE: a turn that leaves the working tree untouched is discarded. Explore only as much as you need, then MAKE the edits with your file-editing tool. Never end your turn before the files exist on disk.
 
@@ -8,19 +16,21 @@ You are the IMPLEMENTATION agent, not a planner. The platform measures your work
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Build ONLY the models + interfaces + repositories (layer 1) for the balance and notification modules. Do NOT build services, routes, or tests in this part.
+Build ONLY the services + routes + unit tests (layer 2) for the balance and notification modules.
 
-Create model files with canonical field shapes:
-- src/modules/balance/balance.model.ts: LeaveBalance entity (canonical name LeaveBalance, NOT Balance) with id, employeeId, policyId, totalEntitlement, usedDays, remainingDays, fiscalYear, status ('ACTIVE'|'CLOSED'), createdAt, updatedAt. Define ILeaveBalanceRepository and IBalanceService interfaces. Include the balance arithmetic rules: availableDays = entitlementDays - usedDays - pendingDays is DERIVED (never stored) and MAY go negative (do NOT clamp); the three stored counters are NON-NEGATIVE and a transition taking usedDays/pendingDays below zero is an ERROR.
-- src/modules/notification/notification.model.ts: Notification entity with id, recipientId, type (import NotificationType from src/shared/types/), title, message, relatedEntityType, relatedEntityId, status ('PENDING'|'SENT'|'READ'|'ARCHIVED'), createdAt, readAt. Define INotificationRepository and INotificationService interfaces.
+Create:
+- src/modules/balance/balance.service.ts: BalanceService implementing IBalanceService. Enforce the binding rules: availableDays is derived (entitlementDays - usedDays - pendingDays), never stored, may go negative (no clamping); stored counters non-negative; a transition taking usedDays/pendingDays below zero throws an error. Use countLeaveDays from src/shared/types/ for any day counting.
+- src/modules/balance/balance.routes.ts: register balance endpoints wired to BalanceService.
+- src/modules/notification/notification.service.ts: NotificationService implementing INotificationService.
+- src/modules/notification/notification.routes.ts: register notification endpoints wired to NotificationService.
 
-Create repository implementations:
-- src/modules/balance/balance.repository.ts: PgLeaveBalanceRepository implementing ILeaveBalanceRepository (snake_case columns: employee_id, policy_id, total_entitlement, used_days, remaining_days, fiscal_year).
-- src/modules/notification/notification.repository.ts: PgNotificationRepository implementing INotificationRepository (snake_case columns: recipient_id, related_entity_type, related_entity_id, read_at).
+Update each module's index.ts barrel to export services + routes.
 
-Each module gets an index.ts barrel exporting its model + interfaces + repository.
+Include Jest unit tests:
+- tests/unit/modules/balance/balance.service.spec.ts (cover derived availableDays, negative-balance behavior, non-negative counter error)
+- tests/unit/modules/notification/notification.service.spec.ts
 
-This phase depends on Phase 1's src/shared/types/index.ts (NotificationType) and src/shared/db/unit-of-work.ts + connection.ts. Read them before generating. Do not reference service/route files.
+This phase depends on Phase 3 part 1/2 (balance.model.ts, balance.repository.ts, notification.model.ts, notification.repository.ts) — read them before generating so signatures match exactly. Also depends on Phase 1's src/shared/types/index.ts for countLeaveDays and NotificationType. Do not reference the leave module.
 
 ## Your iteration budget — and how to get more (READ BEFORE YOU START)
 
@@ -138,27 +148,26 @@ The entities below are shared, cross-module DATA CONTRACTS. Implement each one w
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- Import `NotificationType` from `src/shared/types/index.ts` (re-exported from `notification-type.ts`) for the Notification.type field — do not redefine it locally. (see `src/shared/types/index.ts`)
-- Repository methods that join a caller's transaction take the client as an optional LAST parameter and fall back to the shared `pool` when omitted — matching the pattern established by `PgAuditLogRepository`. (see `src/modules/audit/audit.repository.ts`)
-- Repositories obtain the shared pool from `src/shared/db/connection.ts` (exports `pool`) and never import a pool/client/module-level db helper elsewhere. (see `src/shared/db/connection.ts`)
-- The `IUnitOfWork` contract (`withTransaction<T>(fn: (client: PoolClient) => Promise<T>)`) is the only transaction boundary; repositories do NOT own `withTransaction` and do NOT issue BEGIN/COMMIT/ROLLBACK. (see `src/shared/db/unit-of-work.ts`)
-- Barrel export style matches the existing modules: `export { X } from './file'` / `export type { ... } from './file'`. (see `src/modules/audit/index.ts`)
-- LeaveBalance field names/types match the reconciled entity shape (id, employeeId, policyId, totalEntitlement, usedDays, remainingDays, fiscalYear, status, createdAt, updatedAt) and the canonical name `LeaveBalance` (not `Balance`). (see `.gestalt/architecture/reconciled.json`)
+- BalanceService must implement the IBalanceService interface exactly as declared (create/findById/findByEmployee/deduct/restore signatures), and reuse computeAvailableDays + NegativeBalanceCounterError rather than redefining them. (see `src/modules/balance/balance.model.ts`)
+- NotificationService must implement the INotificationService interface exactly as declared (create/markRead/findByRecipient signatures) and reuse InvalidNotificationTransitionError rather than redefining it. (see `src/modules/notification/notification.model.ts`)
+- Day counting must call countLeaveDays (inclusive calendar days, endDate - startDate + 1) and never re-derive the formula inline. (see `src/shared/types/leave-days.ts`)
+- Notification type values must be the NotificationType enum members (LEAVE_REQUEST_*, LEAVE_BALANCE_*), imported from the shared barrel. (see `src/shared/types/notification-type.ts`)
+- Balance state-changing operations must write an AuditLog via IAuditService.record, matching the AuditLog entity shape and AuditAction/EntityType enums (EntityType.LEAVE_BALANCE). (see `src/modules/audit/audit.model.ts`)
+- Services must receive IUnitOfWork via constructor injection and use withTransaction(fn); participating methods take the client as an optional last parameter, matching the shared contract. (see `src/shared/db/unit-of-work.ts`)
+- Routes must enforce RBAC via requireRole(...allowed) and map errors to the standard { error, code } shape (400 VALIDATION_ERROR, 401 UNAUTHORIZED, 403 FORBIDDEN, 404 NOT_FOUND). (see `src/shared/http/require-role.ts`)
 ### Entity invariants — enforce these
-- Reuse or extend `LeaveBalance`: `availableDays = entitlementDays - usedDays - pendingDays` is DERIVED and never stored; it MAY go negative (no clamping). The three stored counters (totalEntitlement, usedDays, remainingDays) are NON-NEGATIVE; a transition taking usedDays/pendingDays below zero is an ERROR, not a clamp.
-- Reuse or extend `LeaveBalance`: Lifecycle status is restricted to 'ACTIVE' | 'CLOSED'.
-- Reuse or extend `Notification`: Lifecycle status is restricted to 'PENDING' | 'SENT' | 'READ' | 'ARCHIVED'; `readAt` is set only when the notification transitions to READ.
-- Reuse or extend `Notification`: `type` is typed as the shared `NotificationType` enum (imported from `src/shared/types/`), not a free-form string.
+- Reuse or extend `LeaveBalance`: availableDays is always derived (totalEntitlement - usedDays - pendingDays), never stored, and may go negative without clamping; the three stored counters (totalEntitlement, usedDays, remainingDays) are non-negative and any transition taking one below zero is an error (NegativeBalanceCounterError), not a clamp.
+- Reuse or extend `Notification`: readAt is only ever set on a transition into READ; only PENDING and SENT may transition to READ, and any other current status raises InvalidNotificationTransitionError.
 ### Interface contract — expose these operations (their shape is yours)
-- ILeaveBalanceRepository.create — Persists a LeaveBalance row and returns the persisted entity; rejects a non-negative-counter violation (usedDays/remainingDays/totalEntitlement below zero) with a typed error rather than clamping.
-- ILeaveBalanceRepository.deduct (or equivalent counter-mutation operation) — A transition that would take usedDays or pendingDays below zero is an ERROR (typed error), never a clamp; the derived availableDays is never written.
-- INotificationRepository.create — Persists a Notification row and returns the persisted entity; `type` must be a valid NotificationType value.
-- INotificationRepository.markRead (or equivalent status-transition operation) — Sets status to READ and stamps readAt; an illegal transition (e.g. from ARCHIVED) is rejected with a typed error.
+- BalanceService.deduct — Throws NegativeBalanceCounterError when the deduction would take remainingDays below zero; never clamps.
+- BalanceService.restore — Throws NegativeBalanceCounterError when the restore would take usedDays below zero; never clamps.
+- BalanceService.create — Rejects any input whose stored counters are negative with NegativeBalanceCounterError.
+- NotificationService.markRead — Throws InvalidNotificationTransitionError when the notification is not in PENDING or SENT; stamps readAt only on the transition into READ.
+- NotificationService.create — Creates a notification with status PENDING and readAt null; rejects an unknown NotificationType value.
 ### Integration points — connect to these
-- src/shared/types/index.ts — Notification.type is typed as the shared NotificationType enum; balance/notification may also reference shared DTOs (BalanceSnapshot) and countLeaveDays.
-- src/shared/db/connection.ts — Repositories obtain the shared pg Pool for all SQL access.
-- src/shared/db/unit-of-work.ts — Participating repository methods accept an optional PoolClient (last param) to join a caller's transaction; the IUnitOfWork contract governs the boundary.
-- src/modules/audit/index.ts — Balance mutations will later write audit records (GP-002); the balance module depends on audit per the reconciled dependency map.
+- src/modules/audit (IAuditService.record) — Balance state-changing operations must write audit records (GP-002); the balance→audit dependency declared in the reconciled architecture is realized here.
+- src/shared/db (IUnitOfWork) — Services own the transaction boundary via injected IUnitOfWork.withTransaction; balance mutations + their audit rows must commit/rollback atomically.
+- src/shared/types (countLeaveDays, NotificationType) — Day counting and notification typing come from the shared barrel; no inline re-derivation.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
