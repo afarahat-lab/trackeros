@@ -1,0 +1,196 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "employee",
+      "policy",
+      "audit"
+    ],
+    "affectedLayers": [
+      "repository",
+      "service"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "PgEmployeeRepository implements IEmployeeRepository and maps every camelCase Employee field to its snake_case column (employee_number, first_name, last_name, manager_id, hire_date, termination_date, employment_status, created_at, updated_at, deleted_at) with no snake_case leaking into TypeScript field names and no camelCase in SQL.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "EmployeeService implements IEmployeeService (create/update/terminate/reactivate) and delegates all persistence to IEmployeeRepository without importing the pool or a DB client.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "PgLeavePolicyRepository implements ILeavePolicyRepository and maps LeavePolicy fields to snake_case columns (policy_name, leave_type, entitlement_days, accrual_rate, max_accumulation, minimum_notice_days, requires_manager_approval, is_active).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "PolicyService implements IPolicyService (create/update/activate/deactivate/findByLeaveType) and delegates persistence to ILeavePolicyRepository.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "PgAuditLogRepository implements IAuditLogRepository, persists to the audit_logs table, and maps fields to snake_case columns (entity_type, entity_id, old_values, new_values, performed_by, performed_at).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "AuditService implements IAuditService (record/findByEntity/findByPerformedAt) and delegates persistence to IAuditLogRepository.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Each module's index.ts barrel re-exports its new repository and service implementations, and `npm run build` (tsc --noEmit) passes with no type errors.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All SQL and DB access lives ONLY in the repository layer (GP-001); services never import the pool, a client, or a module-level DB helper.",
+    "The repository is the ONLY layer that maps camelCase TypeScript fields to snake_case DB columns; no snake_case in TS field names, no camelCase in SQL.",
+    "Services receive IUnitOfWork via constructor injection and own the unit of work; participating repository/service methods take the client as an optional LAST parameter and fall back to the shared pool when omitted. withTransaction is never placed on a repository.",
+    "No `any`; use `unknown` with type guards (HARNESS no-any rule).",
+    "Do not build routes, controllers, or tests in this phase; do not reference route files.",
+    "Modules import from each other only through their index.ts barrel; no cross-module internal imports."
+  ],
+  "outOfScope": [
+    "Routes, controllers, and HTTP wiring for employee/policy/audit (deferred to Phase 2 part 3/3).",
+    "Jest unit/integration tests for these modules (deferred to Phase 2 part 3/3).",
+    "Knex migrations / DDL for the employees, leave_policies, and audit_logs tables.",
+    "RBAC enforcement and auth middleware (route-level concern, not applicable to layer-2 services).",
+    "The leave, balance, and notification modules."
+  ],
+  "ambiguities": [
+    {
+      "description": "Whether the audit module's record() should itself open a transaction (via IUnitOfWork) or be a single-step write that participates in a caller's transaction via the optional client parameter.",
+      "options": [
+        "record() is a single-step write using the shared pool by default and joins a caller's transaction via the optional client",
+        "record() always wraps itself in withTransaction"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "description": "Whether employee/policy service mutations (create/update/terminate/activate) must write an AuditLog record now, or whether audit recording is only wired when the leave orchestration module composes them.",
+      "options": [
+        "Layer-2 services write audit records for their own state changes (GP-002 applies immediately)",
+        "Audit recording is deferred to the leave orchestration phase; these leaf services only persist their own entity"
+      ],
+      "impactIfWrong": "medium"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "employmentStatus is restricted to 'ACTIVE' | 'INACTIVE' | 'TERMINATED'; terminate() sets status to TERMINATED with a terminationDate, reactivate() restores ACTIVE and clears terminationDate; deletedAt is null for live rows and set on soft-delete."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "isActive is a boolean lifecycle flag; activate()/deactivate() toggle it; entitlementDays is a non-negative integer; leaveType is a valid LeaveType enum value."
+    },
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "AuditLog is append-only (no update/delete lifecycle); every record carries a valid EntityType, AuditAction, and performedAt timestamp; oldValues/newValues are JSON-serializable objects or null."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IEmployeeRepository.create / findById / findByEmployeeNumber / findByEmail / update / delete",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "find* return null (not throw) when no row matches; update returns null when the id does not exist; delete returns boolean success."
+    },
+    {
+      "operation": "IEmployeeService.create / update / terminate / reactivate",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "terminate/reactivate on a non-existent employee return null; invalid employmentStatus transitions are rejected with a typed error rather than silently coerced."
+    },
+    {
+      "operation": "ILeavePolicyRepository.create / findById / findByLeaveType / findActiveByLeaveType / update",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "find* return null when no row matches; findActiveByLeaveType filters isActive=true; update returns null when the id does not exist."
+    },
+    {
+      "operation": "IPolicyService.create / update / activate / deactivate / findByLeaveType",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "activate/deactivate on a non-existent policy return null; create with an invalid LeaveType is rejected with a typed error."
+    },
+    {
+      "operation": "IAuditLogRepository.create / findById / findByEntity / findByPerformedAt / query",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "findById returns null when absent; findByEntity/findByPerformedAt/query return arrays (possibly empty), never null."
+    },
+    {
+      "operation": "IAuditService.record / findByEntity / findByPerformedAt",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "record persists and returns the created AuditLog; read operations return arrays (possibly empty)."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Repository and service implementations must match the exact field names, types, and method signatures already declared in the layer-1 model/interface files (Employee, IEmployeeRepository, IEmployeeService).",
+      "referencePath": "src/modules/employee/employee.model.ts"
+    },
+    {
+      "requirement": "EmployeeService must implement the exact IEmployeeService surface (create/update/terminate/reactivate) and CreateEmployeeInput shape.",
+      "referencePath": "src/modules/employee/employee.service.interface.ts"
+    },
+    {
+      "requirement": "Repository and service implementations must match LeavePolicy and ILeavePolicyRepository field names/types/signatures.",
+      "referencePath": "src/modules/policy/policy.model.ts"
+    },
+    {
+      "requirement": "PolicyService must implement the exact IPolicyService surface and CreateLeavePolicyInput shape.",
+      "referencePath": "src/modules/policy/policy.service.interface.ts"
+    },
+    {
+      "requirement": "Repository and service implementations must match AuditLog, IAuditLogRepository, and AuditLogQuery field names/types/signatures.",
+      "referencePath": "src/modules/audit/audit.model.ts"
+    },
+    {
+      "requirement": "AuditService must implement the exact IAuditService surface and AuditRecordInput shape.",
+      "referencePath": "src/modules/audit/audit.service.interface.ts"
+    },
+    {
+      "requirement": "Services must use the injected IUnitOfWork.withTransaction(fn) contract and never import the pool; participating methods take the client as an optional last parameter.",
+      "referencePath": "src/shared/db/unit-of-work.ts"
+    },
+    {
+      "requirement": "Repositories obtain DB access from the shared pool exported by connection.ts (fallback when no client is passed).",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "LeaveType, EntityType, and AuditAction must be imported from the shared types barrel, not redefined locally.",
+      "referencePath": "src/shared/types/index.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/db/connection.ts (pool)",
+      "why": "Repositories execute SQL against the shared pg Pool as the default client when none is passed."
+    },
+    {
+      "target": "src/shared/db/unit-of-work.ts (IUnitOfWork)",
+      "why": "Services receive IUnitOfWork via constructor to own transaction boundaries for multi-step writes."
+    },
+    {
+      "target": "src/shared/types/index.ts (LeaveType, EntityType, AuditAction)",
+      "why": "Policy and audit modules depend on shared enums for typed fields."
+    },
+    {
+      "target": "src/modules/{employee,policy,audit}/index.ts barrels",
+      "why": "Barrels must re-export the new repository + service implementations for downstream consumers."
+    }
+  ]
+}
