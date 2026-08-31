@@ -1,7 +1,7 @@
 import type { PoolClient } from 'pg';
 import { randomUUID } from 'crypto';
 
-import { pool } from '../../shared/db/connection';
+import { IUnitOfWork, PgUnitOfWork } from '../../shared/db/unit-of-work';
 import {
   AuthorizationError,
   InsufficientBalanceError,
@@ -37,6 +37,7 @@ export class LeaveService implements ILeaveService {
   private readonly policyRepository: ILeavePolicyRepository;
   private readonly auditService: IAuditService;
   private readonly notificationService: INotificationService;
+  private readonly unitOfWork: IUnitOfWork;
 
   constructor(
     requestRepository: ILeaveRequestRepository = new PgLeaveRequestRepository(),
@@ -46,7 +47,8 @@ export class LeaveService implements ILeaveService {
     leaveTypeRepository: ILeaveTypeRepository = new PgLeaveTypeRepository(),
     policyRepository: ILeavePolicyRepository = new PgLeavePolicyRepository(),
     auditService: IAuditService = new AuditService(),
-    notificationService: INotificationService = new NotificationService()
+    notificationService: INotificationService = new NotificationService(),
+    unitOfWork: IUnitOfWork = new PgUnitOfWork()
   ) {
     this.requestRepository = requestRepository;
     this.balanceService = balanceService;
@@ -56,6 +58,7 @@ export class LeaveService implements ILeaveService {
     this.policyRepository = policyRepository;
     this.auditService = auditService;
     this.notificationService = notificationService;
+    this.unitOfWork = unitOfWork;
   }
 
   async submit(
@@ -83,7 +86,7 @@ export class LeaveService implements ILeaveService {
       throw new ValidationError('endDate must be on or after startDate');
     }
 
-    return this.withClient(client, async (c) => {
+    return this.withUnitOfWork(client, async (c) => {
       const employee = await this.employeeRepository.findById(employeeId, c);
       if (!employee) {
         throw new NotFoundError(`Employee ${employeeId} not found`);
@@ -162,7 +165,7 @@ export class LeaveService implements ILeaveService {
     actorId: string,
     client?: PoolClient
   ): Promise<LeaveRequest> {
-    return this.withClient(client, async (c) => {
+    return this.withUnitOfWork(client, async (c) => {
       const request = await this.requestRepository.findById(requestId, c);
       if (!request) {
         throw new NotFoundError(`Leave request ${requestId} not found`);
@@ -254,7 +257,7 @@ export class LeaveService implements ILeaveService {
       throw new ValidationError('rejectionReason is required');
     }
 
-    return this.withClient(client, async (c) => {
+    return this.withUnitOfWork(client, async (c) => {
       const request = await this.requestRepository.findById(requestId, c);
       if (!request) {
         throw new NotFoundError(`Leave request ${requestId} not found`);
@@ -325,7 +328,7 @@ export class LeaveService implements ILeaveService {
     actorRole: UserRole,
     client?: PoolClient
   ): Promise<LeaveRequest> {
-    return this.withClient(client, async (c) => {
+    return this.withUnitOfWork(client, async (c) => {
       const request = await this.requestRepository.findById(requestId, c);
       if (!request) {
         throw new NotFoundError(`Leave request ${requestId} not found`);
@@ -458,24 +461,13 @@ export class LeaveService implements ILeaveService {
     return this.balanceRepository.create(balance, client);
   }
 
-  private async withClient<T>(
+  private async withUnitOfWork<T>(
     client: PoolClient | undefined,
     fn: (c: PoolClient) => Promise<T>
   ): Promise<T> {
     if (client) {
       return fn(client);
     }
-    const c = await pool.connect();
-    try {
-      await c.query('BEGIN');
-      const result = await fn(c);
-      await c.query('COMMIT');
-      return result;
-    } catch (err) {
-      await c.query('ROLLBACK');
-      throw err;
-    } finally {
-      c.release();
-    }
+    return this.unitOfWork.withTransaction(fn);
   }
 }
