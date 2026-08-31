@@ -26,6 +26,7 @@ src/modules/policy/policy.model.ts + index.ts
 src/modules/status/    — status module (model, service interface, service)
 src/modules/uptime/    — uptime module (model, routes, service interface, service)
 src/shared/db/connection.ts
+src/shared/db/unit-of-work.ts    — IUnitOfWork / PgUnitOfWork transaction boundary
 src/shared/types/    — shared-types module (enums, dtos, errors, index)
 src/app.ts
 src/index.ts
@@ -336,8 +337,9 @@ present).
 - `leave.service.ts` — `LeaveService` implements `ILeaveService`
   (submit/approve/reject/cancel). The constructor injects every
   dependency (request repo, balance service + repo, employee repo,
-  leave-type repo, policy repo, audit service, notification service) with
-  concrete defaults, so it is testable with mocks. Each operation:
+  leave-type repo, policy repo, audit service, notification service, and
+  an `IUnitOfWork`) with concrete defaults, so it is testable with mocks.
+  Each operation:
   - `submit` validates `actorId === employeeId`, `leaveTypeId` presence,
     and date validity/order; loads the employee, leave type, and the
     ACTIVE policy for that type; derives the fiscal year from
@@ -361,12 +363,17 @@ present).
     status to `'PENDING'`/`'APPROVED'` for `balanceService.cancel`,
     updates to `CANCELLED`, records a `CANCEL` audit entry, and notifies
     the employee.
-  - `withClient` is the single transaction boundary: when a `PoolClient`
-    is passed in, the caller owns the transaction and the service runs
-    inside it; otherwise the service opens its own connection and wraps
-    the whole operation in `BEGIN`/`COMMIT`/`ROLLBACK` (releasing the
-    client in `finally`). Every state change + balance counter change +
-    audit write + notification runs through the SAME client.
+  - Transaction boundary via `IUnitOfWork`/`PgUnitOfWork` (in
+    `src/shared/db/unit-of-work.ts`): the service injects an
+    `IUnitOfWork` (default `PgUnitOfWork`) and a private
+    `withUnitOfWork(client, fn)` helper. When a `PoolClient` is passed in,
+    the caller owns the transaction and the service runs inside it;
+    otherwise the service delegates to `unitOfWork.withTransaction(fn)`,
+    which acquires a client, issues `BEGIN`, runs the callback, then
+    `COMMIT` (or `ROLLBACK` on throw), releasing the client in `finally`.
+    `PgUnitOfWork` is the ONLY place issuing `BEGIN`/`COMMIT`/`ROLLBACK`.
+    Every state change + balance counter change + audit write +
+    notification runs through the SAME client.
 
 - `leave.controller.ts` — `LeaveController` with `submit`/`approve`/
   `reject`/`cancel` handlers. Auth is header-based: it reads `x-user-id`
