@@ -1,0 +1,187 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "balance",
+      "notification"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository",
+      "interface"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "A `LeaveBalance` entity (canonical name, NOT `Balance`) is exported from `src/modules/balance/balance.model.ts` with the fields id, employeeId, policyId, totalEntitlement, usedDays, remainingDays, fiscalYear, status ('ACTIVE'|'CLOSED'), createdAt, updatedAt.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A `Notification` entity is exported from `src/modules/notification/notification.model.ts` with id, recipientId, type (typed as `NotificationType` imported from `src/shared/types/`), title, message, relatedEntityType, relatedEntityId, status ('PENDING'|'SENT'|'READ'|'ARCHIVED'), createdAt, readAt.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`ILeaveBalanceRepository` and `IBalanceService` interfaces are defined in the balance module, and `INotificationRepository` and `INotificationService` interfaces are defined in the notification module.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`PgLeaveBalanceRepository` implements `ILeaveBalanceRepository` and maps camelCase fields to snake_case columns employee_id, policy_id, total_entitlement, used_days, remaining_days, fiscal_year.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`PgNotificationRepository` implements `INotificationRepository` and maps camelCase fields to snake_case columns recipient_id, related_entity_type, related_entity_id, read_at.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Each module's `index.ts` barrel exports its model, interfaces, and repository (balance: `balance.model.ts` + `balance.repository.ts`; notification: `notification.model.ts` + `notification.repository.ts`).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The balance arithmetic rule is encoded in the model/interface: `availableDays = entitlementDays - usedDays - pendingDays` is DERIVED (never a stored field) and MAY go negative (no clamping); the three stored counters (totalEntitlement, usedDays, remainingDays) are NON-NEGATIVE and a transition taking usedDays/pendingDays below zero is an ERROR.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Do NOT build services, routes, or tests in this phase \u2014 only models, interfaces, repositories, and index barrels. Service interfaces (IBalanceService, INotificationService) are declared but not implemented.",
+    "All database access goes through the repository layer only (GP-001); repositories use the shared `pool` from `src/shared/db/connection.ts` and never import a pool/client/module-level db helper elsewhere.",
+    "Repository methods that may join a caller's transaction take the client as an optional LAST parameter and fall back to the shared pool when omitted (AGENTS.md Architecture rules 5).",
+    "TypeScript identifiers are camelCase; database columns are snake_case; the repository is the ONLY layer that maps between them. No snake_case in TS field names, no camelCase in SQL.",
+    "Use `unknown` with type guards instead of `any` (HARNESS constraint `no-any`).",
+    "Modules import from each other ONLY through their public `index.ts` entry point; no circular dependencies."
+  ],
+  "outOfScope": [
+    "Service implementations (BalanceService, NotificationService) \u2014 deferred to Phase 6 (part 2/2).",
+    "Route files and HTTP endpoints for balance and notification \u2014 deferred to Phase 6.",
+    "Unit tests for balance/notification \u2014 deferred to Phase 6 (tests/unit/modules/balance/balance.service.spec.ts, tests/unit/modules/notification/notification.service.spec.ts).",
+    "The leave orchestration module (leave.model/repository/service/routes) \u2014 Phase 7.",
+    "DB migrations / schema DDL for leave_balances and notifications tables \u2014 not part of this phase's file scope."
+  ],
+  "ambiguities": [
+    {
+      "description": "The balance arithmetic rule references `pendingDays`, but the LeaveBalance entity field list has no `pendingDays` field (only totalEntitlement, usedDays, remainingDays). Is `pendingDays` a separate stored counter to be added, or is it derived from leave requests in the leave module (Phase 7) and thus not a field on LeaveBalance in this phase?",
+      "options": [
+        "pendingDays is NOT a LeaveBalance field in this phase \u2014 it is supplied by the leave module at approval time; the derived formula is documented in the model/interface but only totalEntitlement/usedDays/remainingDays are stored",
+        "Add a pendingDays field to LeaveBalance now (diverging from the reconciled entity shape)",
+        "pendingDays is derived from remainingDays vs usedDays internally"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "The phase says \"the three stored counters are NON-NEGATIVE\" but the entity has totalEntitlement, usedDays, remainingDays \u2014 and the rule separately names usedDays/pendingDays. Which exact fields are the \"three stored counters\" that must be non-negative?",
+      "options": [
+        "totalEntitlement, usedDays, remainingDays (the three fields on the entity)",
+        "usedDays, pendingDays, remainingDays (per the arithmetic rule text)",
+        "totalEntitlement, usedDays, pendingDays"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "The reconciled dependency map says balance depends on audit, but this phase's file scope (models + interfaces + repositories only) does not require an audit import. Should the balance repository/service interface reference audit now, or is that dependency realized only in Phase 6 when the service writes audit records?",
+      "options": [
+        "No audit reference in this phase; the dependency is realized in Phase 6 (service layer)",
+        "Declare the audit dependency in IBalanceService now (e.g. an audit method signature) even though it is not implemented"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "`availableDays = entitlementDays - usedDays - pendingDays` is DERIVED and never stored; it MAY go negative (no clamping). The three stored counters (totalEntitlement, usedDays, remainingDays) are NON-NEGATIVE; a transition taking usedDays/pendingDays below zero is an ERROR, not a clamp."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "Lifecycle status is restricted to 'ACTIVE' | 'CLOSED'."
+    },
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "Lifecycle status is restricted to 'PENDING' | 'SENT' | 'READ' | 'ARCHIVED'; `readAt` is set only when the notification transitions to READ."
+    },
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "`type` is typed as the shared `NotificationType` enum (imported from `src/shared/types/`), not a free-form string."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "ILeaveBalanceRepository.create",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Persists a LeaveBalance row and returns the persisted entity; rejects a non-negative-counter violation (usedDays/remainingDays/totalEntitlement below zero) with a typed error rather than clamping."
+    },
+    {
+      "operation": "ILeaveBalanceRepository.deduct (or equivalent counter-mutation operation)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "A transition that would take usedDays or pendingDays below zero is an ERROR (typed error), never a clamp; the derived availableDays is never written."
+    },
+    {
+      "operation": "INotificationRepository.create",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Persists a Notification row and returns the persisted entity; `type` must be a valid NotificationType value."
+    },
+    {
+      "operation": "INotificationRepository.markRead (or equivalent status-transition operation)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Sets status to READ and stamps readAt; an illegal transition (e.g. from ARCHIVED) is rejected with a typed error."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Import `NotificationType` from `src/shared/types/index.ts` (re-exported from `notification-type.ts`) for the Notification.type field \u2014 do not redefine it locally.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "Repository methods that join a caller's transaction take the client as an optional LAST parameter and fall back to the shared `pool` when omitted \u2014 matching the pattern established by `PgAuditLogRepository`.",
+      "referencePath": "src/modules/audit/audit.repository.ts"
+    },
+    {
+      "requirement": "Repositories obtain the shared pool from `src/shared/db/connection.ts` (exports `pool`) and never import a pool/client/module-level db helper elsewhere.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "The `IUnitOfWork` contract (`withTransaction<T>(fn: (client: PoolClient) => Promise<T>)`) is the only transaction boundary; repositories do NOT own `withTransaction` and do NOT issue BEGIN/COMMIT/ROLLBACK.",
+      "referencePath": "src/shared/db/unit-of-work.ts"
+    },
+    {
+      "requirement": "Barrel export style matches the existing modules: `export { X } from './file'` / `export type { ... } from './file'`.",
+      "referencePath": "src/modules/audit/index.ts"
+    },
+    {
+      "requirement": "LeaveBalance field names/types match the reconciled entity shape (id, employeeId, policyId, totalEntitlement, usedDays, remainingDays, fiscalYear, status, createdAt, updatedAt) and the canonical name `LeaveBalance` (not `Balance`).",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts",
+      "why": "Notification.type is typed as the shared NotificationType enum; balance/notification may also reference shared DTOs (BalanceSnapshot) and countLeaveDays."
+    },
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "Repositories obtain the shared pg Pool for all SQL access."
+    },
+    {
+      "target": "src/shared/db/unit-of-work.ts",
+      "why": "Participating repository methods accept an optional PoolClient (last param) to join a caller's transaction; the IUnitOfWork contract governs the boundary."
+    },
+    {
+      "target": "src/modules/audit/index.ts",
+      "why": "Balance mutations will later write audit records (GP-002); the balance module depends on audit per the reconciled dependency map."
+    }
+  ]
+}
