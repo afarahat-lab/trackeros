@@ -1,0 +1,148 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "employee",
+      "policy",
+      "audit"
+    ],
+    "affectedLayers": [
+      "model",
+      "interface"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "src/modules/employee/employee.model.ts exists and exports an Employee entity whose fields exactly match the canonical shape (id, employeeNumber, firstName, lastName, email, managerId, department, hireDate, terminationDate, employmentStatus, createdAt, updatedAt, deletedAt) with camelCase identifiers and employmentStatus typed as 'ACTIVE'|'INACTIVE'|'TERMINATED'.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/modules/policy/policy.model.ts exists and exports a LeavePolicy entity with the canonical fields (id, policyName, leaveType, entitlementDays, accrualRate, maxAccumulation, minimumNoticeDays, requiresManagerApproval, isActive, createdAt, updatedAt), where leaveType is typed as the LeaveType enum imported from src/shared/types/index.ts.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/modules/audit/audit.model.ts exists and exports an entity named AuditLog (not Audit/AuditRecord) with the canonical fields (id, entityType, entityId, action, oldValues, newValues, performedBy, performedAt, createdAt, updatedAt), where entityType is EntityType and action is AuditAction imported from src/shared/types/index.ts, and oldValues/newValues are typed Record<string, unknown> | null (no any).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Each module exposes the canonical interfaces \u2014 IEmployeeRepository + IEmployeeService (employee), ILeavePolicyRepository + IPolicyService (policy), IAuditLogRepository + IAuditService (audit) \u2014 and each module has an index.ts barrel re-exporting its model and interfaces using export { X } from './file' style.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The phase compiles cleanly under the mechanical gate (npm run build / tsc --noEmit) with no references to repository/service implementation files, route files, or test files, and no `any` types introduced.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Model-only phase: create only model/interface files and index.ts barrels. Do NOT create repository implementations, service implementations, routes, controllers, or tests \u2014 those are deferred to parts 2/3 and later phases.",
+    "No `any` anywhere (HARNESS.json no-any, high severity). Use `unknown` with type guards; AuditLog.oldValues/newValues must be `Record<string, unknown> | null`, not `Record<string, any>`.",
+    "TypeScript identifiers are camelCase; snake_case is reserved for the SQL/repository layer (not in scope here). No snake_case field names in model files.",
+    "Import LeaveType, EntityType, and AuditAction from src/shared/types/index.ts (the authoritative barrel) \u2014 do not import from the individual enum files or redefine the enums.",
+    "Models are plain interface/type declarations; service interfaces live in sibling files named <name>.service.interface.ts; index.ts barrels use export { X } from './file' re-export style (matching existing status/uptime modules)."
+  ],
+  "outOfScope": [
+    "Repository implementations (PgEmployeeRepository, PgLeavePolicyRepository, PgAuditLogRepository) \u2014 deferred to Phase 2 part 2/3.",
+    "Service implementations (EmployeeService, PolicyService, AuditService) \u2014 deferred to Phase 2 part 2/3.",
+    "Routes, controllers, and HTTP wiring \u2014 deferred to Phase 2 part 3/3.",
+    "Unit/integration tests for these modules \u2014 deferred to Phase 2 part 3/3.",
+    "Database migrations / SQL schema / snake_case column mapping \u2014 belongs to the repository layer, not this model-only phase."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "employmentStatus is restricted to the three lifecycle states 'ACTIVE' | 'INACTIVE' | 'TERMINATED'; managerId, department, terminationDate, and deletedAt are nullable (managerId/department/terminationDate/deletedAt: string|null or Date|null), while id, employeeNumber, firstName, lastName, email, hireDate, employmentStatus, createdAt, updatedAt are required."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "leaveType is typed as the LeaveType enum (not a free string); isActive and requiresManagerApproval are booleans; accrualRate, maxAccumulation, and minimumNoticeDays are optional (number | undefined); entitlementDays is a required number."
+    },
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "entityType is typed as EntityType and action as AuditAction (both enums); oldValues and newValues are Record<string, unknown> | null; performedBy is string | null; AuditLog has no lifecycle states (it is an immutable record of a state change)."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IEmployeeRepository: expose create/read/update/delete operations for the Employee entity (exact method names chosen by the code agent).",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": ""
+    },
+    {
+      "operation": "IEmployeeService: expose employee lifecycle operations (e.g. create/update/terminate) that delegate persistence to IEmployeeRepository.",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": ""
+    },
+    {
+      "operation": "ILeavePolicyRepository: expose create/read/update operations for LeavePolicy, including lookup by leaveType and isActive.",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": ""
+    },
+    {
+      "operation": "IPolicyService: expose policy rule operations (e.g. create/update/activate/deactivate) that delegate persistence to ILeavePolicyRepository.",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": ""
+    },
+    {
+      "operation": "IAuditLogRepository: expose a create (record) operation and query operations for AuditLog (e.g. by entityType+entityId, by performedAt).",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": ""
+    },
+    {
+      "operation": "IAuditService: expose a record operation that writes an AuditLog for a state-changing operation (GP-002), delegating persistence to IAuditLogRepository.",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": ""
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Import LeaveType, EntityType, and AuditAction from the shared barrel (not the individual enum files) so the model types stay in lockstep with the authoritative enums.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "Employee entity field names/types must match the canonical shape (camelCase) declared in the reconciled architecture and ARCHITECTURE.md employees table.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "LeavePolicy entity field names/types must match the canonical shape (camelCase) declared in the reconciled architecture and ARCHITECTURE.md leave_policies table.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "AuditLog entity field names/types must match the canonical shape (camelCase) declared in the reconciled architecture and ARCHITECTURE.md audit_logs table, with the entity named AuditLog.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "Interface names must be exactly IEmployeeRepository, IEmployeeService, ILeavePolicyRepository, IPolicyService, IAuditLogRepository, IAuditService (canonical names).",
+      "referencePath": "docs/ARCHITECTURE.md"
+    },
+    {
+      "requirement": "File/module conventions (model as plain interface, service interface in <name>.service.interface.ts, index.ts barrel with export { X } from './file') must match the existing status/uptime modules.",
+      "referencePath": "src/modules/status/index.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts",
+      "why": "Source of the LeaveType, EntityType, and AuditAction enums that the three model files must import."
+    },
+    {
+      "target": "src/shared/db/unit-of-work.ts (IUnitOfWork)",
+      "why": "Declared dependency of the employee/policy/audit modules; the service interfaces will consume it in later phases, so the model/interface layer must not contradict its contract."
+    }
+  ]
+}
