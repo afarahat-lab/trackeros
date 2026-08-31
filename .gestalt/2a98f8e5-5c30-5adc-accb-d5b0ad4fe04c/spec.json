@@ -1,0 +1,160 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "notification"
+    ],
+    "affectedLayers": [
+      "service",
+      "routes",
+      "barrel"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "src/modules/notification/notification.service.ts exports a NotificationService class that implements INotificationService with exactly the three operations declared in src/modules/notification/notification.model.ts: create(input: CreateNotificationInput): Promise<Notification>, markRead(id: string): Promise<Notification>, findByRecipient(recipientId: string, client?: PoolClient): Promise<Notification[]>.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "NotificationService.create generates id (randomUUID) and createdAt, sets status to 'PENDING' and readAt to null, and delegates persistence to the injected repository WITHOUT opening a transaction (mirroring BalanceService.create).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "NotificationService.markRead wraps the repository markRead call in the injected IUnitOfWork.withTransaction, and an InvalidNotificationTransitionError raised by the repository propagates to the caller unchanged.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "NotificationService.findByRecipient accepts an optional PoolClient as its LAST parameter and passes it through to the repository, falling back to the shared pool when omitted.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/modules/notification/notification.routes.ts exports an async notificationRoutes(fastify: FastifyInstance) function that instantiates NotificationService with PgNotificationRepository and UnitOfWork and registers endpoints wired to the service.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "Notification routes validate inputs with Zod safeParse, returning 400 with { error, code: 'VALIDATION_ERROR' } on failure, and map InvalidNotificationTransitionError to a 400/404 typed error rather than a 500.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "src/modules/notification/index.ts re-exports NotificationService and notificationRoutes in addition to the existing model and repository symbols.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "NotificationService constructor takes the repository (PgNotificationRepository) and IUnitOfWork as injected dependencies; it never imports the pool, a pg client, or any module-level DB helper directly.",
+    "The service owns the unit of work: markRead uses uow.withTransaction(fn); create and findByRecipient do not open a transaction. No withTransaction call may appear on the repository.",
+    "Do not reference the leave module or any leave-module symbol.",
+    "Do not modify src/modules/balance/balance.service.ts, balance.routes.ts, or balance/index.ts.",
+    "Do not create or require any test files; unit/integration tests are out of scope for this sub-phase.",
+    "NotificationService must implement the exact INotificationService interface from notification.model.ts \u2014 no additional public methods, no changed signatures, no optional-client parameter added to markRead."
+  ],
+  "outOfScope": [
+    "src/modules/balance/balance.service.ts, balance.routes.ts, balance/index.ts (sibling sub-phase 3a).",
+    "tests/unit/modules/balance/balance.service.spec.ts and tests/unit/modules/notification/notification.service.spec.ts (Phase 3c).",
+    "Notification route registration in src/app.ts.",
+    "Any leave-module orchestration that creates notifications (Phase 4)."
+  ],
+  "ambiguities": [
+    {
+      "description": "Exact notification endpoint paths and RBAC roles are not specified in any committed artifact (ARCHITECTURE.md marks notification part 2/2 deferred). The route surface and role requirements must be decided.",
+      "options": [
+        "Mirror balance routes: reads HR_ADMIN|MANAGER, writes HR_ADMIN-only",
+        "Employee-own-resource scoping: EMPLOYEE can read/markRead own notifications",
+        "HR_ADMIN-only for all notification endpoints"
+      ],
+      "impactIfWrong": "medium"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "A Notification's status may only transition PENDING|SENT -> READ; readAt is set only on that transition and is null otherwise; any other transition raises InvalidNotificationTransitionError (enforced by the repository, propagated by the service)."
+    },
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "A newly created Notification has status 'PENDING', readAt null, and a service-generated id and createdAt; type must be a valid NotificationType value."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "create(input: CreateNotificationInput): Promise<Notification>",
+      "authRule": "Route-level: HR_ADMIN only (mirrors balance write endpoints).",
+      "idempotent": false,
+      "errorSemantics": "Invalid input -> 400 VALIDATION_ERROR; unexpected error -> 500 INTERNAL_ERROR."
+    },
+    {
+      "operation": "markRead(id: string): Promise<Notification>",
+      "authRule": "Route-level: HR_ADMIN or MANAGER (mirrors balance read endpoints).",
+      "idempotent": false,
+      "errorSemantics": "InvalidNotificationTransitionError -> 400 VALIDATION_ERROR (or 404 NOT_FOUND); unexpected error -> 500 INTERNAL_ERROR."
+    },
+    {
+      "operation": "findByRecipient(recipientId: string, client?: PoolClient): Promise<Notification[]>",
+      "authRule": "Route-level: HR_ADMIN or MANAGER (mirrors balance read endpoints).",
+      "idempotent": false,
+      "errorSemantics": "Unexpected error -> 500 INTERNAL_ERROR; empty result is a valid 200 with []."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "NotificationService must implement the exact INotificationService interface (create/markRead/findByRecipient signatures) and reuse Notification, CreateNotificationInput, NotificationStatus, InvalidNotificationTransitionError.",
+      "referencePath": "src/modules/notification/notification.model.ts"
+    },
+    {
+      "requirement": "NotificationService must delegate persistence to PgNotificationRepository (create/findByRecipient/markRead) and rely on its status-transition guard and pool fallback; no inline SQL in the service.",
+      "referencePath": "src/modules/notification/notification.repository.ts"
+    },
+    {
+      "requirement": "NotificationService must mirror BalanceService's structure: constructor(repository, uow), create without transaction, markRead via uow.withTransaction, findByRecipient passing the optional client through.",
+      "referencePath": "src/modules/balance/balance.service.ts"
+    },
+    {
+      "requirement": "notification.routes.ts must follow balance.routes.ts's structure: instantiate service with PgNotificationRepository + UnitOfWork, Zod safeParse -> 400 VALIDATION_ERROR, requireRole preHandler, { error, code } responses, 500 INTERNAL_ERROR catch-all.",
+      "referencePath": "src/modules/balance/balance.routes.ts"
+    },
+    {
+      "requirement": "Use NotificationType (and UserRole for RBAC) from the shared types barrel; do not redefine them.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "Use IUnitOfWork/UnitOfWork and the shared pool for DB access; the service takes IUnitOfWork injected and never imports the pool.",
+      "referencePath": "src/shared/db/unit-of-work.ts"
+    },
+    {
+      "requirement": "Use requireRole for RBAC enforcement on notification endpoints.",
+      "referencePath": "src/shared/http/require-role.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/notification/notification.model.ts",
+      "why": "Source of the INotificationService contract, entity, and error type the service must implement."
+    },
+    {
+      "target": "src/modules/notification/notification.repository.ts",
+      "why": "PgNotificationRepository provides the persistence the service delegates to."
+    },
+    {
+      "target": "src/shared/db/unit-of-work.impl.ts",
+      "why": "UnitOfWork supplies the transaction boundary for markRead."
+    },
+    {
+      "target": "src/shared/http/require-role.ts",
+      "why": "RBAC guard for notification endpoints."
+    },
+    {
+      "target": "src/shared/types/index.ts",
+      "why": "NotificationType and UserRole enums used by the service and routes."
+    }
+  ]
+}
