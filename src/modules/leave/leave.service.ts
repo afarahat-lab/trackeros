@@ -1,7 +1,7 @@
 import type { PoolClient } from 'pg';
 import { randomUUID } from 'crypto';
 
-import { pool } from '../../shared/db/connection';
+import { IUnitOfWork, PgUnitOfWork } from '../../shared/db/unit-of-work';
 import {
   AuthorizationError,
   InsufficientBalanceError,
@@ -37,6 +37,7 @@ export class LeaveService implements ILeaveService {
   private readonly policyRepository: ILeavePolicyRepository;
   private readonly auditService: IAuditService;
   private readonly notificationService: INotificationService;
+  private readonly unitOfWork: IUnitOfWork;
 
   constructor(
     requestRepository: ILeaveRequestRepository = new PgLeaveRequestRepository(),
@@ -46,7 +47,8 @@ export class LeaveService implements ILeaveService {
     leaveTypeRepository: ILeaveTypeRepository = new PgLeaveTypeRepository(),
     policyRepository: ILeavePolicyRepository = new PgLeavePolicyRepository(),
     auditService: IAuditService = new AuditService(),
-    notificationService: INotificationService = new NotificationService()
+    notificationService: INotificationService = new NotificationService(),
+    unitOfWork: IUnitOfWork = new PgUnitOfWork()
   ) {
     this.requestRepository = requestRepository;
     this.balanceService = balanceService;
@@ -56,6 +58,7 @@ export class LeaveService implements ILeaveService {
     this.policyRepository = policyRepository;
     this.auditService = auditService;
     this.notificationService = notificationService;
+    this.unitOfWork = unitOfWork;
   }
 
   async submit(
@@ -463,19 +466,10 @@ export class LeaveService implements ILeaveService {
     fn: (c: PoolClient) => Promise<T>
   ): Promise<T> {
     if (client) {
+      // Nested call: reuse the caller's transaction rather than opening a
+      // second one.
       return fn(client);
     }
-    const c = await pool.connect();
-    try {
-      await c.query('BEGIN');
-      const result = await fn(c);
-      await c.query('COMMIT');
-      return result;
-    } catch (err) {
-      await c.query('ROLLBACK');
-      throw err;
-    } finally {
-      c.release();
-    }
+    return this.unitOfWork.withTransaction(fn);
   }
 }

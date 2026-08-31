@@ -1,3 +1,12 @@
+# Continue the previous attempt (it hit the iteration limit before finishing)
+
+A prior code-agent attempt on this work dir (`/tmp/gestalt/phase/dd1a6d9f-1b67-4054-9579-5cb7ccee58f3/7`) was stopped after reaching its iteration limit. Its work is ALREADY on disk here — do NOT restart from scratch or re-read everything; build on what exists. It made 4 file edit(s). Its last verification FAILED (`cd /tmp/gestalt/phase/dd1a6d9f-1b67-4054-9579-5cb7ccee58f3/7 && timeout 120 npx jest --forceExit --testPathIgnorePatterns 'repository|leave-type' 2>&1 | tail -40`):
+[{'cache_prompt': False, 'type': 'text', 'text': '\x1b[?2004lTerminated\n\x1b[?2004h'}]
+
+Finish the task now: fix any failing build/type-check/tests, then RUN the build and the tests and fix anything still failing. Stop as soon as the build and tests pass. The full original task (with all mandatory constraints) follows for reference.
+
+---
+
 # Implement this phase: Phase 4b — Leave service + controller + routes + app registration
 
 You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/dd1a6d9f-1b67-4054-9579-5cb7ccee58f3/7`. Do not clone anything; work only in this directory.
@@ -125,29 +134,28 @@ submission) in the same place as the sufficiency check. Overlap = any intersecti
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- The service must call BalanceService.reserve/approve/reject/cancel with the day count n and the unit-of-work client, matching the exact method signatures (balanceId, days, [requestStatus], client?) declared in IBalanceService — do not reimplement counter math. (see `src/modules/balance/balance.model.ts`)
-- The service must call AuditService.record(input, client?) with the AuditLogInput shape (entityType/entityId/action/oldValues/newValues/performedBy) and pass the same unit-of-work client. (see `src/modules/audit/audit.model.ts`)
-- The service must call NotificationService.notify(input, client?) with the NotificationInput shape and honor its both-or-null relatedEntityType/relatedEntityId invariant. (see `src/modules/notification/notification.model.ts`)
-- The service must import countLeaveDays from the leave module and use it as the single day-count source; the returned value is endDate - startDate + 1 inclusive calendar days. (see `src/modules/leave/leave.model.ts`)
-- The service must use the shared error types (ValidationError, NotFoundError, InsufficientBalanceError, OverlapError) and their statusCode/code contract rather than ad-hoc errors. (see `src/shared/types/errors.ts`)
-- Routes must register against the Fastify instance in the same style as uptimeRoutes (async plugin function receiving fastify) and be registered in src/app.ts alongside the existing uptimeRoutes registration. (see `src/app.ts`)
+- Reuse the shared countLeaveDays helper from the leave model for every day-count computation; never re-derive endDate - startDate + 1 inline. (see `src/modules/leave/leave.model.ts`)
+- Delegate all balance counter transitions and negative guards to BalanceService (reserve/approve/reject/cancel/getAvailableDays); do not duplicate counter math or guards in the leave service. (see `src/modules/balance/balance.service.ts`)
+- Write audit records via AuditService.record with the matching action (SUBMIT/APPROVE/REJECT/CANCEL), passing the same transaction client. (see `src/modules/audit/audit.service.ts`)
+- Send notifications via NotificationService.notify, passing the same transaction client; respect its both-or-null relatedEntityType/relatedEntityId invariant. (see `src/modules/notification/notification.service.ts`)
+- Match the shared error contract (AppError subclasses with code/statusCode/toResponse) and the UserRole/LeaveRequestStatus values from shared-types. (see `src/shared/types/errors.ts`)
+- The transaction boundary must follow AGENTS.md rule 5: service owns the unit of work via an injected IUnitOfWork.withTransaction(fn); the data-access layer opens it; no pool/client import in the service. (see `AGENTS.md`)
 ### Entity invariants — enforce these
-- Reuse or extend `LeaveRequest`: Lifecycle transitions are strictly SUBMITTED -> APPROVED | REJECTED, and SUBMITTED | APPROVED -> CANCELLED; approve/reject/cancel must reject requests not in the correct prior state (e.g. approving a non-SUBMITTED request is an error).
-- Reuse or extend `LeaveRequest`: On APPROVE, approvedBy/approvedAt are set; on REJECT, rejectedBy/rejectedAt/rejectionReason are set; on CANCEL, cancelledBy/cancelledAt are set — each transition stamps its actor/timestamp fields and updates updatedAt.
-- Reuse or extend `LeaveBalance`: Counter transitions follow the binding semantics: SUBMIT reserves pendingDays += n; APPROVE moves pendingDays -= n / usedDays += n; REJECT/CANCEL(pending) release pendingDays -= n; CANCEL(approved) restores usedDays -= n — all via BalanceService, never directly.
-- Reuse or extend `AuditLog`: Every state-changing operation (submit/approve/reject/cancel) writes exactly one audit record with the matching action (SUBMIT/APPROVE/REJECT/CANCEL) and the request id as entityId, in the same transaction as the status change.
+- Reuse or extend `LeaveRequest`: Lifecycle is strictly SUBMITTED → APPROVED | REJECTED, and SUBMITTED | APPROVED → CANCELLED. approve/reject only accept a SUBMITTED request; cancel only accepts SUBMITTED or APPROVED. No other transition is permitted.
+- Reuse or extend `LeaveRequest`: A request's day count n is always derived from its own startDate/endDate via countLeaveDays; the balance year is always startDate.getFullYear(), so a request crossing 31 Dec is charged in full to its startDate's year.
+- Reuse or extend `LeaveBalance`: Counter transitions are driven only through BalanceService (reserve on submit, approve moves pending→used, reject/cancel release pending, cancel-approved restores used); no counter may go negative, and availability is always derived (entitlement - used - pending), never stored.
+- Reuse or extend `AuditLog`: Every state-changing leave operation (submit/approve/reject/cancel) produces exactly one immutable audit record with the matching action, written in the same transaction as the status and balance changes.
 ### Interface contract — expose these operations (their shape is yours)
-- submit — employee (own request); actorId must equal the request's employeeId; invalid input -> ValidationError (400); unknown employee/leaveType/policy -> NotFoundError (404); insufficient balance -> InsufficientBalanceError (422)
-- approve — manager or hr_admin; no self-approval (actorId must not equal the request's employeeId); not found -> NotFoundError (404); wrong prior state -> ValidationError (400); insufficient balance -> InsufficientBalanceError (422); overlap -> OverlapError (422)
-- reject — manager or hr_admin; not found -> NotFoundError (404); wrong prior state -> ValidationError (400); missing rejectionReason -> ValidationError (400)
-- cancel — employee (own request) or hr_admin; not found -> NotFoundError (404); wrong prior state (not SUBMITTED/APPROVED) -> ValidationError (400)
+- submit — employee only; actor must be the requesting employee (actorId === employeeId); ValidationError (400) for missing leaveTypeId, invalid/out-of-order dates, or actor mismatch; NotFoundError (404) for missing employee/leave type/active policy; reserves n days in pendingDays and returns the created SUBMITTED request.
+- approve — manager or hr_admin; no self-approval; ValidationError (400) if not SUBMITTED; AuthorizationError (403) on self-approval; InsufficientBalanceError (422) when n > availableDays; OverlapError (422) on intersecting APPROVED request; NotFoundError (404) for missing request/balance.
+- reject — manager or hr_admin; ValidationError (400) if not SUBMITTED or rejectionReason empty; releases pendingDays; NotFoundError (404) for missing request/balance.
+- cancel — employee (own request) or hr_admin; ValidationError (400) if not SUBMITTED/APPROVED; AuthorizationError (403) if actor is neither owner nor hr_admin; releases pendingDays (SUBMITTED) or restores usedDays (APPROVED).
 ### Integration points — connect to these
-- src/modules/balance/balance.service.ts (BalanceService) — Orchestrator delegates all counter transitions (reserve/approve/reject/cancel) and sufficiency derivation; negative guards live here only.
-- src/modules/audit/audit.service.ts (AuditService) — Every state-changing operation writes an audit record in the same transaction (GP-002).
-- src/modules/notification/notification.service.ts (NotificationService) — Lifecycle events (submitted/approved/rejected/cancelled) notify the employee/manager.
-- src/modules/leave/leave.repository.ts (PgLeaveRequestRepository) — Persistence of the LeaveRequest aggregate and the findApprovedOverlapping overlap query used at approval.
-- src/shared/db/connection.ts (pool) — Source of the unit-of-work PoolClient for the single transaction spanning status + balance + audit writes.
-- src/app.ts (Fastify app registration) — Leave routes must be registered so endpoints are reachable.
+- src/modules/balance/balance.service.ts (BalanceService) — reserve/approve/reject/cancel/getAvailableDays drive the balance counters and own the negative guards; the leave service passes the transaction client through.
+- src/modules/audit/audit.service.ts (AuditService) — record() writes the immutable audit row for each state change inside the same transaction.
+- src/modules/notification/notification.service.ts (NotificationService) — notify() informs the employee/manager of lifecycle events inside the same transaction.
+- src/modules/leave/leave.repository.ts (PgLeaveRequestRepository) — create/update/findById/findApprovedOverlapping persist the request and power the overlap check.
+- src/app.ts — registers leaveRoutes so the leave HTTP surface is reachable.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
