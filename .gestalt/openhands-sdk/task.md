@@ -1,6 +1,6 @@
-# Implement this phase: Phase 1 — Shared foundations (types + unit of work)
+# Implement this phase: Phase 2 — Leaf modules: employee, policy, audit (part 1/3)
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/b07feb33-7931-41ca-b4f7-c3dc02411147/1`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/b07feb33-7931-41ca-b4f7-c3dc02411147/2`. Do not clone anything; work only in this directory.
 
 You are the IMPLEMENTATION agent, not a planner. The platform measures your work EXCLUSIVELY by the files you create or modify in this working tree (`git status`). Ending your turn with a plan, a summary, or an announcement of what you are 'about to' do — without having actually edited files — is a FAILURE: a turn that leaves the working tree untouched is discarded. Explore only as much as you need, then MAKE the edits with your file-editing tool. Never end your turn before the files exist on disk.
 
@@ -8,24 +8,16 @@ You are the IMPLEMENTATION agent, not a planner. The platform measures your work
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Build the shared foundations under the exact module paths declared in the Module Boundaries.
+Build ONLY the models + interfaces (layer 1) for the employee, policy, and audit modules. Do NOT build repositories, services, routes, or tests in this part — those are deferred to parts 2/3.
 
-Create src/shared/types/ with the cross-module enums and shared value types, each in its own file, plus an index.ts barrel re-exporting all of them:
-- LeaveType enum: annual, sick, emergency, unpaid, maternity, paternity (src/shared/types/leave-type.ts)
-- LeaveRequestStatus enum: PENDING, APPROVED, REJECTED, CANCELLED (src/shared/types/leave-request-status.ts) — NOTE: the canonical name is LeaveRequestStatus, NOT LeaveStatus.
-- NotificationType enum (src/shared/types/notification-type.ts)
-- AuditAction enum (src/shared/types/audit-action.ts)
-- EntityType enum (src/shared/types/entity-type.ts)
-- LeaveRequestSummary and BalanceSnapshot shared DTO/value types (src/shared/types/leave-request-summary.ts, src/shared/types/balance-snapshot.ts)
-- index.ts barrel re-exporting every symbol above.
+Create the model files with the canonical entity field shapes (exact field names/types, camelCase in TypeScript):
+- src/modules/employee/employee.model.ts: Employee entity with id, employeeNumber, firstName, lastName, email, managerId, department, hireDate, terminationDate, employmentStatus ('ACTIVE'|'INACTIVE'|'TERMINATED'), createdAt, updatedAt, deletedAt. Also define IEmployeeRepository and IEmployeeService interfaces here (or in sibling interface files under src/modules/employee/).
+- src/modules/policy/policy.model.ts: LeavePolicy entity with id, policyName, leaveType (import LeaveType from src/shared/types/), entitlementDays, accrualRate, maxAccumulation, minimumNoticeDays, requiresManagerApproval, isActive, createdAt, updatedAt. Also define ILeavePolicyRepository and IPolicyService interfaces.
+- src/modules/audit/audit.model.ts: AuditLog entity (canonical name AuditLog, NOT Audit/AuditRecord) with id, entityType (import EntityType from src/shared/types/), entityId, action (import AuditAction from src/shared/types/), oldValues, newValues, performedBy, performedAt, createdAt, updatedAt. Also define IAuditLogRepository and IAuditService interfaces.
 
-Also create the shared day-count helper EXACTLY ONCE as a shared exported function countLeaveDays(start: Date, end: Date): number implementing the binding rule days = endDate - startDate + 1 (whole calendar days, inclusive of both ends, no weekend/holiday exclusion, integer result). Place it at src/shared/types/leave-days.ts and re-export from index.ts. No call site may re-derive this inline.
+Each module also gets an index.ts barrel exporting its model + interfaces.
 
-Create the unit-of-work contract and implementation in src/shared/db/:
-- src/shared/db/unit-of-work.ts: define IUnitOfWork interface with withTransaction<T>(fn: (client: PoolClient) => Promise<T>): Promise<T>.
-- src/shared/db/unit-of-work.impl.ts: UnitOfWork implementation that opens a client from the existing pool in src/shared/db/connection.ts, runs BEGIN/COMMIT/ROLLBACK, and always releases the client. Read src/shared/db/connection.ts (already exists) before generating — it exports `pool`.
-
-This phase depends on the existing src/shared/db/connection.ts (read it before generating). Include Jest unit tests for countLeaveDays in tests/unit/shared/types/leave-days.spec.ts.
+This phase depends on Phase 1's src/shared/types/index.ts (for LeaveType, EntityType, AuditAction) — read it before generating any import. Do not reference any repository/service implementation files.
 
 ## Your iteration budget — and how to get more (READ BEFORE YOU START)
 
@@ -125,6 +117,47 @@ STANDING DECISIONS carried forward (unchanged):
 - Transactions: the SERVICE owns the unit of work; the DATA-ACCESS layer opens it via an
   injected IUnitOfWork.withTransaction(fn). Services never touch the pool. Participating
   methods take the client as an optional LAST parameter. See AGENTS.md Architecture rules 5. [BINDING RULE — operator decision resolving: Does leave duration support partial/half-day granularity, or only whole inclusive calendar days?; How should remaining_days be bounded if used_days exceeds entitlement due to data correction or policy change?; What exact contents should src/shared/types/ contain beyond the cross-module enums?; How should the PLAN.md drift be reconciled — phases 1-6 are marked [deployed] but none of the leave/balance/employee/policy/notification/audit files exist on disk?; Which balance entity is canonical: Balance or LeaveBalance (near-duplicate definitions in docs/DOMAIN.md)?; Is LeaveRequest.status typed as LeaveRequestStatus or LeaveStatus?; Which audit entity shape and field naming convention is canonical among Audit, AuditLog, AuditRecord, and AuditServiceInterface (camelCase vs snake_case)?; How are leave days counted (inclusive vs exclusive of end date) and rounded for partial days?; How is remaining_days bounded (floor at zero vs allow negative) when used_days exceeds entitlement?; Which LeaveStatus enum values are authoritative — DOMAIN.md (DRAFT/SUBMITTED/APPROVED/REJECTED/CANCELLED) or root ARCHITECTURE.md (PENDING/APPROVED/REJECTED/CANCELLED)?; What exact contents should src/shared/types/ contain beyond leave.types.ts (e.g. index.ts barrel, other shared DTOs)?; apply everywhere these apply, not in one place only]
+
+## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
+The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
+- `Employee` — the entity MUST have exactly these fields:
+    - id: string
+    - employeeNumber: string
+    - firstName: string
+    - lastName: string
+    - email: string
+    - managerId: string | null
+    - department: string | null
+    - hireDate: Date
+    - terminationDate: Date | null
+    - employmentStatus: 'ACTIVE' | 'INACTIVE' | 'TERMINATED'
+    - createdAt: Date
+    - updatedAt: Date
+    - deletedAt: Date | null
+
+## Constraints & consistency
+You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
+### Reuse & consistency — match these exactly
+- Import LeaveType, EntityType, and AuditAction from the shared barrel (not the individual enum files) so the model types stay in lockstep with the authoritative enums. (see `src/shared/types/index.ts`)
+- Employee entity field names/types must match the canonical shape (camelCase) declared in the reconciled architecture and ARCHITECTURE.md employees table. (see `.gestalt/architecture/reconciled.json`)
+- LeavePolicy entity field names/types must match the canonical shape (camelCase) declared in the reconciled architecture and ARCHITECTURE.md leave_policies table. (see `.gestalt/architecture/reconciled.json`)
+- AuditLog entity field names/types must match the canonical shape (camelCase) declared in the reconciled architecture and ARCHITECTURE.md audit_logs table, with the entity named AuditLog. (see `.gestalt/architecture/reconciled.json`)
+- Interface names must be exactly IEmployeeRepository, IEmployeeService, ILeavePolicyRepository, IPolicyService, IAuditLogRepository, IAuditService (canonical names). (see `docs/ARCHITECTURE.md`)
+- File/module conventions (model as plain interface, service interface in <name>.service.interface.ts, index.ts barrel with export { X } from './file') must match the existing status/uptime modules. (see `src/modules/status/index.ts`)
+### Entity invariants — enforce these
+- Reuse or extend `Employee`: employmentStatus is restricted to the three lifecycle states 'ACTIVE' | 'INACTIVE' | 'TERMINATED'; managerId, department, terminationDate, and deletedAt are nullable (managerId/department/terminationDate/deletedAt: string|null or Date|null), while id, employeeNumber, firstName, lastName, email, hireDate, employmentStatus, createdAt, updatedAt are required.
+- Reuse or extend `LeavePolicy`: leaveType is typed as the LeaveType enum (not a free string); isActive and requiresManagerApproval are booleans; accrualRate, maxAccumulation, and minimumNoticeDays are optional (number | undefined); entitlementDays is a required number.
+- Reuse or extend `AuditLog`: entityType is typed as EntityType and action as AuditAction (both enums); oldValues and newValues are Record<string, unknown> | null; performedBy is string | null; AuditLog has no lifecycle states (it is an immutable record of a state change).
+### Interface contract — expose these operations (their shape is yours)
+- IEmployeeRepository: expose create/read/update/delete operations for the Employee entity (exact method names chosen by the code agent).
+- IEmployeeService: expose employee lifecycle operations (e.g. create/update/terminate) that delegate persistence to IEmployeeRepository.
+- ILeavePolicyRepository: expose create/read/update operations for LeavePolicy, including lookup by leaveType and isActive.
+- IPolicyService: expose policy rule operations (e.g. create/update/activate/deactivate) that delegate persistence to ILeavePolicyRepository.
+- IAuditLogRepository: expose a create (record) operation and query operations for AuditLog (e.g. by entityType+entityId, by performedAt).
+- IAuditService: expose a record operation that writes an AuditLog for a state-changing operation (GP-002), delegating persistence to IAuditLogRepository.
+### Integration points — connect to these
+- src/shared/types/index.ts — Source of the LeaveType, EntityType, and AuditAction enums that the three model files must import.
+- src/shared/db/unit-of-work.ts (IUnitOfWork) — Declared dependency of the employee/policy/audit modules; the service interfaces will consume it in later phases, so the model/interface layer must not contradict its contract.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
