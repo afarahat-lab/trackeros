@@ -19,13 +19,14 @@ The architecture is modular, with a clear separation of concerns between models,
 src/modules/audit/audit.model.ts + index.ts
 src/modules/balance/balance.model.ts + index.ts
 src/modules/employee/employee.model.ts + index.ts
-src/modules/leave/    — leave module (model, repository, index)
+src/modules/leave/    — leave module (model, repository, service, controller, routes, index)
 src/modules/leave-type/leave-type.model.ts + index.ts
 src/modules/notification/    — notification module (model, repository, service, index)
 src/modules/policy/policy.model.ts + index.ts
 src/modules/status/    — status module (model, service interface, service)
 src/modules/uptime/    — uptime module (model, routes, service interface, service)
 src/shared/db/connection.ts
+src/shared/db/unit-of-work.ts    — IUnitOfWork / PgUnitOfWork transaction boundary
 src/shared/types/    — shared-types module (enums, dtos, errors, index)
 src/app.ts
 src/index.ts
@@ -323,6 +324,94 @@ here.
 The module depends only on `src/shared/types/` (for `LeaveRequestStatus`)
 and `src/shared/db/connection.ts` — no cross-module imports in this
 phase. No service, controller, routes, or tests were created here.
+
+## Implemented — leave module (Phase 4b/4c): service + controller + routes
+
+This phase completed the leave orchestrator: the `LeaveService`
+implementation, the `LeaveController`, the Fastify `leaveRoutes`, and
+registration in `src/app.ts`. The `index.ts` barrel now also re-exports
+`LeaveService`, `LeaveController`, and `leaveRoutes`. No unit tests were
+added in this phase (the PLAN's `tests/unit/modules/leave/` suite is not
+present).
+
+- `leave.service.ts` — `LeaveService` implements `ILeaveService`
+  (submit/approve/reject/cancel). The constructor injects every
+  dependency (request repo, balance service + repo, employee repo,
+  leave-type repo, policy repo, audit service, notification service, and
+  an `IUnitOfWork`) with concrete defaults, so it is testable with mocks.
+  Each operation:
+  - `submit` validates `actorId === employeeId`, `leaveTypeId` presence,
+    and date validity/order; loads the employee, leave type, and the
+    ACTIVE policy for that type; derives the fiscal year from
+    `startDate.getFullYear()`; computes `n` via the shared
+    `countLeaveDays`; `ensureBalance` auto-creates a balance from the
+    policy's `entitlementDays` when none exists for that employee/policy/
+    year; then `balanceService.reserve(n)`, creates the `SUBMITTED`
+    request, records a `SUBMIT` audit entry, and notifies the employee's
+    manager (when `managerId` is set).
+  - `approve` requires `SUBMITTED` status and rejects self-approval
+    (`AuthorizationError`); enforces sufficiency (`n > availableDays` →
+    `InsufficientBalanceError`) and overlap (via
+    `findApprovedOverlapping` → `OverlapError`) in the same place; then
+    `balanceService.approve(n)`, updates to `APPROVED`, records an
+    `APPROVE` audit entry, and notifies the employee.
+  - `reject` requires `SUBMITTED` status and a non-empty
+    `rejectionReason`; `balanceService.reject(n)`, updates to `REJECTED`,
+    records a `REJECT` audit entry, and notifies the employee.
+  - `cancel` allows `SUBMITTED` or `APPROVED` and permits the request
+    owner or an `HR_ADMIN` (via the `actorRole` argument); maps the
+    status to `'PENDING'`/`'APPROVED'` for `balanceService.cancel`,
+    updates to `CANCELLED`, records a `CANCEL` audit entry, and notifies
+    the employee.
+  - Transaction boundary via `IUnitOfWork`/`PgUnitOfWork` (in
+    `src/shared/db/unit-of-work.ts`): the service injects an
+    `IUnitOfWork` (default `PgUnitOfWork`) and a private
+    `withUnitOfWork(client, fn)` helper. When a `PoolClient` is passed in,
+    the caller owns the transaction and the service runs inside it;
+    otherwise the service delegates to `unitOfWork.withTransaction(fn)`,
+    which acquires a client, issues `BEGIN`, runs the callback, then
+    `COMMIT` (or `ROLLBACK` on throw), releasing the client in `finally`.
+    `PgUnitOfWork` is the ONLY place issuing `BEGIN`/`COMMIT`/`ROLLBACK`.
+    Every state change + balance counter change + audit write +
+    notification runs through the SAME client.
+
+- `leave.controller.ts` — `LeaveController` with `submit`/`approve`/
+  `reject`/`cancel` handlers. Auth is header-based: it reads `x-user-id`
+  and `x-user-role` (validated against `UserRole`) via
+  `getAuthenticatedUser`, throwing `AuthenticationError` when missing or
+  invalid. Role checks are inline per handler: `submit` → `EMPLOYEE`
+  only; `approve`/`reject` → `MANAGER` or `HR_ADMIN`; `cancel` →
+  `EMPLOYEE` or `HR_ADMIN`. `sendError` maps `AppError` to its
+  `statusCode` + `toResponse()` and unknown errors to a 500
+  `INTERNAL_ERROR`.
+
+- `leave.routes.ts` — `leaveRoutes` registers four POST routes with JSON
+  schemas for body/params validation:
+  `POST /leave-requests` (201), `POST /leave-requests/:id/approve`,
+  `POST /leave-requests/:id/reject`, `POST /leave-requests/:id/cancel`.
+
+- `src/app.ts` — now registers `leaveRoutes` alongside `uptimeRoutes`.
+
+**Divergences from the reconciled architecture / binding rules** (the
+implementation chose these shapes; they are documented as built):
+
+- **Auth is header-based, not JWT.** The cross-cutting contract said
+  "JWT bearer; requireRole guard", but the controller reads `x-user-id`
+  and `x-user-role` headers directly. There is no JWT verification and no
+  `requireRole` middleware.
+- **RBAC is inline in the controller, not middleware.** AGENTS.md's
+  "RBAC enforced at middleware, never inline" convention is not followed
+  here — each handler performs its own role check.
+- **`minimumNoticeDays` is not enforced.** The binding rule
+  ("minimumNoticeDays applies except emergency leave") has no
+  implementation in `submit`.
+- **Unpaid-leave sufficiency exemption is not implemented.** Sufficiency
+  is enforced on every `approve` regardless of leave type; there is no
+  unpaid exemption.
+- **Manager approval is role-based, not manager-of-employee.** `approve`
+  only rejects self-approval and relies on the controller's
+  `MANAGER`/`HR_ADMIN` role check; it does not verify the actor is the
+  requesting employee's manager.
 
 <!-- gestalt:architecture feature=dd1a6d9f-1b67-4054-9579-5cb7ccee58f3 START -->
 # Leave Management Module — Reconciled Architecture

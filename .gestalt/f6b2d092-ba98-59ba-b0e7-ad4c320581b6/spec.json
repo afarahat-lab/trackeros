@@ -1,0 +1,149 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "service",
+      "controller",
+      "routes",
+      "app"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "LeaveService implements ILeaveService with submit/approve/reject/cancel operations, each returning the updated LeaveRequest.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Each operation computes the day count n via the shared countLeaveDays helper exactly once \u2014 no inline re-derivation of endDate - startDate + 1 anywhere in the service.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "approve enforces sufficiency (n > availableDays throws InsufficientBalanceError) and overlap (findApprovedOverlapping returns any intersecting APPROVED request for the same employee regardless of leave type \u2192 OverlapError) in the same place.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The balance year is derived once from startDate.getFullYear() per operation (binding rule 4 \u2014 a request crossing 31 Dec is charged in full to its startDate's year, never split).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Every status change + balance counter change + audit write runs through the SAME unit-of-work client in ONE transaction (client passed through to balance and audit services).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/app.ts registers the leave routes alongside uptimeRoutes so the leave HTTP surface is reachable.",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "The SERVICE owns the unit of work: it takes an injected IUnitOfWork with withTransaction(fn) and never imports a pool, a client, or a module-level db helper. Do NOT put withTransaction on a repository. Participating repository/service methods take the client as an optional LAST parameter and fall back to the shared pool when omitted (AGENTS.md rule 5).",
+    "Negative guards live ONLY in BalanceService \u2014 the leave service must not duplicate counter-below-zero checks; it only enforces sufficiency (n <= availableDays) and overlap at approval.",
+    "Cross-module dependencies (balance, audit, notification, employee, leave-type, policy) are imported only through each module's public entry point (index.ts barrel), never from internals.",
+    "No unit/integration tests are created in this sub-phase \u2014 they are owned by Phase 4c and must not gate this sub-phase."
+  ],
+  "outOfScope": [
+    "src/modules/leave/leave.model.ts and leave.repository.ts (LeaveRequest entity, ILeaveRequestRepository, PgLeaveRequestRepository, countLeaveDays) \u2014 owned by Phase 4a.",
+    "tests/unit/modules/leave/leave.service.test.ts and leave.model.test.ts \u2014 owned by Phase 4c."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "Lifecycle: SUBMITTED \u2192 APPROVED | REJECTED | CANCELLED. approve/reject only accept a SUBMITTED request; cancel only accepts SUBMITTED or APPROVED. Each transition records the acting actor (approvedBy/rejectedBy/cancelledBy) and timestamp."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "Counters are mutated only through BalanceService: SUBMIT reserves pendingDays += n; APPROVE moves pendingDays -= n, usedDays += n; REJECT/CANCEL(PENDING) release pendingDays -= n; CANCEL(APPROVED) restores usedDays -= n. No counter goes negative (throws, never clamps)."
+    },
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "Every state-changing operation (submit/approve/reject/cancel) writes exactly one audit record with the matching action (SUBMIT/APPROVE/REJECT/CANCEL) in the same transaction as the status and balance changes."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "submit",
+      "authRule": "employee only; actorId must equal the request employeeId",
+      "idempotent": false,
+      "errorSemantics": "ValidationError on invalid/missing dates or leaveTypeId; NotFoundError on missing employee/leave type/active policy; InsufficientBalanceError on reserve failure"
+    },
+    {
+      "operation": "approve",
+      "authRule": "manager or hr_admin; no self-approval (AuthorizationError)",
+      "idempotent": false,
+      "errorSemantics": "ValidationError if not SUBMITTED; InsufficientBalanceError if n > availableDays; OverlapError on intersecting APPROVED request; NotFoundError on missing request/balance"
+    },
+    {
+      "operation": "reject",
+      "authRule": "manager or hr_admin",
+      "idempotent": false,
+      "errorSemantics": "ValidationError if not SUBMITTED or rejectionReason empty; NotFoundError on missing request/balance"
+    },
+    {
+      "operation": "cancel",
+      "authRule": "employee (owner) or hr_admin",
+      "idempotent": false,
+      "errorSemantics": "ValidationError if not SUBMITTED/APPROVED; AuthorizationError if non-owner non-hr_admin; NotFoundError on missing request/balance"
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Day count must reuse the single shared countLeaveDays helper (endDate - startDate + 1, inclusive, no weekend/holiday exclusion) \u2014 never re-derived inline.",
+      "referencePath": "src/modules/leave/leave.model.ts"
+    },
+    {
+      "requirement": "Balance counter transitions and negative guards must match BalanceService's reserve/approve/reject/cancel semantics (availableDays = entitlementDays - usedDays - pendingDays, derived never stored).",
+      "referencePath": "src/modules/balance/balance.service.ts"
+    },
+    {
+      "requirement": "Audit writes must go through AuditService.record with the AuditAction union (SUBMIT/APPROVE/REJECT/CANCEL) and performedAt set at write time.",
+      "referencePath": "src/modules/audit/audit.service.ts"
+    },
+    {
+      "requirement": "Notifications must go through NotificationService.notify, honoring the both-or-null relatedEntityType/relatedEntityId invariant.",
+      "referencePath": "src/modules/notification/notification.service.ts"
+    },
+    {
+      "requirement": "Transaction boundary must follow AGENTS.md rule 5: service owns the unit of work via an injected IUnitOfWork.withTransaction(fn); it must not import the pool or issue BEGIN/COMMIT/ROLLBACK inline.",
+      "referencePath": "AGENTS.md"
+    },
+    {
+      "requirement": "Error responses must use the AppError contract ({ error, code } via toResponse) with statusCode mapping: 400 validation, 401 auth, 403 authorization, 404 not found, 422 insufficient balance/policy violation.",
+      "referencePath": "src/shared/types/errors.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/balance/balance.service.ts (IBalanceService)",
+      "why": "reserve/approve/reject/cancel counter transitions and getAvailableDays sufficiency derivation"
+    },
+    {
+      "target": "src/modules/audit/audit.service.ts (IAuditService)",
+      "why": "record an audit entry for every state change in the same transaction"
+    },
+    {
+      "target": "src/modules/notification/notification.service.ts (INotificationService)",
+      "why": "notify employee/manager on lifecycle events"
+    },
+    {
+      "target": "src/modules/leave/leave.repository.ts (ILeaveRequestRepository.findApprovedOverlapping)",
+      "why": "overlap detection at approval time"
+    },
+    {
+      "target": "src/app.ts",
+      "why": "register leaveRoutes so the HTTP surface is mounted"
+    }
+  ]
+}
