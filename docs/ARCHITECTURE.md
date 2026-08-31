@@ -39,6 +39,11 @@ src/shared/error types.ts
 - See `AGENTS.md` for stack-specific coding conventions
 - See `docs/GOLDEN_PRINCIPLES.md` for the non-negotiable rules every
   cycle is checked against
+- Models are plain interface/type declarations; repository interfaces
+  live in `<name>.model.ts` alongside the entity, and service
+  interfaces live in a sibling `<name>.service.interface.ts` file.
+  Each module's `index.ts` barrel re-exports its model + interfaces
+  using `export { X } from './file'` style.
 
 ## Dependency rules
 
@@ -108,7 +113,7 @@ TypeScript, Fastify, PostgreSQL, modular monolith. All repository implementation
 
 ### Recommended phases
 1. **Shared foundations (types + unit of work)** — ✅ DONE. Established the shared enums/DTOs (`LeaveType`, `LeaveRequestStatus`, `NotificationType`, `AuditAction`, `EntityType`, `LeaveRequestSummary`, `BalanceSnapshot`, `countLeaveDays`) under `src/shared/types/` and the `IUnitOfWork`/`UnitOfWork` contract under `src/shared/db/`. Resolved the status-enum conflict in favor of `LeaveRequestStatus` (`PENDING`/`APPROVED`/`REJECTED`/`CANCELLED`).
-2. **Leaf modules: employee, policy, audit** — innermost domain modules with no cross-module service deps. (15 files)
+2. **Leaf modules: employee, policy, audit** — 🔶 IN PROGRESS (part 1/3 done). Models + interfaces committed: `Employee`/`IEmployeeRepository` (`employee.model.ts`) + `IEmployeeService` (`employee.service.interface.ts`); `LeavePolicy`/`ILeavePolicyRepository` (`policy.model.ts`) + `IPolicyService` (`policy.service.interface.ts`); `AuditLog`/`IAuditLogRepository` (`audit.model.ts`) + `IAuditService` (`audit.service.interface.ts`). Repository/service implementations (part 2/3) and routes/tests (part 3/3) are deferred. (15 files total)
 3. **balance and notification** — balance depends on audit; both are prerequisites for leave orchestration. (10 files)
 4. **leave orchestration module** — composes balance, notification, audit, employee, and policy inside a single `IUnitOfWork` transaction. (6 files)
 
