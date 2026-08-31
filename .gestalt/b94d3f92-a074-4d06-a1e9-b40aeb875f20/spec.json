@@ -1,0 +1,109 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "audit",
+      "employee",
+      "policy"
+    ],
+    "affectedLayers": [
+      "service"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "When a PoolClient is supplied to AuditService.record, EmployeeService.update/terminate/reactivate, or PolicyService.update/activate/deactivate, the method uses that client directly for every repository call and never invokes withTransaction (no nested BEGIN/COMMIT/ROLLBACK).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "When no client is supplied, each of those methods invokes withTransaction and passes the transaction's client (not a fallback expression) to every repository call inside the callback.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `const db = client ?? tx;` pattern is removed from all three service files (audit.service.ts, employee.service.ts, policy.service.ts).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Existing behavior is preserved: terminate/reactivate still throw InvalidEmployeeTransitionError on illegal transitions, activate/deactivate still toggle isActive, and record still returns the persisted AuditLog \u2014 verified by the existing Jest service specs passing unchanged.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "UnitOfWorkImpl.withTransaction remains the ONLY location in the codebase that issues BEGIN/COMMIT/ROLLBACK; the refactor must not introduce transaction control statements anywhere else.",
+    "Services must not import the pool, a client, or any module-level db helper; they receive the unit of work via constructor injection and the client only as an optional last parameter.",
+    "Repository methods keep their optional client as the LAST parameter and fall back to the shared pool when omitted \u2014 this phase changes only the service call sites, not repository internals.",
+    "The refactor is behavior-preserving: no change to lifecycle validation, error types, return values, or audit-record contents."
+  ],
+  "outOfScope": [
+    "Changing EmployeeService.create and PolicyService.create to participate in transactions \u2014 they currently call repositories directly and are not part of this phase's intent.",
+    "Modifying repository internals, the IUnitOfWork contract, or UnitOfWorkImpl \u2014 only the three service files' transaction handling is in scope.",
+    "Building the leave orchestration module or any new module \u2014 this phase only fixes existing transaction handling in audit/employee/policy services."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "record always persists exactly one AuditLog row with generated id/createdAt/updatedAt; the transaction fix must not change the persisted contents or the single-row guarantee."
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "terminate/reactivate enforce the ACTIVE/INACTIVE/TERMINATED lifecycle and throw InvalidEmployeeTransitionError on illegal transitions; the refactor must not weaken or bypass these guards."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "activate/deactivate toggle isActive and return null when the policy is not found; this behavior is unchanged by the transaction fix."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "AuditService.record",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Errors from the repository propagate unchanged; no new error types introduced."
+    },
+    {
+      "operation": "EmployeeService.terminate / reactivate",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Illegal transitions throw InvalidEmployeeTransitionError; not-found returns null."
+    },
+    {
+      "operation": "PolicyService.activate / deactivate",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Not-found returns null; no error on a valid toggle."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Participating methods must follow the AGENTS.md \u00a75 rule: reuse an already-supplied client and never open a second transaction; the canonical `await this.auditService.record(entry, client);` call shape must remain valid.",
+      "referencePath": "AGENTS.md"
+    },
+    {
+      "requirement": "The withTransaction contract and its single BEGIN/COMMIT/ROLLBACK implementation must remain unchanged and be the only transaction-control source.",
+      "referencePath": "src/shared/db/unit-of-work.impl.ts"
+    },
+    {
+      "requirement": "Repository method signatures (optional client last, pool fallback) must remain as-is so the refactored service call sites continue to compile against them.",
+      "referencePath": "src/modules/audit/audit.repository.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/db/unit-of-work.ts (IUnitOfWork)",
+      "why": "Services depend on withTransaction to open the unit of work when no client is supplied."
+    },
+    {
+      "target": "src/modules/audit/audit.repository.ts, src/modules/employee/employee.repository.ts, src/modules/policy/policy.repository.ts",
+      "why": "Repositories accept the optional client as the last parameter and fall back to the shared pool; the refactored services pass the resolved client through."
+    }
+  ]
+}
