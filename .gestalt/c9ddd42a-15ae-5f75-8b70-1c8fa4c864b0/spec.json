@@ -1,0 +1,180 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "balance",
+      "notification",
+      "audit"
+    ],
+    "affectedLayers": [
+      "service",
+      "routes",
+      "unit-tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "BalanceService implements IBalanceService and derives availableDays exclusively via computeAvailableDays(totalEntitlement, usedDays, pendingDays) \u2014 the value is never stored on the entity and is never clamped (may be negative).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A balance transition that would take any stored counter (totalEntitlement, usedDays, remainingDays) below zero throws NegativeBalanceCounterError rather than clamping; the three stored counters are never persisted negative.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Any day counting in the balance service uses countLeaveDays from src/shared/types (no inline re-derivation of the inclusive-calendar-day formula).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "NotificationService implements INotificationService; markRead transitions only PENDING/SENT into READ (stamping readAt) and throws InvalidNotificationTransitionError for any other current status.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest specs exist and pass: tests/unit/modules/balance/balance.service.spec.ts (derived availableDays incl. negative, negative-balance behavior, non-negative counter error) and tests/unit/modules/notification/notification.service.spec.ts.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "balance/index.ts and notification/index.ts barrels re-export the new service and route symbols alongside the existing model/repository exports.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The service owns the unit of work via an injected IUnitOfWork.withTransaction(fn); services never import the pool, a client, or a module-level db helper. Participating repository/service methods take the client as an optional LAST parameter and fall back to the shared pool when omitted (AGENTS.md Architecture rule 5).",
+    "All database access goes through the repository layer (GP-001); the service must not issue SQL or touch the pool directly.",
+    "Every state-changing operation on a balance entity writes an AuditLog record (GP-002); the balance\u2192audit dependency declared in the reconciled architecture must be realized in this phase.",
+    "All API endpoints enforce RBAC via the route-level requireRole guard (GP-005), never inline; balance/policy/audit reads are employee (own resource) or HR_ADMIN per the reconciled auth contract.",
+    "All inputs are validated at the API boundary before processing (GP-003); async errors are caught and mapped to the standard { error, code } shape with no unhandled rejections (GP-006).",
+    "Do not reference the leave module; balance and notification depend only on shared-types, shared-db, and (balance only) audit.",
+    "TypeScript identifiers camelCase, DB columns snake_case, and only the repository maps between them; no `any` (use unknown + type guards)."
+  ],
+  "outOfScope": [
+    "The leave orchestration module (Phase 4) \u2014 approval flow, sufficiency/overlap checks, and cross-module transaction composition are not built here.",
+    "Balance/notification models, interfaces, and repositories (Phase 3 part 1/2) \u2014 already exist and are not re-authored.",
+    "Notification audit records \u2014 the reconciled dependency map gives notification no audit dependency; only balance mutations write audit rows in this phase.",
+    "Accrual schedulers / BullMQ background jobs and any carry-over or proration logic."
+  ],
+  "ambiguities": [
+    {
+      "description": "IBalanceService.deduct/restore signatures omit the optional client parameter, but the transaction contract requires participating methods to accept the client as an optional last parameter so the leave module can join a caller's transaction. The service implementation may need to accept a client beyond the declared interface (precedent: AuditService.record does this).",
+      "options": [
+        "Add an optional client param to the service methods beyond the interface (matching AuditService.record precedent)",
+        "Keep the interface signature exactly and rely on the repository's client param only",
+        "Extend IBalanceService to include the client param"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "The balance service's deduct/restore must write an audit record (GP-002), but IBalanceService does not declare an audit dependency and the audit write must join the same transaction as the balance mutation. Whether the audit record is written inside the service's own withTransaction (atomic with the mutation) is unspecified.",
+      "options": [
+        "Wrap balance mutation + audit record in one withTransaction",
+        "Write audit record separately after the mutation commits",
+        "Defer audit to the leave module"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "The reconciled auth contract says balance reads are \"employee (own resource) or HR_ADMIN\", but the balance service has no employee-identity check and the route layer must enforce own-resource scoping. The exact RBAC roles for balance/notification endpoints are not pinned by PLAN.md.",
+      "options": [
+        "Balance reads: employee (own) or HR_ADMIN; notification reads: employee (own) or HR_ADMIN",
+        "Balance/notification reads: HR_ADMIN only (matching the stricter leaf-module precedent)",
+        "Balance reads: employee (own) or HR_ADMIN; notification reads: employee (own) only"
+      ],
+      "impactIfWrong": "medium"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "availableDays is always derived (totalEntitlement - usedDays - pendingDays), never stored, and may go negative without clamping; the three stored counters (totalEntitlement, usedDays, remainingDays) are non-negative and any transition taking one below zero is an error (NegativeBalanceCounterError), not a clamp."
+    },
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "readAt is only ever set on a transition into READ; only PENDING and SENT may transition to READ, and any other current status raises InvalidNotificationTransitionError."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "BalanceService.deduct",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws NegativeBalanceCounterError when the deduction would take remainingDays below zero; never clamps."
+    },
+    {
+      "operation": "BalanceService.restore",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws NegativeBalanceCounterError when the restore would take usedDays below zero; never clamps."
+    },
+    {
+      "operation": "BalanceService.create",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Rejects any input whose stored counters are negative with NegativeBalanceCounterError."
+    },
+    {
+      "operation": "NotificationService.markRead",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws InvalidNotificationTransitionError when the notification is not in PENDING or SENT; stamps readAt only on the transition into READ."
+    },
+    {
+      "operation": "NotificationService.create",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Creates a notification with status PENDING and readAt null; rejects an unknown NotificationType value."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "BalanceService must implement the IBalanceService interface exactly as declared (create/findById/findByEmployee/deduct/restore signatures), and reuse computeAvailableDays + NegativeBalanceCounterError rather than redefining them.",
+      "referencePath": "src/modules/balance/balance.model.ts"
+    },
+    {
+      "requirement": "NotificationService must implement the INotificationService interface exactly as declared (create/markRead/findByRecipient signatures) and reuse InvalidNotificationTransitionError rather than redefining it.",
+      "referencePath": "src/modules/notification/notification.model.ts"
+    },
+    {
+      "requirement": "Day counting must call countLeaveDays (inclusive calendar days, endDate - startDate + 1) and never re-derive the formula inline.",
+      "referencePath": "src/shared/types/leave-days.ts"
+    },
+    {
+      "requirement": "Notification type values must be the NotificationType enum members (LEAVE_REQUEST_*, LEAVE_BALANCE_*), imported from the shared barrel.",
+      "referencePath": "src/shared/types/notification-type.ts"
+    },
+    {
+      "requirement": "Balance state-changing operations must write an AuditLog via IAuditService.record, matching the AuditLog entity shape and AuditAction/EntityType enums (EntityType.LEAVE_BALANCE).",
+      "referencePath": "src/modules/audit/audit.model.ts"
+    },
+    {
+      "requirement": "Services must receive IUnitOfWork via constructor injection and use withTransaction(fn); participating methods take the client as an optional last parameter, matching the shared contract.",
+      "referencePath": "src/shared/db/unit-of-work.ts"
+    },
+    {
+      "requirement": "Routes must enforce RBAC via requireRole(...allowed) and map errors to the standard { error, code } shape (400 VALIDATION_ERROR, 401 UNAUTHORIZED, 403 FORBIDDEN, 404 NOT_FOUND).",
+      "referencePath": "src/shared/http/require-role.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/audit (IAuditService.record)",
+      "why": "Balance state-changing operations must write audit records (GP-002); the balance\u2192audit dependency declared in the reconciled architecture is realized here."
+    },
+    {
+      "target": "src/shared/db (IUnitOfWork)",
+      "why": "Services own the transaction boundary via injected IUnitOfWork.withTransaction; balance mutations + their audit rows must commit/rollback atomically."
+    },
+    {
+      "target": "src/shared/types (countLeaveDays, NotificationType)",
+      "why": "Day counting and notification typing come from the shared barrel; no inline re-derivation."
+    }
+  ]
+}
