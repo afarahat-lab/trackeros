@@ -55,6 +55,56 @@ user projects use whatever stack matches their description.
 2. All database access through the repository pattern
 3. Every state-changing operation produces an audit record (GP-001)
 4. RBAC enforced at middleware, never inline (GP-002)
+5. Transactions: the SERVICE owns the unit of work, the DATA-ACCESS layer opens it
+
+### 5 — transaction boundaries (decided 2026-08-30)
+
+"The service owns the unit of work" and "all database access goes through repository
+interfaces" (GP-001) are not in conflict. They govern two different things:
+
+- **Owning the boundary** = deciding what is inside the transaction and what is not. That is a
+  business decision (a status change, its balance counters and its audit row succeed or fail
+  together) and it belongs to the service.
+- **Acquiring the connection** = getting a client from the pool, `BEGIN`, `COMMIT`/`ROLLBACK`,
+  release. That is database access, so it lives behind an interface in the data-access layer.
+
+**The decision:** a data-access unit-of-work abstraction, injected into services the same way
+repositories are.
+
+```ts
+interface IUnitOfWork {
+  withTransaction<T>(fn: (client: PoolClient) => Promise<T>): Promise<T>;
+}
+```
+
+Its implementation acquires a client, issues `BEGIN`, runs the callback, then `COMMIT` — or
+`ROLLBACK` on any throw — and always releases in a `finally`. It is the ONLY place in the
+codebase that issues `BEGIN` / `COMMIT` / `ROLLBACK`. Services receive it via the constructor
+and never import a pool, a client, or a module-level helper directly.
+
+```ts
+await this.uow.withTransaction(async (client) => {
+  await this.leaveRequestRepo.updateStatus(id, 'APPROVED', client);
+  await this.balanceService.commitDays(employeeId, type, days, client);
+  await this.auditService.record(entry, client);
+});
+```
+
+Participating repository and service methods take the client as an **optional last parameter**
+and use it when supplied, falling back to the shared pool when omitted — so single-step callers
+are unaffected. A nested `withTransaction` must reuse an already-supplied client rather than
+opening a second transaction.
+
+**Rejected:** putting `withTransaction` on a repository (e.g. the leave-request repository) or
+having a repository method take the callback. The transaction spans `leave_requests`,
+`leave_balances` and `audit_logs`, so making one aggregate's repository own a boundary crossing
+three of them is arbitrary — the other repositories would receive a client originating from a
+sibling they know nothing about, and a future transaction not involving leave requests would
+have nowhere to live. It also makes that one repository structurally unlike every other, for
+reasons unrelated to leave requests.
+
+Introducing a unit of work moves no invariant: negative guards and authorization stay in the
+services that already own them.
 
 ## What agents must never do
 
