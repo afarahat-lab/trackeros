@@ -13,8 +13,7 @@ export class AuditService implements IAuditService {
   ) {}
 
   async record(input: AuditRecordInput, client?: PoolClient): Promise<AuditLog> {
-    return this.uow.withTransaction(async (tx) => {
-      const db = client ?? tx;
+    const run = async (db: PoolClient): Promise<AuditLog> => {
       const now = new Date();
       const entry: AuditLog = {
         id: randomUUID(),
@@ -29,7 +28,8 @@ export class AuditService implements IAuditService {
         updatedAt: now,
       };
       return this.auditLogs.create(entry, db);
-    });
+    };
+    return client ? run(client) : this.uow.withTransaction(run);
   }
 
   async findByEntity(

@@ -46,9 +46,9 @@ export class EmployeeService implements IEmployeeService {
     changes: Partial<Employee>,
     client?: PoolClient,
   ): Promise<Employee | null> {
-    return this.uow.withTransaction((tx) =>
-      this.employees.update(id, changes, client ?? tx),
-    );
+    const run = (db: PoolClient): Promise<Employee | null> =>
+      this.employees.update(id, changes, db);
+    return client ? run(client) : this.uow.withTransaction(run);
   }
 
   async terminate(
@@ -56,8 +56,7 @@ export class EmployeeService implements IEmployeeService {
     terminationDate: Date,
     client?: PoolClient,
   ): Promise<Employee | null> {
-    return this.uow.withTransaction(async (tx) => {
-      const db = client ?? tx;
+    const run = async (db: PoolClient): Promise<Employee | null> => {
       const employee = await this.employees.findById(id, db);
       if (!employee) {
         return null;
@@ -72,12 +71,12 @@ export class EmployeeService implements IEmployeeService {
         { employmentStatus: 'TERMINATED', terminationDate },
         db,
       );
-    });
+    };
+    return client ? run(client) : this.uow.withTransaction(run);
   }
 
   async reactivate(id: string, client?: PoolClient): Promise<Employee | null> {
-    return this.uow.withTransaction(async (tx) => {
-      const db = client ?? tx;
+    const run = async (db: PoolClient): Promise<Employee | null> => {
       const employee = await this.employees.findById(id, db);
       if (!employee) {
         return null;
@@ -92,6 +91,7 @@ export class EmployeeService implements IEmployeeService {
         { employmentStatus: 'ACTIVE', terminationDate: null },
         db,
       );
-    });
+    };
+    return client ? run(client) : this.uow.withTransaction(run);
   }
 }

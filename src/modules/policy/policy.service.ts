@@ -50,31 +50,31 @@ export class PolicyService implements IPolicyService {
     changes: Partial<LeavePolicy>,
     client?: PoolClient,
   ): Promise<LeavePolicy | null> {
-    return this.uow.withTransaction((tx) =>
-      this.policies.update(id, changes, client ?? tx),
-    );
+    const run = (db: PoolClient): Promise<LeavePolicy | null> =>
+      this.policies.update(id, changes, db);
+    return client ? run(client) : this.uow.withTransaction(run);
   }
 
   async activate(id: string, client?: PoolClient): Promise<LeavePolicy | null> {
-    return this.uow.withTransaction(async (tx) => {
-      const db = client ?? tx;
+    const run = async (db: PoolClient): Promise<LeavePolicy | null> => {
       const policy = await this.policies.findById(id, db);
       if (!policy) {
         return null;
       }
       return this.policies.update(id, { isActive: true }, db);
-    });
+    };
+    return client ? run(client) : this.uow.withTransaction(run);
   }
 
   async deactivate(id: string, client?: PoolClient): Promise<LeavePolicy | null> {
-    return this.uow.withTransaction(async (tx) => {
-      const db = client ?? tx;
+    const run = async (db: PoolClient): Promise<LeavePolicy | null> => {
       const policy = await this.policies.findById(id, db);
       if (!policy) {
         return null;
       }
       return this.policies.update(id, { isActive: false }, db);
-    });
+    };
+    return client ? run(client) : this.uow.withTransaction(run);
   }
 
   async findByLeaveType(
