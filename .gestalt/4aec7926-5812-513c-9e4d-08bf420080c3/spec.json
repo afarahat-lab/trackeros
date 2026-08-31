@@ -1,0 +1,128 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "balance"
+    ],
+    "affectedLayers": [
+      "service",
+      "routes",
+      "barrel"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "BalanceService implements IBalanceService with all five methods (create, findById, findByEmployee, deduct, restore) whose signatures match the inline IBalanceService interface in src/modules/balance/balance.model.ts exactly (deduct/restore take no client param; findById/findByEmployee take an optional PoolClient last param).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "balance.routes.ts exports an async balanceRoutes(fastify: FastifyInstance) function that instantiates PgLeaveBalanceRepository + UnitOfWork + BalanceService, validates inputs with Zod safeParse (400 VALIDATION_ERROR), enforces RBAC via requireRole(...UserRole) preHandlers, and returns { error, code } with 404 NOT_FOUND and 500 INTERNAL_ERROR.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "src/modules/balance/index.ts barrel re-exports BalanceService and balanceRoutes in addition to the existing model/repository exports.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "BalanceService.create generates id/createdAt/updatedAt and delegates to the repository without opening a transaction; deduct/restore wrap in uow.withTransaction when no client is supplied and reuse a supplied client otherwise.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The service must not import a pool, a pg client, or any module-level db helper; it receives IUnitOfWork via constructor injection and delegates all DB access to the repository (GP-001).",
+    "The balance service must not reference the leave module or the notification module (sibling sub-phases / later phase).",
+    "No test files may be created in this sub-phase (tests belong to Phase 3c).",
+    "Do not introduce a stored pendingDays field on LeaveBalance; availableDays is derived only via computeAvailableDays and never persisted.",
+    "The route file must not be wired into app.ts in this sub-phase; only the route file + barrel export are in scope."
+  ],
+  "outOfScope": [
+    "Notification service + routes (src/modules/notification/notification.service.ts, notification.routes.ts, index.ts) \u2014 sibling sub-phase 3b.",
+    "Unit/integration tests for balance and notification services (tests/unit/modules/balance/balance.service.spec.ts, tests/unit/modules/notification/notification.service.spec.ts) \u2014 sibling sub-phase 3c.",
+    "The leave orchestration module (leave.model/repository/service/routes) and any reference to it from the balance service.",
+    "Wiring balanceRoutes into app.ts."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "availableDays is always derived (computeAvailableDays(totalEntitlement, usedDays, pendingDays)) and never stored; it may go negative and must not be clamped."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "The three stored counters (totalEntitlement, usedDays, remainingDays) are non-negative; a deduct/restore transition that would take a counter below zero throws NegativeBalanceCounterError (never clamps)."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "create",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Invalid input (negative counters) surfaces as NegativeBalanceCounterError; route maps to 400 VALIDATION_ERROR."
+    },
+    {
+      "operation": "deduct",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Taking remainingDays below zero throws NegativeBalanceCounterError; route maps to 400 VALIDATION_ERROR."
+    },
+    {
+      "operation": "restore",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Taking usedDays below zero throws NegativeBalanceCounterError; route maps to 400 VALIDATION_ERROR."
+    },
+    {
+      "operation": "findById",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Missing balance returns null; route maps to 404 NOT_FOUND."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "BalanceService must implement the inline IBalanceService interface exactly as declared (method names, parameter order, optional PoolClient last param on findById/findByEmployee, no client param on deduct/restore).",
+      "referencePath": "src/modules/balance/balance.model.ts"
+    },
+    {
+      "requirement": "The service must delegate to PgLeaveBalanceRepository methods (create/findById/findByEmployee/deduct/restore) and rely on its existing non-negative guards and NegativeBalanceCounterError rather than re-implementing them.",
+      "referencePath": "src/modules/balance/balance.repository.ts"
+    },
+    {
+      "requirement": "Transaction ownership must follow the IUnitOfWork.withTransaction contract: service owns the boundary, data-access opens it, participating methods take optional client last param and fall back to uow.withTransaction.",
+      "referencePath": "src/shared/db/unit-of-work.ts"
+    },
+    {
+      "requirement": "Route file must follow the existing employee/policy route pattern: Zod safeParse, requireRole preHandlers, { error, code } error shape with VALIDATION_ERROR/NOT_FOUND/INTERNAL_ERROR codes.",
+      "referencePath": "src/modules/employee/employee.routes.ts"
+    },
+    {
+      "requirement": "RBAC must use the requireRole guard and UserRole enum, never inline role checks.",
+      "referencePath": "src/shared/http/require-role.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/balance/balance.repository.ts (PgLeaveBalanceRepository)",
+      "why": "Service delegates all persistence and counter-guard enforcement to this repository."
+    },
+    {
+      "target": "src/shared/db/unit-of-work.impl.ts (UnitOfWork)",
+      "why": "Service injects IUnitOfWork to own transaction boundaries for deduct/restore."
+    },
+    {
+      "target": "src/shared/http/require-role.ts",
+      "why": "Route-level RBAC guard for balance endpoints."
+    },
+    {
+      "target": "src/shared/types/index.ts (UserRole)",
+      "why": "Role enum used by requireRole preHandlers in balance routes."
+    }
+  ]
+}
