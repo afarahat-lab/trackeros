@@ -1,5 +1,5 @@
 import { PoolClient } from 'pg';
-import { LeaveRequestStatus } from '../../shared/types';
+import { LeaveRequestStatus, UserRole } from '../../shared/types';
 
 export interface LeaveRequest {
   id: string;
@@ -51,6 +51,39 @@ export class OverlappingLeaveError extends Error {
   }
 }
 
+/**
+ * Thrown when the actor attempting to approve/reject/cancel is not the
+ * employee's manager (Employee.managerId) and is not an HR_ADMIN.
+ */
+export class LeaveAuthorizationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'LeaveAuthorizationError';
+  }
+}
+
+/**
+ * Thrown when `apply` is attempted for an employee whose employmentStatus is
+ * not ACTIVE.
+ */
+export class InactiveEmployeeError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'InactiveEmployeeError';
+  }
+}
+
+/**
+ * Thrown when a leave request references a leave type for which there is no
+ * active LeavePolicy (leave_type + is_active).
+ */
+export class InactiveLeavePolicyError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'InactiveLeavePolicyError';
+  }
+}
+
 export interface ILeaveRequestRepository {
   create(request: LeaveRequest, client?: PoolClient): Promise<LeaveRequest>;
   findById(id: string, client?: PoolClient): Promise<LeaveRequest | null>;
@@ -72,17 +105,28 @@ export type CreateLeaveRequestInput = Omit<
 >;
 
 export interface ILeaveService {
-  apply(input: CreateLeaveRequestInput): Promise<LeaveRequest>;
+  apply(
+    input: CreateLeaveRequestInput,
+    actorId: string,
+    actorRole: UserRole,
+  ): Promise<LeaveRequest>;
   approve(
     id: string,
-    approvedBy: string,
+    actorId: string,
+    actorRole: UserRole,
     client?: PoolClient,
   ): Promise<LeaveRequest | null>;
   reject(
     id: string,
-    approvedBy: string,
+    actorId: string,
+    actorRole: UserRole,
     client?: PoolClient,
   ): Promise<LeaveRequest | null>;
-  cancel(id: string, client?: PoolClient): Promise<LeaveRequest | null>;
+  cancel(
+    id: string,
+    actorId: string,
+    actorRole: UserRole,
+    client?: PoolClient,
+  ): Promise<LeaveRequest | null>;
   list(client?: PoolClient): Promise<LeaveRequest[]>;
 }

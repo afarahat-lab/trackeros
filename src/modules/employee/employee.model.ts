@@ -21,7 +21,7 @@ export interface Employee {
 export interface IEmployeeRepository {
   create(employee: Employee): Promise<Employee>;
   list(client?: PoolClient): Promise<Employee[]>;
-  findById(id: string): Promise<Employee | null>;
+  findById(id: string, client?: PoolClient): Promise<Employee | null>;
   findByEmployeeNumber(employeeNumber: string): Promise<Employee | null>;
   findByEmail(email: string): Promise<Employee | null>;
   update(id: string, changes: Partial<Employee>): Promise<Employee | null>;

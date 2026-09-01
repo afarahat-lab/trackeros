@@ -19,7 +19,7 @@ export interface ILeavePolicyRepository {
   create(policy: LeavePolicy): Promise<LeavePolicy>;
   list(client?: PoolClient): Promise<LeavePolicy[]>;
   findById(id: string): Promise<LeavePolicy | null>;
-  findByLeaveType(leaveType: LeaveType): Promise<LeavePolicy | null>;
-  findActiveByLeaveType(leaveType: LeaveType): Promise<LeavePolicy | null>;
+  findByLeaveType(leaveType: LeaveType, client?: PoolClient): Promise<LeavePolicy | null>;
+  findActiveByLeaveType(leaveType: LeaveType, client?: PoolClient): Promise<LeavePolicy | null>;
   update(id: string, changes: Partial<LeavePolicy>): Promise<LeavePolicy | null>;
 }

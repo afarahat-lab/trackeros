@@ -1,57 +1,49 @@
-# Implement this phase: Phase 4 — leave orchestration module
+# Continue the previous attempt (it hit the iteration limit before finishing)
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/b07feb33-7931-41ca-b4f7-c3dc02411147/9`. Do not clone anything; work only in this directory.
+A prior code-agent attempt on this work dir (`/tmp/gestalt/fix/b07feb33-7931-41ca-b4f7-c3dc02411147/9/1`) was stopped after reaching its iteration limit. Its work is ALREADY on disk here — do NOT restart from scratch or re-read everything; build on what exists. It made 7 file edit(s). The prior attempt did NOT run the build/tests before it was cut off.
 
-You are the IMPLEMENTATION agent, not a planner. The platform measures your work EXCLUSIVELY by the files you create or modify in this working tree (`git status`). Ending your turn with a plan, a summary, or an announcement of what you are 'about to' do — without having actually edited files — is a FAILURE: a turn that leaves the working tree untouched is discarded. Explore only as much as you need, then MAKE the edits with your file-editing tool. Never end your turn before the files exist on disk.
+Finish the task now: fix any failing build/type-check/tests, then RUN the build and the tests and fix anything still failing. Stop as soon as the build and tests pass. The full original task (with all mandatory constraints) follows for reference.
 
-## What to build
-(no phase architecture provided — infer from the success criteria below)
+---
 
-## Success criteria
-Build the leave orchestration module, which coordinates the other modules.
+# Fix specific quality-gate violations: Phase 4 — leave orchestration module
 
-Create:
-- src/modules/leave/leave.model.ts: LeaveRequest entity with canonical fields id, employeeId, leaveTypeId, startDate, endDate, reason, status (typed LeaveRequestStatus, imported from src/shared/types/), approvedBy, approvedAt, createdAt, updatedAt. Define ILeaveRequestRepository and ILeaveService interfaces.
-- src/modules/leave/leave.repository.ts: PgLeaveRequestRepository implementing ILeaveRequestRepository (snake_case columns: employee_id, leave_type_id, start_date, end_date, approved_by, approved_at, created_at, updated_at).
-- src/modules/leave/leave.service.ts: LeaveService implementing ILeaveService. Enforce the binding lifecycle: PENDING -> APPROVED | REJECTED, and PENDING | APPROVED -> CANCELLED. At APPROVAL time enforce (a) sufficiency check n <= availableDays (derived, may be negative) and (b) no overlapping APPROVED leave per employee regardless of type. Use countLeaveDays from src/shared/types/ for day counts (whole inclusive calendar days, no weekend/holiday exclusion). The SERVICE owns the unit of work via injected IUnitOfWork.withTransaction(fn); services never touch the pool; participating methods take the client as an optional LAST parameter.
-- src/modules/leave/leave.routes.ts: register leave endpoints (apply, approve, reject, cancel, list) wired to LeaveService.
-- src/modules/leave/index.ts: barrel exporting model, repository, service, routes.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/fix/b07feb33-7931-41ca-b4f7-c3dc02411147/9/1`. Do not clone anything; work only in this directory.
 
-Include Jest unit tests in tests/unit/modules/leave/leave.service.spec.ts covering the lifecycle transitions, sufficiency check, and overlap check.
+You are fixing SPECIFIC violations the quality gate found in EXISTING, already-committed files. Make the targeted edits listed below — do NOT refactor, regenerate, or change unrelated code.
 
-This phase depends on Phase 1 (src/shared/types/index.ts for LeaveRequestStatus + countLeaveDays, src/shared/db/unit-of-work.ts), Phase 2 (employee + policy + audit models/repositories), and Phase 3 (balance + notification models/repositories) — read those files before generating so field names and repository signatures match exactly. Do not reference any future-phase files.
+The files ALREADY EXIST. You MUST edit them in place with the `str_replace_editor` tool. Reading or viewing a file is NOT sufficient — you have NOT finished until you have edited EVERY file listed below.
 
-## Your iteration budget — and how to get more (READ BEFORE YOU START)
+## Constraints & consistency
+You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
+### Reuse & consistency — match these exactly
+- Reuse IAuditService.record(input, client?) and the AuditAction/EntityType enums; the audit write must join the caller's transaction via the optional client parameter. (see `src/modules/audit/audit.service.interface.ts`)
+- Reuse ILeaveBalanceRepository.deduct(id, days, client?) and restore(id, days, client?) so balance mutation joins the leave transaction via the optional client parameter. (see `src/modules/balance/balance.model.ts`)
+- Reuse IEmployeeRepository.findById to load the employee for the managerId and employmentStatus checks. (see `src/modules/employee/employee.model.ts`)
+- Reuse ILeavePolicyRepository.findActiveByLeaveType to resolve the governing active policy (leave_type + is_active) instead of a direct policyId === leaveTypeId match. (see `src/modules/policy/policy.model.ts`)
+- Reuse countLeaveDays for all day counts and computeAvailableDays for the sufficiency check; do not re-derive either inline. (see `src/shared/types/index.ts`)
+- The service owns the unit of work via IUnitOfWork.withTransaction(fn); participating methods take the client as an optional LAST parameter and fall back to the shared pool. (see `src/shared/db/unit-of-work.ts`)
+### Entity invariants — enforce these
+- Reuse or extend `LeaveRequest`: Lifecycle transitions remain PENDING -> APPROVED | REJECTED and PENDING | APPROVED -> CANCELLED; any other transition throws InvalidLeaveRequestTransitionError. approvedBy/approvedAt are set only on APPROVED/REJECTED and always equal the authenticated actor.
+- Reuse or extend `LeaveBalance`: usedDays and remainingDays remain non-negative; approve deducts and cancel-of-APPROVED restores the same inclusive day count, so a deduction is never lost or double-applied. A transition below zero throws NegativeBalanceCounterError (never clamped).
+- Reuse or extend `AuditLog`: Every state-changing operation on a LeaveRequest produces exactly one AuditLog with entityType LEAVE_REQUEST, entityId equal to the request id, and performedBy equal to the authenticated actor (or null where no actor applies).
+### Interface contract — expose these operations (their shape is yours)
+- approve — Actor must be the employee's manager (Employee.managerId) or HR_ADMIN; actor identity comes from request.user.id, not the body.; Missing request -> null (mapped to 404); illegal transition -> InvalidLeaveRequestTransitionError; insufficient balance -> InsufficientLeaveBalanceError; overlap -> OverlappingLeaveError; non-manager actor -> authorization failure (403).
+- reject — Actor must be the employee's manager (Employee.managerId) or HR_ADMIN; actor identity comes from request.user.id, not the body.; Missing request -> null (mapped to 404); illegal transition -> InvalidLeaveRequestTransitionError; non-manager actor -> authorization failure (403).
+- apply — Caller must be authorized to submit for the employee (own resource or HR_ADMIN/MANAGER per existing RBAC); the employee must have employmentStatus ACTIVE.; Inactive/terminated employee -> rejected (typed error); no active LeavePolicy for the leave type -> rejected (typed error); invalid input -> 400 VALIDATION_ERROR.
+- cancel — Caller must be the employee (own resource) or MANAGER/HR_ADMIN per existing RBAC.; Missing request -> null (mapped to 404); illegal transition -> InvalidLeaveRequestTransitionError; restore of an APPROVED request must not throw NegativeBalanceCounterError under correct prior deduction.
+### Integration points — connect to these
+- src/modules/audit/audit.service.interface.ts (IAuditService.record) — LeaveService must depend on IAuditService to satisfy GP-002 for apply/approve/reject/cancel.
+- src/modules/employee/employee.model.ts (IEmployeeRepository.findById) — LeaveService must load the employee to enforce managerId authorization and employmentStatus ACTIVE.
+- src/modules/policy/policy.model.ts (ILeavePolicyRepository.findActiveByLeaveType) — LeaveService must resolve the governing active policy to select the correct balance and enforce isActive.
+- src/modules/balance/balance.model.ts (ILeaveBalanceRepository.deduct/restore) — LeaveService must deduct on approve and restore on cancel-of-APPROVED within the same transaction.
 
-You have a HARD budget of **30 iterations** for this task; one tool call is one iteration. When it runs out you are CUT OFF mid-work — the unfinished phase is recorded as a FAILURE, not as progress. Nothing warns you as you approach it, so you cannot rely on noticing.
-
-**Exploration is what exhausts it.** Measured on this platform's recent phases: the code-agent spent 19 of its 27 file-editing calls on `view` — it ran out of budget reading the codebase, not building the feature. Phases that were cut off had nearly all of their budget consumed before the writing started.
-
-You have a `task` tool. It runs a FRESH sub-agent with its OWN separate 30-iteration budget and its OWN context window, in this same working directory. Everything that sub-agent reads and writes costs you **one** iteration, not 30. It is the supported way to get more capacity, and using it is normal — not an admission of difficulty.
-
-### DELEGATE BY DEFAULT
-
-**Assume you WILL delegate this phase. The question is not whether, but how to slice it.** Decide NOW, before your first edit — a decision made after you have spent half your budget exploring is a decision made too late.
-
-Delegate unless the phase is *trivially* small, which means ALL of:
-- it creates or changes **at most 2 files**, AND
-- it introduces **no new module**, AND
-- you are confident you can finish it, verified, in well under 10 iterations.
-
-If you cannot say all three with confidence, delegate. When you are unsure, delegate — an unnecessary hand-off costs a few iterations, whereas running out costs the entire phase.
-
-### Delegate the READING, not just the writing
-
-The most valuable first delegation is usually a SURVEY, because that is where the budget actually goes. Instead of opening a dozen files yourself, send a sub-agent to read them and report back what you need: the existing conventions, the shapes and signatures you must match, where the seams are. It burns its own budget on that reading and returns you a digest for one iteration.
-
-Then delegate the implementation slices.
-
-### How to delegate
-- Call `task` with `subagent_type='gestalt-implementer'`, ONE call per slice, at most **4** for this phase. Each call blocks until that sub-agent finishes and reports back — they never run at the same time.
-- Split implementation slices by MODULE or FILE GROUP so they own DISJOINT files. Two slices must never edit the same file.
-- Give each one a self-contained prompt: the exact files it owns, what to build, the conventions it must follow, and what to report back. It cannot see this task, so anything you do not tell it, it does not know.
-
-**Never delegate the final verification.** Run the build and the tests YOURSELF, over the whole phase, after the slices are back — a sub-agent only sees its own slice, so its 'it passes' means 'my slice compiled', not 'the phase works'.
+## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
+Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
+- Use unknown with type guards instead of any (rule: `no-any`)
+- Database calls must go through repository pattern (rule: `no-direct-db-outside-repository`)
+- No hardcoded passwords, API keys, or tokens (rule: `no-hardcoded-secrets`)
+- Do not add @gestalt/* packages as project dependencies — these are Gestalt platform internals not available on npm (rule: `no-gestalt-internal-deps`)
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -120,13 +112,6 @@ STANDING DECISIONS carried forward (unchanged):
   injected IUnitOfWork.withTransaction(fn). Services never touch the pool. Participating
   methods take the client as an optional LAST parameter. See AGENTS.md Architecture rules 5. [BINDING RULE — operator decision resolving: Does leave duration support partial/half-day granularity, or only whole inclusive calendar days?; How should remaining_days be bounded if used_days exceeds entitlement due to data correction or policy change?; What exact contents should src/shared/types/ contain beyond the cross-module enums?; How should the PLAN.md drift be reconciled — phases 1-6 are marked [deployed] but none of the leave/balance/employee/policy/notification/audit files exist on disk?; Which balance entity is canonical: Balance or LeaveBalance (near-duplicate definitions in docs/DOMAIN.md)?; Is LeaveRequest.status typed as LeaveRequestStatus or LeaveStatus?; Which audit entity shape and field naming convention is canonical among Audit, AuditLog, AuditRecord, and AuditServiceInterface (camelCase vs snake_case)?; How are leave days counted (inclusive vs exclusive of end date) and rounded for partial days?; How is remaining_days bounded (floor at zero vs allow negative) when used_days exceeds entitlement?; Which LeaveStatus enum values are authoritative — DOMAIN.md (DRAFT/SUBMITTED/APPROVED/REJECTED/CANCELLED) or root ARCHITECTURE.md (PENDING/APPROVED/REJECTED/CANCELLED)?; What exact contents should src/shared/types/ contain beyond leave.types.ts (e.g. index.ts barrel, other shared DTOs)?; apply everywhere these apply, not in one place only]
 
-## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
-Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
-- Use unknown with type guards instead of any (rule: `no-any`)
-- Database calls must go through repository pattern (rule: `no-direct-db-outside-repository`)
-- No hardcoded passwords, API keys, or tokens (rule: `no-hardcoded-secrets`)
-- Do not add @gestalt/* packages as project dependencies — these are Gestalt platform internals not available on npm (rule: `no-gestalt-internal-deps`)
-
 ## Architecture & constraint rules the quality gate enforces (satisfy these now)
 The quality gate judges your code against the rules below and BLOCKS the phase on any violation — a violation it rates critical escalates to a human with no automatic retry. These are the same rules the gate checks, so comply up front rather than leaving them for the gate:
 - Data access is only permitted in the designated data access layer of this project. Code in business logic, presentation, or routing layers must delegate all data operations to the data access layer.
@@ -151,24 +136,78 @@ These are the project's non-negotiable invariants. A violation is a GOLDEN_PRINC
 - GP-006 — Error handling: No unhandled promise rejections. All async errors are caught and handled.
 
 ## Project stack & references
-Before writing code, read the referenced files below (those present in the working directory) to learn the project's language, framework, test runner, and conventions, and the cross-cutting rules your code must satisfy — then follow the existing repository conventions:
+Before making the edits below, read the referenced files (those present in the working directory) to learn the project's architecture, conventions, and the cross-cutting rules your fix must still satisfy — then keep the edits consistent with them:
 - `HARNESS.json`
 - `docs/ARCHITECTURE.md`
 - `docs/GOLDEN_PRINCIPLES.md`
 - `AGENTS.md`
 - `PLAN.md`
 
+## Required edits
+
+### Edit 1
+File: src/modules/leave/leave.service.ts
+Line: 130
+Offending code: `{ status: LeaveRequestStatus.APPROVED, approvedBy, approvedAt: new Date() },`
+Rule violated: review/golden-principle
+Action (do this now): Edit `src/modules/leave/leave.service.ts` at line 130 in place to fix the `review/golden-principle` violation.
+What the quality gate found — apply this: [review/golden-principle] GP-002 breach: state-changing operations write no audit record. `LeaveService` has no `IAuditService` dependency (constructor takes only `PgLeaveRequestRepository` + `ILeaveBalanceRepository` + `IUnitOfWork`), and `approve`/`reject`/`cancel`/`apply` all mutate leave-request state (e.g. this PENDING→APPROVED transition) without writing an `AuditLog`. GOLDEN_PRINCIPLES.md states "All state-changing operations write an audit record" and the task.md lists GP-002 as non-negotiable for this phase; the ARCHITECTURE.md note documenting this as a divergence does not waive the principle.
+
+### Edit 2
+File: src/modules/leave/leave.service.ts
+Line: 130
+Offending code: `{ status: LeaveRequestStatus.APPROVED, approvedBy, approvedAt: new Date() },`
+Rule violated: review/business-rule
+Action (do this now): Edit `src/modules/leave/leave.service.ts` at line 130 in place to fix the `review/business-rule` violation.
+What the quality gate found — apply this: [review/business-rule] Binding business rule not implemented: "Approving a leave request deducts its inclusive day count from LeaveBalance.usedDays and remainingDays atomically with the status change" (ARCHITECTURE.md). `approve` computes `days` and performs the sufficiency check but never calls `balances.deduct`; the only write is this status update. The `ILeaveBalanceRepository` is injected and exposes `deduct(id, days, client?)`, so the atomic deduction is available but unused. Cancelling an APPROVED request likewise performs no `restore`.
+
+### Coherent change 1 — apply as ONE atomic edit across ALL sites below
+
+Unifying change (do this now): Enforce that only the employee's manager (Employee.managerId) may approve/reject, derive approvedBy from request.user, and remove client-supplied approvedBy.
+
+The sites below are the SAME underlying issue. Fixing some but not others leaves the code incoherent and the quality gate WILL re-flag it — apply the one change above consistently to EVERY site:
+
+- Site 1
+File: src/modules/leave/leave.routes.ts
+Line: 57
+Offending code: `{ preHandler: requireRole(UserRole.EMPLOYEE, UserRole.MANAGER, UserRole.HR_ADMIN) },`
+Rule violated: review/business-rule
+Action (do this now): Edit `src/modules/leave/leave.routes.ts` at line 57 in place to fix the `review/business-rule` violation.
+What the quality gate found — apply this: [review/business-rule] Binding business rule not implemented: "Only the employee's manager (Employee.managerId) may approve or reject a leave request" (ARCHITECTURE.md). The approve/reject endpoints gate on role only (MANAGER/HR_ADMIN) and accept `approvedBy` as an unverified body field; there is no check that the caller is the employee's manager. Any MANAGER can approve/reject any employee's request, and the recorded `approvedBy` is client-supplied rather than derived from `request.user`.
+
+- Site 2
+File: src/modules/leave/leave.routes.ts
+Line: 82
+Offending code: `{ preHandler: requireRole(UserRole.MANAGER, UserRole.HR_ADMIN) },`
+Rule violated: review/business-rule
+Action (do this now): Edit `src/modules/leave/leave.routes.ts` at line 82 in place to fix the `review/business-rule` violation.
+What the quality gate found — apply this: [review/business-rule] Binding business rule not implemented: "Only the employee's manager (Employee.managerId) may approve or reject a leave request" (ARCHITECTURE.md). The approve/reject endpoints gate on role only (MANAGER/HR_ADMIN) and accept `approvedBy` as an unverified body field; there is no check that the caller is the employee's manager. Any MANAGER can approve/reject any employee's request, and the recorded `approvedBy` is client-supplied rather than derived from `request.user`.
+
+Then check the rest of these files (and the surrounding module) for ANY OTHER occurrence of the same pattern beyond the specific lines listed above, and apply the same change there too — do NOT limit the fix to only the enumerated sites.
+
+### Edit 3
+File: src/modules/leave/leave.service.ts
+Line: 88
+Offending code: `const balance = balances.find((b) => b.policyId === request.leaveTypeId);`
+Rule violated: review/business-rule
+Action (do this now): Edit `src/modules/leave/leave.service.ts` at line 88 in place to fix the `review/business-rule` violation.
+What the quality gate found — apply this: [review/business-rule] Binding rule not implemented: the applicable balance must be resolved via the governing `LeavePolicy` (`leave_type` + `is_active`), not by a direct string match. Here the balance is selected by `policyId === leaveTypeId`, and there is no `LeavePolicy.isActive` check on the referenced leave type (ARCHITECTURE.md: "the governing policy is resolved by leave_type + is_active" and "A leave request may only reference a LeavePolicy whose isActive is true").
+
+### Edit 4
+File: src/modules/leave/leave.service.ts
+Line: 42
+Offending code: `return this.leaveRequests.create(request);`
+Rule violated: review/business-rule
+Action (do this now): Edit `src/modules/leave/leave.service.ts` at line 42 in place to fix the `review/business-rule` violation.
+What the quality gate found — apply this: [review/business-rule] Binding rule not implemented: "A leave request may only be submitted by an employee whose employmentStatus is ACTIVE" (ARCHITECTURE.md). `apply` writes the request without any employee lookup or `employmentStatus` check; `LeaveService` has no employee dependency.
+
 ## Verify before you finish (MANDATORY)
-The code you write MUST compile and its tests MUST pass — a compilation or type error must NEVER be left for CI to find. Before you declare this task done:
-- Read the project's build / type-check / test commands from `package.json` (scripts) and `HARNESS.json`.
-- Install dependencies if they are not already installed, then RUN the type-check / build (e.g. `npm run build` or `tsc --noEmit`) AND the tests (e.g. `npm test`) for the files this phase touches.
-- FIX every compilation error, type error, and failing test you introduced — including in test files — and re-run until they pass.
-- **While fixing, re-run ONLY what you are fixing** — the specific failing test file(s), or the type-check alone for a type error. Do NOT re-run the whole suite after every edit. A measured run spent ~60 full build/test cycles inside a 30-iteration budget and was cut off mid-work: the suite is the slowest thing you can do, and re-running all of it to learn about one file buys nothing.
-- Run the FULL build and the FULL suite ONCE at the end, to confirm the whole phase holds together. That run is the one that matters; the narrow ones are just your fix loop.
-- If a command HANGS or produces no output, do not sit through it repeatedly: note it, work around it (a narrower target, or a timeout), and say so in your final message. Repeatedly interrupting and re-running the same hanging command is the single most expensive thing you can do with your budget.
+After making the edits above, the code MUST still compile and its tests MUST pass — a compilation/type error, or a test your change breaks, must NEVER be left for CI or the quality gate to find. Before you declare this task done:
+- Read the project's build / type-check / test commands from `package.json` (scripts) and `HARNESS.json`, install dependencies if they are not already installed, then RUN the type-check / build (e.g. `npm run build` or `tsc --noEmit`) AND the tests (e.g. `npm test`).
+- FIX every compilation error, type error, and failing test that YOUR edits introduced — including updating a test whose expectation your change legitimately invalidated (e.g. a new required field, a new status code such as 401/403 from an added authorization check, added input validation) — and re-run until they pass.
 - Only when the build and the tests pass may you consider the task complete. If a dependency install genuinely cannot be made to work, say so explicitly in your final message rather than declaring success on unverified code.
 
 ## Constraints (mandatory)
-- Write and modify source files ONLY. Do NOT run `git commit`, `git push`, `git add`, or any other git command. The platform handles all git operations. (Running the build / type-check / tests above is expected and encouraged — that is NOT a git operation.)
-- Do not create a new repository or change the git remote.
-- Stay within the scope of this phase; do not implement deferred/later work.
+- Keep the change SURGICAL: make the required edits above and fix only what they broke (compile/type errors and the tests they invalidated). Do NOT refactor, regenerate, or change unrelated code, and do not add / delete / rename source files beyond what a required edit — or a test-fix for it — needs.
+- Do NOT run `git commit`, `git push`, `git add`, or any git command. The platform handles all git operations. (Running the build / type-check / tests above is expected and encouraged — that is NOT a git operation.)
+- When the listed edits are made and the build + tests pass, stop.
