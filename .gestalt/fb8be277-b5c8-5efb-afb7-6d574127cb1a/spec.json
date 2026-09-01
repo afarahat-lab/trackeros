@@ -1,0 +1,168 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared-types",
+      "shared-db",
+      "shared/leave"
+    ],
+    "affectedLayers": [
+      "shared types",
+      "data-access interface",
+      "pure domain helper",
+      "unit tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "src/shared/types/leave.types.ts exports the six enums with exactly the canonical values: LeaveType (annual, sick, emergency, unpaid, maternity, paternity), LeaveStatus (PENDING, APPROVED, REJECTED, CANCELLED), EmploymentStatus (ACTIVE, INACTIVE, TERMINATED), NotificationStatus (PENDING, SENT, READ, ARCHIVED), AuditAction (CREATE, UPDATE, DELETE, APPROVE, REJECT), UserRole (employee, manager, hr_admin).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/shared/types/leave.types.ts exports the DTO types CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveRequestQueryParams and the ValidationResult type, all owned by the shared-types module.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/shared/db/unit-of-work.ts exports an IUnitOfWork interface exposing begin, commit, rollback and an optional client?: PoolClient member.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/shared/leave/day-count.ts exports a single pure helper computing inclusive calendar days as (endDate - startDate) + 1, with a single-day span returning 1 and no weekend/holiday exclusion.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A Jest unit test file for the day-count helper exists and passes, covering at minimum: single-day = 1, a multi-day inclusive span, and a same-day (zero-length) span.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The shared pg pool must be imported as a named import from src/shared/db/connection.ts (`import { pool } from ...`); it is a named export, not default.",
+    "LeaveStatus must be PENDING | APPROVED | REJECTED | CANCELLED \u2014 no DRAFT/SUBMITTED (business rule 7; the reconciled artifact is authoritative over the stale docs/ARCHITECTURE.md).",
+    "IUnitOfWork exposes begin/commit/rollback plus optional client?: PoolClient; the service owns the unit of work and the data-access layer opens it. Do not put withTransaction on a repository.",
+    "Day count is inclusive calendar days only: days = (endDate - startDate) + 1, implemented once as a pure helper; no weekend/holiday exclusion and no independent re-computation at call sites.",
+    "Leave package.json as-is; do not add dependencies or modify scripts. Existing deps (pg, ts-jest, jest) are sufficient.",
+    "Strict TypeScript: no `any` (use `unknown` with type guards), strict null checks enabled."
+  ],
+  "outOfScope": [
+    "Field-level definitions of CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveRequestQueryParams and ValidationResult \u2014 these are specified in later phases; this phase only declares the types.",
+    "Any concrete IUnitOfWork implementation (the PoolClient-acquiring begin/commit/rollback logic) \u2014 this phase defines the interface only.",
+    "Domain modules (audit, employee, policy, balance, notification, auth, leave) and any repository/service/controller code \u2014 later phases.",
+    "Knex usage in queries, migrations, and any database schema/DDL \u2014 out of scope for this phase."
+  ],
+  "ambiguities": [
+    {
+      "description": "Field-level shapes of CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveRequestQueryParams and ValidationResult are unspecified in this phase. The code agent must choose placeholder/minimal shapes without contradicting later phases.",
+      "options": [
+        "Declare the DTOs as minimal placeholder types (e.g. empty or loose) to be refined in later phases",
+        "Infer field shapes from the LeaveRequest entity and business rules now"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "description": "Jest test discovery: the requested test path uses a `.spec.ts` suffix, but the project's jest.config.js testMatch glob only matches `*.test.(ts|js)`. A `.spec.ts` file would be silently skipped by CI. The code agent must reconcile the file suffix with the existing testMatch glob.",
+      "options": [
+        "Use a .test.ts suffix so the existing testMatch glob discovers it",
+        "Widen jest.config.js testMatch to include .spec.ts files"
+      ],
+      "impactIfWrong": "medium"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeaveType",
+      "mustExistOrExtend": true,
+      "invariant": "A closed enum of exactly six values (annual, sick, emergency, unpaid, maternity, paternity); no other leave category may be represented."
+    },
+    {
+      "entity": "LeaveStatus",
+      "mustExistOrExtend": true,
+      "invariant": "A closed enum of exactly PENDING, APPROVED, REJECTED, CANCELLED; no DRAFT or SUBMITTED state exists."
+    },
+    {
+      "entity": "EmploymentStatus",
+      "mustExistOrExtend": true,
+      "invariant": "A closed enum of exactly ACTIVE, INACTIVE, TERMINATED."
+    },
+    {
+      "entity": "NotificationStatus",
+      "mustExistOrExtend": true,
+      "invariant": "A closed enum of exactly PENDING, SENT, READ, ARCHIVED."
+    },
+    {
+      "entity": "AuditAction",
+      "mustExistOrExtend": true,
+      "invariant": "A closed enum of exactly CREATE, UPDATE, DELETE, APPROVE, REJECT."
+    },
+    {
+      "entity": "UserRole",
+      "mustExistOrExtend": true,
+      "invariant": "A closed enum of exactly employee, manager, hr_admin."
+    },
+    {
+      "entity": "IUnitOfWork",
+      "mustExistOrExtend": true,
+      "invariant": "Exposes begin/commit/rollback and an optional client?: PoolClient; it is the only abstraction through which a transaction boundary is opened, and it is owned by the data-access layer while the service decides what is inside the boundary."
+    },
+    {
+      "entity": "day-count helper",
+      "mustExistOrExtend": true,
+      "invariant": "A single pure function computing inclusive calendar days = (endDate - startDate) + 1; a single-day span yields 1, and it performs no weekend/holiday exclusion."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "day-count computation",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Pure and deterministic: identical (startDate, endDate) inputs always yield the same integer; no side effects, no I/O."
+    },
+    {
+      "operation": "IUnitOfWork.begin / commit / rollback",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "rollback must be safe to invoke after a failed begin/commit and must release the acquired client; the interface itself carries no auth rule (it is data-access, not an endpoint)."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The shared pool must be the named `pool` export from src/shared/db/connection.ts; do not create a second pool or a default export.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "LeaveStatus values must match business rule 7 (PENDING/APPROVED/REJECTED/CANCELLED), not the stale DRAFT/SUBMITTED set in docs/ARCHITECTURE.md.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "IUnitOfWork shape (begin/commit/rollback + optional client?: PoolClient) must match the transaction contract in AGENTS.md architecture rule 5, not the older withTransaction(fn) form.",
+      "referencePath": "AGENTS.md"
+    },
+    {
+      "requirement": "Day-count semantics must match business rule 1 (inclusive calendar days, single shared helper, no weekend/holiday exclusion).",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "Enum values and module ownership (shared-types owns the enums/DTOs/ValidationResult; shared-db owns IUnitOfWork) must match the reconciled module boundaries.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/db/connection.ts (named `pool` export)",
+      "why": "IUnitOfWork's optional client?: PoolClient and any future data-access implementation acquire clients from this shared pool."
+    },
+    {
+      "target": "pg (PoolClient type)",
+      "why": "IUnitOfWork references PoolClient for its optional client member; raw pg is the mandated data-access layer."
+    },
+    {
+      "target": "Later phases (audit/employee/policy/balance/notification/auth/leave modules)",
+      "why": "They import the enums, DTOs, ValidationResult, IUnitOfWork and the day-count helper defined here; this phase is their shared foundation."
+    }
+  ]
+}
