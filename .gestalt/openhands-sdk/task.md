@@ -1,32 +1,27 @@
-# Implement this phase: Phase 3b — Notification service + routes
+# Implement this phase: Phase 3c — Balance + notification unit tests
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/b07feb33-7931-41ca-b4f7-c3dc02411147/7`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/b07feb33-7931-41ca-b4f7-c3dc02411147/8`. Do not clone anything; work only in this directory.
 
 You are the IMPLEMENTATION agent, not a planner. The platform measures your work EXCLUSIVELY by the files you create or modify in this working tree (`git status`). Ending your turn with a plan, a summary, or an announcement of what you are 'about to' do — without having actually edited files — is a FAILURE: a turn that leaves the working tree untouched is discarded. Explore only as much as you need, then MAKE the edits with your file-editing tool. Never end your turn before the files exist on disk.
 
 ## What to build
-notification.service.ts exists and implements INotificationService
-notification.routes.ts exists and wires endpoints to NotificationService
-notification/index.ts barrel exports the service and routes
-No test files are created in this sub-phase
+balance.service.spec.ts covers derived availableDays, negative availableDays without clamping, and throws on negative counter transitions
+notification.service.spec.ts covers NotificationService behavior
+Both spec files pass when run with Jest
 
 ## Success criteria
-Build ONLY the NotificationService and its routes (layer 2, notification module).
+Write ONLY the Jest unit tests for the balance and notification services created in sub-phases 3a and 3b.
 
 Create:
-- src/modules/notification/notification.service.ts: NotificationService implementing INotificationService.
-- src/modules/notification/notification.routes.ts: register notification endpoints wired to NotificationService.
+- tests/unit/modules/balance/balance.service.spec.ts: cover derived availableDays, negative-balance behavior (no clamping), and non-negative counter error.
+- tests/unit/modules/notification/notification.service.spec.ts.
 
-Update src/modules/notification/index.ts barrel to export the service + routes.
-
-Read Phase 3 part 1/2 files (notification.model.ts, notification.repository.ts) and Phase 1's src/shared/types/index.ts (NotificationType) before generating so signatures match exactly. Do not reference the leave module. No tests in this sub-phase.
+Read the generated balance.service.ts and notification.service.ts (and their models/repositories from Phase 3 part 1/2) so test expectations match exact signatures. Do not reference the leave module.
 
 ## Owned by SIBLING sub-phases (OUT OF SCOPE for this sub-phase)
 This is ONE sub-phase of a split phase. The deliverables below belong to sibling sub-phases — do NOT create them here, do NOT list them as success criteria, and this sub-phase MUST NOT be gated on their presence (they are produced by a sibling, not missing):
 - "Phase 3a — Balance service + routes": src/modules/balance/balance.service.ts, src/modules/balance/balance.routes.ts, src/modules/balance/index.ts
-- "Phase 3c — Balance + notification unit tests": tests/unit/modules/balance/balance.service.spec.ts, tests/unit/modules/notification/notification.service.spec.ts
-
-In particular, UNIT/INTEGRATION TESTS are OUT OF SCOPE for this sub-phase — they are produced in: Phase 3c — Balance + notification unit tests. Do not create test files here, do not require test existence or coverage as a success criterion, and do not fail the gate for missing tests.
+- "Phase 3b — Notification service + routes": src/modules/notification/notification.service.ts, src/modules/notification/notification.routes.ts, src/modules/notification/index.ts
 
 ## Your iteration budget — and how to get more (READ BEFORE YOU START)
 
@@ -144,26 +139,21 @@ The entities below are shared, cross-module DATA CONTRACTS. Implement each one w
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- NotificationService must implement the exact INotificationService interface (create/markRead/findByRecipient signatures) and reuse Notification, CreateNotificationInput, NotificationStatus, InvalidNotificationTransitionError. (see `src/modules/notification/notification.model.ts`)
-- NotificationService must delegate persistence to PgNotificationRepository (create/findByRecipient/markRead) and rely on its status-transition guard and pool fallback; no inline SQL in the service. (see `src/modules/notification/notification.repository.ts`)
-- NotificationService must mirror BalanceService's structure: constructor(repository, uow), create without transaction, markRead via uow.withTransaction, findByRecipient passing the optional client through. (see `src/modules/balance/balance.service.ts`)
-- notification.routes.ts must follow balance.routes.ts's structure: instantiate service with PgNotificationRepository + UnitOfWork, Zod safeParse -> 400 VALIDATION_ERROR, requireRole preHandler, { error, code } responses, 500 INTERNAL_ERROR catch-all. (see `src/modules/balance/balance.routes.ts`)
-- Use NotificationType (and UserRole for RBAC) from the shared types barrel; do not redefine them. (see `src/shared/types/index.ts`)
-- Use IUnitOfWork/UnitOfWork and the shared pool for DB access; the service takes IUnitOfWork injected and never imports the pool. (see `src/shared/db/unit-of-work.ts`)
-- Use requireRole for RBAC enforcement on notification endpoints. (see `src/shared/http/require-role.ts`)
+- Test expectations must match the exact method signatures and constructor dependencies of BalanceService and NotificationService. (see `src/modules/balance/balance.service.ts, src/modules/notification/notification.service.ts`)
+- Error types asserted in tests must be the exact classes NegativeBalanceCounterError and InvalidNotificationTransitionError. (see `src/modules/balance/balance.model.ts, src/modules/notification/notification.model.ts`)
+- Mocking conventions (jest.Mocked, fakeClient, withTransaction mockImplementation) must match the established pattern. (see `tests/unit/modules/employee/employee.service.spec.ts`)
+- The IUnitOfWork mock must expose only withTransaction<T>(fn: (client: PoolClient) => Promise<T>): Promise<T>. (see `src/shared/db/unit-of-work.ts`)
 ### Entity invariants — enforce these
-- Reuse or extend `Notification`: A Notification's status may only transition PENDING|SENT -> READ; readAt is set only on that transition and is null otherwise; any other transition raises InvalidNotificationTransitionError (enforced by the repository, propagated by the service).
-- Reuse or extend `Notification`: A newly created Notification has status 'PENDING', readAt null, and a service-generated id and createdAt; type must be a valid NotificationType value.
+- Reuse or extend `LeaveBalance`: availableDays is derived (totalEntitlement - usedDays - pendingDays), never stored, and may be negative (no clamping); the three stored counters (totalEntitlement, usedDays, remainingDays) are non-negative and a transition below zero raises NegativeBalanceCounterError.
+- Reuse or extend `Notification`: A newly created Notification has status 'PENDING', readAt null, and a generated id/createdAt; only PENDING/SENT may transition to READ (stamping readAt), otherwise InvalidNotificationTransitionError.
 ### Interface contract — expose these operations (their shape is yours)
-- create(input: CreateNotificationInput): Promise<Notification> — Route-level: HR_ADMIN only (mirrors balance write endpoints).; Invalid input -> 400 VALIDATION_ERROR; unexpected error -> 500 INTERNAL_ERROR.
-- markRead(id: string): Promise<Notification> — Route-level: HR_ADMIN or MANAGER (mirrors balance read endpoints).; InvalidNotificationTransitionError -> 400 VALIDATION_ERROR (or 404 NOT_FOUND); unexpected error -> 500 INTERNAL_ERROR.
-- findByRecipient(recipientId: string, client?: PoolClient): Promise<Notification[]> — Route-level: HR_ADMIN or MANAGER (mirrors balance read endpoints).; Unexpected error -> 500 INTERNAL_ERROR; empty result is a valid 200 with [].
+- BalanceService.deduct(id, days) — Delegates to repository inside uow.withTransaction; propagates NegativeBalanceCounterError when remainingDays would drop below zero or days is negative.
+- BalanceService.restore(id, days) — Delegates to repository inside uow.withTransaction; propagates NegativeBalanceCounterError when usedDays would drop below zero or days is negative.
+- NotificationService.markRead(id) — Delegates to repository inside uow.withTransaction; propagates InvalidNotificationTransitionError when the notification is not PENDING/SENT.
 ### Integration points — connect to these
-- src/modules/notification/notification.model.ts — Source of the INotificationService contract, entity, and error type the service must implement.
-- src/modules/notification/notification.repository.ts — PgNotificationRepository provides the persistence the service delegates to.
-- src/shared/db/unit-of-work.impl.ts — UnitOfWork supplies the transaction boundary for markRead.
-- src/shared/http/require-role.ts — RBAC guard for notification endpoints.
-- src/shared/types/index.ts — NotificationType and UserRole enums used by the service and routes.
+- src/modules/balance/balance.service.ts (BalanceService) — Unit under test for balance.service.spec.ts; its create/findById/findByEmployee/deduct/restore behavior is asserted.
+- src/modules/notification/notification.service.ts (NotificationService) — Unit under test for notification.service.spec.ts; its create/markRead/findByRecipient behavior is asserted.
+- src/shared/db/unit-of-work.ts (IUnitOfWork) — Injected into both services; mocked to verify deduct/restore/markRead wrap repository calls in a transaction.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
