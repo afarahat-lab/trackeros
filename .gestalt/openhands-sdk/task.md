@@ -1,6 +1,7 @@
 # Continue the previous attempt (it hit the iteration limit before finishing)
 
-A prior code-agent attempt on this work dir (`/tmp/gestalt/fix/b07feb33-7931-41ca-b4f7-c3dc02411147/9/1`) was stopped after reaching its iteration limit. Its work is ALREADY on disk here — do NOT restart from scratch or re-read everything; build on what exists. It made 7 file edit(s). The prior attempt did NOT run the build/tests before it was cut off.
+A prior code-agent attempt on this work dir (`/tmp/gestalt/fix/b07feb33-7931-41ca-b4f7-c3dc02411147/9/2`) was stopped after reaching its iteration limit. Its work is ALREADY on disk here — do NOT restart from scratch or re-read everything; build on what exists. It made 2 file edit(s). Its last verification FAILED (`cd /tmp/gestalt/fix/b07feb33-7931-41ca-b4f7-c3dc02411147/9/2 && npm run build 2>&1 | tail -30`):
+>\'.\n    Types of parameters \'client\' and \'actorRole\' are incompatible.\n      Type \'import("/tmp/gestalt/fix/b07feb33-7931-41ca-b4f7-c3dc02411147/9/2/src/shared/types/user-role").UserRole\' is not assignable to type \'PoolClient\'.\nsrc/modules/leave/leave.service.ts(151,9): error TS2416: Property \'cancel\' in type \'LeaveService\' is not assignable to the same property in base type \'ILeaveService\'.\n  Type \'(id: string, client?: PoolClient | undefined) => Promise<LeaveRequest | null>\' is not assignable to type \'(id: string, actorId: string, actorRole: UserRole, client?: PoolClient | undefined) => Promise<LeaveRequest | null>\'.\n    Types of parameters \'client\' and \'actorId\' are incompatible.\n      Type \'string\' is not assignable to type \'PoolClient\'.\n\x1b[?2004h'}]
 
 Finish the task now: fix any failing build/type-check/tests, then RUN the build and the tests and fix anything still failing. Stop as soon as the build and tests pass. The full original task (with all mandatory constraints) follows for reference.
 
@@ -8,35 +9,38 @@ Finish the task now: fix any failing build/type-check/tests, then RUN the build 
 
 # Fix specific quality-gate violations: Phase 4 — leave orchestration module
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/fix/b07feb33-7931-41ca-b4f7-c3dc02411147/9/1`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/fix/b07feb33-7931-41ca-b4f7-c3dc02411147/9/2`. Do not clone anything; work only in this directory.
 
 You are fixing SPECIFIC violations the quality gate found in EXISTING, already-committed files. Make the targeted edits listed below — do NOT refactor, regenerate, or change unrelated code.
 
 The files ALREADY EXIST. You MUST edit them in place with the `str_replace_editor` tool. Reading or viewing a file is NOT sufficient — you have NOT finished until you have edited EVERY file listed below.
 
+## This is fix attempt 2 — you are CONTINUING, not starting over
+The changes from the previous fix attempt(s) are ALREADY PRESENT in this working tree — you are editing that real, accumulated state, not a fresh checkout. The violation(s) listed below are what STILL FAILS *after* those prior changes. Build on the existing code: read what is already there, then refine or correct the prior attempt's edits to resolve the remaining violation — do NOT discard the prior work or re-derive the whole change from scratch.
+
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- Reuse IAuditService.record(input, client?) and the AuditAction/EntityType enums; the audit write must join the caller's transaction via the optional client parameter. (see `src/modules/audit/audit.service.interface.ts`)
-- Reuse ILeaveBalanceRepository.deduct(id, days, client?) and restore(id, days, client?) so balance mutation joins the leave transaction via the optional client parameter. (see `src/modules/balance/balance.model.ts`)
-- Reuse IEmployeeRepository.findById to load the employee for the managerId and employmentStatus checks. (see `src/modules/employee/employee.model.ts`)
-- Reuse ILeavePolicyRepository.findActiveByLeaveType to resolve the governing active policy (leave_type + is_active) instead of a direct policyId === leaveTypeId match. (see `src/modules/policy/policy.model.ts`)
-- Reuse countLeaveDays for all day counts and computeAvailableDays for the sufficiency check; do not re-derive either inline. (see `src/shared/types/index.ts`)
-- The service owns the unit of work via IUnitOfWork.withTransaction(fn); participating methods take the client as an optional LAST parameter and fall back to the shared pool. (see `src/shared/db/unit-of-work.ts`)
+- The service must implement the actor-based signatures already declared in ILeaveService (apply/approve/reject/cancel take actorId + actorRole) and use the three error types already declared in leave.model.ts. (see `src/modules/leave/leave.model.ts`)
+- Balance deduction must go through ILeaveBalanceRepository.deduct(id, days, client) with the optional client as the LAST parameter, matching the declared signature and the NegativeBalanceCounterError contract. (see `src/modules/balance/balance.model.ts`)
+- Audit writes must go through IAuditService.record(input, client) with AuditAction.CREATE/UPDATE and EntityType.LEAVE_REQUEST, matching the declared AuditRecordInput shape and the optional-client join contract. (see `src/modules/audit/audit.service.interface.ts`)
+- Employee lookup must use IEmployeeRepository.findById and read Employee.employmentStatus/managerId with the exact field names declared in the employee model. (see `src/modules/employee/employee.model.ts`)
+- Policy resolution must use ILeavePolicyRepository.findActiveByLeaveType(leaveType, client) and read LeavePolicy.isActive, matching the declared signature. (see `src/modules/policy/policy.model.ts`)
+- The transaction boundary must follow the IUnitOfWork.withTransaction contract and the AGENTS.md rule 5 pattern (service owns the boundary, data-access opens it, client passed as optional last param). (see `src/shared/db/unit-of-work.ts`)
 ### Entity invariants — enforce these
-- Reuse or extend `LeaveRequest`: Lifecycle transitions remain PENDING -> APPROVED | REJECTED and PENDING | APPROVED -> CANCELLED; any other transition throws InvalidLeaveRequestTransitionError. approvedBy/approvedAt are set only on APPROVED/REJECTED and always equal the authenticated actor.
-- Reuse or extend `LeaveBalance`: usedDays and remainingDays remain non-negative; approve deducts and cancel-of-APPROVED restores the same inclusive day count, so a deduction is never lost or double-applied. A transition below zero throws NegativeBalanceCounterError (never clamped).
-- Reuse or extend `AuditLog`: Every state-changing operation on a LeaveRequest produces exactly one AuditLog with entityType LEAVE_REQUEST, entityId equal to the request id, and performedBy equal to the authenticated actor (or null where no actor applies).
+- Reuse or extend `LeaveRequest`: A request may only be created (apply) when its employee's employmentStatus is ACTIVE and an active LeavePolicy exists for its leaveTypeId; approving it atomically deducts its inclusive day count from the matched LeaveBalance and writes an audit record; approve/reject/cancel require the actor to be the employee's manager or HR_ADMIN.
+- Reuse or extend `LeaveBalance`: usedDays and remainingDays are mutated only through ILeaveBalanceRepository.deduct/restore within the leave approval transaction; the stored counters remain non-negative (NegativeBalanceCounterError on violation).
+- Reuse or extend `AuditLog`: Every state-changing leave operation (apply/approve/reject/cancel) produces exactly one AuditLog record with entityType LEAVE_REQUEST, joined to the same transaction as the state change.
 ### Interface contract — expose these operations (their shape is yours)
-- approve — Actor must be the employee's manager (Employee.managerId) or HR_ADMIN; actor identity comes from request.user.id, not the body.; Missing request -> null (mapped to 404); illegal transition -> InvalidLeaveRequestTransitionError; insufficient balance -> InsufficientLeaveBalanceError; overlap -> OverlappingLeaveError; non-manager actor -> authorization failure (403).
-- reject — Actor must be the employee's manager (Employee.managerId) or HR_ADMIN; actor identity comes from request.user.id, not the body.; Missing request -> null (mapped to 404); illegal transition -> InvalidLeaveRequestTransitionError; non-manager actor -> authorization failure (403).
-- apply — Caller must be authorized to submit for the employee (own resource or HR_ADMIN/MANAGER per existing RBAC); the employee must have employmentStatus ACTIVE.; Inactive/terminated employee -> rejected (typed error); no active LeavePolicy for the leave type -> rejected (typed error); invalid input -> 400 VALIDATION_ERROR.
-- cancel — Caller must be the employee (own resource) or MANAGER/HR_ADMIN per existing RBAC.; Missing request -> null (mapped to 404); illegal transition -> InvalidLeaveRequestTransitionError; restore of an APPROVED request must not throw NegativeBalanceCounterError under correct prior deduction.
+- apply(input, actorId, actorRole) — Caller must be authenticated (EMPLOYEE/MANAGER/HR_ADMIN); the employee referenced by input.employeeId must be ACTIVE and an active LeavePolicy must exist for the leave type.; InactiveEmployeeError when employmentStatus !== ACTIVE; InactiveLeavePolicyError when no active policy for the leave type.
+- approve(id, actorId, actorRole) — actorRole must be HR_ADMIN, or actorId must equal the request employee's managerId; otherwise LeaveAuthorizationError.; LeaveAuthorizationError on unauthorized actor; InvalidLeaveRequestTransitionError on non-PENDING; InsufficientLeaveBalanceError/OverlappingLeaveError preserved; null when the request does not exist.
+- reject(id, actorId, actorRole) — actorRole must be HR_ADMIN, or actorId must equal the request employee's managerId; otherwise LeaveAuthorizationError.; LeaveAuthorizationError on unauthorized actor; InvalidLeaveRequestTransitionError on non-PENDING; null when the request does not exist.
+- cancel(id, actorId, actorRole) — actorRole must be HR_ADMIN, or actorId must equal the request employee's managerId; otherwise LeaveAuthorizationError.; LeaveAuthorizationError on unauthorized actor; InvalidLeaveRequestTransitionError on non-(PENDING|APPROVED); null when the request does not exist.
 ### Integration points — connect to these
-- src/modules/audit/audit.service.interface.ts (IAuditService.record) — LeaveService must depend on IAuditService to satisfy GP-002 for apply/approve/reject/cancel.
-- src/modules/employee/employee.model.ts (IEmployeeRepository.findById) — LeaveService must load the employee to enforce managerId authorization and employmentStatus ACTIVE.
-- src/modules/policy/policy.model.ts (ILeavePolicyRepository.findActiveByLeaveType) — LeaveService must resolve the governing active policy to select the correct balance and enforce isActive.
-- src/modules/balance/balance.model.ts (ILeaveBalanceRepository.deduct/restore) — LeaveService must deduct on approve and restore on cancel-of-APPROVED within the same transaction.
+- src/modules/employee/index.ts (IEmployeeRepository / PgEmployeeRepository) — apply-time ACTIVE check and approve/reject/cancel manager-relationship check require reading Employee.employmentStatus and Employee.managerId.
+- src/modules/policy/index.ts (ILeavePolicyRepository / PgLeavePolicyRepository) — apply-time active-policy check requires findActiveByLeaveType for the request's leave type.
+- src/modules/audit/index.ts (IAuditService / AuditService) — GP-002 requires an audit record for every state-changing leave operation, joined to the caller's transaction.
+- src/modules/balance/index.ts (ILeaveBalanceRepository.deduct) — approve must deduct the inclusive day count atomically with the status change.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
@@ -151,39 +155,15 @@ Line: 130
 Offending code: `{ status: LeaveRequestStatus.APPROVED, approvedBy, approvedAt: new Date() },`
 Rule violated: review/golden-principle
 Action (do this now): Edit `src/modules/leave/leave.service.ts` at line 130 in place to fix the `review/golden-principle` violation.
-What the quality gate found — apply this: [review/golden-principle] GP-002 breach: state-changing operations write no audit record. `LeaveService` has no `IAuditService` dependency (constructor takes only `PgLeaveRequestRepository` + `ILeaveBalanceRepository` + `IUnitOfWork`), and `approve`/`reject`/`cancel`/`apply` all mutate leave-request state (e.g. this PENDING→APPROVED transition) without writing an `AuditLog`. GOLDEN_PRINCIPLES.md states "All state-changing operations write an audit record" and the task.md lists GP-002 as non-negotiable for this phase; the ARCHITECTURE.md note documenting this as a divergence does not waive the principle.
+What the quality gate found — apply this: [review/golden-principle] GP-002 breach: approve/reject/cancel are state-changing operations that write no AuditLog record. LeaveService has no IAuditService dependency and the approve/reject/cancel flows only call leaveRequests.update — no audit write accompanies the status transition, violating the non-negotiable "all state-changing operations write an audit record" rule.
 
 ### Edit 2
-File: src/modules/leave/leave.service.ts
-Line: 130
-Offending code: `{ status: LeaveRequestStatus.APPROVED, approvedBy, approvedAt: new Date() },`
-Rule violated: review/business-rule
-Action (do this now): Edit `src/modules/leave/leave.service.ts` at line 130 in place to fix the `review/business-rule` violation.
-What the quality gate found — apply this: [review/business-rule] Binding business rule not implemented: "Approving a leave request deducts its inclusive day count from LeaveBalance.usedDays and remainingDays atomically with the status change" (ARCHITECTURE.md). `approve` computes `days` and performs the sufficiency check but never calls `balances.deduct`; the only write is this status update. The `ILeaveBalanceRepository` is injected and exposes `deduct(id, days, client?)`, so the atomic deduction is available but unused. Cancelling an APPROVED request likewise performs no `restore`.
-
-### Coherent change 1 — apply as ONE atomic edit across ALL sites below
-
-Unifying change (do this now): Enforce that only the employee's manager (Employee.managerId) may approve/reject, derive approvedBy from request.user, and remove client-supplied approvedBy.
-
-The sites below are the SAME underlying issue. Fixing some but not others leaves the code incoherent and the quality gate WILL re-flag it — apply the one change above consistently to EVERY site:
-
-- Site 1
 File: src/modules/leave/leave.routes.ts
-Line: 57
-Offending code: `{ preHandler: requireRole(UserRole.EMPLOYEE, UserRole.MANAGER, UserRole.HR_ADMIN) },`
-Rule violated: review/business-rule
-Action (do this now): Edit `src/modules/leave/leave.routes.ts` at line 57 in place to fix the `review/business-rule` violation.
-What the quality gate found — apply this: [review/business-rule] Binding business rule not implemented: "Only the employee's manager (Employee.managerId) may approve or reject a leave request" (ARCHITECTURE.md). The approve/reject endpoints gate on role only (MANAGER/HR_ADMIN) and accept `approvedBy` as an unverified body field; there is no check that the caller is the employee's manager. Any MANAGER can approve/reject any employee's request, and the recorded `approvedBy` is client-supplied rather than derived from `request.user`.
-
-- Site 2
-File: src/modules/leave/leave.routes.ts
-Line: 82
-Offending code: `{ preHandler: requireRole(UserRole.MANAGER, UserRole.HR_ADMIN) },`
-Rule violated: review/business-rule
-Action (do this now): Edit `src/modules/leave/leave.routes.ts` at line 82 in place to fix the `review/business-rule` violation.
-What the quality gate found — apply this: [review/business-rule] Binding business rule not implemented: "Only the employee's manager (Employee.managerId) may approve or reject a leave request" (ARCHITECTURE.md). The approve/reject endpoints gate on role only (MANAGER/HR_ADMIN) and accept `approvedBy` as an unverified body field; there is no check that the caller is the employee's manager. Any MANAGER can approve/reject any employee's request, and the recorded `approvedBy` is client-supplied rather than derived from `request.user`.
-
-Then check the rest of these files (and the surrounding module) for ANY OTHER occurrence of the same pattern beyond the specific lines listed above, and apply the same change there too — do NOT limit the fix to only the enumerated sites.
+Line: 88
+Offending code: `const result = await service.approve(id, parsed.data.approvedBy);`
+Rule violated: review/security
+Action (do this now): Edit `src/modules/leave/leave.routes.ts` at line 88 in place to fix the `review/security` violation.
+What the quality gate found — apply this: [review/security] Manager authorization is not enforced: `approvedBy` is taken from the request body and never verified against `Employee.managerId`, so any caller with MANAGER/HR_ADMIN role can approve/reject any employee's leave (and can spoof the approver identity). The binding rule "Only the employee's manager (Employee.managerId) may approve or reject" is unmet.
 
 ### Edit 3
 File: src/modules/leave/leave.service.ts
@@ -191,15 +171,15 @@ Line: 88
 Offending code: `const balance = balances.find((b) => b.policyId === request.leaveTypeId);`
 Rule violated: review/business-rule
 Action (do this now): Edit `src/modules/leave/leave.service.ts` at line 88 in place to fix the `review/business-rule` violation.
-What the quality gate found — apply this: [review/business-rule] Binding rule not implemented: the applicable balance must be resolved via the governing `LeavePolicy` (`leave_type` + `is_active`), not by a direct string match. Here the balance is selected by `policyId === leaveTypeId`, and there is no `LeavePolicy.isActive` check on the referenced leave type (ARCHITECTURE.md: "the governing policy is resolved by leave_type + is_active" and "A leave request may only reference a LeavePolicy whose isActive is true").
+What the quality gate found — apply this: [review/business-rule] The binding rule "approving a leave request deducts its inclusive day count from LeaveBalance.usedDays and remainingDays atomically with the status change" is not implemented. `approve` only reads the balance (findByEmployee/find) for the sufficiency check and never calls `balances.deduct`, so approved leave never consumes balance.
 
 ### Edit 4
 File: src/modules/leave/leave.service.ts
-Line: 42
+Line: 45
 Offending code: `return this.leaveRequests.create(request);`
 Rule violated: review/business-rule
-Action (do this now): Edit `src/modules/leave/leave.service.ts` at line 42 in place to fix the `review/business-rule` violation.
-What the quality gate found — apply this: [review/business-rule] Binding rule not implemented: "A leave request may only be submitted by an employee whose employmentStatus is ACTIVE" (ARCHITECTURE.md). `apply` writes the request without any employee lookup or `employmentStatus` check; `LeaveService` has no employee dependency.
+Action (do this now): Edit `src/modules/leave/leave.service.ts` at line 45 in place to fix the `review/business-rule` violation.
+What the quality gate found — apply this: [review/business-rule] `apply` does not enforce the binding rules "a leave request may only be submitted by an employee whose employmentStatus is ACTIVE" and "may only reference a LeavePolicy whose isActive is true". The service has no employee/policy dependency and creates the request unconditionally from the input.
 
 ## Verify before you finish (MANDATORY)
 After making the edits above, the code MUST still compile and its tests MUST pass — a compilation/type error, or a test your change breaks, must NEVER be left for CI or the quality gate to find. Before you declare this task done:
