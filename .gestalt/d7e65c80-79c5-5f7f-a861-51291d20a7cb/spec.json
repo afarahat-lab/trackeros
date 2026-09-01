@@ -1,0 +1,128 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "audit"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository",
+      "service"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The AuditLog entity is defined with exactly the canonical fields: id: string, entityType: string, entityId: string, action: AuditAction, oldValues: Record<string, any> | null, newValues: Record<string, any> | null, performedBy: string | null, performedAt: Date, createdAt: Date, updatedAt: Date.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "AuditLogRepository exposes record, findByEntity, findByActor, and findByTimeRange, and record persists an audit_logs row using raw pg parameterized SQL (no Knex) and returns the persisted AuditLog.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "AuditService (implementing AuditServiceInterface) records an audit entry by delegating to the repository's record method, and its record method accepts an optional PoolClient as the last parameter so the write can join a caller's transaction.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests under tests/unit/modules/audit/ cover the repository (record/find methods, optional client passthrough) and the service (record delegation), and the suite passes via the project's Jest/ts-jest configuration.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All SQL for the audit module lives inside the repository only; no SQL or direct pg access in the service, model, or index (no-direct-db-outside-repository).",
+    "Repository queries use raw pg parameterized SQL against the shared pool from src/shared/db/connection.ts; Knex must not be used in repository queries (Knex is migrations-only).",
+    "Write methods that join a caller's transaction accept an optional client?: PoolClient as the LAST parameter and fall back to the shared pool when omitted; the service owns the unit of work and never imports a pool/client directly.",
+    "The audit module exposes a public index.ts entry point, and imports other modules only through their index.ts entry points (e.g. src/shared/types and src/shared/db).",
+    "oldValues and newValues use Record<string, any> | null exactly as the canonical entity spec requires; the no-any constraint does not override this canonical field typing."
+  ],
+  "outOfScope": [
+    "No controller, routes, or HTTP surface for the audit module in this phase; audit is consumed programmatically by services (leave approve/reject in later phases).",
+    "No DDL/migration for the audit_logs table in this phase; the repository targets the canonical table mapping already specified in docs/ARCHITECTURE.md.",
+    "No RBAC/auth enforcement in this phase; audit recording is internal and authorization is applied at the consuming service/route layer in later phases."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "AuditLog is immutable: once recorded it has no lifecycle states and no update/delete transitions; it is only ever created via record."
+    },
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "action must be one of the AuditAction enum values (CREATE | UPDATE | DELETE | APPROVE | REJECT) imported from src/shared/types/leave.types.ts."
+    },
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "oldValues and newValues are nullable JSON payloads (Record<string, any> | null); performedBy is nullable (system/unknown actor allowed), while entityType, entityId, action, performedAt, createdAt, updatedAt are always present."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "record",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Persists an audit entry and returns the persisted AuditLog; accepts an optional PoolClient as the last parameter to join a caller's transaction, defaulting to the shared pool when omitted."
+    },
+    {
+      "operation": "findByEntity",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns audit entries for a given entityType + entityId, ordered by performedAt; returns an empty list when none exist."
+    },
+    {
+      "operation": "findByActor",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns audit entries performed by a given actor (performedBy), ordered by performedAt; returns an empty list when none exist."
+    },
+    {
+      "operation": "findByTimeRange",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns audit entries whose performedAt falls within an inclusive time range, ordered by performedAt; returns an empty list when none exist."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The AuditAction enum must be imported from src/shared/types/leave.types.ts (values CREATE | UPDATE | DELETE | APPROVE | REJECT) and not redefined locally.",
+      "referencePath": "src/shared/types/leave.types.ts"
+    },
+    {
+      "requirement": "The repository must use the shared pg Pool exported from src/shared/db/connection.ts (via src/shared/db/index.ts) as its default connection, never creating its own pool.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "The optional client?: PoolClient parameter and the service-owns-unit-of-work / data-access-opens-it transaction contract must match the IUnitOfWork shape (begin/commit/rollback + client?: PoolClient) defined in src/shared/db/unit-of-work.ts.",
+      "referencePath": "src/shared/db/unit-of-work.ts"
+    },
+    {
+      "requirement": "The AuditLog entity fields and the audit_logs table mapping (snake_case columns: entity_type, entity_id, old_values, new_values, performed_by, performed_at, created_at, updated_at; PK id; FK performed_by -> employees.id) must match the canonical schema in docs/ARCHITECTURE.md.",
+      "referencePath": "docs/ARCHITECTURE.md"
+    },
+    {
+      "requirement": "The repository interface/class names (IAuditLogRepository / AuditLogRepository) and methods (record, findByEntity, findByActor, findByTimeRange) must match the canonical repository contract in docs/ARCHITECTURE.md.",
+      "referencePath": "docs/ARCHITECTURE.md"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/leave.types.ts (AuditAction enum)",
+      "why": "The AuditLog.action field is typed against AuditAction; the audit module depends on shared-types for this enum."
+    },
+    {
+      "target": "src/shared/db/connection.ts (shared pg Pool)",
+      "why": "The repository's default connection is the shared pool; write methods fall back to it when no PoolClient is supplied."
+    },
+    {
+      "target": "src/shared/db/unit-of-work.ts (IUnitOfWork)",
+      "why": "Later phases (leave approve/reject) will pass a PoolClient from IUnitOfWork into record so the audit row commits atomically with the status change and balance update."
+    }
+  ]
+}
