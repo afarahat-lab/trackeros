@@ -1,6 +1,6 @@
-# Implement this phase: Phase 3 — Employee module
+# Implement this phase: Phase 4 — Policy module
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/f5a0dfb3-f8f1-4335-94b2-5d8d22cf459f/3`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/f5a0dfb3-f8f1-4335-94b2-5d8d22cf459f/4`. Do not clone anything; work only in this directory.
 
 You are the IMPLEMENTATION agent, not a planner. The platform measures your work EXCLUSIVELY by the files you create or modify in this working tree (`git status`). Ending your turn with a plan, a summary, or an announcement of what you are 'about to' do — without having actually edited files — is a FAILURE: a turn that leaves the working tree untouched is discarded. Explore only as much as you need, then MAKE the edits with your file-editing tool. Never end your turn before the files exist on disk.
 
@@ -8,7 +8,7 @@ You are the IMPLEMENTATION agent, not a planner. The platform measures your work
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the employee module under src/modules/employee/. Create src/modules/employee/employee.model.ts defining the Employee entity with the exact canonical fields: id: string, employeeNumber: string, firstName: string, lastName: string, email: string, managerId: string | null, department: string | null, hireDate: Date, terminationDate: Date | null, employmentStatus: EmploymentStatus, createdAt: Date, updatedAt: Date, deletedAt: Date | null. Create src/modules/employee/employee.repository.ts implementing EmployeeRepository using raw pg parameterized SQL against the shared pool, with optional client?: PoolClient on write methods. Create src/modules/employee/employee.service.ts implementing EmployeeService. This phase depends on src/shared/types/leave.types.ts (EmploymentStatus enum) and src/shared/db/connection.ts from Phase 1 — read them before generating. Include Jest unit tests in tests/unit/modules/employee/.
+Create the policy module under src/modules/policy/. Create src/modules/policy/policy.model.ts defining the LeavePolicy entity with the exact canonical fields: id: string, policyName: string, leaveType: LeaveType, entitlementDays: number, accrualRate: number | undefined, maxAccumulation: number | undefined, minimumNoticeDays: number | undefined, requiresManagerApproval: boolean, isActive: boolean, createdAt: Date, updatedAt: Date. Create src/modules/policy/policy.repository.ts implementing LeavePolicyRepository using raw pg parameterized SQL against the shared pool, with optional client?: PoolClient on write methods. Create src/modules/policy/policy.service.ts implementing LeavePolicyService. This phase depends on src/shared/types/leave.types.ts (LeaveType enum) and src/shared/db/connection.ts from Phase 1 — read them before generating. Include Jest unit tests in tests/unit/modules/policy/.
 
 ## Your iteration budget — and how to get more (READ BEFORE YOU START)
 
@@ -72,47 +72,28 @@ These are resolved, feature-wide decisions. Wherever this phase touches the conc
 
 14. CONTRACTS PACKAGE — @trackeros/contracts is NOT scaffolded (there is no packages/ directory) and must NOT be created in this feature. Keep shared types in src/shared/types. [BINDING RULE — operator decision resolving: How is the day count for a LeaveRequest derived from startDate and endDate (inclusive vs exclusive, calendar vs business days), and is it the same count used for both the balance sufficiency check and the balance deduction?; Which fiscal year does a LeaveRequest map to when startDate and endDate span a fiscal-year boundary, and how is the day count split across years for balance deduction?; What is the concrete RBAC role model (employee/manager/hr_admin) and which roles may perform each leave action (create, submit, approve, reject, cancel, view balances)?; How are leave_balances.used_days and remaining_days computed, rounded, and bounded when a request is approved (e.g. partial-day requests, half-day rounding, negative-balance guard)?; Are background jobs required via BullMQ for leave workflows (accrual schedulers, notification fanout)?; How should local development auth be implemented concretely (seeded local users vs mock OIDC provider)?; LeaveStatus enum value discrepancy: DOMAIN.md defines DRAFT/SUBMITTED/APPROVED/REJECTED/CANCELLED, while root ARCHITECTURE.md uses PENDING/APPROVED/REJECTED/CANCELLED. Which set is authoritative for the leave_requests.status field and shared types?; Should concrete repositories use Knex query builder or raw pg (parameterized SQL) against the shared pg.Pool?; Which validation library should be standardized for API-boundary input validation?; What are the canonical names for duplicate/overlapping domain entities (Balance vs LeaveBalance, Policy vs LeavePolicy, Audit vs AuditLog vs AuditRecord)?; Should package.json name be changed from leave-management to trackeros, and should express/class-validator/zod be pruned to match the declared Fastify stack?; What is the exact error response shape beyond the required 400/401/403/404 status codes?; Should the existing uptime module be refactored to the canonical repository/controller pattern, or left as-is?; Is the shared @trackeros/contracts package already scaffolded, or does it need to be created?; What background jobs, if any, are required via BullMQ for leave/expense workflows (accrual schedulers, notification fanout)?; apply everywhere these apply, not in one place only]
 
-## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
-The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
-- `Employee` — the entity MUST have exactly these fields:
-    - id: string
-    - employeeNumber: string
-    - firstName: string
-    - lastName: string
-    - email: string
-    - managerId: string | null
-    - department: string | null
-    - hireDate: Date
-    - terminationDate: Date | null
-    - employmentStatus: 'ACTIVE' | 'INACTIVE' | 'TERMINATED'
-    - createdAt: Date
-    - updatedAt: Date
-    - deletedAt: Date | null
-
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- Reuse the EmploymentStatus enum (ACTIVE | INACTIVE | TERMINATED) exactly as exported — do not redefine or duplicate it. (see `src/shared/types/leave.types.ts`)
-- Import the shared pg Pool (and PoolClient type) from the shared-db public entry point; never construct a new pool. (see `src/shared/db/connection.ts`)
-- Match the employees table mapping: snake_case columns (employee_number, first_name, last_name, email, manager_id, department, hire_date, termination_date, employment_status, created_at, updated_at, deleted_at) with PK id, FK manager_id -> employees.id, and unique indexes on employee_number and email. (see `docs/ARCHITECTURE.md`)
-- Mirror the audit module's repository pattern: a snake_case row interface plus a mapRow function converting DB rows to the camelCase entity, randomUUID() for id generation, and RETURNING on insert. (see `src/modules/audit/audit.repository.ts`)
-- Mirror the audit module's service pattern: injectable repository defaulting to the concrete implementation, thin delegation, and the I*Service interface naming convention (IEmployeeService, not EmployeeServiceInterface). (see `src/modules/audit/audit.service.ts`)
-- Follow the transaction contract: the service owns the unit of work and receives IUnitOfWork via injection; repository write methods take the optional PoolClient as the last parameter and fall back to the shared pool when omitted. (see `AGENTS.md`)
+- Import the LeaveType enum from the shared types module (via its public entry point) — do not redefine it. The enum exposes annual/sick/emergency/unpaid/maternity/paternity. (see `src/shared/types/leave.types.ts`)
+- Import the shared `pg` Pool from the shared db module (via its public entry point) for all repository queries; never construct a new Pool. (see `src/shared/db/connection.ts`)
+- Mirror the committed employee module conventions: model file defines the entity plus CreateLeavePolicyInput/UpdateLeavePolicyInput; repository file defines both the I*Repository interface and the concrete class (randomUUID, mapRow, `conn = client ?? pool`, RETURNING columns); service is a thin delegating facade with an injectable repository; service interface lives in a separate I*Service file; index.ts is the public entry point exporting entity/input types, repository class+interface, service class+interface, and error types. (see `src/modules/employee/employee.repository.ts`)
+- Reuse the established error family: a RepositoryError base with a `code` property, a PolicyNotFoundError for findById/update misses, and a UniqueConstraintError for pg code 23505 — matching the employee module's error shape and stable machine codes. (see `src/modules/employee/employee.errors.ts`)
+- Match the canonical ILeavePolicyRepository method set (findById, findByLeaveType, findActive, create, update) and the LeavePolicy/leave_policies canonical names from the reconciled architecture. (see `.gestalt/architecture/reconciled.json`)
 ### Entity invariants — enforce these
-- Reuse or extend `Employee`: employmentStatus is always one of the EmploymentStatus enum values (ACTIVE | INACTIVE | TERMINATED); no other lifecycle state is representable.
-- Reuse or extend `Employee`: managerId is a self-referential FK to employees.id and may be null (no manager); it is never a dangling reference to a non-existent employee.
-- Reuse or extend `Employee`: employeeNumber and email are unique across all non-deleted employees; softDelete marks deletedAt rather than physically removing the row, so a soft-deleted employee's unique values remain reserved.
-- Reuse or extend `Employee`: id, createdAt, and updatedAt are generated by the repository (never caller-supplied); deletedAt is null until softDelete and terminationDate is null while the employee is not terminated.
+- Reuse or extend `LeavePolicy`: Lifecycle states are ACTIVE and INACTIVE, expressed via the boolean `isActive`; a policy is created with a caller-supplied `isActive` and may be toggled via update. `id`, `createdAt`, and `updatedAt` are generated by the repository and never caller-supplied.
+- Reuse or extend `LeavePolicy`: `leaveType` must be a valid LeaveType enum value; `entitlementDays` is a required non-negative number; the optional numeric fields (accrualRate, maxAccumulation, minimumNoticeDays) are `number | undefined` and, when present, are persisted as their numeric value (undefined maps to NULL in the row).
+- Reuse or extend `LeavePolicy`: The conceptual table `leave_policies` uses snake_case columns with PK `id` and indexes on `leave_type` and `is_active`; there is no `deleted_at` column (policies are not soft-deleted).
 ### Interface contract — expose these operations (their shape is yours)
-- create — Rejects with a typed error when a unique constraint (employee_number or email) is violated; otherwise persists and returns the created Employee.
-- findById / findByEmployeeNumber / findByEmail — Return the mapped Employee or null when no matching row exists; never throw for a missing record.
-- findByManager — Returns the (possibly empty) list of employees whose managerId equals the given id; never throws for an empty result.
-- update — Persists the supplied changes and returns the updated Employee; a missing target row surfaces as a typed not-found error rather than a silent no-op.
-- softDelete — Sets deletedAt (and updatedAt) on the target row and returns the soft-deleted Employee; a missing target row surfaces as a typed not-found error.
+- create — Persists a new policy and returns the mapped entity with generated id/createdAt/updatedAt. Accepts an optional PoolClient as the last parameter to join a caller's transaction; falls back to the shared pool when omitted. A pg 23505 violation is mapped to a typed UniqueConstraintError.
+- update — Persists only the supplied changes and returns the updated entity. Accepts an optional PoolClient as the last parameter. Throws a typed PolicyNotFoundError when no row matches the id; maps pg 23505 to UniqueConstraintError.
+- findById — Read-only; uses the shared pool (no client parameter). Returns the mapped entity or null when absent.
+- findByLeaveType — Read-only; uses the shared pool. Returns all policies matching the given LeaveType (empty array when none).
+- findActive — Read-only; uses the shared pool. Returns only policies where isActive is true (empty array when none).
 ### Integration points — connect to these
-- src/shared/types/leave.types.ts (EmploymentStatus enum) — The Employee entity's employmentStatus field is typed against this enum; the module must import it from the shared-types entry point.
-- src/shared/db/connection.ts (shared pg Pool) — The repository issues all queries against this shared pool and accepts PoolClient for transactional writes.
-- src/shared/db/unit-of-work.ts (IUnitOfWork) — The service owns the transaction boundary and receives IUnitOfWork via injection to acquire the client passed to participating repository writes.
+- src/shared/types/leave.types.ts (LeaveType enum) — The LeavePolicy entity's leaveType field is typed against this enum; the policy module depends on it from Phase 1.
+- src/shared/db/connection.ts (pg Pool) — The repository issues raw parameterized SQL against this shared pool; the module depends on it from Phase 1.
+- src/modules/leave (Phase 8, downstream) — LeaveService will consume findById/findByLeaveType/findActive to resolve entitlement and approval rules when validating leave requests against an ACTIVE policy.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
