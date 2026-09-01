@@ -1,0 +1,106 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "balance",
+      "notification"
+    ],
+    "affectedLayers": [
+      "unit tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "tests/unit/modules/balance/balance.service.spec.ts exists and covers: computeAvailableDays derivation (totalEntitlement - usedDays - pendingDays, never stored), negative availableDays is NOT clamped, and NegativeBalanceCounterError propagation from the repository for non-negative counter violations.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "tests/unit/modules/notification/notification.service.spec.ts exists and covers: create initializing id/status='PENDING'/createdAt/readAt=null and delegating to repo.create, markRead delegating through uow.withTransaction, and findByRecipient delegating to repo.findByRecipient.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Both spec files pass under the Jest runner (npx jest) with no type errors, using jest.Mocked repository/uow mocks and fakeClient = {} as PoolClient per the existing employee.service.spec.ts conventions.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Only the two spec files may be created/modified: tests/unit/modules/balance/balance.service.spec.ts and tests/unit/modules/notification/notification.service.spec.ts. Do not modify balance.service.ts, balance.routes.ts, balance index.ts, notification.service.ts, notification.routes.ts, notification index.ts, or any repository/model file.",
+    "Test expectations must match the exact committed signatures: BalanceService(balances: PgLeaveBalanceRepository, uow: IUnitOfWork) with create/findById/findByEmployee/deduct/restore; NotificationService(notifications: PgNotificationRepository, uow: IUnitOfWork) with create/markRead/findByRecipient.",
+    "Do not reference the leave module or countLeaveDays (neither service uses it).",
+    "Follow the existing employee.service.spec.ts conventions: jest.Mocked<I...Repository> and jest.Mocked<IUnitOfWork>, uow.withTransaction.mockImplementation(async (fn) => fn(fakeClient)), construct services with mocks cast as unknown as Pg...Repository, relative imports from tests/unit/modules/... to src/modules/... and src/shared/db/unit-of-work."
+  ],
+  "outOfScope": [
+    "Phase 3a deliverables (balance.service.ts, balance.routes.ts, balance index.ts) and Phase 3b deliverables (notification.service.ts, notification.routes.ts, notification index.ts) \u2014 owned by sibling sub-phases, read-only here.",
+    "Repository-level enforcement tests (assertCountersNonNegative, deduct/restore SQL guards, markRead status transition SQL) \u2014 those behaviors are tested at the repository layer, not the service layer.",
+    "The leave module and any cross-module orchestration (sufficiency/overlap checks) \u2014 Phase 4 scope."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "availableDays is derived (totalEntitlement - usedDays - pendingDays), never stored, and may be negative (no clamping); the three stored counters (totalEntitlement, usedDays, remainingDays) are non-negative and a transition below zero raises NegativeBalanceCounterError."
+    },
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "A newly created Notification has status 'PENDING', readAt null, and a generated id/createdAt; only PENDING/SENT may transition to READ (stamping readAt), otherwise InvalidNotificationTransitionError."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "BalanceService.deduct(id, days)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Delegates to repository inside uow.withTransaction; propagates NegativeBalanceCounterError when remainingDays would drop below zero or days is negative."
+    },
+    {
+      "operation": "BalanceService.restore(id, days)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Delegates to repository inside uow.withTransaction; propagates NegativeBalanceCounterError when usedDays would drop below zero or days is negative."
+    },
+    {
+      "operation": "NotificationService.markRead(id)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Delegates to repository inside uow.withTransaction; propagates InvalidNotificationTransitionError when the notification is not PENDING/SENT."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Test expectations must match the exact method signatures and constructor dependencies of BalanceService and NotificationService.",
+      "referencePath": "src/modules/balance/balance.service.ts, src/modules/notification/notification.service.ts"
+    },
+    {
+      "requirement": "Error types asserted in tests must be the exact classes NegativeBalanceCounterError and InvalidNotificationTransitionError.",
+      "referencePath": "src/modules/balance/balance.model.ts, src/modules/notification/notification.model.ts"
+    },
+    {
+      "requirement": "Mocking conventions (jest.Mocked, fakeClient, withTransaction mockImplementation) must match the established pattern.",
+      "referencePath": "tests/unit/modules/employee/employee.service.spec.ts"
+    },
+    {
+      "requirement": "The IUnitOfWork mock must expose only withTransaction<T>(fn: (client: PoolClient) => Promise<T>): Promise<T>.",
+      "referencePath": "src/shared/db/unit-of-work.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/balance/balance.service.ts (BalanceService)",
+      "why": "Unit under test for balance.service.spec.ts; its create/findById/findByEmployee/deduct/restore behavior is asserted."
+    },
+    {
+      "target": "src/modules/notification/notification.service.ts (NotificationService)",
+      "why": "Unit under test for notification.service.spec.ts; its create/markRead/findByRecipient behavior is asserted."
+    },
+    {
+      "target": "src/shared/db/unit-of-work.ts (IUnitOfWork)",
+      "why": "Injected into both services; mocked to verify deduct/restore/markRead wrap repository calls in a transaction."
+    }
+  ]
+}
