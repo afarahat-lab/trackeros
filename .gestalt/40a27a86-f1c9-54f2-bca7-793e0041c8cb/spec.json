@@ -1,0 +1,135 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "balance"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository",
+      "service",
+      "errors",
+      "tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The LeaveBalance entity is defined with the exact canonical fields id, employeeId, policyId, totalEntitlement, usedDays, remainingDays, fiscalYear, status, createdAt, updatedAt (id/createdAt/updatedAt repository-generated, never caller-supplied).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "ILeaveBalanceRepository exposes findByEmployee, findByEmployeeAndPolicy, findByEmployeeAndFiscalYear, create, update, and commitDays; write methods accept an optional PoolClient as the last parameter and default to the shared pool.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "commitDays atomically increments usedDays and decrements remainingDays by the same integer amount, and rejects (does not clamp) any commit that would drive remainingDays below zero.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "usedDays and remainingDays are persisted and returned as integers with no rounding; remainingDays always equals totalEntitlement - usedDays and is non-negative.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A unique-constraint violation (pg code 23505) on (employee_id, policy_id, fiscal_year) is mapped to UniqueConstraintError; a missing row on update/commitDays throws BalanceNotFoundError (code BALANCE_NOT_FOUND).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests exist under tests/unit/modules/balance/ covering the repository (mocking src/shared/db), the service (injecting a fake repository), and the error types, and the suite passes.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Repository queries use raw pg parameterized SQL against the shared pool; Knex is for migrations only and must not appear in repository queries.",
+    "No `any` (use `unknown` with type guards); no direct DB access outside the repository layer; no hardcoded secrets; no @gestalt/* dependencies.",
+    "The balance module is a thin facade and does NOT orchestrate audit records; audit on state changes is the leave service's responsibility (GP-002).",
+    "The service owns the unit of work; the data-access layer opens it. Services take an injected IUnitOfWork with withTransaction(fn) and never import a pool/client/module-level db helper; withTransaction must not live on a repository.",
+    "balance may import only from shared-types and shared-db, plus RepositoryError and UniqueConstraintError from the employee module's public entry point (src/modules/employee/index.ts); no other module dependencies.",
+    "status is a plain string with lifecycle values ACTIVE and CLOSED (not an enum); id/createdAt/updatedAt are repository-generated via randomUUID() and never caller-supplied."
+  ],
+  "outOfScope": [
+    "Audit orchestration for balance state changes (GP-002) \u2014 owned by the leave service, not the balance module.",
+    "HTTP routes/controllers, API-boundary validation, and RBAC guards for balance \u2014 no controller/routes files in this phase.",
+    "Background jobs / accrual schedulers (BullMQ) and notification fanout \u2014 none in this feature.",
+    "Database migrations/DDL for leave_balances \u2014 this phase implements the repository against the already-reconciled schema."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "remainingDays = totalEntitlement - usedDays, always non-negative; usedDays and remainingDays are integers with no rounding."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "status is a plain string restricted to ACTIVE or CLOSED; a balance is uniquely identified by (employeeId, policyId, fiscalYear)."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "commitDays",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Rejects (throws) when the commit would drive remainingDays below zero; throws BalanceNotFoundError when no matching balance row exists; joins a caller's transaction via optional PoolClient."
+    },
+    {
+      "operation": "create",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Maps pg unique-violation 23505 on (employee_id, policy_id, fiscal_year) to UniqueConstraintError; generates id/createdAt/updatedAt itself."
+    },
+    {
+      "operation": "update",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws BalanceNotFoundError when no row matches; maps 23505 to UniqueConstraintError; only supplied fields are persisted."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Reuse the shared pg Pool exported from connection.ts (never create a second pool); write methods fall back to it when no client is supplied.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "Import RepositoryError and UniqueConstraintError from the employee module's public entry point rather than redeclaring them; add only BalanceNotFoundError locally.",
+      "referencePath": "src/modules/employee/index.ts"
+    },
+    {
+      "requirement": "Mirror the policy repository's raw-pg patterns: randomUUID() id, const conn = client ?? pool, snake_case\u2192camelCase mapRow, RETURNING column list, dynamic SET clause for update, and 23505\u2192UniqueConstraintError mapping.",
+      "referencePath": "src/modules/policy/policy.repository.ts"
+    },
+    {
+      "requirement": "Match the canonical LeaveBalance entity/table shape (leave_balances, snake_case columns, PK id, FKs to employees.id and leave_policies.id, unique (employee_id, policy_id, fiscal_year)).",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "Follow the module file convention (model, repository, service, service.interface, errors, index) and the thin delegating service facade with injectable repository defaulting to the concrete class.",
+      "referencePath": "src/modules/policy/policy.service.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/db/connection.ts (shared pg Pool)",
+      "why": "Repository reads/writes run against the single shared pool; write methods accept an optional PoolClient to join the leave service's transaction."
+    },
+    {
+      "target": "src/shared/types/leave.types.ts (shared-types)",
+      "why": "Balance module may import shared enums/types; the dependency map limits balance to shared-types and shared-db."
+    },
+    {
+      "target": "src/modules/employee/index.ts (RepositoryError, UniqueConstraintError)",
+      "why": "Balance reuses the shared error base classes rather than redeclaring them, matching the policy module's pattern."
+    },
+    {
+      "target": "src/modules/leave/ (future Phase 8 consumer)",
+      "why": "commitDays is the transactional primitive the leave service will call during approve/reject to debit a balance atomically."
+    }
+  ]
+}
