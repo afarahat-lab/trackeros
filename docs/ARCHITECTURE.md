@@ -185,8 +185,10 @@ from the reconciled architecture above.
   violations (pg code `23505`) on `employee_number`/`email` are mapped to
   `UniqueConstraintError`.
 - `employee.errors.ts` — `RepositoryError` base class plus
-  `UniqueConstraintError` (code `DUPLICATE_EMPLOYEE`) and
-  `EmployeeNotFoundError` (code `EMPLOYEE_NOT_FOUND`).
+  `UniqueConstraintError` (takes a caller-supplied `code`; the employee
+  repository passes `DUPLICATE_EMPLOYEE`) and `EmployeeNotFoundError` (code
+  `EMPLOYEE_NOT_FOUND`). The `RepositoryError`/`UniqueConstraintError` pair
+  is reused by the policy module, which passes `DUPLICATE_POLICY`.
 - `employee.service.interface.ts` — `IEmployeeService`.
 - `employee.service.ts` — `EmployeeService`, a thin delegating facade over
   the repository; the repository is injectable (defaults to
