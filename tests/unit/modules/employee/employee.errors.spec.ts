@@ -6,7 +6,10 @@ import {
 
 describe('employee errors', () => {
   it('UniqueConstraintError carries the DUPLICATE_EMPLOYEE code', () => {
-    const err = new UniqueConstraintError("An employee with this 'email' already exists");
+    const err = new UniqueConstraintError(
+      'DUPLICATE_EMPLOYEE',
+      "An employee with this 'email' already exists"
+    );
     expect(err).toBeInstanceOf(RepositoryError);
     expect(err).toBeInstanceOf(Error);
     expect(err.code).toBe('DUPLICATE_EMPLOYEE');

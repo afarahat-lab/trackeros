@@ -1,12 +1,15 @@
+import { PolicyNotFoundError } from '../../../../src/modules/policy/policy.errors';
 import {
-  PolicyNotFoundError,
   RepositoryError,
   UniqueConstraintError,
-} from '../../../../src/modules/policy/policy.errors';
+} from '../../../../src/modules/employee/index';
 
 describe('policy errors', () => {
   it('UniqueConstraintError carries the DUPLICATE_POLICY code', () => {
-    const err = new UniqueConstraintError('A leave policy with these values already exists');
+    const err = new UniqueConstraintError(
+      'DUPLICATE_POLICY',
+      'A leave policy with these values already exists'
+    );
     expect(err).toBeInstanceOf(RepositoryError);
     expect(err).toBeInstanceOf(Error);
     expect(err.code).toBe('DUPLICATE_POLICY');

@@ -7,8 +7,4 @@ export { LeavePolicyRepository } from './policy.repository';
 export type { ILeavePolicyRepository } from './policy.repository';
 export { LeavePolicyService } from './policy.service';
 export type { ILeavePolicyService } from './policy.service.interface';
-export {
-  RepositoryError,
-  UniqueConstraintError,
-  PolicyNotFoundError,
-} from './policy.errors';
+export { PolicyNotFoundError } from './policy.errors';
