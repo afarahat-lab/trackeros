@@ -1,0 +1,85 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "policy",
+      "employee"
+    ],
+    "affectedLayers": [
+      "domain",
+      "documentation"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "No local `RepositoryError` or `UniqueConstraintError` class definitions remain anywhere under `src/modules/policy/`; both symbols are obtained by importing from the employee module's public entry point (`src/modules/employee/index.ts`).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Every policy-module reference to `RepositoryError`/`UniqueConstraintError` (in `policy.errors.ts` and `policy.repository.ts`) resolves to the single employee-module definition, so `PolicyNotFoundError instanceof RepositoryError` and the `DUPLICATE_POLICY` `UniqueConstraintError` remain true with no duplicate class identity.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`docs/ARCHITECTURE.md`'s Policy module section no longer states that `policy.errors.ts` contains `RepositoryError`/`UniqueConstraintError`; it accurately reflects that these are imported from the employee module and that `policy.errors.ts` defines only `PolicyNotFoundError`.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The employee module's public entry point (`src/modules/employee/index.ts`) is the single source of truth for `RepositoryError` and `UniqueConstraintError`; the policy module must import these symbols from that entry point and must not re-define them.",
+    "Cross-module imports must go through the declared public entry point (`index.ts`) only \u2014 no deep imports of `employee.errors.ts` from the policy module.",
+    "The refactor must not change the observable error semantics: `PolicyNotFoundError` keeps code `POLICY_NOT_FOUND`, and the `DUPLICATE_POLICY` `UniqueConstraintError` keeps its code and message.",
+    "No circular dependency may be introduced between the policy and employee modules (employee must not import from policy)."
+  ],
+  "outOfScope": [],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "RepositoryError",
+      "mustExistOrExtend": true,
+      "invariant": "Defined exactly once, in the employee module, and re-exported from its public entry point; it is the single base class for all repository error types, so `PolicyNotFoundError` and `UniqueConstraintError` share one class identity."
+    },
+    {
+      "entity": "UniqueConstraintError",
+      "mustExistOrExtend": true,
+      "invariant": "Defined exactly once, in the employee module, and re-exported from its public entry point; policy code instantiates it with code `DUPLICATE_POLICY` and it remains `instanceof RepositoryError`."
+    },
+    {
+      "entity": "PolicyNotFoundError",
+      "mustExistOrExtend": true,
+      "invariant": "Remains the only error class defined in `policy.errors.ts`, extends the imported `RepositoryError`, and carries code `POLICY_NOT_FOUND`."
+    }
+  ],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [
+    {
+      "requirement": "`RepositoryError` and `UniqueConstraintError` must be the exact symbols exported from the employee module's public entry point \u2014 no local re-declaration, re-export, or aliasing that would create a second class identity.",
+      "referencePath": "src/modules/employee/index.ts"
+    },
+    {
+      "requirement": "The policy module's error layout must match the employee module's established pattern: a base `RepositoryError` plus typed subclasses, with the base and shared `UniqueConstraintError` owned by the employee module and consumed via its entry point.",
+      "referencePath": "src/modules/employee/employee.errors.ts"
+    },
+    {
+      "requirement": "The Policy module documentation must accurately describe the current error ownership (imported `RepositoryError`/`UniqueConstraintError`, locally-defined `PolicyNotFoundError`), consistent with the actual source files.",
+      "referencePath": "docs/ARCHITECTURE.md"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/employee/index.ts",
+      "why": "The public entry point that re-exports `RepositoryError` and `UniqueConstraintError`; the policy module's error and repository files import these symbols from here."
+    },
+    {
+      "target": "src/modules/policy/policy.errors.ts",
+      "why": "Defines `PolicyNotFoundError` and imports `RepositoryError` from the employee entry point; must contain no local `RepositoryError`/`UniqueConstraintError` definitions."
+    },
+    {
+      "target": "src/modules/policy/policy.repository.ts",
+      "why": "Consumes `UniqueConstraintError` from the employee entry point when mapping pg `23505` violations to `DUPLICATE_POLICY`."
+    }
+  ]
+}
