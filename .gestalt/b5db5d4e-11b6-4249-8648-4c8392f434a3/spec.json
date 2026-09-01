@@ -1,0 +1,138 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "routes"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "leave.routes.ts instantiates LeaveService with all six constructor dependencies (leave-request repository, balance repository, employee repository, policy repository, audit service, unit of work) so the file type-checks against the current LeaveService constructor in src/modules/leave/leave.service.ts.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The approve, reject, and cancel handlers pass request.user.id as actorId and request.user.role as actorRole to the service methods, matching the ILeaveService signatures in src/modules/leave/leave.model.ts; no client-supplied body field is used as the actor identity.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The apply handler passes request.user.id and request.user.role as the actor arguments to service.apply, so the audit record's performedBy reflects the authenticated caller rather than a body field.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A LeaveAuthorizationError raised by approve/reject/cancel is mapped to an HTTP 403 FORBIDDEN response (not a 500), so the manager-only authorization rule is observable at the API boundary.",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "The actor identity for every state-changing operation MUST come from request.user (populated by requireRole), never from a client-supplied body field such as approvedBy.",
+    "LeaveService must be constructed with all six dependencies declared by its constructor in src/modules/leave/leave.service.ts (leave-request repo, balance repo, employee repo, policy repo, audit service, unit of work).",
+    "No service-layer edit is in scope: the audit logging, balance deduction, and manager authorization logic already present in src/modules/leave/leave.service.ts must be preserved unchanged.",
+    "RBAC remains enforced by the route-level requireRole guard (GP-005); the handler must not re-implement role checks inline."
+  ],
+  "outOfScope": [
+    "Editing src/modules/leave/leave.service.ts \u2014 the audit logging, balance deduction, and manager authorization logic are already implemented and must remain unchanged.",
+    "Registering leave routes in src/app.ts \u2014 route registration is not part of the three gate findings and is deferred.",
+    "Restoring deducted balance when an APPROVED request is cancelled \u2014 not one of the three findings and not required by this phase."
+  ],
+  "ambiguities": [
+    {
+      "description": "Should leave routes be registered in src/app.ts? Currently only uptimeRoutes is registered, so the leave endpoints are unreachable even after the routes file is fixed.",
+      "options": [
+        "Register leaveRoutes in app.ts as part of this phase",
+        "Leave registration out of scope (deferred)"
+      ],
+      "impactIfWrong": "medium"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "approvedBy is always derived from the authenticated actor (request.user.id), never from a client-supplied body field; it is null until an approve/reject transition stamps it."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "Lifecycle transitions remain PENDING \u2192 APPROVED | REJECTED and PENDING | APPROVED \u2192 CANCELLED; any other transition throws InvalidLeaveRequestTransitionError (unchanged by this phase)."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "Approving a request deducts its inclusive day count from usedDays/remainingDays atomically with the status change and audit record (already implemented in the service; this phase must not break it)."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "approve",
+      "authRule": "MANAGER or HR_ADMIN; the actor must be the employee's manager (Employee.managerId) unless HR_ADMIN, enforced by the service's authorization check.",
+      "idempotent": false,
+      "errorSemantics": "LeaveAuthorizationError \u2192 403 FORBIDDEN; InvalidLeaveRequestTransitionError/InsufficientLeaveBalanceError/OverlappingLeaveError \u2192 400 CONFLICT; missing request \u2192 404 NOT_FOUND."
+    },
+    {
+      "operation": "reject",
+      "authRule": "MANAGER or HR_ADMIN; the actor must be the employee's manager (Employee.managerId) unless HR_ADMIN.",
+      "idempotent": false,
+      "errorSemantics": "LeaveAuthorizationError \u2192 403 FORBIDDEN; InvalidLeaveRequestTransitionError \u2192 400 CONFLICT; missing request \u2192 404 NOT_FOUND."
+    },
+    {
+      "operation": "cancel",
+      "authRule": "EMPLOYEE, MANAGER, or HR_ADMIN; the actor must be the employee's manager (Employee.managerId) unless HR_ADMIN.",
+      "idempotent": false,
+      "errorSemantics": "LeaveAuthorizationError \u2192 403 FORBIDDEN; InvalidLeaveRequestTransitionError \u2192 400 CONFLICT; missing request \u2192 404 NOT_FOUND."
+    },
+    {
+      "operation": "apply",
+      "authRule": "EMPLOYEE, MANAGER, or HR_ADMIN; the authenticated caller's id/role are passed as the actor.",
+      "idempotent": false,
+      "errorSemantics": "Invalid input \u2192 400 VALIDATION_ERROR; InactiveEmployeeError/InactiveLeavePolicyError \u2192 400 CONFLICT."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The route handlers must call the service methods with the exact signatures declared by ILeaveService (apply(input, actorId, actorRole); approve/reject/cancel(id, actorId, actorRole)) \u2014 no positional mismatch or omitted actor arguments.",
+      "referencePath": "src/modules/leave/leave.model.ts"
+    },
+    {
+      "requirement": "The LeaveService constructor invocation must supply the six dependencies in the order declared by the class constructor (leaveRequests, balances, employees, policies, audit, uow).",
+      "referencePath": "src/modules/leave/leave.service.ts"
+    },
+    {
+      "requirement": "The actor identity must be read from request.user (id and role), whose shape is declared by the AuthenticatedUser augmentation and populated by requireRole.",
+      "referencePath": "src/shared/http/require-role.ts"
+    },
+    {
+      "requirement": "Error responses must conform to the standard shape { error: string; code: string } with the codes VALIDATION_ERROR / UNAUTHORIZED / FORBIDDEN / NOT_FOUND / CONFLICT as established by the reconciled error contract.",
+      "referencePath": "docs/ARCHITECTURE.md"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/leave/leave.service.ts",
+      "why": "The routes must wire the existing LeaveService (6-arg constructor, actor-based method signatures) without modifying it."
+    },
+    {
+      "target": "src/shared/http/require-role.ts",
+      "why": "Provides request.user (id + role) that the handlers must read as the actor identity."
+    },
+    {
+      "target": "src/modules/audit/index.ts",
+      "why": "Supplies the IAuditService implementation (AuditService) required as a LeaveService constructor dependency."
+    },
+    {
+      "target": "src/modules/employee/index.ts",
+      "why": "Supplies PgEmployeeRepository required as a LeaveService constructor dependency."
+    },
+    {
+      "target": "src/modules/policy/index.ts",
+      "why": "Supplies PgLeavePolicyRepository required as a LeaveService constructor dependency."
+    }
+  ]
+}
