@@ -9,3 +9,15 @@
 # Node Modules
 node_modules/
 .aider*
+
+# OS noise — never functional, and `git add -A` in the code-agent commit path
+# will otherwise sweep it into the repo (that is how .DS_Store, aider-output.md
+# and two files named from LLM prose reached main).
+.DS_Store
+
+# NOTE: .gestalt/ is deliberately NOT ignored. On a FEATURE branch it is
+# functional — `.gestalt/architecture/*.json` is what a consulted architect reads
+# (ROLE_ARTIFACTS), and `.gestalt/<correlation-id>/` holds the design artifacts a
+# self-heal retry ADOPTS instead of regenerating. Ignoring it would silently break
+# both. What was removed from `main` was 52 dead correlation directories from
+# finished runs, which are scratch only once their run has ended.
