@@ -1,27 +1,25 @@
-# Implement this phase: Phase 3c — Balance + notification unit tests
+# Implement this phase: Phase 4 — leave orchestration module
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/b07feb33-7931-41ca-b4f7-c3dc02411147/8`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/b07feb33-7931-41ca-b4f7-c3dc02411147/9`. Do not clone anything; work only in this directory.
 
 You are the IMPLEMENTATION agent, not a planner. The platform measures your work EXCLUSIVELY by the files you create or modify in this working tree (`git status`). Ending your turn with a plan, a summary, or an announcement of what you are 'about to' do — without having actually edited files — is a FAILURE: a turn that leaves the working tree untouched is discarded. Explore only as much as you need, then MAKE the edits with your file-editing tool. Never end your turn before the files exist on disk.
 
 ## What to build
-balance.service.spec.ts covers derived availableDays, negative availableDays without clamping, and throws on negative counter transitions
-notification.service.spec.ts covers NotificationService behavior
-Both spec files pass when run with Jest
+(no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Write ONLY the Jest unit tests for the balance and notification services created in sub-phases 3a and 3b.
+Build the leave orchestration module, which coordinates the other modules.
 
 Create:
-- tests/unit/modules/balance/balance.service.spec.ts: cover derived availableDays, negative-balance behavior (no clamping), and non-negative counter error.
-- tests/unit/modules/notification/notification.service.spec.ts.
+- src/modules/leave/leave.model.ts: LeaveRequest entity with canonical fields id, employeeId, leaveTypeId, startDate, endDate, reason, status (typed LeaveRequestStatus, imported from src/shared/types/), approvedBy, approvedAt, createdAt, updatedAt. Define ILeaveRequestRepository and ILeaveService interfaces.
+- src/modules/leave/leave.repository.ts: PgLeaveRequestRepository implementing ILeaveRequestRepository (snake_case columns: employee_id, leave_type_id, start_date, end_date, approved_by, approved_at, created_at, updated_at).
+- src/modules/leave/leave.service.ts: LeaveService implementing ILeaveService. Enforce the binding lifecycle: PENDING -> APPROVED | REJECTED, and PENDING | APPROVED -> CANCELLED. At APPROVAL time enforce (a) sufficiency check n <= availableDays (derived, may be negative) and (b) no overlapping APPROVED leave per employee regardless of type. Use countLeaveDays from src/shared/types/ for day counts (whole inclusive calendar days, no weekend/holiday exclusion). The SERVICE owns the unit of work via injected IUnitOfWork.withTransaction(fn); services never touch the pool; participating methods take the client as an optional LAST parameter.
+- src/modules/leave/leave.routes.ts: register leave endpoints (apply, approve, reject, cancel, list) wired to LeaveService.
+- src/modules/leave/index.ts: barrel exporting model, repository, service, routes.
 
-Read the generated balance.service.ts and notification.service.ts (and their models/repositories from Phase 3 part 1/2) so test expectations match exact signatures. Do not reference the leave module.
+Include Jest unit tests in tests/unit/modules/leave/leave.service.spec.ts covering the lifecycle transitions, sufficiency check, and overlap check.
 
-## Owned by SIBLING sub-phases (OUT OF SCOPE for this sub-phase)
-This is ONE sub-phase of a split phase. The deliverables below belong to sibling sub-phases — do NOT create them here, do NOT list them as success criteria, and this sub-phase MUST NOT be gated on their presence (they are produced by a sibling, not missing):
-- "Phase 3a — Balance service + routes": src/modules/balance/balance.service.ts, src/modules/balance/balance.routes.ts, src/modules/balance/index.ts
-- "Phase 3b — Notification service + routes": src/modules/notification/notification.service.ts, src/modules/notification/notification.routes.ts, src/modules/notification/index.ts
+This phase depends on Phase 1 (src/shared/types/index.ts for LeaveRequestStatus + countLeaveDays, src/shared/db/unit-of-work.ts), Phase 2 (employee + policy + audit models/repositories), and Phase 3 (balance + notification models/repositories) — read those files before generating so field names and repository signatures match exactly. Do not reference any future-phase files.
 
 ## Your iteration budget — and how to get more (READ BEFORE YOU START)
 
@@ -121,39 +119,6 @@ STANDING DECISIONS carried forward (unchanged):
 - Transactions: the SERVICE owns the unit of work; the DATA-ACCESS layer opens it via an
   injected IUnitOfWork.withTransaction(fn). Services never touch the pool. Participating
   methods take the client as an optional LAST parameter. See AGENTS.md Architecture rules 5. [BINDING RULE — operator decision resolving: Does leave duration support partial/half-day granularity, or only whole inclusive calendar days?; How should remaining_days be bounded if used_days exceeds entitlement due to data correction or policy change?; What exact contents should src/shared/types/ contain beyond the cross-module enums?; How should the PLAN.md drift be reconciled — phases 1-6 are marked [deployed] but none of the leave/balance/employee/policy/notification/audit files exist on disk?; Which balance entity is canonical: Balance or LeaveBalance (near-duplicate definitions in docs/DOMAIN.md)?; Is LeaveRequest.status typed as LeaveRequestStatus or LeaveStatus?; Which audit entity shape and field naming convention is canonical among Audit, AuditLog, AuditRecord, and AuditServiceInterface (camelCase vs snake_case)?; How are leave days counted (inclusive vs exclusive of end date) and rounded for partial days?; How is remaining_days bounded (floor at zero vs allow negative) when used_days exceeds entitlement?; Which LeaveStatus enum values are authoritative — DOMAIN.md (DRAFT/SUBMITTED/APPROVED/REJECTED/CANCELLED) or root ARCHITECTURE.md (PENDING/APPROVED/REJECTED/CANCELLED)?; What exact contents should src/shared/types/ contain beyond leave.types.ts (e.g. index.ts barrel, other shared DTOs)?; apply everywhere these apply, not in one place only]
-
-## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
-The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
-- `Notification` — the entity MUST have exactly these fields:
-    - id: string
-    - recipientId: string
-    - type: NotificationType
-    - title: string
-    - message: string
-    - relatedEntityType: string | null
-    - relatedEntityId: string | null
-    - status: 'PENDING' | 'SENT' | 'READ' | 'ARCHIVED'
-    - createdAt: Date
-    - readAt: Date | null
-
-## Constraints & consistency
-You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
-### Reuse & consistency — match these exactly
-- Test expectations must match the exact method signatures and constructor dependencies of BalanceService and NotificationService. (see `src/modules/balance/balance.service.ts, src/modules/notification/notification.service.ts`)
-- Error types asserted in tests must be the exact classes NegativeBalanceCounterError and InvalidNotificationTransitionError. (see `src/modules/balance/balance.model.ts, src/modules/notification/notification.model.ts`)
-- Mocking conventions (jest.Mocked, fakeClient, withTransaction mockImplementation) must match the established pattern. (see `tests/unit/modules/employee/employee.service.spec.ts`)
-- The IUnitOfWork mock must expose only withTransaction<T>(fn: (client: PoolClient) => Promise<T>): Promise<T>. (see `src/shared/db/unit-of-work.ts`)
-### Entity invariants — enforce these
-- Reuse or extend `LeaveBalance`: availableDays is derived (totalEntitlement - usedDays - pendingDays), never stored, and may be negative (no clamping); the three stored counters (totalEntitlement, usedDays, remainingDays) are non-negative and a transition below zero raises NegativeBalanceCounterError.
-- Reuse or extend `Notification`: A newly created Notification has status 'PENDING', readAt null, and a generated id/createdAt; only PENDING/SENT may transition to READ (stamping readAt), otherwise InvalidNotificationTransitionError.
-### Interface contract — expose these operations (their shape is yours)
-- BalanceService.deduct(id, days) — Delegates to repository inside uow.withTransaction; propagates NegativeBalanceCounterError when remainingDays would drop below zero or days is negative.
-- BalanceService.restore(id, days) — Delegates to repository inside uow.withTransaction; propagates NegativeBalanceCounterError when usedDays would drop below zero or days is negative.
-- NotificationService.markRead(id) — Delegates to repository inside uow.withTransaction; propagates InvalidNotificationTransitionError when the notification is not PENDING/SENT.
-### Integration points — connect to these
-- src/modules/balance/balance.service.ts (BalanceService) — Unit under test for balance.service.spec.ts; its create/findById/findByEmployee/deduct/restore behavior is asserted.
-- src/modules/notification/notification.service.ts (NotificationService) — Unit under test for notification.service.spec.ts; its create/markRead/findByRecipient behavior is asserted.
-- src/shared/db/unit-of-work.ts (IUnitOfWork) — Injected into both services; mocked to verify deduct/restore/markRead wrap repository calls in a transaction.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
