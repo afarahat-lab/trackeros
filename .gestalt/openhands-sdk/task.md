@@ -1,31 +1,28 @@
-# Continue the previous attempt (it hit the iteration limit before finishing)
-
-A prior code-agent attempt on this work dir (`/tmp/gestalt/fix/f5a0dfb3-f8f1-4335-94b2-5d8d22cf459f/4/1`) was stopped after reaching its iteration limit. Its work is ALREADY on disk here — do NOT restart from scratch or re-read everything; build on what exists. It made 11 file edit(s). Its last verification PASSED (`cd /tmp/gestalt/fix/f5a0dfb3-f8f1-4335-94b2-5d8d22cf459f/4/1 && npx jest tests/unit/modules/policy/policy.errors.spec.ts tests/unit/modules/employee/employee.errors.spec.ts --runInBand 2>&1 | tail -40`).
-
-Finish the task now: fix any failing build/type-check/tests, then RUN the build and the tests and fix anything still failing. Stop as soon as the build and tests pass. The full original task (with all mandatory constraints) follows for reference.
-
----
-
 # Fix specific quality-gate violations: Phase 4 — Policy module
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/fix/f5a0dfb3-f8f1-4335-94b2-5d8d22cf459f/4/1`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/fix/f5a0dfb3-f8f1-4335-94b2-5d8d22cf459f/4/2`. Do not clone anything; work only in this directory.
 
 You are fixing SPECIFIC violations the quality gate found in EXISTING, already-committed files. Make the targeted edits listed below — do NOT refactor, regenerate, or change unrelated code.
 
 The files ALREADY EXIST. You MUST edit them in place with the `str_replace_editor` tool. Reading or viewing a file is NOT sufficient — you have NOT finished until you have edited EVERY file listed below.
 
+## This is fix attempt 2 — you are CONTINUING, not starting over
+The changes from the previous fix attempt(s) are ALREADY PRESENT in this working tree — you are editing that real, accumulated state, not a fresh checkout. The violation(s) listed below are what STILL FAILS *after* those prior changes. Build on the existing code: read what is already there, then refine or correct the prior attempt's edits to resolve the remaining violation — do NOT discard the prior work or re-derive the whole change from scratch.
+
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- The shared UniqueConstraintError and RepositoryError must match the error-shape contract { error: string; code: string } with a stable machine code in SCREAMING_SNAKE_CASE. (see `docs/ARCHITECTURE.md`)
-- The employee repository's unique-violation throw sites must emit code DUPLICATE_EMPLOYEE, matching the existing employee.repository.ts behaviour. (see `src/modules/employee/employee.repository.ts`)
-- The policy repository's unique-violation throw sites must emit code DUPLICATE_POLICY, matching the existing policy.repository.ts behaviour. (see `src/modules/policy/policy.repository.ts`)
-- The shared error classes must be importable through the shared module's public entry point, consistent with the module dependency rule that modules import only via index.ts. (see `AGENTS.md`)
+- `RepositoryError` and `UniqueConstraintError` must be the exact symbols exported from the employee module's public entry point — no local re-declaration, re-export, or aliasing that would create a second class identity. (see `src/modules/employee/index.ts`)
+- The policy module's error layout must match the employee module's established pattern: a base `RepositoryError` plus typed subclasses, with the base and shared `UniqueConstraintError` owned by the employee module and consumed via its entry point. (see `src/modules/employee/employee.errors.ts`)
+- The Policy module documentation must accurately describe the current error ownership (imported `RepositoryError`/`UniqueConstraintError`, locally-defined `PolicyNotFoundError`), consistent with the actual source files. (see `docs/ARCHITECTURE.md`)
 ### Entity invariants — enforce these
-- Reuse or extend `UniqueConstraintError`: A single shared class; constructor (code, message) with code required and no default; carries no module-specific knowledge; its code field is populated from the caller-supplied argument.
-- Reuse or extend `RepositoryError`: A single shared base error class extending Error with a stable machine code field; module-specific NotFoundError classes extend it and remain in their own modules.
-- Reuse or extend `EmployeeNotFoundError`: Remains in the employee module; extends the shared RepositoryError; preserves code EMPLOYEE_NOT_FOUND.
-- Reuse or extend `PolicyNotFoundError`: Remains in the policy module; extends the shared RepositoryError; preserves code POLICY_NOT_FOUND.
+- Reuse or extend `RepositoryError`: Defined exactly once, in the employee module, and re-exported from its public entry point; it is the single base class for all repository error types, so `PolicyNotFoundError` and `UniqueConstraintError` share one class identity.
+- Reuse or extend `UniqueConstraintError`: Defined exactly once, in the employee module, and re-exported from its public entry point; policy code instantiates it with code `DUPLICATE_POLICY` and it remains `instanceof RepositoryError`.
+- Reuse or extend `PolicyNotFoundError`: Remains the only error class defined in `policy.errors.ts`, extends the imported `RepositoryError`, and carries code `POLICY_NOT_FOUND`.
+### Integration points — connect to these
+- src/modules/employee/index.ts — The public entry point that re-exports `RepositoryError` and `UniqueConstraintError`; the policy module's error and repository files import these symbols from here.
+- src/modules/policy/policy.errors.ts — Defines `PolicyNotFoundError` and imports `RepositoryError` from the employee entry point; must contain no local `RepositoryError`/`UniqueConstraintError` definitions.
+- src/modules/policy/policy.repository.ts — Consumes `UniqueConstraintError` from the employee entry point when mapping pg `23505` violations to `DUPLICATE_POLICY`.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
@@ -99,7 +96,7 @@ Before making the edits below, read the referenced files (those present in the w
 
 ### Coherent change 1 — apply as ONE atomic edit across ALL sites below
 
-Unifying change (do this now): Remove the local RepositoryError and UniqueConstraintError class declarations from src/modules/policy/policy.errors.ts and import them from the employee module's public entry point (src/modules/employee/index.ts) instead.
+Unifying change (do this now): In src/modules/policy/policy.errors.ts, remove the local RepositoryError and UniqueConstraintError class definitions and import them from the employee module's public entry point; update all references in the policy module to use the imported classes.
 
 The sites below are the SAME underlying issue. Fixing some but not others leaves the code incoherent and the quality gate WILL re-flag it — apply the one change above consistently to EVERY site:
 
@@ -107,17 +104,17 @@ The sites below are the SAME underlying issue. Fixing some but not others leaves
 File: src/modules/policy/policy.errors.ts
 Line: 1
 Offending code: `export class RepositoryError extends Error {`
-Rule violated: no-redefine-symbol
-Action (do this now): Edit `src/modules/policy/policy.errors.ts` at line 1 in place to fix the `no-redefine-symbol` violation.
-What the quality gate found — apply this: [no-redefine-symbol] The `RepositoryError` base class (a base error carrying a `code` property) is already exported by the employee module's public entry point (src/modules/employee/index.ts exports `RepositoryError` from employee.errors.ts). The policy module re-declares an identical symbol with the same shape and meaning instead of importing it. This duplicates a symbol owned by another module, violating the rule against redefining symbols another module already owns.
+Rule violated: no-redefine-owned-symbol
+Action (do this now): Edit `src/modules/policy/policy.errors.ts` at line 1 in place to fix the `no-redefine-owned-symbol` violation.
+What the quality gate found — apply this: [no-redefine-owned-symbol] The employee module already exports a `RepositoryError` base class (identical shape: `readonly code: string`, same constructor and `name` assignment) from its public entry point `src/modules/employee/index.ts`. The policy module re-declares the SAME concept instead of importing it, duplicating the shape and meaning of an existing exported symbol.
 
 - Site 2
 File: src/modules/policy/policy.errors.ts
 Line: 11
 Offending code: `export class UniqueConstraintError extends RepositoryError {`
-Rule violated: no-redefine-symbol
-Action (do this now): Edit `src/modules/policy/policy.errors.ts` at line 11 in place to fix the `no-redefine-symbol` violation.
-What the quality gate found — apply this: [no-redefine-symbol] `UniqueConstraintError` (a RepositoryError subclass carrying a stable machine code) is already exported by the employee module's public entry point (src/modules/employee/index.ts). The policy module re-declares the same symbol with the same shape and meaning (a RepositoryError subclass with a `code` property) instead of importing it, duplicating a symbol owned by another module.
+Rule violated: no-redefine-owned-symbol
+Action (do this now): Edit `src/modules/policy/policy.errors.ts` at line 11 in place to fix the `no-redefine-owned-symbol` violation.
+What the quality gate found — apply this: [no-redefine-owned-symbol] The employee module already exports a `UniqueConstraintError` (same shape: constructor takes a message, sets `name`, calls `super(code, message)`) from its public entry point. The policy module re-declares the same concept (a unique-constraint violation error) with only a different code value, duplicating the shape and meaning of an existing exported symbol rather than importing it.
 
 Then check the rest of these files (and the surrounding module) for ANY OTHER occurrence of the same pattern beyond the specific lines listed above, and apply the same change there too — do NOT limit the fix to only the enumerated sites.
 
