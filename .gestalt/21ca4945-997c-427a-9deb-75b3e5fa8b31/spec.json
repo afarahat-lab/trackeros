@@ -1,0 +1,157 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave",
+      "balance",
+      "employee",
+      "policy",
+      "audit"
+    ],
+    "affectedLayers": [
+      "service",
+      "routes",
+      "model",
+      "tests"
+    ],
+    "isBreakingChange": true,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "approve deducts the request's inclusive day count (countLeaveDays) from the matched LeaveBalance via ILeaveBalanceRepository.deduct, inside the same IUnitOfWork transaction as the status update to APPROVED.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "apply, approve, reject, and cancel each write an AuditLog record via IAuditService.record (entityType LEAVE_REQUEST; AuditAction.CREATE for apply, AuditAction.UPDATE for approve/reject/cancel) within the same transaction as the state change.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "approve/reject/cancel enforce manager authorization: the actor must be the employee's manager (Employee.managerId === actorId) or have role HR_ADMIN, otherwise LeaveAuthorizationError is thrown.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "apply verifies the employee exists with employmentStatus === 'ACTIVE' (via IEmployeeRepository.findById) and that an active LeavePolicy exists for the leave type (via ILeavePolicyRepository.findActiveByLeaveType), throwing InactiveEmployeeError and InactiveLeavePolicyError respectively.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Routes pass request.user.id and request.user.role as the actor to apply/approve/reject/cancel; the approve/reject body no longer supplies an approver identity (no approvedBy spoofing vector).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "LeaveAuthorizationError, InactiveEmployeeError, and InactiveLeavePolicyError are exported from src/modules/leave/index.ts and used by the service.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "tests/unit/modules/leave/leave.service.spec.ts is updated to construct LeaveService with the new dependencies (employee, policy, audit) and actor-based signatures, and adds coverage for deduction, audit writes, authorization, and apply-time checks; the suite passes.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The service owns the unit of work: all mutating operations (apply, approve, reject, cancel) run through the injected IUnitOfWork.withTransaction and pass the transaction client as the optional LAST parameter to every participating repository/service call (leaveRequests, balances.deduct, audit.record, employee/policy reads). The service never imports the pool or a pg client directly.",
+    "LeaveService must depend on the other modules only through their public barrels (index.ts): IEmployeeRepository, ILeavePolicyRepository, IAuditService, ILeaveBalanceRepository. No import of another module's internals.",
+    "The actor identity and role come from the authenticated request.user (id + role), never from the request body. RBAC remains enforced by the route-level requireRole guard; the manager-relationship check is a service-level authorization rule.",
+    "The existing lifecycle, sufficiency, and overlap rules are preserved unchanged: PENDING -> APPROVED|REJECTED, PENDING|APPROVED -> CANCELLED; approve still enforces n <= availableDays and no overlapping APPROVED leave; countLeaveDays is the single day-count source.",
+    "The new typed errors (LeaveAuthorizationError, InactiveEmployeeError, InactiveLeavePolicyError) must be mapped to an HTTP error response (no unhandled rejections, GP-006); the code agent chooses the status/code consistent with the existing leave error mapping."
+  ],
+  "outOfScope": [
+    "Notification creation on approve/reject (the reconciled architecture lists it, but this phase's gate findings do not require it and no INotificationService dependency is mandated).",
+    "Cancel restoring previously deducted days (restore on cancel of an APPROVED request) \u2014 not raised by the gate findings and not required by this phase.",
+    "Resolving the balance by leave_type + is_active (the canonical decision) instead of the existing policyId === leaveTypeId match \u2014 the balance-resolution divergence is not part of the four gate findings.",
+    "Adding audit writes to the balance module (BalanceService.deduct/restore/create) \u2014 a separate documented divergence, not in this phase's scope."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "A request may only be created (apply) when its employee's employmentStatus is ACTIVE and an active LeavePolicy exists for its leaveTypeId; approving it atomically deducts its inclusive day count from the matched LeaveBalance and writes an audit record; approve/reject/cancel require the actor to be the employee's manager or HR_ADMIN."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "usedDays and remainingDays are mutated only through ILeaveBalanceRepository.deduct/restore within the leave approval transaction; the stored counters remain non-negative (NegativeBalanceCounterError on violation)."
+    },
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "Every state-changing leave operation (apply/approve/reject/cancel) produces exactly one AuditLog record with entityType LEAVE_REQUEST, joined to the same transaction as the state change."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "apply(input, actorId, actorRole)",
+      "authRule": "Caller must be authenticated (EMPLOYEE/MANAGER/HR_ADMIN); the employee referenced by input.employeeId must be ACTIVE and an active LeavePolicy must exist for the leave type.",
+      "idempotent": false,
+      "errorSemantics": "InactiveEmployeeError when employmentStatus !== ACTIVE; InactiveLeavePolicyError when no active policy for the leave type."
+    },
+    {
+      "operation": "approve(id, actorId, actorRole)",
+      "authRule": "actorRole must be HR_ADMIN, or actorId must equal the request employee's managerId; otherwise LeaveAuthorizationError.",
+      "idempotent": false,
+      "errorSemantics": "LeaveAuthorizationError on unauthorized actor; InvalidLeaveRequestTransitionError on non-PENDING; InsufficientLeaveBalanceError/OverlappingLeaveError preserved; null when the request does not exist."
+    },
+    {
+      "operation": "reject(id, actorId, actorRole)",
+      "authRule": "actorRole must be HR_ADMIN, or actorId must equal the request employee's managerId; otherwise LeaveAuthorizationError.",
+      "idempotent": false,
+      "errorSemantics": "LeaveAuthorizationError on unauthorized actor; InvalidLeaveRequestTransitionError on non-PENDING; null when the request does not exist."
+    },
+    {
+      "operation": "cancel(id, actorId, actorRole)",
+      "authRule": "actorRole must be HR_ADMIN, or actorId must equal the request employee's managerId; otherwise LeaveAuthorizationError.",
+      "idempotent": false,
+      "errorSemantics": "LeaveAuthorizationError on unauthorized actor; InvalidLeaveRequestTransitionError on non-(PENDING|APPROVED); null when the request does not exist."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The service must implement the actor-based signatures already declared in ILeaveService (apply/approve/reject/cancel take actorId + actorRole) and use the three error types already declared in leave.model.ts.",
+      "referencePath": "src/modules/leave/leave.model.ts"
+    },
+    {
+      "requirement": "Balance deduction must go through ILeaveBalanceRepository.deduct(id, days, client) with the optional client as the LAST parameter, matching the declared signature and the NegativeBalanceCounterError contract.",
+      "referencePath": "src/modules/balance/balance.model.ts"
+    },
+    {
+      "requirement": "Audit writes must go through IAuditService.record(input, client) with AuditAction.CREATE/UPDATE and EntityType.LEAVE_REQUEST, matching the declared AuditRecordInput shape and the optional-client join contract.",
+      "referencePath": "src/modules/audit/audit.service.interface.ts"
+    },
+    {
+      "requirement": "Employee lookup must use IEmployeeRepository.findById and read Employee.employmentStatus/managerId with the exact field names declared in the employee model.",
+      "referencePath": "src/modules/employee/employee.model.ts"
+    },
+    {
+      "requirement": "Policy resolution must use ILeavePolicyRepository.findActiveByLeaveType(leaveType, client) and read LeavePolicy.isActive, matching the declared signature.",
+      "referencePath": "src/modules/policy/policy.model.ts"
+    },
+    {
+      "requirement": "The transaction boundary must follow the IUnitOfWork.withTransaction contract and the AGENTS.md rule 5 pattern (service owns the boundary, data-access opens it, client passed as optional last param).",
+      "referencePath": "src/shared/db/unit-of-work.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/employee/index.ts (IEmployeeRepository / PgEmployeeRepository)",
+      "why": "apply-time ACTIVE check and approve/reject/cancel manager-relationship check require reading Employee.employmentStatus and Employee.managerId."
+    },
+    {
+      "target": "src/modules/policy/index.ts (ILeavePolicyRepository / PgLeavePolicyRepository)",
+      "why": "apply-time active-policy check requires findActiveByLeaveType for the request's leave type."
+    },
+    {
+      "target": "src/modules/audit/index.ts (IAuditService / AuditService)",
+      "why": "GP-002 requires an audit record for every state-changing leave operation, joined to the caller's transaction."
+    },
+    {
+      "target": "src/modules/balance/index.ts (ILeaveBalanceRepository.deduct)",
+      "why": "approve must deduct the inclusive day count atomically with the status change."
+    }
+  ]
+}
