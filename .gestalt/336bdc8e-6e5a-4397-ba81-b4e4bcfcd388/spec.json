@@ -1,0 +1,159 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave",
+      "balance",
+      "audit",
+      "employee",
+      "policy"
+    ],
+    "affectedLayers": [
+      "service",
+      "routes",
+      "repository-interface"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "Approving a PENDING leave request atomically deducts its inclusive day count (countLeaveDays) from the applicable LeaveBalance via ILeaveBalanceRepository.deduct within the same unit of work as the status change to APPROVED \u2014 a reviewer can assert that a failed deduction rolls back the status change and that usedDays/remainingDays are updated.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Cancelling an APPROVED leave request restores the previously deducted day count via ILeaveBalanceRepository.restore within the same unit of work as the status change to CANCELLED; cancelling a PENDING request performs no restore.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Every state-changing operation (apply, approve, reject, cancel) writes an AuditLog via IAuditService.record with EntityType.LEAVE_REQUEST and the appropriate AuditAction, passing the transaction client when one exists so the audit write joins the same unit of work.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Approve/reject derive the actor from request.user.id (never a client-supplied body field) and reject the operation unless the actor is the employee's manager (Employee.managerId) or HR_ADMIN; a MANAGER who is not the employee's manager is denied.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "apply rejects a request unless the employee's employmentStatus is ACTIVE (loaded via IEmployeeRepository.findById), and rejects a request whose leave type resolves to no active LeavePolicy (ILeavePolicyRepository.findActiveByLeaveType returns null or isActive is false).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The applicable balance for approval is resolved via the governing active LeavePolicy (leave_type + is_active), not by a direct policyId === leaveTypeId string match; the sufficiency check uses that resolved balance.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The service owns the unit of work via injected IUnitOfWork.withTransaction(fn); services never import the pool or a pg client. Participating repository/service methods take the client as an optional LAST parameter and fall back to the shared pool when omitted. Do NOT put withTransaction on a repository.",
+    "IEmployeeRepository.findById and ILeavePolicyRepository.findActiveByLeaveType/findByLeaveType do not accept a PoolClient, so employee/policy checks cannot join the leave transaction without signature changes. The implementation must either perform those checks outside the transaction or extend the repository signatures to accept an optional client \u2014 but must not bypass the repository layer (GP-001).",
+    "Audit writes must use IAuditService.record (which accepts an optional PoolClient) with EntityType.LEAVE_REQUEST; do not write audit rows directly through a repository from LeaveService.",
+    "The actor for approve/reject is request.user.id (authoritative identity), never a client-supplied approvedBy body field. The recorded approvedBy must equal the authenticated actor.",
+    "Day counts must use the shared countLeaveDays helper (inclusive calendar days, endDate - startDate + 1); no call site may re-derive the count inline."
+  ],
+  "outOfScope": [
+    "Notification creation on approve/reject is not part of this phase's gate findings and remains out of scope; LeaveService is not required to depend on INotificationService here.",
+    "Balance-module audit logging (GP-002 for BalanceService.deduct/restore/create) is a separate divergence and is not addressed by this phase.",
+    "Own-resource scoping on leave list/read endpoints and any broader RBAC rework beyond the manager-relationship check for approve/reject are out of scope."
+  ],
+  "ambiguities": [
+    {
+      "description": "When a MANAGER who is not the employee's manager attempts approve/reject, the existing route-level RBAC already admits MANAGER, so the denial must come from the new manager-relationship check. What error semantics should this authorization failure carry \u2014 a 403 FORBIDDEN (authorization) or a 400 CONFLICT (business rule)?",
+      "options": [
+        "403 FORBIDDEN (authorization failure)",
+        "400 CONFLICT (business-rule violation)"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "Lifecycle transitions remain PENDING -> APPROVED | REJECTED and PENDING | APPROVED -> CANCELLED; any other transition throws InvalidLeaveRequestTransitionError. approvedBy/approvedAt are set only on APPROVED/REJECTED and always equal the authenticated actor."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "usedDays and remainingDays remain non-negative; approve deducts and cancel-of-APPROVED restores the same inclusive day count, so a deduction is never lost or double-applied. A transition below zero throws NegativeBalanceCounterError (never clamped)."
+    },
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "Every state-changing operation on a LeaveRequest produces exactly one AuditLog with entityType LEAVE_REQUEST, entityId equal to the request id, and performedBy equal to the authenticated actor (or null where no actor applies)."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "approve",
+      "authRule": "Actor must be the employee's manager (Employee.managerId) or HR_ADMIN; actor identity comes from request.user.id, not the body.",
+      "idempotent": false,
+      "errorSemantics": "Missing request -> null (mapped to 404); illegal transition -> InvalidLeaveRequestTransitionError; insufficient balance -> InsufficientLeaveBalanceError; overlap -> OverlappingLeaveError; non-manager actor -> authorization failure (403)."
+    },
+    {
+      "operation": "reject",
+      "authRule": "Actor must be the employee's manager (Employee.managerId) or HR_ADMIN; actor identity comes from request.user.id, not the body.",
+      "idempotent": false,
+      "errorSemantics": "Missing request -> null (mapped to 404); illegal transition -> InvalidLeaveRequestTransitionError; non-manager actor -> authorization failure (403)."
+    },
+    {
+      "operation": "apply",
+      "authRule": "Caller must be authorized to submit for the employee (own resource or HR_ADMIN/MANAGER per existing RBAC); the employee must have employmentStatus ACTIVE.",
+      "idempotent": false,
+      "errorSemantics": "Inactive/terminated employee -> rejected (typed error); no active LeavePolicy for the leave type -> rejected (typed error); invalid input -> 400 VALIDATION_ERROR."
+    },
+    {
+      "operation": "cancel",
+      "authRule": "Caller must be the employee (own resource) or MANAGER/HR_ADMIN per existing RBAC.",
+      "idempotent": false,
+      "errorSemantics": "Missing request -> null (mapped to 404); illegal transition -> InvalidLeaveRequestTransitionError; restore of an APPROVED request must not throw NegativeBalanceCounterError under correct prior deduction."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Reuse IAuditService.record(input, client?) and the AuditAction/EntityType enums; the audit write must join the caller's transaction via the optional client parameter.",
+      "referencePath": "src/modules/audit/audit.service.interface.ts"
+    },
+    {
+      "requirement": "Reuse ILeaveBalanceRepository.deduct(id, days, client?) and restore(id, days, client?) so balance mutation joins the leave transaction via the optional client parameter.",
+      "referencePath": "src/modules/balance/balance.model.ts"
+    },
+    {
+      "requirement": "Reuse IEmployeeRepository.findById to load the employee for the managerId and employmentStatus checks.",
+      "referencePath": "src/modules/employee/employee.model.ts"
+    },
+    {
+      "requirement": "Reuse ILeavePolicyRepository.findActiveByLeaveType to resolve the governing active policy (leave_type + is_active) instead of a direct policyId === leaveTypeId match.",
+      "referencePath": "src/modules/policy/policy.model.ts"
+    },
+    {
+      "requirement": "Reuse countLeaveDays for all day counts and computeAvailableDays for the sufficiency check; do not re-derive either inline.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The service owns the unit of work via IUnitOfWork.withTransaction(fn); participating methods take the client as an optional LAST parameter and fall back to the shared pool.",
+      "referencePath": "src/shared/db/unit-of-work.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/audit/audit.service.interface.ts (IAuditService.record)",
+      "why": "LeaveService must depend on IAuditService to satisfy GP-002 for apply/approve/reject/cancel."
+    },
+    {
+      "target": "src/modules/employee/employee.model.ts (IEmployeeRepository.findById)",
+      "why": "LeaveService must load the employee to enforce managerId authorization and employmentStatus ACTIVE."
+    },
+    {
+      "target": "src/modules/policy/policy.model.ts (ILeavePolicyRepository.findActiveByLeaveType)",
+      "why": "LeaveService must resolve the governing active policy to select the correct balance and enforce isActive."
+    },
+    {
+      "target": "src/modules/balance/balance.model.ts (ILeaveBalanceRepository.deduct/restore)",
+      "why": "LeaveService must deduct on approve and restore on cancel-of-APPROVED within the same transaction."
+    }
+  ]
+}
