@@ -1,6 +1,6 @@
 # Continue the previous attempt (it hit the iteration limit before finishing)
 
-A prior code-agent attempt on this work dir (`/tmp/gestalt/fix/b07feb33-7931-41ca-b4f7-c3dc02411147/9/3`) was stopped after reaching its iteration limit. Its work is ALREADY on disk here — do NOT restart from scratch or re-read everything; build on what exists. It made 9 file edit(s). The prior attempt did NOT run the build/tests before it was cut off.
+A prior code-agent attempt on this work dir (`/tmp/gestalt/fix/b07feb33-7931-41ca-b4f7-c3dc02411147/9/4`) was stopped after reaching its iteration limit. Its work is ALREADY on disk here — do NOT restart from scratch or re-read everything; build on what exists. It made 3 file edit(s). Its last verification PASSED (`cd /tmp/gestalt/fix/b07feb33-7931-41ca-b4f7-c3dc02411147/9/4 && npx jest tests/unit/modules/leave/leave.service.spec.ts --forceExit 2>&1 | tail -80`).
 
 Finish the task now: fix any failing build/type-check/tests, then RUN the build and the tests and fix anything still failing. Stop as soon as the build and tests pass. The full original task (with all mandatory constraints) follows for reference.
 
@@ -8,37 +8,32 @@ Finish the task now: fix any failing build/type-check/tests, then RUN the build 
 
 # Fix specific quality-gate violations: Phase 4 — leave orchestration module
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/fix/b07feb33-7931-41ca-b4f7-c3dc02411147/9/3`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/fix/b07feb33-7931-41ca-b4f7-c3dc02411147/9/4`. Do not clone anything; work only in this directory.
 
 You are fixing SPECIFIC violations the quality gate found in EXISTING, already-committed files. Make the targeted edits listed below — do NOT refactor, regenerate, or change unrelated code.
 
 The files ALREADY EXIST. You MUST edit them in place with the `str_replace_editor` tool. Reading or viewing a file is NOT sufficient — you have NOT finished until you have edited EVERY file listed below.
 
-## This is fix attempt 3 — you are CONTINUING, not starting over
+## This is fix attempt 4 — you are CONTINUING, not starting over
 The changes from the previous fix attempt(s) are ALREADY PRESENT in this working tree — you are editing that real, accumulated state, not a fresh checkout. The violation(s) listed below are what STILL FAILS *after* those prior changes. Build on the existing code: read what is already there, then refine or correct the prior attempt's edits to resolve the remaining violation — do NOT discard the prior work or re-derive the whole change from scratch.
 
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- The route handlers must call the service methods with the exact signatures declared by ILeaveService (apply(input, actorId, actorRole); approve/reject/cancel(id, actorId, actorRole)) — no positional mismatch or omitted actor arguments. (see `src/modules/leave/leave.model.ts`)
-- The LeaveService constructor invocation must supply the six dependencies in the order declared by the class constructor (leaveRequests, balances, employees, policies, audit, uow). (see `src/modules/leave/leave.service.ts`)
-- The actor identity must be read from request.user (id and role), whose shape is declared by the AuthenticatedUser augmentation and populated by requireRole. (see `src/shared/http/require-role.ts`)
-- Error responses must conform to the standard shape { error: string; code: string } with the codes VALIDATION_ERROR / UNAUTHORIZED / FORBIDDEN / NOT_FOUND / CONFLICT as established by the reconciled error contract. (see `docs/ARCHITECTURE.md`)
+- The cancel restore must mirror approve's deduct: same countLeaveDays(startDate, endDate) day count and same balance resolution (policyId === leaveTypeId), and reuse the existing ILeaveBalanceRepository.restore method. (see `src/modules/leave/leave.service.ts`)
+- The restore must join the same transaction as the status update and audit record, following the existing client ? run(client) : this.uow.withTransaction(run) pattern already used by approve/reject/cancel. (see `src/modules/leave/leave.service.ts`)
+- The restore call must match the ILeaveBalanceRepository.restore(id, days, client?) signature and its NegativeBalanceCounterError semantics. (see `src/modules/balance/balance.model.ts`)
+- The updated unit tests must match the current six-argument LeaveService constructor and the (id, actorId, actorRole) transition signatures, and follow the existing jest.Mocked + withTransaction.mockImplementation(async (fn) => fn(fakeClient)) conventions. (see `tests/unit/modules/leave/leave.service.spec.ts`)
 ### Entity invariants — enforce these
-- Reuse or extend `LeaveRequest`: approvedBy is always derived from the authenticated actor (request.user.id), never from a client-supplied body field; it is null until an approve/reject transition stamps it.
-- Reuse or extend `LeaveRequest`: Lifecycle transitions remain PENDING → APPROVED | REJECTED and PENDING | APPROVED → CANCELLED; any other transition throws InvalidLeaveRequestTransitionError (unchanged by this phase).
-- Reuse or extend `LeaveBalance`: Approving a request deducts its inclusive day count from usedDays/remainingDays atomically with the status change and audit record (already implemented in the service; this phase must not break it).
+- Reuse or extend `LeaveRequest`: A LeaveRequest in APPROVED status has had its inclusive day count deducted from the employee's LeaveBalance; cancelling it must restore exactly that deducted count so usedDays/remainingDays return to their pre-approval values. A PENDING request has no deducted days and its cancellation must not alter the balance.
+- Reuse or extend `LeaveBalance`: usedDays and remainingDays remain non-negative and mutually consistent (usedDays + remainingDays === totalEntitlement); restore is the exact inverse of deduct for the same day count and must not push usedDays below zero (NegativeBalanceCounterError).
 ### Interface contract — expose these operations (their shape is yours)
-- approve — MANAGER or HR_ADMIN; the actor must be the employee's manager (Employee.managerId) unless HR_ADMIN, enforced by the service's authorization check.; LeaveAuthorizationError → 403 FORBIDDEN; InvalidLeaveRequestTransitionError/InsufficientLeaveBalanceError/OverlappingLeaveError → 400 CONFLICT; missing request → 404 NOT_FOUND.
-- reject — MANAGER or HR_ADMIN; the actor must be the employee's manager (Employee.managerId) unless HR_ADMIN.; LeaveAuthorizationError → 403 FORBIDDEN; InvalidLeaveRequestTransitionError → 400 CONFLICT; missing request → 404 NOT_FOUND.
-- cancel — EMPLOYEE, MANAGER, or HR_ADMIN; the actor must be the employee's manager (Employee.managerId) unless HR_ADMIN.; LeaveAuthorizationError → 403 FORBIDDEN; InvalidLeaveRequestTransitionError → 400 CONFLICT; missing request → 404 NOT_FOUND.
-- apply — EMPLOYEE, MANAGER, or HR_ADMIN; the authenticated caller's id/role are passed as the actor.; Invalid input → 400 VALIDATION_ERROR; InactiveEmployeeError/InactiveLeavePolicyError → 400 CONFLICT.
+- cancel(id, actorId, actorRole, client?) — HR_ADMIN bypasses; otherwise actorId must equal the target employee's managerId (LeaveAuthorizationError otherwise).; Returns null when the request does not exist; throws InvalidLeaveRequestTransitionError when status is not PENDING or APPROVED; propagates NegativeBalanceCounterError from restore.
+- ILeaveBalanceRepository.restore(id, days, client?) — Decrements usedDays and increments remainingDays; throws NegativeBalanceCounterError if usedDays would drop below zero.
 ### Integration points — connect to these
-- src/modules/leave/leave.service.ts — The routes must wire the existing LeaveService (6-arg constructor, actor-based method signatures) without modifying it.
-- src/shared/http/require-role.ts — Provides request.user (id + role) that the handlers must read as the actor identity.
-- src/modules/audit/index.ts — Supplies the IAuditService implementation (AuditService) required as a LeaveService constructor dependency.
-- src/modules/employee/index.ts — Supplies PgEmployeeRepository required as a LeaveService constructor dependency.
-- src/modules/policy/index.ts — Supplies PgLeavePolicyRepository required as a LeaveService constructor dependency.
+- ILeaveBalanceRepository.restore — cancel must restore deducted days for APPROVED requests; the repository already exposes restore as the exact inverse of deduct.
+- IAuditService.record — cancel is a state-changing operation and must continue writing an AuditLog (GP-002); already wired, must remain intact.
+- IUnitOfWork.withTransaction — The restore + status update + audit record must be atomic; the service owns the unit of work.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
@@ -149,27 +144,27 @@ Before making the edits below, read the referenced files (those present in the w
 
 ### Edit 1
 File: src/modules/leave/leave.service.ts
-Line: 120
-Offending code: `{ status: LeaveRequestStatus.APPROVED, approvedBy, approvedAt: new Date() },`
+Line: 31
+Offending code: `private readonly uow: IUnitOfWork,`
 Rule violated: review/golden-principle
-Action (do this now): Edit `src/modules/leave/leave.service.ts` at line 120 in place to fix the `review/golden-principle` violation.
-What the quality gate found — apply this: [review/golden-principle] GP-002 breach: approve/reject/cancel are state-changing operations but write no AuditLog record. LeaveService has no audit dependency and the approve flow only updates leave_requests.status — no audit_logs insert accompanies the transition.
+Action (do this now): Edit `src/modules/leave/leave.service.ts` at line 31 in place to fix the `review/golden-principle` violation.
+What the quality gate found — apply this: [review/golden-principle] GP-002 breach: `approve`/`reject`/`cancel` are state-changing operations but write no `AuditLog`. The `LeaveService` constructor has no `IAuditService` dependency (only `PgLeaveRequestRepository`, `ILeaveBalanceRepository`, `IUnitOfWork`), and none of the transition methods record an audit entry. This is a non-negotiable golden principle and a blocking signal.
 
 ### Edit 2
-File: src/modules/leave/leave.service.ts
-Line: 73
-Offending code: `const balances = await this.balances.findByEmployee(request.employeeId, db);`
-Rule violated: review/architecture
-Action (do this now): Edit `src/modules/leave/leave.service.ts` at line 73 in place to fix the `review/architecture` violation.
-What the quality gate found — apply this: [review/architecture] Binding business rule violated: approving a leave request must deduct its inclusive day count from LeaveBalance.usedDays/remainingDays atomically with the status change. The balance is only read (findByEmployee) for the sufficiency check and never mutated via balance.deduct, so approved leave is never reflected in the balance.
+File: src/modules/leave/leave.routes.ts
+Line: 33
+Offending code: `approvedBy: z.string().min(1),`
+Rule violated: review/authorization
+Action (do this now): Edit `src/modules/leave/leave.routes.ts` at line 33 in place to fix the `review/authorization` violation.
+What the quality gate found — apply this: [review/authorization] The binding business rule "Only the employee's manager (Employee.managerId) may approve or reject a leave request" is not enforced. `approvedBy` is accepted as an arbitrary request-body field and never verified against the target employee's `managerId`; RBAC only checks the caller's role is MANAGER/HR_ADMIN, so any manager can approve/reject any employee's leave.
 
 ### Edit 3
-File: src/modules/leave/leave.routes.ts
-Line: 28
-Offending code: `approvedBy: z.string().min(1),`
-Rule violated: review/security
-Action (do this now): Edit `src/modules/leave/leave.routes.ts` at line 28 in place to fix the `review/security` violation.
-What the quality gate found — apply this: [review/security] Binding business rule violated: only the employee's manager (Employee.managerId) may approve/reject. approvedBy is a client-supplied body field and is never verified against the employee's managerId, so any MANAGER/HR_ADMIN can approve and spoof the approver identity.
+File: src/modules/leave/leave.service.ts
+Line: 119
+Offending code: `{ status: LeaveRequestStatus.APPROVED, approvedBy, approvedAt: new Date() },`
+Rule violated: review/business-rule
+Action (do this now): Edit `src/modules/leave/leave.service.ts` at line 119 in place to fix the `review/business-rule` violation.
+What the quality gate found — apply this: [review/business-rule] The binding rule "Approving a leave request deducts its inclusive day count from LeaveBalance.usedDays and remainingDays atomically with the status change" is not implemented. `approve` performs the sufficiency check against the balance but never calls `balance.deduct`; the update only mutates `status`/`approvedBy`/`approvedAt`, so `usedDays`/`remainingDays` drift and `cancel` of an APPROVED request has nothing to restore.
 
 ## Verify before you finish (MANDATORY)
 After making the edits above, the code MUST still compile and its tests MUST pass — a compilation/type error, or a test your change breaks, must NEVER be left for CI or the quality gate to find. Before you declare this task done:

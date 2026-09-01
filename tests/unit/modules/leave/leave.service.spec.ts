@@ -3,6 +3,7 @@ import {
   CreateLeaveRequestInput,
   InsufficientLeaveBalanceError,
   InvalidLeaveRequestTransitionError,
+  LeaveAuthorizationError,
   LeaveRequest,
   LeaveService,
   OverlappingLeaveError,
@@ -11,8 +12,11 @@ import {
 import { ILeaveRequestRepository } from '../../../../src/modules/leave/leave.model';
 import { LeaveBalance } from '../../../../src/modules/balance';
 import { ILeaveBalanceRepository } from '../../../../src/modules/balance/balance.model';
+import { Employee, IEmployeeRepository } from '../../../../src/modules/employee';
+import { ILeavePolicyRepository } from '../../../../src/modules/policy';
+import { IAuditService } from '../../../../src/modules/audit';
 import { IUnitOfWork } from '../../../../src/shared/db/unit-of-work';
-import { LeaveRequestStatus } from '../../../../src/shared/types';
+import { LeaveRequestStatus, UserRole } from '../../../../src/shared/types';
 
 function date(iso: string): Date {
   return new Date(iso);
@@ -68,6 +72,9 @@ function makeBalance(overrides: Partial<LeaveBalance> = {}): LeaveBalance {
 describe('LeaveService', () => {
   let leaveRequests: jest.Mocked<ILeaveRequestRepository>;
   let balances: jest.Mocked<ILeaveBalanceRepository>;
+  let employees: jest.Mocked<IEmployeeRepository>;
+  let policies: jest.Mocked<ILeavePolicyRepository>;
+  let audit: jest.Mocked<IAuditService>;
   let uow: jest.Mocked<IUnitOfWork>;
   let service: LeaveService;
   const fakeClient = {} as PoolClient;
@@ -87,6 +94,29 @@ describe('LeaveService', () => {
       deduct: jest.fn(),
       restore: jest.fn(),
     };
+    employees = {
+      create: jest.fn(),
+      list: jest.fn(),
+      findById: jest.fn(),
+      findByEmployeeNumber: jest.fn(),
+      findByEmail: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+    };
+    policies = {
+      create: jest.fn(),
+      list: jest.fn(),
+      findById: jest.fn(),
+      findByLeaveType: jest.fn(),
+      findActiveByLeaveType: jest.fn(),
+      update: jest.fn(),
+    };
+    audit = {
+      record: jest.fn(),
+      findByEntity: jest.fn(),
+      findByPerformedAt: jest.fn(),
+      query: jest.fn(),
+    };
     uow = {
       withTransaction: jest.fn(),
     };
@@ -95,6 +125,9 @@ describe('LeaveService', () => {
     service = new LeaveService(
       leaveRequests as unknown as PgLeaveRequestRepository,
       balances,
+      employees,
+      policies,
+      audit,
       uow,
     );
   });
@@ -135,7 +168,7 @@ describe('LeaveService', () => {
         }),
       );
 
-      const result = await service.approve('lr-1', 'mgr-1');
+      const result = await service.approve('lr-1', 'mgr-1', UserRole.HR_ADMIN);
 
       expect(uow.withTransaction).toHaveBeenCalledTimes(1);
       expect(leaveRequests.update).toHaveBeenCalledWith(
@@ -157,7 +190,7 @@ describe('LeaveService', () => {
         makeRequest({ status: LeaveRequestStatus.REJECTED, approvedBy: 'mgr-1' }),
       );
 
-      const result = await service.reject('lr-1', 'mgr-1');
+      const result = await service.reject('lr-1', 'mgr-1', UserRole.HR_ADMIN);
 
       expect(leaveRequests.update).toHaveBeenCalledWith(
         'lr-1',
@@ -174,7 +207,7 @@ describe('LeaveService', () => {
         makeRequest({ status: LeaveRequestStatus.CANCELLED }),
       );
 
-      const result = await service.cancel('lr-1');
+      const result = await service.cancel('lr-1', 'mgr-1', UserRole.HR_ADMIN);
 
       expect(leaveRequests.update).toHaveBeenCalledWith(
         'lr-1',
@@ -191,7 +224,7 @@ describe('LeaveService', () => {
         makeRequest({ status: LeaveRequestStatus.CANCELLED }),
       );
 
-      const result = await service.cancel('lr-1');
+      const result = await service.cancel('lr-1', 'mgr-1', UserRole.HR_ADMIN);
 
       expect(leaveRequests.update).toHaveBeenCalledWith(
         'lr-1',
@@ -205,7 +238,7 @@ describe('LeaveService', () => {
       const request = makeRequest({ status: LeaveRequestStatus.APPROVED });
       leaveRequests.findById.mockResolvedValue(request);
 
-      await expect(service.approve('lr-1', 'mgr-1')).rejects.toThrow(
+      await expect(service.approve('lr-1', 'mgr-1', UserRole.HR_ADMIN)).rejects.toThrow(
         InvalidLeaveRequestTransitionError,
       );
     });
@@ -214,7 +247,7 @@ describe('LeaveService', () => {
       const request = makeRequest({ status: LeaveRequestStatus.CANCELLED });
       leaveRequests.findById.mockResolvedValue(request);
 
-      await expect(service.reject('lr-1', 'mgr-1')).rejects.toThrow(
+      await expect(service.reject('lr-1', 'mgr-1', UserRole.HR_ADMIN)).rejects.toThrow(
         InvalidLeaveRequestTransitionError,
       );
     });
@@ -223,7 +256,7 @@ describe('LeaveService', () => {
       const request = makeRequest({ status: LeaveRequestStatus.REJECTED });
       leaveRequests.findById.mockResolvedValue(request);
 
-      await expect(service.cancel('lr-1')).rejects.toThrow(
+      await expect(service.cancel('lr-1', 'mgr-1', UserRole.HR_ADMIN)).rejects.toThrow(
         InvalidLeaveRequestTransitionError,
       );
     });
@@ -232,7 +265,7 @@ describe('LeaveService', () => {
       const request = makeRequest({ status: LeaveRequestStatus.CANCELLED });
       leaveRequests.findById.mockResolvedValue(request);
 
-      await expect(service.cancel('lr-1')).rejects.toThrow(
+      await expect(service.cancel('lr-1', 'mgr-1', UserRole.HR_ADMIN)).rejects.toThrow(
         InvalidLeaveRequestTransitionError,
       );
     });
@@ -240,7 +273,7 @@ describe('LeaveService', () => {
     it('approve returns null when the request does not exist', async () => {
       leaveRequests.findById.mockResolvedValue(null);
 
-      await expect(service.approve('missing', 'mgr-1')).resolves.toBeNull();
+      await expect(service.approve('missing', 'mgr-1', UserRole.HR_ADMIN)).resolves.toBeNull();
     });
   });
 
@@ -259,7 +292,7 @@ describe('LeaveService', () => {
         makeRequest({ status: LeaveRequestStatus.APPROVED, approvedBy: 'mgr-1' }),
       );
 
-      const result = await service.approve('lr-1', 'mgr-1');
+      const result = await service.approve('lr-1', 'mgr-1', UserRole.HR_ADMIN);
 
       expect(result?.status).toBe('APPROVED');
     });
@@ -278,7 +311,7 @@ describe('LeaveService', () => {
         makeRequest({ status: LeaveRequestStatus.APPROVED, approvedBy: 'mgr-1' }),
       );
 
-      await expect(service.approve('lr-1', 'mgr-1')).rejects.toThrow(
+      await expect(service.approve('lr-1', 'mgr-1', UserRole.HR_ADMIN)).rejects.toThrow(
         InsufficientLeaveBalanceError,
       );
     });
@@ -297,7 +330,7 @@ describe('LeaveService', () => {
         makeRequest({ status: LeaveRequestStatus.APPROVED, approvedBy: 'mgr-1' }),
       );
 
-      await expect(service.approve('lr-1', 'mgr-1')).rejects.toThrow(
+      await expect(service.approve('lr-1', 'mgr-1', UserRole.HR_ADMIN)).rejects.toThrow(
         InsufficientLeaveBalanceError,
       );
     });
@@ -322,7 +355,7 @@ describe('LeaveService', () => {
         makeRequest({ status: LeaveRequestStatus.APPROVED, approvedBy: 'mgr-1' }),
       );
 
-      await expect(service.approve('lr-1', 'mgr-1')).rejects.toThrow(
+      await expect(service.approve('lr-1', 'mgr-1', UserRole.HR_ADMIN)).rejects.toThrow(
         InsufficientLeaveBalanceError,
       );
     });
@@ -348,7 +381,7 @@ describe('LeaveService', () => {
         makeRequest({ status: LeaveRequestStatus.APPROVED, approvedBy: 'mgr-1' }),
       );
 
-      const result = await service.approve('lr-1', 'mgr-1');
+      const result = await service.approve('lr-1', 'mgr-1', UserRole.HR_ADMIN);
 
       expect(result?.status).toBe('APPROVED');
     });
@@ -372,7 +405,7 @@ describe('LeaveService', () => {
         makeRequest({ status: LeaveRequestStatus.APPROVED, approvedBy: 'mgr-1' }),
       );
 
-      await expect(service.approve('lr-1', 'mgr-1')).rejects.toThrow(
+      await expect(service.approve('lr-1', 'mgr-1', UserRole.HR_ADMIN)).rejects.toThrow(
         OverlappingLeaveError,
       );
     });
@@ -402,7 +435,7 @@ describe('LeaveService', () => {
         makeRequest({ status: LeaveRequestStatus.APPROVED, approvedBy: 'mgr-1' }),
       );
 
-      const result = await service.approve('lr-1', 'mgr-1');
+      const result = await service.approve('lr-1', 'mgr-1', UserRole.HR_ADMIN);
 
       expect(result?.status).toBe('APPROVED');
     });

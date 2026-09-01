@@ -284,6 +284,23 @@ export class LeaveService implements ILeaveService {
       }
       await this.assertAuthorized(request, actorId, actorRole, db, 'cancel');
 
+      if (request.status === LeaveRequestStatus.APPROVED) {
+        const days = countLeaveDays(request.startDate, request.endDate);
+        const balances = await this.balances.findByEmployee(
+          request.employeeId,
+          db,
+        );
+        const balance = balances.find(
+          (b) => b.policyId === request.leaveTypeId,
+        );
+        if (!balance) {
+          throw new InsufficientLeaveBalanceError(
+            `No leave balance found for employee ${request.employeeId} and leave type ${request.leaveTypeId}`,
+          );
+        }
+        await this.balances.restore(balance.id, days, db);
+      }
+
       const cancelledAt = new Date();
       const updated = await this.leaveRequests.update(
         id,
