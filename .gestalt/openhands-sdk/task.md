@@ -1,6 +1,6 @@
-# Implement this phase: Phase 1 — Shared types & data-access foundation
+# Implement this phase: Phase 2 — Audit module
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/f5a0dfb3-f8f1-4335-94b2-5d8d22cf459f/1`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/f5a0dfb3-f8f1-4335-94b2-5d8d22cf459f/2`. Do not clone anything; work only in this directory.
 
 You are the IMPLEMENTATION agent, not a planner. The platform measures your work EXCLUSIVELY by the files you create or modify in this working tree (`git status`). Ending your turn with a plan, a summary, or an announcement of what you are 'about to' do — without having actually edited files — is a FAILURE: a turn that leaves the working tree untouched is discarded. Explore only as much as you need, then MAKE the edits with your file-editing tool. Never end your turn before the files exist on disk.
 
@@ -8,7 +8,7 @@ You are the IMPLEMENTATION agent, not a planner. The platform measures your work
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the shared type definitions and data-access foundation under src/shared/. Create src/shared/types/leave.types.ts defining the enums LeaveType (annual, sick, emergency, unpaid, maternity, paternity), LeaveStatus (PENDING, APPROVED, REJECTED, CANCELLED), EmploymentStatus (ACTIVE, INACTIVE, TERMINATED), NotificationStatus (PENDING, SENT, READ, ARCHIVED), AuditAction (CREATE, UPDATE, DELETE, APPROVE, REJECT), UserRole (employee, manager, hr_admin), plus the DTOs CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveRequestQueryParams, and ValidationResult. Create src/shared/db/unit-of-work.ts defining the IUnitOfWork interface (begin/commit/rollback, optional client?: PoolClient). Create src/shared/leave/day-count.ts implementing the single shared pure helper for inclusive calendar day count: days = (endDate - startDate) + 1, no weekend/holiday exclusion. This phase depends on the existing src/shared/db/connection.ts (exports the pg Pool) — read it before generating. Include Jest unit tests for the day-count helper in tests/unit/shared/leave/day-count.spec.ts.
+Create the audit module under src/modules/audit/. Create src/modules/audit/audit.model.ts defining the AuditLog entity with the exact canonical fields: id: string, entityType: string, entityId: string, action: AuditAction, oldValues: Record<string, any> | null, newValues: Record<string, any> | null, performedBy: string | null, performedAt: Date, createdAt: Date, updatedAt: Date. Create src/modules/audit/audit.repository.ts implementing AuditLogRepository using raw pg parameterized SQL against the shared pool (no Knex in queries), with an optional client?: PoolClient parameter on write methods. Create src/modules/audit/audit.service.ts implementing AuditService (AuditServiceInterface) that records audit entries. This phase depends on src/shared/types/leave.types.ts (AuditAction enum) and src/shared/db/connection.ts from Phase 1 — read them before generating. Include Jest unit tests in tests/unit/modules/audit/.
 
 ## Your iteration budget — and how to get more (READ BEFORE YOU START)
 
@@ -75,27 +75,24 @@ These are resolved, feature-wide decisions. Wherever this phase touches the conc
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- The shared pool must be the named `pool` export from src/shared/db/connection.ts; do not create a second pool or a default export. (see `src/shared/db/connection.ts`)
-- LeaveStatus values must match business rule 7 (PENDING/APPROVED/REJECTED/CANCELLED), not the stale DRAFT/SUBMITTED set in docs/ARCHITECTURE.md. (see `.gestalt/architecture/reconciled.json`)
-- IUnitOfWork shape (begin/commit/rollback + optional client?: PoolClient) must match the transaction contract in AGENTS.md architecture rule 5, not the older withTransaction(fn) form. (see `AGENTS.md`)
-- Day-count semantics must match business rule 1 (inclusive calendar days, single shared helper, no weekend/holiday exclusion). (see `.gestalt/architecture/reconciled.json`)
-- Enum values and module ownership (shared-types owns the enums/DTOs/ValidationResult; shared-db owns IUnitOfWork) must match the reconciled module boundaries. (see `.gestalt/architecture/reconciled.json`)
+- The AuditAction enum must be imported from src/shared/types/leave.types.ts (values CREATE | UPDATE | DELETE | APPROVE | REJECT) and not redefined locally. (see `src/shared/types/leave.types.ts`)
+- The repository must use the shared pg Pool exported from src/shared/db/connection.ts (via src/shared/db/index.ts) as its default connection, never creating its own pool. (see `src/shared/db/connection.ts`)
+- The optional client?: PoolClient parameter and the service-owns-unit-of-work / data-access-opens-it transaction contract must match the IUnitOfWork shape (begin/commit/rollback + client?: PoolClient) defined in src/shared/db/unit-of-work.ts. (see `src/shared/db/unit-of-work.ts`)
+- The AuditLog entity fields and the audit_logs table mapping (snake_case columns: entity_type, entity_id, old_values, new_values, performed_by, performed_at, created_at, updated_at; PK id; FK performed_by -> employees.id) must match the canonical schema in docs/ARCHITECTURE.md. (see `docs/ARCHITECTURE.md`)
+- The repository interface/class names (IAuditLogRepository / AuditLogRepository) and methods (record, findByEntity, findByActor, findByTimeRange) must match the canonical repository contract in docs/ARCHITECTURE.md. (see `docs/ARCHITECTURE.md`)
 ### Entity invariants — enforce these
-- Reuse or extend `LeaveType`: A closed enum of exactly six values (annual, sick, emergency, unpaid, maternity, paternity); no other leave category may be represented.
-- Reuse or extend `LeaveStatus`: A closed enum of exactly PENDING, APPROVED, REJECTED, CANCELLED; no DRAFT or SUBMITTED state exists.
-- Reuse or extend `EmploymentStatus`: A closed enum of exactly ACTIVE, INACTIVE, TERMINATED.
-- Reuse or extend `NotificationStatus`: A closed enum of exactly PENDING, SENT, READ, ARCHIVED.
-- Reuse or extend `AuditAction`: A closed enum of exactly CREATE, UPDATE, DELETE, APPROVE, REJECT.
-- Reuse or extend `UserRole`: A closed enum of exactly employee, manager, hr_admin.
-- Reuse or extend `IUnitOfWork`: Exposes begin/commit/rollback and an optional client?: PoolClient; it is the only abstraction through which a transaction boundary is opened, and it is owned by the data-access layer while the service decides what is inside the boundary.
-- Reuse or extend `day-count helper`: A single pure function computing inclusive calendar days = (endDate - startDate) + 1; a single-day span yields 1, and it performs no weekend/holiday exclusion.
+- Reuse or extend `AuditLog`: AuditLog is immutable: once recorded it has no lifecycle states and no update/delete transitions; it is only ever created via record.
+- Reuse or extend `AuditLog`: action must be one of the AuditAction enum values (CREATE | UPDATE | DELETE | APPROVE | REJECT) imported from src/shared/types/leave.types.ts.
+- Reuse or extend `AuditLog`: oldValues and newValues are nullable JSON payloads (Record<string, any> | null); performedBy is nullable (system/unknown actor allowed), while entityType, entityId, action, performedAt, createdAt, updatedAt are always present.
 ### Interface contract — expose these operations (their shape is yours)
-- day-count computation — idempotent; Pure and deterministic: identical (startDate, endDate) inputs always yield the same integer; no side effects, no I/O.
-- IUnitOfWork.begin / commit / rollback — rollback must be safe to invoke after a failed begin/commit and must release the acquired client; the interface itself carries no auth rule (it is data-access, not an endpoint).
+- record — Persists an audit entry and returns the persisted AuditLog; accepts an optional PoolClient as the last parameter to join a caller's transaction, defaulting to the shared pool when omitted.
+- findByEntity — Returns audit entries for a given entityType + entityId, ordered by performedAt; returns an empty list when none exist.
+- findByActor — Returns audit entries performed by a given actor (performedBy), ordered by performedAt; returns an empty list when none exist.
+- findByTimeRange — Returns audit entries whose performedAt falls within an inclusive time range, ordered by performedAt; returns an empty list when none exist.
 ### Integration points — connect to these
-- src/shared/db/connection.ts (named `pool` export) — IUnitOfWork's optional client?: PoolClient and any future data-access implementation acquire clients from this shared pool.
-- pg (PoolClient type) — IUnitOfWork references PoolClient for its optional client member; raw pg is the mandated data-access layer.
-- Later phases (audit/employee/policy/balance/notification/auth/leave modules) — They import the enums, DTOs, ValidationResult, IUnitOfWork and the day-count helper defined here; this phase is their shared foundation.
+- src/shared/types/leave.types.ts (AuditAction enum) — The AuditLog.action field is typed against AuditAction; the audit module depends on shared-types for this enum.
+- src/shared/db/connection.ts (shared pg Pool) — The repository's default connection is the shared pool; write methods fall back to it when no PoolClient is supplied.
+- src/shared/db/unit-of-work.ts (IUnitOfWork) — Later phases (leave approve/reject) will pass a PoolClient from IUnitOfWork into record so the audit row commits atomically with the status change and balance update.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
