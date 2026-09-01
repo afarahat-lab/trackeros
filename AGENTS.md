@@ -69,39 +69,49 @@ interfaces" (GP-001) are not in conflict. They govern two different things:
   release. That is database access, so it lives behind an interface in the data-access layer.
 
 **The decision:** a data-access unit-of-work abstraction, injected into services the same way
-repositories are.
+repositories are. The interface exposes explicit transaction lifecycle methods plus the
+acquired client:
 
 ```ts
 interface IUnitOfWork {
-  withTransaction<T>(fn: (client: PoolClient) => Promise<T>): Promise<T>;
+  begin(): Promise<void>;
+  commit(): Promise<void>;
+  rollback(): Promise<void>;
+  /** A client acquired from the shared pool, available to participating repositories. */
+  client?: PoolClient;
 }
 ```
 
-Its implementation acquires a client, issues `BEGIN`, runs the callback, then `COMMIT` — or
-`ROLLBACK` on any throw — and always releases in a `finally`. It is the ONLY place in the
-codebase that issues `BEGIN` / `COMMIT` / `ROLLBACK`. Services receive it via the constructor
-and never import a pool, a client, or a module-level helper directly.
+Its implementation acquires a client from the shared `pg` pool, issues `BEGIN`, exposes the
+client, then `COMMIT` — or `ROLLBACK` on any throw — and always releases in a `finally`. It is
+the ONLY place in the codebase that issues `BEGIN` / `COMMIT` / `ROLLBACK`. Services receive it
+via the constructor and never import a pool, a client, or a module-level helper directly.
 
 ```ts
-await this.uow.withTransaction(async (client) => {
-  await this.leaveRequestRepo.updateStatus(id, 'APPROVED', client);
-  await this.balanceService.commitDays(employeeId, type, days, client);
-  await this.auditService.record(entry, client);
-});
+await this.uow.begin();
+try {
+  await this.leaveRequestRepo.updateStatus(id, 'APPROVED', this.uow.client);
+  await this.balanceService.commitDays(employeeId, type, days, this.uow.client);
+  await this.auditService.record(entry, this.uow.client);
+  await this.uow.commit();
+} catch (err) {
+  await this.uow.rollback();
+  throw err;
+}
 ```
 
 Participating repository and service methods take the client as an **optional last parameter**
 and use it when supplied, falling back to the shared pool when omitted — so single-step callers
-are unaffected. A nested `withTransaction` must reuse an already-supplied client rather than
+are unaffected. A nested unit of work must reuse an already-supplied client rather than
 opening a second transaction.
 
-**Rejected:** putting `withTransaction` on a repository (e.g. the leave-request repository) or
-having a repository method take the callback. The transaction spans `leave_requests`,
-`leave_balances` and `audit_logs`, so making one aggregate's repository own a boundary crossing
-three of them is arbitrary — the other repositories would receive a client originating from a
-sibling they know nothing about, and a future transaction not involving leave requests would
-have nowhere to live. It also makes that one repository structurally unlike every other, for
-reasons unrelated to leave requests.
+**Rejected:** putting the transaction lifecycle on a repository (e.g. the leave-request
+repository) or having a repository method take the callback. The transaction spans
+`leave_requests`, `leave_balances` and `audit_logs`, so making one aggregate's repository own a
+boundary crossing three of them is arbitrary — the other repositories would receive a client
+originating from a sibling they know nothing about, and a future transaction not involving
+leave requests would have nowhere to live. It also makes that one repository structurally
+unlike every other, for reasons unrelated to leave requests.
 
 Introducing a unit of work moves no invariant: negative guards and authorization stay in the
 services that already own them.

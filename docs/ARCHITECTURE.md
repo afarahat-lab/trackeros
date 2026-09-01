@@ -54,18 +54,18 @@ src/shared/error types.ts
 
 ### Stack compliance
 - Language: TypeScript, Node 20, npm, Jest, Fastify, React Native, PostgreSQL, modular-monolith.
-- Corrections applied: use Fastify only (no express); use Knex query builder for repository queries and migrations; use Fastify JSON schema validation for API-boundary input validation; prune class-validator/zod/express dependencies.
+- Corrections applied: use Fastify only (no express); use raw `pg` parameterized SQL (`Pool`/`PoolClient`) for repository queries (no Knex in queries); use Fastify JSON schema validation for API-boundary input validation; prune class-validator/zod/express dependencies.
 
 ### Canonical names
 - Entity/table names: Employee/employees, LeaveRequest/leave_requests, LeaveBalance/leave_balances, LeavePolicy/leave_policies, Notification/notifications, AuditLog/audit_logs.
 - Repository interfaces: ILeaveRequestRepository, ILeaveBalanceRepository, ILeavePolicyRepository, IEmployeeRepository, INotificationRepository, IAuditLogRepository.
-- Concrete repositories: LeaveRequestRepository, LeaveBalanceRepository, LeavePolicyRepository, EmployeeRepository, NotificationRepository, AuditLogRepository (all PostgreSQL via Knex).
+- Concrete repositories: LeaveRequestRepository, LeaveBalanceRepository, LeavePolicyRepository, EmployeeRepository, NotificationRepository, AuditLogRepository (all PostgreSQL via raw `pg`).
 - Services: LeaveService, LeaveBalanceService, LeavePolicyService, EmployeeService, NotificationService, AuditService.
-- Enums: LeaveType = annual | sick | emergency | unpaid | maternity | paternity; LeaveStatus = DRAFT | SUBMITTED | APPROVED | REJECTED | CANCELLED; EmploymentStatus = ACTIVE | INACTIVE | TERMINATED; NotificationStatus = PENDING | SENT | READ | ARCHIVED; AuditAction = CREATE | UPDATE | DELETE | APPROVE | REJECT; UserRole = employee | manager | hr_admin.
+- Enums: LeaveType = annual | sick | emergency | unpaid | maternity | paternity; LeaveStatus = PENDING | APPROVED | REJECTED | CANCELLED; EmploymentStatus = ACTIVE | INACTIVE | TERMINATED; NotificationStatus = PENDING | SENT | READ | ARCHIVED; AuditAction = CREATE | UPDATE | DELETE | APPROVE | REJECT; UserRole = employee | manager | hr_admin.
 
 ### Domain entities and lifecycle states
 - Employee: ACTIVE, INACTIVE, TERMINATED.
-- LeaveRequest: DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED. State machine: DRAFT→SUBMITTED→(APPROVED|REJECTED); SUBMITTED→CANCELLED (owner only); APPROVED/REJECTED/CANCELLED are terminal.
+- LeaveRequest: PENDING, APPROVED, REJECTED, CANCELLED. State machine: PENDING→(APPROVED|REJECTED); PENDING→CANCELLED (owner only); APPROVED/REJECTED/CANCELLED are terminal. Requests are created as PENDING immediately — there is no DRAFT/SUBMITTED state.
 - LeaveBalance: ACTIVE, CLOSED.
 - LeavePolicy: ACTIVE, INACTIVE.
 - Notification: PENDING, SENT, READ, ARCHIVED.
@@ -75,7 +75,7 @@ src/shared/error types.ts
 ### Binding business rules
 - startDate <= endDate; invalid otherwise.
 - Only the applicant's manager (Employee referenced by managerId) may approve/reject; approver must not be the applicant.
-- LeaveRequest may only transition to APPROVED/REJECTED from SUBMITTED; DRAFT must be submitted first; SUBMITTED may be CANCELLED by owner; APPROVED/REJECTED/CANCELLED are terminal.
+- LeaveRequest may only transition to APPROVED/REJECTED from PENDING; PENDING may be CANCELLED by owner; APPROVED/REJECTED/CANCELLED are terminal.
 - Approving decrements LeaveBalance.remainingDays and increments usedDays by the request's day count for the matching leaveType and fiscalYear; remainingDays must not go below zero.
 - LeaveRequest may only be created against an ACTIVE LeavePolicy whose leaveType matches the request's leaveType.
 - Every state-changing operation writes an AuditLog record.
@@ -96,11 +96,11 @@ src/shared/error types.ts
 - IEmployeeRepository / EmployeeRepository: findById, findByEmployeeNumber, findByEmail, findByManager, create, update, softDelete.
 - INotificationRepository / NotificationRepository: create, findByRecipient, findByEntity, updateStatus, markRead.
 - IAuditLogRepository / AuditLogRepository: record, findByEntity, findByActor, findByTimeRange.
-All concrete repositories use PostgreSQL via Knex query builder.
+All concrete repositories use PostgreSQL via raw `pg` parameterized SQL.
 
 ### Module boundaries
 - shared-types: enums, DTOs, ValidationResult, UserRole.
-- shared-db: IUnitOfWork, Knex instance, connection pool, base repository helpers.
+- shared-db: IUnitOfWork, `pg` Pool instance, connection pool, base repository helpers.
 - audit: AuditLog entity, AuditLogRepository, AuditService.
 - employee: Employee entity, EmployeeRepository, EmployeeService.
 - policy: LeavePolicy entity, LeavePolicyRepository, LeavePolicyService.
@@ -133,8 +133,11 @@ Dependencies flow inward only; leave depends on audit/balance/policy/employee/no
 ### Cross-cutting contracts
 - Auth: request.user = { id: string; role: UserRole }; UserRole = employee | manager | hr_admin; JWT bearer verified by auth middleware; RBAC enforced by requireRole(...) route guard, never inline.
 - Error response: { error: string; code: string }; validation failure -> 400; authentication failure -> 401; authorization failure -> 403; not found -> 404.
-- Transaction: service owns unit of work; IUnitOfWork.withTransaction<T>(fn: (trx: Knex.Transaction) => Promise<T>) is the only place issuing BEGIN/COMMIT/ROLLBACK; repository methods that join a caller's transaction take an optional Knex.Transaction as last parameter (default shared Knex instance); approve/reject flow (status update + balance commit + audit record) must be atomic.
+- Transaction: service owns unit of work; `IUnitOfWork` exposes `begin()` / `commit()` / `rollback()` plus an optional `client?: PoolClient` acquired from the shared pool — it is the only place issuing BEGIN/COMMIT/ROLLBACK; repository methods that join a caller's transaction take an optional `PoolClient` as last parameter (default shared pool); approve/reject flow (status update + balance commit + audit record) must be atomic.
+
+### Day-count derivation (resolved in Phase 1)
+- `countLeaveDays(startDate, endDate)` in `src/shared/leave/day-count.ts` is the single shared pure helper: `days = (endDate - startDate) + 1`, inclusive, no weekend/holiday exclusion. Dates are normalized to UTC calendar days so the result is a whole number independent of time-of-day and DST. The same count is used for both the balance-sufficiency check and the balance deduction.
 
 ### Open questions
-See openQuestions list for unresolved foundational semantics: day-count derivation, fiscal-year boundary handling, RBAC authorization matrix, balance rounding/bounds, background jobs, and local dev auth strategy.
+See openQuestions list for unresolved foundational semantics: fiscal-year boundary handling, RBAC authorization matrix, balance rounding/bounds, background jobs, and local dev auth strategy.
 <!-- gestalt:architecture feature=f5a0dfb3-f8f1-4335-94b2-5d8d22cf459f END -->
