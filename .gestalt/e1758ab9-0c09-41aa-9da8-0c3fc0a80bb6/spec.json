@@ -1,0 +1,116 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave",
+      "balance"
+    ],
+    "affectedLayers": [
+      "service",
+      "unit tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "Cancelling an APPROVED leave request restores the previously deducted inclusive day count by calling the balance repository's restore with the same day count computed via countLeaveDays(startDate, endDate), resolving the balance by policyId === leaveTypeId (mirroring approve), atomically with the status change and audit record.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Cancelling a PENDING leave request performs NO balance restore (nothing was deducted), and still transitions to CANCELLED with an audit record.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A restore failure (e.g. NegativeBalanceCounterError) propagates and the status change is rolled back \u2014 no CANCELLED status is persisted if the balance restore fails.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "tests/unit/modules/leave/leave.service.spec.ts is brought in sync with the current service: constructs LeaveService with all six dependencies (leaveRequests, balances, employees, policies, audit, uow), calls approve/reject/cancel with (id, actorId, actorRole), and mocks/asserts employees, policies, audit.record, balances.deduct/restore, and authorization.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The restore must use the same inclusive day count and balance resolution as approve: days = countLeaveDays(startDate, endDate) and balance selected where policyId === leaveTypeId. Do not re-derive the day count inline; reuse the shared countLeaveDays helper.",
+    "The restore must occur inside the same unit of work as the status update and audit record (service owns the transaction via IUnitOfWork.withTransaction; the repository restore takes the client as an optional last parameter). No pool/client import in the service.",
+    "Do not change the existing approve/reject/cancel method signatures, the six-argument LeaveService constructor, the authorization guard, or the audit recording already present \u2014 only add the missing restore behavior and fix the out-of-sync tests.",
+    "The restore must only run when the request's prior status is APPROVED; a PENDING cancel must not touch the balance."
+  ],
+  "outOfScope": [
+    "Implementing the notification side effect on approve/reject (the open question of whether it is implemented and tested) \u2014 out of scope for this phase unless it is already present; do not add new notification behavior here.",
+    "Re-opening the already-settled findings: audit recording (GP-002), manager-only authorization, and deduct-on-approve are already implemented and must not be re-implemented or re-flagged.",
+    "Changing route shapes, HTTP methods/paths, request-body schemas, or RBAC role lists \u2014 the routes already pass actor.id and no longer accept an arbitrary approvedBy field."
+  ],
+  "ambiguities": [
+    {
+      "description": "Whether the notification side effect required by the binding rule for approve is implemented and covered by tests. If it is missing, this phase does not add it (out of scope); if present, tests must not break it.",
+      "options": [
+        "Notification on approve is already implemented and tested \u2014 leave as-is",
+        "Notification on approve is implemented but untested \u2014 add coverage in this phase",
+        "Notification on approve is missing \u2014 defer to a later phase"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "A LeaveRequest in APPROVED status has had its inclusive day count deducted from the employee's LeaveBalance; cancelling it must restore exactly that deducted count so usedDays/remainingDays return to their pre-approval values. A PENDING request has no deducted days and its cancellation must not alter the balance."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "usedDays and remainingDays remain non-negative and mutually consistent (usedDays + remainingDays === totalEntitlement); restore is the exact inverse of deduct for the same day count and must not push usedDays below zero (NegativeBalanceCounterError)."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "cancel(id, actorId, actorRole, client?)",
+      "authRule": "HR_ADMIN bypasses; otherwise actorId must equal the target employee's managerId (LeaveAuthorizationError otherwise).",
+      "idempotent": false,
+      "errorSemantics": "Returns null when the request does not exist; throws InvalidLeaveRequestTransitionError when status is not PENDING or APPROVED; propagates NegativeBalanceCounterError from restore."
+    },
+    {
+      "operation": "ILeaveBalanceRepository.restore(id, days, client?)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Decrements usedDays and increments remainingDays; throws NegativeBalanceCounterError if usedDays would drop below zero."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The cancel restore must mirror approve's deduct: same countLeaveDays(startDate, endDate) day count and same balance resolution (policyId === leaveTypeId), and reuse the existing ILeaveBalanceRepository.restore method.",
+      "referencePath": "src/modules/leave/leave.service.ts"
+    },
+    {
+      "requirement": "The restore must join the same transaction as the status update and audit record, following the existing client ? run(client) : this.uow.withTransaction(run) pattern already used by approve/reject/cancel.",
+      "referencePath": "src/modules/leave/leave.service.ts"
+    },
+    {
+      "requirement": "The restore call must match the ILeaveBalanceRepository.restore(id, days, client?) signature and its NegativeBalanceCounterError semantics.",
+      "referencePath": "src/modules/balance/balance.model.ts"
+    },
+    {
+      "requirement": "The updated unit tests must match the current six-argument LeaveService constructor and the (id, actorId, actorRole) transition signatures, and follow the existing jest.Mocked + withTransaction.mockImplementation(async (fn) => fn(fakeClient)) conventions.",
+      "referencePath": "tests/unit/modules/leave/leave.service.spec.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "ILeaveBalanceRepository.restore",
+      "why": "cancel must restore deducted days for APPROVED requests; the repository already exposes restore as the exact inverse of deduct."
+    },
+    {
+      "target": "IAuditService.record",
+      "why": "cancel is a state-changing operation and must continue writing an AuditLog (GP-002); already wired, must remain intact."
+    },
+    {
+      "target": "IUnitOfWork.withTransaction",
+      "why": "The restore + status update + audit record must be atomic; the service owns the unit of work."
+    }
+  ]
+}
