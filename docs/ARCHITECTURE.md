@@ -185,8 +185,10 @@ from the reconciled architecture above.
   violations (pg code `23505`) on `employee_number`/`email` are mapped to
   `UniqueConstraintError`.
 - `employee.errors.ts` — `RepositoryError` base class plus
-  `UniqueConstraintError` (code `DUPLICATE_EMPLOYEE`) and
-  `EmployeeNotFoundError` (code `EMPLOYEE_NOT_FOUND`).
+  `UniqueConstraintError` (takes a caller-supplied `code`; the employee
+  repository passes `DUPLICATE_EMPLOYEE`) and `EmployeeNotFoundError` (code
+  `EMPLOYEE_NOT_FOUND`). The `RepositoryError`/`UniqueConstraintError` pair
+  is reused by the policy module, which passes `DUPLICATE_POLICY`.
 - `employee.service.interface.ts` — `IEmployeeService`.
 - `employee.service.ts` — `EmployeeService`, a thin delegating facade over
   the repository; the repository is injectable (defaults to
@@ -225,9 +227,10 @@ contracts from the reconciled architecture above.
   `update` builds a dynamic SET clause from only the supplied fields and
   throws `PolicyNotFoundError` when no row matches. Unique-constraint
   violations (pg code `23505`) are mapped to `UniqueConstraintError`.
-- `policy.errors.ts` — `RepositoryError` base class plus
-  `UniqueConstraintError` (code `DUPLICATE_POLICY`) and
-  `PolicyNotFoundError` (code `POLICY_NOT_FOUND`).
+- `policy.errors.ts` — `PolicyNotFoundError` (code `POLICY_NOT_FOUND`),
+  extending the imported `RepositoryError`. The base `RepositoryError` and the
+  shared `UniqueConstraintError` (code `DUPLICATE_POLICY`) are imported from
+  the employee module's public entry point, not re-declared locally.
 - `policy.service.interface.ts` — `ILeavePolicyService`.
 - `policy.service.ts` — `LeavePolicyService`, a thin delegating facade over
   the repository; the repository is injectable (defaults to

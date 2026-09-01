@@ -87,6 +87,7 @@ export class EmployeeRepository implements IEmployeeRepository {
       if (isPgError(err) && UNIQUE_CONSTRAINT_CODES.has(err.code)) {
         const target = uniqueViolatedColumn(err);
         throw new UniqueConstraintError(
+          'DUPLICATE_EMPLOYEE',
           `An employee with this ${target ? `'${target}'` : 'employee_number or email'} already exists`
         );
       }
@@ -174,6 +175,7 @@ export class EmployeeRepository implements IEmployeeRepository {
       if (isPgError(err) && UNIQUE_CONSTRAINT_CODES.has(err.code)) {
         const target = uniqueViolatedColumn(err);
         throw new UniqueConstraintError(
+          'DUPLICATE_EMPLOYEE',
           `An employee with this ${target ? `'${target}'` : 'employee_number or email'} already exists`
         );
       }

@@ -3,7 +3,8 @@ import type { Pool, PoolClient } from 'pg';
 
 import { pool } from '../../shared/db';
 import { LeaveType } from '../../shared/types';
-import { PolicyNotFoundError, UniqueConstraintError } from './policy.errors';
+import { PolicyNotFoundError } from './policy.errors';
+import { UniqueConstraintError } from '../employee/index';
 import type {
   LeavePolicy,
   CreateLeavePolicyInput,
@@ -83,6 +84,7 @@ export class LeavePolicyRepository implements ILeavePolicyRepository {
     } catch (err) {
       if (isPgUniqueViolation(err)) {
         throw new UniqueConstraintError(
+          'DUPLICATE_POLICY',
           'A leave policy with these values already exists'
         );
       }
@@ -158,6 +160,7 @@ export class LeavePolicyRepository implements ILeavePolicyRepository {
     } catch (err) {
       if (isPgUniqueViolation(err)) {
         throw new UniqueConstraintError(
+          'DUPLICATE_POLICY',
           'A leave policy with these values already exists'
         );
       }

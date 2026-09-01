@@ -1,0 +1,91 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "employee",
+      "policy",
+      "shared"
+    ],
+    "affectedLayers": [
+      "domain",
+      "data-access"
+    ],
+    "isBreakingChange": true,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "A single shared UniqueConstraintError class exists under src/shared and is the only unique-violation error class in the codebase; its constructor is (code: string, message: string) with code required and no default value.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The employee repository's unique-violation throw sites emit code DUPLICATE_EMPLOYEE and the policy repository's emit DUPLICATE_POLICY, preserving the existing codes exactly.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Existing employee and policy error/repository unit tests continue to pass with the emitted codes DUPLICATE_EMPLOYEE and DUPLICATE_POLICY unchanged.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A single shared RepositoryError base class exists under src/shared, and the module-specific NotFoundError classes (EmployeeNotFoundError, PolicyNotFoundError) extend it while remaining in their own modules.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The shared UniqueConstraintError must NOT hardcode any code and must NOT provide a default value for code; code is a required constructor argument supplied by the caller.",
+    "Each module's unique-constraint code must be defined as a named constant (SCREAMING_SNAKE_CASE) with one definition per module, not a bare string literal at the throw site.",
+    "Do not add a second unique-violation error class anywhere; every future module reuses the single shared UniqueConstraintError and passes its own DUPLICATE_<ENTITY> constant.",
+    "Cross-module imports of the shared error classes must go through the shared module's public entry point (index.ts), never a deep file path."
+  ],
+  "outOfScope": [
+    "Moving or changing EmployeeNotFoundError and PolicyNotFoundError \u2014 they remain module-specific and are not relocated to shared.",
+    "Changing any emitted machine code \u2014 DUPLICATE_EMPLOYEE and DUPLICATE_POLICY are preserved exactly; no generic DUPLICATE_RESOURCE code.",
+    "Adding a default value for the code argument or a second unique-violation error class."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "UniqueConstraintError",
+      "mustExistOrExtend": true,
+      "invariant": "A single shared class; constructor (code, message) with code required and no default; carries no module-specific knowledge; its code field is populated from the caller-supplied argument."
+    },
+    {
+      "entity": "RepositoryError",
+      "mustExistOrExtend": true,
+      "invariant": "A single shared base error class extending Error with a stable machine code field; module-specific NotFoundError classes extend it and remain in their own modules."
+    },
+    {
+      "entity": "EmployeeNotFoundError",
+      "mustExistOrExtend": true,
+      "invariant": "Remains in the employee module; extends the shared RepositoryError; preserves code EMPLOYEE_NOT_FOUND."
+    },
+    {
+      "entity": "PolicyNotFoundError",
+      "mustExistOrExtend": true,
+      "invariant": "Remains in the policy module; extends the shared RepositoryError; preserves code POLICY_NOT_FOUND."
+    }
+  ],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [
+    {
+      "requirement": "The shared UniqueConstraintError and RepositoryError must match the error-shape contract { error: string; code: string } with a stable machine code in SCREAMING_SNAKE_CASE.",
+      "referencePath": "docs/ARCHITECTURE.md"
+    },
+    {
+      "requirement": "The employee repository's unique-violation throw sites must emit code DUPLICATE_EMPLOYEE, matching the existing employee.repository.ts behaviour.",
+      "referencePath": "src/modules/employee/employee.repository.ts"
+    },
+    {
+      "requirement": "The policy repository's unique-violation throw sites must emit code DUPLICATE_POLICY, matching the existing policy.repository.ts behaviour.",
+      "referencePath": "src/modules/policy/policy.repository.ts"
+    },
+    {
+      "requirement": "The shared error classes must be importable through the shared module's public entry point, consistent with the module dependency rule that modules import only via index.ts.",
+      "referencePath": "AGENTS.md"
+    }
+  ],
+  "integrationPoints": []
+}

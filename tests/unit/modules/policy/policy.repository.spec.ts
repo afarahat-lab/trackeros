@@ -1,9 +1,6 @@
 import { LeaveType } from '../../../../src/shared/types';
 import { LeavePolicyRepository } from '../../../../src/modules/policy/policy.repository';
-import {
-  PolicyNotFoundError,
-  UniqueConstraintError,
-} from '../../../../src/modules/policy/policy.errors';
+import { PolicyNotFoundError } from '../../../../src/modules/policy/policy.errors';
 import type { CreateLeavePolicyInput } from '../../../../src/modules/policy/policy.model';
 
 const poolQuery = jest.fn();

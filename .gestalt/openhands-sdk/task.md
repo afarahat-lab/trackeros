@@ -1,46 +1,35 @@
-# Implement this phase: Phase 4 — Policy module
+# Fix specific quality-gate violations: Phase 4 — Policy module
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/f5a0dfb3-f8f1-4335-94b2-5d8d22cf459f/4`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/fix/f5a0dfb3-f8f1-4335-94b2-5d8d22cf459f/4/2`. Do not clone anything; work only in this directory.
 
-You are the IMPLEMENTATION agent, not a planner. The platform measures your work EXCLUSIVELY by the files you create or modify in this working tree (`git status`). Ending your turn with a plan, a summary, or an announcement of what you are 'about to' do — without having actually edited files — is a FAILURE: a turn that leaves the working tree untouched is discarded. Explore only as much as you need, then MAKE the edits with your file-editing tool. Never end your turn before the files exist on disk.
+You are fixing SPECIFIC violations the quality gate found in EXISTING, already-committed files. Make the targeted edits listed below — do NOT refactor, regenerate, or change unrelated code.
 
-## What to build
-(no phase architecture provided — infer from the success criteria below)
+The files ALREADY EXIST. You MUST edit them in place with the `str_replace_editor` tool. Reading or viewing a file is NOT sufficient — you have NOT finished until you have edited EVERY file listed below.
 
-## Success criteria
-Create the policy module under src/modules/policy/. Create src/modules/policy/policy.model.ts defining the LeavePolicy entity with the exact canonical fields: id: string, policyName: string, leaveType: LeaveType, entitlementDays: number, accrualRate: number | undefined, maxAccumulation: number | undefined, minimumNoticeDays: number | undefined, requiresManagerApproval: boolean, isActive: boolean, createdAt: Date, updatedAt: Date. Create src/modules/policy/policy.repository.ts implementing LeavePolicyRepository using raw pg parameterized SQL against the shared pool, with optional client?: PoolClient on write methods. Create src/modules/policy/policy.service.ts implementing LeavePolicyService. This phase depends on src/shared/types/leave.types.ts (LeaveType enum) and src/shared/db/connection.ts from Phase 1 — read them before generating. Include Jest unit tests in tests/unit/modules/policy/.
+## This is fix attempt 2 — you are CONTINUING, not starting over
+The changes from the previous fix attempt(s) are ALREADY PRESENT in this working tree — you are editing that real, accumulated state, not a fresh checkout. The violation(s) listed below are what STILL FAILS *after* those prior changes. Build on the existing code: read what is already there, then refine or correct the prior attempt's edits to resolve the remaining violation — do NOT discard the prior work or re-derive the whole change from scratch.
 
-## Your iteration budget — and how to get more (READ BEFORE YOU START)
+## Constraints & consistency
+You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
+### Reuse & consistency — match these exactly
+- `RepositoryError` and `UniqueConstraintError` must be the exact symbols exported from the employee module's public entry point — no local re-declaration, re-export, or aliasing that would create a second class identity. (see `src/modules/employee/index.ts`)
+- The policy module's error layout must match the employee module's established pattern: a base `RepositoryError` plus typed subclasses, with the base and shared `UniqueConstraintError` owned by the employee module and consumed via its entry point. (see `src/modules/employee/employee.errors.ts`)
+- The Policy module documentation must accurately describe the current error ownership (imported `RepositoryError`/`UniqueConstraintError`, locally-defined `PolicyNotFoundError`), consistent with the actual source files. (see `docs/ARCHITECTURE.md`)
+### Entity invariants — enforce these
+- Reuse or extend `RepositoryError`: Defined exactly once, in the employee module, and re-exported from its public entry point; it is the single base class for all repository error types, so `PolicyNotFoundError` and `UniqueConstraintError` share one class identity.
+- Reuse or extend `UniqueConstraintError`: Defined exactly once, in the employee module, and re-exported from its public entry point; policy code instantiates it with code `DUPLICATE_POLICY` and it remains `instanceof RepositoryError`.
+- Reuse or extend `PolicyNotFoundError`: Remains the only error class defined in `policy.errors.ts`, extends the imported `RepositoryError`, and carries code `POLICY_NOT_FOUND`.
+### Integration points — connect to these
+- src/modules/employee/index.ts — The public entry point that re-exports `RepositoryError` and `UniqueConstraintError`; the policy module's error and repository files import these symbols from here.
+- src/modules/policy/policy.errors.ts — Defines `PolicyNotFoundError` and imports `RepositoryError` from the employee entry point; must contain no local `RepositoryError`/`UniqueConstraintError` definitions.
+- src/modules/policy/policy.repository.ts — Consumes `UniqueConstraintError` from the employee entry point when mapping pg `23505` violations to `DUPLICATE_POLICY`.
 
-You have a HARD budget of **30 iterations** for this task; one tool call is one iteration. When it runs out you are CUT OFF mid-work — the unfinished phase is recorded as a FAILURE, not as progress. Nothing warns you as you approach it, so you cannot rely on noticing.
-
-**Exploration is what exhausts it.** Measured on this platform's recent phases: the code-agent spent 19 of its 27 file-editing calls on `view` — it ran out of budget reading the codebase, not building the feature. Phases that were cut off had nearly all of their budget consumed before the writing started.
-
-You have a `task` tool. It runs a FRESH sub-agent with its OWN separate 30-iteration budget and its OWN context window, in this same working directory. Everything that sub-agent reads and writes costs you **one** iteration, not 30. It is the supported way to get more capacity, and using it is normal — not an admission of difficulty.
-
-### DELEGATE BY DEFAULT
-
-**Assume you WILL delegate this phase. The question is not whether, but how to slice it.** Decide NOW, before your first edit — a decision made after you have spent half your budget exploring is a decision made too late.
-
-Delegate unless the phase is *trivially* small, which means ALL of:
-- it creates or changes **at most 2 files**, AND
-- it introduces **no new module**, AND
-- you are confident you can finish it, verified, in well under 10 iterations.
-
-If you cannot say all three with confidence, delegate. When you are unsure, delegate — an unnecessary hand-off costs a few iterations, whereas running out costs the entire phase.
-
-### Delegate the READING, not just the writing
-
-The most valuable first delegation is usually a SURVEY, because that is where the budget actually goes. Instead of opening a dozen files yourself, send a sub-agent to read them and report back what you need: the existing conventions, the shapes and signatures you must match, where the seams are. It burns its own budget on that reading and returns you a digest for one iteration.
-
-Then delegate the implementation slices.
-
-### How to delegate
-- Call `task` with `subagent_type='gestalt-implementer'`, ONE call per slice, at most **4** for this phase. Each call blocks until that sub-agent finishes and reports back — they never run at the same time.
-- Split implementation slices by MODULE or FILE GROUP so they own DISJOINT files. Two slices must never edit the same file.
-- Give each one a self-contained prompt: the exact files it owns, what to build, the conventions it must follow, and what to report back. It cannot see this task, so anything you do not tell it, it does not know.
-
-**Never delegate the final verification.** Run the build and the tests YOURSELF, over the whole phase, after the slices are back — a sub-agent only sees its own slice, so its 'it passes' means 'my slice compiled', not 'the phase works'.
+## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
+Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
+- Use unknown with type guards instead of any (rule: `no-any`)
+- Database calls must go through repository pattern (rule: `no-direct-db-outside-repository`)
+- No hardcoded passwords, API keys, or tokens (rule: `no-hardcoded-secrets`)
+- Do not add @gestalt/* packages as project dependencies — these are Gestalt platform internals not available on npm (rule: `no-gestalt-internal-deps`)
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -72,36 +61,6 @@ These are resolved, feature-wide decisions. Wherever this phase touches the conc
 
 14. CONTRACTS PACKAGE — @trackeros/contracts is NOT scaffolded (there is no packages/ directory) and must NOT be created in this feature. Keep shared types in src/shared/types. [BINDING RULE — operator decision resolving: How is the day count for a LeaveRequest derived from startDate and endDate (inclusive vs exclusive, calendar vs business days), and is it the same count used for both the balance sufficiency check and the balance deduction?; Which fiscal year does a LeaveRequest map to when startDate and endDate span a fiscal-year boundary, and how is the day count split across years for balance deduction?; What is the concrete RBAC role model (employee/manager/hr_admin) and which roles may perform each leave action (create, submit, approve, reject, cancel, view balances)?; How are leave_balances.used_days and remaining_days computed, rounded, and bounded when a request is approved (e.g. partial-day requests, half-day rounding, negative-balance guard)?; Are background jobs required via BullMQ for leave workflows (accrual schedulers, notification fanout)?; How should local development auth be implemented concretely (seeded local users vs mock OIDC provider)?; LeaveStatus enum value discrepancy: DOMAIN.md defines DRAFT/SUBMITTED/APPROVED/REJECTED/CANCELLED, while root ARCHITECTURE.md uses PENDING/APPROVED/REJECTED/CANCELLED. Which set is authoritative for the leave_requests.status field and shared types?; Should concrete repositories use Knex query builder or raw pg (parameterized SQL) against the shared pg.Pool?; Which validation library should be standardized for API-boundary input validation?; What are the canonical names for duplicate/overlapping domain entities (Balance vs LeaveBalance, Policy vs LeavePolicy, Audit vs AuditLog vs AuditRecord)?; Should package.json name be changed from leave-management to trackeros, and should express/class-validator/zod be pruned to match the declared Fastify stack?; What is the exact error response shape beyond the required 400/401/403/404 status codes?; Should the existing uptime module be refactored to the canonical repository/controller pattern, or left as-is?; Is the shared @trackeros/contracts package already scaffolded, or does it need to be created?; What background jobs, if any, are required via BullMQ for leave/expense workflows (accrual schedulers, notification fanout)?; apply everywhere these apply, not in one place only]
 
-## Constraints & consistency
-You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
-### Reuse & consistency — match these exactly
-- Import the LeaveType enum from the shared types module (via its public entry point) — do not redefine it. The enum exposes annual/sick/emergency/unpaid/maternity/paternity. (see `src/shared/types/leave.types.ts`)
-- Import the shared `pg` Pool from the shared db module (via its public entry point) for all repository queries; never construct a new Pool. (see `src/shared/db/connection.ts`)
-- Mirror the committed employee module conventions: model file defines the entity plus CreateLeavePolicyInput/UpdateLeavePolicyInput; repository file defines both the I*Repository interface and the concrete class (randomUUID, mapRow, `conn = client ?? pool`, RETURNING columns); service is a thin delegating facade with an injectable repository; service interface lives in a separate I*Service file; index.ts is the public entry point exporting entity/input types, repository class+interface, service class+interface, and error types. (see `src/modules/employee/employee.repository.ts`)
-- Reuse the established error family: a RepositoryError base with a `code` property, a PolicyNotFoundError for findById/update misses, and a UniqueConstraintError for pg code 23505 — matching the employee module's error shape and stable machine codes. (see `src/modules/employee/employee.errors.ts`)
-- Match the canonical ILeavePolicyRepository method set (findById, findByLeaveType, findActive, create, update) and the LeavePolicy/leave_policies canonical names from the reconciled architecture. (see `.gestalt/architecture/reconciled.json`)
-### Entity invariants — enforce these
-- Reuse or extend `LeavePolicy`: Lifecycle states are ACTIVE and INACTIVE, expressed via the boolean `isActive`; a policy is created with a caller-supplied `isActive` and may be toggled via update. `id`, `createdAt`, and `updatedAt` are generated by the repository and never caller-supplied.
-- Reuse or extend `LeavePolicy`: `leaveType` must be a valid LeaveType enum value; `entitlementDays` is a required non-negative number; the optional numeric fields (accrualRate, maxAccumulation, minimumNoticeDays) are `number | undefined` and, when present, are persisted as their numeric value (undefined maps to NULL in the row).
-- Reuse or extend `LeavePolicy`: The conceptual table `leave_policies` uses snake_case columns with PK `id` and indexes on `leave_type` and `is_active`; there is no `deleted_at` column (policies are not soft-deleted).
-### Interface contract — expose these operations (their shape is yours)
-- create — Persists a new policy and returns the mapped entity with generated id/createdAt/updatedAt. Accepts an optional PoolClient as the last parameter to join a caller's transaction; falls back to the shared pool when omitted. A pg 23505 violation is mapped to a typed UniqueConstraintError.
-- update — Persists only the supplied changes and returns the updated entity. Accepts an optional PoolClient as the last parameter. Throws a typed PolicyNotFoundError when no row matches the id; maps pg 23505 to UniqueConstraintError.
-- findById — Read-only; uses the shared pool (no client parameter). Returns the mapped entity or null when absent.
-- findByLeaveType — Read-only; uses the shared pool. Returns all policies matching the given LeaveType (empty array when none).
-- findActive — Read-only; uses the shared pool. Returns only policies where isActive is true (empty array when none).
-### Integration points — connect to these
-- src/shared/types/leave.types.ts (LeaveType enum) — The LeavePolicy entity's leaveType field is typed against this enum; the policy module depends on it from Phase 1.
-- src/shared/db/connection.ts (pg Pool) — The repository issues raw parameterized SQL against this shared pool; the module depends on it from Phase 1.
-- src/modules/leave (Phase 8, downstream) — LeaveService will consume findById/findByLeaveType/findActive to resolve entitlement and approval rules when validating leave requests against an ACTIVE policy.
-
-## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
-Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
-- Use unknown with type guards instead of any (rule: `no-any`)
-- Database calls must go through repository pattern (rule: `no-direct-db-outside-repository`)
-- No hardcoded passwords, API keys, or tokens (rule: `no-hardcoded-secrets`)
-- Do not add @gestalt/* packages as project dependencies — these are Gestalt platform internals not available on npm (rule: `no-gestalt-internal-deps`)
-
 ## Architecture & constraint rules the quality gate enforces (satisfy these now)
 The quality gate judges your code against the rules below and BLOCKS the phase on any violation — a violation it rates critical escalates to a human with no automatic retry. These are the same rules the gate checks, so comply up front rather than leaving them for the gate:
 - Data access is only permitted in the designated data access layer of this project. Code in business logic, presentation, or routing layers must delegate all data operations to the data access layer.
@@ -126,24 +85,46 @@ These are the project's non-negotiable invariants. A violation is a GOLDEN_PRINC
 - GP-006 — Error handling: No unhandled promise rejections. All async errors are caught and handled.
 
 ## Project stack & references
-Before writing code, read the referenced files below (those present in the working directory) to learn the project's language, framework, test runner, and conventions, and the cross-cutting rules your code must satisfy — then follow the existing repository conventions:
+Before making the edits below, read the referenced files (those present in the working directory) to learn the project's architecture, conventions, and the cross-cutting rules your fix must still satisfy — then keep the edits consistent with them:
 - `HARNESS.json`
 - `docs/ARCHITECTURE.md`
 - `docs/GOLDEN_PRINCIPLES.md`
 - `AGENTS.md`
 - `PLAN.md`
 
+## Required edits
+
+### Coherent change 1 — apply as ONE atomic edit across ALL sites below
+
+Unifying change (do this now): In src/modules/policy/policy.errors.ts, remove the local RepositoryError and UniqueConstraintError class definitions and import them from the employee module's public entry point; update all references in the policy module to use the imported classes.
+
+The sites below are the SAME underlying issue. Fixing some but not others leaves the code incoherent and the quality gate WILL re-flag it — apply the one change above consistently to EVERY site:
+
+- Site 1
+File: src/modules/policy/policy.errors.ts
+Line: 1
+Offending code: `export class RepositoryError extends Error {`
+Rule violated: no-redefine-owned-symbol
+Action (do this now): Edit `src/modules/policy/policy.errors.ts` at line 1 in place to fix the `no-redefine-owned-symbol` violation.
+What the quality gate found — apply this: [no-redefine-owned-symbol] The employee module already exports a `RepositoryError` base class (identical shape: `readonly code: string`, same constructor and `name` assignment) from its public entry point `src/modules/employee/index.ts`. The policy module re-declares the SAME concept instead of importing it, duplicating the shape and meaning of an existing exported symbol.
+
+- Site 2
+File: src/modules/policy/policy.errors.ts
+Line: 11
+Offending code: `export class UniqueConstraintError extends RepositoryError {`
+Rule violated: no-redefine-owned-symbol
+Action (do this now): Edit `src/modules/policy/policy.errors.ts` at line 11 in place to fix the `no-redefine-owned-symbol` violation.
+What the quality gate found — apply this: [no-redefine-owned-symbol] The employee module already exports a `UniqueConstraintError` (same shape: constructor takes a message, sets `name`, calls `super(code, message)`) from its public entry point. The policy module re-declares the same concept (a unique-constraint violation error) with only a different code value, duplicating the shape and meaning of an existing exported symbol rather than importing it.
+
+Then check the rest of these files (and the surrounding module) for ANY OTHER occurrence of the same pattern beyond the specific lines listed above, and apply the same change there too — do NOT limit the fix to only the enumerated sites.
+
 ## Verify before you finish (MANDATORY)
-The code you write MUST compile and its tests MUST pass — a compilation or type error must NEVER be left for CI to find. Before you declare this task done:
-- Read the project's build / type-check / test commands from `package.json` (scripts) and `HARNESS.json`.
-- Install dependencies if they are not already installed, then RUN the type-check / build (e.g. `npm run build` or `tsc --noEmit`) AND the tests (e.g. `npm test`) for the files this phase touches.
-- FIX every compilation error, type error, and failing test you introduced — including in test files — and re-run until they pass.
-- **While fixing, re-run ONLY what you are fixing** — the specific failing test file(s), or the type-check alone for a type error. Do NOT re-run the whole suite after every edit. A measured run spent ~60 full build/test cycles inside a 30-iteration budget and was cut off mid-work: the suite is the slowest thing you can do, and re-running all of it to learn about one file buys nothing.
-- Run the FULL build and the FULL suite ONCE at the end, to confirm the whole phase holds together. That run is the one that matters; the narrow ones are just your fix loop.
-- If a command HANGS or produces no output, do not sit through it repeatedly: note it, work around it (a narrower target, or a timeout), and say so in your final message. Repeatedly interrupting and re-running the same hanging command is the single most expensive thing you can do with your budget.
+After making the edits above, the code MUST still compile and its tests MUST pass — a compilation/type error, or a test your change breaks, must NEVER be left for CI or the quality gate to find. Before you declare this task done:
+- Read the project's build / type-check / test commands from `package.json` (scripts) and `HARNESS.json`, install dependencies if they are not already installed, then RUN the type-check / build (e.g. `npm run build` or `tsc --noEmit`) AND the tests (e.g. `npm test`).
+- FIX every compilation error, type error, and failing test that YOUR edits introduced — including updating a test whose expectation your change legitimately invalidated (e.g. a new required field, a new status code such as 401/403 from an added authorization check, added input validation) — and re-run until they pass.
 - Only when the build and the tests pass may you consider the task complete. If a dependency install genuinely cannot be made to work, say so explicitly in your final message rather than declaring success on unverified code.
 
 ## Constraints (mandatory)
-- Write and modify source files ONLY. Do NOT run `git commit`, `git push`, `git add`, or any other git command. The platform handles all git operations. (Running the build / type-check / tests above is expected and encouraged — that is NOT a git operation.)
-- Do not create a new repository or change the git remote.
-- Stay within the scope of this phase; do not implement deferred/later work.
+- Keep the change SURGICAL: make the required edits above and fix only what they broke (compile/type errors and the tests they invalidated). Do NOT refactor, regenerate, or change unrelated code, and do not add / delete / rename source files beyond what a required edit — or a test-fix for it — needs.
+- Do NOT run `git commit`, `git push`, `git add`, or any git command. The platform handles all git operations. (Running the build / type-check / tests above is expected and encouraged — that is NOT a git operation.)
+- When the listed edits are made and the build + tests pass, stop.

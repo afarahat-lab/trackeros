@@ -9,8 +9,8 @@ export class RepositoryError extends Error {
 }
 
 export class UniqueConstraintError extends RepositoryError {
-  constructor(message: string) {
-    super('DUPLICATE_EMPLOYEE', message);
+  constructor(code: string, message: string) {
+    super(code, message);
     this.name = 'UniqueConstraintError';
   }
 }
