@@ -1,0 +1,207 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave",
+      "balance",
+      "audit",
+      "policy",
+      "employee"
+    ],
+    "affectedLayers": [
+      "service"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "src/modules/leave/leave.service.ts exists and exports a LeaveService exposing create, approve, reject, and cancel operations.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "create persists a LeaveRequest via the repository and returns it with status PENDING immediately (no DRAFT/SUBMITTED state).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "approve computes the day count exactly once via countLeaveDays from src/shared/leave/day-count.ts and uses that same value for both the balance-sufficiency check and the balance deduction.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "approve debits exactly one LeaveBalance row \u2014 the row for the request's leaveType and the fiscal year of startDate \u2014 and rejects (never clamps) when the deduction would drive remainingDays below zero.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "approve/reject refuse a manager approving or rejecting their own request (approver id equals the request's employeeId).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "approve/reject/cancel only transition a request from PENDING; APPROVED/REJECTED/CANCELLED are terminal and any transition from a terminal state is rejected with a typed error.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "every state-changing operation (create, approve, reject, cancel) writes an AuditLog record with the matching AuditAction (CREATE/APPROVE/REJECT/UPDATE or DELETE).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "the approve flow (status update + balance commit + audit record) is atomic: it runs inside a single unit of work and rolls back on any failure.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The service owns the unit of work and receives IUnitOfWork via constructor injection; it never imports the pg pool, a PoolClient, or a module-level db helper. The data-access layer (IUnitOfWork implementation) is the only place issuing BEGIN/COMMIT/ROLLBACK.",
+    "Participating repository/service methods take the client as an optional LAST parameter and fall back to the shared pool when omitted. The service passes the unit-of-work client to every write inside the transaction; it does not put withTransaction on a repository.",
+    "The service must not perform inline SQL or direct database access \u2014 all persistence goes through the injected repository/service interfaces (GP-001).",
+    "The service must not enforce RBAC inline (GP-005 / AGENTS.md rule 4). Authorization (own/subordinate/all) is a route-level concern owned by Phase 7/9; the service only enforces the domain rule that an approver may not approve/reject their own request.",
+    "The service must not re-declare or re-implement the day-count logic; it imports countLeaveDays from src/shared/leave/day-count.ts and never computes the day count independently.",
+    "The service must not create test files and must not be gated on the existence of tests (tests are owned by Phase 8c)."
+  ],
+  "outOfScope": [
+    "Unit/integration tests for the leave module (tests/unit/modules/leave/*.test.ts) \u2014 owned by Phase 8c.",
+    "The leave domain model and repository (src/modules/leave/leave.model.ts, leave.repository.ts) \u2014 owned by Phase 8a.",
+    "The leave controller and routes, API-boundary validation, and route-level RBAC wiring \u2014 owned by Phase 9.",
+    "Background jobs, notification fanout, and BullMQ \u2014 explicitly out of scope for the whole feature."
+  ],
+  "ambiguities": [
+    {
+      "description": "How the fiscal year of startDate is derived (calendar year vs a configured fiscal-year boundary).",
+      "options": [
+        "Calendar year of startDate (startDate.getUTCFullYear())",
+        "A fiscal-year helper/constant elsewhere in the codebase",
+        "Defer to a later phase and use calendar year for now"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "Whether create must validate the request against an ACTIVE policy matching leaveType (reconciled architecture rule) or only persist PENDING.",
+      "options": [
+        "Enforce active-policy check on create",
+        "Defer active-policy check to approve",
+        "Skip policy validation in this phase"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "Which AuditAction to use for cancel (AuditAction has no CANCEL value).",
+      "options": [
+        "UPDATE",
+        "DELETE",
+        "Add a CANCEL value to AuditAction (out of scope for this phase)"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "Lifecycle: created as PENDING immediately; PENDING \u2192 APPROVED | REJECTED; PENDING \u2192 CANCELLED (owner only); APPROVED/REJECTED/CANCELLED are terminal. The service is the sole enforcer of transition legality."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "startDate <= endDate; a request with startDate after endDate is invalid and rejected."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "approvedBy/approvedAt are null for PENDING/CANCELLED and set (approvedBy = approver id, approvedAt = now) only on APPROVED/REJECTED."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "remainingDays is always non-negative; an approval that would drive remainingDays below zero is rejected, never clamped."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "Exactly one LeaveBalance row is debited per approval \u2014 the row for the request's leaveType and the fiscal year of startDate; no splitting across fiscal years."
+    },
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "Every state-changing operation (create/approve/reject/cancel) produces exactly one AuditLog record with the matching AuditAction and the request id as entityId."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "create",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Rejects invalid input (startDate > endDate) with a typed error; returns the persisted request with status PENDING."
+    },
+    {
+      "operation": "approve",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Rejects self-approval, non-PENDING requests, and insufficient balance (INSUFFICIENT_BALANCE) with typed errors; on success the status change, balance deduction and audit record are atomic."
+    },
+    {
+      "operation": "reject",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Rejects self-rejection and non-PENDING requests with typed errors; does not touch balance; writes an audit record."
+    },
+    {
+      "operation": "cancel",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Only the owner may cancel, and only from PENDING; terminal states cannot be cancelled; writes an audit record."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Day count must be computed by countLeaveDays and used identically for the sufficiency check and the deduction \u2014 never recomputed independently.",
+      "referencePath": "src/shared/leave/day-count.ts"
+    },
+    {
+      "requirement": "Balance deduction must go through commitDays, which already guards remaining_days >= days and throws InsufficientBalanceError \u2014 the service must not reimplement the negative-balance guard.",
+      "referencePath": "src/modules/balance/balance.repository.ts"
+    },
+    {
+      "requirement": "The service must use the IUnitOfWork interface (begin/commit/rollback/client) as the sole transaction mechanism, matching the AGENTS.md rule 5 contract.",
+      "referencePath": "src/shared/db/unit-of-work.ts"
+    },
+    {
+      "requirement": "LeaveStatus/LeaveType/AuditAction enums must be imported from the shared types, not re-declared, matching the leave model's usage.",
+      "referencePath": "src/shared/types/leave.types.ts"
+    },
+    {
+      "requirement": "The service must consume the leave repository's updateStatus/create surface and its LeaveNotFoundError, not reimplement persistence or duplicate error types.",
+      "referencePath": "src/modules/leave/leave.repository.ts"
+    },
+    {
+      "requirement": "Cross-module imports (balance, audit, policy, employee) must go through each module's public index.ts entry point, never internals.",
+      "referencePath": "src/modules/balance/index.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/balance (LeaveBalanceService.commitDays / ILeaveBalanceRepository)",
+      "why": "Debits the single balance row for the request's leaveType and startDate fiscal year during approve."
+    },
+    {
+      "target": "src/modules/audit (AuditService.record)",
+      "why": "Writes the audit record for every state-changing operation."
+    },
+    {
+      "target": "src/modules/policy (LeavePolicyService / ILeavePolicyRepository)",
+      "why": "Resolves the active policy for the request's leaveType to locate the balance row (policyId) and validate the request against an ACTIVE policy."
+    },
+    {
+      "target": "src/modules/employee (EmployeeService / IEmployeeRepository)",
+      "why": "Resolves the applicant's managerId to enforce the self-approval rule and manager authorization."
+    },
+    {
+      "target": "src/shared/db (IUnitOfWork)",
+      "why": "Provides the transaction boundary for the atomic approve flow."
+    }
+  ]
+}
