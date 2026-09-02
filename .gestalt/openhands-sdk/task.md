@@ -1,6 +1,6 @@
-# Implement this phase: Phase 4 — Policy module
+# Implement this phase: Phase 5 — Balance module
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/f5a0dfb3-f8f1-4335-94b2-5d8d22cf459f/4`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/f5a0dfb3-f8f1-4335-94b2-5d8d22cf459f/5`. Do not clone anything; work only in this directory.
 
 You are the IMPLEMENTATION agent, not a planner. The platform measures your work EXCLUSIVELY by the files you create or modify in this working tree (`git status`). Ending your turn with a plan, a summary, or an announcement of what you are 'about to' do — without having actually edited files — is a FAILURE: a turn that leaves the working tree untouched is discarded. Explore only as much as you need, then MAKE the edits with your file-editing tool. Never end your turn before the files exist on disk.
 
@@ -8,7 +8,7 @@ You are the IMPLEMENTATION agent, not a planner. The platform measures your work
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the policy module under src/modules/policy/. Create src/modules/policy/policy.model.ts defining the LeavePolicy entity with the exact canonical fields: id: string, policyName: string, leaveType: LeaveType, entitlementDays: number, accrualRate: number | undefined, maxAccumulation: number | undefined, minimumNoticeDays: number | undefined, requiresManagerApproval: boolean, isActive: boolean, createdAt: Date, updatedAt: Date. Create src/modules/policy/policy.repository.ts implementing LeavePolicyRepository using raw pg parameterized SQL against the shared pool, with optional client?: PoolClient on write methods. Create src/modules/policy/policy.service.ts implementing LeavePolicyService. This phase depends on src/shared/types/leave.types.ts (LeaveType enum) and src/shared/db/connection.ts from Phase 1 — read them before generating. Include Jest unit tests in tests/unit/modules/policy/.
+Create the balance module under src/modules/balance/. Create src/modules/balance/balance.model.ts defining the LeaveBalance entity with the exact canonical fields: id: string, employeeId: string, policyId: string, totalEntitlement: number, usedDays: number, remainingDays: number, fiscalYear: number, status: string, createdAt: Date, updatedAt: Date. Create src/modules/balance/balance.repository.ts implementing LeaveBalanceRepository using raw pg parameterized SQL against the shared pool, with optional client?: PoolClient on write methods. Create src/modules/balance/balance.service.ts implementing LeaveBalanceService. usedDays and remainingDays are INTEGERS; no rounding. This phase depends on src/shared/types/leave.types.ts and src/shared/db/connection.ts from Phase 1 — read them before generating. Include Jest unit tests in tests/unit/modules/balance/.
 
 ## Your iteration budget — and how to get more (READ BEFORE YOU START)
 
@@ -75,25 +75,23 @@ These are resolved, feature-wide decisions. Wherever this phase touches the conc
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- Import the LeaveType enum from the shared types module (via its public entry point) — do not redefine it. The enum exposes annual/sick/emergency/unpaid/maternity/paternity. (see `src/shared/types/leave.types.ts`)
-- Import the shared `pg` Pool from the shared db module (via its public entry point) for all repository queries; never construct a new Pool. (see `src/shared/db/connection.ts`)
-- Mirror the committed employee module conventions: model file defines the entity plus CreateLeavePolicyInput/UpdateLeavePolicyInput; repository file defines both the I*Repository interface and the concrete class (randomUUID, mapRow, `conn = client ?? pool`, RETURNING columns); service is a thin delegating facade with an injectable repository; service interface lives in a separate I*Service file; index.ts is the public entry point exporting entity/input types, repository class+interface, service class+interface, and error types. (see `src/modules/employee/employee.repository.ts`)
-- Reuse the established error family: a RepositoryError base with a `code` property, a PolicyNotFoundError for findById/update misses, and a UniqueConstraintError for pg code 23505 — matching the employee module's error shape and stable machine codes. (see `src/modules/employee/employee.errors.ts`)
-- Match the canonical ILeavePolicyRepository method set (findById, findByLeaveType, findActive, create, update) and the LeavePolicy/leave_policies canonical names from the reconciled architecture. (see `.gestalt/architecture/reconciled.json`)
+- Reuse the shared pg Pool exported from connection.ts (never create a second pool); write methods fall back to it when no client is supplied. (see `src/shared/db/connection.ts`)
+- Import RepositoryError and UniqueConstraintError from the employee module's public entry point rather than redeclaring them; add only BalanceNotFoundError locally. (see `src/modules/employee/index.ts`)
+- Mirror the policy repository's raw-pg patterns: randomUUID() id, const conn = client ?? pool, snake_case→camelCase mapRow, RETURNING column list, dynamic SET clause for update, and 23505→UniqueConstraintError mapping. (see `src/modules/policy/policy.repository.ts`)
+- Match the canonical LeaveBalance entity/table shape (leave_balances, snake_case columns, PK id, FKs to employees.id and leave_policies.id, unique (employee_id, policy_id, fiscal_year)). (see `.gestalt/architecture/reconciled.json`)
+- Follow the module file convention (model, repository, service, service.interface, errors, index) and the thin delegating service facade with injectable repository defaulting to the concrete class. (see `src/modules/policy/policy.service.ts`)
 ### Entity invariants — enforce these
-- Reuse or extend `LeavePolicy`: Lifecycle states are ACTIVE and INACTIVE, expressed via the boolean `isActive`; a policy is created with a caller-supplied `isActive` and may be toggled via update. `id`, `createdAt`, and `updatedAt` are generated by the repository and never caller-supplied.
-- Reuse or extend `LeavePolicy`: `leaveType` must be a valid LeaveType enum value; `entitlementDays` is a required non-negative number; the optional numeric fields (accrualRate, maxAccumulation, minimumNoticeDays) are `number | undefined` and, when present, are persisted as their numeric value (undefined maps to NULL in the row).
-- Reuse or extend `LeavePolicy`: The conceptual table `leave_policies` uses snake_case columns with PK `id` and indexes on `leave_type` and `is_active`; there is no `deleted_at` column (policies are not soft-deleted).
+- Reuse or extend `LeaveBalance`: remainingDays = totalEntitlement - usedDays, always non-negative; usedDays and remainingDays are integers with no rounding.
+- Reuse or extend `LeaveBalance`: status is a plain string restricted to ACTIVE or CLOSED; a balance is uniquely identified by (employeeId, policyId, fiscalYear).
 ### Interface contract — expose these operations (their shape is yours)
-- create — Persists a new policy and returns the mapped entity with generated id/createdAt/updatedAt. Accepts an optional PoolClient as the last parameter to join a caller's transaction; falls back to the shared pool when omitted. A pg 23505 violation is mapped to a typed UniqueConstraintError.
-- update — Persists only the supplied changes and returns the updated entity. Accepts an optional PoolClient as the last parameter. Throws a typed PolicyNotFoundError when no row matches the id; maps pg 23505 to UniqueConstraintError.
-- findById — Read-only; uses the shared pool (no client parameter). Returns the mapped entity or null when absent.
-- findByLeaveType — Read-only; uses the shared pool. Returns all policies matching the given LeaveType (empty array when none).
-- findActive — Read-only; uses the shared pool. Returns only policies where isActive is true (empty array when none).
+- commitDays — Rejects (throws) when the commit would drive remainingDays below zero; throws BalanceNotFoundError when no matching balance row exists; joins a caller's transaction via optional PoolClient.
+- create — Maps pg unique-violation 23505 on (employee_id, policy_id, fiscal_year) to UniqueConstraintError; generates id/createdAt/updatedAt itself.
+- update — Throws BalanceNotFoundError when no row matches; maps 23505 to UniqueConstraintError; only supplied fields are persisted.
 ### Integration points — connect to these
-- src/shared/types/leave.types.ts (LeaveType enum) — The LeavePolicy entity's leaveType field is typed against this enum; the policy module depends on it from Phase 1.
-- src/shared/db/connection.ts (pg Pool) — The repository issues raw parameterized SQL against this shared pool; the module depends on it from Phase 1.
-- src/modules/leave (Phase 8, downstream) — LeaveService will consume findById/findByLeaveType/findActive to resolve entitlement and approval rules when validating leave requests against an ACTIVE policy.
+- src/shared/db/connection.ts (shared pg Pool) — Repository reads/writes run against the single shared pool; write methods accept an optional PoolClient to join the leave service's transaction.
+- src/shared/types/leave.types.ts (shared-types) — Balance module may import shared enums/types; the dependency map limits balance to shared-types and shared-db.
+- src/modules/employee/index.ts (RepositoryError, UniqueConstraintError) — Balance reuses the shared error base classes rather than redeclaring them, matching the policy module's pattern.
+- src/modules/leave/ (future Phase 8 consumer) — commitDays is the transactional primitive the leave service will call during approve/reject to debit a balance atomically.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
