@@ -1,0 +1,167 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "domain",
+      "data-access"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "src/modules/leave/leave.model.ts exports a LeaveRequest entity whose fields are exactly id: string, employeeId: string, leaveType: LeaveType, startDate: Date, endDate: Date, reason: string | undefined, status: LeaveStatus, approvedBy: string | null, approvedAt: Date | null, createdAt: Date, updatedAt: Date \u2014 with LeaveType/LeaveStatus imported from src/shared/types.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/modules/leave/leave.repository.ts exports ILeaveRequestRepository and LeaveRequestRepository exposing create, findById, findByEmployee, findByStatus, findByQuery, update, updateStatus, and delete.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "create persists a leave_requests row via parameterized SQL and returns the mapped entity with status PENDING, approvedBy null, approvedAt null, and a generated id/createdAt/updatedAt.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "updateStatus persists the new LeaveStatus and returns the updated entity; when the target status is APPROVED/REJECTED it stamps approvedBy and approvedAt, and throws LeaveNotFoundError (code LEAVE_NOT_FOUND) when no row matches.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "update builds a dynamic SET clause from only the supplied fields, always sets updated_at, and throws LeaveNotFoundError when no row matches.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findById returns the mapped LeaveRequest or null when absent; findByEmployee/findByStatus/findByQuery return mapped arrays filtered by their respective criteria.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All SQL must be raw pg parameterized SQL against the shared pool (src/shared/db/connection.ts); Knex must not be used in repository queries.",
+    "Write methods (create, update, updateStatus, delete) accept an optional PoolClient as their LAST parameter and default to the shared pool via `const conn: Pool | PoolClient = client ?? pool`; read methods always use the shared pool.",
+    "IDs are generated with randomUUID from 'crypto'; createdAt/updatedAt are set to `new Date()` by the repository and never caller-supplied.",
+    "RepositoryError and UniqueConstraintError must be imported from the employee module's public entry point (src/modules/employee/index.ts), not re-declared; a local LeaveNotFoundError (code LEAVE_NOT_FOUND) extends RepositoryError.",
+    "pg unique-violation (code 23505) must be detected via an isPgError/isPgUniqueViolation guard and mapped to UniqueConstraintError; no `any` type (use unknown + type guards).",
+    "Only leave.model.ts and leave.repository.ts are created in this sub-phase; no leave.service.ts, no tests, no module index.ts."
+  ],
+  "outOfScope": [
+    "src/modules/leave/leave.service.ts (LeaveService) \u2014 Phase 8b sibling.",
+    "Unit/integration tests (tests/unit/modules/leave/*) \u2014 Phase 8c sibling.",
+    "Leave controller, routes, and API-boundary validation \u2014 Phase 9.",
+    "Business-rule enforcement (startDate<=endDate, active-policy check, balance deduction, audit writes, RBAC) \u2014 owned by the service/controller phases, not the repository."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "A LeaveRequest is created as PENDING immediately (no DRAFT/SUBMITTED state); approvedBy and approvedAt are null until the request is approved or rejected, and remain null for PENDING/CANCELLED."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "Lifecycle state machine: PENDING \u2192 (APPROVED | REJECTED); PENDING \u2192 CANCELLED (owner only); APPROVED/REJECTED/CANCELLED are terminal. The repository persists status transitions but does not itself enforce the transition legality (service owns that)."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "leaveType is stored as the LeaveType enum string value (not a FK to leave_policies); reason maps to NULL when undefined; approvedBy/approvedAt map to NULL when null."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "create",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Persists a new leave_requests row and returns the mapped LeaveRequest; maps pg 23505 to UniqueConstraintError; defaults status to PENDING and approvedBy/approvedAt to null."
+    },
+    {
+      "operation": "findById",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the mapped LeaveRequest or null when no row matches; never throws for a missing row."
+    },
+    {
+      "operation": "findByEmployee",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an array (possibly empty) of mapped LeaveRequests for the given employeeId."
+    },
+    {
+      "operation": "findByStatus",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an array (possibly empty) of mapped LeaveRequests matching the given LeaveStatus."
+    },
+    {
+      "operation": "findByQuery",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an array (possibly empty) of mapped LeaveRequests filtered by the supplied query criteria (status/leaveType/date ranges/limit/offset)."
+    },
+    {
+      "operation": "update",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Applies only the supplied fields, always sets updated_at, returns the updated entity, and throws LeaveNotFoundError (code LEAVE_NOT_FOUND) when no row matches."
+    },
+    {
+      "operation": "updateStatus",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Persists the new status (and stamps approvedBy/approvedAt for APPROVED/REJECTED), returns the updated entity, and throws LeaveNotFoundError when no row matches."
+    },
+    {
+      "operation": "delete",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Removes the matching leave_requests row and throws LeaveNotFoundError when no row matches."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "LeaveRequest entity fields and their snake_case column mappings must match the canonical leave_requests table (id, employee_id, leave_type, start_date, end_date, reason, status, approved_by, approved_at, created_at, updated_at) as defined in the reconciled architecture.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "LeaveType and LeaveStatus enums must be imported from the shared types module (values annual/sick/emergency/unpaid/maternity/paternity and PENDING/APPROVED/REJECTED/CANCELLED), not re-declared.",
+      "referencePath": "src/shared/types/leave.types.ts"
+    },
+    {
+      "requirement": "The shared pg Pool must be imported from the shared-db public entry point and used as the default connection for all repository queries.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "RepositoryError and UniqueConstraintError must be imported from the employee module's public entry point (not re-declared), matching how policy/balance/notification reuse them.",
+      "referencePath": "src/modules/employee/index.ts"
+    },
+    {
+      "requirement": "Row-mapping convention (LEAVE_COLUMNS constant, snake_case LeaveRequestRow interface, mapRow() to camelCase) must mirror the sibling repository modules.",
+      "referencePath": "src/modules/balance/balance.repository.ts"
+    },
+    {
+      "requirement": "Dynamic SET-clause update pattern (only supplied fields + always updated_at + not-found throw) must match the sibling update implementations.",
+      "referencePath": "src/modules/policy/policy.repository.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types (LeaveType, LeaveStatus)",
+      "why": "Entity field types for leaveType and status."
+    },
+    {
+      "target": "src/shared/db (pool)",
+      "why": "Default connection for all repository queries."
+    },
+    {
+      "target": "src/modules/employee (RepositoryError, UniqueConstraintError)",
+      "why": "Shared typed error base classes reused by the leave repository."
+    }
+  ]
+}
