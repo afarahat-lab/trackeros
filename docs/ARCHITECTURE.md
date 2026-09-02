@@ -25,13 +25,14 @@ src/modules/balance/balance.{model,repository,service,service.interface,errors}.
 src/modules/status/status.{model,service,service.interface}.ts + index.ts
 src/modules/uptime/uptime.{model,routes,service,service.interface}.ts + index.ts
 src/modules/notification/notification.{model,repository,service}.ts   — entity + repository + service (no service interface, no errors.ts, no index.ts)
+src/modules/auth/{authenticated-user,auth.middleware,auth.errors,local-users,rbac,fastify.d.ts}.ts + index.ts   — JWT auth middleware + route-level RBAC guard
 src/shared/types/leave.types.ts + index.ts   — enums, DTOs, ValidationResult
 src/shared/db/connection.ts + unit-of-work.ts + index.ts   — pg Pool, IUnitOfWork
 src/shared/leave/day-count.ts + index.ts   — inclusive day-count helper
 ```
 
-Remaining domain modules (leave, auth)
-are planned per the reconciled architecture below and not yet built.
+Remaining domain module (leave)
+is planned per the reconciled architecture below and not yet built.
 
 ## Key patterns
 
@@ -349,3 +350,57 @@ balance modules, the notification module has no service interface, no
 `errors.ts`, and no `index.ts` — the `NotificationNotFoundError` lives in the
 repository file, and the module currently has no public entry point, so other
 modules cannot yet import from it via `index.ts`.
+
+## Auth module — implemented (Phase 7)
+
+The auth module implements the JWT auth middleware and the route-level RBAC
+guard from the reconciled architecture above. It ships the middleware, the
+RBAC helpers, the principal type, the seeded local identities, the error type,
+the Fastify request augmentation and a public entry point.
+
+- `authenticated-user.ts` — `AuthenticatedUser` interface
+  (`{ id: string; role: UserRole }`), the principal populated onto
+  `request.user` after successful JWT verification; plus `isUserRole`, a type
+  guard narrowing a decoded JWT `role` claim to the `UserRole` enum (so a
+  token can never grant a role outside `employee | manager | hr_admin`).
+- `auth.middleware.ts` — `authenticate`, a Fastify `preHandler` hook that
+  verifies a bearer JWT and populates `request.user`. On any failure it sends
+  `401` with the `{ error, code }` shape and leaves `request.user` unset.
+  Reads the secret from `process.env.JWT_SECRET` and fails closed
+  (`AUTH_NOT_CONFIGURED`) when unset — never a hardcoded fallback. Distinguishes
+  `TOKEN_EXPIRED` from `INVALID_TOKEN`; rejects tokens whose subject is not a
+  seeded local user or whose role is not a valid `UserRole`. Only this hook
+  sets `request.user`; handlers must never assign it.
+- `local-users.ts` — `LocalUser` interface and `LOCAL_USERS`, the seeded
+  development identities (two employees, one manager, one hr_admin) with no
+  credentials; `findLocalUserById` is the lookup the middleware uses to
+  validate the token subject.
+- `rbac.ts` — `hasRole` (role-rank comparison: manager inherits employee,
+  hr_admin supersedes both), `isOwnResource` (principal id equals the
+  resource's `employeeId`), `isSubordinate` (applicant reports directly to the
+  manager AND is not the manager themself — self-approval always denied), and
+  `requireRole(required)`, a route-level guard returning a `preHandler` that
+  rejects with `403` / `FORBIDDEN`. RBAC is enforced at the route boundary
+  only, never inline in a service.
+- `auth.errors.ts` — `AuthenticationError` carrying a stable machine `code`
+  surfaced in the `{ error, code }` response body.
+- `fastify.d.ts` — module augmentation adding `user?: AuthenticatedUser` to
+  `FastifyRequest`.
+- `index.ts` — public entry point exporting the principal type, the
+  middleware, the RBAC helpers and the local-user lookup.
+
+RBAC matrix (as implemented): employee acts on OWN resources; manager inherits
+employee permissions and additionally approves/rejects subordinates' requests
+(never their own); hr_admin acts on ALL. Ownership is
+`principal.id === resource.employeeId`; subordination is
+`applicant.managerId === manager.id && applicant.id !== manager.id`, with the
+applicant's `managerId` read via the employee module (never a direct
+employees-table query from the leave module).
+
+Note: the plan (Phase 7) named only two files (`auth.middleware.ts`,
+`rbac.ts`); the implementation additionally ships `authenticated-user.ts`,
+`local-users.ts`, `auth.errors.ts`, `fastify.d.ts` and `index.ts`. The
+"RBAC authorization matrix" and "local dev auth strategy" open questions from
+the reconciled architecture are now resolved by this module: local dev auth
+uses seeded `LOCAL_USERS` (no mock OIDC provider), and the role matrix is the
+own/subordinate/all hierarchy above.
