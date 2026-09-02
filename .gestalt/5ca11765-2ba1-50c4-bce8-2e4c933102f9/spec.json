@@ -1,0 +1,137 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "auth",
+      "shared-types",
+      "employee"
+    ],
+    "affectedLayers": [
+      "middleware",
+      "route-guard",
+      "unit-tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The JWT middleware verifies a bearer token and, on success, populates request.user with exactly { id: string; role: UserRole } (role one of 'employee' | 'manager' | 'hr_admin'); a missing/invalid/expired token is rejected with a 401 and does not set request.user.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The requireRole(...) guard enforces the full RBAC matrix: employee may act only on their OWN resources; manager inherits all employee permissions and may additionally approve/reject subordinates' requests but never their own; hr_admin may view and act on ALL requests and adjust balances. Each matrix case is covered by a passing Jest unit test in tests/unit/modules/auth/.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Ownership is resolved by comparing the authenticated principal's employee id to the resource's owning employeeId (LeaveRequest.employeeId / LeaveBalance.employeeId); a resource is \"own\" only when they are equal.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Subordination is resolved via the employee module (B is subordinate of A when B.managerId === A.id); the auth/RBAC code never queries the employees table directly.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Self-approval is explicitly blocked: the approver must never equal the applicant, even when a manager is their own manager.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "RBAC is enforced ONLY at the route level via requireRole(...); no inline role/ownership checks may appear inside services or handlers.",
+    "The auth module depends only on shared-types (UserRole enum); it must not import from leave, balance, or any other domain module.",
+    "Manager/subordinate lookup goes through the employee module's public entry point (src/modules/employee/index.ts); the auth/RBAC code must not query the employees table directly.",
+    "Local dev auth uses seeded local users; no mock OIDC provider is introduced.",
+    "No hardcoded secrets: the JWT signing/verification secret must come from configuration/environment, never a literal in source.",
+    "Use `unknown` with type guards, not `any`, when decoding the JWT payload into request.user."
+  ],
+  "outOfScope": [
+    "No mock OIDC provider; local dev auth is seeded local users only.",
+    "No inline RBAC/ownership checks inside services or handlers \u2014 enforcement is route-level only.",
+    "No leave/balance business logic (create/approve/reject/cancel, balance adjustment) is implemented in this phase \u2014 only the auth + RBAC primitives those routes will consume.",
+    "No direct employees-table query from the auth module; manager lookup is delegated to the employee module."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "request.user (auth principal)",
+      "mustExistOrExtend": true,
+      "invariant": "Always the shape { id: string; role: UserRole } with role restricted to 'employee' | 'manager' | 'hr_admin'; set only by the JWT middleware after successful verification, never by handlers."
+    },
+    {
+      "entity": "UserRole",
+      "mustExistOrExtend": true,
+      "invariant": "Role hierarchy is fixed: manager inherits every employee permission; hr_admin supersedes both. No role may be granted a permission outside this matrix."
+    },
+    {
+      "entity": "Employee (managerId relationship)",
+      "mustExistOrExtend": true,
+      "invariant": "B is a subordinate of A iff B.managerId === A.id; this relationship is the sole basis for manager approval authority and is read via the employee module, never recomputed in auth."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "JWT verification middleware (populates request.user)",
+      "authRule": "Requires a valid bearer JWT; missing/invalid/expired token \u2192 401 and request.user left unset.",
+      "idempotent": false,
+      "errorSemantics": "Authentication failure \u2192 401 with { error: string; code: string }."
+    },
+    {
+      "operation": "requireRole(...) route guard",
+      "authRule": "Enforces the role matrix; authorization failure \u2192 403 (code FORBIDDEN).",
+      "idempotent": false,
+      "errorSemantics": "Authorization failure \u2192 403 with { error: string; code: string }."
+    },
+    {
+      "operation": "Ownership check (own resource)",
+      "authRule": "Resource is \"own\" iff its employeeId equals the authenticated principal's employee id.",
+      "idempotent": false,
+      "errorSemantics": ""
+    },
+    {
+      "operation": "Subordination check (manager over subordinate)",
+      "authRule": "Manager may approve/reject only where applicant.managerId === manager.id AND applicant.id !== manager.id (self-approval always denied).",
+      "idempotent": false,
+      "errorSemantics": ""
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Reuse the UserRole enum (employee | manager | hr_admin) exactly as defined; do not redeclare or diverge from its values.",
+      "referencePath": "src/shared/types/leave.types.ts"
+    },
+    {
+      "requirement": "request.user must match the auth contract { id: string; role: UserRole }.",
+      "referencePath": ".gestalt/architecture/reconciled.json (auth_contract)"
+    },
+    {
+      "requirement": "Manager/subordinate resolution must use the employee module's manager lookup (findByManager / managerId), not a direct employees-table query.",
+      "referencePath": "src/modules/employee/index.ts"
+    },
+    {
+      "requirement": "Error responses use the { error: string; code: string } shape with 401 for auth failure and 403 (FORBIDDEN) for authorization failure.",
+      "referencePath": ".gestalt/architecture/reconciled.json (error_response_contract)"
+    },
+    {
+      "requirement": "Self-approval prohibition and manager-only approval follow the binding rule \"Only a manager (an Employee referenced by the applicant's managerId) may approve or reject a LeaveRequest; the approver must not be the applicant.\"",
+      "referencePath": ".gestalt/architecture/reconciled.json (business_rules)"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/leave.types.ts (UserRole enum)",
+      "why": "The auth module's role type and matrix are defined against this enum."
+    },
+    {
+      "target": "src/modules/employee/index.ts (IEmployeeService.findByManager / Employee.managerId)",
+      "why": "Subordination resolution for manager approval authority; the only sanctioned path to the employees table."
+    },
+    {
+      "target": "src/modules/leave (Phase 8/9 routes)",
+      "why": "The requireRole(...) guard and request.user principal are consumed by leave routes to enforce the RBAC matrix."
+    }
+  ]
+}
