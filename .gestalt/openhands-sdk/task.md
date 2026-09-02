@@ -1,23 +1,22 @@
-# Implement this phase: Phase 6b — Notification service
+# Implement this phase: Phase 6c — Notification unit tests
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/f5a0dfb3-f8f1-4335-94b2-5d8d22cf459f/7`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/f5a0dfb3-f8f1-4335-94b2-5d8d22cf459f/8`. Do not clone anything; work only in this directory.
 
 You are the IMPLEMENTATION agent, not a planner. The platform measures your work EXCLUSIVELY by the files you create or modify in this working tree (`git status`). Ending your turn with a plan, a summary, or an announcement of what you are 'about to' do — without having actually edited files — is a FAILURE: a turn that leaves the working tree untouched is discarded. Explore only as much as you need, then MAKE the edits with your file-editing tool. Never end your turn before the files exist on disk.
 
 ## What to build
-notification.service.ts exports NotificationService that depends on NotificationRepository and the Notification entity from Phase 6a.
-Service methods delegate persistence to NotificationRepository and use NotificationStatus from src/shared/types/leave.types.ts.
-The file compiles cleanly with TypeScript and contains no BullMQ/background-fanout logic.
+Jest unit tests exist under tests/unit/modules/notification/ and cover NotificationService and NotificationRepository.
+Tests mock the shared pg pool/PoolClient and verify the optional client?: PoolClient path on write methods.
+Tests cover create, markAsRead, and listByRecipient behavior.
+All tests pass when run with the project's Jest configuration.
 
 ## Success criteria
-Create src/modules/notification/notification.service.ts implementing NotificationService. It depends on the Notification entity (notification.model.ts) and NotificationRepository (notification.repository.ts) created in Phase 6a, and on the NotificationStatus enum from src/shared/types/leave.types.ts. Implement the service methods (e.g. create, markAsRead, listByRecipient) by delegating to the repository. No background fanout (no BullMQ).
+Create Jest unit tests under tests/unit/modules/notification/ covering the NotificationService and NotificationRepository created in Phases 6a and 6b. Mock the shared pg pool / PoolClient and the repository where appropriate. Cover create, markAsRead, and listByRecipient behavior, including the optional client?: PoolClient path on write methods.
 
 ## Owned by SIBLING sub-phases (OUT OF SCOPE for this sub-phase)
 This is ONE sub-phase of a split phase. The deliverables below belong to sibling sub-phases — do NOT create them here, do NOT list them as success criteria, and this sub-phase MUST NOT be gated on their presence (they are produced by a sibling, not missing):
 - "Phase 6a — Notification entity and repository": src/modules/notification/notification.model.ts, src/modules/notification/notification.repository.ts
-- "Phase 6c — Notification unit tests": tests/unit/modules/notification/notification.service.spec.ts, tests/unit/modules/notification/notification.repository.spec.ts
-
-In particular, UNIT/INTEGRATION TESTS are OUT OF SCOPE for this sub-phase — they are produced in: Phase 6c — Notification unit tests. Do not create test files here, do not require test existence or coverage as a success criterion, and do not fail the gate for missing tests.
+- "Phase 6b — Notification service": src/modules/notification/notification.service.ts
 
 ## Your iteration budget — and how to get more (READ BEFORE YOU START)
 
@@ -98,23 +97,22 @@ The entities below are shared, cross-module DATA CONTRACTS. Implement each one w
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- Service method names and signatures must mirror INotificationRepository exactly (create, findByRecipient, findByEntity, updateStatus, markRead), including the optional PoolClient last parameter on write methods. (see `src/modules/notification/notification.repository.ts`)
-- Import Notification and CreateNotificationInput types from the notification model; do not re-declare them. (see `src/modules/notification/notification.model.ts`)
-- Import NotificationStatus from the shared types module (not re-declared locally). (see `src/shared/types/leave.types.ts`)
-- Follow the established thin-facade service pattern: constructor injection defaulting to the concrete repository, methods delegating directly and forwarding the optional PoolClient. (see `src/modules/balance/balance.service.ts`)
-- NotificationNotFoundError and RepositoryError are declared in the repository file and imported from the employee module's public entry point respectively — the service must not re-declare them. (see `src/modules/notification/notification.repository.ts`)
+- Repository tests must mock the shared pool exactly as the balance/audit specs do — jest.mock of src/shared/db with a module-level poolQuery jest.fn(), and a FakeClient { query: jest.fn() } for the optional-client path, asserting poolQuery is not called when a client is supplied. (see `tests/unit/modules/balance/balance.repository.spec.ts`)
+- Service tests must inject a fake INotificationRepository with jest.fn() methods and assert delegation including the undefined client on write methods, matching the balance service spec pattern. (see `tests/unit/modules/balance/balance.service.spec.ts`)
+- Tests must assert against the actual NotificationRepository/NotificationService/Notification/CreateNotificationInput/INotificationRepository/NotificationNotFoundError shapes and the NotificationStatus enum as declared in the committed source. (see `src/modules/notification/notification.repository.ts`)
+- Tests must import the shared pool from src/shared/db and NotificationStatus from src/shared/types, and RepositoryError from the employee module's public entry point, matching the notification repository's own imports. (see `src/shared/db/index.ts`)
 ### Entity invariants — enforce these
-- Reuse or extend `NotificationService`: The service is stateless beyond its injected repository reference and never mutates or re-shapes the Notification entities it returns.
+- Reuse or extend `Notification`: A Notification's id and createdAt are repository-generated (never caller-supplied); status defaults to PENDING on create and readAt is null until markRead sets status to READ and stamps read_at.
+- Reuse or extend `Notification`: relatedEntityType and relatedEntityId are either both present or both absent; a mismatched pair is rejected with INVALID_NOTIFICATION.
 ### Interface contract — expose these operations (their shape is yours)
-- create — Delegates to repository.create; INVALID_NOTIFICATION (mismatched relatedEntityType/relatedEntityId) propagates unchanged.
-- updateStatus — Delegates to repository.updateStatus; NotificationNotFoundError (NOTIFICATION_NOT_FOUND) propagates unchanged when no row matches.
-- markRead — Delegates to repository.markRead; sets status=READ and stamps read_at; NotificationNotFoundError propagates unchanged when no row matches.
-- findByRecipient — Delegates to repository.findByRecipient; returns Notification[] (possibly empty), no client forwarded.
-- findByEntity — Delegates to repository.findByEntity; returns Notification[] (possibly empty), no client forwarded.
+- create — Rejects a mismatched relatedEntityType/relatedEntityId pair with RepositoryError code INVALID_NOTIFICATION; otherwise persists and returns the mapped Notification.
+- markRead — Sets status to READ and stamps read_at; throws NotificationNotFoundError (code NOTIFICATION_NOT_FOUND) when no row is affected.
+- updateStatus — Updates only status and throws NotificationNotFoundError (code NOTIFICATION_NOT_FOUND) when no row is affected.
+- findByRecipient — Returns an array (empty when none) of mapped notifications ordered by created_at DESC, id ASC; uses the shared pool and takes no client.
 ### Integration points — connect to these
-- src/modules/notification/notification.repository.ts (INotificationRepository / NotificationRepository) — The service delegates all five operations to this repository interface.
-- src/modules/notification/notification.model.ts (Notification, CreateNotificationInput) — Type source for the service's method signatures and return values.
-- src/shared/types/leave.types.ts (NotificationStatus) — Enum used in updateStatus/markRead signatures.
+- src/shared/db (pool) — The repository's read methods and default write path use the shared pg pool; tests mock it to verify SQL and parameter binding without a live DB.
+- src/shared/types (NotificationStatus) — NotificationStatus enum values (PENDING/SENT/READ/ARCHIVED) drive create defaults and markRead/updateStatus assertions.
+- src/modules/employee (RepositoryError) — NotificationNotFoundError and the INVALID_NOTIFICATION error extend/use RepositoryError imported from the employee module's public entry point.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
