@@ -1,0 +1,131 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "notification"
+    ],
+    "affectedLayers": [
+      "unit tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "A Jest unit test suite exists under tests/unit/modules/notification/ covering NotificationRepository and NotificationService (e.g. notification.repository.spec.ts and notification.service.spec.ts), following the .spec.ts naming convention used by the audit/balance/employee/policy suites.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Repository create is tested to: persist a row via the shared pool, return the mapped Notification (snake_case DB columns mapped to camelCase entity fields, status cast to NotificationStatus), default status to PENDING and readAt to null, and generate id/createdAt rather than taking them from input.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Repository create is tested to reject a mismatched relatedEntityType/relatedEntityId pair (one present, one absent) with a RepositoryError carrying code INVALID_NOTIFICATION.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Repository markRead is tested to set status to READ and stamp read_at, return the updated Notification, and throw NotificationNotFoundError (code NOTIFICATION_NOT_FOUND) when no row is affected.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Repository findByRecipient is tested to return an empty array when none exist and to return all mapped notifications for a recipient ordered by created_at DESC, id ASC.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The optional client?: PoolClient path is tested on the write methods (create, updateStatus, markRead): when a fake client is supplied the repository uses client.query and the shared pool is NOT called; read methods (findByRecipient, findByEntity) always use the shared pool and take no client.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "NotificationService is tested with an injected fake INotificationRepository to assert delegation for create, findByRecipient, findByEntity, updateStatus, and markRead \u2014 write methods forward the optional client (undefined when omitted) and read methods pass no client.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Tests must mock the shared pg pool via jest.mock('../../../../src/shared/db', ...) exposing a module-level poolQuery jest.fn(), and use a FakeClient with a query jest.fn() for the optional-client path \u2014 mirroring the existing balance/audit repository specs. No real database connection may be opened.",
+    "Tests must import the notification module from its actual committed files (src/modules/notification/notification.repository.ts, notification.service.ts, notification.model.ts) and the shared types/db from their existing paths \u2014 do not assume an index.ts, errors.ts, or service interface exists for the notification module.",
+    "Tests must use the actual API names create, markRead, and findByRecipient (not the task's markAsRead/listByRecipient aliases), and assert against the real NotificationStatus enum values PENDING/SENT/READ/ARCHIVED.",
+    "Tests must not create or modify production source files (no index.ts, errors.ts, or service interface) \u2014 this sub-phase only adds test files under tests/unit/modules/notification/."
+  ],
+  "outOfScope": [
+    "Creating src/modules/notification/notification.model.ts, notification.repository.ts, and notification.service.ts \u2014 these are owned by sibling sub-phases 6a and 6b and already exist in the committed source.",
+    "Adding an index.ts, errors.ts, or service interface to the notification module \u2014 the module intentionally lacks these and this sub-phase must not introduce them.",
+    "Integration tests against a real PostgreSQL database, and any background fanout/BullMQ behavior (explicitly out of scope for the notification module)."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "A Notification's id and createdAt are repository-generated (never caller-supplied); status defaults to PENDING on create and readAt is null until markRead sets status to READ and stamps read_at."
+    },
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "relatedEntityType and relatedEntityId are either both present or both absent; a mismatched pair is rejected with INVALID_NOTIFICATION."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "create",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Rejects a mismatched relatedEntityType/relatedEntityId pair with RepositoryError code INVALID_NOTIFICATION; otherwise persists and returns the mapped Notification."
+    },
+    {
+      "operation": "markRead",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Sets status to READ and stamps read_at; throws NotificationNotFoundError (code NOTIFICATION_NOT_FOUND) when no row is affected."
+    },
+    {
+      "operation": "updateStatus",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Updates only status and throws NotificationNotFoundError (code NOTIFICATION_NOT_FOUND) when no row is affected."
+    },
+    {
+      "operation": "findByRecipient",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an array (empty when none) of mapped notifications ordered by created_at DESC, id ASC; uses the shared pool and takes no client."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Repository tests must mock the shared pool exactly as the balance/audit specs do \u2014 jest.mock of src/shared/db with a module-level poolQuery jest.fn(), and a FakeClient { query: jest.fn() } for the optional-client path, asserting poolQuery is not called when a client is supplied.",
+      "referencePath": "tests/unit/modules/balance/balance.repository.spec.ts"
+    },
+    {
+      "requirement": "Service tests must inject a fake INotificationRepository with jest.fn() methods and assert delegation including the undefined client on write methods, matching the balance service spec pattern.",
+      "referencePath": "tests/unit/modules/balance/balance.service.spec.ts"
+    },
+    {
+      "requirement": "Tests must assert against the actual NotificationRepository/NotificationService/Notification/CreateNotificationInput/INotificationRepository/NotificationNotFoundError shapes and the NotificationStatus enum as declared in the committed source.",
+      "referencePath": "src/modules/notification/notification.repository.ts"
+    },
+    {
+      "requirement": "Tests must import the shared pool from src/shared/db and NotificationStatus from src/shared/types, and RepositoryError from the employee module's public entry point, matching the notification repository's own imports.",
+      "referencePath": "src/shared/db/index.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/db (pool)",
+      "why": "The repository's read methods and default write path use the shared pg pool; tests mock it to verify SQL and parameter binding without a live DB."
+    },
+    {
+      "target": "src/shared/types (NotificationStatus)",
+      "why": "NotificationStatus enum values (PENDING/SENT/READ/ARCHIVED) drive create defaults and markRead/updateStatus assertions."
+    },
+    {
+      "target": "src/modules/employee (RepositoryError)",
+      "why": "NotificationNotFoundError and the INVALID_NOTIFICATION error extend/use RepositoryError imported from the employee module's public entry point."
+    }
+  ]
+}
