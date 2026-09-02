@@ -1,22 +1,20 @@
-# Implement this phase: Phase 6a — Notification entity and repository
+# Implement this phase: Phase 6b — Notification service
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/f5a0dfb3-f8f1-4335-94b2-5d8d22cf459f/6`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/f5a0dfb3-f8f1-4335-94b2-5d8d22cf459f/7`. Do not clone anything; work only in this directory.
 
 You are the IMPLEMENTATION agent, not a planner. The platform measures your work EXCLUSIVELY by the files you create or modify in this working tree (`git status`). Ending your turn with a plan, a summary, or an announcement of what you are 'about to' do — without having actually edited files — is a FAILURE: a turn that leaves the working tree untouched is discarded. Explore only as much as you need, then MAKE the edits with your file-editing tool. Never end your turn before the files exist on disk.
 
 ## What to build
-notification.model.ts exports the Notification entity/interface with exactly the canonical fields and types listed (id, recipientId, type, title, message, relatedEntityType, relatedEntityId, status: NotificationStatus, createdAt, readAt).
-notification.model.ts imports NotificationStatus from src/shared/types/leave.types.ts and does not redefine it.
-notification.repository.ts exports NotificationRepository implemented with raw pg parameterized SQL against the shared pool from src/shared/db/connection.ts.
-All write methods on NotificationRepository accept an optional client?: PoolClient parameter and use it when provided.
-Both files compile cleanly with TypeScript and contain no BullMQ/background-fanout logic.
+notification.service.ts exports NotificationService that depends on NotificationRepository and the Notification entity from Phase 6a.
+Service methods delegate persistence to NotificationRepository and use NotificationStatus from src/shared/types/leave.types.ts.
+The file compiles cleanly with TypeScript and contains no BullMQ/background-fanout logic.
 
 ## Success criteria
-Create the notification module foundation. First read src/shared/types/leave.types.ts (NotificationStatus enum) and src/shared/db/connection.ts (shared pool) from Phase 1. Create src/modules/notification/notification.model.ts defining the Notification entity with the exact canonical fields: id: string, recipientId: string, type: string, title: string, message: string, relatedEntityType: string | null, relatedEntityId: string | null, status: NotificationStatus, createdAt: Date, readAt: Date | null. Create src/modules/notification/notification.repository.ts implementing NotificationRepository using raw pg parameterized SQL against the shared pool, with optional client?: PoolClient on write methods. No background fanout (no BullMQ).
+Create src/modules/notification/notification.service.ts implementing NotificationService. It depends on the Notification entity (notification.model.ts) and NotificationRepository (notification.repository.ts) created in Phase 6a, and on the NotificationStatus enum from src/shared/types/leave.types.ts. Implement the service methods (e.g. create, markAsRead, listByRecipient) by delegating to the repository. No background fanout (no BullMQ).
 
 ## Owned by SIBLING sub-phases (OUT OF SCOPE for this sub-phase)
 This is ONE sub-phase of a split phase. The deliverables below belong to sibling sub-phases — do NOT create them here, do NOT list them as success criteria, and this sub-phase MUST NOT be gated on their presence (they are produced by a sibling, not missing):
-- "Phase 6b — Notification service": src/modules/notification/notification.service.ts
+- "Phase 6a — Notification entity and repository": src/modules/notification/notification.model.ts, src/modules/notification/notification.repository.ts
 - "Phase 6c — Notification unit tests": tests/unit/modules/notification/notification.service.spec.ts, tests/unit/modules/notification/notification.repository.spec.ts
 
 In particular, UNIT/INTEGRATION TESTS are OUT OF SCOPE for this sub-phase — they are produced in: Phase 6c — Notification unit tests. Do not create test files here, do not require test existence or coverage as a success criterion, and do not fail the gate for missing tests.
@@ -100,26 +98,23 @@ The entities below are shared, cross-module DATA CONTRACTS. Implement each one w
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- Import NotificationStatus from the shared types module (re-exported by src/shared/types/index.ts) rather than declaring a new enum; the values must be exactly PENDING, SENT, READ, ARCHIVED. (see `src/shared/types/leave.types.ts`)
-- Use the shared pg Pool exported from src/shared/db (re-exported by src/shared/db/index.ts) as the default connection; write methods accept an optional PoolClient as the last parameter and fall back to the shared pool. (see `src/shared/db/connection.ts`)
-- Match the notifications table contract: snake_case columns id, recipient_id, type, title, message, related_entity_type, related_entity_id, status, created_at, read_at; PK id; FK recipient_id -> employees.id; indexes on recipient_id, status, and related_entity_type/related_entity_id. (see `docs/ARCHITECTURE.md`)
-- Reuse RepositoryError and UniqueConstraintError from the employee module's public entry point (src/modules/employee/index.ts) rather than re-declaring them; add only a notification-specific not-found error locally. (see `src/modules/employee/employee.errors.ts`)
-- Mirror the sibling repository pattern: private mapRow converting snake_case rows to camelCase entities, a *_COLUMNS constant, raw pg parameterized SQL, and the interface + concrete class co-located in the repository file. (see `src/modules/audit/audit.repository.ts`)
+- Service method names and signatures must mirror INotificationRepository exactly (create, findByRecipient, findByEntity, updateStatus, markRead), including the optional PoolClient last parameter on write methods. (see `src/modules/notification/notification.repository.ts`)
+- Import Notification and CreateNotificationInput types from the notification model; do not re-declare them. (see `src/modules/notification/notification.model.ts`)
+- Import NotificationStatus from the shared types module (not re-declared locally). (see `src/shared/types/leave.types.ts`)
+- Follow the established thin-facade service pattern: constructor injection defaulting to the concrete repository, methods delegating directly and forwarding the optional PoolClient. (see `src/modules/balance/balance.service.ts`)
+- NotificationNotFoundError and RepositoryError are declared in the repository file and imported from the employee module's public entry point respectively — the service must not re-declare them. (see `src/modules/notification/notification.repository.ts`)
 ### Entity invariants — enforce these
-- Reuse or extend `Notification`: status is always one of the shared NotificationStatus values (PENDING | SENT | READ | ARCHIVED); a newly created notification is PENDING unless the caller supplies a status, and readAt is null until the notification is marked read.
-- Reuse or extend `Notification`: id and createdAt are generated by the repository (id via randomUUID, createdAt = now) and are never caller-supplied; readAt is repository-managed and set only by markRead.
-- Reuse or extend `Notification`: relatedEntityType and relatedEntityId are either both present or both null (they identify the same related entity); recipientId references an existing employees.id.
+- Reuse or extend `NotificationService`: The service is stateless beyond its injected repository reference and never mutates or re-shapes the Notification entities it returns.
 ### Interface contract — expose these operations (their shape is yours)
-- create — Persists a notification and returns the mapped entity; generates id/createdAt, defaults status to PENDING and readAt to null. Takes an optional PoolClient as the last parameter to join a caller's transaction.
-- findByRecipient — Returns all notifications for a recipient ordered deterministically (e.g. createdAt DESC, id); always uses the shared pool and never accepts a client.
-- findByEntity — Returns notifications matching a related entity type + id; always uses the shared pool and never accepts a client.
-- updateStatus — Persists a supplied NotificationStatus for an identified notification; throws a typed not-found error when no row matches; takes an optional PoolClient as the last parameter.
-- markRead — Sets readAt to now and status to READ for an identified notification; throws a typed not-found error when no row matches; takes an optional PoolClient as the last parameter.
+- create — Delegates to repository.create; INVALID_NOTIFICATION (mismatched relatedEntityType/relatedEntityId) propagates unchanged.
+- updateStatus — Delegates to repository.updateStatus; NotificationNotFoundError (NOTIFICATION_NOT_FOUND) propagates unchanged when no row matches.
+- markRead — Delegates to repository.markRead; sets status=READ and stamps read_at; NotificationNotFoundError propagates unchanged when no row matches.
+- findByRecipient — Delegates to repository.findByRecipient; returns Notification[] (possibly empty), no client forwarded.
+- findByEntity — Delegates to repository.findByEntity; returns Notification[] (possibly empty), no client forwarded.
 ### Integration points — connect to these
-- src/shared/types (NotificationStatus enum) — The Notification entity's status field is typed with the shared enum; no local enum is declared.
-- src/shared/db (shared pg Pool) — The repository's default connection for all queries; write methods fall back to it when no PoolClient is supplied.
-- src/modules/employee (RepositoryError, UniqueConstraintError) — The notification repository reuses the shared error base classes from the employee module's public entry point.
-- employees table (recipient_id FK) — recipientId references employees.id; the FK enforces referential integrity for notification recipients.
+- src/modules/notification/notification.repository.ts (INotificationRepository / NotificationRepository) — The service delegates all five operations to this repository interface.
+- src/modules/notification/notification.model.ts (Notification, CreateNotificationInput) — Type source for the service's method signatures and return values.
+- src/shared/types/leave.types.ts (NotificationStatus) — Enum used in updateStatus/markRead signatures.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
