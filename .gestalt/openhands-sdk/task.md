@@ -1,6 +1,14 @@
-# Implement this phase: Phase 5 — Balance module
+# Continue the previous attempt (it hit the iteration limit before finishing)
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/f5a0dfb3-f8f1-4335-94b2-5d8d22cf459f/5`. Do not clone anything; work only in this directory.
+A prior code-agent attempt on this work dir (`/tmp/gestalt/phase/f5a0dfb3-f8f1-4335-94b2-5d8d22cf459f/6`) was stopped after reaching its iteration limit. Its work is ALREADY on disk here — do NOT restart from scratch or re-read everything; build on what exists. It made 14 file edit(s). Its last verification PASSED (`cd /tmp/gestalt/phase/f5a0dfb3-f8f1-4335-94b2-5d8d22cf459f/6 && timeout 180 npx jest --passWithNoTests --forceExit --runInBand --silent 2>&1 | tail -25; echo "EXIT: $?"`).
+
+Finish the task now: fix any failing build/type-check/tests, then RUN the build and the tests and fix anything still failing. Stop as soon as the build and tests pass. The full original task (with all mandatory constraints) follows for reference.
+
+---
+
+# Implement this phase: Phase 6 — Notification module
+
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/f5a0dfb3-f8f1-4335-94b2-5d8d22cf459f/6`. Do not clone anything; work only in this directory.
 
 You are the IMPLEMENTATION agent, not a planner. The platform measures your work EXCLUSIVELY by the files you create or modify in this working tree (`git status`). Ending your turn with a plan, a summary, or an announcement of what you are 'about to' do — without having actually edited files — is a FAILURE: a turn that leaves the working tree untouched is discarded. Explore only as much as you need, then MAKE the edits with your file-editing tool. Never end your turn before the files exist on disk.
 
@@ -8,7 +16,7 @@ You are the IMPLEMENTATION agent, not a planner. The platform measures your work
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the balance module under src/modules/balance/. Create src/modules/balance/balance.model.ts defining the LeaveBalance entity with the exact canonical fields: id: string, employeeId: string, policyId: string, totalEntitlement: number, usedDays: number, remainingDays: number, fiscalYear: number, status: string, createdAt: Date, updatedAt: Date. Create src/modules/balance/balance.repository.ts implementing LeaveBalanceRepository using raw pg parameterized SQL against the shared pool, with optional client?: PoolClient on write methods. Create src/modules/balance/balance.service.ts implementing LeaveBalanceService. usedDays and remainingDays are INTEGERS; no rounding. This phase depends on src/shared/types/leave.types.ts and src/shared/db/connection.ts from Phase 1 — read them before generating. Include Jest unit tests in tests/unit/modules/balance/.
+Create the notification module under src/modules/notification/. Create src/modules/notification/notification.model.ts defining the Notification entity with the exact canonical fields: id: string, recipientId: string, type: string, title: string, message: string, relatedEntityType: string | null, relatedEntityId: string | null, status: NotificationStatus, createdAt: Date, readAt: Date | null. Create src/modules/notification/notification.repository.ts implementing NotificationRepository using raw pg parameterized SQL against the shared pool, with optional client?: PoolClient on write methods. Create src/modules/notification/notification.service.ts implementing NotificationService. No background fanout (no BullMQ). This phase depends on src/shared/types/leave.types.ts (NotificationStatus enum) and src/shared/db/connection.ts from Phase 1 — read them before generating. Include Jest unit tests in tests/unit/modules/notification/.
 
 ## Your iteration budget — and how to get more (READ BEFORE YOU START)
 
@@ -72,26 +80,44 @@ These are resolved, feature-wide decisions. Wherever this phase touches the conc
 
 14. CONTRACTS PACKAGE — @trackeros/contracts is NOT scaffolded (there is no packages/ directory) and must NOT be created in this feature. Keep shared types in src/shared/types. [BINDING RULE — operator decision resolving: How is the day count for a LeaveRequest derived from startDate and endDate (inclusive vs exclusive, calendar vs business days), and is it the same count used for both the balance sufficiency check and the balance deduction?; Which fiscal year does a LeaveRequest map to when startDate and endDate span a fiscal-year boundary, and how is the day count split across years for balance deduction?; What is the concrete RBAC role model (employee/manager/hr_admin) and which roles may perform each leave action (create, submit, approve, reject, cancel, view balances)?; How are leave_balances.used_days and remaining_days computed, rounded, and bounded when a request is approved (e.g. partial-day requests, half-day rounding, negative-balance guard)?; Are background jobs required via BullMQ for leave workflows (accrual schedulers, notification fanout)?; How should local development auth be implemented concretely (seeded local users vs mock OIDC provider)?; LeaveStatus enum value discrepancy: DOMAIN.md defines DRAFT/SUBMITTED/APPROVED/REJECTED/CANCELLED, while root ARCHITECTURE.md uses PENDING/APPROVED/REJECTED/CANCELLED. Which set is authoritative for the leave_requests.status field and shared types?; Should concrete repositories use Knex query builder or raw pg (parameterized SQL) against the shared pg.Pool?; Which validation library should be standardized for API-boundary input validation?; What are the canonical names for duplicate/overlapping domain entities (Balance vs LeaveBalance, Policy vs LeavePolicy, Audit vs AuditLog vs AuditRecord)?; Should package.json name be changed from leave-management to trackeros, and should express/class-validator/zod be pruned to match the declared Fastify stack?; What is the exact error response shape beyond the required 400/401/403/404 status codes?; Should the existing uptime module be refactored to the canonical repository/controller pattern, or left as-is?; Is the shared @trackeros/contracts package already scaffolded, or does it need to be created?; What background jobs, if any, are required via BullMQ for leave/expense workflows (accrual schedulers, notification fanout)?; apply everywhere these apply, not in one place only]
 
+## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
+The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
+- `Notification` — the entity MUST have exactly these fields:
+    - id: string
+    - recipientId: string
+    - type: string
+    - title: string
+    - message: string
+    - relatedEntityType: string | null
+    - relatedEntityId: string | null
+    - status: 'PENDING' | 'SENT' | 'READ' | 'ARCHIVED'
+    - createdAt: Date
+    - readAt: Date | null
+
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- Reuse the shared pg Pool exported from connection.ts (never create a second pool); write methods fall back to it when no client is supplied. (see `src/shared/db/connection.ts`)
-- Import RepositoryError and UniqueConstraintError from the employee module's public entry point rather than redeclaring them; add only BalanceNotFoundError locally. (see `src/modules/employee/index.ts`)
-- Mirror the policy repository's raw-pg patterns: randomUUID() id, const conn = client ?? pool, snake_case→camelCase mapRow, RETURNING column list, dynamic SET clause for update, and 23505→UniqueConstraintError mapping. (see `src/modules/policy/policy.repository.ts`)
-- Match the canonical LeaveBalance entity/table shape (leave_balances, snake_case columns, PK id, FKs to employees.id and leave_policies.id, unique (employee_id, policy_id, fiscal_year)). (see `.gestalt/architecture/reconciled.json`)
-- Follow the module file convention (model, repository, service, service.interface, errors, index) and the thin delegating service facade with injectable repository defaulting to the concrete class. (see `src/modules/policy/policy.service.ts`)
+- Reuse the NotificationStatus enum (PENDING | SENT | READ | ARCHIVED) from src/shared/types/leave.types.ts; do not redeclare it. (see `src/shared/types/leave.types.ts`)
+- Import the shared pg Pool from src/shared/db/connection.ts (via src/shared/db index); never create a second pool or import pg directly for the connection. (see `src/shared/db/connection.ts`)
+- Import RepositoryError and UniqueConstraintError from the employee module's public entry point (src/modules/employee/index.ts); do not redeclare them locally. (see `src/modules/employee/index.ts`)
+- Match the repository contract INotificationRepository { create, findByRecipient, findByEntity, updateStatus, markRead } declared in the reconciled architecture. (see `.gestalt/architecture/reconciled.json`)
+- Match the notifications table shape (id, recipient_id, type, title, message, related_entity_type, related_entity_id, status, created_at, read_at; PK id; FK recipient_id -> employees.id) and snake_case column mapping. (see `docs/ARCHITECTURE.md`)
+- Follow the established module file structure and conventions (model, repository with interface+class, service.interface, service, errors, index) mirroring the balance module. (see `src/modules/balance/index.ts`)
 ### Entity invariants — enforce these
-- Reuse or extend `LeaveBalance`: remainingDays = totalEntitlement - usedDays, always non-negative; usedDays and remainingDays are integers with no rounding.
-- Reuse or extend `LeaveBalance`: status is a plain string restricted to ACTIVE or CLOSED; a balance is uniquely identified by (employeeId, policyId, fiscalYear).
+- Reuse or extend `Notification`: Lifecycle states are PENDING → SENT → READ → ARCHIVED (NotificationStatus). A notification is created PENDING; readAt is null until the notification is marked read, at which point status becomes READ and readAt is set to the read time.
+- Reuse or extend `Notification`: relatedEntityType and relatedEntityId are either both null (a standalone notification) or both non-null (a notification about a specific entity); they are never mixed.
+- Reuse or extend `Notification`: recipientId references an existing employee (FK recipient_id -> employees.id); a notification is always addressed to exactly one recipient.
 ### Interface contract — expose these operations (their shape is yours)
-- commitDays — Rejects (throws) when the commit would drive remainingDays below zero; throws BalanceNotFoundError when no matching balance row exists; joins a caller's transaction via optional PoolClient.
-- create — Maps pg unique-violation 23505 on (employee_id, policy_id, fiscal_year) to UniqueConstraintError; generates id/createdAt/updatedAt itself.
-- update — Throws BalanceNotFoundError when no row matches; maps 23505 to UniqueConstraintError; only supplied fields are persisted.
+- create — Persists a new notification (status defaults to PENDING, id/createdAt generated) and returns the created entity; accepts an optional PoolClient to join a caller's transaction.
+- findByRecipient — Returns all notifications for a recipient, ordered by createdAt descending; returns an empty array when none exist (never throws).
+- findByEntity — Returns notifications matching a related entity type + id; returns an empty array when none exist (never throws).
+- updateStatus — Transitions a notification to a supplied valid NotificationStatus and returns the updated entity; throws a typed not-found error (stable machine code) when no row matches; accepts an optional PoolClient.
+- markRead — Sets status=READ and readAt=now for the target notification and returns the updated entity; throws a typed not-found error when no row matches; accepts an optional PoolClient.
 ### Integration points — connect to these
-- src/shared/db/connection.ts (shared pg Pool) — Repository reads/writes run against the single shared pool; write methods accept an optional PoolClient to join the leave service's transaction.
-- src/shared/types/leave.types.ts (shared-types) — Balance module may import shared enums/types; the dependency map limits balance to shared-types and shared-db.
-- src/modules/employee/index.ts (RepositoryError, UniqueConstraintError) — Balance reuses the shared error base classes rather than redeclaring them, matching the policy module's pattern.
-- src/modules/leave/ (future Phase 8 consumer) — commitDays is the transactional primitive the leave service will call during approve/reject to debit a balance atomically.
+- src/shared/types/leave.types.ts (NotificationStatus enum) — The notification entity's status field is typed against this shared enum.
+- src/shared/db/connection.ts (shared pg Pool) — The repository issues all SQL against this single shared pool.
+- src/modules/employee/index.ts (RepositoryError, UniqueConstraintError) — Notification-specific errors extend the shared RepositoryError; unique-violation mapping reuses UniqueConstraintError.
+- src/modules/leave (Phase 8, future) — The leave service will call NotificationService to fan out submitted/approved/rejected events; this phase only provides the callable surface.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
