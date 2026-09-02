@@ -1,0 +1,122 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "notification"
+    ],
+    "affectedLayers": [
+      "service"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "src/modules/notification/notification.service.ts exists and exports a NotificationService class exposing exactly five methods: create, findByRecipient, findByEntity, updateStatus, markRead.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Each service method delegates to the injected repository method of the same name and forwards the optional PoolClient as the last parameter (create/updateStatus/markRead), while read methods (findByRecipient/findByEntity) pass no client.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The service constructor accepts an optional INotificationRepository and defaults to `new NotificationRepository()` when none is supplied.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Repository errors (e.g. NotificationNotFoundError, INVALID_NOTIFICATION RepositoryError) propagate unchanged through the service \u2014 no catching, wrapping, or transformation.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The service is a thin synchronous delegating facade: it adds no business logic, no validation, no audit writes, and no transaction orchestration of its own.",
+    "No background fanout (no BullMQ/queue) \u2014 the service only delegates to NotificationRepository.",
+    "The service must not import the pg Pool or any module-level db helper; it only receives/forwards the optional PoolClient parameter.",
+    "Only src/modules/notification/notification.service.ts is created \u2014 no index.ts, no errors.ts, no service interface file, no tests."
+  ],
+  "outOfScope": [
+    "Creating notification.model.ts and notification.repository.ts (Phase 6a sibling deliverable).",
+    "Unit/integration tests for the notification service or repository (Phase 6c sibling deliverable).",
+    "Creating index.ts, errors.ts, or a separate service interface file for the notification module.",
+    "Background notification fanout / BullMQ job scheduling."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "NotificationService",
+      "mustExistOrExtend": true,
+      "invariant": "The service is stateless beyond its injected repository reference and never mutates or re-shapes the Notification entities it returns."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "create",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Delegates to repository.create; INVALID_NOTIFICATION (mismatched relatedEntityType/relatedEntityId) propagates unchanged."
+    },
+    {
+      "operation": "updateStatus",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Delegates to repository.updateStatus; NotificationNotFoundError (NOTIFICATION_NOT_FOUND) propagates unchanged when no row matches."
+    },
+    {
+      "operation": "markRead",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Delegates to repository.markRead; sets status=READ and stamps read_at; NotificationNotFoundError propagates unchanged when no row matches."
+    },
+    {
+      "operation": "findByRecipient",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Delegates to repository.findByRecipient; returns Notification[] (possibly empty), no client forwarded."
+    },
+    {
+      "operation": "findByEntity",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Delegates to repository.findByEntity; returns Notification[] (possibly empty), no client forwarded."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Service method names and signatures must mirror INotificationRepository exactly (create, findByRecipient, findByEntity, updateStatus, markRead), including the optional PoolClient last parameter on write methods.",
+      "referencePath": "src/modules/notification/notification.repository.ts"
+    },
+    {
+      "requirement": "Import Notification and CreateNotificationInput types from the notification model; do not re-declare them.",
+      "referencePath": "src/modules/notification/notification.model.ts"
+    },
+    {
+      "requirement": "Import NotificationStatus from the shared types module (not re-declared locally).",
+      "referencePath": "src/shared/types/leave.types.ts"
+    },
+    {
+      "requirement": "Follow the established thin-facade service pattern: constructor injection defaulting to the concrete repository, methods delegating directly and forwarding the optional PoolClient.",
+      "referencePath": "src/modules/balance/balance.service.ts"
+    },
+    {
+      "requirement": "NotificationNotFoundError and RepositoryError are declared in the repository file and imported from the employee module's public entry point respectively \u2014 the service must not re-declare them.",
+      "referencePath": "src/modules/notification/notification.repository.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/notification/notification.repository.ts (INotificationRepository / NotificationRepository)",
+      "why": "The service delegates all five operations to this repository interface."
+    },
+    {
+      "target": "src/modules/notification/notification.model.ts (Notification, CreateNotificationInput)",
+      "why": "Type source for the service's method signatures and return values."
+    },
+    {
+      "target": "src/shared/types/leave.types.ts (NotificationStatus)",
+      "why": "Enum used in updateStatus/markRead signatures."
+    }
+  ]
+}
