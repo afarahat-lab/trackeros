@@ -1,6 +1,14 @@
-# Implement this phase: Phase 7 — Auth & RBAC
+# Continue the previous attempt (it hit the iteration limit before finishing)
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/f5a0dfb3-f8f1-4335-94b2-5d8d22cf459f/9`. Do not clone anything; work only in this directory.
+A prior code-agent attempt on this work dir (`/tmp/gestalt/phase/f5a0dfb3-f8f1-4335-94b2-5d8d22cf459f/10`) was stopped after reaching its iteration limit. Its work is ALREADY on disk here — do NOT restart from scratch or re-read everything; build on what exists. It made 13 file edit(s). Its last verification PASSED (`cd /tmp/gestalt/phase/f5a0dfb3-f8f1-4335-94b2-5d8d22cf459f/10 && ls node_modules/.bin/ 2>/dev/null | head; echo "---"; ls node_modules 2>/dev/null | head; echo "--- check npx tsc ---"; npx tsc --versi`).
+
+Finish the task now: fix any failing build/type-check/tests, then RUN the build and the tests and fix anything still failing. Stop as soon as the build and tests pass. The full original task (with all mandatory constraints) follows for reference.
+
+---
+
+# Implement this phase: Phase 8 — Leave module (domain + service)
+
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/f5a0dfb3-f8f1-4335-94b2-5d8d22cf459f/10`. Do not clone anything; work only in this directory.
 
 You are the IMPLEMENTATION agent, not a planner. The platform measures your work EXCLUSIVELY by the files you create or modify in this working tree (`git status`). Ending your turn with a plan, a summary, or an announcement of what you are 'about to' do — without having actually edited files — is a FAILURE: a turn that leaves the working tree untouched is discarded. Explore only as much as you need, then MAKE the edits with your file-editing tool. Never end your turn before the files exist on disk.
 
@@ -8,7 +16,7 @@ You are the IMPLEMENTATION agent, not a planner. The platform measures your work
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the auth module under src/modules/auth/. Create src/modules/auth/auth.middleware.ts implementing JWT verification that populates request.user (seeded local users, no mock OIDC provider). Create src/modules/auth/rbac.ts implementing the requireRole(...) route-level guard enforcing the RBAC matrix: employee may create/submit/cancel their OWN request and view their OWN balances; manager inherits all employee permissions and may additionally approve/reject subordinates' requests (but NOT their own); hr_admin may view and act on ALL requests and adjust balances. Enforce RBAC at the route level only, never inline in services. This phase depends on src/shared/types/leave.types.ts (UserRole enum) from Phase 1 — read it before generating. Include Jest unit tests in tests/unit/modules/auth/.
+Create the leave domain model and service under src/modules/leave/. Create src/modules/leave/leave.model.ts defining the LeaveRequest entity with the exact canonical fields: id: string, employeeId: string, leaveType: LeaveType, startDate: Date, endDate: Date, reason: string | undefined, status: LeaveStatus, approvedBy: string | null, approvedAt: Date | null, createdAt: Date, updatedAt: Date. Create src/modules/leave/leave.repository.ts implementing LeaveRequestRepository using raw pg parameterized SQL against the shared pool, with optional client?: PoolClient on write methods. Create src/modules/leave/leave.service.ts implementing LeaveService: create (status PENDING immediately), approve/reject (manager may not approve own request), cancel. Approval must use the shared day-count helper (src/shared/leave/day-count.ts) for BOTH the balance-sufficiency check and the balance deduction, attribute the whole request to the fiscal year of startDate (single LeaveBalance row debited), and reject (not clamp) any approval that would drive remainingDays below zero. This phase depends on src/shared/types/leave.types.ts, src/shared/leave/day-count.ts, src/shared/db/connection.ts (Phase 1), and the balance/employee/policy/audit modules (Phases 2-5) — read them before generating. Include Jest unit tests in tests/unit/modules/leave/.
 
 ## Your iteration budget — and how to get more (READ BEFORE YOU START)
 
@@ -71,28 +79,6 @@ These are resolved, feature-wide decisions. Wherever this phase touches the conc
 13. UPTIME MODULE — Leave it as-is. Do not refactor it. New modules follow the canonical repository/controller pattern regardless.
 
 14. CONTRACTS PACKAGE — @trackeros/contracts is NOT scaffolded (there is no packages/ directory) and must NOT be created in this feature. Keep shared types in src/shared/types. [BINDING RULE — operator decision resolving: How is the day count for a LeaveRequest derived from startDate and endDate (inclusive vs exclusive, calendar vs business days), and is it the same count used for both the balance sufficiency check and the balance deduction?; Which fiscal year does a LeaveRequest map to when startDate and endDate span a fiscal-year boundary, and how is the day count split across years for balance deduction?; What is the concrete RBAC role model (employee/manager/hr_admin) and which roles may perform each leave action (create, submit, approve, reject, cancel, view balances)?; How are leave_balances.used_days and remaining_days computed, rounded, and bounded when a request is approved (e.g. partial-day requests, half-day rounding, negative-balance guard)?; Are background jobs required via BullMQ for leave workflows (accrual schedulers, notification fanout)?; How should local development auth be implemented concretely (seeded local users vs mock OIDC provider)?; LeaveStatus enum value discrepancy: DOMAIN.md defines DRAFT/SUBMITTED/APPROVED/REJECTED/CANCELLED, while root ARCHITECTURE.md uses PENDING/APPROVED/REJECTED/CANCELLED. Which set is authoritative for the leave_requests.status field and shared types?; Should concrete repositories use Knex query builder or raw pg (parameterized SQL) against the shared pg.Pool?; Which validation library should be standardized for API-boundary input validation?; What are the canonical names for duplicate/overlapping domain entities (Balance vs LeaveBalance, Policy vs LeavePolicy, Audit vs AuditLog vs AuditRecord)?; Should package.json name be changed from leave-management to trackeros, and should express/class-validator/zod be pruned to match the declared Fastify stack?; What is the exact error response shape beyond the required 400/401/403/404 status codes?; Should the existing uptime module be refactored to the canonical repository/controller pattern, or left as-is?; Is the shared @trackeros/contracts package already scaffolded, or does it need to be created?; What background jobs, if any, are required via BullMQ for leave/expense workflows (accrual schedulers, notification fanout)?; apply everywhere these apply, not in one place only]
-
-## Constraints & consistency
-You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
-### Reuse & consistency — match these exactly
-- Reuse the UserRole enum (employee | manager | hr_admin) exactly as defined; do not redeclare or diverge from its values. (see `src/shared/types/leave.types.ts`)
-- request.user must match the auth contract { id: string; role: UserRole }. (see `.gestalt/architecture/reconciled.json (auth_contract)`)
-- Manager/subordinate resolution must use the employee module's manager lookup (findByManager / managerId), not a direct employees-table query. (see `src/modules/employee/index.ts`)
-- Error responses use the { error: string; code: string } shape with 401 for auth failure and 403 (FORBIDDEN) for authorization failure. (see `.gestalt/architecture/reconciled.json (error_response_contract)`)
-- Self-approval prohibition and manager-only approval follow the binding rule "Only a manager (an Employee referenced by the applicant's managerId) may approve or reject a LeaveRequest; the approver must not be the applicant." (see `.gestalt/architecture/reconciled.json (business_rules)`)
-### Entity invariants — enforce these
-- Reuse or extend `request.user (auth principal)`: Always the shape { id: string; role: UserRole } with role restricted to 'employee' | 'manager' | 'hr_admin'; set only by the JWT middleware after successful verification, never by handlers.
-- Reuse or extend `UserRole`: Role hierarchy is fixed: manager inherits every employee permission; hr_admin supersedes both. No role may be granted a permission outside this matrix.
-- Reuse or extend `Employee (managerId relationship)`: B is a subordinate of A iff B.managerId === A.id; this relationship is the sole basis for manager approval authority and is read via the employee module, never recomputed in auth.
-### Interface contract — expose these operations (their shape is yours)
-- JWT verification middleware (populates request.user) — Requires a valid bearer JWT; missing/invalid/expired token → 401 and request.user left unset.; Authentication failure → 401 with { error: string; code: string }.
-- requireRole(...) route guard — Enforces the role matrix; authorization failure → 403 (code FORBIDDEN).; Authorization failure → 403 with { error: string; code: string }.
-- Ownership check (own resource) — Resource is "own" iff its employeeId equals the authenticated principal's employee id.
-- Subordination check (manager over subordinate) — Manager may approve/reject only where applicant.managerId === manager.id AND applicant.id !== manager.id (self-approval always denied).
-### Integration points — connect to these
-- src/shared/types/leave.types.ts (UserRole enum) — The auth module's role type and matrix are defined against this enum.
-- src/modules/employee/index.ts (IEmployeeService.findByManager / Employee.managerId) — Subordination resolution for manager approval authority; the only sanctioned path to the employees table.
-- src/modules/leave (Phase 8/9 routes) — The requireRole(...) guard and request.user principal are consumed by leave routes to enforce the RBAC matrix.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
