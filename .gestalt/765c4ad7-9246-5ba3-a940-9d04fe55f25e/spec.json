@@ -1,0 +1,190 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave",
+      "shared/leave"
+    ],
+    "affectedLayers": [
+      "service",
+      "shared-helper"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "src/modules/leave/leave.service.ts exposes a LeaveService with create, approve, reject, and cancel operations, each returning the persisted LeaveRequest.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "create persists a request with status PENDING immediately (no DRAFT/SUBMITTED), validates startDate <= endDate, and rejects a request whose leaveType has no ACTIVE LeavePolicy with a typed error.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "approve only transitions a PENDING request, denies self-approval (approver id === applicant id), and atomically updates status + commits balance + writes an APPROVE audit record.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "approve computes the day count once via countLeaveDays and uses that same value for both the balance-sufficiency check and the balance deduction; an approval that would drive remainingDays below zero is rejected (InsufficientBalanceError), never clamped.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "approve attributes the whole request to the fiscal year of startDate (calendar UTC year) and debits exactly one LeaveBalance row via commitDays keyed by (employeeId, policyId, fiscalYear).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "reject only transitions a PENDING request, denies self-rejection, and writes a REJECT audit record; cancel only transitions a PENDING request (owner-only) and writes an audit record.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "every state-changing operation (create/approve/reject/cancel) writes exactly one AuditLog record with the matching AuditAction (CREATE/APPROVE/REJECT).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "a shared pure helper fiscalYearOf(date): number is added beside countLeaveDays in src/shared/leave and exported from src/shared/leave/index.ts, deriving the UTC calendar year; no call site inlines date.getFullYear().",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The service owns the transaction boundary and receives IUnitOfWork via constructor injection; it never imports the pg pool, a PoolClient, or any module-level db helper directly. Participating repository/service methods are called with the unit-of-work client as the optional last parameter.",
+    "The approve/reject flow (status update + balance commit + audit record) must be atomic: all three succeed or all three roll back.",
+    "All database access goes through repository interfaces (GP-001); the service never issues SQL or queries the employees/leave_balances/leave_policies tables directly.",
+    "The service enforces the business rule that a manager may not approve/reject their own request; RBAC role checks remain at the route boundary (requireRole) and are not re-implemented inline in the service.",
+    "The service imports sibling modules only through their public entry points (index.ts); no cross-module internal imports.",
+    "No `any`; use `unknown` with type guards. Strict TypeScript (no implicit any, strict null checks).",
+    "Deliverable is src/modules/leave/leave.service.ts only (plus the fiscalYearOf helper in src/shared/leave); no separate leave.service.interface.ts, no controller, no routes, no tests."
+  ],
+  "outOfScope": [
+    "Unit/integration tests for the leave module (Phase 8c) \u2014 do not create test files or require test coverage.",
+    "Leave controller and routes (Phase 9), including API-boundary validation, requireRole wiring, and HTTP error mapping.",
+    "Leave domain model and repository (Phase 8a) \u2014 leave.model.ts and leave.repository.ts are owned by a sibling sub-phase.",
+    "Notification fanout / background jobs (no BullMQ) and any fiscal-calendar configuration field or per-policy fiscal calendar."
+  ],
+  "ambiguities": [
+    {
+      "description": "No concrete IUnitOfWork implementation exists anywhere in src/ (only the interface). LeaveService must receive IUnitOfWork via constructor, but this phase cannot reference a concrete class that does not exist \u2014 how the concrete implementation is supplied (injected by a later phase vs. constructed here) is unresolved.",
+      "options": [
+        "Inject IUnitOfWork via constructor with no default; the controller/DI (Phase 9) supplies the concrete implementation",
+        "Inject IUnitOfWork via constructor with a default concrete implementation created in this phase",
+        "LeaveService accepts an optional IUnitOfWork and falls back to a non-transactional path when absent"
+      ],
+      "impactIfWrong": "medium"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "A request is created as PENDING immediately; the only legal transitions are PENDING\u2192APPROVED, PENDING\u2192REJECTED, and PENDING\u2192CANCELLED (owner only); APPROVED/REJECTED/CANCELLED are terminal and must never be re-transitioned."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "startDate <= endDate always holds for a persisted request; a request may only be created against an ACTIVE LeavePolicy whose leaveType matches the request's leaveType."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "Approving a request debits exactly one LeaveBalance row keyed by (employeeId, policyId, fiscalYear) where fiscalYear is the calendar UTC year of startDate; remainingDays must never go below zero (reject, never clamp)."
+    },
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "Every state-changing operation (create/approve/reject/cancel) produces exactly one AuditLog record with the matching AuditAction (CREATE/APPROVE/REJECT)."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "create",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Rejects invalid input (startDate > endDate, or no ACTIVE policy for the leaveType) with a typed error; persists status PENDING and writes a CREATE audit record."
+    },
+    {
+      "operation": "approve",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Only from PENDING; denies self-approval; rejects (never clamps) when the balance would go below zero (InsufficientBalanceError); atomic status+balance+audit."
+    },
+    {
+      "operation": "reject",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Only from PENDING; denies self-rejection; writes a REJECT audit record; no balance mutation."
+    },
+    {
+      "operation": "cancel",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Only from PENDING and only by the owner; writes an audit record; no balance mutation."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Use countLeaveDays(startDate, endDate) as the single source of the day count for BOTH the balance-sufficiency check and the balance deduction; never compute the day count independently.",
+      "referencePath": "src/shared/leave/day-count.ts"
+    },
+    {
+      "requirement": "Derive fiscalYear via the shared fiscalYearOf(date) helper (calendar UTC year of startDate) at every site that needs it \u2014 the balance-sufficiency check, the balance debit, and any findByEmployeeAndFiscalYear lookup \u2014 never inline date.getFullYear().",
+      "referencePath": "src/shared/leave/day-count.ts"
+    },
+    {
+      "requirement": "Debit the balance via commitDays(employeeId, policyId, fiscalYear, days, client), which atomically increments used_days and decrements remaining_days guarded by remaining_days >= days and throws InsufficientBalanceError on failure.",
+      "referencePath": "src/modules/balance/balance.repository.ts"
+    },
+    {
+      "requirement": "Resolve the LeavePolicy by leaveType via the policy module and filter to isActive policies itself, then use policy.id as the policyId for balance operations.",
+      "referencePath": "src/modules/policy/policy.repository.ts"
+    },
+    {
+      "requirement": "Enforce self-approval denial using isSubordinate(manager, applicantId, applicantManagerId), which returns false when applicantId === manager.id; read applicantManagerId from the employee module, never a direct employees-table query.",
+      "referencePath": "src/modules/auth/rbac.ts"
+    },
+    {
+      "requirement": "Write audit records via the audit module's record operation with AuditAction CREATE/APPROVE/REJECT, passing the unit-of-work client as the optional last parameter.",
+      "referencePath": "src/modules/audit/audit.service.interface.ts"
+    },
+    {
+      "requirement": "Receive IUnitOfWork via constructor and drive begin/commit/rollback with the exposed client; never import the pg pool or a PoolClient directly.",
+      "referencePath": "src/shared/db/unit-of-work.ts"
+    },
+    {
+      "requirement": "Use the LeaveType/LeaveStatus/AuditAction enums from the shared types module; do not re-declare them.",
+      "referencePath": "src/shared/types/leave.types.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/leave/leave.repository.ts (ILeaveRequestRepository)",
+      "why": "create/updateStatus/findById for persisting requests and status transitions within the service's unit of work."
+    },
+    {
+      "target": "src/modules/balance/balance.repository.ts (ILeaveBalanceRepository.commitDays / findByEmployeeAndFiscalYear)",
+      "why": "Balance-sufficiency check and atomic balance debit on approval."
+    },
+    {
+      "target": "src/modules/policy/policy.repository.ts (ILeavePolicyRepository.findByLeaveType / findActive)",
+      "why": "Resolve the ACTIVE LeavePolicy for the request's leaveType to obtain policyId."
+    },
+    {
+      "target": "src/modules/employee/employee.repository.ts (IEmployeeRepository.findById)",
+      "why": "Read the applicant's managerId for the self-approval/subordination check."
+    },
+    {
+      "target": "src/modules/audit/audit.service.interface.ts (IAuditService.record)",
+      "why": "Write CREATE/APPROVE/REJECT audit records for every state-changing operation."
+    },
+    {
+      "target": "src/shared/db/unit-of-work.ts (IUnitOfWork)",
+      "why": "Transaction boundary owned by the service; supplies the client passed to participating repositories."
+    }
+  ]
+}
