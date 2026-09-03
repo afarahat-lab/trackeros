@@ -1,1 +1,1 @@
-export { countLeaveDays } from './day-count';
+export { countLeaveDays, fiscalYearOf } from './day-count';

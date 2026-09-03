@@ -1,21 +1,31 @@
-# Implement this phase: Phase 8a — Leave domain model + repository
+# Continue the previous attempt (it hit the iteration limit before finishing)
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/f5a0dfb3-f8f1-4335-94b2-5d8d22cf459f/10`. Do not clone anything; work only in this directory.
+A prior code-agent attempt on this work dir (`/tmp/gestalt/phase/f5a0dfb3-f8f1-4335-94b2-5d8d22cf459f/11`) was stopped after reaching its iteration limit. Its work is ALREADY on disk here — do NOT restart from scratch or re-read everything; build on what exists. It made 4 file edit(s). Its last verification PASSED (`cd /tmp/gestalt/phase/f5a0dfb3-f8f1-4335-94b2-5d8d22cf459f/11 && for f in auth.middleware rbac notification.service policy.service audit.service policy.errors employee.errors balance.errors; do echo "`).
+
+Finish the task now: fix any failing build/type-check/tests, then RUN the build and the tests and fix anything still failing. Stop as soon as the build and tests pass. The full original task (with all mandatory constraints) follows for reference.
+
+---
+
+# Implement this phase: Phase 8b — Leave service
+
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/f5a0dfb3-f8f1-4335-94b2-5d8d22cf459f/11`. Do not clone anything; work only in this directory.
 
 You are the IMPLEMENTATION agent, not a planner. The platform measures your work EXCLUSIVELY by the files you create or modify in this working tree (`git status`). Ending your turn with a plan, a summary, or an announcement of what you are 'about to' do — without having actually edited files — is a FAILURE: a turn that leaves the working tree untouched is discarded. Explore only as much as you need, then MAKE the edits with your file-editing tool. Never end your turn before the files exist on disk.
 
 ## What to build
-src/modules/leave/leave.model.ts exists and exports LeaveRequest with exactly the canonical fields (id, employeeId, leaveType, startDate, endDate, reason, status, approvedBy, approvedAt, createdAt, updatedAt) using LeaveType and LeaveStatus from src/shared/types/leave.types.ts.
-src/modules/leave/leave.repository.ts exists and exports LeaveRequestRepository implemented with raw pg parameterized SQL against the shared pool from src/shared/db/connection.ts.
-Write methods (create, updateStatus) accept an optional client?: PoolClient and use it when provided, otherwise the shared pool.
-No service or test files are created in this sub-phase.
+src/modules/leave/leave.service.ts exists and exports LeaveService with create, approve, reject, and cancel methods.
+create persists a LeaveRequest with status PENDING and no approvedBy/approvedAt.
+approve rejects (throws/returns error) when the approver is the same as the request employee.
+approve uses src/shared/leave/day-count.ts for both the balance-sufficiency check and the balance deduction, debiting a single LeaveBalance row for the fiscal year of startDate.
+approve rejects (does not clamp) any request that would drive remainingDays below zero.
+No test files are created in this sub-phase.
 
 ## Success criteria
-Create the leave domain model and repository under src/modules/leave/. Create src/modules/leave/leave.model.ts defining the LeaveRequest entity with the exact canonical fields: id: string, employeeId: string, leaveType: LeaveType, startDate: Date, endDate: Date, reason: string | undefined, status: LeaveStatus, approvedBy: string | null, approvedAt: Date | null, createdAt: Date, updatedAt: Date. Create src/modules/leave/leave.repository.ts implementing LeaveRequestRepository using raw pg parameterized SQL against the shared pool, with optional client?: PoolClient on write methods (create, updateStatus, findById, findByEmployee, findByStatus, etc.). This sub-phase depends on src/shared/types/leave.types.ts and src/shared/db/connection.ts (Phase 1) — read them before generating. Do NOT create the service or tests in this sub-phase.
+Create src/modules/leave/leave.service.ts implementing LeaveService on top of the repository from Phase 8a. Implement create (status PENDING immediately), approve/reject (a manager may not approve their own request), and cancel. Approval must use the shared day-count helper (src/shared/leave/day-count.ts) for BOTH the balance-sufficiency check and the balance deduction, attribute the whole request to the fiscal year of startDate (single LeaveBalance row debited), and reject (not clamp) any approval that would drive remainingDays below zero. This sub-phase depends on src/modules/leave/leave.model.ts and leave.repository.ts (Phase 8a), src/shared/leave/day-count.ts, and the balance/employee/policy/audit modules (Phases 2-5) — read them before generating. Do NOT create tests in this sub-phase.
 
 ## Owned by SIBLING sub-phases (OUT OF SCOPE for this sub-phase)
 This is ONE sub-phase of a split phase. The deliverables below belong to sibling sub-phases — do NOT create them here, do NOT list them as success criteria, and this sub-phase MUST NOT be gated on their presence (they are produced by a sibling, not missing):
-- "Phase 8b — Leave service": src/modules/leave/leave.service.ts
+- "Phase 8a — Leave domain model + repository": src/modules/leave/leave.model.ts, src/modules/leave/leave.repository.ts
 - "Phase 8c — Leave module unit tests": tests/unit/modules/leave/leave.model.test.ts, tests/unit/modules/leave/leave.repository.test.ts, tests/unit/modules/leave/leave.service.test.ts
 
 In particular, UNIT/INTEGRATION TESTS are OUT OF SCOPE for this sub-phase — they are produced in: Phase 8c — Leave module unit tests. Do not create test files here, do not require test existence or coverage as a success criterion, and do not fail the gate for missing tests.
@@ -84,6 +94,20 @@ These are resolved, feature-wide decisions. Wherever this phase touches the conc
 
 ## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
 The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
+- `Employee` — the entity MUST have exactly these fields:
+    - id: string
+    - employeeNumber: string
+    - firstName: string
+    - lastName: string
+    - email: string
+    - managerId: string | null
+    - department: string | null
+    - hireDate: Date
+    - terminationDate: Date | null
+    - employmentStatus: 'ACTIVE' | 'INACTIVE' | 'TERMINATED'
+    - createdAt: Date
+    - updatedAt: Date
+    - deletedAt: Date | null
 - `LeaveRequest` — the entity MUST have exactly these fields:
     - id: string
     - employeeId: string
@@ -96,40 +120,46 @@ The entities below are shared, cross-module DATA CONTRACTS. Implement each one w
     - approvedAt: Date | null
     - createdAt: Date
     - updatedAt: Date
-- `LeaveType` — the entity MUST have exactly these fields:
-    - annual
-    - sick
-    - emergency
-    - unpaid
-    - maternity
-    - paternity
+- `LeaveBalance` — the entity MUST have exactly these fields:
+    - id: string
+    - employeeId: string
+    - policyId: string
+    - totalEntitlement: number
+    - usedDays: number
+    - remainingDays: number
+    - fiscalYear: number
+    - status: string
+    - createdAt: Date
+    - updatedAt: Date
 
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- LeaveRequest entity fields and their snake_case column mappings must match the canonical leave_requests table (id, employee_id, leave_type, start_date, end_date, reason, status, approved_by, approved_at, created_at, updated_at) as defined in the reconciled architecture. (see `.gestalt/architecture/reconciled.json`)
-- LeaveType and LeaveStatus enums must be imported from the shared types module (values annual/sick/emergency/unpaid/maternity/paternity and PENDING/APPROVED/REJECTED/CANCELLED), not re-declared. (see `src/shared/types/leave.types.ts`)
-- The shared pg Pool must be imported from the shared-db public entry point and used as the default connection for all repository queries. (see `src/shared/db/connection.ts`)
-- RepositoryError and UniqueConstraintError must be imported from the employee module's public entry point (not re-declared), matching how policy/balance/notification reuse them. (see `src/modules/employee/index.ts`)
-- Row-mapping convention (LEAVE_COLUMNS constant, snake_case LeaveRequestRow interface, mapRow() to camelCase) must mirror the sibling repository modules. (see `src/modules/balance/balance.repository.ts`)
-- Dynamic SET-clause update pattern (only supplied fields + always updated_at + not-found throw) must match the sibling update implementations. (see `src/modules/policy/policy.repository.ts`)
+- Use countLeaveDays(startDate, endDate) as the single source of the day count for BOTH the balance-sufficiency check and the balance deduction; never compute the day count independently. (see `src/shared/leave/day-count.ts`)
+- Derive fiscalYear via the shared fiscalYearOf(date) helper (calendar UTC year of startDate) at every site that needs it — the balance-sufficiency check, the balance debit, and any findByEmployeeAndFiscalYear lookup — never inline date.getFullYear(). (see `src/shared/leave/day-count.ts`)
+- Debit the balance via commitDays(employeeId, policyId, fiscalYear, days, client), which atomically increments used_days and decrements remaining_days guarded by remaining_days >= days and throws InsufficientBalanceError on failure. (see `src/modules/balance/balance.repository.ts`)
+- Resolve the LeavePolicy by leaveType via the policy module and filter to isActive policies itself, then use policy.id as the policyId for balance operations. (see `src/modules/policy/policy.repository.ts`)
+- Enforce self-approval denial using isSubordinate(manager, applicantId, applicantManagerId), which returns false when applicantId === manager.id; read applicantManagerId from the employee module, never a direct employees-table query. (see `src/modules/auth/rbac.ts`)
+- Write audit records via the audit module's record operation with AuditAction CREATE/APPROVE/REJECT, passing the unit-of-work client as the optional last parameter. (see `src/modules/audit/audit.service.interface.ts`)
+- Receive IUnitOfWork via constructor and drive begin/commit/rollback with the exposed client; never import the pg pool or a PoolClient directly. (see `src/shared/db/unit-of-work.ts`)
+- Use the LeaveType/LeaveStatus/AuditAction enums from the shared types module; do not re-declare them. (see `src/shared/types/leave.types.ts`)
 ### Entity invariants — enforce these
-- Reuse or extend `LeaveRequest`: A LeaveRequest is created as PENDING immediately (no DRAFT/SUBMITTED state); approvedBy and approvedAt are null until the request is approved or rejected, and remain null for PENDING/CANCELLED.
-- Reuse or extend `LeaveRequest`: Lifecycle state machine: PENDING → (APPROVED | REJECTED); PENDING → CANCELLED (owner only); APPROVED/REJECTED/CANCELLED are terminal. The repository persists status transitions but does not itself enforce the transition legality (service owns that).
-- Reuse or extend `LeaveRequest`: leaveType is stored as the LeaveType enum string value (not a FK to leave_policies); reason maps to NULL when undefined; approvedBy/approvedAt map to NULL when null.
+- Reuse or extend `LeaveRequest`: A request is created as PENDING immediately; the only legal transitions are PENDING→APPROVED, PENDING→REJECTED, and PENDING→CANCELLED (owner only); APPROVED/REJECTED/CANCELLED are terminal and must never be re-transitioned.
+- Reuse or extend `LeaveRequest`: startDate <= endDate always holds for a persisted request; a request may only be created against an ACTIVE LeavePolicy whose leaveType matches the request's leaveType.
+- Reuse or extend `LeaveBalance`: Approving a request debits exactly one LeaveBalance row keyed by (employeeId, policyId, fiscalYear) where fiscalYear is the calendar UTC year of startDate; remainingDays must never go below zero (reject, never clamp).
+- Reuse or extend `AuditLog`: Every state-changing operation (create/approve/reject/cancel) produces exactly one AuditLog record with the matching AuditAction (CREATE/APPROVE/REJECT).
 ### Interface contract — expose these operations (their shape is yours)
-- create — Persists a new leave_requests row and returns the mapped LeaveRequest; maps pg 23505 to UniqueConstraintError; defaults status to PENDING and approvedBy/approvedAt to null.
-- findById — Returns the mapped LeaveRequest or null when no row matches; never throws for a missing row.
-- findByEmployee — Returns an array (possibly empty) of mapped LeaveRequests for the given employeeId.
-- findByStatus — Returns an array (possibly empty) of mapped LeaveRequests matching the given LeaveStatus.
-- findByQuery — Returns an array (possibly empty) of mapped LeaveRequests filtered by the supplied query criteria (status/leaveType/date ranges/limit/offset).
-- update — Applies only the supplied fields, always sets updated_at, returns the updated entity, and throws LeaveNotFoundError (code LEAVE_NOT_FOUND) when no row matches.
-- updateStatus — Persists the new status (and stamps approvedBy/approvedAt for APPROVED/REJECTED), returns the updated entity, and throws LeaveNotFoundError when no row matches.
-- delete — Removes the matching leave_requests row and throws LeaveNotFoundError when no row matches.
+- create — Rejects invalid input (startDate > endDate, or no ACTIVE policy for the leaveType) with a typed error; persists status PENDING and writes a CREATE audit record.
+- approve — Only from PENDING; denies self-approval; rejects (never clamps) when the balance would go below zero (InsufficientBalanceError); atomic status+balance+audit.
+- reject — Only from PENDING; denies self-rejection; writes a REJECT audit record; no balance mutation.
+- cancel — Only from PENDING and only by the owner; writes an audit record; no balance mutation.
 ### Integration points — connect to these
-- src/shared/types (LeaveType, LeaveStatus) — Entity field types for leaveType and status.
-- src/shared/db (pool) — Default connection for all repository queries.
-- src/modules/employee (RepositoryError, UniqueConstraintError) — Shared typed error base classes reused by the leave repository.
+- src/modules/leave/leave.repository.ts (ILeaveRequestRepository) — create/updateStatus/findById for persisting requests and status transitions within the service's unit of work.
+- src/modules/balance/balance.repository.ts (ILeaveBalanceRepository.commitDays / findByEmployeeAndFiscalYear) — Balance-sufficiency check and atomic balance debit on approval.
+- src/modules/policy/policy.repository.ts (ILeavePolicyRepository.findByLeaveType / findActive) — Resolve the ACTIVE LeavePolicy for the request's leaveType to obtain policyId.
+- src/modules/employee/employee.repository.ts (IEmployeeRepository.findById) — Read the applicant's managerId for the self-approval/subordination check.
+- src/modules/audit/audit.service.interface.ts (IAuditService.record) — Write CREATE/APPROVE/REJECT audit records for every state-changing operation.
+- src/shared/db/unit-of-work.ts (IUnitOfWork) — Transaction boundary owned by the service; supplies the client passed to participating repositories.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:

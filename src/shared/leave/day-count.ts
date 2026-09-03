@@ -25,3 +25,13 @@ export function countLeaveDays(startDate: Date, endDate: Date): number {
   );
   return Math.round((end - start) / MS_PER_DAY) + 1;
 }
+
+/**
+ * The fiscal year a leave request maps to: the calendar UTC year of `startDate`.
+ * A request spanning a fiscal-year boundary is attributed wholly to this year;
+ * never split a request across years and never derive the year inline via
+ * `date.getFullYear()` (use this helper at every site that needs a fiscal year).
+ */
+export function fiscalYearOf(date: Date): number {
+  return date.getUTCFullYear();
+}
