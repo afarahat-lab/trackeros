@@ -1,0 +1,113 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "balance"
+    ],
+    "affectedLayers": [
+      "service",
+      "unit-test"
+    ],
+    "isBreakingChange": true,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "BalanceService accepts IUnitOfWork as a new constructor dependency (in addition to IBalanceRepository, IEmployeeService, IPolicyService) and stores it for use in openPeriod/carryForward.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "openPeriod performs its employee lookup, policy lookup, duplicate-key check, and balance create inside a single unitOfWork.withTransaction callback, forwarding the transaction's PoolClient as the optional last argument to every IBalanceRepository call it makes.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "carryForward performs its source lookup, policy lookup, next-period lookup, and the resulting create/update inside a single unitOfWork.withTransaction callback, forwarding the transaction's PoolClient as the optional last argument to every IBalanceRepository call it makes.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "getBalance and getBalanceById remain read-only and do NOT open a transaction or forward a client (they continue to call the repository without a client argument).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All existing BalanceService unit tests in tests/unit/modules/balance/balance.service.test.ts pass after the constructor change, with the four BalanceService constructions updated to pass a fake IUnitOfWork as the fourth argument.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A unit test verifies that when withTransaction's callback throws, the error propagates to the caller of openPeriod/carryForward (the service does not swallow or convert the transaction failure).",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "BalanceService must never import the pg Pool/PoolClient or the shared db connection directly; it obtains the client only from the injected IUnitOfWork.withTransaction callback.",
+    "withTransaction must be invoked only in BalanceService (the service owns the unit of work); it must NOT be added to IBalanceRepository or PgLeaveBalanceRepository.",
+    "No changes to IBalanceRepository or PgLeaveBalanceRepository are required \u2014 their methods already accept an optional trailing PoolClient and fall back to the shared pool when omitted.",
+    "IEmployeeService.getEmployeeById and IPolicyService.getPolicyByLeaveTypeCode remain unchanged and do NOT accept a client; they are read-only cross-module lookups.",
+    "The existing validation, error, and business-rule semantics of openPeriod/carryForward (full entitlement grant, min(unused, carryForwardDays) cap, ValidationError/NotFoundError/ConflictError) must be preserved unchanged \u2014 this phase only adds the transaction boundary."
+  ],
+  "outOfScope": [
+    "No production DI/wiring changes \u2014 no DI container or wiring file in src/ instantiates BalanceService; only the unit test file constructs it.",
+    "No repository changes \u2014 IBalanceRepository/PgLeaveBalanceRepository already support client forwarding and are not modified.",
+    "No changes to IEmployeeService or IPolicyService \u2014 they do not gain a client parameter and are not required to join the transaction.",
+    "No audit-log writes (GP-002), routes/controllers, or RBAC for the balance module \u2014 those remain deferred to later phases."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "BalanceService",
+      "mustExistOrExtend": true,
+      "invariant": "openPeriod and carryForward each execute their state-changing work atomically: either all repository writes within the operation succeed together or none are persisted (the injected IUnitOfWork.withTransaction provides this all-or-nothing boundary)."
+    },
+    {
+      "entity": "BalanceService",
+      "mustExistOrExtend": true,
+      "invariant": "getBalance and getBalanceById are pure read-only operations that never open a transaction and never mutate balance state."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "BalanceService.openPeriod",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Preserves existing error semantics: ValidationError(400) for invalid input/non-positive entitlement, NotFoundError(404) for unknown employee/policy, ConflictError(409) for a duplicate balance key. A transaction failure propagates to the caller unchanged."
+    },
+    {
+      "operation": "BalanceService.carryForward",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Preserves existing error semantics: ValidationError(400) for invalid sourceBalanceId / non-closable period / negative counters, NotFoundError(404) for missing source balance. A transaction failure propagates to the caller unchanged."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "BalanceService must obtain the transaction boundary exclusively through the IUnitOfWork.withTransaction contract (service owns the unit of work, data-access layer opens it), never importing the pool/client directly.",
+      "referencePath": "src/shared/db/unit-of-work.ts"
+    },
+    {
+      "requirement": "BalanceService must forward the transaction's PoolClient as the optional last argument to IBalanceRepository.create/findById/findByKey/update, matching the existing optional-client signatures (which fall back to the shared pool when omitted).",
+      "referencePath": "src/modules/balance/balance.repository.ts"
+    },
+    {
+      "requirement": "The transaction-boundary pattern must match AGENTS.md item 5: withTransaction is placed in the service (not the repository), and participating repository/service methods take the client as an optional last parameter.",
+      "referencePath": "AGENTS.md"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/db/unit-of-work.ts (IUnitOfWork)",
+      "why": "BalanceService injects IUnitOfWork and calls withTransaction to own the atomic boundary for openPeriod/carryForward."
+    },
+    {
+      "target": "src/modules/balance/balance.repository.ts (IBalanceRepository)",
+      "why": "BalanceService forwards the transaction's PoolClient to create/findById/findByKey/update so balance writes join the transaction."
+    },
+    {
+      "target": "src/modules/employee (IEmployeeService) and src/modules/policy (IPolicyService)",
+      "why": "Read-only cross-module lookups used by openPeriod/carryForward; unchanged and do not accept a client."
+    }
+  ]
+}
