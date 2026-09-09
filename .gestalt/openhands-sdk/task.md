@@ -1,37 +1,54 @@
-# Fix specific quality-gate violations: Phase 4 — balance module
+# Implement this phase: Phase 4 — balance module
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/fix/babd3932-368b-46a5-a4dc-6dccaafd84ba/4/2`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/babd3932-368b-46a5-a4dc-6dccaafd84ba/4`. Do not clone anything; work only in this directory.
 
-You are fixing SPECIFIC violations the quality gate found in EXISTING, already-committed files. Make the targeted edits listed below — do NOT refactor, regenerate, or change unrelated code.
+You are the IMPLEMENTATION agent, not a planner. The platform measures your work EXCLUSIVELY by the files you create or modify in this working tree (`git status`). Ending your turn with a plan, a summary, or an announcement of what you are 'about to' do — without having actually edited files — is a FAILURE: a turn that leaves the working tree untouched is discarded. Explore only as much as you need, then MAKE the edits with your file-editing tool. Never end your turn before the files exist on disk.
 
-The files ALREADY EXIST. You MUST edit them in place with the `str_replace_editor` tool. Reading or viewing a file is NOT sufficient — you have NOT finished until you have edited EVERY file listed below.
+## What to build
+(no phase architecture provided — infer from the success criteria below)
 
-## This is fix attempt 2, but you are starting from a CLEAN branch
-No earlier fix attempt's changes are present in this working tree — this branch was created from the phase's own state, not from a previous attempt. Do NOT look for a prior attempt's edits; they are not here. Work from the code that IS present, and if a file named below does not exist yet, CREATE it with the required content rather than reporting that there is nothing to change.
+## Success criteria
+Build the balance module under src/modules/balance/ with a public index.ts. Use the EXACT canonical LeaveBalance field shape: id, employeeId, leaveTypeCode, periodStart, periodEnd, entitledDays, usedDays, pendingDays.
 
-## Constraints & consistency
-You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
-### Reuse & consistency — match these exactly
-- BalanceService must obtain the transaction boundary exclusively through the IUnitOfWork.withTransaction contract (service owns the unit of work, data-access layer opens it), never importing the pool/client directly. (see `src/shared/db/unit-of-work.ts`)
-- BalanceService must forward the transaction's PoolClient as the optional last argument to IBalanceRepository.create/findById/findByKey/update, matching the existing optional-client signatures (which fall back to the shared pool when omitted). (see `src/modules/balance/balance.repository.ts`)
-- The transaction-boundary pattern must match AGENTS.md item 5: withTransaction is placed in the service (not the repository), and participating repository/service methods take the client as an optional last parameter. (see `AGENTS.md`)
-### Entity invariants — enforce these
-- Reuse or extend `BalanceService`: openPeriod and carryForward each execute their state-changing work atomically: either all repository writes within the operation succeed together or none are persisted (the injected IUnitOfWork.withTransaction provides this all-or-nothing boundary).
-- Reuse or extend `BalanceService`: getBalance and getBalanceById are pure read-only operations that never open a transaction and never mutate balance state.
-### Interface contract — expose these operations (their shape is yours)
-- BalanceService.openPeriod — Preserves existing error semantics: ValidationError(400) for invalid input/non-positive entitlement, NotFoundError(404) for unknown employee/policy, ConflictError(409) for a duplicate balance key. A transaction failure propagates to the caller unchanged.
-- BalanceService.carryForward — Preserves existing error semantics: ValidationError(400) for invalid sourceBalanceId / non-closable period / negative counters, NotFoundError(404) for missing source balance. A transaction failure propagates to the caller unchanged.
-### Integration points — connect to these
-- src/shared/db/unit-of-work.ts (IUnitOfWork) — BalanceService injects IUnitOfWork and calls withTransaction to own the atomic boundary for openPeriod/carryForward.
-- src/modules/balance/balance.repository.ts (IBalanceRepository) — BalanceService forwards the transaction's PoolClient to create/findById/findByKey/update so balance writes join the transaction.
-- src/modules/employee (IEmployeeService) and src/modules/policy (IPolicyService) — Read-only cross-module lookups used by openPeriod/carryForward; unchanged and do not accept a client.
+Create:
+- src/modules/balance/balance.model.ts — LeaveBalance interface.
+- src/modules/balance/balance.repository.ts — IBalanceRepository + PgLeaveBalanceRepository (uses pool from src/shared/db/connection.ts).
+- src/modules/balance/balance.service.ts — IBalanceService + BalanceService.
+- src/modules/balance/index.ts — public exports.
 
-## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
-Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
-- Use unknown with type guards instead of any (rule: `no-any`)
-- Database calls must go through repository pattern (rule: `no-direct-db-outside-repository`)
-- No hardcoded passwords, API keys, or tokens (rule: `no-hardcoded-secrets`)
-- Do not add @gestalt/* packages as project dependencies — these are Gestalt platform internals not available on npm (rule: `no-gestalt-internal-deps`)
+The service MUST implement the BINDING accrual and carry-forward rules: grant the FULL entitlement at the start of each accrual period (no pro-rata); on period close, carry forward min(unused, carryForwardDays) into the next OPEN period (hard cap, days above cap forfeited). Import LeaveTypeCode from src/shared/types/index.ts and error types from src/shared/errors/index.ts. Include Jest unit tests in tests/unit/modules/balance/ covering accrual and carry-forward. This phase depends on Phase 1 files (src/shared/types/index.ts, src/shared/errors/index.ts) and Phase 2's src/modules/leave-type/index.ts and src/modules/policy/index.ts (for LeaveTypeCode and carryForwardDays) — read them before generating code referencing their types.
+
+## Your iteration budget — and how to get more (READ BEFORE YOU START)
+
+You have a HARD budget of **30 iterations** for this task; one tool call is one iteration. When it runs out you are CUT OFF mid-work — the unfinished phase is recorded as a FAILURE, not as progress. Nothing warns you as you approach it, so you cannot rely on noticing.
+
+**Exploration is what exhausts it.** Measured on this platform's recent phases: the code-agent spent 19 of its 27 file-editing calls on `view` — it ran out of budget reading the codebase, not building the feature. Phases that were cut off had nearly all of their budget consumed before the writing started.
+
+You have a `task` tool. It runs a FRESH sub-agent with its OWN separate 30-iteration budget and its OWN context window, in this same working directory. Everything that sub-agent reads and writes costs you **one** iteration, not 30. It is the supported way to get more capacity, and using it is normal — not an admission of difficulty.
+
+### DELEGATE BY DEFAULT
+
+**Assume you WILL delegate this phase. The question is not whether, but how to slice it.** Decide NOW, before your first edit — a decision made after you have spent half your budget exploring is a decision made too late.
+
+Delegate unless the phase is *trivially* small, which means ALL of:
+- it creates or changes **at most 2 files**, AND
+- it introduces **no new module**, AND
+- you are confident you can finish it, verified, in well under 10 iterations.
+
+If you cannot say all three with confidence, delegate. When you are unsure, delegate — an unnecessary hand-off costs a few iterations, whereas running out costs the entire phase.
+
+### Delegate the READING, not just the writing
+
+The most valuable first delegation is usually a SURVEY, because that is where the budget actually goes. Instead of opening a dozen files yourself, send a sub-agent to read them and report back what you need: the existing conventions, the shapes and signatures you must match, where the seams are. It burns its own budget on that reading and returns you a digest for one iteration.
+
+Then delegate the implementation slices.
+
+### How to delegate
+- Call `task` with `subagent_type='gestalt-implementer'`, ONE call per slice, at most **4** for this phase. Each call blocks until that sub-agent finishes and reports back — they never run at the same time.
+- Split implementation slices by MODULE or FILE GROUP so they own DISJOINT files. Two slices must never edit the same file.
+- Give each one a self-contained prompt: the exact files it owns, what to build, the conventions it must follow, and what to report back. It cannot see this task, so anything you do not tell it, it does not know.
+
+**Never delegate the final verification.** Run the build and the tests YOURSELF, over the whole phase, after the slices are back — a sub-agent only sees its own slice, so its 'it passes' means 'my slice compiled', not 'the phase works'.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -61,6 +78,37 @@ These are resolved, feature-wide decisions. Wherever this phase touches the conc
 
 12. DUPLICATE of question 6 — same decision: do NOT add BullMQ to package.json; notifications are synchronous direct inserts. [BINDING RULE — operator decision resolving: Should the inclusive calendar-day count (requestedDays = endDate - startDate + 1) exclude weekends and/or public holidays, or count all calendar days?; Should leave balances accrue pro-rata over the accrual period, or be granted in full at the start of each period?; Should unused entitled days carry forward to the next accrual period, and if so up to what cap?; What migration mechanism should be established for PostgreSQL schema changes?; Should a controller layer be introduced for all new modules, or should routes call services directly?; Should BullMQ be added for notification fanout/accrual jobs, or keep notifications synchronous?; Which naming scheme is canonical for LeaveStatus and LeaveType enums: DOMAIN.md (DRAFT/SUBMITTED/APPROVED/REJECTED/CANCELLED; annual/sick/emergency/unpaid/maternity/paternity) or root ARCHITECTURE.md (PENDING/APPROVED/REJECTED/CANCELLED; ANNUAL/SICK/MATERNITY/PATERNITY/UNPAID/OTHER)?; Should the persistence layer define the missing IUnitOfWork concrete implementation (PgUnitOfWork) and the shared base repository / error types, given none exist in the codebase?; What migration mechanism should be established, given no migrations or knexfile currently exist?; How should leave days be counted for a date range (inclusive vs exclusive end date, and half-day handling)?; Should a controller layer be introduced for new modules, or should routes call services directly (as the existing uptime module does)?; Should BullMQ be added to package.json before implementing notification fanout/accrual jobs?; apply everywhere these apply, not in one place only]
 
+## Constraints & consistency
+You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
+### Reuse & consistency — match these exactly
+- LeaveTypeCode must be the enum from src/shared/types/index.ts with lowercase persisted values (annual, sick, emergency, unpaid, maternity, paternity) — no local re-declaration. (see `src/shared/types/index.ts`)
+- carryForwardDays and annualEntitlementDays must be read from the LeavePolicy entity exported by the policy module's public entry point, matching its field names and types. (see `src/modules/policy/index.ts`)
+- Error types must be the shared AppError subclasses (ValidationError 400, NotFoundError 404, ConflictError 409) with their stable code strings. (see `src/shared/errors/index.ts`)
+- The repository must use the shared pg Pool from connection.ts (default pool) and follow the same mapRow/randomUUID/optional-PoolClient pattern as the existing PgLeaveTypeRepository. (see `src/shared/db/connection.ts`)
+- The transaction boundary must match the IUnitOfWork.withTransaction contract (service owns the boundary, data-access opens it; optional trailing PoolClient on participating methods). (see `src/shared/db/unit-of-work.ts`)
+### Entity invariants — enforce these
+- Reuse or extend `LeaveBalance`: A LeaveBalance row is uniquely identified per employee + leaveTypeCode + accrual period (periodStart/periodEnd); there is at most one balance row per (employeeId, leaveTypeCode, periodStart, periodEnd).
+- Reuse or extend `LeaveBalance`: entitledDays, usedDays, and pendingDays are non-negative numbers, and usedDays + pendingDays never exceeds entitledDays for a given balance row.
+- Reuse or extend `LeaveBalance`: periodStart is strictly before periodEnd; the accrual period boundaries are derived from the policy's accrualPeriodMonths and are contiguous (the next period's periodStart equals the prior period's periodEnd).
+- Reuse or extend `LeaveBalance`: The entity has no status field; OPEN vs CLOSED is inferred from periodStart/periodEnd relative to the current date, not stored on the entity.
+### Interface contract — expose these operations (their shape is yours)
+- accrue / open period (grant entitlement at period start) — Rejects invalid input (unknown leaveTypeCode, non-positive entitlement, invalid period range) with ValidationError; unknown employee/policy with NotFoundError; a duplicate balance for the same employee/type/period with ConflictError.
+- close period / carry forward — Carries forward exactly min(unused, carryForwardDays) into the next OPEN period and forfeits the remainder; throws NotFoundError when the source balance or target policy is missing, and ValidationError when the period is not closable.
+- read balance (retrieve by employee + leave type + period) — Returns the matching balance or null/NotFoundError when none exists; never mutates counters.
+### Integration points — connect to these
+- src/shared/types/index.ts — LeaveTypeCode enum is the canonical leave-type discriminator used in the balance entity and service.
+- src/modules/policy/index.ts — LeavePolicy supplies annualEntitlementDays (full entitlement) and carryForwardDays (hard cap) that drive accrual and carry-forward.
+- src/shared/errors/index.ts — Typed error contract for validation/not-found/conflict semantics across the service.
+- src/shared/db/connection.ts — Shared pg Pool is the default data source for the PgLeaveBalanceRepository.
+- src/modules/leave-type/index.ts — LeaveType existence may be validated when opening a balance period for a leave type code.
+
+## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
+Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
+- Use unknown with type guards instead of any (rule: `no-any`)
+- Database calls must go through repository pattern (rule: `no-direct-db-outside-repository`)
+- No hardcoded passwords, API keys, or tokens (rule: `no-hardcoded-secrets`)
+- Do not add @gestalt/* packages as project dependencies — these are Gestalt platform internals not available on npm (rule: `no-gestalt-internal-deps`)
+
 ## Architecture & constraint rules the quality gate enforces (satisfy these now)
 The quality gate judges your code against the rules below and BLOCKS the phase on any violation — a violation it rates critical escalates to a human with no automatic retry. These are the same rules the gate checks, so comply up front rather than leaving them for the gate:
 - Data access is only permitted in the designated data access layer of this project. Code in business logic, presentation, or routing layers must delegate all data operations to the data access layer.
@@ -85,50 +133,24 @@ These are the project's non-negotiable invariants. A violation is a GOLDEN_PRINC
 - GP-006 — Error handling: No unhandled promise rejections. All async errors are caught and handled.
 
 ## Project stack & references
-Before making the edits below, read the referenced files (those present in the working directory) to learn the project's architecture, conventions, and the cross-cutting rules your fix must still satisfy — then keep the edits consistent with them:
+Before writing code, read the referenced files below (those present in the working directory) to learn the project's language, framework, test runner, and conventions, and the cross-cutting rules your code must satisfy — then follow the existing repository conventions:
 - `HARNESS.json`
 - `docs/ARCHITECTURE.md`
 - `docs/GOLDEN_PRINCIPLES.md`
 - `AGENTS.md`
 - `PLAN.md`
 
-## Required edits
-
-### Coherent change 1 — apply as ONE atomic edit across ALL sites below
-
-Unifying change (do this now): Inject IUnitOfWork from src/shared/db/index.ts into BalanceService and wrap openPeriod and carryForward in withTransaction, forwarding the transaction PoolClient to all repository calls.
-
-The sites below are the SAME underlying issue. Fixing some but not others leaves the code incoherent and the quality gate WILL re-flag it — apply the one change above consistently to EVERY site:
-
-- Site 1
-File: src/modules/balance/balance.service.ts
-Line: 32
-Offending code: `constructor(
-    private readonly repository: IBalanceRepository,
-    private readonly employeeService: IEmployeeService,
-    private readonly policyService: IPolicyService
-  ) {}`
-Rule violated: unit-of-work-transaction
-Action (do this now): Edit `src/modules/balance/balance.service.ts` at line 32 in place to fix the `unit-of-work-transaction` violation.
-What the quality gate found — apply this: [unit-of-work-transaction] ARCHITECTURE.md's cross-cutting contract and the phase spec constraint require the service to own the unit of work via an injected IUnitOfWork.withTransaction, with participating methods accepting an optional trailing PoolClient. BalanceService does not inject IUnitOfWork and its multi-step operations (openPeriod's findByKey+create, carryForward's findById+findByKey+create/update) run outside any transaction boundary, so concurrent carryForward calls can create duplicate next-period rows and violate the "at most one balance row per (employeeId, leaveTypeCode, periodStart, periodEnd)" invariant.
-
-- Site 2
-File: src/modules/balance/balance.service.ts
-Line: 35
-Offending code: `private readonly policyService: IPolicyService`
-Rule violated: review/architecture
-Action (do this now): Edit `src/modules/balance/balance.service.ts` at line 35 in place to fix the `review/architecture` violation.
-What the quality gate found — apply this: [review/architecture] Spec constraint #2 requires "the service owns the unit of work via an injected IUnitOfWork.withTransaction". BalanceService's constructor injects only IBalanceRepository, IEmployeeService, and IPolicyService — no IUnitOfWork — and neither openPeriod nor carryForward wraps its multi-step read/write sequence in a transaction. carryForward performs findById → getPolicyByLeaveTypeCode → findByKey → update/create non-atomically, so concurrent calls can double-carry. The repository methods do accept an optional trailing PoolClient (satisfying the second half of the constraint), but the service never opens a transaction boundary.
-
-Then check the rest of these files (and the surrounding module) for ANY OTHER occurrence of the same pattern beyond the specific lines listed above, and apply the same change there too — do NOT limit the fix to only the enumerated sites.
-
 ## Verify before you finish (MANDATORY)
-After making the edits above, the code MUST still compile and its tests MUST pass — a compilation/type error, or a test your change breaks, must NEVER be left for CI or the quality gate to find. Before you declare this task done:
-- Read the project's build / type-check / test commands from `package.json` (scripts) and `HARNESS.json`, install dependencies if they are not already installed, then RUN the type-check / build (e.g. `npm run build` or `tsc --noEmit`) AND the tests (e.g. `npm test`).
-- FIX every compilation error, type error, and failing test that YOUR edits introduced — including updating a test whose expectation your change legitimately invalidated (e.g. a new required field, a new status code such as 401/403 from an added authorization check, added input validation) — and re-run until they pass.
+The code you write MUST compile and its tests MUST pass — a compilation or type error must NEVER be left for CI to find. Before you declare this task done:
+- Read the project's build / type-check / test commands from `package.json` (scripts) and `HARNESS.json`.
+- Install dependencies if they are not already installed, then RUN the type-check / build (e.g. `npm run build` or `tsc --noEmit`) AND the tests (e.g. `npm test`) for the files this phase touches.
+- FIX every compilation error, type error, and failing test you introduced — including in test files — and re-run until they pass.
+- **While fixing, re-run ONLY what you are fixing** — the specific failing test file(s), or the type-check alone for a type error. Do NOT re-run the whole suite after every edit. A measured run spent ~60 full build/test cycles inside a 30-iteration budget and was cut off mid-work: the suite is the slowest thing you can do, and re-running all of it to learn about one file buys nothing.
+- Run the FULL build and the FULL suite ONCE at the end, to confirm the whole phase holds together. That run is the one that matters; the narrow ones are just your fix loop.
+- If a command HANGS or produces no output, do not sit through it repeatedly: note it, work around it (a narrower target, or a timeout), and say so in your final message. Repeatedly interrupting and re-running the same hanging command is the single most expensive thing you can do with your budget.
 - Only when the build and the tests pass may you consider the task complete. If a dependency install genuinely cannot be made to work, say so explicitly in your final message rather than declaring success on unverified code.
 
 ## Constraints (mandatory)
-- Keep the change SURGICAL: make the required edits above and fix only what they broke (compile/type errors and the tests they invalidated). Do NOT refactor, regenerate, or change unrelated code, and do not add / delete / rename source files beyond what a required edit — or a test-fix for it — needs.
-- Do NOT run `git commit`, `git push`, `git add`, or any git command. The platform handles all git operations. (Running the build / type-check / tests above is expected and encouraged — that is NOT a git operation.)
-- When the listed edits are made and the build + tests pass, stop.
+- Write and modify source files ONLY. Do NOT run `git commit`, `git push`, `git add`, or any other git command. The platform handles all git operations. (Running the build / type-check / tests above is expected and encouraged — that is NOT a git operation.)
+- Do not create a new repository or change the git remote.
+- Stay within the scope of this phase; do not implement deferred/later work.
