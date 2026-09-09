@@ -11,9 +11,13 @@ interface AuditLogRow {
   action: string;
   entity_type: string;
   entity_id: string;
-  before_state: unknown | null;
-  after_state: unknown | null;
+  before_state: string | null;
+  after_state: string | null;
   occurred_at: Date;
+}
+
+function parseState(value: string | null): unknown | null {
+  return value === null ? null : JSON.parse(value);
 }
 
 function mapRow(row: AuditLogRow): AuditLog {
@@ -23,8 +27,8 @@ function mapRow(row: AuditLogRow): AuditLog {
     action: row.action as AuditAction,
     entityType: row.entity_type,
     entityId: row.entity_id,
-    beforeState: row.before_state,
-    afterState: row.after_state,
+    beforeState: parseState(row.before_state),
+    afterState: parseState(row.after_state),
     occurredAt: row.occurred_at,
   };
 }
