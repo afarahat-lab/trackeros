@@ -1,6 +1,6 @@
-# Implement this phase: Phase 2 — employee, leave-type, and policy modules
+# Implement this phase: Phase 3 — audit and notification modules
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/babd3932-368b-46a5-a4dc-6dccaafd84ba/2`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/babd3932-368b-46a5-a4dc-6dccaafd84ba/3`. Do not clone anything; work only in this directory.
 
 You are the IMPLEMENTATION agent, not a planner. The platform measures your work EXCLUSIVELY by the files you create or modify in this working tree (`git status`). Ending your turn with a plan, a summary, or an announcement of what you are 'about to' do — without having actually edited files — is a FAILURE: a turn that leaves the working tree untouched is discarded. Explore only as much as you need, then MAKE the edits with your file-editing tool. Never end your turn before the files exist on disk.
 
@@ -8,15 +8,13 @@ You are the IMPLEMENTATION agent, not a planner. The platform measures your work
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Build three reference-data modules. Each module lives under its declared directory and exposes a public index.ts. Use the EXACT canonical entity field shapes below — do not rename, split, add, or omit fields.
+Build two modules, each under its declared directory with a public index.ts. Use the EXACT canonical entity field shapes.
 
-1. src/modules/employee/ — Employee model (id, employeeNumber, firstName, lastName, email, role, managerId, department, hireDate, terminationDate, employmentStatus), IEmployeeRepository + PgEmployeeRepository, IEmployeeService + EmployeeService, and public index.ts. Import EmployeeRole and EmploymentStatus from src/shared/types/index.ts (Phase 1).
+1. src/modules/audit/ — AuditLog model (id, actorId, action, entityType, entityId, beforeState, afterState, occurredAt), IAuditRepository + PgAuditLogRepository, IAuditService + AuditService, public index.ts. Import AuditAction from src/shared/types/index.ts.
 
-2. src/modules/leave-type/ — LeaveType model (code, name, requiresApproval, maxConsecutiveDays, isPaid), ILeaveTypeRepository + PgLeaveTypeRepository, ILeaveTypeService + LeaveTypeService, public index.ts. Import LeaveTypeCode from src/shared/types/index.ts.
+2. src/modules/notification/ — Notification model (id, recipientId, type, title, message, relatedEntityType, relatedEntityId, status, createdAt, readAt), INotificationRepository + PgNotificationRepository, INotificationService + NotificationService, public index.ts. Import NotificationStatus from src/shared/types/index.ts.
 
-3. src/modules/policy/ — LeavePolicy model (id, leaveTypeCode, policyName, annualEntitlementDays, accrualPeriodMonths, carryForwardDays, minNoticeDays, maxRequestDays, requiresManagerApproval, effectiveFrom, effectiveTo, status), IPolicyRepository + PgLeavePolicyRepository, IPolicyService + PolicyService, public index.ts.
-
-Repositories use the existing pool from src/shared/db/connection.ts and the shared error types from src/shared/errors/index.ts. Include Jest unit tests in tests/unit/modules/ for each module's service. This phase depends on Phase 1 files: src/shared/types/index.ts and src/shared/errors/index.ts — read them before generating any code that references their types.
+Notifications are SYNCHRONOUS direct inserts (no BullMQ) — the service inserts within the caller's transaction boundary. Repositories use the pool from src/shared/db/connection.ts and error types from src/shared/errors/index.ts. Include Jest unit tests in tests/unit/modules/ for each service. This phase depends on Phase 1 files: src/shared/types/index.ts and src/shared/errors/index.ts — read them before generating code referencing their types.
 
 ## Your iteration budget — and how to get more (READ BEFORE YOU START)
 
@@ -80,44 +78,42 @@ These are resolved, feature-wide decisions. Wherever this phase touches the conc
 
 ## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
 The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
-- `Employee` — the entity MUST have exactly these fields:
+- `Notification` — the entity MUST have exactly these fields:
     - id
-    - employeeNumber
-    - firstName
-    - lastName
-    - email
-    - role
-    - managerId
-    - department
-    - hireDate
-    - terminationDate
-    - employmentStatus
+    - recipientId
+    - type
+    - title
+    - message
+    - relatedEntityType
+    - relatedEntityId
+    - status
+    - createdAt
+    - readAt
 
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- EmployeeRole and EmploymentStatus must be imported from the shared types entry point, not re-declared; the Employee model's role and employmentStatus fields must use these exact enum types. (see `src/shared/types/index.ts`)
-- LeaveTypeCode must be imported from the shared types entry point; the LeaveType.code and LeavePolicy.leaveTypeCode fields must use this exact enum type with lowercase persisted values. (see `src/shared/types/index.ts`)
-- All error throwing must use AppError and its subclasses (ValidationError/UnauthorizedError/ForbiddenError/NotFoundError/ConflictError) with their fixed statusCode and code, matching the shared error contract. (see `src/shared/errors/index.ts`)
-- Repositories must obtain their client from the shared pg Pool (falling back to it when no transaction client is passed), never opening their own connection or importing a module-level helper. (see `src/shared/db/connection.ts`)
-- Module file layout and public index.ts re-export shape must match the existing uptime/status module convention (model, service interface, service implementation, repository interface, repository implementation). (see `src/modules/uptime/index.ts`)
-- Unit tests must follow the existing relative-import and describe/it style used by the Phase 1 shared tests. (see `tests/unit/shared/errors.test.ts`)
+- Import AuditAction and NotificationStatus enums from src/shared/types/index.ts (do not redefine them locally); Notification.type is a plain string with no enum. (see `src/shared/types/index.ts`)
+- Use AppError subclasses (ValidationError 400, NotFoundError 404, ConflictError 409) from src/shared/errors/index.ts for all service error semantics. (see `src/shared/errors/index.ts`)
+- Repositories use the pool from src/shared/db/connection.ts as the constructor default and accept an optional trailing PoolClient, matching the PgEmployeeRepository pattern. (see `src/shared/db/connection.ts`)
+- Repository methods must map snake_case columns to the canonical camelCase entity fields and cast enum fields, matching the existing PgEmployeeRepository mapRow convention. (see `src/modules/employee/employee.repository.ts`)
+- Service constructor injects the repository interface and validates via a private validate() throwing ValidationError, matching EmployeeService/LeaveTypeService/PolicyService. (see `src/modules/employee/employee.service.ts`)
+- Database columns, FKs, and indexes must match the reconciled schema: audit_logs(id, actor_id, action, entity_type, entity_id, before_state, after_state, occurred_at) with FK actor_id→employees.id; notifications(id, recipient_id, type, title, message, related_entity_type, related_entity_id, status, created_at, read_at) with FK recipient_id→employees.id. (see `.gestalt/architecture/reconciled.json`)
+- Unit tests use in-memory fake repositories implementing the interfaces and assert typed error semantics, matching tests/unit/modules/employee.service.test.ts style. (see `tests/unit/modules/employee.service.test.ts`)
 ### Entity invariants — enforce these
-- Reuse or extend `Employee`: An Employee's employmentStatus is always one of ACTIVE | TERMINATED | ON_LEAVE (EmploymentStatus), and role is one of EMPLOYEE | MANAGER | ADMIN (EmployeeRole); managerId, when present, references another Employee's id.
-- Reuse or extend `LeaveType`: A LeaveType's code is always one of the persisted lowercase LeaveTypeCode values (annual | sick | emergency | unpaid | maternity | paternity) and is unique across leave types.
-- Reuse or extend `LeavePolicy`: A LeavePolicy's leaveTypeCode references an existing LeaveType.code, and its status is one of DRAFT | ACTIVE | SUPERSEDED; effectiveFrom is not after effectiveTo when both are present.
+- Reuse or extend `AuditLog`: An AuditLog is an immutable record of a single state-changing operation: once created it is never updated or deleted; its action must be one of the AuditAction enum values and its actorId must reference an existing employee.
+- Reuse or extend `Notification`: A Notification is created with status PENDING and transitions through SENT → READ → ARCHIVED (per NotificationStatus); readAt is null until the notification is read, and recipientId must reference an existing employee.
 ### Interface contract — expose these operations (their shape is yours)
-- Employee service: create an employee — Rejects invalid input with ValidationError (400); rejects a duplicate employeeNumber or email with ConflictError (409).
-- Employee service: retrieve an employee by id — Throws NotFoundError (404) when no employee matches the id.
-- LeaveType service: create a leave type — Rejects invalid input with ValidationError (400); rejects a duplicate code with ConflictError (409).
-- LeaveType service: retrieve a leave type by code — Throws NotFoundError (404) when no leave type matches the code.
-- Policy service: create a leave policy — Rejects invalid input with ValidationError (400); rejects a policy whose leaveTypeCode does not reference an existing leave type with NotFoundError (404).
-- Policy service: retrieve a leave policy by id — Throws NotFoundError (404) when no policy matches the id.
+- AuditService.record (create an audit log entry) — Rejects invalid input (missing/empty actorId, entityType, entityId, or a non-AuditAction action) with ValidationError; returns the persisted AuditLog.
+- AuditService.getById (retrieve an audit log) — Throws NotFoundError when the id is unknown.
+- NotificationService.create (create a notification) — Rejects invalid input (missing/empty recipientId, type, title, message, or a non-NotificationStatus status) with ValidationError; returns the persisted Notification with status defaulting to PENDING.
+- NotificationService.getById (retrieve a notification) — Throws NotFoundError when the id is unknown.
+- NotificationService.markRead (transition a notification to READ) — Throws NotFoundError when the id is unknown; sets readAt and status READ.
 ### Integration points — connect to these
-- src/shared/types/index.ts — Source of EmployeeRole, EmploymentStatus, and LeaveTypeCode enums used to type the three models.
-- src/shared/errors/index.ts — Source of AppError and subclasses for all error semantics in services and repositories.
-- src/shared/db/connection.ts — The single shared pg Pool repositories use for database access.
-- src/shared/db/unit-of-work.ts — IUnitOfWork/PgUnitOfWork contract that repository/service methods must remain compatible with (optional trailing client parameter).
+- src/shared/types/index.ts — AuditAction and NotificationStatus enums are the canonical persisted values for AuditLog.action and Notification.status.
+- src/shared/errors/index.ts — ValidationError/NotFoundError/ConflictError are the typed error contract every service must throw.
+- src/shared/db/connection.ts — The shared pool is the default data-access connection for both repositories.
+- src/shared/db/unit-of-work.ts — Phase 6 will wrap audit + notification inserts in IUnitOfWork.withTransaction; these repositories must accept the optional PoolClient to join that boundary.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
