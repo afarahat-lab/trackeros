@@ -128,10 +128,10 @@ Two modules, each under `src/modules/<name>/` with the same split-file layout as
 **Divergences from the plan worth noting:**
 - `beforeState`/`afterState` are typed `unknown | null` (not a specific shape) and `relatedEntityType`/`relatedEntityId` are nullable — the plan's field list did not specify nullability; the implementation chose nullable/unknown to reflect optional audit deltas and optional notification linkage.
 - `NotificationService` adds a `markRead` operation (status → READ + `readAt`) beyond the plan's create/retrieve scope.
-- Both repositories accept an optional trailing `PoolClient` (transaction-boundary support per AGENTS.md), but the **services do not yet accept or forward a client** — `record`/`create`/`markRead` are single-step and do not open a transaction. The plan's "inserts within the caller's transaction boundary" is therefore only wired at the repository level; the service-level forwarding of a transaction client is deferred to Phase 6 (leave orchestration), which will pass the client through the repository methods directly.
+- Both repositories accept an optional trailing `PoolClient` (transaction-boundary support per AGENTS.md). `NotificationService.create` accepts and forwards an optional trailing `PoolClient` to the repository so the insert joins the caller's transaction; `AuditService.record` does not yet forward a client and remains single-step. Neither service opens BEGIN/COMMIT/ROLLBACK itself — that stays exclusively in PgUnitOfWork.
 - No audit-log writes (GP-002) and no routes/controllers/RBAC for these modules — out of scope for this phase (routes deferred).
 
-Jest unit tests under `tests/unit/modules/` cover each service with in-memory fake repositories: create/retrieve happy paths, ValidationError on empty/invalid fields, NotFoundError on unknown id, and (notification) `markRead` semantics.
+Jest unit tests under `tests/unit/modules/` cover each service with in-memory fake repositories: create/retrieve happy paths, ValidationError on empty/invalid fields, NotFoundError on unknown id, and (notification) `markRead` semantics plus client-forwarding on `create`.
 
 ### Open questions
 Day-count calendar vs business days; accrual model; carry-forward cap; migration mechanism; controller layer; BullMQ for notifications.
