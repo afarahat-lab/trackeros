@@ -128,7 +128,7 @@ Two modules, each under `src/modules/<name>/` with the same split-file layout as
 **Divergences from the plan worth noting:**
 - `beforeState`/`afterState` are typed `unknown | null` (not a specific shape) and `relatedEntityType`/`relatedEntityId` are nullable — the plan's field list did not specify nullability; the implementation chose nullable/unknown to reflect optional audit deltas and optional notification linkage.
 - `NotificationService` adds a `markRead` operation (status → READ + `readAt`) beyond the plan's create/retrieve scope.
-- Both repositories accept an optional trailing `PoolClient` (transaction-boundary support per AGENTS.md). `NotificationService.create` accepts and forwards an optional trailing `PoolClient` to the repository so the insert joins the caller's transaction; `AuditService.record` does not yet forward a client and remains single-step. Neither service opens BEGIN/COMMIT/ROLLBACK itself — that stays exclusively in PgUnitOfWork.
+- Both repositories accept an optional trailing `PoolClient` (transaction-boundary support per AGENTS.md). Both `NotificationService.create` and `AuditService.record` accept and forward an optional trailing `PoolClient` to their repositories so the insert joins the caller's transaction. Neither service opens BEGIN/COMMIT/ROLLBACK itself — that stays exclusively in PgUnitOfWork.
 - No audit-log writes (GP-002) and no routes/controllers/RBAC for these modules — out of scope for this phase (routes deferred).
 
 Jest unit tests under `tests/unit/modules/` cover each service with in-memory fake repositories: create/retrieve happy paths, ValidationError on empty/invalid fields, NotFoundError on unknown id, and (notification) `markRead` semantics plus client-forwarding on `create`.
