@@ -1,0 +1,144 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "balance"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository",
+      "service",
+      "public-api"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The LeaveBalance entity exposes exactly the canonical field set \u2014 id, employeeId, leaveTypeCode, periodStart, periodEnd, entitledDays, usedDays, pendingDays \u2014 and no status field.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The balance service grants the FULL policy entitlement at the start of each accrual period: entitledDays equals the policy's annualEntitlementDays with no pro-rata reduction.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "On period close, the service carries forward exactly min(unused, carryForwardDays) into the next OPEN period, where unused = entitledDays - usedDays - pendingDays; days above the cap are forfeited.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests under tests/unit/modules/balance/ cover both accrual (full entitlement at period start) and carry-forward (hard cap, forfeiture above cap) with in-memory fake repositories.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The public index.ts re-exports the model, repository interface, repository implementation, service interface, and service implementation so downstream modules (validation, leave) can import LeaveBalance and the balance service through the entry point only.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All database access goes through the repository layer (GP-001); the service never imports a pool, client, or module-level db helper.",
+    "The service owns the unit of work via an injected IUnitOfWork.withTransaction; participating repository/service methods take an optional trailing PoolClient and fall back to the shared pool when omitted. BEGIN/COMMIT/ROLLBACK are issued only by PgUnitOfWork, never by the balance repository.",
+    "LeaveTypeCode is imported from src/shared/types/index.ts (lowercase persisted values: annual, sick, emergency, unpaid, maternity, paternity); carryForwardDays is read from LeavePolicy in src/modules/policy/index.ts. No new enum or duplicate type is declared locally.",
+    "Errors are thrown as the shared typed errors from src/shared/errors/index.ts (ValidationError/NotFoundError/ConflictError), never as bare Error or inline status codes.",
+    "The module follows the established split-file convention (model, repository.interface, repository, service.interface, service, index.ts) matching employee/leave-type/policy/audit/notification, rather than the single-file layout listed in the task.",
+    "The Pg repository generates ids via randomUUID(), maps snake_case rows to camelCase via a mapRow helper, and accepts an optional trailing PoolClient.",
+    "No `any` (use unknown + type guards), no direct DB access outside the repository, no hardcoded secrets, no @gestalt/* dependencies."
+  ],
+  "outOfScope": [
+    "Routes, controllers, and RBAC guards for the balance module \u2014 deferred to later phases; this phase delivers model/repository/service/index only.",
+    "Audit-log writes (GP-002) for balance state changes \u2014 audit is a separate module and not wired into balance in this phase.",
+    "The sufficiency check (entitledDays - usedDays - pendingDays >= requestedDays) and the requestedDays day-count helper \u2014 owned by the validation module (Phase 5) and shared/types respectively, not re-derived here.",
+    "Knex migrations / DDL for the leave_balances table \u2014 the code agent generates migrations as part of persistence work, not a deliverable of this phase's module files."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "A LeaveBalance row is uniquely identified per employee + leaveTypeCode + accrual period (periodStart/periodEnd); there is at most one balance row per (employeeId, leaveTypeCode, periodStart, periodEnd)."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "entitledDays, usedDays, and pendingDays are non-negative numbers, and usedDays + pendingDays never exceeds entitledDays for a given balance row."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "periodStart is strictly before periodEnd; the accrual period boundaries are derived from the policy's accrualPeriodMonths and are contiguous (the next period's periodStart equals the prior period's periodEnd)."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "The entity has no status field; OPEN vs CLOSED is inferred from periodStart/periodEnd relative to the current date, not stored on the entity."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "accrue / open period (grant entitlement at period start)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Rejects invalid input (unknown leaveTypeCode, non-positive entitlement, invalid period range) with ValidationError; unknown employee/policy with NotFoundError; a duplicate balance for the same employee/type/period with ConflictError."
+    },
+    {
+      "operation": "close period / carry forward",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Carries forward exactly min(unused, carryForwardDays) into the next OPEN period and forfeits the remainder; throws NotFoundError when the source balance or target policy is missing, and ValidationError when the period is not closable."
+    },
+    {
+      "operation": "read balance (retrieve by employee + leave type + period)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the matching balance or null/NotFoundError when none exists; never mutates counters."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "LeaveTypeCode must be the enum from src/shared/types/index.ts with lowercase persisted values (annual, sick, emergency, unpaid, maternity, paternity) \u2014 no local re-declaration.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "carryForwardDays and annualEntitlementDays must be read from the LeavePolicy entity exported by the policy module's public entry point, matching its field names and types.",
+      "referencePath": "src/modules/policy/index.ts"
+    },
+    {
+      "requirement": "Error types must be the shared AppError subclasses (ValidationError 400, NotFoundError 404, ConflictError 409) with their stable code strings.",
+      "referencePath": "src/shared/errors/index.ts"
+    },
+    {
+      "requirement": "The repository must use the shared pg Pool from connection.ts (default pool) and follow the same mapRow/randomUUID/optional-PoolClient pattern as the existing PgLeaveTypeRepository.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "The transaction boundary must match the IUnitOfWork.withTransaction contract (service owns the boundary, data-access opens it; optional trailing PoolClient on participating methods).",
+      "referencePath": "src/shared/db/unit-of-work.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts",
+      "why": "LeaveTypeCode enum is the canonical leave-type discriminator used in the balance entity and service."
+    },
+    {
+      "target": "src/modules/policy/index.ts",
+      "why": "LeavePolicy supplies annualEntitlementDays (full entitlement) and carryForwardDays (hard cap) that drive accrual and carry-forward."
+    },
+    {
+      "target": "src/shared/errors/index.ts",
+      "why": "Typed error contract for validation/not-found/conflict semantics across the service."
+    },
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "Shared pg Pool is the default data source for the PgLeaveBalanceRepository."
+    },
+    {
+      "target": "src/modules/leave-type/index.ts",
+      "why": "LeaveType existence may be validated when opening a balance period for a leave type code."
+    }
+  ]
+}
