@@ -1,3 +1,4 @@
+import { PoolClient } from 'pg';
 import { NotificationStatus } from '../../shared/types';
 import { ValidationError, NotFoundError } from '../../shared/errors';
 import { Notification, CreateNotificationInput } from './notification.model';
@@ -7,12 +8,15 @@ import { INotificationService } from './notification.service.interface';
 export class NotificationService implements INotificationService {
   constructor(private readonly repository: INotificationRepository) {}
 
-  async create(input: CreateNotificationInput): Promise<Notification> {
+  async create(input: CreateNotificationInput, client?: PoolClient): Promise<Notification> {
     this.validate(input);
-    return this.repository.create({
-      ...input,
-      status: input.status ?? NotificationStatus.PENDING,
-    });
+    return this.repository.create(
+      {
+        ...input,
+        status: input.status ?? NotificationStatus.PENDING,
+      },
+      client
+    );
   }
 
   async getById(id: string): Promise<Notification> {
