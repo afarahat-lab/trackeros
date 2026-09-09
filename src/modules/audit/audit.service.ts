@@ -1,3 +1,4 @@
+import { PoolClient } from 'pg';
 import { AuditAction } from '../../shared/types';
 import { ValidationError, NotFoundError } from '../../shared/errors';
 import { AuditLog, CreateAuditLogInput } from './audit.model';
@@ -7,9 +8,9 @@ import { IAuditService } from './audit.service.interface';
 export class AuditService implements IAuditService {
   constructor(private readonly repository: IAuditRepository) {}
 
-  async record(input: CreateAuditLogInput): Promise<AuditLog> {
+  async record(input: CreateAuditLogInput, client?: PoolClient): Promise<AuditLog> {
     this.validate(input);
-    return this.repository.create(input);
+    return this.repository.create(input, client);
   }
 
   async getById(id: string): Promise<AuditLog> {
