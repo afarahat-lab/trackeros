@@ -140,6 +140,9 @@ export class PgLeaveBalanceRepository implements IBalanceRepository {
       id,
       ...values,
     ]);
+    if (result.rows.length === 0) {
+      throw new NotFoundError('Leave balance not found');
+    }
     return mapRow(result.rows[0]);
   }
 }
