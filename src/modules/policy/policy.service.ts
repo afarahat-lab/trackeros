@@ -1,4 +1,5 @@
 import { ValidationError, NotFoundError } from '../../shared/errors';
+import { LeaveTypeCode } from '../../shared/types';
 import { ILeaveTypeService } from '../leave-type';
 import { LeavePolicy, CreateLeavePolicyInput, LeavePolicyStatus } from './policy.model';
 import { IPolicyRepository } from './policy.repository.interface';
@@ -28,6 +29,14 @@ export class PolicyService implements IPolicyService {
 
   async getLeavePolicyById(id: string): Promise<LeavePolicy> {
     const policy = await this.repository.findById(id);
+    if (!policy) {
+      throw new NotFoundError('Leave policy not found');
+    }
+    return policy;
+  }
+
+  async getPolicyByLeaveTypeCode(leaveTypeCode: LeaveTypeCode): Promise<LeavePolicy> {
+    const policy = await this.repository.findByLeaveTypeCode(leaveTypeCode);
     if (!policy) {
       throw new NotFoundError('Leave policy not found');
     }

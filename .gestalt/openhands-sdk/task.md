@@ -1,6 +1,6 @@
-# Implement this phase: Phase 3 — audit and notification modules
+# Implement this phase: Phase 4 — balance module
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/babd3932-368b-46a5-a4dc-6dccaafd84ba/3`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/babd3932-368b-46a5-a4dc-6dccaafd84ba/4`. Do not clone anything; work only in this directory.
 
 You are the IMPLEMENTATION agent, not a planner. The platform measures your work EXCLUSIVELY by the files you create or modify in this working tree (`git status`). Ending your turn with a plan, a summary, or an announcement of what you are 'about to' do — without having actually edited files — is a FAILURE: a turn that leaves the working tree untouched is discarded. Explore only as much as you need, then MAKE the edits with your file-editing tool. Never end your turn before the files exist on disk.
 
@@ -8,13 +8,15 @@ You are the IMPLEMENTATION agent, not a planner. The platform measures your work
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Build two modules, each under its declared directory with a public index.ts. Use the EXACT canonical entity field shapes.
+Build the balance module under src/modules/balance/ with a public index.ts. Use the EXACT canonical LeaveBalance field shape: id, employeeId, leaveTypeCode, periodStart, periodEnd, entitledDays, usedDays, pendingDays.
 
-1. src/modules/audit/ — AuditLog model (id, actorId, action, entityType, entityId, beforeState, afterState, occurredAt), IAuditRepository + PgAuditLogRepository, IAuditService + AuditService, public index.ts. Import AuditAction from src/shared/types/index.ts.
+Create:
+- src/modules/balance/balance.model.ts — LeaveBalance interface.
+- src/modules/balance/balance.repository.ts — IBalanceRepository + PgLeaveBalanceRepository (uses pool from src/shared/db/connection.ts).
+- src/modules/balance/balance.service.ts — IBalanceService + BalanceService.
+- src/modules/balance/index.ts — public exports.
 
-2. src/modules/notification/ — Notification model (id, recipientId, type, title, message, relatedEntityType, relatedEntityId, status, createdAt, readAt), INotificationRepository + PgNotificationRepository, INotificationService + NotificationService, public index.ts. Import NotificationStatus from src/shared/types/index.ts.
-
-Notifications are SYNCHRONOUS direct inserts (no BullMQ) — the service inserts within the caller's transaction boundary. Repositories use the pool from src/shared/db/connection.ts and error types from src/shared/errors/index.ts. Include Jest unit tests in tests/unit/modules/ for each service. This phase depends on Phase 1 files: src/shared/types/index.ts and src/shared/errors/index.ts — read them before generating code referencing their types.
+The service MUST implement the BINDING accrual and carry-forward rules: grant the FULL entitlement at the start of each accrual period (no pro-rata); on period close, carry forward min(unused, carryForwardDays) into the next OPEN period (hard cap, days above cap forfeited). Import LeaveTypeCode from src/shared/types/index.ts and error types from src/shared/errors/index.ts. Include Jest unit tests in tests/unit/modules/balance/ covering accrual and carry-forward. This phase depends on Phase 1 files (src/shared/types/index.ts, src/shared/errors/index.ts) and Phase 2's src/modules/leave-type/index.ts and src/modules/policy/index.ts (for LeaveTypeCode and carryForwardDays) — read them before generating code referencing their types.
 
 ## Your iteration budget — and how to get more (READ BEFORE YOU START)
 
@@ -76,44 +78,29 @@ These are resolved, feature-wide decisions. Wherever this phase touches the conc
 
 12. DUPLICATE of question 6 — same decision: do NOT add BullMQ to package.json; notifications are synchronous direct inserts. [BINDING RULE — operator decision resolving: Should the inclusive calendar-day count (requestedDays = endDate - startDate + 1) exclude weekends and/or public holidays, or count all calendar days?; Should leave balances accrue pro-rata over the accrual period, or be granted in full at the start of each period?; Should unused entitled days carry forward to the next accrual period, and if so up to what cap?; What migration mechanism should be established for PostgreSQL schema changes?; Should a controller layer be introduced for all new modules, or should routes call services directly?; Should BullMQ be added for notification fanout/accrual jobs, or keep notifications synchronous?; Which naming scheme is canonical for LeaveStatus and LeaveType enums: DOMAIN.md (DRAFT/SUBMITTED/APPROVED/REJECTED/CANCELLED; annual/sick/emergency/unpaid/maternity/paternity) or root ARCHITECTURE.md (PENDING/APPROVED/REJECTED/CANCELLED; ANNUAL/SICK/MATERNITY/PATERNITY/UNPAID/OTHER)?; Should the persistence layer define the missing IUnitOfWork concrete implementation (PgUnitOfWork) and the shared base repository / error types, given none exist in the codebase?; What migration mechanism should be established, given no migrations or knexfile currently exist?; How should leave days be counted for a date range (inclusive vs exclusive end date, and half-day handling)?; Should a controller layer be introduced for new modules, or should routes call services directly (as the existing uptime module does)?; Should BullMQ be added to package.json before implementing notification fanout/accrual jobs?; apply everywhere these apply, not in one place only]
 
-## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
-The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
-- `Notification` — the entity MUST have exactly these fields:
-    - id
-    - recipientId
-    - type
-    - title
-    - message
-    - relatedEntityType
-    - relatedEntityId
-    - status
-    - createdAt
-    - readAt
-
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- Import AuditAction and NotificationStatus enums from src/shared/types/index.ts (do not redefine them locally); Notification.type is a plain string with no enum. (see `src/shared/types/index.ts`)
-- Use AppError subclasses (ValidationError 400, NotFoundError 404, ConflictError 409) from src/shared/errors/index.ts for all service error semantics. (see `src/shared/errors/index.ts`)
-- Repositories use the pool from src/shared/db/connection.ts as the constructor default and accept an optional trailing PoolClient, matching the PgEmployeeRepository pattern. (see `src/shared/db/connection.ts`)
-- Repository methods must map snake_case columns to the canonical camelCase entity fields and cast enum fields, matching the existing PgEmployeeRepository mapRow convention. (see `src/modules/employee/employee.repository.ts`)
-- Service constructor injects the repository interface and validates via a private validate() throwing ValidationError, matching EmployeeService/LeaveTypeService/PolicyService. (see `src/modules/employee/employee.service.ts`)
-- Database columns, FKs, and indexes must match the reconciled schema: audit_logs(id, actor_id, action, entity_type, entity_id, before_state, after_state, occurred_at) with FK actor_id→employees.id; notifications(id, recipient_id, type, title, message, related_entity_type, related_entity_id, status, created_at, read_at) with FK recipient_id→employees.id. (see `.gestalt/architecture/reconciled.json`)
-- Unit tests use in-memory fake repositories implementing the interfaces and assert typed error semantics, matching tests/unit/modules/employee.service.test.ts style. (see `tests/unit/modules/employee.service.test.ts`)
+- LeaveTypeCode must be the enum from src/shared/types/index.ts with lowercase persisted values (annual, sick, emergency, unpaid, maternity, paternity) — no local re-declaration. (see `src/shared/types/index.ts`)
+- carryForwardDays and annualEntitlementDays must be read from the LeavePolicy entity exported by the policy module's public entry point, matching its field names and types. (see `src/modules/policy/index.ts`)
+- Error types must be the shared AppError subclasses (ValidationError 400, NotFoundError 404, ConflictError 409) with their stable code strings. (see `src/shared/errors/index.ts`)
+- The repository must use the shared pg Pool from connection.ts (default pool) and follow the same mapRow/randomUUID/optional-PoolClient pattern as the existing PgLeaveTypeRepository. (see `src/shared/db/connection.ts`)
+- The transaction boundary must match the IUnitOfWork.withTransaction contract (service owns the boundary, data-access opens it; optional trailing PoolClient on participating methods). (see `src/shared/db/unit-of-work.ts`)
 ### Entity invariants — enforce these
-- Reuse or extend `AuditLog`: An AuditLog is an immutable record of a single state-changing operation: once created it is never updated or deleted; its action must be one of the AuditAction enum values and its actorId must reference an existing employee.
-- Reuse or extend `Notification`: A Notification is created with status PENDING and transitions through SENT → READ → ARCHIVED (per NotificationStatus); readAt is null until the notification is read, and recipientId must reference an existing employee.
+- Reuse or extend `LeaveBalance`: A LeaveBalance row is uniquely identified per employee + leaveTypeCode + accrual period (periodStart/periodEnd); there is at most one balance row per (employeeId, leaveTypeCode, periodStart, periodEnd).
+- Reuse or extend `LeaveBalance`: entitledDays, usedDays, and pendingDays are non-negative numbers, and usedDays + pendingDays never exceeds entitledDays for a given balance row.
+- Reuse or extend `LeaveBalance`: periodStart is strictly before periodEnd; the accrual period boundaries are derived from the policy's accrualPeriodMonths and are contiguous (the next period's periodStart equals the prior period's periodEnd).
+- Reuse or extend `LeaveBalance`: The entity has no status field; OPEN vs CLOSED is inferred from periodStart/periodEnd relative to the current date, not stored on the entity.
 ### Interface contract — expose these operations (their shape is yours)
-- AuditService.record (create an audit log entry) — Rejects invalid input (missing/empty actorId, entityType, entityId, or a non-AuditAction action) with ValidationError; returns the persisted AuditLog.
-- AuditService.getById (retrieve an audit log) — Throws NotFoundError when the id is unknown.
-- NotificationService.create (create a notification) — Rejects invalid input (missing/empty recipientId, type, title, message, or a non-NotificationStatus status) with ValidationError; returns the persisted Notification with status defaulting to PENDING.
-- NotificationService.getById (retrieve a notification) — Throws NotFoundError when the id is unknown.
-- NotificationService.markRead (transition a notification to READ) — Throws NotFoundError when the id is unknown; sets readAt and status READ.
+- accrue / open period (grant entitlement at period start) — Rejects invalid input (unknown leaveTypeCode, non-positive entitlement, invalid period range) with ValidationError; unknown employee/policy with NotFoundError; a duplicate balance for the same employee/type/period with ConflictError.
+- close period / carry forward — Carries forward exactly min(unused, carryForwardDays) into the next OPEN period and forfeits the remainder; throws NotFoundError when the source balance or target policy is missing, and ValidationError when the period is not closable.
+- read balance (retrieve by employee + leave type + period) — Returns the matching balance or null/NotFoundError when none exists; never mutates counters.
 ### Integration points — connect to these
-- src/shared/types/index.ts — AuditAction and NotificationStatus enums are the canonical persisted values for AuditLog.action and Notification.status.
-- src/shared/errors/index.ts — ValidationError/NotFoundError/ConflictError are the typed error contract every service must throw.
-- src/shared/db/connection.ts — The shared pool is the default data-access connection for both repositories.
-- src/shared/db/unit-of-work.ts — Phase 6 will wrap audit + notification inserts in IUnitOfWork.withTransaction; these repositories must accept the optional PoolClient to join that boundary.
+- src/shared/types/index.ts — LeaveTypeCode enum is the canonical leave-type discriminator used in the balance entity and service.
+- src/modules/policy/index.ts — LeavePolicy supplies annualEntitlementDays (full entitlement) and carryForwardDays (hard cap) that drive accrual and carry-forward.
+- src/shared/errors/index.ts — Typed error contract for validation/not-found/conflict semantics across the service.
+- src/shared/db/connection.ts — Shared pg Pool is the default data source for the PgLeaveBalanceRepository.
+- src/modules/leave-type/index.ts — LeaveType existence may be validated when opening a balance period for a leave type code.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:

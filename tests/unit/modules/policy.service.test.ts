@@ -22,6 +22,10 @@ class FakePolicyRepository implements IPolicyRepository {
     return this.rows.find((p) => p.id === id) ?? null;
   }
 
+  async findByLeaveTypeCode(code: LeaveTypeCode): Promise<LeavePolicy | null> {
+    return this.rows.find((p) => p.leaveTypeCode === code) ?? null;
+  }
+
   async findAll(): Promise<LeavePolicy[]> {
     return [...this.rows];
   }

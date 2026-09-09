@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import { Pool, PoolClient, QueryResult } from 'pg';
 import { pool as defaultPool } from '../../shared/db/connection';
+import { LeaveTypeCode } from '../../shared/types';
 import { LeavePolicy, CreateLeavePolicyInput, LeavePolicyStatus } from './policy.model';
 import { IPolicyRepository } from './policy.repository.interface';
 
@@ -80,6 +81,17 @@ export class PgLeavePolicyRepository implements IPolicyRepository {
   async findById(id: string, client?: PoolClient): Promise<LeavePolicy | null> {
     const query = `SELECT ${COLUMNS} FROM leave_policies WHERE id = $1`;
     const result: QueryResult<LeavePolicyRow> = await this.db(client).query(query, [id]);
+    return result.rows.length ? mapRow(result.rows[0]) : null;
+  }
+
+  async findByLeaveTypeCode(
+    leaveTypeCode: LeaveTypeCode,
+    client?: PoolClient
+  ): Promise<LeavePolicy | null> {
+    const query = `SELECT ${COLUMNS} FROM leave_policies WHERE leave_type_code = $1`;
+    const result: QueryResult<LeavePolicyRow> = await this.db(client).query(query, [
+      leaveTypeCode,
+    ]);
     return result.rows.length ? mapRow(result.rows[0]) : null;
   }
 
