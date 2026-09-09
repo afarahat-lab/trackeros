@@ -1,6 +1,6 @@
-# Implement this phase: Phase 1 — Shared foundations (types, errors, unit-of-work)
+# Implement this phase: Phase 2 — employee, leave-type, and policy modules
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/babd3932-368b-46a5-a4dc-6dccaafd84ba/1`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/babd3932-368b-46a5-a4dc-6dccaafd84ba/2`. Do not clone anything; work only in this directory.
 
 You are the IMPLEMENTATION agent, not a planner. The platform measures your work EXCLUSIVELY by the files you create or modify in this working tree (`git status`). Ending your turn with a plan, a summary, or an announcement of what you are 'about to' do — without having actually edited files — is a FAILURE: a turn that leaves the working tree untouched is discarded. Explore only as much as you need, then MAKE the edits with your file-editing tool. Never end your turn before the files exist on disk.
 
@@ -8,22 +8,15 @@ You are the IMPLEMENTATION agent, not a planner. The platform measures your work
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Create the shared foundation files that every later module imports. All paths below are the AUTHORITATIVE module boundaries — do not relocate any symbol.
+Build three reference-data modules. Each module lives under its declared directory and exposes a public index.ts. Use the EXACT canonical entity field shapes below — do not rename, split, add, or omit fields.
 
-1. src/shared/types/index.ts — define the canonical enums and cross-module DTOs:
-   - LeaveStatus enum: DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED (persisted string values, per DOMAIN.md).
-   - LeaveTypeCode enum: ANNUAL, SICK, EMERGENCY (plus unpaid/maternity/paternity per DOMAIN.md scheme).
-   - AuditAction enum: CREATE, UPDATE, DELETE, APPROVE, REJECT.
-   - NotificationStatus enum: PENDING, SENT, READ, ARCHIVED.
-   - EmploymentStatus enum: ACTIVE, TERMINATED, ON_LEAVE.
-   - EmployeeRole enum: EMPLOYEE, MANAGER, ADMIN.
-   - CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveRequestQueryParams interfaces. Use the EXACT canonical field names from the entity shapes (e.g. CreateLeaveRequestDto: employeeId, leaveTypeCode, startDate, endDate, reason; UpdateLeaveRequestDto: startDate, endDate, reason, status).
+1. src/modules/employee/ — Employee model (id, employeeNumber, firstName, lastName, email, role, managerId, department, hireDate, terminationDate, employmentStatus), IEmployeeRepository + PgEmployeeRepository, IEmployeeService + EmployeeService, and public index.ts. Import EmployeeRole and EmploymentStatus from src/shared/types/index.ts (Phase 1).
 
-2. src/shared/errors/index.ts — define AppError base class (message, statusCode, code) and subclasses: ValidationError (400), NotFoundError (404), UnauthorizedError (401), ForbiddenError (403), ConflictError (409).
+2. src/modules/leave-type/ — LeaveType model (code, name, requiresApproval, maxConsecutiveDays, isPaid), ILeaveTypeRepository + PgLeaveTypeRepository, ILeaveTypeService + LeaveTypeService, public index.ts. Import LeaveTypeCode from src/shared/types/index.ts.
 
-3. src/shared/db/unit-of-work.ts — define IUnitOfWork interface with withTransaction<T>(work: (tx: unknown) => Promise<T>): Promise<T>, and PgUnitOfWork implementation using the existing pool from src/shared/db/connection.ts (read it first). PgUnitOfWork opens a client, BEGIN/COMMIT/ROLLBACK, and reuses the client within the transaction.
+3. src/modules/policy/ — LeavePolicy model (id, leaveTypeCode, policyName, annualEntitlementDays, accrualPeriodMonths, carryForwardDays, minNoticeDays, maxRequestDays, requiresManagerApproval, effectiveFrom, effectiveTo, status), IPolicyRepository + PgLeavePolicyRepository, IPolicyService + PolicyService, public index.ts.
 
-Include Jest unit tests in tests/unit/shared/ for the error classes and enums. This phase depends on the existing src/shared/db/connection.ts (read it before generating PgUnitOfWork).
+Repositories use the existing pool from src/shared/db/connection.ts and the shared error types from src/shared/errors/index.ts. Include Jest unit tests in tests/unit/modules/ for each module's service. This phase depends on Phase 1 files: src/shared/types/index.ts and src/shared/errors/index.ts — read them before generating any code that references their types.
 
 ## Your iteration budget — and how to get more (READ BEFORE YOU START)
 
@@ -85,27 +78,46 @@ These are resolved, feature-wide decisions. Wherever this phase touches the conc
 
 12. DUPLICATE of question 6 — same decision: do NOT add BullMQ to package.json; notifications are synchronous direct inserts. [BINDING RULE — operator decision resolving: Should the inclusive calendar-day count (requestedDays = endDate - startDate + 1) exclude weekends and/or public holidays, or count all calendar days?; Should leave balances accrue pro-rata over the accrual period, or be granted in full at the start of each period?; Should unused entitled days carry forward to the next accrual period, and if so up to what cap?; What migration mechanism should be established for PostgreSQL schema changes?; Should a controller layer be introduced for all new modules, or should routes call services directly?; Should BullMQ be added for notification fanout/accrual jobs, or keep notifications synchronous?; Which naming scheme is canonical for LeaveStatus and LeaveType enums: DOMAIN.md (DRAFT/SUBMITTED/APPROVED/REJECTED/CANCELLED; annual/sick/emergency/unpaid/maternity/paternity) or root ARCHITECTURE.md (PENDING/APPROVED/REJECTED/CANCELLED; ANNUAL/SICK/MATERNITY/PATERNITY/UNPAID/OTHER)?; Should the persistence layer define the missing IUnitOfWork concrete implementation (PgUnitOfWork) and the shared base repository / error types, given none exist in the codebase?; What migration mechanism should be established, given no migrations or knexfile currently exist?; How should leave days be counted for a date range (inclusive vs exclusive end date, and half-day handling)?; Should a controller layer be introduced for new modules, or should routes call services directly (as the existing uptime module does)?; Should BullMQ be added to package.json before implementing notification fanout/accrual jobs?; apply everywhere these apply, not in one place only]
 
+## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
+The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
+- `Employee` — the entity MUST have exactly these fields:
+    - id
+    - employeeNumber
+    - firstName
+    - lastName
+    - email
+    - role
+    - managerId
+    - department
+    - hireDate
+    - terminationDate
+    - employmentStatus
+
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- PgUnitOfWork must obtain its client from the existing `pool` export in src/shared/db/connection.ts (the only pool, built from DATABASE_URL with SSL only in production). (see `src/shared/db/connection.ts`)
-- Enum member sets and DTO field names must match the canonical entity shapes and module ownership declared in the reconciled architecture (LeaveStatus/LeaveTypeCode/AuditAction/NotificationStatus/EmploymentStatus/EmployeeRole; CreateLeaveRequestDto/UpdateLeaveRequestDto/LeaveRequestQueryParams). (see `.gestalt/architecture/reconciled.json`)
-- The withTransaction contract must follow the AGENTS.md transaction-boundary decision: service owns the unit of work, data-access layer opens it, repositories take an optional client as the last parameter, and BEGIN/COMMIT/ROLLBACK live only in PgUnitOfWork. (see `AGENTS.md`)
-- Error classes must satisfy the cross-cutting error contract { error, code } with 400/401/403/404/409 semantics (ValidationError→400, UnauthorizedError→401, ForbiddenError→403, NotFoundError→404, ConflictError→409). (see `docs/ARCHITECTURE.md`)
+- EmployeeRole and EmploymentStatus must be imported from the shared types entry point, not re-declared; the Employee model's role and employmentStatus fields must use these exact enum types. (see `src/shared/types/index.ts`)
+- LeaveTypeCode must be imported from the shared types entry point; the LeaveType.code and LeavePolicy.leaveTypeCode fields must use this exact enum type with lowercase persisted values. (see `src/shared/types/index.ts`)
+- All error throwing must use AppError and its subclasses (ValidationError/UnauthorizedError/ForbiddenError/NotFoundError/ConflictError) with their fixed statusCode and code, matching the shared error contract. (see `src/shared/errors/index.ts`)
+- Repositories must obtain their client from the shared pg Pool (falling back to it when no transaction client is passed), never opening their own connection or importing a module-level helper. (see `src/shared/db/connection.ts`)
+- Module file layout and public index.ts re-export shape must match the existing uptime/status module convention (model, service interface, service implementation, repository interface, repository implementation). (see `src/modules/uptime/index.ts`)
+- Unit tests must follow the existing relative-import and describe/it style used by the Phase 1 shared tests. (see `tests/unit/shared/errors.test.ts`)
 ### Entity invariants — enforce these
-- Reuse or extend `LeaveStatus`: Exposes exactly the five lifecycle states DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED as persisted string values; no extra members.
-- Reuse or extend `LeaveTypeCode`: Exposes exactly six lowercase members annual, sick, emergency, unpaid, maternity, paternity; these are the persisted string values in leave_requests.leave_type_code / leave_policies.leave_type.
-- Reuse or extend `AuditAction`: Exposes exactly CREATE, UPDATE, DELETE, APPROVE, REJECT.
-- Reuse or extend `NotificationStatus`: Exposes exactly PENDING, SENT, READ, ARCHIVED.
-- Reuse or extend `EmploymentStatus`: Exposes exactly ACTIVE, TERMINATED, ON_LEAVE.
-- Reuse or extend `EmployeeRole`: Exposes exactly EMPLOYEE, MANAGER, ADMIN.
-- Reuse or extend `AppError`: Base error carries message, statusCode, and code; every subclass fixes its own statusCode (400/401/403/404/409) and a distinct code, and instances are instanceof AppError.
+- Reuse or extend `Employee`: An Employee's employmentStatus is always one of ACTIVE | TERMINATED | ON_LEAVE (EmploymentStatus), and role is one of EMPLOYEE | MANAGER | ADMIN (EmployeeRole); managerId, when present, references another Employee's id.
+- Reuse or extend `LeaveType`: A LeaveType's code is always one of the persisted lowercase LeaveTypeCode values (annual | sick | emergency | unpaid | maternity | paternity) and is unique across leave types.
+- Reuse or extend `LeavePolicy`: A LeavePolicy's leaveTypeCode references an existing LeaveType.code, and its status is one of DRAFT | ACTIVE | SUPERSEDED; effectiveFrom is not after effectiveTo when both are present.
 ### Interface contract — expose these operations (their shape is yours)
-- IUnitOfWork.withTransaction — On callback throw, ROLLBACK is issued and the original error re-thrown; the client is released in a finally regardless of outcome.
-- PgUnitOfWork.withTransaction — Acquires a client from the shared pool, issues BEGIN before the callback and COMMIT after it resolves; any throw triggers ROLLBACK; release always happens.
+- Employee service: create an employee — Rejects invalid input with ValidationError (400); rejects a duplicate employeeNumber or email with ConflictError (409).
+- Employee service: retrieve an employee by id — Throws NotFoundError (404) when no employee matches the id.
+- LeaveType service: create a leave type — Rejects invalid input with ValidationError (400); rejects a duplicate code with ConflictError (409).
+- LeaveType service: retrieve a leave type by code — Throws NotFoundError (404) when no leave type matches the code.
+- Policy service: create a leave policy — Rejects invalid input with ValidationError (400); rejects a policy whose leaveTypeCode does not reference an existing leave type with NotFoundError (404).
+- Policy service: retrieve a leave policy by id — Throws NotFoundError (404) when no policy matches the id.
 ### Integration points — connect to these
-- src/shared/db/connection.ts — PgUnitOfWork depends on its `pool` export; must be read before generating the implementation.
-- src/modules/employee, leave-type, policy, audit, notification, balance, validation, leave (Phase 2–6) — These later modules import the enums, DTOs, error classes, and IUnitOfWork produced here; the public index.ts files are the authoritative entry points they will consume.
+- src/shared/types/index.ts — Source of EmployeeRole, EmploymentStatus, and LeaveTypeCode enums used to type the three models.
+- src/shared/errors/index.ts — Source of AppError and subclasses for all error semantics in services and repositories.
+- src/shared/db/connection.ts — The single shared pg Pool repositories use for database access.
+- src/shared/db/unit-of-work.ts — IUnitOfWork/PgUnitOfWork contract that repository/service methods must remain compatible with (optional trailing client parameter).
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
