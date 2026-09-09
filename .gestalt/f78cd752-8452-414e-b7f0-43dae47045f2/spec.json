@@ -1,0 +1,79 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "balance"
+    ],
+    "affectedLayers": [
+      "repository"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "When PgLeaveBalanceRepository.update is called with a non-empty changes object and an id that matches no row, it throws NotFoundError (statusCode 404, code NOT_FOUND) with message 'Leave balance not found' instead of throwing a TypeError.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "When the UPDATE affects at least one row, update still returns the mapped LeaveBalance for the updated row (existing happy-path behavior is preserved).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The zero-row check uses the pg QueryResult.rowCount signal (rows affected by the UPDATE), not result.rows.length, to decide the missing-row case.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No signature change to IBalanceRepository.update \u2014 it keeps returning Promise<LeaveBalance> and accepting the optional trailing PoolClient.",
+    "No new import is required \u2014 NotFoundError is already imported in balance.repository.ts from '../../shared/errors'.",
+    "The empty-changes branch (fields.length === 0) must keep its existing behavior: findById then throw NotFoundError('Leave balance not found') when missing, else return the existing row."
+  ],
+  "outOfScope": [
+    "No changes to the empty-changes branch, the dynamic SET-clause construction, FIELD_COLUMNS mapping, or any other repository method (create/findById/findByKey).",
+    "No changes to the IBalanceRepository interface signature, the BalanceService, routes/controllers, or any transaction/audit behavior."
+  ],
+  "ambiguities": [
+    {
+      "description": "Verification strategy: is a new automated test required to prove the fixed behavior, or is the change acceptable without one?",
+      "options": [
+        "Require a new automated test that exercises the real repository's update against a zero-affected-row result",
+        "Accept the change without a new test, relying on existing coverage and manual verification"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "An update against a non-existent LeaveBalance id must surface as NotFoundError(404), never as an untyped runtime error (TypeError) or a silently-returned undefined."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IBalanceRepository.update(id, changes, client?)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws NotFoundError(404, code NOT_FOUND, message 'Leave balance not found') when the target row does not exist; returns the updated LeaveBalance otherwise."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The missing-row error must match the existing NotFoundError contract (statusCode 404, code NOT_FOUND) and the message 'Leave balance not found' already used by the empty-changes branch of the same method.",
+      "referencePath": "src/shared/errors/index.ts"
+    },
+    {
+      "requirement": "The fix must align with the architecture's stated contract that update throws NotFoundError(404) when the row is missing.",
+      "referencePath": "docs/ARCHITECTURE.md"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/errors/index.ts (NotFoundError)",
+      "why": "The fix must throw the existing NotFoundError type to preserve the cross-cutting error contract."
+    }
+  ]
+}
