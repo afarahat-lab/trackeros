@@ -1,0 +1,67 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "audit"
+    ],
+    "affectedLayers": [
+      "repository"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "mapRow returns beforeState/afterState as parsed values (objects/arrays/primitives), not the raw JSON string, whenever the corresponding before_state/after_state column is non-null.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A null before_state or after_state column maps to null (JSON.parse is never invoked on null), preserving the AuditLog `unknown | null` contract.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Round-trip symmetry: a value passed to create() (which JSON.stringify's it) is returned by findById() as a structurally equal value after mapRow parses it back.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "JSON.parse must be guarded so it is only invoked when the column value is non-null; null columns must map to null without parsing.",
+    "The write path is unchanged: create() continues to JSON.stringify non-null beforeState/afterState before insert; this phase only alters the read/mapping path.",
+    "No `any` may be introduced; parsed values remain typed `unknown` (per the HARNESS no-any rule and the existing AuditLog model)."
+  ],
+  "outOfScope": [
+    "Changing the write path (create()'s JSON.stringify), the AuditLog model shape, the repository interface, or adding routes/controllers/RBAC \u2014 none of these are part of this phase."
+  ],
+  "ambiguities": [
+    {
+      "description": "Behavior when a non-null before_state/after_state column contains malformed JSON (JSON.parse throws).",
+      "options": [
+        "Let JSON.parse throw (propagate the error)",
+        "Return the raw string unchanged on parse failure",
+        "Return null on parse failure"
+      ],
+      "impactIfWrong": "medium"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "beforeState and afterState remain `unknown | null`; after mapping, a non-null column yields the parsed value and a null column yields null."
+    }
+  ],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [
+    {
+      "requirement": "The mapped AuditLog must satisfy the AuditLog interface declared in audit.model.ts (beforeState/afterState: unknown | null), and the parse must be the inverse of the JSON.stringify performed in create() so round-trips are lossless.",
+      "referencePath": "src/modules/audit/audit.model.ts"
+    },
+    {
+      "requirement": "The parse behavior must be the exact inverse of the existing JSON.stringify in create() within audit.repository.ts, so values written by create() are returned structurally equal by findById().",
+      "referencePath": "src/modules/audit/audit.repository.ts"
+    }
+  ],
+  "integrationPoints": []
+}
