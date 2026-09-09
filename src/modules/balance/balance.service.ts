@@ -1,5 +1,7 @@
+import { PoolClient } from 'pg';
 import { LeaveTypeCode } from '../../shared/types';
 import { ValidationError, NotFoundError, ConflictError } from '../../shared/errors';
+import { IUnitOfWork } from '../../shared/db';
 import { IEmployeeService } from '../employee';
 import { IPolicyService } from '../policy';
 import { LeaveBalance, CreateLeaveBalanceInput } from './balance.model';
@@ -32,42 +34,46 @@ export class BalanceService implements IBalanceService {
   constructor(
     private readonly repository: IBalanceRepository,
     private readonly employeeService: IEmployeeService,
-    private readonly policyService: IPolicyService
+    private readonly policyService: IPolicyService,
+    private readonly uow: IUnitOfWork
   ) {}
 
   async openPeriod(input: OpenBalancePeriodInput): Promise<LeaveBalance> {
     this.validateOpenInput(input);
 
-    await this.employeeService.getEmployeeById(input.employeeId);
+    return this.uow.withTransaction(async (client) => {
+      await this.employeeService.getEmployeeById(input.employeeId);
 
-    const policy = await this.policyService.getPolicyByLeaveTypeCode(input.leaveTypeCode);
+      const policy = await this.policyService.getPolicyByLeaveTypeCode(input.leaveTypeCode);
 
-    // Grant the FULL entitlement at the start of the period (no pro-rata).
-    if (policy.annualEntitlementDays <= 0) {
-      throw new ValidationError('Invalid entitlement');
-    }
+      // Grant the FULL entitlement at the start of the period (no pro-rata).
+      if (policy.annualEntitlementDays <= 0) {
+        throw new ValidationError('Invalid entitlement');
+      }
 
-    const existing = await this.repository.findByKey(
-      input.employeeId,
-      input.leaveTypeCode,
-      input.periodStart,
-      input.periodEnd
-    );
-    if (existing) {
-      throw new ConflictError('Leave balance already exists for this period');
-    }
+      const existing = await this.repository.findByKey(
+        input.employeeId,
+        input.leaveTypeCode,
+        input.periodStart,
+        input.periodEnd,
+        client
+      );
+      if (existing) {
+        throw new ConflictError('Leave balance already exists for this period');
+      }
 
-    const balance: CreateLeaveBalanceInput = {
-      employeeId: input.employeeId,
-      leaveTypeCode: input.leaveTypeCode,
-      periodStart: input.periodStart,
-      periodEnd: input.periodEnd,
-      entitledDays: policy.annualEntitlementDays,
-      usedDays: 0,
-      pendingDays: 0,
-    };
+      const balance: CreateLeaveBalanceInput = {
+        employeeId: input.employeeId,
+        leaveTypeCode: input.leaveTypeCode,
+        periodStart: input.periodStart,
+        periodEnd: input.periodEnd,
+        entitledDays: policy.annualEntitlementDays,
+        usedDays: 0,
+        pendingDays: 0,
+      };
 
-    return this.repository.create(balance);
+      return this.repository.create(balance, client);
+    });
   }
 
   async carryForward(input: CarryForwardInput): Promise<LeaveBalance> {
@@ -75,53 +81,60 @@ export class BalanceService implements IBalanceService {
       throw new ValidationError('Invalid sourceBalanceId');
     }
 
-    const source = await this.repository.findById(input.sourceBalanceId);
-    if (!source) {
-      throw new NotFoundError('Leave balance not found');
-    }
+    return this.uow.withTransaction(async (client) => {
+      const source = await this.repository.findById(input.sourceBalanceId, client);
+      if (!source) {
+        throw new NotFoundError('Leave balance not found');
+      }
 
-    const policy = await this.policyService.getPolicyByLeaveTypeCode(source.leaveTypeCode);
+      const policy = await this.policyService.getPolicyByLeaveTypeCode(source.leaveTypeCode);
 
-    // OPEN vs CLOSED is inferred from the period boundaries relative to now.
-    if (source.periodEnd.getTime() > Date.now()) {
-      throw new ValidationError('Period is not closable');
-    }
+      // OPEN vs CLOSED is inferred from the period boundaries relative to now.
+      if (source.periodEnd.getTime() > Date.now()) {
+        throw new ValidationError('Period is not closable');
+      }
 
-    const unused = source.entitledDays - source.usedDays - source.pendingDays;
-    if (unused < 0) {
-      throw new ValidationError('Balance counters exceed entitlement');
-    }
+      const unused = source.entitledDays - source.usedDays - source.pendingDays;
+      if (unused < 0) {
+        throw new ValidationError('Balance counters exceed entitlement');
+      }
 
-    // Hard cap: days above carryForwardDays are forfeited.
-    const carry = Math.min(unused, policy.carryForwardDays);
+      // Hard cap: days above carryForwardDays are forfeited.
+      const carry = Math.min(unused, policy.carryForwardDays);
 
-    const nextPeriodStart = source.periodEnd;
-    const nextPeriodEnd = this.addMonths(source.periodEnd, policy.accrualPeriodMonths);
+      const nextPeriodStart = source.periodEnd;
+      const nextPeriodEnd = this.addMonths(source.periodEnd, policy.accrualPeriodMonths);
 
-    const existingNext = await this.repository.findByKey(
-      source.employeeId,
-      source.leaveTypeCode,
-      nextPeriodStart,
-      nextPeriodEnd
-    );
+      const existingNext = await this.repository.findByKey(
+        source.employeeId,
+        source.leaveTypeCode,
+        nextPeriodStart,
+        nextPeriodEnd,
+        client
+      );
 
-    if (existingNext) {
-      return this.repository.update(existingNext.id, {
-        entitledDays: existingNext.entitledDays + carry,
-      });
-    }
+      if (existingNext) {
+        return this.repository.update(
+          existingNext.id,
+          {
+            entitledDays: existingNext.entitledDays + carry,
+          },
+          client
+        );
+      }
 
-    const nextBalance: CreateLeaveBalanceInput = {
-      employeeId: source.employeeId,
-      leaveTypeCode: source.leaveTypeCode,
-      periodStart: nextPeriodStart,
-      periodEnd: nextPeriodEnd,
-      entitledDays: policy.annualEntitlementDays + carry,
-      usedDays: 0,
-      pendingDays: 0,
-    };
+      const nextBalance: CreateLeaveBalanceInput = {
+        employeeId: source.employeeId,
+        leaveTypeCode: source.leaveTypeCode,
+        periodStart: nextPeriodStart,
+        periodEnd: nextPeriodEnd,
+        entitledDays: policy.annualEntitlementDays + carry,
+        usedDays: 0,
+        pendingDays: 0,
+      };
 
-    return this.repository.create(nextBalance);
+      return this.repository.create(nextBalance, client);
+    });
   }
 
   async getBalance(
