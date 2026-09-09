@@ -1,0 +1,160 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "audit",
+      "notification"
+    ],
+    "affectedLayers": [
+      "domain",
+      "data-access",
+      "service"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The audit module at src/modules/audit/ exposes, via its public index.ts, an AuditLog model with exactly the canonical fields (id, actorId, action, entityType, entityId, beforeState, afterState, occurredAt), an IAuditRepository + PgAuditLogRepository, and an IAuditService + AuditService.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The notification module at src/modules/notification/ exposes, via its public index.ts, a Notification model with exactly the canonical fields (id, recipientId, type, title, message, relatedEntityType, relatedEntityId, status, createdAt, readAt), an INotificationRepository + PgNotificationRepository, and an INotificationService + NotificationService.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "AuditLog.action is typed as the AuditAction enum and Notification.status is typed as the NotificationStatus enum, both imported from src/shared/types/index.ts (Notification.type remains a plain string).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Each repository's create operation persists a row (snake_case columns per the reconciled schema) and returns the mapped entity with a generated id; mapRow casts enum fields and converts snake_case to camelCase.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Each service rejects invalid input with ValidationError and unknown-id lookups with NotFoundError, matching the existing EmployeeService/LeaveTypeService/PolicyService semantics.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Notification creation is a synchronous direct insert: the repository/service method accepts an optional trailing PoolClient and performs no BEGIN/COMMIT/ROLLBACK, so it can join the caller's transaction boundary (no BullMQ).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests exist at tests/unit/modules/audit-log.service.test.ts and tests/unit/modules/notification.service.test.ts using in-memory fake repositories implementing the interfaces, and the build gate (npm run build = tsc --noEmit, strict) passes.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Use the EXACT canonical entity field shapes from .gestalt/architecture/reconciled.json \u2014 do not rename, split, add, or omit fields on AuditLog or Notification.",
+    "Repositories must use the pool from src/shared/db/connection.ts (constructor default) and error types from src/shared/errors/index.ts; no direct db access outside the repository layer.",
+    "Follow the established module file convention: <name>.model.ts, <name>.repository.interface.ts, <name>.repository.ts, <name>.service.interface.ts, <name>.service.ts, and index.ts re-exporting all five.",
+    "Notifications are synchronous direct inserts within the caller's transaction boundary \u2014 no BullMQ, no queue, no background job.",
+    "Honor no-any (use unknown + type guards), no-direct-db-outside-repository, no-hardcoded-secrets, and no-gestalt-internal-deps; strict TypeScript with tsc --noEmit must pass.",
+    "Modules must not import from each other's internals \u2014 only from public index.ts (and shared foundations)."
+  ],
+  "outOfScope": [
+    "Consuming audit/notification side effects from the leave module (Phase 6 orchestration) \u2014 this phase only builds the write mechanism.",
+    "BullMQ / background job fanout for notifications \u2014 notifications are synchronous direct inserts only.",
+    "HTTP routes/controllers for audit or notification \u2014 these are service/repository modules with no REST surface in this phase.",
+    "Knex migrations / DDL for audit_logs and notifications tables \u2014 schema is specified in reconciled.json but migration generation is not part of this phase.",
+    "Reading/querying audit records for reporting (audit trail reports) \u2014 only the write path is in scope."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "An AuditLog is an immutable record of a single state-changing operation: once created it is never updated or deleted; its action must be one of the AuditAction enum values and its actorId must reference an existing employee."
+    },
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "A Notification is created with status PENDING and transitions through SENT \u2192 READ \u2192 ARCHIVED (per NotificationStatus); readAt is null until the notification is read, and recipientId must reference an existing employee."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "AuditService.record (create an audit log entry)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Rejects invalid input (missing/empty actorId, entityType, entityId, or a non-AuditAction action) with ValidationError; returns the persisted AuditLog."
+    },
+    {
+      "operation": "AuditService.getById (retrieve an audit log)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws NotFoundError when the id is unknown."
+    },
+    {
+      "operation": "NotificationService.create (create a notification)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Rejects invalid input (missing/empty recipientId, type, title, message, or a non-NotificationStatus status) with ValidationError; returns the persisted Notification with status defaulting to PENDING."
+    },
+    {
+      "operation": "NotificationService.getById (retrieve a notification)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws NotFoundError when the id is unknown."
+    },
+    {
+      "operation": "NotificationService.markRead (transition a notification to READ)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws NotFoundError when the id is unknown; sets readAt and status READ."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Import AuditAction and NotificationStatus enums from src/shared/types/index.ts (do not redefine them locally); Notification.type is a plain string with no enum.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "Use AppError subclasses (ValidationError 400, NotFoundError 404, ConflictError 409) from src/shared/errors/index.ts for all service error semantics.",
+      "referencePath": "src/shared/errors/index.ts"
+    },
+    {
+      "requirement": "Repositories use the pool from src/shared/db/connection.ts as the constructor default and accept an optional trailing PoolClient, matching the PgEmployeeRepository pattern.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "Repository methods must map snake_case columns to the canonical camelCase entity fields and cast enum fields, matching the existing PgEmployeeRepository mapRow convention.",
+      "referencePath": "src/modules/employee/employee.repository.ts"
+    },
+    {
+      "requirement": "Service constructor injects the repository interface and validates via a private validate() throwing ValidationError, matching EmployeeService/LeaveTypeService/PolicyService.",
+      "referencePath": "src/modules/employee/employee.service.ts"
+    },
+    {
+      "requirement": "Database columns, FKs, and indexes must match the reconciled schema: audit_logs(id, actor_id, action, entity_type, entity_id, before_state, after_state, occurred_at) with FK actor_id\u2192employees.id; notifications(id, recipient_id, type, title, message, related_entity_type, related_entity_id, status, created_at, read_at) with FK recipient_id\u2192employees.id.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "Unit tests use in-memory fake repositories implementing the interfaces and assert typed error semantics, matching tests/unit/modules/employee.service.test.ts style.",
+      "referencePath": "tests/unit/modules/employee.service.test.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts",
+      "why": "AuditAction and NotificationStatus enums are the canonical persisted values for AuditLog.action and Notification.status."
+    },
+    {
+      "target": "src/shared/errors/index.ts",
+      "why": "ValidationError/NotFoundError/ConflictError are the typed error contract every service must throw."
+    },
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "The shared pool is the default data-access connection for both repositories."
+    },
+    {
+      "target": "src/shared/db/unit-of-work.ts",
+      "why": "Phase 6 will wrap audit + notification inserts in IUnitOfWork.withTransaction; these repositories must accept the optional PoolClient to join that boundary."
+    }
+  ]
+}
