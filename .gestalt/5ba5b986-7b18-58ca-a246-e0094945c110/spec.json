@@ -1,0 +1,165 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "employee",
+      "leave-type",
+      "policy"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository",
+      "service",
+      "tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "Each of the three modules (employee, leave-type, policy) exposes a public index.ts that re-exports its model, repository interface, repository implementation, service interface, and service implementation.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The Employee model declares exactly the canonical fields (id, employeeNumber, firstName, lastName, email, role, managerId, department, hireDate, terminationDate, employmentStatus) with role typed as EmployeeRole and employmentStatus typed as EmploymentStatus imported from src/shared/types/index.ts \u2014 no renamed, split, added, or omitted fields.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The LeaveType model declares exactly the canonical fields (code, name, requiresApproval, maxConsecutiveDays, isPaid) with code typed as LeaveTypeCode imported from src/shared/types/index.ts.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The LeavePolicy model declares exactly the canonical fields (id, leaveTypeCode, policyName, annualEntitlementDays, accrualPeriodMonths, carryForwardDays, minNoticeDays, maxRequestDays, requiresManagerApproval, effectiveFrom, effectiveTo, status) with leaveTypeCode typed as LeaveTypeCode.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Each repository implementation obtains its database client from the shared pool exported by src/shared/db/connection.ts and throws only the shared error types from src/shared/errors/index.ts (no inline SQL outside the repository, no ad-hoc error objects).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests exist under tests/unit/modules/ for each of the three services, and `npm run build` (tsc --noEmit) plus `npx jest` pass with no type errors.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Use the EXACT canonical entity field shapes from PLAN.md Phase 2 / reconciled.json \u2014 do not rename, split, add, or omit any field on Employee, LeaveType, or LeavePolicy.",
+    "Import EmployeeRole, EmploymentStatus, and LeaveTypeCode from src/shared/types/index.ts (Phase 1) rather than re-declaring them locally.",
+    "Repositories must use the existing pool from src/shared/db/connection.ts and the shared error types from src/shared/errors/index.ts; no direct DB access outside the repository layer (GP-001 / no-direct-db-outside-repository).",
+    "Each module lives under its declared directory (src/modules/employee/, src/modules/leave-type/, src/modules/policy/) and exposes a public index.ts; modules import each other only through public entry points.",
+    "No controller layer for these modules \u2014 routes (if any) call services directly, matching the existing uptime/status module convention.",
+    "Strict TypeScript: no `any` (use `unknown` with type guards), strict null checks, no implicit any.",
+    "Repository and service methods that may join a caller's transaction accept the client as an optional LAST parameter and fall back to the shared pool when omitted (AGENTS.md transaction-boundary decision)."
+  ],
+  "outOfScope": [
+    "Knex migrations / SQL DDL for the employees, leave_types, and leave_policies tables \u2014 the code agent generates migrations in a later persistence slice; this phase defines models, repositories, services, and tests only.",
+    "HTTP routes, controllers, and RBAC middleware for these modules \u2014 no route/verb/body shape is prescribed in this phase.",
+    "Audit-log writes for these modules' state-changing operations (GP-002) \u2014 the audit module is Phase 3; these reference-data services do not yet emit audit records.",
+    "LeaveType ACTIVE/ARCHIVED and LeavePolicy DRAFT/ACTIVE/SUPERSEDED lifecycle enforcement \u2014 the lifecycle states are canonical but not part of the model field shape for this phase.",
+    "Accrual, carry-forward, and balance logic (Phase 4) and validation/day-count logic (Phase 5) \u2014 these reference-data modules do not implement them."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "An Employee's employmentStatus is always one of ACTIVE | TERMINATED | ON_LEAVE (EmploymentStatus), and role is one of EMPLOYEE | MANAGER | ADMIN (EmployeeRole); managerId, when present, references another Employee's id."
+    },
+    {
+      "entity": "LeaveType",
+      "mustExistOrExtend": true,
+      "invariant": "A LeaveType's code is always one of the persisted lowercase LeaveTypeCode values (annual | sick | emergency | unpaid | maternity | paternity) and is unique across leave types."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "A LeavePolicy's leaveTypeCode references an existing LeaveType.code, and its status is one of DRAFT | ACTIVE | SUPERSEDED; effectiveFrom is not after effectiveTo when both are present."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "Employee service: create an employee",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Rejects invalid input with ValidationError (400); rejects a duplicate employeeNumber or email with ConflictError (409)."
+    },
+    {
+      "operation": "Employee service: retrieve an employee by id",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws NotFoundError (404) when no employee matches the id."
+    },
+    {
+      "operation": "LeaveType service: create a leave type",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Rejects invalid input with ValidationError (400); rejects a duplicate code with ConflictError (409)."
+    },
+    {
+      "operation": "LeaveType service: retrieve a leave type by code",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws NotFoundError (404) when no leave type matches the code."
+    },
+    {
+      "operation": "Policy service: create a leave policy",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Rejects invalid input with ValidationError (400); rejects a policy whose leaveTypeCode does not reference an existing leave type with NotFoundError (404)."
+    },
+    {
+      "operation": "Policy service: retrieve a leave policy by id",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws NotFoundError (404) when no policy matches the id."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "EmployeeRole and EmploymentStatus must be imported from the shared types entry point, not re-declared; the Employee model's role and employmentStatus fields must use these exact enum types.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "LeaveTypeCode must be imported from the shared types entry point; the LeaveType.code and LeavePolicy.leaveTypeCode fields must use this exact enum type with lowercase persisted values.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "All error throwing must use AppError and its subclasses (ValidationError/UnauthorizedError/ForbiddenError/NotFoundError/ConflictError) with their fixed statusCode and code, matching the shared error contract.",
+      "referencePath": "src/shared/errors/index.ts"
+    },
+    {
+      "requirement": "Repositories must obtain their client from the shared pg Pool (falling back to it when no transaction client is passed), never opening their own connection or importing a module-level helper.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "Module file layout and public index.ts re-export shape must match the existing uptime/status module convention (model, service interface, service implementation, repository interface, repository implementation).",
+      "referencePath": "src/modules/uptime/index.ts"
+    },
+    {
+      "requirement": "Unit tests must follow the existing relative-import and describe/it style used by the Phase 1 shared tests.",
+      "referencePath": "tests/unit/shared/errors.test.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts",
+      "why": "Source of EmployeeRole, EmploymentStatus, and LeaveTypeCode enums used to type the three models."
+    },
+    {
+      "target": "src/shared/errors/index.ts",
+      "why": "Source of AppError and subclasses for all error semantics in services and repositories."
+    },
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "The single shared pg Pool repositories use for database access."
+    },
+    {
+      "target": "src/shared/db/unit-of-work.ts",
+      "why": "IUnitOfWork/PgUnitOfWork contract that repository/service methods must remain compatible with (optional trailing client parameter)."
+    }
+  ]
+}
