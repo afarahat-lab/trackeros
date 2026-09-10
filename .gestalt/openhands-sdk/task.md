@@ -1,23 +1,29 @@
-# Implement this phase: Phase 5 — validation module
+# Implement this phase: Phase 6a — leave model + repository
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/babd3932-368b-46a5-a4dc-6dccaafd84ba/5`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/babd3932-368b-46a5-a4dc-6dccaafd84ba/6`. Do not clone anything; work only in this directory.
 
 You are the IMPLEMENTATION agent, not a planner. The platform measures your work EXCLUSIVELY by the files you create or modify in this working tree (`git status`). Ending your turn with a plan, a summary, or an announcement of what you are 'about to' do — without having actually edited files — is a FAILURE: a turn that leaves the working tree untouched is discarded. Explore only as much as you need, then MAKE the edits with your file-editing tool. Never end your turn before the files exist on disk.
 
 ## What to build
-(no phase architecture provided — infer from the success criteria below)
+src/modules/leave/leave.model.ts exports a LeaveRequest interface with exactly the canonical fields: id, employeeId, leaveTypeCode, startDate, endDate, requestedDays, reason, status, approverId, approvalComment, submittedAt, decidedAt.
+src/modules/leave/leave.repository.ts exports ILeaveRepository and PgLeaveRequestRepository, using the pool from src/shared/db/connection.ts and importing types from src/shared/types/index.ts and src/shared/errors/index.ts.
+No service, routes, index, or test files are created in this sub-phase.
 
 ## Success criteria
-Build the validation module under src/modules/validation/ with a public index.ts.
+Create the leave module foundation: the LeaveRequest interface and the repository layer. Use the EXACT canonical LeaveRequest field shape: id, employeeId, leaveTypeCode, startDate, endDate, requestedDays, reason, status, approverId, approvalComment, submittedAt, decidedAt.
 
 Create:
-- src/modules/validation/validation.model.ts — ValidationResult model (e.g. { valid: boolean; errors: string[] }).
-- src/modules/validation/validation.service.ts — IValidationService + ValidationService.
-- src/modules/validation/index.ts — public exports.
+- src/modules/leave/leave.model.ts — LeaveRequest interface (canonical field shape only).
+- src/modules/leave/leave.repository.ts — ILeaveRepository + PgLeaveRequestRepository using pool from src/shared/db/connection.ts.
 
-The service implements the BINDING day-count rule ONCE as a shared helper: requestedDays = endDate - startDate + 1 (INCLUSIVE, all calendar days, no weekend/holiday exclusion, whole-day only). Expose this helper (e.g. calculateRequestedDays) so every consumer (sufficiency checks, balance deduction, policy max-duration enforcement) calls it — do not re-derive per module. Also implement date-range validation (startDate <= endDate) and balance-sufficiency checks against LeaveBalance (entitledDays - usedDays - pendingDays >= requestedDays).
+Import from src/shared/types/index.ts (LeaveStatus, CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveRequestQueryParams) and src/shared/errors/index.ts. This sub-phase depends on Phases 1 and 3 — read those index.ts files before generating code referencing their types. Do NOT create service, routes, index, or tests yet.
 
-Import LeaveTypeCode and CreateLeaveRequestDto from src/shared/types/index.ts, error types from src/shared/errors/index.ts, and LeaveBalance from src/modules/balance/index.ts (Phase 4). Include Jest unit tests in tests/unit/modules/validation/ covering inclusive day counting and sufficiency. This phase depends on Phase 1 (src/shared/types/index.ts, src/shared/errors/index.ts) and Phase 4 (src/modules/balance/index.ts) — read them before generating code referencing their types.
+## Owned by SIBLING sub-phases (OUT OF SCOPE for this sub-phase)
+This is ONE sub-phase of a split phase. The deliverables below belong to sibling sub-phases — do NOT create them here, do NOT list them as success criteria, and this sub-phase MUST NOT be gated on their presence (they are produced by a sibling, not missing):
+- "Phase 6b — leave service + routes + public index": src/modules/leave/leave.service.ts, src/modules/leave/leave.routes.ts, src/modules/leave/index.ts
+- "Phase 6c — leave service unit tests": tests/unit/modules/leave/leave.service.test.ts
+
+In particular, UNIT/INTEGRATION TESTS are OUT OF SCOPE for this sub-phase — they are produced in: Phase 6c — leave service unit tests. Do not create test files here, do not require test existence or coverage as a success criterion, and do not fail the gate for missing tests.
 
 ## Your iteration budget — and how to get more (READ BEFORE YOU START)
 
@@ -79,24 +85,43 @@ These are resolved, feature-wide decisions. Wherever this phase touches the conc
 
 12. DUPLICATE of question 6 — same decision: do NOT add BullMQ to package.json; notifications are synchronous direct inserts. [BINDING RULE — operator decision resolving: Should the inclusive calendar-day count (requestedDays = endDate - startDate + 1) exclude weekends and/or public holidays, or count all calendar days?; Should leave balances accrue pro-rata over the accrual period, or be granted in full at the start of each period?; Should unused entitled days carry forward to the next accrual period, and if so up to what cap?; What migration mechanism should be established for PostgreSQL schema changes?; Should a controller layer be introduced for all new modules, or should routes call services directly?; Should BullMQ be added for notification fanout/accrual jobs, or keep notifications synchronous?; Which naming scheme is canonical for LeaveStatus and LeaveType enums: DOMAIN.md (DRAFT/SUBMITTED/APPROVED/REJECTED/CANCELLED; annual/sick/emergency/unpaid/maternity/paternity) or root ARCHITECTURE.md (PENDING/APPROVED/REJECTED/CANCELLED; ANNUAL/SICK/MATERNITY/PATERNITY/UNPAID/OTHER)?; Should the persistence layer define the missing IUnitOfWork concrete implementation (PgUnitOfWork) and the shared base repository / error types, given none exist in the codebase?; What migration mechanism should be established, given no migrations or knexfile currently exist?; How should leave days be counted for a date range (inclusive vs exclusive end date, and half-day handling)?; Should a controller layer be introduced for new modules, or should routes call services directly (as the existing uptime module does)?; Should BullMQ be added to package.json before implementing notification fanout/accrual jobs?; apply everywhere these apply, not in one place only]
 
+## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
+The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
+- `LeaveRequest` — the entity MUST have exactly these fields:
+    - id
+    - employeeId
+    - leaveTypeCode
+    - startDate
+    - endDate
+    - requestedDays
+    - reason
+    - status
+    - approverId
+    - approvalComment
+    - submittedAt
+    - decidedAt
+
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- The inclusive day count must be obtained by importing and calling the canonical requestedDays(startDate, endDate) helper — never re-derived — so every consumer (sufficiency, balance deduction, policy max-duration) uses the identical derivation. (see `src/shared/types/index.ts`)
-- Error semantics must reuse the shared AppError subclasses: ValidationError (400) for invalid input and ConflictError (409) for insufficient balance, matching the { error, code } contract. (see `src/shared/errors/index.ts`)
-- The LeaveBalance shape consumed for sufficiency must match the canonical model (entitledDays, usedDays, pendingDays counters) exported from the balance module's public entry point. (see `src/modules/balance/index.ts`)
-- The sufficiency formula entitledDays - usedDays - pendingDays >= requestedDays must match the canonical business rule so validation agrees with the balance module's own unused-day computation. (see `.gestalt/architecture/reconciled.json`)
+- Reuse LeaveStatus, LeaveTypeCode, CreateLeaveRequestDto, UpdateLeaveRequestDto, and LeaveRequestQueryParams exactly as exported — do not redeclare or diverge from their field shapes. (see `src/shared/types/index.ts`)
+- Reuse AppError and its subclasses (ValidationError, NotFoundError, ConflictError, etc.) for any typed errors the repository raises — do not introduce new error classes. (see `src/shared/errors/index.ts`)
+- Obtain the database connection from the single shared pg Pool (defaultPool) and follow the optional-trailing-PoolClient convention used by PgLeaveBalanceRepository and PgAuditLogRepository. (see `src/shared/db/connection.ts`)
+- Match the repository shape and snake_case↔camelCase mapping convention of the existing balance/audit repositories (randomUUID id generation, mapRow, COLUMNS constant, db(client) fallback helper). (see `src/modules/balance/balance.repository.ts`)
+- The leave_requests table columns (employee_id, leave_type_code, start_date, end_date, requested_days, reason, status, approver_id, approval_comment, submitted_at, decided_at) must match the reconciled SQL schema for leave_requests. (see `.gestalt/architecture/reconciled.json`)
 ### Entity invariants — enforce these
-- Reuse or extend `ValidationResult`: A ValidationResult is a pure value object that reports whether validation passed and the list of failure reasons; it must never perform side effects or throw — the service decides whether to surface a typed error from it.
-- Reuse or extend `LeaveBalance (consumed, not owned)`: Sufficiency is derived solely from the balance's counters as entitledDays - usedDays - pendingDays; the validation module must not mutate the balance or reinterpret OPEN/CLOSED state.
+- Reuse or extend `LeaveRequest`: A LeaveRequest is a single application by one employee for a span of leave of one type; its lifecycle status is one of LeaveStatus (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED) and it carries exactly the canonical 12 fields.
+- Reuse or extend `LeaveRequest`: requestedDays is derived from the inclusive calendar-day rule (endDate - startDate + 1) via the shared requestedDays helper — the repository/model must not re-derive or store a conflicting value; it persists the value the service computed.
 ### Interface contract — expose these operations (their shape is yours)
-- validateDateRange(startDate, endDate) — Rejects startDate > endDate with ValidationError (400); accepts startDate <= endDate.
-- validateSufficiency(balance, requestedDays) — Rejects with ConflictError (409) when entitledDays - usedDays - pendingDays < requestedDays; passes otherwise.
-- validateLeaveRequest(dto) — Composes date-range validation and sufficiency checking against the request's leave type balance; surfaces ValidationError (400) for invalid ranges and ConflictError (409) for insufficient balance.
+- create (persist a new LeaveRequest) — Returns the persisted LeaveRequest with generated id; does not open a transaction; accepts an optional trailing PoolClient to join a caller's transaction.
+- findById (retrieve a LeaveRequest by id) — Read-only; returns the entity or null when absent (does not throw NotFoundError — the service decides error semantics).
+- update (mutate a LeaveRequest's fields, including status) — Returns the updated entity; throws NotFoundError when the row is missing; accepts an optional trailing PoolClient to join a caller's transaction.
+- findByQuery / list (filter LeaveRequests by query params) — Read-only; returns an array (possibly empty); honors the LeaveRequestQueryParams filters (status, leaveTypeCode, date ranges, limit/offset).
 ### Integration points — connect to these
-- src/shared/types/index.ts — Provides LeaveTypeCode, CreateLeaveRequestDto, and the canonical requestedDays helper the validation service consumes.
-- src/shared/errors/index.ts — Provides ValidationError (400) and ConflictError (409) for the validation service's typed failure semantics.
-- src/modules/balance/index.ts — Provides the LeaveBalance model whose counters drive the sufficiency check.
+- src/shared/types/index.ts — LeaveStatus, LeaveTypeCode, and the three leave DTOs are the canonical types the model and repository must consume.
+- src/shared/errors/index.ts — Typed error classes for repository-level not-found/validation semantics.
+- src/shared/db/connection.ts — The single shared pg Pool the repository must use for all queries.
+- src/shared/db/unit-of-work.ts — The repository must be transaction-participating (optional PoolClient) so the Phase 6b service can join its approve/reject unit of work — though the repository itself never opens a transaction.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
