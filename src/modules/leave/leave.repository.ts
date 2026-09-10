@@ -43,6 +43,8 @@ const FIELD_COLUMNS: Record<UpdateField, string> = {
   endDate: 'end_date',
   reason: 'reason',
   status: 'status',
+  approverId: 'approver_id',
+  decidedAt: 'decided_at',
 };
 
 function mapRow(row: LeaveRequestRow): LeaveRequest {

@@ -61,6 +61,8 @@ export interface UpdateLeaveRequestDto {
   endDate?: Date;
   reason?: string;
   status?: LeaveStatus;
+  approverId?: string;
+  decidedAt?: Date;
 }
 
 export interface LeaveRequestQueryParams {

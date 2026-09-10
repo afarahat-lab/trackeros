@@ -169,7 +169,7 @@ export class LeaveService implements ILeaveService {
 
       const updated = await this.repository.update(
         requestId,
-        { status: LeaveStatus.APPROVED },
+        { status: LeaveStatus.APPROVED, approverId: actor.id, decidedAt: new Date() },
         client,
       );
 
@@ -230,7 +230,7 @@ export class LeaveService implements ILeaveService {
 
       const updated = await this.repository.update(
         requestId,
-        { status: LeaveStatus.REJECTED },
+        { status: LeaveStatus.REJECTED, approverId: actor.id, decidedAt: new Date() },
         client,
       );
 

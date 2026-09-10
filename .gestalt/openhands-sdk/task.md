@@ -1,65 +1,49 @@
-# Implement this phase: Phase 6b — leave service + routes + public index
+# Fix specific quality-gate violations: Phase 6b — leave service + routes + public index
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/babd3932-368b-46a5-a4dc-6dccaafd84ba/7`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/fix/babd3932-368b-46a5-a4dc-6dccaafd84ba/7/1`. Do not clone anything; work only in this directory.
 
-You are the IMPLEMENTATION agent, not a planner. The platform measures your work EXCLUSIVELY by the files you create or modify in this working tree (`git status`). Ending your turn with a plan, a summary, or an announcement of what you are 'about to' do — without having actually edited files — is a FAILURE: a turn that leaves the working tree untouched is discarded. Explore only as much as you need, then MAKE the edits with your file-editing tool. Never end your turn before the files exist on disk.
+You are fixing SPECIFIC violations the quality gate found in EXISTING, already-committed files. Make the targeted edits listed below — do NOT refactor, regenerate, or change unrelated code.
 
-## What to build
-src/modules/leave/leave.service.ts exports ILeaveService and LeaveService implementing create (DRAFT), submit (SUBMITTED), and approve/reject (APPROVED/REJECTED).
-The approve/reject workflow runs inside PgUnitOfWork.withTransaction and atomically performs status change, balance update (usedDays/pendingDays), audit log insert, and synchronous notification insert.
-requestedDays is computed via the shared helper from src/modules/validation/index.ts and is never re-derived locally.
-src/modules/leave/leave.routes.ts defines Fastify routes that call the service directly (no separate controller file), matching the src/modules/uptime/uptime.routes.ts pattern.
-src/modules/leave/index.ts publicly exports the model, repository, service, and routes.
-No test files are created in this sub-phase.
+The files ALREADY EXIST. You MUST edit them in place with the `str_replace_editor` tool. Reading or viewing a file is NOT sufficient — you have NOT finished until you have edited EVERY file listed below.
 
-## Success criteria
-Build the leave orchestration and HTTP surface on top of Phase 6a.
+## Constraints & consistency
+You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
+### Reuse & consistency — match these exactly
+- UpdateLeaveRequestDto must extend the existing DTO in src/shared/types/index.ts (add approverId/decidedAt) rather than define a parallel type; the repository's UpdateField/FIELD_COLUMNS typing must remain keyed off UpdateLeaveRequestDto. (see `src/shared/types/index.ts`)
+- FIELD_COLUMNS additions must map to the exact snake_case columns approver_id and decided_at already present in the COLUMNS constant and LeaveRequestRow/mapRow in leave.repository.ts, so update() and mapRow stay in sync. (see `src/modules/leave/leave.repository.ts`)
+- The approve/reject transaction must continue to satisfy the reconciled transaction_contract: status change + approver_id/decided_at + balance counters + audit insert + notification insert all inside one IUnitOfWork.withTransaction, with the client forwarded to each participating call. (see `.gestalt/architecture/reconciled.json`)
+- The LeaveRequest model's approverId/decidedAt nullability (string | null / Date | null) must remain unchanged; this phase only populates them, matching the canonical 12-field shape in leave.model.ts. (see `src/modules/leave/leave.model.ts`)
+### Entity invariants — enforce these
+- Reuse or extend `LeaveRequest`: A LeaveRequest in APPROVED or REJECTED state must have a non-null approverId (the deciding actor's id) and a non-null decidedAt timestamp; a DRAFT or SUBMITTED request keeps both null.
+- Reuse or extend `LeaveRequest`: approverId must equal the authenticated deciding actor's id (never the requester, per the no-self-approval rule already enforced by assertCanDecide).
+### Interface contract — expose these operations (their shape is yours)
+- approve — MANAGER or ADMIN only; no self-approval; a MANAGER must be the requester's direct manager (unchanged — this phase does not alter authorization).; ConflictError on non-SUBMITTED status; ForbiddenError on unauthorized actor; NotFoundError on unknown request/balance — unchanged from current behavior.
+- reject — MANAGER or ADMIN only; no self-rejection; a MANAGER must be the requester's direct manager (unchanged).; ConflictError on non-SUBMITTED status; ForbiddenError on unauthorized actor; NotFoundError on unknown request/balance — unchanged.
+### Integration points — connect to these
+- src/modules/leave/leave.repository.ts (PgLeaveRequestRepository.update + FIELD_COLUMNS) — The dynamic SET clause must be able to persist approver_id/decided_at; the service's update call depends on this mapping.
+- src/shared/types/index.ts (UpdateLeaveRequestDto) — The DTO is the shared contract the service passes to repository.update; it must carry approverId/decidedAt for the decision write.
+- src/modules/audit (AuditService.record) — afterState of the APPROVE/REJECT audit entry — The audit afterState must now reflect the populated approverId/decidedAt, closing the divergence noted in ARCHITECTURE.md.
 
-Create:
-- src/modules/leave/leave.service.ts — ILeaveService + LeaveService. Orchestrates the full workflow: create (DRAFT), submit (SUBMITTED), approve/reject (APPROVED/REJECTED). The approve/reject transaction MUST run inside PgUnitOfWork.withTransaction (from src/shared/db/unit-of-work.ts) and atomically perform: status change + balance update (usedDays/pendingDays) + audit log insert + synchronous notification insert. requestedDays is computed via the shared helper from src/modules/validation/index.ts (Phase 5) — never re-derive it.
-- src/modules/leave/leave.routes.ts — Fastify routes. Per BINDING rule 5, routes call services DIRECTLY (matching src/modules/uptime/uptime.routes.ts pattern) — do NOT create a separate controller file.
-- src/modules/leave/index.ts — public exports.
+## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
+The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
+- `Notification` — the entity MUST have exactly these fields:
+    - id
+    - recipientId
+    - type
+    - title
+    - message
+    - relatedEntityType
+    - relatedEntityId
+    - status
+    - createdAt
+    - readAt
 
-Import from: src/shared/types/index.ts, src/shared/errors/index.ts, src/shared/db/unit-of-work.ts, src/modules/balance/index.ts, src/modules/audit/index.ts, src/modules/notification/index.ts, src/modules/validation/index.ts. Depends on Phases 1, 3, 4, 5 and Phase 6a — read those index.ts files before generating code referencing their types. Do NOT create tests yet.
-
-## Owned by SIBLING sub-phases (OUT OF SCOPE for this sub-phase)
-This is ONE sub-phase of a split phase. The deliverables below belong to sibling sub-phases — do NOT create them here, do NOT list them as success criteria, and this sub-phase MUST NOT be gated on their presence (they are produced by a sibling, not missing):
-- "Phase 6a — leave model + repository": src/modules/leave/leave.model.ts, src/modules/leave/leave.repository.ts
-- "Phase 6c — leave service unit tests": tests/unit/modules/leave/leave.service.test.ts
-
-In particular, UNIT/INTEGRATION TESTS are OUT OF SCOPE for this sub-phase — they are produced in: Phase 6c — leave service unit tests. Do not create test files here, do not require test existence or coverage as a success criterion, and do not fail the gate for missing tests.
-
-## Your iteration budget — and how to get more (READ BEFORE YOU START)
-
-You have a HARD budget of **30 iterations** for this task; one tool call is one iteration. When it runs out you are CUT OFF mid-work — the unfinished phase is recorded as a FAILURE, not as progress. Nothing warns you as you approach it, so you cannot rely on noticing.
-
-**Exploration is what exhausts it.** Measured on this platform's recent phases: the code-agent spent 19 of its 27 file-editing calls on `view` — it ran out of budget reading the codebase, not building the feature. Phases that were cut off had nearly all of their budget consumed before the writing started.
-
-You have a `task` tool. It runs a FRESH sub-agent with its OWN separate 30-iteration budget and its OWN context window, in this same working directory. Everything that sub-agent reads and writes costs you **one** iteration, not 30. It is the supported way to get more capacity, and using it is normal — not an admission of difficulty.
-
-### DELEGATE BY DEFAULT
-
-**Assume you WILL delegate this phase. The question is not whether, but how to slice it.** Decide NOW, before your first edit — a decision made after you have spent half your budget exploring is a decision made too late.
-
-Delegate unless the phase is *trivially* small, which means ALL of:
-- it creates or changes **at most 2 files**, AND
-- it introduces **no new module**, AND
-- you are confident you can finish it, verified, in well under 10 iterations.
-
-If you cannot say all three with confidence, delegate. When you are unsure, delegate — an unnecessary hand-off costs a few iterations, whereas running out costs the entire phase.
-
-### Delegate the READING, not just the writing
-
-The most valuable first delegation is usually a SURVEY, because that is where the budget actually goes. Instead of opening a dozen files yourself, send a sub-agent to read them and report back what you need: the existing conventions, the shapes and signatures you must match, where the seams are. It burns its own budget on that reading and returns you a digest for one iteration.
-
-Then delegate the implementation slices.
-
-### How to delegate
-- Call `task` with `subagent_type='gestalt-implementer'`, ONE call per slice, at most **4** for this phase. Each call blocks until that sub-agent finishes and reports back — they never run at the same time.
-- Split implementation slices by MODULE or FILE GROUP so they own DISJOINT files. Two slices must never edit the same file.
-- Give each one a self-contained prompt: the exact files it owns, what to build, the conventions it must follow, and what to report back. It cannot see this task, so anything you do not tell it, it does not know.
-
-**Never delegate the final verification.** Run the build and the tests YOURSELF, over the whole phase, after the slices are back — a sub-agent only sees its own slice, so its 'it passes' means 'my slice compiled', not 'the phase works'.
+## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
+Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
+- Use unknown with type guards instead of any (rule: `no-any`)
+- Database calls must go through repository pattern (rule: `no-direct-db-outside-repository`)
+- No hardcoded passwords, API keys, or tokens (rule: `no-hardcoded-secrets`)
+- Do not add @gestalt/* packages as project dependencies — these are Gestalt platform internals not available on npm (rule: `no-gestalt-internal-deps`)
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -89,56 +73,6 @@ These are resolved, feature-wide decisions. Wherever this phase touches the conc
 
 12. DUPLICATE of question 6 — same decision: do NOT add BullMQ to package.json; notifications are synchronous direct inserts. [BINDING RULE — operator decision resolving: Should the inclusive calendar-day count (requestedDays = endDate - startDate + 1) exclude weekends and/or public holidays, or count all calendar days?; Should leave balances accrue pro-rata over the accrual period, or be granted in full at the start of each period?; Should unused entitled days carry forward to the next accrual period, and if so up to what cap?; What migration mechanism should be established for PostgreSQL schema changes?; Should a controller layer be introduced for all new modules, or should routes call services directly?; Should BullMQ be added for notification fanout/accrual jobs, or keep notifications synchronous?; Which naming scheme is canonical for LeaveStatus and LeaveType enums: DOMAIN.md (DRAFT/SUBMITTED/APPROVED/REJECTED/CANCELLED; annual/sick/emergency/unpaid/maternity/paternity) or root ARCHITECTURE.md (PENDING/APPROVED/REJECTED/CANCELLED; ANNUAL/SICK/MATERNITY/PATERNITY/UNPAID/OTHER)?; Should the persistence layer define the missing IUnitOfWork concrete implementation (PgUnitOfWork) and the shared base repository / error types, given none exist in the codebase?; What migration mechanism should be established, given no migrations or knexfile currently exist?; How should leave days be counted for a date range (inclusive vs exclusive end date, and half-day handling)?; Should a controller layer be introduced for new modules, or should routes call services directly (as the existing uptime module does)?; Should BullMQ be added to package.json before implementing notification fanout/accrual jobs?; apply everywhere these apply, not in one place only]
 
-## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
-The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
-- `Notification` — the entity MUST have exactly these fields:
-    - id
-    - recipientId
-    - type
-    - title
-    - message
-    - relatedEntityType
-    - relatedEntityId
-    - status
-    - createdAt
-    - readAt
-
-## Constraints & consistency
-You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
-### Reuse & consistency — match these exactly
-- requestedDays must be computed by calling the canonical requestedDays(startDate, endDate) helper — the single source of truth is src/shared/types/index.ts (the validation module imports it from there rather than re-exporting it). (see `src/shared/types/index.ts`)
-- The approve/reject transaction must use IUnitOfWork.withTransaction exactly as defined (service owns the boundary, data-access opens it); match the signature and client-forwarding pattern. (see `src/shared/db/unit-of-work.ts`)
-- Balance updates must go through IBalanceRepository.update with the same Partial<Omit<LeaveBalance,'id'>> changes shape and optional trailing PoolClient. (see `src/modules/balance/balance.repository.ts`)
-- Audit inserts must use IAuditService.record(input, client?) with CreateAuditLogInput (actorId, action, entityType, entityId, beforeState, afterState) and forward the transaction client. (see `src/modules/audit/audit.service.interface.ts`)
-- Notification inserts must use INotificationService.create(input, client?) with CreateNotificationInput and forward the transaction client (status defaults to PENDING). (see `src/modules/notification/notification.service.interface.ts`)
-- Leave persistence must go through ILeaveRepository (create/findById/update) with the exact 12-field LeaveRequest shape and UpdateLeaveRequestDto changes. (see `src/modules/leave/leave.repository.ts`)
-- Route handlers must follow the direct-service-call pattern (instantiate service, call it, map AppError to status codes) rather than a controller layer. (see `src/modules/uptime/uptime.routes.ts`)
-### Entity invariants — enforce these
-- Reuse or extend `LeaveRequest`: Lifecycle is strictly DRAFT → SUBMITTED → APPROVED|REJECTED (CANCELLED out of scope here); a request may only be submitted from DRAFT, and only a SUBMITTED request may be approved or rejected.
-- Reuse or extend `LeaveRequest`: requestedDays is always the canonical inclusive day count (endDate - startDate + 1) computed by the shared helper; the service never stores a locally-derived value.
-- Reuse or extend `LeaveBalance`: Reservation lifecycle: submit increments pendingDays; approve decrements pendingDays and increments usedDays; reject decrements pendingDays only — counters must never go negative.
-- Reuse or extend `AuditLog`: Every state-changing leave operation (create/submit/approve/reject) produces exactly one AuditLog row with the correct AuditAction (CREATE/UPDATE/APPROVE/REJECT) and the actor as actorId.
-- Reuse or extend `Notification`: Approve/reject produces a synchronous Notification insert (status PENDING) inside the same transaction as the status change and balance update.
-### Interface contract — expose these operations (their shape is yours)
-- create — Requires an authenticated actor (EMPLOYEE or above); the created request's employeeId is the requester.; Invalid input → ValidationError (400); insufficient balance → ConflictError (409).
-- submit — Requires an authenticated actor; only the request's owner may submit.; Unknown request → NotFoundError (404); invalid state transition (not DRAFT) → ConflictError (409).
-- approve — Requires MANAGER or ADMIN; no self-approval; approver must be the requester's manager or an ADMIN.; Unknown request → NotFoundError (404); invalid state transition (not SUBMITTED) → ConflictError (409); unauthorized actor → ForbiddenError (403).
-- reject — Requires MANAGER or ADMIN; no self-rejection; approver must be the requester's manager or an ADMIN.; Unknown request → NotFoundError (404); invalid state transition (not SUBMITTED) → ConflictError (409); unauthorized actor → ForbiddenError (403).
-### Integration points — connect to these
-- src/modules/balance/index.ts — LeaveService reads and mutates LeaveBalance (pendingDays/usedDays) during submit/approve/reject via IBalanceRepository/IBalanceService.
-- src/modules/audit/index.ts — LeaveService writes an AuditLog for every state-changing operation (GP-002).
-- src/modules/notification/index.ts — LeaveService inserts synchronous notifications on approve/reject within the transaction.
-- src/modules/validation/index.ts — LeaveService delegates date-range and balance-sufficiency validation (and derives requestedDays via the shared helper).
-- src/modules/employee/index.ts — LeaveService resolves the requester/approver (manager relationship, self-approval guard) via IEmployeeService.
-- src/shared/db/unit-of-work.ts — LeaveService injects IUnitOfWork and runs approve/reject inside withTransaction.
-
-## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
-Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
-- Use unknown with type guards instead of any (rule: `no-any`)
-- Database calls must go through repository pattern (rule: `no-direct-db-outside-repository`)
-- No hardcoded passwords, API keys, or tokens (rule: `no-hardcoded-secrets`)
-- Do not add @gestalt/* packages as project dependencies — these are Gestalt platform internals not available on npm (rule: `no-gestalt-internal-deps`)
-
 ## Architecture & constraint rules the quality gate enforces (satisfy these now)
 The quality gate judges your code against the rules below and BLOCKS the phase on any violation — a violation it rates critical escalates to a human with no automatic retry. These are the same rules the gate checks, so comply up front rather than leaving them for the gate:
 - Data access is only permitted in the designated data access layer of this project. Code in business logic, presentation, or routing layers must delegate all data operations to the data access layer.
@@ -163,24 +97,62 @@ These are the project's non-negotiable invariants. A violation is a GOLDEN_PRINC
 - GP-006 — Error handling: No unhandled promise rejections. All async errors are caught and handled.
 
 ## Project stack & references
-Before writing code, read the referenced files below (those present in the working directory) to learn the project's language, framework, test runner, and conventions, and the cross-cutting rules your code must satisfy — then follow the existing repository conventions:
+Before making the edits below, read the referenced files (those present in the working directory) to learn the project's architecture, conventions, and the cross-cutting rules your fix must still satisfy — then keep the edits consistent with them:
 - `HARNESS.json`
 - `docs/ARCHITECTURE.md`
 - `docs/GOLDEN_PRINCIPLES.md`
 - `AGENTS.md`
 - `PLAN.md`
 
+## Required edits
+
+### Coherent change 1 — apply as ONE atomic edit across ALL sites below
+
+Unifying change (do this now): Add approverId and decidedAt to the leave update path (repository UpdateLeaveRequestDto and FIELD_COLUMNS) and set them in approve/reject transitions.
+
+The sites below are the SAME underlying issue. Fixing some but not others leaves the code incoherent and the quality gate WILL re-flag it — apply the one change above consistently to EVERY site:
+
+- Site 1
+File: src/modules/leave/leave.service.ts
+Line: 172
+Offending code: `{ status: LeaveStatus.APPROVED },`
+Rule violated: approve-reject-approver-fields
+Action (do this now): Edit `src/modules/leave/leave.service.ts` at line 172 in place to fix the `approve-reject-approver-fields` violation.
+What the quality gate found — apply this: [approve-reject-approver-fields] The spec success criteria and entity invariant require approve to transition status → APPROVED "with approverId/decidedAt". The service only sets `status`, omitting approverId and decidedAt, so the approval decision is not recorded with who/when. The same omission occurs in reject (line 233).
+
+- Site 2
+File: src/modules/leave/leave.service.ts
+Line: 233
+Offending code: `{ status: LeaveStatus.REJECTED },`
+Rule violated: approve-reject-approver-fields
+Action (do this now): Edit `src/modules/leave/leave.service.ts` at line 233 in place to fix the `approve-reject-approver-fields` violation.
+What the quality gate found — apply this: [approve-reject-approver-fields] The spec success criteria and entity invariant require reject to transition status → REJECTED "with approverId/decidedAt". The service only sets `status`, omitting approverId and decidedAt, so the rejection decision is not recorded with who/when.
+
+- Site 3
+File: src/modules/leave/leave.service.ts
+Line: 190
+Offending code: `{ status: LeaveStatus.APPROVED },`
+Rule violated: review/spec-compliance
+Action (do this now): Edit `src/modules/leave/leave.service.ts` at line 190 in place to fix the `review/spec-compliance` violation.
+What the quality gate found — apply this: [review/spec-compliance] Success criterion #4 requires approve to set "status → APPROVED (with approverId/decidedAt)", but the service only updates `status`. The approver identity and decision timestamp are never persisted, so `approverId`/`decidedAt` remain null after approval. The repository's `UpdateLeaveRequestDto` (startDate/endDate/reason/status only) and `FIELD_COLUMNS` map do not even support these fields, so the service cannot populate them.
+
+- Site 4
+File: src/modules/leave/leave.service.ts
+Line: 235
+Offending code: `{ status: LeaveStatus.REJECTED },`
+Rule violated: review/spec-compliance
+Action (do this now): Edit `src/modules/leave/leave.service.ts` at line 235 in place to fix the `review/spec-compliance` violation.
+What the quality gate found — apply this: [review/spec-compliance] Success criterion #5 requires reject to set "status → REJECTED (with approverId/decidedAt)", but the service only updates `status`. The approver identity and decision timestamp are never persisted, so `approverId`/`decidedAt` remain null after rejection.
+
+Then check the rest of these files (and the surrounding module) for ANY OTHER occurrence of the same pattern beyond the specific lines listed above, and apply the same change there too — do NOT limit the fix to only the enumerated sites.
+
 ## Verify before you finish (MANDATORY)
-The code you write MUST compile and its tests MUST pass — a compilation or type error must NEVER be left for CI to find. Before you declare this task done:
-- Read the project's build / type-check / test commands from `package.json` (scripts) and `HARNESS.json`.
-- Install dependencies if they are not already installed, then RUN the type-check / build (e.g. `npm run build` or `tsc --noEmit`) AND the tests (e.g. `npm test`) for the files this phase touches.
-- FIX every compilation error, type error, and failing test you introduced — including in test files — and re-run until they pass.
-- **While fixing, re-run ONLY what you are fixing** — the specific failing test file(s), or the type-check alone for a type error. Do NOT re-run the whole suite after every edit. A measured run spent ~60 full build/test cycles inside a 30-iteration budget and was cut off mid-work: the suite is the slowest thing you can do, and re-running all of it to learn about one file buys nothing.
-- Run the FULL build and the FULL suite ONCE at the end, to confirm the whole phase holds together. That run is the one that matters; the narrow ones are just your fix loop.
-- If a command HANGS or produces no output, do not sit through it repeatedly: note it, work around it (a narrower target, or a timeout), and say so in your final message. Repeatedly interrupting and re-running the same hanging command is the single most expensive thing you can do with your budget.
+After making the edits above, the code MUST still compile and its tests MUST pass — a compilation/type error, or a test your change breaks, must NEVER be left for CI or the quality gate to find. Before you declare this task done:
+- Read the project's build / type-check / test commands from `package.json` (scripts) and `HARNESS.json`, install dependencies if they are not already installed, then RUN the type-check / build (e.g. `npm run build` or `tsc --noEmit`) AND the tests (e.g. `npm test`).
+- FIX every compilation error, type error, and failing test that YOUR edits introduced — including updating a test whose expectation your change legitimately invalidated (e.g. a new required field, a new status code such as 401/403 from an added authorization check, added input validation) — and re-run until they pass.
 - Only when the build and the tests pass may you consider the task complete. If a dependency install genuinely cannot be made to work, say so explicitly in your final message rather than declaring success on unverified code.
 
 ## Constraints (mandatory)
-- Write and modify source files ONLY. Do NOT run `git commit`, `git push`, `git add`, or any other git command. The platform handles all git operations. (Running the build / type-check / tests above is expected and encouraged — that is NOT a git operation.)
-- Do not create a new repository or change the git remote.
-- Stay within the scope of this phase; do not implement deferred/later work.
+- Keep the change SURGICAL: make the required edits above and fix only what they broke (compile/type errors and the tests they invalidated). Do NOT refactor, regenerate, or change unrelated code, and do not add / delete / rename source files beyond what a required edit — or a test-fix for it — needs.
+- Do NOT run `git commit`, `git push`, `git add`, or any git command. The platform handles all git operations. (Running the build / type-check / tests above is expected and encouraged — that is NOT a git operation.)
+- When the listed edits are made and the build + tests pass, stop.
