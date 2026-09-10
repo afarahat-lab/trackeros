@@ -7,13 +7,23 @@ import { LeaveBalance, CreateLeaveBalanceInput } from './balance.model';
 
 export interface IBalanceRepository {
   create(input: CreateLeaveBalanceInput, client?: PoolClient): Promise<LeaveBalance>;
-  findById(id: string, client?: PoolClient): Promise<LeaveBalance | null>;
+  /**
+   * `forUpdate` takes a row-level lock (SELECT ... FOR UPDATE). Pass it whenever the
+   * caller intends to WRITE the row it just read: the balance deltas are computed in
+   * application code, so without the lock two concurrent transactions both read the
+   * same pendingDays and the second write silently discards the first (PostgreSQL's
+   * default READ COMMITTED permits this — being inside a transaction is NOT enough).
+   * Only meaningful with an explicit `client`; a lock outside a transaction is
+   * released immediately and buys nothing.
+   */
+  findById(id: string, client?: PoolClient, forUpdate?: boolean): Promise<LeaveBalance | null>;
   findByKey(
     employeeId: string,
     leaveTypeCode: LeaveTypeCode,
     periodStart: Date,
     periodEnd: Date,
-    client?: PoolClient
+    client?: PoolClient,
+    forUpdate?: boolean
   ): Promise<LeaveBalance | null>;
   update(
     id: string,
@@ -61,6 +71,16 @@ function mapRow(row: LeaveBalanceRow): LeaveBalance {
   };
 }
 
+/**
+ * ` FOR UPDATE` when the caller both asked for the lock AND is inside an explicit
+ * transaction. Outside one, PostgreSQL commits the implicit single-statement
+ * transaction straight away and the lock is gone before the caller can use it — so
+ * emitting it there would imply a guarantee that does not exist.
+ */
+function lockClause(client: PoolClient | undefined, forUpdate: boolean): string {
+  return client && forUpdate ? ' FOR UPDATE' : '';
+}
+
 export class PgLeaveBalanceRepository implements IBalanceRepository {
   constructor(private readonly dbPool: Pool = defaultPool) {}
 
@@ -91,8 +111,12 @@ export class PgLeaveBalanceRepository implements IBalanceRepository {
     return mapRow(result.rows[0]);
   }
 
-  async findById(id: string, client?: PoolClient): Promise<LeaveBalance | null> {
-    const query = `SELECT ${COLUMNS} FROM leave_balances WHERE id = $1`;
+  async findById(
+    id: string,
+    client?: PoolClient,
+    forUpdate = false
+  ): Promise<LeaveBalance | null> {
+    const query = `SELECT ${COLUMNS} FROM leave_balances WHERE id = $1${lockClause(client, forUpdate)}`;
     const result: QueryResult<LeaveBalanceRow> = await this.db(client).query(query, [id]);
     return result.rows.length ? mapRow(result.rows[0]) : null;
   }
@@ -102,11 +126,13 @@ export class PgLeaveBalanceRepository implements IBalanceRepository {
     leaveTypeCode: LeaveTypeCode,
     periodStart: Date,
     periodEnd: Date,
-    client?: PoolClient
+    client?: PoolClient,
+    forUpdate = false
   ): Promise<LeaveBalance | null> {
     const query = `
       SELECT ${COLUMNS} FROM leave_balances
       WHERE employee_id = $1 AND leave_type_code = $2 AND period_start = $3 AND period_end = $4
+      ${lockClause(client, forUpdate)}
     `;
     const result: QueryResult<LeaveBalanceRow> = await this.db(client).query(query, [
       employeeId,

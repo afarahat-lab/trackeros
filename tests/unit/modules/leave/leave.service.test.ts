@@ -91,6 +91,7 @@ class FakeLeaveRepository implements ILeaveRepository {
 
 class FakeBalanceRepository implements IBalanceRepository {
   rows: LeaveBalance[] = [];
+  findByKeyCalls: { client?: PoolClient; forUpdate?: boolean }[] = [];
   updateCalls: {
     id: string;
     changes: Partial<Omit<LeaveBalance, 'id'>>;
@@ -114,8 +115,10 @@ class FakeBalanceRepository implements IBalanceRepository {
     leaveTypeCode: LeaveTypeCode,
     _periodStart: Date,
     _periodEnd: Date,
-    _client?: PoolClient
+    _client?: PoolClient,
+    forUpdate?: boolean
   ): Promise<LeaveBalance | null> {
+    this.findByKeyCalls.push({ client: _client, forUpdate });
     return (
       this.rows.find(
         (b) => b.employeeId === employeeId && b.leaveTypeCode === leaveTypeCode
@@ -141,8 +144,13 @@ class FakeBalanceRepository implements IBalanceRepository {
 class FakeAuditService implements IAuditService {
   records: CreateAuditLogInput[] = [];
   recordClients: (PoolClient | undefined)[] = [];
+  failNext = false;
 
   async record(input: CreateAuditLogInput, client?: PoolClient): Promise<AuditLog> {
+    if (this.failNext) {
+      this.failNext = false;
+      throw new Error('audit insert failed');
+    }
     this.records.push(input);
     this.recordClients.push(client);
     return { id: `audit-${this.records.length}`, occurredAt: new Date(), ...input };
@@ -235,10 +243,18 @@ class FakePolicyService implements IPolicyService {
 class FakeUnitOfWork implements IUnitOfWork {
   readonly stubClient = {} as PoolClient;
   callCount = 0;
+  rolledBack = false;
 
   async withTransaction<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {
     this.callCount += 1;
-    return work(this.stubClient);
+    try {
+      return await work(this.stubClient);
+    } catch (err) {
+      // A real unit of work rolls back here; recording it is what makes the
+      // all-or-nothing guarantee assertable.
+      this.rolledBack = true;
+      throw err;
+    }
   }
 }
 
@@ -622,5 +638,114 @@ describe('LeaveService', () => {
     it('rejects an unknown request with NotFoundError', async () => {
       await expect(service.reject(manager, 'missing')).rejects.toThrow(NotFoundError);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Regression: leave-balance race + create atomicity
+// ---------------------------------------------------------------------------
+
+describe('LeaveService concurrency and atomicity guarantees', () => {
+  let repository: FakeLeaveRepository;
+  let balanceRepository: FakeBalanceRepository;
+  let auditService: FakeAuditService;
+  let uow: FakeUnitOfWork;
+  let service: LeaveService;
+
+  beforeEach(async () => {
+    repository = new FakeLeaveRepository();
+    balanceRepository = new FakeBalanceRepository();
+    auditService = new FakeAuditService();
+    uow = new FakeUnitOfWork();
+    service = new LeaveService(
+      repository,
+      balanceRepository,
+      auditService,
+      new FakeNotificationService(),
+      new FakeValidationService(),
+      new FakeEmployeeService([
+        makeEmployee(REQUESTER_ID),
+        makeEmployee(MANAGER_ID, { role: EmployeeRole.MANAGER }),
+      ]),
+      new FakePolicyService([makePolicy()]),
+      uow
+    );
+    await balanceRepository.create(makeBalance());
+  });
+
+  const manager = () => makeActor({ id: MANAGER_ID, role: EmployeeRole.MANAGER });
+
+  async function seedRequest(status: LeaveStatus): Promise<void> {
+    await repository.create({
+      employeeId: REQUESTER_ID,
+      leaveTypeCode: LeaveTypeCode.ANNUAL,
+      startDate: START,
+      endDate: END,
+      requestedDays: REQUESTED_DAYS,
+      reason: null,
+      status,
+      approverId: null,
+      approvalComment: null,
+      submittedAt: null,
+      decidedAt: null,
+    });
+  }
+
+  // The deltas are computed in application code (read pendingDays, adjust, write the
+  // result). Without a row lock two concurrent transactions read the same value and
+  // the second write discards the first — READ COMMITTED permits exactly this, so
+  // being inside a transaction is not sufficient.
+  it.each([
+    ['submit', LeaveStatus.DRAFT, (s: LeaveService) => s.submit(makeActor(), 'lr-1')],
+    ['approve', LeaveStatus.SUBMITTED, (s: LeaveService) => s.approve(manager(), 'lr-1')],
+    ['reject', LeaveStatus.SUBMITTED, (s: LeaveService) => s.reject(manager(), 'lr-1')],
+  ])('%s locks the balance row it goes on to write', async (_op, status, run) => {
+    await seedRequest(status);
+    if (status === LeaveStatus.SUBMITTED) {
+      // approve/reject consume days that submit had already reserved
+      await balanceRepository.update(balanceRepository.rows[0].id, {
+        pendingDays: REQUESTED_DAYS,
+      });
+    }
+    balanceRepository.findByKeyCalls.length = 0;
+    balanceRepository.updateCalls.length = 0;
+
+    await run(service);
+
+    const transactional = balanceRepository.findByKeyCalls.filter(
+      (c) => c.client !== undefined
+    );
+    expect(transactional.length).toBeGreaterThan(0);
+    for (const call of transactional) {
+      expect(call.forUpdate).toBe(true);
+    }
+    // and it really did write the row it locked
+    expect(balanceRepository.updateCalls.length).toBeGreaterThan(0);
+  });
+
+  it('does not lock the balance on create — that read only validates', async () => {
+    balanceRepository.findByKeyCalls.length = 0;
+    await service.create(makeActor(), makeDto());
+    expect(balanceRepository.findByKeyCalls.length).toBeGreaterThan(0);
+    for (const call of balanceRepository.findByKeyCalls) {
+      expect(call.forUpdate).toBeFalsy();
+    }
+  });
+
+  // Written outside a transaction, a failing audit insert leaves a persisted request
+  // with no audit trail — and create was the only mutation here that was unwrapped.
+  it('writes the request and its audit record in ONE unit of work', async () => {
+    await service.create(makeActor(), makeDto());
+
+    expect(uow.callCount).toBe(1);
+    const client = repository.createCalls[0]?.client;
+    expect(client).toBe(uow.stubClient);
+    expect(auditService.recordClients[0]).toBe(client);
+  });
+
+  it('unwinds the whole create when the audit write fails', async () => {
+    auditService.failNext = true;
+    await expect(service.create(makeActor(), makeDto())).rejects.toThrow('audit insert failed');
+    expect(uow.rolledBack).toBe(true);
   });
 });
