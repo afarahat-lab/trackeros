@@ -88,18 +88,27 @@ export class LeaveService implements ILeaveService {
       decidedAt: null,
     };
 
-    const created = await this.repository.create(toCreate);
+    // The request and its audit record are ONE unit of work. Written separately, a
+    // failing audit insert leaves a persisted request with no audit trail, which
+    // breaks the platform rule that every state change is audited — and made create
+    // the only mutation here that was not transactional.
+    return this.uow.withTransaction(async (client) => {
+      const created = await this.repository.create(toCreate, client);
 
-    await this.auditService.record({
-      actorId: actor.id,
-      action: AuditAction.CREATE,
-      entityType: 'leave_request',
-      entityId: created.id,
-      beforeState: null,
-      afterState: created,
+      await this.auditService.record(
+        {
+          actorId: actor.id,
+          action: AuditAction.CREATE,
+          entityType: 'leave_request',
+          entityId: created.id,
+          beforeState: null,
+          afterState: created,
+        },
+        client,
+      );
+
+      return created;
     });
-
-    return created;
   }
 
   async submit(actor: LeaveActor, requestId: string): Promise<LeaveRequest> {
@@ -119,6 +128,7 @@ export class LeaveService implements ILeaveService {
         request.leaveTypeCode,
         request.startDate,
         client,
+        true, // this transaction writes the balance below — lock the row
       );
 
       const updated = await this.repository.update(
@@ -164,6 +174,7 @@ export class LeaveService implements ILeaveService {
         request.leaveTypeCode,
         request.startDate,
         client,
+        true, // this transaction writes the balance below — lock the row
       );
       this.assertPendingDays(balance, request.requestedDays);
 
@@ -225,6 +236,7 @@ export class LeaveService implements ILeaveService {
         request.leaveTypeCode,
         request.startDate,
         client,
+        true, // this transaction writes the balance below — lock the row
       );
       this.assertPendingDays(balance, request.requestedDays);
 
@@ -302,11 +314,18 @@ export class LeaveService implements ILeaveService {
     }
   }
 
+  /**
+   * `forUpdate` MUST be true whenever the caller goes on to write the balance: the
+   * deltas are computed here in application code, so an unlocked read lets two
+   * concurrent decisions compute from the same pendingDays and lose one update.
+   * Validation-only reads (create) leave it false and take no lock.
+   */
   private async resolveBalance(
     employeeId: string,
     leaveTypeCode: LeaveTypeCode,
     date: Date,
     client?: PoolClient,
+    forUpdate = false,
   ): Promise<LeaveBalance> {
     const policy = await this.policyService.getPolicyByLeaveTypeCode(leaveTypeCode);
     const employee = await this.employeeService.getEmployeeById(employeeId);
@@ -318,6 +337,7 @@ export class LeaveService implements ILeaveService {
       period.start,
       period.end,
       client,
+      forUpdate,
     );
 
     if (!balance) {
