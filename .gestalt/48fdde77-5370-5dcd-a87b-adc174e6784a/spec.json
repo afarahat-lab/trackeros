@@ -1,0 +1,118 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "validation"
+    ],
+    "affectedLayers": [
+      "domain",
+      "service"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The validation module exposes a public entry point at src/modules/validation/index.ts that re-exports the ValidationResult model and the validation service (interface + implementation), mirroring the balance module's export shape.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Date-range validation rejects any input where startDate > endDate with a typed ValidationError (400), and accepts startDate <= endDate (including equal dates, which count as one day).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Inclusive day counting is performed by importing and calling the existing requestedDays(startDate, endDate) helper from src/shared/types/index.ts \u2014 never re-derived, re-exported, or aliased \u2014 so a same-day range yields 1 and an N-day span yields N.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Balance-sufficiency checking computes entitledDays - usedDays - pendingDays and rejects with a typed ConflictError (409) when that remainder is less than the requested day count, and passes when it is greater than or equal.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests exist under tests/unit/modules/validation/ covering inclusive day counting (same-day, multi-day, cross-month) and sufficiency (sufficient, exactly-sufficient, insufficient) using in-memory fakes.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Import and call requestedDays directly from src/shared/types/index.ts; do NOT define a new helper, do NOT re-export it as calculateRequestedDays, and do NOT alias it \u2014 the canonical helper already exists there (Phase 1) and re-deriving it violates the 'implement ONCE' rule.",
+    "Use strict TypeScript with no `any`; use `unknown` plus type guards where needed (HARNESS.json no-any constraint).",
+    "Use relative imports (../../shared/types, ../../shared/errors, ../balance) and import only through the public index.ts entry points \u2014 never from module internals.",
+    "Follow the balance module's split-file layout: validation.model.ts, validation.service.ts, and index.ts, with the service interface declared alongside its implementation in the same file (no separate .interface.ts files).",
+    "Validation is a pure rules module: no audit writes, no routes/controllers, no RBAC, and no database access in this phase."
+  ],
+  "outOfScope": [
+    "Audit-log writes (GP-002) \u2014 validation is a pure rules module; audit side effects are owned by the Phase 6 leave orchestrator.",
+    "HTTP routes, controllers, and RBAC enforcement \u2014 deferred to Phase 6.",
+    "Policy max-duration enforcement (maxConsecutiveDays / maxRequestDays) and notice-period (minNoticeDays) checks \u2014 not part of this phase's three required behaviors.",
+    "Any persistence/repository layer for the validation module \u2014 validation operates on in-memory inputs (DTOs and LeaveBalance) and performs no database access."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "ValidationResult",
+      "mustExistOrExtend": true,
+      "invariant": "A ValidationResult is a pure value object that reports whether validation passed and the list of failure reasons; it must never perform side effects or throw \u2014 the service decides whether to surface a typed error from it."
+    },
+    {
+      "entity": "LeaveBalance (consumed, not owned)",
+      "mustExistOrExtend": true,
+      "invariant": "Sufficiency is derived solely from the balance's counters as entitledDays - usedDays - pendingDays; the validation module must not mutate the balance or reinterpret OPEN/CLOSED state."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "validateDateRange(startDate, endDate)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Rejects startDate > endDate with ValidationError (400); accepts startDate <= endDate."
+    },
+    {
+      "operation": "validateSufficiency(balance, requestedDays)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Rejects with ConflictError (409) when entitledDays - usedDays - pendingDays < requestedDays; passes otherwise."
+    },
+    {
+      "operation": "validateLeaveRequest(dto)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Composes date-range validation and sufficiency checking against the request's leave type balance; surfaces ValidationError (400) for invalid ranges and ConflictError (409) for insufficient balance."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The inclusive day count must be obtained by importing and calling the canonical requestedDays(startDate, endDate) helper \u2014 never re-derived \u2014 so every consumer (sufficiency, balance deduction, policy max-duration) uses the identical derivation.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "Error semantics must reuse the shared AppError subclasses: ValidationError (400) for invalid input and ConflictError (409) for insufficient balance, matching the { error, code } contract.",
+      "referencePath": "src/shared/errors/index.ts"
+    },
+    {
+      "requirement": "The LeaveBalance shape consumed for sufficiency must match the canonical model (entitledDays, usedDays, pendingDays counters) exported from the balance module's public entry point.",
+      "referencePath": "src/modules/balance/index.ts"
+    },
+    {
+      "requirement": "The sufficiency formula entitledDays - usedDays - pendingDays >= requestedDays must match the canonical business rule so validation agrees with the balance module's own unused-day computation.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts",
+      "why": "Provides LeaveTypeCode, CreateLeaveRequestDto, and the canonical requestedDays helper the validation service consumes."
+    },
+    {
+      "target": "src/shared/errors/index.ts",
+      "why": "Provides ValidationError (400) and ConflictError (409) for the validation service's typed failure semantics."
+    },
+    {
+      "target": "src/modules/balance/index.ts",
+      "why": "Provides the LeaveBalance model whose counters drive the sufficiency check."
+    }
+  ]
+}
