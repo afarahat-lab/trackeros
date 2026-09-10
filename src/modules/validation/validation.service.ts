@@ -7,17 +7,6 @@ import { ValidationError, ConflictError } from '../../shared/errors';
 import { LeaveBalance } from '../balance';
 import { ValidationResult } from './validation.model';
 
-/**
- * Shared helper for the inclusive calendar-day count. Delegates to the single
- * canonical derivation in shared/types so every consumer (sufficiency checks,
- * balance deduction, policy max-duration enforcement) uses the identical rule:
- * requestedDays = endDate - startDate + 1, whole-day only, no weekend or
- * holiday exclusion. Never re-derive this per module.
- */
-export function calculateRequestedDays(startDate: Date, endDate: Date): number {
-  return requestedDays(startDate, endDate);
-}
-
 export interface IValidationService {
   validateDateRange(startDate: Date, endDate: Date): void;
   validateSufficiency(balance: LeaveBalance, requestedDays: number): void;
@@ -51,7 +40,7 @@ export class ValidationService implements IValidationService {
     this.checkLeaveRequestInput(dto);
     this.validateDateRange(dto.startDate, dto.endDate);
 
-    const requested = calculateRequestedDays(dto.startDate, dto.endDate);
+    const requested = requestedDays(dto.startDate, dto.endDate);
     this.assert(this.checkSufficiency(balance, requested), ConflictError);
   }
 

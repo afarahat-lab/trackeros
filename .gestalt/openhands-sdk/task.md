@@ -1,55 +1,23 @@
-# Implement this phase: Phase 5 — validation module
+# Fix specific quality-gate violations: Phase 5 — validation module
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/babd3932-368b-46a5-a4dc-6dccaafd84ba/5`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/fix/babd3932-368b-46a5-a4dc-6dccaafd84ba/5/1`. Do not clone anything; work only in this directory.
 
-You are the IMPLEMENTATION agent, not a planner. The platform measures your work EXCLUSIVELY by the files you create or modify in this working tree (`git status`). Ending your turn with a plan, a summary, or an announcement of what you are 'about to' do — without having actually edited files — is a FAILURE: a turn that leaves the working tree untouched is discarded. Explore only as much as you need, then MAKE the edits with your file-editing tool. Never end your turn before the files exist on disk.
+You are fixing SPECIFIC violations the quality gate found in EXISTING, already-committed files. Make the targeted edits listed below — do NOT refactor, regenerate, or change unrelated code.
 
-## What to build
-(no phase architecture provided — infer from the success criteria below)
+The files ALREADY EXIST. You MUST edit them in place with the `str_replace_editor` tool. Reading or viewing a file is NOT sufficient — you have NOT finished until you have edited EVERY file listed below.
 
-## Success criteria
-Build the validation module under src/modules/validation/ with a public index.ts.
+## Constraints & consistency
+You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
+### Reuse & consistency — match these exactly
+- The day-count derivation used by `validateLeaveRequest` must match the canonical `requestedDays` implementation (inclusive `endDate - startDate + 1`, whole-day only, no weekend/holiday exclusion) — call it directly rather than re-deriving. (see `src/shared/types/index.ts`)
+- The validation module's public surface must remain consistent with the documented `IValidationService` contract (validateDateRange, validateSufficiency, validateLeaveRequest) — only the standalone `calculateRequestedDays` export is removed. (see `src/modules/validation/validation.service.ts`)
 
-Create:
-- src/modules/validation/validation.model.ts — ValidationResult model (e.g. { valid: boolean; errors: string[] }).
-- src/modules/validation/validation.service.ts — IValidationService + ValidationService.
-- src/modules/validation/index.ts — public exports.
-
-The service implements the BINDING day-count rule ONCE as a shared helper: requestedDays = endDate - startDate + 1 (INCLUSIVE, all calendar days, no weekend/holiday exclusion, whole-day only). Expose this helper (e.g. calculateRequestedDays) so every consumer (sufficiency checks, balance deduction, policy max-duration enforcement) calls it — do not re-derive per module. Also implement date-range validation (startDate <= endDate) and balance-sufficiency checks against LeaveBalance (entitledDays - usedDays - pendingDays >= requestedDays).
-
-Import LeaveTypeCode and CreateLeaveRequestDto from src/shared/types/index.ts, error types from src/shared/errors/index.ts, and LeaveBalance from src/modules/balance/index.ts (Phase 4). Include Jest unit tests in tests/unit/modules/validation/ covering inclusive day counting and sufficiency. This phase depends on Phase 1 (src/shared/types/index.ts, src/shared/errors/index.ts) and Phase 4 (src/modules/balance/index.ts) — read them before generating code referencing their types.
-
-## Your iteration budget — and how to get more (READ BEFORE YOU START)
-
-You have a HARD budget of **30 iterations** for this task; one tool call is one iteration. When it runs out you are CUT OFF mid-work — the unfinished phase is recorded as a FAILURE, not as progress. Nothing warns you as you approach it, so you cannot rely on noticing.
-
-**Exploration is what exhausts it.** Measured on this platform's recent phases: the code-agent spent 19 of its 27 file-editing calls on `view` — it ran out of budget reading the codebase, not building the feature. Phases that were cut off had nearly all of their budget consumed before the writing started.
-
-You have a `task` tool. It runs a FRESH sub-agent with its OWN separate 30-iteration budget and its OWN context window, in this same working directory. Everything that sub-agent reads and writes costs you **one** iteration, not 30. It is the supported way to get more capacity, and using it is normal — not an admission of difficulty.
-
-### DELEGATE BY DEFAULT
-
-**Assume you WILL delegate this phase. The question is not whether, but how to slice it.** Decide NOW, before your first edit — a decision made after you have spent half your budget exploring is a decision made too late.
-
-Delegate unless the phase is *trivially* small, which means ALL of:
-- it creates or changes **at most 2 files**, AND
-- it introduces **no new module**, AND
-- you are confident you can finish it, verified, in well under 10 iterations.
-
-If you cannot say all three with confidence, delegate. When you are unsure, delegate — an unnecessary hand-off costs a few iterations, whereas running out costs the entire phase.
-
-### Delegate the READING, not just the writing
-
-The most valuable first delegation is usually a SURVEY, because that is where the budget actually goes. Instead of opening a dozen files yourself, send a sub-agent to read them and report back what you need: the existing conventions, the shapes and signatures you must match, where the seams are. It burns its own budget on that reading and returns you a digest for one iteration.
-
-Then delegate the implementation slices.
-
-### How to delegate
-- Call `task` with `subagent_type='gestalt-implementer'`, ONE call per slice, at most **4** for this phase. Each call blocks until that sub-agent finishes and reports back — they never run at the same time.
-- Split implementation slices by MODULE or FILE GROUP so they own DISJOINT files. Two slices must never edit the same file.
-- Give each one a self-contained prompt: the exact files it owns, what to build, the conventions it must follow, and what to report back. It cannot see this task, so anything you do not tell it, it does not know.
-
-**Never delegate the final verification.** Run the build and the tests YOURSELF, over the whole phase, after the slices are back — a sub-agent only sees its own slice, so its 'it passes' means 'my slice compiled', not 'the phase works'.
+## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
+Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
+- Use unknown with type guards instead of any (rule: `no-any`)
+- Database calls must go through repository pattern (rule: `no-direct-db-outside-repository`)
+- No hardcoded passwords, API keys, or tokens (rule: `no-hardcoded-secrets`)
+- Do not add @gestalt/* packages as project dependencies — these are Gestalt platform internals not available on npm (rule: `no-gestalt-internal-deps`)
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
@@ -79,32 +47,6 @@ These are resolved, feature-wide decisions. Wherever this phase touches the conc
 
 12. DUPLICATE of question 6 — same decision: do NOT add BullMQ to package.json; notifications are synchronous direct inserts. [BINDING RULE — operator decision resolving: Should the inclusive calendar-day count (requestedDays = endDate - startDate + 1) exclude weekends and/or public holidays, or count all calendar days?; Should leave balances accrue pro-rata over the accrual period, or be granted in full at the start of each period?; Should unused entitled days carry forward to the next accrual period, and if so up to what cap?; What migration mechanism should be established for PostgreSQL schema changes?; Should a controller layer be introduced for all new modules, or should routes call services directly?; Should BullMQ be added for notification fanout/accrual jobs, or keep notifications synchronous?; Which naming scheme is canonical for LeaveStatus and LeaveType enums: DOMAIN.md (DRAFT/SUBMITTED/APPROVED/REJECTED/CANCELLED; annual/sick/emergency/unpaid/maternity/paternity) or root ARCHITECTURE.md (PENDING/APPROVED/REJECTED/CANCELLED; ANNUAL/SICK/MATERNITY/PATERNITY/UNPAID/OTHER)?; Should the persistence layer define the missing IUnitOfWork concrete implementation (PgUnitOfWork) and the shared base repository / error types, given none exist in the codebase?; What migration mechanism should be established, given no migrations or knexfile currently exist?; How should leave days be counted for a date range (inclusive vs exclusive end date, and half-day handling)?; Should a controller layer be introduced for new modules, or should routes call services directly (as the existing uptime module does)?; Should BullMQ be added to package.json before implementing notification fanout/accrual jobs?; apply everywhere these apply, not in one place only]
 
-## Constraints & consistency
-You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
-### Reuse & consistency — match these exactly
-- The inclusive day count must be obtained by importing and calling the canonical requestedDays(startDate, endDate) helper — never re-derived — so every consumer (sufficiency, balance deduction, policy max-duration) uses the identical derivation. (see `src/shared/types/index.ts`)
-- Error semantics must reuse the shared AppError subclasses: ValidationError (400) for invalid input and ConflictError (409) for insufficient balance, matching the { error, code } contract. (see `src/shared/errors/index.ts`)
-- The LeaveBalance shape consumed for sufficiency must match the canonical model (entitledDays, usedDays, pendingDays counters) exported from the balance module's public entry point. (see `src/modules/balance/index.ts`)
-- The sufficiency formula entitledDays - usedDays - pendingDays >= requestedDays must match the canonical business rule so validation agrees with the balance module's own unused-day computation. (see `.gestalt/architecture/reconciled.json`)
-### Entity invariants — enforce these
-- Reuse or extend `ValidationResult`: A ValidationResult is a pure value object that reports whether validation passed and the list of failure reasons; it must never perform side effects or throw — the service decides whether to surface a typed error from it.
-- Reuse or extend `LeaveBalance (consumed, not owned)`: Sufficiency is derived solely from the balance's counters as entitledDays - usedDays - pendingDays; the validation module must not mutate the balance or reinterpret OPEN/CLOSED state.
-### Interface contract — expose these operations (their shape is yours)
-- validateDateRange(startDate, endDate) — Rejects startDate > endDate with ValidationError (400); accepts startDate <= endDate.
-- validateSufficiency(balance, requestedDays) — Rejects with ConflictError (409) when entitledDays - usedDays - pendingDays < requestedDays; passes otherwise.
-- validateLeaveRequest(dto) — Composes date-range validation and sufficiency checking against the request's leave type balance; surfaces ValidationError (400) for invalid ranges and ConflictError (409) for insufficient balance.
-### Integration points — connect to these
-- src/shared/types/index.ts — Provides LeaveTypeCode, CreateLeaveRequestDto, and the canonical requestedDays helper the validation service consumes.
-- src/shared/errors/index.ts — Provides ValidationError (400) and ConflictError (409) for the validation service's typed failure semantics.
-- src/modules/balance/index.ts — Provides the LeaveBalance model whose counters drive the sufficiency check.
-
-## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
-Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
-- Use unknown with type guards instead of any (rule: `no-any`)
-- Database calls must go through repository pattern (rule: `no-direct-db-outside-repository`)
-- No hardcoded passwords, API keys, or tokens (rule: `no-hardcoded-secrets`)
-- Do not add @gestalt/* packages as project dependencies — these are Gestalt platform internals not available on npm (rule: `no-gestalt-internal-deps`)
-
 ## Architecture & constraint rules the quality gate enforces (satisfy these now)
 The quality gate judges your code against the rules below and BLOCKS the phase on any violation — a violation it rates critical escalates to a human with no automatic retry. These are the same rules the gate checks, so comply up front rather than leaving them for the gate:
 - Data access is only permitted in the designated data access layer of this project. Code in business logic, presentation, or routing layers must delegate all data operations to the data access layer.
@@ -129,24 +71,46 @@ These are the project's non-negotiable invariants. A violation is a GOLDEN_PRINC
 - GP-006 — Error handling: No unhandled promise rejections. All async errors are caught and handled.
 
 ## Project stack & references
-Before writing code, read the referenced files below (those present in the working directory) to learn the project's language, framework, test runner, and conventions, and the cross-cutting rules your code must satisfy — then follow the existing repository conventions:
+Before making the edits below, read the referenced files (those present in the working directory) to learn the project's architecture, conventions, and the cross-cutting rules your fix must still satisfy — then keep the edits consistent with them:
 - `HARNESS.json`
 - `docs/ARCHITECTURE.md`
 - `docs/GOLDEN_PRINCIPLES.md`
 - `AGENTS.md`
 - `PLAN.md`
 
+## Required edits
+
+### Coherent change 1 — apply as ONE atomic edit across ALL sites below
+
+Unifying change (do this now): Remove the exported calculateRequestedDays wrapper and call requestedDays directly from src/shared/types/index.ts in validation.service.ts.
+
+The sites below are the SAME underlying issue. Fixing some but not others leaves the code incoherent and the quality gate WILL re-flag it — apply the one change above consistently to EVERY site:
+
+- Site 1
+File: src/modules/validation/validation.service.ts
+Line: 20
+Offending code: `export function calculateRequestedDays(startDate: Date, endDate: Date): number {`
+Rule violated: no-redefinition-of-shared-symbol
+Action (do this now): Edit `src/modules/validation/validation.service.ts` at line 20 in place to fix the `no-redefinition-of-shared-symbol` violation.
+What the quality gate found — apply this: [no-redefinition-of-shared-symbol] The spec constraint explicitly forbids re-exporting or aliasing the canonical requestedDays helper: "Import and call requestedDays directly from src/shared/types/index.ts; do NOT define a new helper, do NOT re-export it as calculateRequestedDays, and do NOT alias it". This function defines a new exported symbol (calculateRequestedDays) that merely delegates to the existing requestedDays, duplicating a symbol already owned by src/shared/types/index.ts. The service should call requestedDays directly instead of wrapping it.
+
+- Site 2
+File: src/modules/validation/validation.service.ts
+Line: 16
+Offending code: `export function calculateRequestedDays(startDate: Date, endDate: Date): number {`
+Rule violated: review/architecture
+Action (do this now): Edit `src/modules/validation/validation.service.ts` at line 16 in place to fix the `review/architecture` violation.
+What the quality gate found — apply this: [review/architecture] The phase spec constraint explicitly forbids re-exporting/aliasing the canonical helper: "Import and call requestedDays directly from src/shared/types/index.ts; do NOT define a new helper, do NOT re-export it as calculateRequestedDays, and do NOT alias it". Success criterion #3 likewise requires the day count be obtained by "importing and calling the existing requestedDays(...) helper ... never re-derived, re-exported, or aliased". This module defines a new `calculateRequestedDays` wrapper that merely delegates to `requestedDays`, which is exactly the alias the spec prohibits.
+
+Then check the rest of these files (and the surrounding module) for ANY OTHER occurrence of the same pattern beyond the specific lines listed above, and apply the same change there too — do NOT limit the fix to only the enumerated sites.
+
 ## Verify before you finish (MANDATORY)
-The code you write MUST compile and its tests MUST pass — a compilation or type error must NEVER be left for CI to find. Before you declare this task done:
-- Read the project's build / type-check / test commands from `package.json` (scripts) and `HARNESS.json`.
-- Install dependencies if they are not already installed, then RUN the type-check / build (e.g. `npm run build` or `tsc --noEmit`) AND the tests (e.g. `npm test`) for the files this phase touches.
-- FIX every compilation error, type error, and failing test you introduced — including in test files — and re-run until they pass.
-- **While fixing, re-run ONLY what you are fixing** — the specific failing test file(s), or the type-check alone for a type error. Do NOT re-run the whole suite after every edit. A measured run spent ~60 full build/test cycles inside a 30-iteration budget and was cut off mid-work: the suite is the slowest thing you can do, and re-running all of it to learn about one file buys nothing.
-- Run the FULL build and the FULL suite ONCE at the end, to confirm the whole phase holds together. That run is the one that matters; the narrow ones are just your fix loop.
-- If a command HANGS or produces no output, do not sit through it repeatedly: note it, work around it (a narrower target, or a timeout), and say so in your final message. Repeatedly interrupting and re-running the same hanging command is the single most expensive thing you can do with your budget.
+After making the edits above, the code MUST still compile and its tests MUST pass — a compilation/type error, or a test your change breaks, must NEVER be left for CI or the quality gate to find. Before you declare this task done:
+- Read the project's build / type-check / test commands from `package.json` (scripts) and `HARNESS.json`, install dependencies if they are not already installed, then RUN the type-check / build (e.g. `npm run build` or `tsc --noEmit`) AND the tests (e.g. `npm test`).
+- FIX every compilation error, type error, and failing test that YOUR edits introduced — including updating a test whose expectation your change legitimately invalidated (e.g. a new required field, a new status code such as 401/403 from an added authorization check, added input validation) — and re-run until they pass.
 - Only when the build and the tests pass may you consider the task complete. If a dependency install genuinely cannot be made to work, say so explicitly in your final message rather than declaring success on unverified code.
 
 ## Constraints (mandatory)
-- Write and modify source files ONLY. Do NOT run `git commit`, `git push`, `git add`, or any other git command. The platform handles all git operations. (Running the build / type-check / tests above is expected and encouraged — that is NOT a git operation.)
-- Do not create a new repository or change the git remote.
-- Stay within the scope of this phase; do not implement deferred/later work.
+- Keep the change SURGICAL: make the required edits above and fix only what they broke (compile/type errors and the tests they invalidated). Do NOT refactor, regenerate, or change unrelated code, and do not add / delete / rename source files beyond what a required edit — or a test-fix for it — needs.
+- Do NOT run `git commit`, `git push`, `git add`, or any git command. The platform handles all git operations. (Running the build / type-check / tests above is expected and encouraged — that is NOT a git operation.)
+- When the listed edits are made and the build + tests pass, stop.

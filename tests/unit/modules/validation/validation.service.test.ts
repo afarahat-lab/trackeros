@@ -1,6 +1,6 @@
-import { ValidationService, calculateRequestedDays } from '../../../../src/modules/validation';
+import { ValidationService } from '../../../../src/modules/validation';
 import { ValidationError, ConflictError } from '../../../../src/shared/errors';
-import { LeaveTypeCode } from '../../../../src/shared/types';
+import { LeaveTypeCode, requestedDays } from '../../../../src/shared/types';
 import { LeaveBalance } from '../../../../src/modules/balance';
 
 const d = (y: number, m: number, day: number) => new Date(Date.UTC(y, m - 1, day));
@@ -19,23 +19,23 @@ function makeBalance(overrides: Partial<LeaveBalance> = {}): LeaveBalance {
   };
 }
 
-describe('calculateRequestedDays (inclusive day count)', () => {
+describe('requestedDays (inclusive day count)', () => {
   it('counts a single day as 1', () => {
-    expect(calculateRequestedDays(d(2025, 6, 1), d(2025, 6, 1))).toBe(1);
+    expect(requestedDays(d(2025, 6, 1), d(2025, 6, 1))).toBe(1);
   });
 
   it('counts two consecutive days as 2 (inclusive end)', () => {
-    expect(calculateRequestedDays(d(2025, 6, 1), d(2025, 6, 2))).toBe(2);
+    expect(requestedDays(d(2025, 6, 1), d(2025, 6, 2))).toBe(2);
   });
 
   it('counts all calendar days across a weekend (no weekend exclusion)', () => {
     // Fri 2025-06-06 -> Mon 2025-06-09 spans a weekend and is 4 inclusive days.
-    expect(calculateRequestedDays(d(2025, 6, 6), d(2025, 6, 9))).toBe(4);
+    expect(requestedDays(d(2025, 6, 6), d(2025, 6, 9))).toBe(4);
   });
 
   it('counts across a month boundary', () => {
     // 2025-02-27 -> 2025-03-02 = 4 inclusive days.
-    expect(calculateRequestedDays(d(2025, 2, 27), d(2025, 3, 2))).toBe(4);
+    expect(requestedDays(d(2025, 2, 27), d(2025, 3, 2))).toBe(4);
   });
 });
 
