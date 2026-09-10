@@ -1,0 +1,157 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "balance"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository",
+      "service"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The LeaveBalance model exposes the exact canonical field shape: id, employeeId, leaveTypeCode, periodStart, periodEnd, entitledDays, usedDays, pendingDays \u2014 no added, renamed, or omitted fields.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Opening an accrual period grants the FULL entitlement at period start with no pro-rata: entitledDays equals the policy's annualEntitlementDays, and usedDays and pendingDays are both 0.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Carry-forward on period close computes unused = entitledDays - usedDays - pendingDays, then carries min(unused, carryForwardDays) into the next period \u2014 a hard cap where days above the cap are forfeited.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/modules/balance/index.ts publicly re-exports the LeaveBalance model, the repository interface and its Pg implementation, and the service interface and its implementation.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests under tests/unit/modules/balance/ cover accrual (full-entitlement grant, invalid input rejection, unknown employee/policy, duplicate key) and carry-forward (cap enforcement with forfeiture, zero carry, missing source, non-closable period).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository obtains its connection from the shared pool in src/shared/db/connection.ts and accepts an optional trailing PoolClient so it can join a caller's transaction.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "LeaveTypeCode must be imported from src/shared/types/index.ts (not re-declared locally), and error types from src/shared/errors/index.ts.",
+    "The service owns the unit of work via an injected IUnitOfWork.withTransaction; it never imports a pool, client, or module-level db helper, and BEGIN/COMMIT/ROLLBACK are issued only by PgUnitOfWork.",
+    "All database access goes through the repository interface (GP-001); no inline SQL or direct pool access in the service.",
+    "Cross-module dependencies (employee, policy) are consumed only through their public index.ts entry points, never their internals.",
+    "Accrual and carry-forward are BINDING rules: full entitlement at period start (no pro-rata) and hard-cap carry-forward min(unused, carryForwardDays) with forfeiture above the cap \u2014 the implementation must not soften or reinterpret them.",
+    "Strict TypeScript: no `any` (use `unknown` with guards), no implicit any, strict null checks."
+  ],
+  "outOfScope": [
+    "HTTP routes, controllers, and RBAC guards for the balance module \u2014 deferred to the leave orchestrator phase; this phase is service/repository/model only.",
+    "Audit-log writes (GP-002) for balance state changes \u2014 the leave orchestrator owns audit/notification side effects; balance does not write audit rows in this phase.",
+    "Pro-rata accrual, monthly installments, and any accrual model other than full-entitlement-at-period-start.",
+    "BullMQ / background accrual schedulers and notification fanout \u2014 accrual and carry-forward are invoked synchronously by the service.",
+    "Knex migrations / DDL for the leave_balances table \u2014 persistence schema work is not part of this phase."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "A balance is uniquely identified per employee + leaveTypeCode + accrual period (periodStart/periodEnd); at most one row may exist for a given key, and a duplicate create is rejected with ConflictError."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "OPEN vs CLOSED is not a stored field \u2014 it is inferred from periodStart/periodEnd relative to the current date; a period whose periodEnd is in the future is not closable."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "Day counters are non-negative and consistent: entitledDays >= 0, usedDays >= 0, pendingDays >= 0, and unused = entitledDays - usedDays - pendingDays must not be negative."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "On open, entitledDays equals the policy's annualEntitlementDays (full grant, no pro-rata) and usedDays/pendingDays start at 0."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "On carry-forward, the next period's entitledDays gains exactly min(unused, carryForwardDays); days above the cap are forfeited and never added."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "openPeriod (open an accrual period / grant entitlement)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "ValidationError(400) on invalid input (empty employeeId, invalid LeaveTypeCode, invalid dates, periodStart >= periodEnd, non-positive entitlement); NotFoundError(404) on unknown employee or missing policy; ConflictError(409) on duplicate balance key."
+    },
+    {
+      "operation": "carryForward (close a period and roll unused days into the next)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "NotFoundError(404) on missing source balance; ValidationError(400) when the source period is not closable (periodEnd in the future) or counters are negative."
+    },
+    {
+      "operation": "getBalance / getBalanceById (read-only lookups)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "NotFoundError(404) on unknown balance id; read-only, never opens a transaction or forwards a client."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "LeaveTypeCode enum must be the one from shared types (lowercase persisted values annual/sick/emergency/unpaid/maternity/paternity), not a local re-declaration.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "Error types (ValidationError, NotFoundError, ConflictError) must be the shared AppError subclasses with their canonical status codes, not local error classes.",
+      "referencePath": "src/shared/errors/index.ts"
+    },
+    {
+      "requirement": "The transaction boundary must match IUnitOfWork.withTransaction semantics: service owns the unit of work, data-access opens it, repositories take an optional trailing PoolClient and fall back to the shared pool.",
+      "referencePath": "src/shared/db/unit-of-work.ts"
+    },
+    {
+      "requirement": "Entitlement and carry-forward cap must be resolved from the live LeavePolicy fields annualEntitlementDays, accrualPeriodMonths, and carryForwardDays via IPolicyService.getPolicyByLeaveTypeCode.",
+      "referencePath": "src/modules/policy/index.ts"
+    },
+    {
+      "requirement": "Employee existence must be verified via IEmployeeService.getEmployeeById (cross-module dependency through the public entry point).",
+      "referencePath": "src/modules/employee/index.ts"
+    },
+    {
+      "requirement": "The repository must obtain its connection from the shared pool, matching the existing connection module.",
+      "referencePath": "src/shared/db/connection.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/policy/index.ts (IPolicyService.getPolicyByLeaveTypeCode)",
+      "why": "Resolves annualEntitlementDays, accrualPeriodMonths, and carryForwardDays that drive the binding accrual and carry-forward rules."
+    },
+    {
+      "target": "src/modules/employee/index.ts (IEmployeeService.getEmployeeById)",
+      "why": "Verifies the employee exists before opening a balance period."
+    },
+    {
+      "target": "src/shared/db/index.ts (IUnitOfWork / PgUnitOfWork)",
+      "why": "Provides the transaction boundary the service uses to make openPeriod/carryForward atomic."
+    },
+    {
+      "target": "src/shared/types/index.ts (LeaveTypeCode)",
+      "why": "Canonical leave-type enum used as the balance's leaveTypeCode discriminator."
+    },
+    {
+      "target": "src/shared/errors/index.ts (ValidationError, NotFoundError, ConflictError)",
+      "why": "Typed error semantics for invalid input, missing entities, and duplicate keys."
+    }
+  ]
+}
