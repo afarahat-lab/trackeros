@@ -162,21 +162,20 @@ The validation module under `src/modules/validation/` with a minimal split-file 
 
 **model** — `ValidationResult` (`{ valid: boolean; errors: string[] }`), a pure value object describing the outcome of a validation rule. It reports only pass/fail plus failure reasons; it performs no side effects and never throws. The service decides whether to surface a typed `AppError` from a failed result.
 
-**service** — `IValidationService` (validateDateRange, validateSufficiency, validateLeaveRequest) + `ValidationService`. The module also exports a standalone `calculateRequestedDays(startDate, endDate)` helper.
+**service** — `IValidationService` (validateDateRange, validateSufficiency, validateLeaveRequest) + `ValidationService`. The service imports the canonical `requestedDays` helper directly from `src/shared/types/index.ts` (Phase 1) — it does **not** define or re-export a local day-count helper.
 
-- `calculateRequestedDays` is a **thin delegate** to the canonical `requestedDays` helper in `src/shared/types/index.ts` (Phase 1) — it does not re-derive the rule. The inclusive day-count (`endDate - startDate + 1`, whole-day only, no weekend/holiday exclusion) lives in shared/types, and every consumer imports it from there.
 - `validateDateRange(startDate, endDate)` rejects a non-date argument or `startDate > endDate` with `ValidationError` (400).
 - `validateSufficiency(balance, requestedDays)` rejects with `ConflictError` (409) when `entitledDays - usedDays - pendingDays < requestedDays`.
-- `validateLeaveRequest(dto, balance)` composes input validation (non-empty `employeeId`, `LeaveTypeCode` enum membership), date-range validation, and the sufficiency check — deriving `requestedDays` via `calculateRequestedDays` before the sufficiency check.
-- Two pure rule methods — `checkDateRange` and `checkSufficiency` — return a `ValidationResult` without throwing; the throwing wrappers funnel a failed result through a private `assert` helper that maps the result to the appropriate error type.
+- `validateLeaveRequest(dto, balance)` composes input validation (non-empty `employeeId`, `LeaveTypeCode` enum membership), date-range validation, and the sufficiency check — deriving `requestedDays` via the shared `requestedDays(dto.startDate, dto.endDate)` helper before the sufficiency check.
+- Two pure rule methods — `checkDateRange` and `checkSufficiency` — return a `ValidationResult` without throwing; the throwing wrappers funnel a failed result through a private `assert` helper that maps the result to the appropriate error type. A private `checkLeaveRequestInput` validates the DTO shape (object present, non-empty `employeeId`, `LeaveTypeCode` enum membership).
 
 **Divergences from the plan worth noting:**
-- PLAN.md Phase 5 prescribed implementing the binding day-count rule "ONCE as a shared helper" in the validation module. The canonical `requestedDays` helper was already implemented in `src/shared/types/index.ts` in Phase 1, so `calculateRequestedDays` here is a delegate rather than the canonical definition — the single source of truth remains shared/types.
+- PLAN.md Phase 5 prescribed implementing the binding day-count rule "ONCE as a shared helper" in the validation module (e.g. `calculateRequestedDays`). The canonical `requestedDays` helper was already implemented in `src/shared/types/index.ts` in Phase 1, so the validation module imports it directly rather than defining a local delegate — the single source of truth remains shared/types, and no `calculateRequestedDays` symbol exists.
 - The plan did not specify error types for the sufficiency check; the implementation surfaces insufficiency as `ConflictError` (409) while date-range failures are `ValidationError` (400).
 - `validateLeaveRequest` adds `employeeId`/`leaveTypeCode` input validation beyond the plan's date-range + sufficiency scope.
 - No repository, no routes/controllers/RBAC, and no audit-log writes (GP-002) — out of scope for this phase (the leave orchestrator in Phase 6 owns the audit/notification side effects and consumes this module).
 
-Jest unit tests under `tests/unit/modules/validation/` cover `calculateRequestedDays` (single day, consecutive days, weekend span, month boundary), `validateDateRange`, `validateSufficiency` (including pendingDays accounting), and `validateLeaveRequest` (happy path, ConflictError on insufficient balance, ValidationError on inverted range).
+Jest unit tests under `tests/unit/modules/validation/` cover the shared `requestedDays` helper (single day, consecutive days, weekend span, month boundary), `validateDateRange`, `validateSufficiency` (including pendingDays accounting), and `validateLeaveRequest` (happy path, ConflictError on insufficient balance, ValidationError on inverted range).
 
 ### Open questions
 Day-count calendar vs business days; accrual model; carry-forward cap; migration mechanism; controller layer; BullMQ for notifications.
