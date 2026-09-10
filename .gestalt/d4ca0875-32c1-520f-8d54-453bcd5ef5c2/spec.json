@@ -1,0 +1,159 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "src/modules/leave/leave.model.ts exports a LeaveRequest interface whose field set is EXACTLY the canonical shape \u2014 id, employeeId, leaveTypeCode, startDate, endDate, requestedDays, reason, status, approverId, approvalComment, submittedAt, decidedAt \u2014 with no added, renamed, or omitted fields.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/modules/leave/leave.repository.ts exports an ILeaveRepository interface and a PgLeaveRequestRepository implementation that obtains its connection from the shared pool in src/shared/db/connection.ts (no inline pool/client construction, no module-level db helper).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Every repository method that participates in a caller's transaction accepts an optional PoolClient as its LAST parameter and falls back to the shared pool when omitted (matching the balance/audit/notification repository convention).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository maps snake_case leave_requests columns (employee_id, leave_type_code, start_date, end_date, requested_days, approver_id, approval_comment, submitted_at, decided_at) to the camelCase LeaveRequest fields and back, and generates the id via randomUUID() on create.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The module compiles under strict TypeScript (tsc --noEmit) and imports only from src/shared/types/index.ts, src/shared/errors/index.ts, and src/shared/db/connection.ts \u2014 no imports from sibling module internals or from the not-yet-created leave service/routes/index files.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "LeaveRequest must use the EXACT canonical field shape (id, employeeId, leaveTypeCode, startDate, endDate, requestedDays, reason, status, approverId, approvalComment, submittedAt, decidedAt) \u2014 no field may be added, renamed, split, or omitted.",
+    "All database access goes through the repository layer (GP-001); the repository must use the shared pool from src/shared/db/connection.ts and never construct its own Pool or import a module-level db helper.",
+    "The repository must NOT own the transaction boundary: no BEGIN/COMMIT/ROLLBACK and no withTransaction on the repository. Participating methods take an optional PoolClient as the LAST parameter and fall back to the shared pool when omitted.",
+    "Import LeaveStatus, CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveRequestQueryParams from src/shared/types/index.ts and error types from src/shared/errors/index.ts \u2014 do not redeclare or duplicate these types locally.",
+    "Do NOT create leave.service.ts, leave.routes.ts, leave/index.ts, or any test files \u2014 those belong to sibling sub-phases 6b/6c and are out of scope here."
+  ],
+  "outOfScope": [
+    "src/modules/leave/leave.service.ts, leave.routes.ts, and index.ts (Phase 6b \u2014 leave service + routes + public index).",
+    "Unit/integration tests for the leave module (Phase 6c \u2014 leave service unit tests). No test files, no coverage requirement.",
+    "The approve/reject orchestration transaction (status + balance + audit + notification) \u2014 that is the service's unit of work in Phase 6b, not the repository's.",
+    "Knex migrations / DDL for the leave_requests table \u2014 the repository targets the conceptual table shape but this sub-phase does not author migrations."
+  ],
+  "ambiguities": [
+    {
+      "description": "Whether the repository interface should be declared in a separate leave.repository.interface.ts file (matching audit/notification/employee/leave-type/policy) or inline in leave.repository.ts (matching balance). The intent names only leave.repository.ts.",
+      "options": [
+        "Inline interface in leave.repository.ts (balance convention)",
+        "Separate leave.repository.interface.ts (audit/notification convention)"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "description": "Nullability of approverId, approvalComment, submittedAt, and decidedAt \u2014 the canonical field list does not state which are nullable (a DRAFT request has no approver/decision yet).",
+      "options": [
+        "approverId/approvalComment/decidedAt nullable, submittedAt nullable until submit",
+        "All four nullable",
+        "All required with placeholder values"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "The exact set of repository operations (create/findById/update/findByQuery) \u2014 the intent does not enumerate them, leaving the code agent to choose the minimal set the Phase 6b service will need.",
+      "options": [
+        "create, findById, update, findByQuery",
+        "create, findById, update, findByQuery, findByEmployeeId",
+        "create, findById, update only"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "A LeaveRequest is a single application by one employee for a span of leave of one type; its lifecycle status is one of LeaveStatus (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED) and it carries exactly the canonical 12 fields."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "requestedDays is derived from the inclusive calendar-day rule (endDate - startDate + 1) via the shared requestedDays helper \u2014 the repository/model must not re-derive or store a conflicting value; it persists the value the service computed."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "create (persist a new LeaveRequest)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the persisted LeaveRequest with generated id; does not open a transaction; accepts an optional trailing PoolClient to join a caller's transaction."
+    },
+    {
+      "operation": "findById (retrieve a LeaveRequest by id)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Read-only; returns the entity or null when absent (does not throw NotFoundError \u2014 the service decides error semantics)."
+    },
+    {
+      "operation": "update (mutate a LeaveRequest's fields, including status)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the updated entity; throws NotFoundError when the row is missing; accepts an optional trailing PoolClient to join a caller's transaction."
+    },
+    {
+      "operation": "findByQuery / list (filter LeaveRequests by query params)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Read-only; returns an array (possibly empty); honors the LeaveRequestQueryParams filters (status, leaveTypeCode, date ranges, limit/offset)."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Reuse LeaveStatus, LeaveTypeCode, CreateLeaveRequestDto, UpdateLeaveRequestDto, and LeaveRequestQueryParams exactly as exported \u2014 do not redeclare or diverge from their field shapes.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "Reuse AppError and its subclasses (ValidationError, NotFoundError, ConflictError, etc.) for any typed errors the repository raises \u2014 do not introduce new error classes.",
+      "referencePath": "src/shared/errors/index.ts"
+    },
+    {
+      "requirement": "Obtain the database connection from the single shared pg Pool (defaultPool) and follow the optional-trailing-PoolClient convention used by PgLeaveBalanceRepository and PgAuditLogRepository.",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "Match the repository shape and snake_case\u2194camelCase mapping convention of the existing balance/audit repositories (randomUUID id generation, mapRow, COLUMNS constant, db(client) fallback helper).",
+      "referencePath": "src/modules/balance/balance.repository.ts"
+    },
+    {
+      "requirement": "The leave_requests table columns (employee_id, leave_type_code, start_date, end_date, requested_days, reason, status, approver_id, approval_comment, submitted_at, decided_at) must match the reconciled SQL schema for leave_requests.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts",
+      "why": "LeaveStatus, LeaveTypeCode, and the three leave DTOs are the canonical types the model and repository must consume."
+    },
+    {
+      "target": "src/shared/errors/index.ts",
+      "why": "Typed error classes for repository-level not-found/validation semantics."
+    },
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "The single shared pg Pool the repository must use for all queries."
+    },
+    {
+      "target": "src/shared/db/unit-of-work.ts",
+      "why": "The repository must be transaction-participating (optional PoolClient) so the Phase 6b service can join its approve/reject unit of work \u2014 though the repository itself never opens a transaction."
+    }
+  ]
+}
