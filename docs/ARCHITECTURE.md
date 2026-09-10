@@ -195,6 +195,29 @@ The leave module foundation under `src/modules/leave/` — this sub-phase delive
 - The repository interface is declared inline (balance convention) rather than in a separate `leave.repository.interface.ts` file — the spec listed this as an open ambiguity with both options valid.
 - No audit-log writes (GP-002) and no routes/controllers/RBAC — out of scope for this sub-phase (the Phase 6b service owns the audit/notification side effects and the approve/reject unit of work).
 
+### Phase 6b delivered (leave service + routes + index.ts)
+
+This sub-phase completes the leave module: the orchestration service, the Fastify routes, and the public `index.ts` (the model and repository were delivered in 6a).
+
+**service** — `LeaveActor` (`{ id: string; role: EmployeeRole }`), `ILeaveService` (create, submit, approve, reject), and `LeaveService`. The constructor injects eight collaborators: `ILeaveRepository`, `IBalanceRepository`, `IAuditService`, `INotificationService`, `IValidationService`, `IEmployeeService`, `IPolicyService`, and `IUnitOfWork` — all cross-module dependencies resolved through public entry points. A `createLeaveService()` factory wires the concrete PostgreSQL-backed collaborators (including `new PgUnitOfWork()`).
+
+- `create(actor, input)` asserts the actor is authenticated, **forces `employeeId = actor.id`** (the requester always owns the request, ignoring any client-supplied id), resolves the balance for the requested period, runs `validateLeaveRequest`, computes `requestedDays` via the shared helper, and inserts a DRAFT row. It then records a CREATE audit entry. `create` does **not** open a transaction — the insert and audit write are not atomic.
+- `submit(actor, requestId)` enforces owner-only (ForbiddenError) and DRAFT-only (ConflictError), then runs inside `uow.withTransaction`: resolves the balance, updates status → SUBMITTED, increments `pendingDays` by `requestedDays`, and records an UPDATE audit entry. No notification is sent on submit.
+- `approve(actor, requestId)` enforces `assertCanDecide` (MANAGER/ADMIN only, no self-approval, a MANAGER must be the requester's direct manager via `employeeService.getEmployeeById`) and SUBMITTED-only, then runs inside `uow.withTransaction`: resolves the balance, asserts `pendingDays >= requestedDays` (ConflictError otherwise), updates status → APPROVED, decrements `pendingDays` and increments `usedDays`, records an APPROVE audit entry, and inserts a synchronous notification to the requester.
+- `reject(actor, requestId)` mirrors approve but decrements `pendingDays` only (no `usedDays` change), records a REJECT audit entry, and sends a rejection notification.
+- `resolveBalance(employeeId, leaveTypeCode, date, client?)` fetches the policy and employee, computes the accrual period containing `date` via private `periodContaining` (anchored on `employee.hireDate`, stepping `accrualPeriodMonths` at a time with a 10,000-iteration safety bound), and looks the balance up with `findByKey` (NotFoundError if absent). `periodContaining`/`startOfUtcDay`/`addMonths` are private UTC helpers.
+
+**routes** — `leaveRoutes(fastify)` registers four endpoints with **no controller file** (routes call the service directly, per binding rule 5): `POST /leaves` (201), `POST /leaves/:id/submit`, `POST /leaves/:id/approve`, `POST /leaves/:id/reject` (all 200). A `resolveActor` helper extracts `request.user` and enforces role membership at the API boundary (GP-005), throwing UnauthorizedError on a missing/invalid actor. A `sendError` helper maps `AppError` to `{ error, code }` with the correct status, and any other throw to a 500. The service instance is resolved from `fastify.leaveService` if present, else `createLeaveService()`.
+
+**index.ts** — re-exports `LeaveRequest`/`CreateLeaveRequestInput` (model), `ILeaveRepository`/`PgLeaveRequestRepository` (repository), `ILeaveService`/`LeaveService`/`LeaveActor`/`createLeaveService` (service), and `leaveRoutes` (routes).
+
+**Divergences from the plan worth noting:**
+- The canonical lifecycle includes CANCELLED, but no `cancel` operation or route is implemented — the service exposes only create/submit/approve/reject.
+- The repository's `findByQuery` (list/query) is not surfaced by any route — there is no GET/list endpoint.
+- The `update` repository method only supports `startDate`/`endDate`/`reason`/`status`, so the service never populates `approverId`, `approvalComment`, `submittedAt`, or `decidedAt` — those canonical fields remain `null` even after submit/approve/reject. The audit `beforeState`/`afterState` therefore capture the status change but not the approver identity or decision timestamps.
+- `create` writes its audit entry outside a transaction (unlike submit/approve/reject), so a failed audit insert would leave the DRAFT row committed without its audit record.
+- No Jest tests were added in this sub-phase (the plan prescribed `tests/unit/modules/leave/` for service orchestration).
+
 ### Open questions
 Day-count calendar vs business days; accrual model; carry-forward cap; migration mechanism; controller layer; BullMQ for notifications.
 <!-- gestalt:architecture feature=babd3932-368b-46a5-a4dc-6dccaafd84ba END -->
