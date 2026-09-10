@@ -1,26 +1,30 @@
-# Implement this phase: Phase 6a — leave model + repository
+# Implement this phase: Phase 6b — leave service + routes + public index
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/babd3932-368b-46a5-a4dc-6dccaafd84ba/6`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/babd3932-368b-46a5-a4dc-6dccaafd84ba/7`. Do not clone anything; work only in this directory.
 
 You are the IMPLEMENTATION agent, not a planner. The platform measures your work EXCLUSIVELY by the files you create or modify in this working tree (`git status`). Ending your turn with a plan, a summary, or an announcement of what you are 'about to' do — without having actually edited files — is a FAILURE: a turn that leaves the working tree untouched is discarded. Explore only as much as you need, then MAKE the edits with your file-editing tool. Never end your turn before the files exist on disk.
 
 ## What to build
-src/modules/leave/leave.model.ts exports a LeaveRequest interface with exactly the canonical fields: id, employeeId, leaveTypeCode, startDate, endDate, requestedDays, reason, status, approverId, approvalComment, submittedAt, decidedAt.
-src/modules/leave/leave.repository.ts exports ILeaveRepository and PgLeaveRequestRepository, using the pool from src/shared/db/connection.ts and importing types from src/shared/types/index.ts and src/shared/errors/index.ts.
-No service, routes, index, or test files are created in this sub-phase.
+src/modules/leave/leave.service.ts exports ILeaveService and LeaveService implementing create (DRAFT), submit (SUBMITTED), and approve/reject (APPROVED/REJECTED).
+The approve/reject workflow runs inside PgUnitOfWork.withTransaction and atomically performs status change, balance update (usedDays/pendingDays), audit log insert, and synchronous notification insert.
+requestedDays is computed via the shared helper from src/modules/validation/index.ts and is never re-derived locally.
+src/modules/leave/leave.routes.ts defines Fastify routes that call the service directly (no separate controller file), matching the src/modules/uptime/uptime.routes.ts pattern.
+src/modules/leave/index.ts publicly exports the model, repository, service, and routes.
+No test files are created in this sub-phase.
 
 ## Success criteria
-Create the leave module foundation: the LeaveRequest interface and the repository layer. Use the EXACT canonical LeaveRequest field shape: id, employeeId, leaveTypeCode, startDate, endDate, requestedDays, reason, status, approverId, approvalComment, submittedAt, decidedAt.
+Build the leave orchestration and HTTP surface on top of Phase 6a.
 
 Create:
-- src/modules/leave/leave.model.ts — LeaveRequest interface (canonical field shape only).
-- src/modules/leave/leave.repository.ts — ILeaveRepository + PgLeaveRequestRepository using pool from src/shared/db/connection.ts.
+- src/modules/leave/leave.service.ts — ILeaveService + LeaveService. Orchestrates the full workflow: create (DRAFT), submit (SUBMITTED), approve/reject (APPROVED/REJECTED). The approve/reject transaction MUST run inside PgUnitOfWork.withTransaction (from src/shared/db/unit-of-work.ts) and atomically perform: status change + balance update (usedDays/pendingDays) + audit log insert + synchronous notification insert. requestedDays is computed via the shared helper from src/modules/validation/index.ts (Phase 5) — never re-derive it.
+- src/modules/leave/leave.routes.ts — Fastify routes. Per BINDING rule 5, routes call services DIRECTLY (matching src/modules/uptime/uptime.routes.ts pattern) — do NOT create a separate controller file.
+- src/modules/leave/index.ts — public exports.
 
-Import from src/shared/types/index.ts (LeaveStatus, CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveRequestQueryParams) and src/shared/errors/index.ts. This sub-phase depends on Phases 1 and 3 — read those index.ts files before generating code referencing their types. Do NOT create service, routes, index, or tests yet.
+Import from: src/shared/types/index.ts, src/shared/errors/index.ts, src/shared/db/unit-of-work.ts, src/modules/balance/index.ts, src/modules/audit/index.ts, src/modules/notification/index.ts, src/modules/validation/index.ts. Depends on Phases 1, 3, 4, 5 and Phase 6a — read those index.ts files before generating code referencing their types. Do NOT create tests yet.
 
 ## Owned by SIBLING sub-phases (OUT OF SCOPE for this sub-phase)
 This is ONE sub-phase of a split phase. The deliverables below belong to sibling sub-phases — do NOT create them here, do NOT list them as success criteria, and this sub-phase MUST NOT be gated on their presence (they are produced by a sibling, not missing):
-- "Phase 6b — leave service + routes + public index": src/modules/leave/leave.service.ts, src/modules/leave/leave.routes.ts, src/modules/leave/index.ts
+- "Phase 6a — leave model + repository": src/modules/leave/leave.model.ts, src/modules/leave/leave.repository.ts
 - "Phase 6c — leave service unit tests": tests/unit/modules/leave/leave.service.test.ts
 
 In particular, UNIT/INTEGRATION TESTS are OUT OF SCOPE for this sub-phase — they are produced in: Phase 6c — leave service unit tests. Do not create test files here, do not require test existence or coverage as a success criterion, and do not fail the gate for missing tests.
@@ -87,41 +91,46 @@ These are resolved, feature-wide decisions. Wherever this phase touches the conc
 
 ## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
 The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
-- `LeaveRequest` — the entity MUST have exactly these fields:
+- `Notification` — the entity MUST have exactly these fields:
     - id
-    - employeeId
-    - leaveTypeCode
-    - startDate
-    - endDate
-    - requestedDays
-    - reason
+    - recipientId
+    - type
+    - title
+    - message
+    - relatedEntityType
+    - relatedEntityId
     - status
-    - approverId
-    - approvalComment
-    - submittedAt
-    - decidedAt
+    - createdAt
+    - readAt
 
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- Reuse LeaveStatus, LeaveTypeCode, CreateLeaveRequestDto, UpdateLeaveRequestDto, and LeaveRequestQueryParams exactly as exported — do not redeclare or diverge from their field shapes. (see `src/shared/types/index.ts`)
-- Reuse AppError and its subclasses (ValidationError, NotFoundError, ConflictError, etc.) for any typed errors the repository raises — do not introduce new error classes. (see `src/shared/errors/index.ts`)
-- Obtain the database connection from the single shared pg Pool (defaultPool) and follow the optional-trailing-PoolClient convention used by PgLeaveBalanceRepository and PgAuditLogRepository. (see `src/shared/db/connection.ts`)
-- Match the repository shape and snake_case↔camelCase mapping convention of the existing balance/audit repositories (randomUUID id generation, mapRow, COLUMNS constant, db(client) fallback helper). (see `src/modules/balance/balance.repository.ts`)
-- The leave_requests table columns (employee_id, leave_type_code, start_date, end_date, requested_days, reason, status, approver_id, approval_comment, submitted_at, decided_at) must match the reconciled SQL schema for leave_requests. (see `.gestalt/architecture/reconciled.json`)
+- requestedDays must be computed by calling the canonical requestedDays(startDate, endDate) helper — the single source of truth is src/shared/types/index.ts (the validation module imports it from there rather than re-exporting it). (see `src/shared/types/index.ts`)
+- The approve/reject transaction must use IUnitOfWork.withTransaction exactly as defined (service owns the boundary, data-access opens it); match the signature and client-forwarding pattern. (see `src/shared/db/unit-of-work.ts`)
+- Balance updates must go through IBalanceRepository.update with the same Partial<Omit<LeaveBalance,'id'>> changes shape and optional trailing PoolClient. (see `src/modules/balance/balance.repository.ts`)
+- Audit inserts must use IAuditService.record(input, client?) with CreateAuditLogInput (actorId, action, entityType, entityId, beforeState, afterState) and forward the transaction client. (see `src/modules/audit/audit.service.interface.ts`)
+- Notification inserts must use INotificationService.create(input, client?) with CreateNotificationInput and forward the transaction client (status defaults to PENDING). (see `src/modules/notification/notification.service.interface.ts`)
+- Leave persistence must go through ILeaveRepository (create/findById/update) with the exact 12-field LeaveRequest shape and UpdateLeaveRequestDto changes. (see `src/modules/leave/leave.repository.ts`)
+- Route handlers must follow the direct-service-call pattern (instantiate service, call it, map AppError to status codes) rather than a controller layer. (see `src/modules/uptime/uptime.routes.ts`)
 ### Entity invariants — enforce these
-- Reuse or extend `LeaveRequest`: A LeaveRequest is a single application by one employee for a span of leave of one type; its lifecycle status is one of LeaveStatus (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED) and it carries exactly the canonical 12 fields.
-- Reuse or extend `LeaveRequest`: requestedDays is derived from the inclusive calendar-day rule (endDate - startDate + 1) via the shared requestedDays helper — the repository/model must not re-derive or store a conflicting value; it persists the value the service computed.
+- Reuse or extend `LeaveRequest`: Lifecycle is strictly DRAFT → SUBMITTED → APPROVED|REJECTED (CANCELLED out of scope here); a request may only be submitted from DRAFT, and only a SUBMITTED request may be approved or rejected.
+- Reuse or extend `LeaveRequest`: requestedDays is always the canonical inclusive day count (endDate - startDate + 1) computed by the shared helper; the service never stores a locally-derived value.
+- Reuse or extend `LeaveBalance`: Reservation lifecycle: submit increments pendingDays; approve decrements pendingDays and increments usedDays; reject decrements pendingDays only — counters must never go negative.
+- Reuse or extend `AuditLog`: Every state-changing leave operation (create/submit/approve/reject) produces exactly one AuditLog row with the correct AuditAction (CREATE/UPDATE/APPROVE/REJECT) and the actor as actorId.
+- Reuse or extend `Notification`: Approve/reject produces a synchronous Notification insert (status PENDING) inside the same transaction as the status change and balance update.
 ### Interface contract — expose these operations (their shape is yours)
-- create (persist a new LeaveRequest) — Returns the persisted LeaveRequest with generated id; does not open a transaction; accepts an optional trailing PoolClient to join a caller's transaction.
-- findById (retrieve a LeaveRequest by id) — Read-only; returns the entity or null when absent (does not throw NotFoundError — the service decides error semantics).
-- update (mutate a LeaveRequest's fields, including status) — Returns the updated entity; throws NotFoundError when the row is missing; accepts an optional trailing PoolClient to join a caller's transaction.
-- findByQuery / list (filter LeaveRequests by query params) — Read-only; returns an array (possibly empty); honors the LeaveRequestQueryParams filters (status, leaveTypeCode, date ranges, limit/offset).
+- create — Requires an authenticated actor (EMPLOYEE or above); the created request's employeeId is the requester.; Invalid input → ValidationError (400); insufficient balance → ConflictError (409).
+- submit — Requires an authenticated actor; only the request's owner may submit.; Unknown request → NotFoundError (404); invalid state transition (not DRAFT) → ConflictError (409).
+- approve — Requires MANAGER or ADMIN; no self-approval; approver must be the requester's manager or an ADMIN.; Unknown request → NotFoundError (404); invalid state transition (not SUBMITTED) → ConflictError (409); unauthorized actor → ForbiddenError (403).
+- reject — Requires MANAGER or ADMIN; no self-rejection; approver must be the requester's manager or an ADMIN.; Unknown request → NotFoundError (404); invalid state transition (not SUBMITTED) → ConflictError (409); unauthorized actor → ForbiddenError (403).
 ### Integration points — connect to these
-- src/shared/types/index.ts — LeaveStatus, LeaveTypeCode, and the three leave DTOs are the canonical types the model and repository must consume.
-- src/shared/errors/index.ts — Typed error classes for repository-level not-found/validation semantics.
-- src/shared/db/connection.ts — The single shared pg Pool the repository must use for all queries.
-- src/shared/db/unit-of-work.ts — The repository must be transaction-participating (optional PoolClient) so the Phase 6b service can join its approve/reject unit of work — though the repository itself never opens a transaction.
+- src/modules/balance/index.ts — LeaveService reads and mutates LeaveBalance (pendingDays/usedDays) during submit/approve/reject via IBalanceRepository/IBalanceService.
+- src/modules/audit/index.ts — LeaveService writes an AuditLog for every state-changing operation (GP-002).
+- src/modules/notification/index.ts — LeaveService inserts synchronous notifications on approve/reject within the transaction.
+- src/modules/validation/index.ts — LeaveService delegates date-range and balance-sufficiency validation (and derives requestedDays via the shared helper).
+- src/modules/employee/index.ts — LeaveService resolves the requester/approver (manager relationship, self-approval guard) via IEmployeeService.
+- src/shared/db/unit-of-work.ts — LeaveService injects IUnitOfWork and runs approve/reject inside withTransaction.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
