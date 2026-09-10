@@ -216,7 +216,23 @@ This sub-phase completes the leave module: the orchestration service, the Fastif
 - The repository's `findByQuery` (list/query) is not surfaced by any route — there is no GET/list endpoint.
 - `approvalComment` and `submittedAt` are never populated — they remain `null` even after submit/approve/reject (the `update` repository method does not support those fields). `approverId` and `decidedAt` ARE populated on approve/reject (added in a follow-up fix phase): the `UpdateLeaveRequestDto` gained `approverId?`/`decidedAt?`, the repository's `FIELD_COLUMNS` map gained `approverId: 'approver_id'` / `decidedAt: 'decided_at'`, and the service now sets both in the approve/reject transitions, so the audit `afterState` captures the approver identity and decision timestamp.
 - `create` writes its audit entry outside a transaction (unlike submit/approve/reject), so a failed audit insert would leave the DRAFT row committed without its audit record.
-- No Jest tests were added in this sub-phase (the plan prescribed `tests/unit/modules/leave/` for service orchestration).
+
+### Phase 6c delivered (leave service unit tests)
+
+This sub-phase adds the Jest unit tests for the `LeaveService` orchestration delivered in 6b, under `tests/unit/modules/leave/leave.service.test.ts`. No production source files were modified — the 6a/6b deliverables are treated as fixed contracts.
+
+**Fakes** — eight in-memory fakes, one per injected collaborator, all imported through public entry points: `FakeLeaveRepository`, `FakeBalanceRepository`, `FakeAuditService`, `FakeNotificationService`, `FakeValidationService`, `FakeEmployeeService`, `FakePolicyService`, and `FakeUnitOfWork`. `FakeUnitOfWork` mirrors the balance test's pattern — `withTransaction` runs its callback with an opaque stub `PoolClient` (`{} as PoolClient`) and counts invocations, so transaction-boundary assertions are containment-based (all steps inside one callback, client forwarded) rather than rollback-simulation.
+
+**Coverage** — the suite exercises all four operations and their guards:
+- `create` — forces `employeeId = actor.id` (ignoring the client-supplied id), persists a DRAFT row with `requestedDays` from the shared helper, and records a CREATE audit entry; rejects a missing actor (UnauthorizedError), an invalid role (ForbiddenError), a missing balance (NotFoundError), and propagates ValidationError/ConflictError from `validateLeaveRequest`.
+- `submit` — owner-only (ForbiddenError on non-owner), DRAFT-only (ConflictError on non-DRAFT), NotFoundError on unknown id; the happy path asserts status → SUBMITTED, `pendingDays` incremented by `requestedDays`, an UPDATE audit entry, and that all writes occur inside the single `withTransaction` callback with the stub client forwarded.
+- `approve` — MANAGER/ADMIN only, no self-approval, a MANAGER must be the requester's direct manager (ADMIN exempt), SUBMITTED-only, and `pendingDays >= requestedDays` (all ForbiddenError/ConflictError otherwise); the happy path asserts status → APPROVED with `approverId = actor.id` and `decidedAt` set, `pendingDays` decremented and `usedDays` incremented, an APPROVE audit entry, and a synchronous notification to the requester — all inside one unit of work.
+- `reject` — mirrors approve's guards but asserts `pendingDays` decremented only (`usedDays` untouched), status → REJECTED with `approverId`/`decidedAt` set, a REJECT audit entry, and a rejection notification, all inside one unit of work.
+
+**Divergences from the plan worth noting:**
+- The spec's atomicity ambiguity (rollback-simulation vs containment) was resolved in favor of containment: the tests assert all four steps occur within the single `withTransaction` callback and that the stub client is forwarded to each repository/service call, rather than simulating a mid-transaction throw.
+- The spec's client-forwarding ambiguity was resolved in favor of the opaque stub client (matching the balance test), but the tests still assert the stub client is forwarded to repository/service calls via recorded `client` fields on the fakes.
+- The CANCELLED lifecycle state and the repository's `findByQuery`/list behavior are explicitly out of scope (no `cancel` operation or GET endpoint exists to test).
 
 ### Open questions
 Day-count calendar vs business days; accrual model; carry-forward cap; migration mechanism; controller layer; BullMQ for notifications.
