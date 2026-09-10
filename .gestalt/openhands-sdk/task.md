@@ -1,6 +1,6 @@
-# Implement this phase: Phase 4 — balance module
+# Implement this phase: Phase 5 — validation module
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/babd3932-368b-46a5-a4dc-6dccaafd84ba/4`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/babd3932-368b-46a5-a4dc-6dccaafd84ba/5`. Do not clone anything; work only in this directory.
 
 You are the IMPLEMENTATION agent, not a planner. The platform measures your work EXCLUSIVELY by the files you create or modify in this working tree (`git status`). Ending your turn with a plan, a summary, or an announcement of what you are 'about to' do — without having actually edited files — is a FAILURE: a turn that leaves the working tree untouched is discarded. Explore only as much as you need, then MAKE the edits with your file-editing tool. Never end your turn before the files exist on disk.
 
@@ -8,15 +8,16 @@ You are the IMPLEMENTATION agent, not a planner. The platform measures your work
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Build the balance module under src/modules/balance/ with a public index.ts. Use the EXACT canonical LeaveBalance field shape: id, employeeId, leaveTypeCode, periodStart, periodEnd, entitledDays, usedDays, pendingDays.
+Build the validation module under src/modules/validation/ with a public index.ts.
 
 Create:
-- src/modules/balance/balance.model.ts — LeaveBalance interface.
-- src/modules/balance/balance.repository.ts — IBalanceRepository + PgLeaveBalanceRepository (uses pool from src/shared/db/connection.ts).
-- src/modules/balance/balance.service.ts — IBalanceService + BalanceService.
-- src/modules/balance/index.ts — public exports.
+- src/modules/validation/validation.model.ts — ValidationResult model (e.g. { valid: boolean; errors: string[] }).
+- src/modules/validation/validation.service.ts — IValidationService + ValidationService.
+- src/modules/validation/index.ts — public exports.
 
-The service MUST implement the BINDING accrual and carry-forward rules: grant the FULL entitlement at the start of each accrual period (no pro-rata); on period close, carry forward min(unused, carryForwardDays) into the next OPEN period (hard cap, days above cap forfeited). Import LeaveTypeCode from src/shared/types/index.ts and error types from src/shared/errors/index.ts. Include Jest unit tests in tests/unit/modules/balance/ covering accrual and carry-forward. This phase depends on Phase 1 files (src/shared/types/index.ts, src/shared/errors/index.ts) and Phase 2's src/modules/leave-type/index.ts and src/modules/policy/index.ts (for LeaveTypeCode and carryForwardDays) — read them before generating code referencing their types.
+The service implements the BINDING day-count rule ONCE as a shared helper: requestedDays = endDate - startDate + 1 (INCLUSIVE, all calendar days, no weekend/holiday exclusion, whole-day only). Expose this helper (e.g. calculateRequestedDays) so every consumer (sufficiency checks, balance deduction, policy max-duration enforcement) calls it — do not re-derive per module. Also implement date-range validation (startDate <= endDate) and balance-sufficiency checks against LeaveBalance (entitledDays - usedDays - pendingDays >= requestedDays).
+
+Import LeaveTypeCode and CreateLeaveRequestDto from src/shared/types/index.ts, error types from src/shared/errors/index.ts, and LeaveBalance from src/modules/balance/index.ts (Phase 4). Include Jest unit tests in tests/unit/modules/validation/ covering inclusive day counting and sufficiency. This phase depends on Phase 1 (src/shared/types/index.ts, src/shared/errors/index.ts) and Phase 4 (src/modules/balance/index.ts) — read them before generating code referencing their types.
 
 ## Your iteration budget — and how to get more (READ BEFORE YOU START)
 
@@ -81,28 +82,21 @@ These are resolved, feature-wide decisions. Wherever this phase touches the conc
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- LeaveTypeCode enum must be the one from shared types (lowercase persisted values annual/sick/emergency/unpaid/maternity/paternity), not a local re-declaration. (see `src/shared/types/index.ts`)
-- Error types (ValidationError, NotFoundError, ConflictError) must be the shared AppError subclasses with their canonical status codes, not local error classes. (see `src/shared/errors/index.ts`)
-- The transaction boundary must match IUnitOfWork.withTransaction semantics: service owns the unit of work, data-access opens it, repositories take an optional trailing PoolClient and fall back to the shared pool. (see `src/shared/db/unit-of-work.ts`)
-- Entitlement and carry-forward cap must be resolved from the live LeavePolicy fields annualEntitlementDays, accrualPeriodMonths, and carryForwardDays via IPolicyService.getPolicyByLeaveTypeCode. (see `src/modules/policy/index.ts`)
-- Employee existence must be verified via IEmployeeService.getEmployeeById (cross-module dependency through the public entry point). (see `src/modules/employee/index.ts`)
-- The repository must obtain its connection from the shared pool, matching the existing connection module. (see `src/shared/db/connection.ts`)
+- The inclusive day count must be obtained by importing and calling the canonical requestedDays(startDate, endDate) helper — never re-derived — so every consumer (sufficiency, balance deduction, policy max-duration) uses the identical derivation. (see `src/shared/types/index.ts`)
+- Error semantics must reuse the shared AppError subclasses: ValidationError (400) for invalid input and ConflictError (409) for insufficient balance, matching the { error, code } contract. (see `src/shared/errors/index.ts`)
+- The LeaveBalance shape consumed for sufficiency must match the canonical model (entitledDays, usedDays, pendingDays counters) exported from the balance module's public entry point. (see `src/modules/balance/index.ts`)
+- The sufficiency formula entitledDays - usedDays - pendingDays >= requestedDays must match the canonical business rule so validation agrees with the balance module's own unused-day computation. (see `.gestalt/architecture/reconciled.json`)
 ### Entity invariants — enforce these
-- Reuse or extend `LeaveBalance`: A balance is uniquely identified per employee + leaveTypeCode + accrual period (periodStart/periodEnd); at most one row may exist for a given key, and a duplicate create is rejected with ConflictError.
-- Reuse or extend `LeaveBalance`: OPEN vs CLOSED is not a stored field — it is inferred from periodStart/periodEnd relative to the current date; a period whose periodEnd is in the future is not closable.
-- Reuse or extend `LeaveBalance`: Day counters are non-negative and consistent: entitledDays >= 0, usedDays >= 0, pendingDays >= 0, and unused = entitledDays - usedDays - pendingDays must not be negative.
-- Reuse or extend `LeaveBalance`: On open, entitledDays equals the policy's annualEntitlementDays (full grant, no pro-rata) and usedDays/pendingDays start at 0.
-- Reuse or extend `LeaveBalance`: On carry-forward, the next period's entitledDays gains exactly min(unused, carryForwardDays); days above the cap are forfeited and never added.
+- Reuse or extend `ValidationResult`: A ValidationResult is a pure value object that reports whether validation passed and the list of failure reasons; it must never perform side effects or throw — the service decides whether to surface a typed error from it.
+- Reuse or extend `LeaveBalance (consumed, not owned)`: Sufficiency is derived solely from the balance's counters as entitledDays - usedDays - pendingDays; the validation module must not mutate the balance or reinterpret OPEN/CLOSED state.
 ### Interface contract — expose these operations (their shape is yours)
-- openPeriod (open an accrual period / grant entitlement) — ValidationError(400) on invalid input (empty employeeId, invalid LeaveTypeCode, invalid dates, periodStart >= periodEnd, non-positive entitlement); NotFoundError(404) on unknown employee or missing policy; ConflictError(409) on duplicate balance key.
-- carryForward (close a period and roll unused days into the next) — NotFoundError(404) on missing source balance; ValidationError(400) when the source period is not closable (periodEnd in the future) or counters are negative.
-- getBalance / getBalanceById (read-only lookups) — NotFoundError(404) on unknown balance id; read-only, never opens a transaction or forwards a client.
+- validateDateRange(startDate, endDate) — Rejects startDate > endDate with ValidationError (400); accepts startDate <= endDate.
+- validateSufficiency(balance, requestedDays) — Rejects with ConflictError (409) when entitledDays - usedDays - pendingDays < requestedDays; passes otherwise.
+- validateLeaveRequest(dto) — Composes date-range validation and sufficiency checking against the request's leave type balance; surfaces ValidationError (400) for invalid ranges and ConflictError (409) for insufficient balance.
 ### Integration points — connect to these
-- src/modules/policy/index.ts (IPolicyService.getPolicyByLeaveTypeCode) — Resolves annualEntitlementDays, accrualPeriodMonths, and carryForwardDays that drive the binding accrual and carry-forward rules.
-- src/modules/employee/index.ts (IEmployeeService.getEmployeeById) — Verifies the employee exists before opening a balance period.
-- src/shared/db/index.ts (IUnitOfWork / PgUnitOfWork) — Provides the transaction boundary the service uses to make openPeriod/carryForward atomic.
-- src/shared/types/index.ts (LeaveTypeCode) — Canonical leave-type enum used as the balance's leaveTypeCode discriminator.
-- src/shared/errors/index.ts (ValidationError, NotFoundError, ConflictError) — Typed error semantics for invalid input, missing entities, and duplicate keys.
+- src/shared/types/index.ts — Provides LeaveTypeCode, CreateLeaveRequestDto, and the canonical requestedDays helper the validation service consumes.
+- src/shared/errors/index.ts — Provides ValidationError (400) and ConflictError (409) for the validation service's typed failure semantics.
+- src/modules/balance/index.ts — Provides the LeaveBalance model whose counters drive the sufficiency check.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
