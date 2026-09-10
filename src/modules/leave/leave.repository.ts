@@ -3,7 +3,6 @@ import { Pool, PoolClient, QueryResult } from 'pg';
 import { pool as defaultPool } from '../../shared/db/connection';
 import { NotFoundError } from '../../shared/errors';
 import {
-  CreateLeaveRequestDto,
   LeaveRequestQueryParams,
   LeaveStatus,
   LeaveTypeCode,
