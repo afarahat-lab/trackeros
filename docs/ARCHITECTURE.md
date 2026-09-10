@@ -177,6 +177,24 @@ The validation module under `src/modules/validation/` with a minimal split-file 
 
 Jest unit tests under `tests/unit/modules/validation/` cover the shared `requestedDays` helper (single day, consecutive days, weekend span, month boundary), `validateDateRange`, `validateSufficiency` (including pendingDays accounting), and `validateLeaveRequest` (happy path, ConflictError on insufficient balance, ValidationError on inverted range).
 
+### Phase 6a delivered (leave model + repository)
+
+The leave module foundation under `src/modules/leave/` — this sub-phase delivers only the model and repository; the service, routes, public `index.ts`, and tests belong to sibling sub-phases 6b/6c and are intentionally absent.
+
+**model** — `LeaveRequest` with the exact canonical 12-field shape (id, employeeId, leaveTypeCode: LeaveTypeCode, startDate: Date, endDate: Date, requestedDays: number, reason, status: LeaveStatus, approverId, approvalComment, submittedAt, decidedAt). `CreateLeaveRequestInput = Omit<LeaveRequest, 'id'>` — the repository generates `id`. Nullability: `reason`, `approverId`, `approvalComment`, `submittedAt`, and `decidedAt` are `string | null` / `Date | null` (a DRAFT request has no approver/decision yet); `requestedDays` is persisted as the value the service computed via the shared `requestedDays` helper — the model/repository do not re-derive it.
+
+**repository** — `ILeaveRepository` (create, findById, update, findByQuery) + `PgLeaveRequestRepository`, declared **inline in `leave.repository.ts`** (the balance convention, not the separate `leave.repository.interface.ts` file used by audit/notification/employee/leave-type/policy). The repository obtains its connection from the shared pool in `src/shared/db/connection.ts` (constructor-injected `dbPool` defaulting to `defaultPool`), generates `id` via `randomUUID()`, and maps snake_case `leave_requests` columns ↔ camelCase fields via a `mapRow` helper and a `COLUMNS` constant. Every method accepts an optional trailing `PoolClient` and falls back to the shared pool when omitted (via a private `db(client)` helper) — the repository never opens BEGIN/COMMIT/ROLLBACK.
+
+- `create` inserts all 12 columns and returns the persisted row.
+- `findById` is read-only and returns `null` when absent (does not throw — the service decides error semantics).
+- `update(id, changes: UpdateLeaveRequestDto)` builds a dynamic `SET` clause from a `FIELD_COLUMNS` map (`startDate`, `endDate`, `reason`, `status`); an empty changes object returns the existing row (throwing NotFoundError(404) if missing), and a zero-affected-row update throws NotFoundError(404).
+- `findByQuery(params: LeaveRequestQueryParams)` honors the status/leaveTypeCode/date-range filters plus `limit`/`offset`, ordering by `start_date DESC`, and returns an array (possibly empty).
+
+**Divergences from the plan worth noting:**
+- PLAN.md Phase 6 prescribed a single phase delivering model + repository + service + routes + `index.ts`; the implementation split it into sub-phases, and this sub-phase (6a) delivers only the model and repository. No service, routes, `index.ts`, or tests exist yet.
+- The repository interface is declared inline (balance convention) rather than in a separate `leave.repository.interface.ts` file — the spec listed this as an open ambiguity with both options valid.
+- No audit-log writes (GP-002) and no routes/controllers/RBAC — out of scope for this sub-phase (the Phase 6b service owns the audit/notification side effects and the approve/reject unit of work).
+
 ### Open questions
 Day-count calendar vs business days; accrual model; carry-forward cap; migration mechanism; controller layer; BullMQ for notifications.
 <!-- gestalt:architecture feature=babd3932-368b-46a5-a4dc-6dccaafd84ba END -->
