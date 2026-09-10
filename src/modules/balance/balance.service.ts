@@ -94,6 +94,10 @@ export class BalanceService implements IBalanceService {
         throw new ValidationError('Period is not closable');
       }
 
+      if (source.entitledDays < 0 || source.usedDays < 0 || source.pendingDays < 0) {
+        throw new ValidationError('Balance counters must be non-negative');
+      }
+
       const unused = source.entitledDays - source.usedDays - source.pendingDays;
       if (unused < 0) {
         throw new ValidationError('Balance counters exceed entitlement');

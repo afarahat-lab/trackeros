@@ -271,6 +271,14 @@ describe('BalanceService', () => {
       ).rejects.toThrow(NotFoundError);
     });
 
+    it('throws ValidationError when a counter is negative', async () => {
+      await seedSource({ usedDays: -1 });
+
+      await expect(
+        service.carryForward({ sourceBalanceId: 'balance-1' })
+      ).rejects.toThrow(ValidationError);
+    });
+
     it('throws ValidationError when the period is not closable (still open)', async () => {
       const future: CreateLeaveBalanceInput = {
         employeeId: 'emp-1',
