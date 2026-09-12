@@ -785,6 +785,32 @@ describe('LeaveService', () => {
       await expect(service.cancel(makeActor(), 'lr-1')).rejects.toThrow(ConflictError);
     });
 
+    it('blocks cancellation when the leave starts today with ConflictError', async () => {
+      // startDate <= today (same UTC day) is not "strictly in the future".
+      await repository.create(
+        makeRequest({ startDate: new Date(), endDate: new Date(Date.now() + 24 * 60 * 60 * 1000) })
+      );
+      await expect(service.cancel(makeActor(), 'lr-1')).rejects.toThrow(ConflictError);
+    });
+
+    it('rejects a missing actor with UnauthorizedError', async () => {
+      await repository.create(
+        makeRequest({ startDate: FUTURE_START, endDate: FUTURE_END })
+      );
+      await expect(
+        service.cancel({ id: '', role: EmployeeRole.EMPLOYEE }, 'lr-1')
+      ).rejects.toThrow(UnauthorizedError);
+    });
+
+    it('rejects an invalid actor role with ForbiddenError', async () => {
+      await repository.create(
+        makeRequest({ startDate: FUTURE_START, endDate: FUTURE_END })
+      );
+      await expect(
+        service.cancel({ id: REQUESTER_ID, role: 'GUEST' as EmployeeRole }, 'lr-1')
+      ).rejects.toThrow(ForbiddenError);
+    });
+
     it('rejects an unknown request with NotFoundError', async () => {
       await expect(service.cancel(makeActor(), 'missing')).rejects.toThrow(NotFoundError);
     });

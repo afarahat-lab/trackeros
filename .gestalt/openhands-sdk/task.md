@@ -1,6 +1,6 @@
-# Implement this phase: Phase 3 — Add POST /leaves/:id/cancel route
+# Implement this phase: Phase 4 — LeaveService cancel unit tests
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/621bb1fd-0965-415a-bf2e-ec2c42b15f04/3`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/621bb1fd-0965-415a-bf2e-ec2c42b15f04/4`. Do not clone anything; work only in this directory.
 
 You are the IMPLEMENTATION agent, not a planner. The platform measures your work EXCLUSIVELY by the files you create or modify in this working tree (`git status`). Ending your turn with a plan, a summary, or an announcement of what you are 'about to' do — without having actually edited files — is a FAILURE: a turn that leaves the working tree untouched is discarded. Explore only as much as you need, then MAKE the edits with your file-editing tool. Never end your turn before the files exist on disk.
 
@@ -8,9 +8,17 @@ You are the IMPLEMENTATION agent, not a planner. The platform measures your work
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Add a `POST /leaves/:id/cancel` endpoint to `leaveRoutes(fastify)` in `src/modules/leave/leave.routes.ts`. This phase depends on `src/modules/leave/leave.service.ts` (the `cancel` method added in Phase 2) and the existing `src/modules/leave/leave.routes.ts` (the `resolveActor` helper, `sendError` helper, and the existing four endpoints) — read both before generating code.
+Add Jest unit tests for the `LeaveService.cancel` operation to `tests/unit/modules/leave/leave.service.test.ts` (extend the existing suite from Phase 6c). This phase depends on `src/modules/leave/leave.service.ts` (the `cancel` implementation from Phase 2) and the existing `tests/unit/modules/leave/leave.service.test.ts` (the eight in-memory fakes — FakeLeaveRepository, FakeBalanceRepository, FakeAuditService, FakeNotificationService, FakeValidationService, FakeEmployeeService, FakePolicyService, FakeUnitOfWork — and the containment-based transaction assertions) — read both before generating code. Treat the Phase 2/3 deliverables as fixed contracts; do not modify production source.
 
-Follow the existing route conventions exactly: no controller file (routes call the service directly), `resolveActor` extracts `request.user` and enforces role membership at the API boundary (UnauthorizedError on missing/invalid actor), `sendError` maps `AppError` to `{ error, code }` with the correct status and any other throw to 500. The endpoint returns 200 on success and calls `service.cancel(actor, request.params.id)`. Resolve the service instance from `fastify.leaveService` if present, else `createLeaveService()`, matching the existing endpoints. Ensure `src/modules/leave/index.ts` already re-exports `leaveRoutes` (no change needed unless the route registration signature changed). This phase touches approximately 1 file (`leave.routes.ts`). No service logic, no tests in this phase.
+Coverage for `cancel`:
+- Authorization guards: owner may cancel own DRAFT/SUBMITTED (ForbiddenError on non-owner); direct manager may cancel an APPROVED request for their direct report (ForbiddenError when actor is not the direct manager); ADMIN may cancel an APPROVED request for anyone (ADMIN exempt from the direct-manager check); no acting on your own request where that rule applies.
+- Timing guard: ConflictError when `startDate <= today` (today or past).
+- Balance release (full `requestedDays`, no pro-rating): DRAFT → no balance change; SUBMITTED → `pendingDays -= requestedDays`; APPROVED → `usedDays -= requestedDays`. Assert the balance row is read with the row lock (`forUpdate` flag) before writing.
+- Status transition: status → CANCELLED with `cancelledBy = actor.id` and `cancelledAt` set.
+- Side effects: a CANCEL audit entry (action `AuditAction.CANCEL`) and a synchronous cancellation notification to the affected employee.
+- Atomicity: assert all steps occur inside the single `withTransaction` callback with the stub client forwarded to each repository/service call (containment-based, matching the existing suite's convention).
+
+This phase touches approximately 1 file (`tests/unit/modules/leave/leave.service.test.ts`).
 
 ## Your iteration budget — and how to get more (READ BEFORE YOU START)
 
@@ -67,14 +75,21 @@ In every case the balance row MUST be read with the row lock before it is writte
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- The new handler must reuse the existing resolveActor and sendError helpers and follow the identical try/catch + request.log.error + reply.status(200).send pattern of the submit/approve/reject handlers. (see `src/modules/leave/leave.routes.ts`)
-- The handler must call the ILeaveService.cancel(actor, id) method exactly as declared, passing the resolved actor and the :id path parameter. (see `src/modules/leave/leave.service.ts`)
-- The service instance must be resolved once as fastify.leaveService ?? createLeaveService(), matching the existing endpoints' resolution. (see `src/modules/leave/leave.routes.ts`)
+- The cancel tests must match the existing suite's containment-based transaction assertion convention: assert uow.callCount === 1 and that each participating call receives uow.stubClient, exactly as the submit/approve/reject tests do. (see `tests/unit/modules/leave/leave.service.test.ts`)
+- The cancel tests must exercise the real cancel implementation and its authorization/timing/balance-release semantics as defined in the service, without re-deriving or contradicting them. (see `src/modules/leave/leave.service.ts`)
+- The cancel tests must use AuditAction.CANCEL (value 'CANCEL') for the audit assertion, matching the shared enum member added in Phase 1. (see `src/shared/types/index.ts`)
+- The cancel tests must reuse the existing fakes and fixtures (makeRequest, makeActor, makeBalance, makeEmployee, makePolicy) and their recorded-call arrays rather than introducing parallel test doubles. (see `tests/unit/modules/leave/leave.service.test.ts`)
+### Entity invariants — enforce these
+- Reuse or extend `LeaveRequest`: A cancelled request ends in status CANCELLED with cancelledBy set to the acting actor's id and cancelledAt set to a Date; cancellation is only reachable from DRAFT (owner), SUBMITTED (owner), or APPROVED (direct manager or ADMIN), and only while startDate is strictly in the future.
+- Reuse or extend `LeaveBalance`: Cancellation releases the full requestedDays with no pro-rating: DRAFT releases nothing, SUBMITTED decrements pendingDays by requestedDays, APPROVED decrements usedDays by requestedDays; the balance row is always read with a row lock (forUpdate=true) before any write.
+- Reuse or extend `AuditLog`: Every cancellation writes exactly one audit record with action AuditAction.CANCEL, entityType 'leave_request', entityId equal to the request id, and actorId equal to the acting actor's id.
+- Reuse or extend `Notification`: Every cancellation produces exactly one synchronous notification to the affected employee (recipientId = request.employeeId) with relatedEntityType 'leave_request' and relatedEntityId equal to the request id.
 ### Interface contract — expose these operations (their shape is yours)
-- cancel(actor: LeaveActor, requestId: string): Promise<LeaveRequest> — Actor is resolved and role-validated at the API boundary by resolveActor before the service is invoked; the service enforces cancellation authorization.; AppError (UnauthorizedError, ForbiddenError, ConflictError, NotFoundError) surfaces as { error, code } with its statusCode; any other throw becomes 500.
+- LeaveService.cancel(actor, requestId) — Owner may cancel own DRAFT/SUBMITTED; direct manager (employee.managerId === actor.id) may cancel APPROVED; ADMIN may cancel APPROVED for anyone (exempt from direct-manager check); no acting on own request where the manager/ADMIN rule applies. Violations throw ForbiddenError.; ForbiddenError on authorization failure; ConflictError when startDate <= today; NotFoundError on unknown request; UnauthorizedError on missing/invalid actor.
 ### Integration points — connect to these
-- ILeaveService.cancel (LeaveService) — The route delegates the entire cancel operation to the already-implemented service method.
-- resolveActor / sendError helpers in leave.routes.ts — Reused for API-boundary authentication and error mapping, keeping the new endpoint consistent with existing ones.
+- src/modules/leave/leave.service.ts (LeaveService.cancel) — The operation under test; its authorization, timing guard, balance release, status transition, and side effects define the assertions.
+- tests/unit/modules/leave/leave.service.test.ts (existing fakes + fixtures) — The suite to extend; its eight fakes and containment-based transaction assertions are the test harness for the new cancel cases.
+- src/shared/types/index.ts (AuditAction.CANCEL, LeaveStatus.CANCELLED) — The enum values the audit and status assertions must reference.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
