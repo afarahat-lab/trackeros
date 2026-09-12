@@ -11,7 +11,8 @@
     "migrate": "knex migrate:latest",
     "migrate:rollback": "knex migrate:rollback",
     "migrate:make": "knex migrate:make",
-    "smoke:migrate": "rm -f ./.smoke.sqlite && knex migrate:latest --env test"
+    "smoke:migrate": "rm -f ./.smoke.sqlite && knex migrate:latest --env test",
+    "smoke": "node scripts/smoke.js"
   },
   "dependencies": {
     "bcrypt": "^5.0.1",

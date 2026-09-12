@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "tier": "tier1",
   "templateId": "corporate-ops-web-mobile",
-  "description": "Trackeros — a corporate operations web and mobile platform for\n  mid-sized companies. Provides employee self-service (leave\n  requests, balances, expense claims), manager workflows\n  (approvals, team views, time-off calendars), and HR admin\n  surfaces (leave policy configuration, balance accruals,\n  audit reports).\n  \n  Backend: TypeScript on Node 20 (Fastify), PostgreSQL via\n  Knex migrations + a thin repository layer, BullMQ for\n  background jobs (accrual schedulers, notification fanout).\n  Module structure: src/modules/<name>/<name>.{model,\n  repository,service,controller,routes}.ts. Domain modules\n  include leave, balance, employee, policy, notification.\n  Shared utilities under src/shared/ (db connection, base\n  repository, error types).\n  \n  Frontend: React + Vite SPA for the web client, React Native\n  for the mobile client (shared @trackeros/contracts package\n  for the typed REST surface). Auth via JWT against the\n  backend's /auth endpoints; identity comes from corporate\n  OIDC in production and from local users in development.\n  \n  Tests: Jest for unit + integration. CI on GitHub Actions\n  runs lint (ESLint) + typecheck (tsc --noEmit) + unit tests +\n  a Semgrep security pass on every PR. Conventional Commits +\n  squash-merge. Strict TypeScript (no implicit any, strict\n  null checks).",
+  "description": "Trackeros \u2014 a corporate operations web and mobile platform for\n  mid-sized companies. Provides employee self-service (leave\n  requests, balances, expense claims), manager workflows\n  (approvals, team views, time-off calendars), and HR admin\n  surfaces (leave policy configuration, balance accruals,\n  audit reports).\n  \n  Backend: TypeScript on Node 20 (Fastify), PostgreSQL via\n  Knex migrations + a thin repository layer, BullMQ for\n  background jobs (accrual schedulers, notification fanout).\n  Module structure: src/modules/<name>/<name>.{model,\n  repository,service,controller,routes}.ts. Domain modules\n  include leave, balance, employee, policy, notification.\n  Shared utilities under src/shared/ (db connection, base\n  repository, error types).\n  \n  Frontend: React + Vite SPA for the web client, React Native\n  for the mobile client (shared @trackeros/contracts package\n  for the typed REST surface). Auth via JWT against the\n  backend's /auth endpoints; identity comes from corporate\n  OIDC in production and from local users in development.\n  \n  Tests: Jest for unit + integration. CI on GitHub Actions\n  runs lint (ESLint) + typecheck (tsc --noEmit) + unit tests +\n  a Semgrep security pass on every PR. Conventional Commits +\n  squash-merge. Strict TypeScript (no implicit any, strict\n  null checks).",
   "stack": {
     "language": "TypeScript",
     "nodeVersion": "20",
@@ -63,7 +63,7 @@
       },
       {
         "id": "no-gestalt-internal-deps",
-        "description": "Do not add @gestalt/* packages as project dependencies — these are Gestalt platform internals not available on npm",
+        "description": "Do not add @gestalt/* packages as project dependencies \u2014 these are Gestalt platform internals not available on npm",
         "severity": "critical"
       }
     ]
@@ -78,8 +78,8 @@
   },
   "_comment_verification": "MECHANICAL COMPILE GATE: run in the code-agent work dir before commit; a non-zero exit blocks the commit + routes to self-heal so a compile/type error never reaches CI. Installs deps (clones carry no node_modules), guards on source presence so an empty phase exits 0.",
   "verification": {
-    "command": "npm install --include=dev --no-audit --no-fund && if find src -name '*.ts' -not -name '*.spec.ts' -not -name '*.test.ts' -not -name '*.d.ts' -type f | grep -q .; then npm run build && npx jest --passWithNoTests --forceExit; else echo 'no source files to verify'; fi",
-    "timeoutSeconds": 900
+    "command": "npm install --include=dev --no-audit --no-fund && if find src -name '*.ts' -not -name '*.spec.ts' -not -name '*.test.ts' -not -name '*.d.ts' -type f | grep -q .; then npm run build && npx jest --passWithNoTests --forceExit && npm run smoke; else echo 'no source files to verify'; fi",
+    "timeoutSeconds": 1200
   },
   "pipeline": {
     "adapter": "github-actions",
