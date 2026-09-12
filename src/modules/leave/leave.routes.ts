@@ -83,4 +83,16 @@ export async function leaveRoutes(fastify: FastifyInstance): Promise<void> {
       return sendError(reply, error);
     }
   });
+
+  fastify.post('/leaves/:id/cancel', async (request: LeaveAuthRequest, reply) => {
+    try {
+      const actor = resolveActor(request);
+      const { id } = request.params as { id: string };
+      const cancelled = await leaveService.cancel(actor, id);
+      return reply.status(200).send(cancelled);
+    } catch (error) {
+      request.log.error(error);
+      return sendError(reply, error);
+    }
+  });
 }

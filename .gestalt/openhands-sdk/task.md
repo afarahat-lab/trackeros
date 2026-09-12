@@ -1,6 +1,6 @@
-# Implement this phase: Phase 2 — Add cancel to ILeaveService + LeaveService
+# Implement this phase: Phase 3 — Add POST /leaves/:id/cancel route
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/621bb1fd-0965-415a-bf2e-ec2c42b15f04/2`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/621bb1fd-0965-415a-bf2e-ec2c42b15f04/3`. Do not clone anything; work only in this directory.
 
 You are the IMPLEMENTATION agent, not a planner. The platform measures your work EXCLUSIVELY by the files you create or modify in this working tree (`git status`). Ending your turn with a plan, a summary, or an announcement of what you are 'about to' do — without having actually edited files — is a FAILURE: a turn that leaves the working tree untouched is discarded. Explore only as much as you need, then MAKE the edits with your file-editing tool. Never end your turn before the files exist on disk.
 
@@ -8,17 +8,9 @@ You are the IMPLEMENTATION agent, not a planner. The platform measures your work
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Add a `cancel(actor: LeaveActor, requestId: string)` method to `ILeaveService` and implement it in `LeaveService` in `src/modules/leave/leave.service.ts`. This phase depends on `src/shared/types/index.ts` (AuditAction.CANCEL from Phase 1) and the existing `src/modules/leave/leave.service.ts` (ILeaveService, LeaveService, LeaveActor, the eight injected collaborators, and the existing create/submit/approve/reject implementations) — read both before generating code.
+Add a `POST /leaves/:id/cancel` endpoint to `leaveRoutes(fastify)` in `src/modules/leave/leave.routes.ts`. This phase depends on `src/modules/leave/leave.service.ts` (the `cancel` method added in Phase 2) and the existing `src/modules/leave/leave.routes.ts` (the `resolveActor` helper, `sendError` helper, and the existing four endpoints) — read both before generating code.
 
-Implement `cancel` per the binding rules:
-- Authorization: owner may cancel their own DRAFT or SUBMITTED request; the direct manager (`employee.managerId === actor.id`) may cancel an APPROVED request; ADMIN may cancel an APPROVED request for anyone. Mirror the existing `assertCanDecide` shape (ADMIN exempt from the direct-manager check, MANAGER not; no acting on your own request where that rule applies). Throw ForbiddenError otherwise.
-- Timing guard: block cancellation once `startDate <= today` (startDate today or in the past) with ConflictError. This makes pro-rating unnecessary.
-- Balance release (full `requestedDays`, no pro-rating): DRAFT → no balance change; SUBMITTED → `pendingDays -= requestedDays`; APPROVED → `usedDays -= requestedDays`. Read the balance row with the row lock (`forUpdate` flag) before writing, exactly as submit/approve/reject do.
-- Status transition: set status → CANCELLED and populate `cancelledBy = actor.id` and `cancelledAt = now` (the LeaveRequest entity has these fields; ensure the repository's `UpdateLeaveRequestDto`/`FIELD_COLUMNS` map supports `cancelledBy`/`cancelledAt` — if not, add those two fields to the update DTO and column map in `src/modules/leave/leave.repository.ts` as part of this phase).
-- Side effects: record a CANCEL audit entry (action `AuditAction.CANCEL`) and insert a synchronous cancellation notification to the affected employee.
-- Atomicity: the whole operation (status change, balance release, audit entry, notification) is ONE unit of work via `IUnitOfWork.withTransaction`, with the client threaded through every call.
-
-This phase touches approximately 1-2 files (`leave.service.ts`, and `leave.repository.ts` only if the update DTO/column map lacks `cancelledBy`/`cancelledAt`). No routes, no tests in this phase.
+Follow the existing route conventions exactly: no controller file (routes call the service directly), `resolveActor` extracts `request.user` and enforces role membership at the API boundary (UnauthorizedError on missing/invalid actor), `sendError` maps `AppError` to `{ error, code }` with the correct status and any other throw to 500. The endpoint returns 200 on success and calls `service.cancel(actor, request.params.id)`. Resolve the service instance from `fastify.leaveService` if present, else `createLeaveService()`, matching the existing endpoints. Ensure `src/modules/leave/index.ts` already re-exports `leaveRoutes` (no change needed unless the route registration signature changed). This phase touches approximately 1 file (`leave.routes.ts`). No service logic, no tests in this phase.
 
 ## Your iteration budget — and how to get more (READ BEFORE YOU START)
 
@@ -71,6 +63,18 @@ BALANCE EFFECTS (making the state transitions explicit, since they are the risky
 - Cancelling a SUBMITTED request: pendingDays -= requestedDays.
 - Cancelling an APPROVED request: usedDays -= requestedDays.
 In every case the balance row MUST be read with the row lock before it is written (the repository's `forUpdate` flag) — the deltas are computed in application code, so an unlocked read lets two concurrent operations lose one another's update. Cancel is a write path and must take the lock, exactly as submit/approve/reject do. The whole operation — status change, balance release, audit entry, notification — is ONE unit of work via IUnitOfWork.withTransaction, with the client threaded through every call. [BINDING RULE — operator decision resolving: Should ADMIN be able to cancel an APPROVED request (consistent with the existing assertCanDecide which exempts ADMIN from the direct-manager check), or is cancellation strictly limited to the owner (DRAFT/SUBMITTED) and the direct manager (APPROVED)?; Should a manager be allowed to cancel an APPROVED request after the leave start date has already passed (or after it has fully elapsed)?; When cancelling an APPROVED request that has already partially elapsed, should the released usedDays be pro-rated to only the unelapsed portion, or released in full?; The AuditAction enum (src/shared/types) has CREATE/UPDATE/DELETE/APPROVE/REJECT but no CANCEL. The cancel operation must record an audit entry (GP-002); which action value should it use?; Should cancelling an APPROVED request whose startDate is already in the past (leave partially or fully taken) be blocked, or is the full usedDays release always permitted regardless of elapsed time?; apply everywhere these apply, not in one place only]
+
+## Constraints & consistency
+You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
+### Reuse & consistency — match these exactly
+- The new handler must reuse the existing resolveActor and sendError helpers and follow the identical try/catch + request.log.error + reply.status(200).send pattern of the submit/approve/reject handlers. (see `src/modules/leave/leave.routes.ts`)
+- The handler must call the ILeaveService.cancel(actor, id) method exactly as declared, passing the resolved actor and the :id path parameter. (see `src/modules/leave/leave.service.ts`)
+- The service instance must be resolved once as fastify.leaveService ?? createLeaveService(), matching the existing endpoints' resolution. (see `src/modules/leave/leave.routes.ts`)
+### Interface contract — expose these operations (their shape is yours)
+- cancel(actor: LeaveActor, requestId: string): Promise<LeaveRequest> — Actor is resolved and role-validated at the API boundary by resolveActor before the service is invoked; the service enforces cancellation authorization.; AppError (UnauthorizedError, ForbiddenError, ConflictError, NotFoundError) surfaces as { error, code } with its statusCode; any other throw becomes 500.
+### Integration points — connect to these
+- ILeaveService.cancel (LeaveService) — The route delegates the entire cancel operation to the already-implemented service method.
+- resolveActor / sendError helpers in leave.routes.ts — Reused for API-boundary authentication and error mapping, keeping the new endpoint consistent with existing ones.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
