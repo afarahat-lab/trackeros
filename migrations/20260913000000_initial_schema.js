@@ -93,8 +93,15 @@ exports.up = async function up(knex) {
     t.string('action').notNullable();             // CREATE | UPDATE | DELETE | APPROVE | REJECT | CANCEL
     t.string('entity_type').notNullable();
     t.string('entity_id').notNullable();
-    t.json('before_state');
-    t.json('after_state');
+    // text, NOT json/jsonb — this matches the repository's actual contract: AuditLogRow
+    // declares `before_state: string | null`, create() inserts JSON.stringify(...), and
+    // mapRow() reads it back with JSON.parse(...). A real `json` column is auto-parsed by
+    // node-pg into an object, so JSON.parse() then receives an object and dies with
+    // `"[object Object]" is not valid JSON`. Storing these as jsonb would be the better
+    // design, but that is a change to working application code, not to the schema that
+    // has to match it. (sqlite cannot catch this: its `json` type IS text.)
+    t.text('before_state');
+    t.text('after_state');
     t.timestamp('occurred_at').notNullable().defaultTo(knex.fn.now());
     t.index(['entity_type', 'entity_id']);
   });

@@ -31,7 +31,13 @@ module.exports = {
     },
   },
   production: { ...base, client: 'pg', connection: process.env.DATABASE_URL },
-  // Throwaway file DB for the smoke check — no container, no credentials.
+  // Real-Postgres smoke — the brief's Q1 target. Used by `npm run smoke` whenever
+  // SMOKE_DATABASE_URL is set, so all three stages run against the SAME engine the
+  // repositories dial. This is what closes the persistence caveat the sqlite path prints.
+  smoke_pg: { ...base, client: 'pg', connection: process.env.SMOKE_DATABASE_URL },
+  // Throwaway file DB for the smoke check — no container, no credentials. The fallback
+  // when no Postgres is available: it still catches a missing schema mechanism and a
+  // column no migration created, but NOT anything the handler does with the database.
   test: {
     ...base,
     client: 'sqlite3',
