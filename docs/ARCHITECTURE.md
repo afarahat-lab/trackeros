@@ -330,6 +330,25 @@ This phase adds the HTTP surface for cancellation, completing the four recommend
 **Divergences from the plan worth noting:**
 - None — this phase matches PLAN.md Phase 3 exactly (one file, `leave.routes.ts`, no service logic, no tests).
 
+### Phase 4 delivered (cancel unit tests)
+
+This phase adds the Jest unit tests for `LeaveService.cancel` to `tests/unit/modules/leave/leave.service.test.ts`, extending the existing suite. No production source files were modified — the Phase 1–3 deliverables (`AuditAction.CANCEL`, the cancel service, and the route) are treated as fixed contracts.
+
+**Coverage** — a new `cancel` describe block exercises the operation's authorization, timing guard, balance release, status transition, side effects, and atomicity, reusing the existing eight in-memory fakes and fixtures (`makeRequest`, `makeActor`, `makeBalance`, `makeEmployee`, `makePolicy`) and their recorded-call arrays:
+
+- **Owner cancels DRAFT** — status → CANCELLED with `cancelledBy = actor.id` and `cancelledAt` set; asserts **zero** balance reads/writes (`findByKeyCalls` and `updateCalls` remain empty), exactly one CANCEL audit entry (`AuditAction.CANCEL`, `entityType 'leave_request'`, `entityId = request id`), one synchronous cancellation notification to the requester, and `uow.callCount === 1` with the stub client forwarded to every participating call.
+- **Owner cancels SUBMITTED** — releases the full `requestedDays` by decrementing `pendingDays` (leaving `usedDays` untouched), asserting the balance row was read with `forUpdate = true` before the write.
+- **Direct manager cancels APPROVED** — releases the full `requestedDays` by decrementing `usedDays` (leaving `pendingDays` untouched), with the `forUpdate` row lock asserted.
+- **ADMIN cancels APPROVED** — an ADMIN cancels an APPROVED request for anyone (exempt from the direct-manager check).
+- **Authorization guards** — ForbiddenError for a non-owner cancelling a DRAFT, the owner cancelling their own APPROVED request, and a non-direct manager cancelling an APPROVED request.
+- **Timing guard** — ConflictError when `startDate` is today or in the past (a past start and a same-UTC-day start); success paths use future startDate fixtures relative to `Date.now()`.
+- **Actor validation** — UnauthorizedError on a missing actor, ForbiddenError on an invalid role.
+- **NotFoundError** — unknown request id.
+
+**Divergences from the plan worth noting:**
+- The plan's Phase 4 coverage is matched, plus two extra actor-validation cases (missing actor → UnauthorizedError, invalid role → ForbiddenError) and an explicit "starts today" timing case beyond the single past-date case.
+- The Phase 2 delivered section above noted the cancel tests were delivered together with the service; the committed diff for this phase shows the test file as the sole production change, so the cancel tests are consolidated here (Phase 4), matching the plan's phase split.
+
 ### Open questions
 - ADMIN cancellation authority for APPROVED requests — **resolved**: ADMIN may cancel an APPROVED request for anyone (exempt from the direct-manager check).
 - Whether APPROVED cancellation is allowed after startDate/endDate has passed — **resolved**: blocked once `startDate <= today` (ConflictError).
