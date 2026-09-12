@@ -285,6 +285,17 @@ leave -> shared-types, balance, audit, notification, employee, validation, polic
 3. Add POST /leaves/:id/cancel route.
 4. LeaveService cancel unit tests.
 
+### Phase 1 delivered (AuditAction.CANCEL enum member)
+
+This phase delivered only the shared-enum change (recommended phase 1); the cancel service, route, and tests (phases 2–4) are not yet implemented.
+
+- `src/shared/types/index.ts` — `AuditAction` gained `CANCEL = 'CANCEL'`, appended after `REJECT` in the existing member order, so the enum is now exactly `CREATE, UPDATE, DELETE, APPROVE, REJECT, CANCEL` (each an uppercase string-literal value equal to its member name). No other enum or DTO changed.
+- `tests/unit/shared/types.test.ts` — the existing `AuditAction` member-list assertion was extended to expect the six-member order `['CREATE','UPDATE','DELETE','APPROVE','REJECT','CANCEL']` (the test description was updated to match).
+
+**Divergences from the plan worth noting:**
+- PLAN.md Phase 1 prescribed searching for consumers that switch exhaustively on `AuditAction` and updating them so the new CANCEL case is handled. No such switch exists: `src/modules/audit/audit.service.ts` validates via `Object.values(AuditAction).includes(input.action)`, which accepts the new member without modification, and the leave service references `AuditAction` only by value. No consumer changes were required.
+- The `UpdateLeaveRequestDto` / `FIELD_COLUMNS` map do **not** yet carry `cancelledBy`/`cancelledAt` — those belong to the Phase 2 service/repository work and are intentionally absent here.
+
 ### Open questions
 - ADMIN cancellation authority for APPROVED requests.
 - Whether APPROVED cancellation is allowed after startDate/endDate has passed.
