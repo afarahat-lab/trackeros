@@ -1,0 +1,129 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "unit-test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The test suite asserts that an owner cancelling their own DRAFT request transitions status to CANCELLED with cancelledBy = actor.id and cancelledAt set, and performs NO balance read or write (findByKeyCalls and updateCalls on the balance fake remain empty).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The test suite asserts that an owner cancelling their own SUBMITTED request releases the full requestedDays by decrementing pendingDays (pendingDays -= requestedDays) and leaves usedDays untouched, with the balance row read via findByKey with forUpdate=true before the write.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The test suite asserts that a direct manager cancelling an APPROVED request for their direct report releases the full requestedDays by decrementing usedDays (usedDays -= requestedDays) and leaves pendingDays untouched, with the balance row read via findByKey with forUpdate=true before the write.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The test suite asserts the authorization guards: ForbiddenError when a non-owner attempts to cancel a DRAFT/SUBMITTED request, when the owner attempts to cancel their own APPROVED request, and when a non-direct manager attempts to cancel an APPROVED request; and that an ADMIN cancels an APPROVED request for anyone without the direct-manager check.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The test suite asserts the timing guard: ConflictError when startDate is today or in the past (startDate <= today), and that a future startDate proceeds.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The test suite asserts the side effects: exactly one audit record with action AuditAction.CANCEL (entityType 'leave_request', entityId = request id, actorId = actor.id) and exactly one synchronous cancellation notification to the affected employee (recipientId = request.employeeId).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The test suite asserts atomicity via containment: uow.callCount === 1 and every repository/service call (repository.update, balanceRepository.update, auditService.record, notificationService.create) receives the FakeUnitOfWork stubClient as its client argument.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The test suite asserts NotFoundError for an unknown request id and that the full suite (existing create/submit/approve/reject tests plus new cancel tests) passes under Jest.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Do not modify production source (src/modules/leave/leave.service.ts, leave.repository.ts, leave.routes.ts, or src/shared/types). Phase 2/3 deliverables are fixed contracts; this phase only extends tests/unit/modules/leave/leave.service.test.ts.",
+    "Reuse the existing eight in-memory fakes (FakeLeaveRepository, FakeBalanceRepository, FakeAuditService, FakeNotificationService, FakeValidationService, FakeEmployeeService, FakePolicyService, FakeUnitOfWork) and the containment-based transaction assertion convention already present in the suite; do not introduce a new fake or assertion style.",
+    "Tests must use the real LeaveService.cancel implementation (no mocking of the service under test) and assert observable behavior through the fakes' recorded call arrays (updateCalls, findByKeyCalls, records, inputs, callCount).",
+    "Balance-release assertions must assert the full requestedDays delta (no pro-rating) and that the balance row is read with forUpdate=true before any balance write; DRAFT cancellation must assert zero balance reads/writes.",
+    "Use future startDate fixtures (relative to Date.now()) for the success-path cancel tests so the timing guard does not reject them; use a past/today startDate only for the ConflictError timing test."
+  ],
+  "outOfScope": [
+    "No production code changes: the cancel implementation, route, and AuditAction.CANCEL enum are fixed contracts from Phases 1-3 and must not be edited in this phase.",
+    "No integration/e2e tests, no route-level tests, no database or real-transaction tests \u2014 this phase is unit tests against in-memory fakes only.",
+    "No new fakes, helpers, or fixtures beyond what the existing suite already provides; no changes to the create/submit/approve/reject test blocks."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "A cancelled request ends in status CANCELLED with cancelledBy set to the acting actor's id and cancelledAt set to a Date; cancellation is only reachable from DRAFT (owner), SUBMITTED (owner), or APPROVED (direct manager or ADMIN), and only while startDate is strictly in the future."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "Cancellation releases the full requestedDays with no pro-rating: DRAFT releases nothing, SUBMITTED decrements pendingDays by requestedDays, APPROVED decrements usedDays by requestedDays; the balance row is always read with a row lock (forUpdate=true) before any write."
+    },
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "Every cancellation writes exactly one audit record with action AuditAction.CANCEL, entityType 'leave_request', entityId equal to the request id, and actorId equal to the acting actor's id."
+    },
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "Every cancellation produces exactly one synchronous notification to the affected employee (recipientId = request.employeeId) with relatedEntityType 'leave_request' and relatedEntityId equal to the request id."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "LeaveService.cancel(actor, requestId)",
+      "authRule": "Owner may cancel own DRAFT/SUBMITTED; direct manager (employee.managerId === actor.id) may cancel APPROVED; ADMIN may cancel APPROVED for anyone (exempt from direct-manager check); no acting on own request where the manager/ADMIN rule applies. Violations throw ForbiddenError.",
+      "idempotent": false,
+      "errorSemantics": "ForbiddenError on authorization failure; ConflictError when startDate <= today; NotFoundError on unknown request; UnauthorizedError on missing/invalid actor."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The cancel tests must match the existing suite's containment-based transaction assertion convention: assert uow.callCount === 1 and that each participating call receives uow.stubClient, exactly as the submit/approve/reject tests do.",
+      "referencePath": "tests/unit/modules/leave/leave.service.test.ts"
+    },
+    {
+      "requirement": "The cancel tests must exercise the real cancel implementation and its authorization/timing/balance-release semantics as defined in the service, without re-deriving or contradicting them.",
+      "referencePath": "src/modules/leave/leave.service.ts"
+    },
+    {
+      "requirement": "The cancel tests must use AuditAction.CANCEL (value 'CANCEL') for the audit assertion, matching the shared enum member added in Phase 1.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The cancel tests must reuse the existing fakes and fixtures (makeRequest, makeActor, makeBalance, makeEmployee, makePolicy) and their recorded-call arrays rather than introducing parallel test doubles.",
+      "referencePath": "tests/unit/modules/leave/leave.service.test.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/leave/leave.service.ts (LeaveService.cancel)",
+      "why": "The operation under test; its authorization, timing guard, balance release, status transition, and side effects define the assertions."
+    },
+    {
+      "target": "tests/unit/modules/leave/leave.service.test.ts (existing fakes + fixtures)",
+      "why": "The suite to extend; its eight fakes and containment-based transaction assertions are the test harness for the new cancel cases."
+    },
+    {
+      "target": "src/shared/types/index.ts (AuditAction.CANCEL, LeaveStatus.CANCELLED)",
+      "why": "The enum values the audit and status assertions must reference."
+    }
+  ]
+}
