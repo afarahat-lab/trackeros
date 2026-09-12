@@ -1,6 +1,6 @@
-# Implement this phase: Phase 1 — Add AuditAction.CANCEL to shared-types
+# Implement this phase: Phase 2 — Add cancel to ILeaveService + LeaveService
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/621bb1fd-0965-415a-bf2e-ec2c42b15f04/1`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/621bb1fd-0965-415a-bf2e-ec2c42b15f04/2`. Do not clone anything; work only in this directory.
 
 You are the IMPLEMENTATION agent, not a planner. The platform measures your work EXCLUSIVELY by the files you create or modify in this working tree (`git status`). Ending your turn with a plan, a summary, or an announcement of what you are 'about to' do — without having actually edited files — is a FAILURE: a turn that leaves the working tree untouched is discarded. Explore only as much as you need, then MAKE the edits with your file-editing tool. Never end your turn before the files exist on disk.
 
@@ -8,7 +8,17 @@ You are the IMPLEMENTATION agent, not a planner. The platform measures your work
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Add the `CANCEL = 'CANCEL'` member to the `AuditAction` enum in `src/shared/types/index.ts` (the shared-types module owns this cross-module value type). Do NOT reuse UPDATE or DELETE. Read the existing `AuditAction` enum in `src/shared/types/index.ts` before editing so the new member matches the existing member style (string literal values). After adding the member, search the codebase for any consumer that switches exhaustively on `AuditAction` (e.g. `src/modules/audit/audit.service.ts` and any other switch statements) and update those consumers so the new CANCEL case is handled — do not leave a non-exhaustive switch that would fail typecheck. This phase touches approximately 1-2 files (the enum plus any exhaustive-switch consumer). No new modules, no routes, no service logic. Include a Jest unit test under `tests/unit/shared/` asserting the `AuditAction` enum now contains the CANCEL member with value 'CANCEL' (extend the existing shared enum test file if one exists).
+Add a `cancel(actor: LeaveActor, requestId: string)` method to `ILeaveService` and implement it in `LeaveService` in `src/modules/leave/leave.service.ts`. This phase depends on `src/shared/types/index.ts` (AuditAction.CANCEL from Phase 1) and the existing `src/modules/leave/leave.service.ts` (ILeaveService, LeaveService, LeaveActor, the eight injected collaborators, and the existing create/submit/approve/reject implementations) — read both before generating code.
+
+Implement `cancel` per the binding rules:
+- Authorization: owner may cancel their own DRAFT or SUBMITTED request; the direct manager (`employee.managerId === actor.id`) may cancel an APPROVED request; ADMIN may cancel an APPROVED request for anyone. Mirror the existing `assertCanDecide` shape (ADMIN exempt from the direct-manager check, MANAGER not; no acting on your own request where that rule applies). Throw ForbiddenError otherwise.
+- Timing guard: block cancellation once `startDate <= today` (startDate today or in the past) with ConflictError. This makes pro-rating unnecessary.
+- Balance release (full `requestedDays`, no pro-rating): DRAFT → no balance change; SUBMITTED → `pendingDays -= requestedDays`; APPROVED → `usedDays -= requestedDays`. Read the balance row with the row lock (`forUpdate` flag) before writing, exactly as submit/approve/reject do.
+- Status transition: set status → CANCELLED and populate `cancelledBy = actor.id` and `cancelledAt = now` (the LeaveRequest entity has these fields; ensure the repository's `UpdateLeaveRequestDto`/`FIELD_COLUMNS` map supports `cancelledBy`/`cancelledAt` — if not, add those two fields to the update DTO and column map in `src/modules/leave/leave.repository.ts` as part of this phase).
+- Side effects: record a CANCEL audit entry (action `AuditAction.CANCEL`) and insert a synchronous cancellation notification to the affected employee.
+- Atomicity: the whole operation (status change, balance release, audit entry, notification) is ONE unit of work via `IUnitOfWork.withTransaction`, with the client threaded through every call.
+
+This phase touches approximately 1-2 files (`leave.service.ts`, and `leave.repository.ts` only if the update DTO/column map lacks `cancelledBy`/`cancelledAt`). No routes, no tests in this phase.
 
 ## Your iteration budget — and how to get more (READ BEFORE YOU START)
 
@@ -61,14 +71,6 @@ BALANCE EFFECTS (making the state transitions explicit, since they are the risky
 - Cancelling a SUBMITTED request: pendingDays -= requestedDays.
 - Cancelling an APPROVED request: usedDays -= requestedDays.
 In every case the balance row MUST be read with the row lock before it is written (the repository's `forUpdate` flag) — the deltas are computed in application code, so an unlocked read lets two concurrent operations lose one another's update. Cancel is a write path and must take the lock, exactly as submit/approve/reject do. The whole operation — status change, balance release, audit entry, notification — is ONE unit of work via IUnitOfWork.withTransaction, with the client threaded through every call. [BINDING RULE — operator decision resolving: Should ADMIN be able to cancel an APPROVED request (consistent with the existing assertCanDecide which exempts ADMIN from the direct-manager check), or is cancellation strictly limited to the owner (DRAFT/SUBMITTED) and the direct manager (APPROVED)?; Should a manager be allowed to cancel an APPROVED request after the leave start date has already passed (or after it has fully elapsed)?; When cancelling an APPROVED request that has already partially elapsed, should the released usedDays be pro-rated to only the unelapsed portion, or released in full?; The AuditAction enum (src/shared/types) has CREATE/UPDATE/DELETE/APPROVE/REJECT but no CANCEL. The cancel operation must record an audit entry (GP-002); which action value should it use?; Should cancelling an APPROVED request whose startDate is already in the past (leave partially or fully taken) be blocked, or is the full usedDays release always permitted regardless of elapsed time?; apply everywhere these apply, not in one place only]
-
-## Constraints & consistency
-You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
-### Reuse & consistency — match these exactly
-- The new CANCEL member must match the existing string-literal member style (uppercase value equal to member name) of the AuditAction enum. (see `src/shared/types/index.ts`)
-- The updated test must extend the existing AuditAction member-list assertion in the shared enum test file rather than introducing a divergent assertion style. (see `tests/unit/shared/types.test.ts`)
-### Entity invariants — enforce these
-- Reuse or extend `AuditAction`: AuditAction is a string-literal enum whose members are the canonical persisted audit-action values; it must contain exactly CREATE, UPDATE, DELETE, APPROVE, REJECT, CANCEL in that order, each with an uppercase string-literal value equal to its member name.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:

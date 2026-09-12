@@ -42,6 +42,7 @@ export interface ILeaveService {
   submit(actor: LeaveActor, requestId: string): Promise<LeaveRequest>;
   approve(actor: LeaveActor, requestId: string): Promise<LeaveRequest>;
   reject(actor: LeaveActor, requestId: string): Promise<LeaveRequest>;
+  cancel(actor: LeaveActor, requestId: string): Promise<LeaveRequest>;
 }
 
 /**
@@ -86,6 +87,8 @@ export class LeaveService implements ILeaveService {
       approvalComment: null,
       submittedAt: null,
       decidedAt: null,
+      cancelledBy: null,
+      cancelledAt: null,
     };
 
     // The request and its audit record are ONE unit of work. Written separately, a
@@ -280,6 +283,86 @@ export class LeaveService implements ILeaveService {
     });
   }
 
+  async cancel(actor: LeaveActor, requestId: string): Promise<LeaveRequest> {
+    this.assertAuthenticated(actor);
+
+    const request = await this.getRequest(requestId);
+    await this.assertCanCancel(actor, request);
+    // Cancellation is only valid strictly before the leave's calendar start day: a
+    // startDate of today (or earlier) is blocked, which is what removes any need to
+    // pro-rate the released balance.
+    if (
+      this.startOfUtcDay(request.startDate).getTime() <= this.startOfUtcDay(new Date()).getTime()
+    ) {
+      throw new ConflictError('Leave that has already begun cannot be cancelled');
+    }
+
+    return this.uow.withTransaction(async (client) => {
+      if (request.status !== LeaveStatus.DRAFT) {
+        // DRAFT reserved no balance, so it neither reads nor writes the balance row.
+        const balance = await this.resolveBalance(
+          request.employeeId,
+          request.leaveTypeCode,
+          request.startDate,
+          client,
+          true, // this transaction writes the balance below — lock the row
+        );
+
+        if (request.status === LeaveStatus.SUBMITTED) {
+          await this.balanceRepository.update(
+            balance.id,
+            { pendingDays: balance.pendingDays - request.requestedDays },
+            client,
+          );
+        } else {
+          // APPROVED — release the full requestedDays back from usedDays (no pro-rating):
+          // the timing guard above makes cancellation only possible before the leave starts.
+          await this.balanceRepository.update(
+            balance.id,
+            { usedDays: balance.usedDays - request.requestedDays },
+            client,
+          );
+        }
+      }
+
+      const updated = await this.repository.update(
+        requestId,
+        {
+          status: LeaveStatus.CANCELLED,
+          cancelledBy: actor.id,
+          cancelledAt: new Date(),
+        },
+        client,
+      );
+
+      await this.auditService.record(
+        {
+          actorId: actor.id,
+          action: AuditAction.CANCEL,
+          entityType: 'leave_request',
+          entityId: requestId,
+          beforeState: request,
+          afterState: updated,
+        },
+        client,
+      );
+
+      await this.notificationService.create(
+        {
+          recipientId: request.employeeId,
+          type: 'leave_request',
+          title: 'Leave request cancelled',
+          message: `Your leave request ${requestId} was cancelled.`,
+          relatedEntityType: 'leave_request',
+          relatedEntityId: requestId,
+        },
+        client,
+      );
+
+      return updated;
+    });
+  }
+
   private async getRequest(requestId: string): Promise<LeaveRequest> {
     const request = await this.repository.findById(requestId);
     if (!request) {
@@ -311,6 +394,34 @@ export class LeaveService implements ILeaveService {
     const employee = await this.employeeService.getEmployeeById(request.employeeId);
     if (employee.managerId !== actor.id) {
       throw new ForbiddenError('Approver must be the requester manager');
+    }
+  }
+
+  private async assertCanCancel(actor: LeaveActor, request: LeaveRequest): Promise<void> {
+    // The owner may cancel their own DRAFT or SUBMITTED request.
+    if (actor.id === request.employeeId) {
+      if (request.status === LeaveStatus.DRAFT || request.status === LeaveStatus.SUBMITTED) {
+        return;
+      }
+      throw new ForbiddenError('Only the owner may cancel a DRAFT or SUBMITTED request');
+    }
+
+    // Otherwise only an APPROVED request may be cancelled, by the direct manager or an ADMIN.
+    if (request.status !== LeaveStatus.APPROVED) {
+      throw new ForbiddenError('Only the owner may cancel this leave request');
+    }
+
+    if (actor.role === EmployeeRole.ADMIN) {
+      return;
+    }
+
+    if (actor.role !== EmployeeRole.MANAGER) {
+      throw new ForbiddenError('Only a MANAGER or ADMIN may cancel an APPROVED request');
+    }
+
+    const employee = await this.employeeService.getEmployeeById(request.employeeId);
+    if (employee.managerId !== actor.id) {
+      throw new ForbiddenError('Canceller must be the requester manager');
     }
   }
 

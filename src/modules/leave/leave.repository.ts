@@ -30,11 +30,13 @@ interface LeaveRequestRow {
   approval_comment: string | null;
   submitted_at: Date | null;
   decided_at: Date | null;
+  cancelled_by: string | null;
+  cancelled_at: Date | null;
 }
 
 const COLUMNS =
   'id, employee_id, leave_type_code, start_date, end_date, requested_days, reason, ' +
-  'status, approver_id, approval_comment, submitted_at, decided_at';
+  'status, approver_id, approval_comment, submitted_at, decided_at, cancelled_by, cancelled_at';
 
 type UpdateField = keyof UpdateLeaveRequestDto;
 
@@ -45,6 +47,8 @@ const FIELD_COLUMNS: Record<UpdateField, string> = {
   status: 'status',
   approverId: 'approver_id',
   decidedAt: 'decided_at',
+  cancelledBy: 'cancelled_by',
+  cancelledAt: 'cancelled_at',
 };
 
 function mapRow(row: LeaveRequestRow): LeaveRequest {
@@ -61,6 +65,8 @@ function mapRow(row: LeaveRequestRow): LeaveRequest {
     approvalComment: row.approval_comment,
     submittedAt: row.submitted_at,
     decidedAt: row.decided_at,
+    cancelledBy: row.cancelled_by,
+    cancelledAt: row.cancelled_at,
   };
 }
 
@@ -76,8 +82,9 @@ export class PgLeaveRequestRepository implements ILeaveRepository {
     const query = `
       INSERT INTO leave_requests (
         id, employee_id, leave_type_code, start_date, end_date, requested_days,
-        reason, status, approver_id, approval_comment, submitted_at, decided_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        reason, status, approver_id, approval_comment, submitted_at, decided_at,
+        cancelled_by, cancelled_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
       RETURNING ${COLUMNS}
     `;
     const values = [
@@ -93,6 +100,8 @@ export class PgLeaveRequestRepository implements ILeaveRepository {
       input.approvalComment,
       input.submittedAt,
       input.decidedAt,
+      input.cancelledBy,
+      input.cancelledAt,
     ];
     const result: QueryResult<LeaveRequestRow> = await this.db(client).query(query, values);
     return mapRow(result.rows[0]);

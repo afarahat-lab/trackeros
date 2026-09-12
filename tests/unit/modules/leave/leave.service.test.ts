@@ -340,6 +340,8 @@ function makeRequest(overrides: Partial<LeaveRequest> = {}): LeaveRequest {
     approvalComment: null,
     submittedAt: null,
     decidedAt: null,
+    cancelledBy: null,
+    cancelledAt: null,
     ...overrides,
   };
 }
@@ -639,6 +641,154 @@ describe('LeaveService', () => {
       await expect(service.reject(manager, 'missing')).rejects.toThrow(NotFoundError);
     });
   });
+
+  describe('cancel', () => {
+    const manager = makeActor({ id: MANAGER_ID, role: EmployeeRole.MANAGER });
+    const admin = makeActor({ id: 'admin-1', role: EmployeeRole.ADMIN });
+    const FUTURE_START = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    const FUTURE_END = new Date(Date.now() + 32 * 24 * 60 * 60 * 1000);
+
+    beforeEach(async () => {
+      await balanceRepository.create(makeBalance());
+    });
+
+    it('owner cancels their own DRAFT without touching the balance', async () => {
+      await repository.create(
+        makeRequest({ startDate: FUTURE_START, endDate: FUTURE_END })
+      );
+
+      const cancelled = await service.cancel(makeActor(), 'lr-1');
+
+      expect(cancelled.status).toBe(LeaveStatus.CANCELLED);
+      expect(cancelled.cancelledBy).toBe(REQUESTER_ID);
+      expect(cancelled.cancelledAt).toBeInstanceOf(Date);
+
+      expect(repository.updateCalls).toHaveLength(1);
+      expect(repository.updateCalls[0].changes.status).toBe(LeaveStatus.CANCELLED);
+      expect(repository.updateCalls[0].changes.cancelledBy).toBe(REQUESTER_ID);
+      expect(repository.updateCalls[0].client).toBe(uow.stubClient);
+
+      // DRAFT reserved nothing: no balance read or write.
+      expect(balanceRepository.findByKeyCalls).toHaveLength(0);
+      expect(balanceRepository.updateCalls).toHaveLength(0);
+
+      expect(auditService.records).toHaveLength(1);
+      expect(auditService.records[0].action).toBe(AuditAction.CANCEL);
+      expect(auditService.records[0].entityId).toBe('lr-1');
+      expect(auditService.recordClients[0]).toBe(uow.stubClient);
+
+      expect(notificationService.inputs).toHaveLength(1);
+      expect(notificationService.inputs[0].recipientId).toBe(REQUESTER_ID);
+      expect(notificationService.inputs[0].title).toBe('Leave request cancelled');
+      expect(notificationService.createClients[0]).toBe(uow.stubClient);
+
+      expect(uow.callCount).toBe(1);
+    });
+
+    it('owner cancels their own SUBMITTED request and releases pendingDays', async () => {
+      await balanceRepository.update('balance-1', { pendingDays: REQUESTED_DAYS });
+      await repository.create(
+        makeRequest({
+          status: LeaveStatus.SUBMITTED,
+          startDate: FUTURE_START,
+          endDate: FUTURE_END,
+        })
+      );
+      balanceRepository.updateCalls.length = 0;
+      balanceRepository.findByKeyCalls.length = 0;
+
+      const cancelled = await service.cancel(makeActor(), 'lr-1');
+
+      expect(cancelled.status).toBe(LeaveStatus.CANCELLED);
+      expect(balanceRepository.findByKeyCalls.some((c) => c.forUpdate)).toBe(true);
+      expect(balanceRepository.updateCalls).toHaveLength(1);
+      expect(balanceRepository.updateCalls[0].changes.pendingDays).toBe(0);
+      expect(balanceRepository.updateCalls[0].changes.usedDays).toBeUndefined();
+      expect(balanceRepository.updateCalls[0].client).toBe(uow.stubClient);
+    });
+
+    it('direct manager cancels an APPROVED request and releases usedDays', async () => {
+      await balanceRepository.update('balance-1', { usedDays: REQUESTED_DAYS });
+      await repository.create(
+        makeRequest({
+          status: LeaveStatus.APPROVED,
+          startDate: FUTURE_START,
+          endDate: FUTURE_END,
+        })
+      );
+      balanceRepository.updateCalls.length = 0;
+      balanceRepository.findByKeyCalls.length = 0;
+
+      const cancelled = await service.cancel(manager, 'lr-1');
+
+      expect(cancelled.status).toBe(LeaveStatus.CANCELLED);
+      expect(cancelled.cancelledBy).toBe(MANAGER_ID);
+      expect(balanceRepository.findByKeyCalls.some((c) => c.forUpdate)).toBe(true);
+      expect(balanceRepository.updateCalls).toHaveLength(1);
+      expect(balanceRepository.updateCalls[0].changes.usedDays).toBe(0);
+      expect(balanceRepository.updateCalls[0].changes.pendingDays).toBeUndefined();
+      expect(balanceRepository.updateCalls[0].client).toBe(uow.stubClient);
+    });
+
+    it('allows an ADMIN to cancel an APPROVED request without being the direct manager', async () => {
+      await balanceRepository.update('balance-1', { usedDays: REQUESTED_DAYS });
+      await repository.create(
+        makeRequest({
+          status: LeaveStatus.APPROVED,
+          startDate: FUTURE_START,
+          endDate: FUTURE_END,
+        })
+      );
+
+      const cancelled = await service.cancel(admin, 'lr-1');
+      expect(cancelled.status).toBe(LeaveStatus.CANCELLED);
+      expect(cancelled.cancelledBy).toBe('admin-1');
+    });
+
+    it('rejects a non-owner, non-manager cancelling a DRAFT with ForbiddenError', async () => {
+      await repository.create(
+        makeRequest({ startDate: FUTURE_START, endDate: FUTURE_END })
+      );
+      await expect(
+        service.cancel(makeActor({ id: 'other-employee' }), 'lr-1')
+      ).rejects.toThrow(ForbiddenError);
+    });
+
+    it('rejects the owner cancelling their own APPROVED request with ForbiddenError', async () => {
+      await repository.create(
+        makeRequest({
+          status: LeaveStatus.APPROVED,
+          startDate: FUTURE_START,
+          endDate: FUTURE_END,
+        })
+      );
+      await expect(service.cancel(makeActor(), 'lr-1')).rejects.toThrow(ForbiddenError);
+    });
+
+    it('rejects a non-direct manager cancelling an APPROVED request with ForbiddenError', async () => {
+      await repository.create(
+        makeRequest({
+          status: LeaveStatus.APPROVED,
+          startDate: FUTURE_START,
+          endDate: FUTURE_END,
+        })
+      );
+      await expect(
+        service.cancel(makeActor({ id: 'other-mgr', role: EmployeeRole.MANAGER }), 'lr-1')
+      ).rejects.toThrow(ForbiddenError);
+    });
+
+    it('blocks cancellation once the leave has already begun with ConflictError', async () => {
+      await repository.create(
+        makeRequest({ startDate: new Date(Date.now() - 60_000) })
+      );
+      await expect(service.cancel(makeActor(), 'lr-1')).rejects.toThrow(ConflictError);
+    });
+
+    it('rejects an unknown request with NotFoundError', async () => {
+      await expect(service.cancel(makeActor(), 'missing')).rejects.toThrow(NotFoundError);
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -688,6 +838,8 @@ describe('LeaveService concurrency and atomicity guarantees', () => {
       approvalComment: null,
       submittedAt: null,
       decidedAt: null,
+      cancelledBy: null,
+      cancelledAt: null,
     });
   }
 
