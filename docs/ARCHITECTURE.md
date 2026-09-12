@@ -296,8 +296,35 @@ This phase delivered only the shared-enum change (recommended phase 1); the canc
 - PLAN.md Phase 1 prescribed searching for consumers that switch exhaustively on `AuditAction` and updating them so the new CANCEL case is handled. No such switch exists: `src/modules/audit/audit.service.ts` validates via `Object.values(AuditAction).includes(input.action)`, which accepts the new member without modification, and the leave service references `AuditAction` only by value. No consumer changes were required.
 - The `UpdateLeaveRequestDto` / `FIELD_COLUMNS` map do **not** yet carry `cancelledBy`/`cancelledAt` — those belong to the Phase 2 service/repository work and are intentionally absent here.
 
+### Phase 2 delivered (cancel service, model/repository support, and unit tests)
+
+This phase completes the cancellation flow's service, persistence, and test layers. The `POST /leaves/:id/cancel` route (recommended phase 3) was **not** added — see divergences.
+
+**model** — `LeaveRequest` gained `cancelledBy: string | null` and `cancelledAt: Date | null` (both null until cancelled), bringing the entity to 14 fields. `CreateLeaveRequestInput` is unchanged in shape (still `Omit<LeaveRequest, 'id'>`), so `create` now supplies both new fields as `null`.
+
+**shared-types** — `UpdateLeaveRequestDto` gained `cancelledBy?: string` and `cancelledAt?: Date` (the only shared-types change this phase; `AuditAction.CANCEL` was already added in Phase 1).
+
+**repository** — `PgLeaveRequestRepository` gained the two new columns end-to-end: `COLUMNS` now selects `cancelled_by, cancelled_at`; `LeaveRequestRow`/`mapRow` carry them; `create` inserts 14 values; and `FIELD_COLUMNS` maps `cancelledBy: 'cancelled_by'` / `cancelledAt: 'cancelled_at'` so `update` can set them.
+
+**service** — `ILeaveService` gained `cancel(actor, requestId)`; `LeaveService.cancel` implements it plus a private `assertCanCancel` helper.
+
+- `assertCanCancel` authorization: the owner may cancel their own DRAFT or SUBMITTED request; otherwise only an APPROVED request may be cancelled, by the direct manager (`employee.managerId === actor.id`) or an ADMIN (exempt from the direct-manager check). All other combinations throw ForbiddenError.
+- Timing guard: cancellation is blocked once `startDate <= today` (UTC day comparison) with ConflictError — this is what removes any need to pro-rate the released balance.
+- Balance release (full `requestedDays`, no pro-rating): DRAFT → no balance read or write; SUBMITTED → `pendingDays -= requestedDays`; APPROVED → `usedDays -= requestedDays`. The balance row is read with `forUpdate = true` (row lock) before the write, exactly as submit/approve/reject.
+- Status transition: `status → CANCELLED` with `cancelledBy = actor.id` and `cancelledAt = now`.
+- Side effects: a CANCEL audit entry (`AuditAction.CANCEL`) and a synchronous cancellation notification to the requester.
+- Atomicity: the whole operation runs inside one `uow.withTransaction`, with the client threaded through every repository/service call.
+
+**tests** — the `cancel` describe block in `tests/unit/modules/leave/leave.service.test.ts` covers owner-cancels-DRAFT (no balance touch), owner-cancels-SUBMITTED (pendingDays release), direct-manager-cancels-APPROVED (usedDays release), ADMIN-cancels-APPROVED, the ForbiddenError guards (non-owner, owner-cancels-own-APPROVED, non-direct-manager), the timing ConflictError, and NotFoundError — all with containment-based transaction assertions (single `withTransaction` callback, stub client forwarded).
+
+**Divergences from the plan worth noting:**
+- The `POST /leaves/:id/cancel` route (recommended phase 3) was **not** added — `leave.routes.ts` still exposes only the four original endpoints (`POST /leaves`, `/submit`, `/approve`, `/reject`). The service and tests are complete, but there is no HTTP surface for cancellation yet.
+- The plan's phase 2 prescribed "no tests in this phase" (tests were phase 4); the implementation delivered the service and the tests together, skipping the route.
+- The plan prescribed reading the balance row with the row lock "exactly as submit/approve/reject do"; the implementation skips the balance read entirely for DRAFT (which reserved nothing), reading/locking only for SUBMITTED and APPROVED.
+
 ### Open questions
-- ADMIN cancellation authority for APPROVED requests.
-- Whether APPROVED cancellation is allowed after startDate/endDate has passed.
-- Whether usedDays release is full or pro-rated when leave has partially elapsed.
+- ADMIN cancellation authority for APPROVED requests — **resolved**: ADMIN may cancel an APPROVED request for anyone (exempt from the direct-manager check).
+- Whether APPROVED cancellation is allowed after startDate/endDate has passed — **resolved**: blocked once `startDate <= today` (ConflictError).
+- Whether usedDays release is full or pro-rated when leave has partially elapsed — **resolved**: full release, no pro-rating, because the timing guard makes cancellation possible only before the leave starts.
+- The `POST /leaves/:id/cancel` route remains unimplemented (see Phase 2 divergences).
 <!-- gestalt:architecture feature=621bb1fd-0965-415a-bf2e-ec2c42b15f04 END -->
