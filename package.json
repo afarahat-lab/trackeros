@@ -7,7 +7,11 @@
     "start": "ts-node src/index.ts",
     "build": "./node_modules/.bin/tsc --noEmit",
     "test": "jest --passWithNoTests --forceExit",
-    "lint": "echo \"No lint configured\""
+    "lint": "echo \"No lint configured\"",
+    "migrate": "knex migrate:latest",
+    "migrate:rollback": "knex migrate:rollback",
+    "migrate:make": "knex migrate:make",
+    "smoke:migrate": "rm -f ./.smoke.sqlite && knex migrate:latest --env test"
   },
   "dependencies": {
     "bcrypt": "^5.0.1",
@@ -30,6 +34,7 @@
     "@types/node": "^16.0.0",
     "@types/pg": "^8.6.1",
     "jest": "^29.0.0",
+    "sqlite3": "^6.0.1",
     "ts-jest": "^29.0.0",
     "ts-node": "^10.0.0",
     "typescript": "^5.0.0"
