@@ -298,7 +298,7 @@ This phase delivered only the shared-enum change (recommended phase 1); the canc
 
 ### Phase 2 delivered (cancel service, model/repository support, and unit tests)
 
-This phase completes the cancellation flow's service, persistence, and test layers. The `POST /leaves/:id/cancel` route (recommended phase 3) was **not** added — see divergences.
+This phase completes the cancellation flow's service, persistence, and test layers. The `POST /leaves/:id/cancel` route (recommended phase 3) was **not** added in this phase — it was delivered in Phase 3 (see below).
 
 **model** — `LeaveRequest` gained `cancelledBy: string | null` and `cancelledAt: Date | null` (both null until cancelled), bringing the entity to 14 fields. `CreateLeaveRequestInput` is unchanged in shape (still `Omit<LeaveRequest, 'id'>`), so `create` now supplies both new fields as `null`.
 
@@ -318,13 +318,20 @@ This phase completes the cancellation flow's service, persistence, and test laye
 **tests** — the `cancel` describe block in `tests/unit/modules/leave/leave.service.test.ts` covers owner-cancels-DRAFT (no balance touch), owner-cancels-SUBMITTED (pendingDays release), direct-manager-cancels-APPROVED (usedDays release), ADMIN-cancels-APPROVED, the ForbiddenError guards (non-owner, owner-cancels-own-APPROVED, non-direct-manager), the timing ConflictError, and NotFoundError — all with containment-based transaction assertions (single `withTransaction` callback, stub client forwarded).
 
 **Divergences from the plan worth noting:**
-- The `POST /leaves/:id/cancel` route (recommended phase 3) was **not** added — `leave.routes.ts` still exposes only the four original endpoints (`POST /leaves`, `/submit`, `/approve`, `/reject`). The service and tests are complete, but there is no HTTP surface for cancellation yet.
-- The plan's phase 2 prescribed "no tests in this phase" (tests were phase 4); the implementation delivered the service and the tests together, skipping the route.
+- The plan's phase 2 prescribed "no tests in this phase" (tests were phase 4); the implementation delivered the service and the tests together, deferring the route to Phase 3.
 - The plan prescribed reading the balance row with the row lock "exactly as submit/approve/reject do"; the implementation skips the balance read entirely for DRAFT (which reserved nothing), reading/locking only for SUBMITTED and APPROVED.
+
+### Phase 3 delivered (POST /leaves/:id/cancel route)
+
+This phase adds the HTTP surface for cancellation, completing the four recommended phases.
+
+**routes** — `leaveRoutes(fastify)` in `src/modules/leave/leave.routes.ts` gained a fifth endpoint, `POST /leaves/:id/cancel` (200), following the existing conventions exactly: no controller file (the route calls `leaveService.cancel(actor, request.params.id)` directly), `resolveActor` extracts `request.user` and enforces role membership at the API boundary (UnauthorizedError on missing/invalid actor), `sendError` maps `AppError` to `{ error, code }` with the correct status and any other throw to 500, and the service instance is resolved from `fastify.leaveService` if present, else `createLeaveService()`. The endpoint mirrors the submit/approve/reject handlers (try/catch → `request.log.error` → `sendError`).
+
+**Divergences from the plan worth noting:**
+- None — this phase matches PLAN.md Phase 3 exactly (one file, `leave.routes.ts`, no service logic, no tests).
 
 ### Open questions
 - ADMIN cancellation authority for APPROVED requests — **resolved**: ADMIN may cancel an APPROVED request for anyone (exempt from the direct-manager check).
 - Whether APPROVED cancellation is allowed after startDate/endDate has passed — **resolved**: blocked once `startDate <= today` (ConflictError).
 - Whether usedDays release is full or pro-rated when leave has partially elapsed — **resolved**: full release, no pro-rating, because the timing guard makes cancellation possible only before the leave starts.
-- The `POST /leaves/:id/cancel` route remains unimplemented (see Phase 2 divergences).
 <!-- gestalt:architecture feature=621bb1fd-0965-415a-bf2e-ec2c42b15f04 END -->
