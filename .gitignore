@@ -21,3 +21,6 @@ node_modules/
 # self-heal retry ADOPTS instead of regenerating. Ignoring it would silently break
 # both. What was removed from `main` was 52 dead correlation directories from
 # finished runs, which are scratch only once their run has ended.
+
+# throwaway smoke-check database
+.smoke.sqlite
