@@ -237,3 +237,56 @@ This sub-phase adds the Jest unit tests for the `LeaveService` orchestration del
 ### Open questions
 Day-count calendar vs business days; accrual model; carry-forward cap; migration mechanism; controller layer; BullMQ for notifications.
 <!-- gestalt:architecture feature=babd3932-368b-46a5-a4dc-6dccaafd84ba END -->
+
+<!-- gestalt:architecture feature=621bb1fd-0965-415a-bf2e-ec2c42b15f04 START -->
+## Feature: Leave cancellation flow
+
+### Stack compliance
+TypeScript 20, Fastify, PostgreSQL via pg, modular monolith. No stack deviations.
+
+### Domain entities
+- **LeaveRequest** — lifecycle: DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED. Gains `cancelledBy` and `cancelledAt` (null until cancelled).
+- **LeaveBalance** — lifecycle: OPEN, CLOSED. Cancellation mutates `pendingDays` (DRAFT/SUBMITTED) or `usedDays` (APPROVED).
+- **AuditLog** — lifecycle: RECORDED. Immutable record; cancellation writes action CANCEL.
+- **Notification** — lifecycle: PENDING, SENT, READ, ARCHIVED. Notifies affected employee.
+
+### Conceptual tables (no DDL)
+- **leave_requests**: id, employee_id, leave_type_code, start_date, end_date, requested_days, reason, status, approver_id, approval_comment, submitted_at, decided_at, cancelled_by, cancelled_at. PK id. FKs employee_id -> employees.id, leave_type_code -> leave_types.code, approver_id -> employees.id, cancelled_by -> employees.id. Indexes: employee_id, status, (leave_type_code, start_date).
+- **leave_balances**: id, employee_id, leave_type_code, period_start, period_end, entitled_days, used_days, pending_days. PK id. FKs employee_id -> employees.id, leave_type_code -> leave_types.code. Unique index (employee_id, leave_type_code, period_start, period_end); index employee_id.
+- **audit_logs**: id, actor_id, action, entity_type, entity_id, before_state, after_state, occurred_at. PK id. FK actor_id -> employees.id. Indexes (entity_type, entity_id), actor_id.
+- **notifications**: id, recipient_id, type, title, message, related_entity_type, related_entity_id, status, created_at, read_at. PK id. FK recipient_id -> employees.id. Indexes recipient_id, status.
+
+### Repositories
+- ILeaveRepository -> PgLeaveRequestRepository: create, findById, update, findByQuery
+- IBalanceRepository -> PgLeaveBalanceRepository: create, findById, findByKey, update
+- IAuditRepository -> PgAuditLogRepository: create, findById
+- INotificationRepository -> PgNotificationRepository: create, findById, updateStatus
+
+### Modules
+- **leave** (`src/modules/leave/`) owns ILeaveService.cancel + LeaveService.cancel orchestration, cancellation authorization, balance release, POST /leaves/:id/cancel, CANCEL audit + notification.
+- **shared-types** (`src/shared/types/`) owns AuditAction.CANCEL enum value.
+
+### Dependency map
+leave -> shared-types, balance, audit, notification, employee, validation, policy, shared-db, shared-errors.
+
+### Cross-cutting contracts
+- **Auth**: request.user: { id: string; role: EmployeeRole } where EmployeeRole = 'EMPLOYEE' | 'MANAGER' | 'ADMIN'. JWT bearer verified by auth middleware; resolveActor validates presence/role at API boundary; RBAC enforced in service (owner DRAFT/SUBMITTED, direct-manager APPROVED), never inline in route.
+- **Error**: Errors return { error: string; code: string }. Validation -> 400 ValidationError; auth -> 401 UnauthorizedError; authorization -> 403 ForbiddenError; not found -> 404 NotFoundError; invalid state transition -> 409 ConflictError; other -> 500.
+- **Transaction**: Cancellation is atomic via IUnitOfWork.withTransaction (PgUnitOfWork: PoolClient, BEGIN, callback, COMMIT/ROLLBACK, release). Repository/service methods that join a caller transaction take optional trailing PoolClient; cancel passes client to ILeaveRepository.update, IBalanceRepository.update, IAuditService.record, INotificationService.create. Balance reads before write use findByKey with forUpdate=true.
+
+### Resolved conflicts
+- Added `cancelled_by` and `cancelled_at` to leave_requests to match LeaveRequest.cancelledBy/cancelledAt.
+- Added AuditAction.CANCEL to shared-types (resolves data open question).
+- Balance release uses canonical inclusive day count: requestedDays = endDate - startDate + 1.
+
+### Recommended phases
+1. Add AuditAction.CANCEL to shared-types.
+2. Add cancel to ILeaveService + LeaveService.
+3. Add POST /leaves/:id/cancel route.
+4. LeaveService cancel unit tests.
+
+### Open questions
+- ADMIN cancellation authority for APPROVED requests.
+- Whether APPROVED cancellation is allowed after startDate/endDate has passed.
+- Whether usedDays release is full or pro-rated when leave has partially elapsed.
+<!-- gestalt:architecture feature=621bb1fd-0965-415a-bf2e-ec2c42b15f04 END -->

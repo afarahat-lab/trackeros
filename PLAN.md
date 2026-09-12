@@ -1,82 +1,39 @@
 # PLAN.md
 
-## Phase 1: Phase 1 — Shared foundations (types, errors, unit-of-work)
+## Phase 1: Phase 1 — Add AuditAction.CANCEL to shared-types
 
-Create the shared foundation files that every later module imports. All paths below are the AUTHORITATIVE module boundaries — do not relocate any symbol.
+Add the `CANCEL = 'CANCEL'` member to the `AuditAction` enum in `src/shared/types/index.ts` (the shared-types module owns this cross-module value type). Do NOT reuse UPDATE or DELETE. Read the existing `AuditAction` enum in `src/shared/types/index.ts` before editing so the new member matches the existing member style (string literal values). After adding the member, search the codebase for any consumer that switches exhaustively on `AuditAction` (e.g. `src/modules/audit/audit.service.ts` and any other switch statements) and update those consumers so the new CANCEL case is handled — do not leave a non-exhaustive switch that would fail typecheck. This phase touches approximately 1-2 files (the enum plus any exhaustive-switch consumer). No new modules, no routes, no service logic. Include a Jest unit test under `tests/unit/shared/` asserting the `AuditAction` enum now contains the CANCEL member with value 'CANCEL' (extend the existing shared enum test file if one exists).
 
-1. src/shared/types/index.ts — define the canonical enums and cross-module DTOs:
-   - LeaveStatus enum: DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED (persisted string values, per DOMAIN.md).
-   - LeaveTypeCode enum: ANNUAL, SICK, EMERGENCY (plus unpaid/maternity/paternity per DOMAIN.md scheme).
-   - AuditAction enum: CREATE, UPDATE, DELETE, APPROVE, REJECT.
-   - NotificationStatus enum: PENDING, SENT, READ, ARCHIVED.
-   - EmploymentStatus enum: ACTIVE, TERMINATED, ON_LEAVE.
-   - EmployeeRole enum: EMPLOYEE, MANAGER, ADMIN.
-   - CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveRequestQueryParams interfaces. Use the EXACT canonical field names from the entity shapes (e.g. CreateLeaveRequestDto: employeeId, leaveTypeCode, startDate, endDate, reason; UpdateLeaveRequestDto: startDate, endDate, reason, status).
+## Phase 2: Phase 2 — Add cancel to ILeaveService + LeaveService
 
-2. src/shared/errors/index.ts — define AppError base class (message, statusCode, code) and subclasses: ValidationError (400), NotFoundError (404), UnauthorizedError (401), ForbiddenError (403), ConflictError (409).
+Add a `cancel(actor: LeaveActor, requestId: string)` method to `ILeaveService` and implement it in `LeaveService` in `src/modules/leave/leave.service.ts`. This phase depends on `src/shared/types/index.ts` (AuditAction.CANCEL from Phase 1) and the existing `src/modules/leave/leave.service.ts` (ILeaveService, LeaveService, LeaveActor, the eight injected collaborators, and the existing create/submit/approve/reject implementations) — read both before generating code.
 
-3. src/shared/db/unit-of-work.ts — define IUnitOfWork interface with withTransaction<T>(work: (tx: unknown) => Promise<T>): Promise<T>, and PgUnitOfWork implementation using the existing pool from src/shared/db/connection.ts (read it first). PgUnitOfWork opens a client, BEGIN/COMMIT/ROLLBACK, and reuses the client within the transaction.
+Implement `cancel` per the binding rules:
+- Authorization: owner may cancel their own DRAFT or SUBMITTED request; the direct manager (`employee.managerId === actor.id`) may cancel an APPROVED request; ADMIN may cancel an APPROVED request for anyone. Mirror the existing `assertCanDecide` shape (ADMIN exempt from the direct-manager check, MANAGER not; no acting on your own request where that rule applies). Throw ForbiddenError otherwise.
+- Timing guard: block cancellation once `startDate <= today` (startDate today or in the past) with ConflictError. This makes pro-rating unnecessary.
+- Balance release (full `requestedDays`, no pro-rating): DRAFT → no balance change; SUBMITTED → `pendingDays -= requestedDays`; APPROVED → `usedDays -= requestedDays`. Read the balance row with the row lock (`forUpdate` flag) before writing, exactly as submit/approve/reject do.
+- Status transition: set status → CANCELLED and populate `cancelledBy = actor.id` and `cancelledAt = now` (the LeaveRequest entity has these fields; ensure the repository's `UpdateLeaveRequestDto`/`FIELD_COLUMNS` map supports `cancelledBy`/`cancelledAt` — if not, add those two fields to the update DTO and column map in `src/modules/leave/leave.repository.ts` as part of this phase).
+- Side effects: record a CANCEL audit entry (action `AuditAction.CANCEL`) and insert a synchronous cancellation notification to the affected employee.
+- Atomicity: the whole operation (status change, balance release, audit entry, notification) is ONE unit of work via `IUnitOfWork.withTransaction`, with the client threaded through every call.
 
-Include Jest unit tests in tests/unit/shared/ for the error classes and enums. This phase depends on the existing src/shared/db/connection.ts (read it before generating PgUnitOfWork).
+This phase touches approximately 1-2 files (`leave.service.ts`, and `leave.repository.ts` only if the update DTO/column map lacks `cancelledBy`/`cancelledAt`). No routes, no tests in this phase.
 
-## Phase 2: Phase 2 — employee, leave-type, and policy modules
+## Phase 3: Phase 3 — Add POST /leaves/:id/cancel route
 
-Build three reference-data modules. Each module lives under its declared directory and exposes a public index.ts. Use the EXACT canonical entity field shapes below — do not rename, split, add, or omit fields.
+Add a `POST /leaves/:id/cancel` endpoint to `leaveRoutes(fastify)` in `src/modules/leave/leave.routes.ts`. This phase depends on `src/modules/leave/leave.service.ts` (the `cancel` method added in Phase 2) and the existing `src/modules/leave/leave.routes.ts` (the `resolveActor` helper, `sendError` helper, and the existing four endpoints) — read both before generating code.
 
-1. src/modules/employee/ — Employee model (id, employeeNumber, firstName, lastName, email, role, managerId, department, hireDate, terminationDate, employmentStatus), IEmployeeRepository + PgEmployeeRepository, IEmployeeService + EmployeeService, and public index.ts. Import EmployeeRole and EmploymentStatus from src/shared/types/index.ts (Phase 1).
+Follow the existing route conventions exactly: no controller file (routes call the service directly), `resolveActor` extracts `request.user` and enforces role membership at the API boundary (UnauthorizedError on missing/invalid actor), `sendError` maps `AppError` to `{ error, code }` with the correct status and any other throw to 500. The endpoint returns 200 on success and calls `service.cancel(actor, request.params.id)`. Resolve the service instance from `fastify.leaveService` if present, else `createLeaveService()`, matching the existing endpoints. Ensure `src/modules/leave/index.ts` already re-exports `leaveRoutes` (no change needed unless the route registration signature changed). This phase touches approximately 1 file (`leave.routes.ts`). No service logic, no tests in this phase.
 
-2. src/modules/leave-type/ — LeaveType model (code, name, requiresApproval, maxConsecutiveDays, isPaid), ILeaveTypeRepository + PgLeaveTypeRepository, ILeaveTypeService + LeaveTypeService, public index.ts. Import LeaveTypeCode from src/shared/types/index.ts.
+## Phase 4: Phase 4 — LeaveService cancel unit tests
 
-3. src/modules/policy/ — LeavePolicy model (id, leaveTypeCode, policyName, annualEntitlementDays, accrualPeriodMonths, carryForwardDays, minNoticeDays, maxRequestDays, requiresManagerApproval, effectiveFrom, effectiveTo, status), IPolicyRepository + PgLeavePolicyRepository, IPolicyService + PolicyService, public index.ts.
+Add Jest unit tests for the `LeaveService.cancel` operation to `tests/unit/modules/leave/leave.service.test.ts` (extend the existing suite from Phase 6c). This phase depends on `src/modules/leave/leave.service.ts` (the `cancel` implementation from Phase 2) and the existing `tests/unit/modules/leave/leave.service.test.ts` (the eight in-memory fakes — FakeLeaveRepository, FakeBalanceRepository, FakeAuditService, FakeNotificationService, FakeValidationService, FakeEmployeeService, FakePolicyService, FakeUnitOfWork — and the containment-based transaction assertions) — read both before generating code. Treat the Phase 2/3 deliverables as fixed contracts; do not modify production source.
 
-Repositories use the existing pool from src/shared/db/connection.ts and the shared error types from src/shared/errors/index.ts. Include Jest unit tests in tests/unit/modules/ for each module's service. This phase depends on Phase 1 files: src/shared/types/index.ts and src/shared/errors/index.ts — read them before generating any code that references their types.
+Coverage for `cancel`:
+- Authorization guards: owner may cancel own DRAFT/SUBMITTED (ForbiddenError on non-owner); direct manager may cancel an APPROVED request for their direct report (ForbiddenError when actor is not the direct manager); ADMIN may cancel an APPROVED request for anyone (ADMIN exempt from the direct-manager check); no acting on your own request where that rule applies.
+- Timing guard: ConflictError when `startDate <= today` (today or past).
+- Balance release (full `requestedDays`, no pro-rating): DRAFT → no balance change; SUBMITTED → `pendingDays -= requestedDays`; APPROVED → `usedDays -= requestedDays`. Assert the balance row is read with the row lock (`forUpdate` flag) before writing.
+- Status transition: status → CANCELLED with `cancelledBy = actor.id` and `cancelledAt` set.
+- Side effects: a CANCEL audit entry (action `AuditAction.CANCEL`) and a synchronous cancellation notification to the affected employee.
+- Atomicity: assert all steps occur inside the single `withTransaction` callback with the stub client forwarded to each repository/service call (containment-based, matching the existing suite's convention).
 
-## Phase 3: Phase 3 — audit and notification modules
-
-Build two modules, each under its declared directory with a public index.ts. Use the EXACT canonical entity field shapes.
-
-1. src/modules/audit/ — AuditLog model (id, actorId, action, entityType, entityId, beforeState, afterState, occurredAt), IAuditRepository + PgAuditLogRepository, IAuditService + AuditService, public index.ts. Import AuditAction from src/shared/types/index.ts.
-
-2. src/modules/notification/ — Notification model (id, recipientId, type, title, message, relatedEntityType, relatedEntityId, status, createdAt, readAt), INotificationRepository + PgNotificationRepository, INotificationService + NotificationService, public index.ts. Import NotificationStatus from src/shared/types/index.ts.
-
-Notifications are SYNCHRONOUS direct inserts (no BullMQ) — the service inserts within the caller's transaction boundary. Repositories use the pool from src/shared/db/connection.ts and error types from src/shared/errors/index.ts. Include Jest unit tests in tests/unit/modules/ for each service. This phase depends on Phase 1 files: src/shared/types/index.ts and src/shared/errors/index.ts — read them before generating code referencing their types.
-
-## Phase 4: Phase 4 — balance module
-
-Build the balance module under src/modules/balance/ with a public index.ts. Use the EXACT canonical LeaveBalance field shape: id, employeeId, leaveTypeCode, periodStart, periodEnd, entitledDays, usedDays, pendingDays.
-
-Create:
-- src/modules/balance/balance.model.ts — LeaveBalance interface.
-- src/modules/balance/balance.repository.ts — IBalanceRepository + PgLeaveBalanceRepository (uses pool from src/shared/db/connection.ts).
-- src/modules/balance/balance.service.ts — IBalanceService + BalanceService.
-- src/modules/balance/index.ts — public exports.
-
-The service MUST implement the BINDING accrual and carry-forward rules: grant the FULL entitlement at the start of each accrual period (no pro-rata); on period close, carry forward min(unused, carryForwardDays) into the next OPEN period (hard cap, days above cap forfeited). Import LeaveTypeCode from src/shared/types/index.ts and error types from src/shared/errors/index.ts. Include Jest unit tests in tests/unit/modules/balance/ covering accrual and carry-forward. This phase depends on Phase 1 files (src/shared/types/index.ts, src/shared/errors/index.ts) and Phase 2's src/modules/leave-type/index.ts and src/modules/policy/index.ts (for LeaveTypeCode and carryForwardDays) — read them before generating code referencing their types.
-
-## Phase 5: Phase 5 — validation module
-
-Build the validation module under src/modules/validation/ with a public index.ts.
-
-Create:
-- src/modules/validation/validation.model.ts — ValidationResult model (e.g. { valid: boolean; errors: string[] }).
-- src/modules/validation/validation.service.ts — IValidationService + ValidationService.
-- src/modules/validation/index.ts — public exports.
-
-The service implements the BINDING day-count rule ONCE as a shared helper: requestedDays = endDate - startDate + 1 (INCLUSIVE, all calendar days, no weekend/holiday exclusion, whole-day only). Expose this helper (e.g. calculateRequestedDays) so every consumer (sufficiency checks, balance deduction, policy max-duration enforcement) calls it — do not re-derive per module. Also implement date-range validation (startDate <= endDate) and balance-sufficiency checks against LeaveBalance (entitledDays - usedDays - pendingDays >= requestedDays).
-
-Import LeaveTypeCode and CreateLeaveRequestDto from src/shared/types/index.ts, error types from src/shared/errors/index.ts, and LeaveBalance from src/modules/balance/index.ts (Phase 4). Include Jest unit tests in tests/unit/modules/validation/ covering inclusive day counting and sufficiency. This phase depends on Phase 1 (src/shared/types/index.ts, src/shared/errors/index.ts) and Phase 4 (src/modules/balance/index.ts) — read them before generating code referencing their types.
-
-## Phase 6: Phase 6 — leave module (service + controller + routes)
-
-Build the leave module under src/modules/leave/ with a public index.ts. Use the EXACT canonical LeaveRequest field shape: id, employeeId, leaveTypeCode, startDate, endDate, requestedDays, reason, status, approverId, approvalComment, submittedAt, decidedAt.
-
-Create:
-- src/modules/leave/leave.model.ts — LeaveRequest interface.
-- src/modules/leave/leave.repository.ts — ILeaveRepository + PgLeaveRequestRepository (uses pool from src/shared/db/connection.ts).
-- src/modules/leave/leave.service.ts — ILeaveService + LeaveService (orchestration).
-- src/modules/leave/leave.routes.ts — Fastify routes.
-- src/modules/leave/index.ts — public exports.
-
-Per BINDING rule 5, routes call services DIRECTLY (matching the existing src/modules/uptime/uptime.routes.ts pattern) — do NOT create a separate controller file. The service orchestrates the full workflow: create (DRAFT), submit (SUBMITTED), approve/reject (APPROVED/REJECTED). The approve/reject transaction MUST run inside PgUnitOfWork.withTransaction (from src/shared/db/unit-of-work.ts) and atomically perform: status change + balance update (usedDays/pendingDays) + audit log insert + synchronous notification insert. requestedDays is computed via the shared helper from src/modules/validation/index.ts (Phase 5) — never re-derive it.
-
-Import from: src/shared/types/index.ts (LeaveStatus, CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveRequestQueryParams), src/shared/errors/index.ts, src/shared/db/unit-of-work.ts, src/modules/balance/index.ts, src/modules/audit/index.ts, src/modules/notification/index.ts, src/modules/validation/index.ts. Include Jest unit tests in tests/unit/modules/leave/ for the service orchestration. This phase depends on Phases 1, 3, 4, and 5 — read those index.ts files before generating code referencing their types.
+This phase touches approximately 1 file (`tests/unit/modules/leave/leave.service.test.ts`).
