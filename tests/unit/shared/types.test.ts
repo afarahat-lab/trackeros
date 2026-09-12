@@ -30,13 +30,14 @@ describe('shared enums', () => {
     ]);
   });
 
-  it('AuditAction exposes exactly CREATE, UPDATE, DELETE, APPROVE, REJECT', () => {
+  it('AuditAction exposes exactly CREATE, UPDATE, DELETE, APPROVE, REJECT, CANCEL', () => {
     expect(Object.values(AuditAction)).toEqual([
       'CREATE',
       'UPDATE',
       'DELETE',
       'APPROVE',
       'REJECT',
+      'CANCEL',
     ]);
   });
 

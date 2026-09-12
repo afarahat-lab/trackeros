@@ -1,23 +1,14 @@
-# Implement this phase: Phase 6c — leave service unit tests
+# Implement this phase: Phase 1 — Add AuditAction.CANCEL to shared-types
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/babd3932-368b-46a5-a4dc-6dccaafd84ba/8`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/621bb1fd-0965-415a-bf2e-ec2c42b15f04/1`. Do not clone anything; work only in this directory.
 
 You are the IMPLEMENTATION agent, not a planner. The platform measures your work EXCLUSIVELY by the files you create or modify in this working tree (`git status`). Ending your turn with a plan, a summary, or an announcement of what you are 'about to' do — without having actually edited files — is a FAILURE: a turn that leaves the working tree untouched is discarded. Explore only as much as you need, then MAKE the edits with your file-editing tool. Never end your turn before the files exist on disk.
 
 ## What to build
-tests/unit/modules/leave/leave.service.test.ts contains Jest unit tests for LeaveService orchestration: create (DRAFT), submit (SUBMITTED), approve (APPROVED), and reject (REJECTED).
-Tests verify the approve/reject transaction atomically performs status change, balance update, audit log insert, and synchronous notification insert, with repository/unit-of-work/balance/audit/notification/validation dependencies mocked.
-Tests pass when run with the project's Jest configuration.
+(no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Add Jest unit tests for the leave service orchestration built in Phase 6b.
-
-Create tests under tests/unit/modules/leave/ covering the LeaveService orchestration: create (DRAFT), submit (SUBMITTED), approve (APPROVED), reject (REJECTED), and the atomic approve/reject transaction behavior (status change + balance update + audit log insert + synchronous notification insert). Mock the repository, unit-of-work, balance, audit, notification, and validation dependencies. Depends on Phases 1, 3, 4, 5, 6a, and 6b.
-
-## Owned by SIBLING sub-phases (OUT OF SCOPE for this sub-phase)
-This is ONE sub-phase of a split phase. The deliverables below belong to sibling sub-phases — do NOT create them here, do NOT list them as success criteria, and this sub-phase MUST NOT be gated on their presence (they are produced by a sibling, not missing):
-- "Phase 6a — leave model + repository": src/modules/leave/leave.model.ts, src/modules/leave/leave.repository.ts
-- "Phase 6b — leave service + routes + public index": src/modules/leave/leave.service.ts, src/modules/leave/leave.routes.ts, src/modules/leave/index.ts
+Add the `CANCEL = 'CANCEL'` member to the `AuditAction` enum in `src/shared/types/index.ts` (the shared-types module owns this cross-module value type). Do NOT reuse UPDATE or DELETE. Read the existing `AuditAction` enum in `src/shared/types/index.ts` before editing so the new member matches the existing member style (string literal values). After adding the member, search the codebase for any consumer that switches exhaustively on `AuditAction` (e.g. `src/modules/audit/audit.service.ts` and any other switch statements) and update those consumers so the new CANCEL case is handled — do not leave a non-exhaustive switch that would fail typecheck. This phase touches approximately 1-2 files (the enum plus any exhaustive-switch consumer). No new modules, no routes, no service logic. Include a Jest unit test under `tests/unit/shared/` asserting the `AuditAction` enum now contains the CANCEL member with value 'CANCEL' (extend the existing shared enum test file if one exists).
 
 ## Your iteration budget — and how to get more (READ BEFORE YOU START)
 
@@ -53,70 +44,31 @@ Then delegate the implementation slices.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
-- CONSOLIDATED DECISION — all 12 questions. Guiding principles: follow the EXISTING codebase convention where one exists; prefer the simplest rule that is consistent across every consumer; add no new runtime dependency unless required; treat DOMAIN.md as canonical for domain vocabulary.
+- CONSOLIDATED DECISION — all 5 questions. Guiding principle: pick the rule set that makes the hardest sub-problem disappear rather than the one that needs the most logic. Questions 2, 3 and 5 are the same decision asked three ways (what happens to leave that has already begun); answering 2 determines 3 and 5, and they are answered consistently below.
 
-1. DAY COUNT: Count ALL CALENDAR DAYS, inclusive. requestedDays = endDate - startDate + 1. Do NOT exclude weekends or public holidays. This single derivation is canonical and MUST be used identically by sufficiency checks, balance deduction, and policy max-duration enforcement — implement it ONCE as a shared helper and call it from every consumer; do not re-derive it per module.
+1. ADMIN AUTHORIZATION: ADMIN may cancel an APPROVED request for anyone. Mirror the existing `assertCanDecide` exactly — ADMIN is exempt from the direct-manager check, MANAGER is not. Do NOT invent a second, different authorization shape for cancel: same roles, same exemption, same "may not act on your own request" rule where it applies. Concretely: owner may cancel their own DRAFT or SUBMITTED request; the direct manager (employee.managerId === actor.id) may cancel an APPROVED request; ADMIN may cancel an APPROVED request for anyone.
 
-2. ACCRUAL: Grant the FULL entitlement at the start of each accrual period. No pro-rata, no monthly installments. entitledDays is the policy's full allowance for the period regardless of how much of the period has elapsed.
+2. TIMING: Allow cancellation ONLY before startDate. A request whose startDate is today or in the past may NOT be cancelled — throw ConflictError. This is the binding rule; it is what makes questions 3 and 5 trivial.
 
-3. CARRY FORWARD: Carry forward unused entitled days up to the fixed cap in carryForwardDays (a HARD CAP, not a fixed allowance). Days above the cap are forfeited. When a balance period is CLOSED, min(unused, carryForwardDays) rolls into the next OPEN period.
+3. PRO-RATING: Release the FULL requestedDays. No pro-rating, ever. This follows directly from decision 2: if cancellation is only possible before the leave starts, then no day has been consumed, so a partial release can never be correct. Do NOT implement elapsed-day arithmetic — there is no case that needs it.
 
-4. MIGRATIONS: Adopt knex migrations. knex is already in package.json — use it rather than adding a new tool. Create the knexfile and a migrations directory as part of the persistence work.
+4. AUDIT ACTION: Add `CANCEL = 'CANCEL'` to the AuditAction enum in src/shared/types and use it. Do NOT reuse UPDATE or DELETE. GP-002 requires state changes to be auditable, and an audit trail that cannot distinguish a cancellation from an ordinary edit fails that purpose — the whole value of the entry is knowing what happened. This is a deliberate shared-enum change; update every consumer that switches exhaustively on AuditAction.
 
-5. CONTROLLER LAYER: Routes call services DIRECTLY, matching the existing uptime module pattern. Do NOT introduce controller files for any new module. Consistency with the existing codebase wins, and it keeps per-phase file counts smaller.
+5. DUPLICATE of question 2 — same decision, stated as the guard: block cancellation once startDate <= today with a ConflictError. Because that guard exists, the usedDays release is unconditional and always the full requestedDays; there is no over-release case to defend against.
 
-6. NOTIFICATIONS: Keep notifications SYNCHRONOUS (direct insert). Do NOT add BullMQ. Do not defer notifications entirely — implement them synchronously inside the existing transaction boundary.
-
-7. ENUM NAMING: Adopt the DOMAIN.md scheme as canonical. LeaveStatus = DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED. LeaveType = lowercase annual, sick, emergency, unpaid, maternity, paternity. These are the persisted string values in leave_requests.status and leave_policies.leave_type. Where root ARCHITECTURE.md disagrees, DOMAIN.md wins and ARCHITECTURE.md should be updated to match.
-
-8. PERSISTENCE INFRASTRUCTURE: YES — create the concrete PgUnitOfWork implementation of IUnitOfWork, plus the shared base repository and shared error types, IN THIS persistence slice. Do NOT defer them to a separate shared-infrastructure phase and do not reference them by interface only. The approve/reject transaction contract (status change + balance update + audit + notification) cannot be implemented without a concrete withTransaction, so it must exist before any consumer phase. Follow the established convention: the SERVICE owns the unit of work, the DATA-ACCESS layer opens it.
-
-9. DUPLICATE of question 4 — same decision: adopt knex migrations, create knexfile + migrations directory.
-
-10. DUPLICATE/REFINEMENT of question 1 — same decision: INCLUSIVE, days = endDate - startDate + 1. No half-day handling: leave is whole-day only. Half-days are out of scope.
-
-11. DUPLICATE of question 5 — same decision: routes call services directly, no controller layer, match the existing uptime pattern.
-
-12. DUPLICATE of question 6 — same decision: do NOT add BullMQ to package.json; notifications are synchronous direct inserts. [BINDING RULE — operator decision resolving: Should the inclusive calendar-day count (requestedDays = endDate - startDate + 1) exclude weekends and/or public holidays, or count all calendar days?; Should leave balances accrue pro-rata over the accrual period, or be granted in full at the start of each period?; Should unused entitled days carry forward to the next accrual period, and if so up to what cap?; What migration mechanism should be established for PostgreSQL schema changes?; Should a controller layer be introduced for all new modules, or should routes call services directly?; Should BullMQ be added for notification fanout/accrual jobs, or keep notifications synchronous?; Which naming scheme is canonical for LeaveStatus and LeaveType enums: DOMAIN.md (DRAFT/SUBMITTED/APPROVED/REJECTED/CANCELLED; annual/sick/emergency/unpaid/maternity/paternity) or root ARCHITECTURE.md (PENDING/APPROVED/REJECTED/CANCELLED; ANNUAL/SICK/MATERNITY/PATERNITY/UNPAID/OTHER)?; Should the persistence layer define the missing IUnitOfWork concrete implementation (PgUnitOfWork) and the shared base repository / error types, given none exist in the codebase?; What migration mechanism should be established, given no migrations or knexfile currently exist?; How should leave days be counted for a date range (inclusive vs exclusive end date, and half-day handling)?; Should a controller layer be introduced for new modules, or should routes call services directly (as the existing uptime module does)?; Should BullMQ be added to package.json before implementing notification fanout/accrual jobs?; apply everywhere these apply, not in one place only]
-
-## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
-The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
-- `Notification` — the entity MUST have exactly these fields:
-    - id
-    - recipientId
-    - type
-    - title
-    - message
-    - relatedEntityType
-    - relatedEntityId
-    - status
-    - createdAt
-    - readAt
+BALANCE EFFECTS (making the state transitions explicit, since they are the risky part):
+- Cancelling a DRAFT request: no balance change (a DRAFT reserved nothing).
+- Cancelling a SUBMITTED request: pendingDays -= requestedDays.
+- Cancelling an APPROVED request: usedDays -= requestedDays.
+In every case the balance row MUST be read with the row lock before it is written (the repository's `forUpdate` flag) — the deltas are computed in application code, so an unlocked read lets two concurrent operations lose one another's update. Cancel is a write path and must take the lock, exactly as submit/approve/reject do. The whole operation — status change, balance release, audit entry, notification — is ONE unit of work via IUnitOfWork.withTransaction, with the client threaded through every call. [BINDING RULE — operator decision resolving: Should ADMIN be able to cancel an APPROVED request (consistent with the existing assertCanDecide which exempts ADMIN from the direct-manager check), or is cancellation strictly limited to the owner (DRAFT/SUBMITTED) and the direct manager (APPROVED)?; Should a manager be allowed to cancel an APPROVED request after the leave start date has already passed (or after it has fully elapsed)?; When cancelling an APPROVED request that has already partially elapsed, should the released usedDays be pro-rated to only the unelapsed portion, or released in full?; The AuditAction enum (src/shared/types) has CREATE/UPDATE/DELETE/APPROVE/REJECT but no CANCEL. The cancel operation must record an audit entry (GP-002); which action value should it use?; Should cancelling an APPROVED request whose startDate is already in the past (leave partially or fully taken) be blocked, or is the full usedDays release always permitted regardless of elapsed time?; apply everywhere these apply, not in one place only]
 
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- The fake IUnitOfWork must mirror the FakeUnitOfWork pattern in the existing balance test (withTransaction runs the callback with a stub PoolClient) so transaction-boundary assertions are consistent across modules. (see `tests/unit/modules/balance/balance.service.test.ts`)
-- The LeaveService constructor signature and its eight injected collaborators (ILeaveRepository, IBalanceRepository, IAuditService, INotificationService, IValidationService, IEmployeeService, IPolicyService, IUnitOfWork) must be matched exactly as declared — tests must not assume a different dependency set. (see `src/modules/leave/leave.service.ts`)
-- The LeaveRequest shape (12 canonical fields incl. nullable reason/approverId/approvalComment/submittedAt/decidedAt) and CreateLeaveRequestInput used in test fixtures must match the model contract. (see `src/modules/leave/leave.model.ts`)
-- Typed error assertions must use the shared error classes (UnauthorizedError, ForbiddenError, ConflictError, NotFoundError, ValidationError) with their canonical status codes, not string matching. (see `src/shared/errors/index.ts`)
-- Enum values used in fixtures (LeaveStatus, LeaveTypeCode, EmployeeRole, AuditAction) must be the canonical members re-exported from shared types. (see `src/shared/types/index.ts`)
+- The new CANCEL member must match the existing string-literal member style (uppercase value equal to member name) of the AuditAction enum. (see `src/shared/types/index.ts`)
+- The updated test must extend the existing AuditAction member-list assertion in the shared enum test file rather than introducing a divergent assertion style. (see `tests/unit/shared/types.test.ts`)
 ### Entity invariants — enforce these
-- Reuse or extend `LeaveRequest`: Lifecycle transitions under test are strictly DRAFT → SUBMITTED → APPROVED|REJECTED; a request may only be submitted from DRAFT and only decided from SUBMITTED, and any other transition is rejected with ConflictError.
-- Reuse or extend `LeaveRequest`: employeeId is always the authenticated actor's id (the requester owns the request); approverId and decidedAt are null until an approve/reject decision, at which point approverId = actor.id and decidedAt is set.
-- Reuse or extend `LeaveBalance`: Reservation lifecycle counters: submit increments pendingDays by requestedDays; approve decrements pendingDays and increments usedDays by requestedDays; reject decrements pendingDays only; pendingDays must never go negative (guarded by ConflictError).
-- Reuse or extend `AuditLog`: Every state-changing operation (create, submit, approve, reject) produces exactly one audit record with the matching AuditAction (CREATE/UPDATE/APPROVE/REJECT) and entityType 'leave_request'.
-### Interface contract — expose these operations (their shape is yours)
-- create(actor, input) — Requires an authenticated actor (non-empty id, valid EmployeeRole); the created request's employeeId is forced to actor.id.; UnauthorizedError on missing/invalid actor; ValidationError/ConflictError from validateLeaveRequest; NotFoundError when no balance exists for the requested period.
-- submit(actor, requestId) — Owner-only: actor.id must equal request.employeeId.; ForbiddenError on non-owner; ConflictError on non-DRAFT state; NotFoundError on unknown request.
-- approve(actor, requestId) — MANAGER or ADMIN only; no self-approval; a MANAGER must be the requester's direct manager (ADMIN exempt).; ForbiddenError on role/self/manager violations; ConflictError on non-SUBMITTED state or insufficient pendingDays; NotFoundError on unknown request.
-- reject(actor, requestId) — MANAGER or ADMIN only; no self-rejection; a MANAGER must be the requester's direct manager (ADMIN exempt).; ForbiddenError on role/self/manager violations; ConflictError on non-SUBMITTED state or insufficient pendingDays; NotFoundError on unknown request.
-### Integration points — connect to these
-- src/modules/leave/leave.service.ts (LeaveService + ILeaveService + LeaveActor) — The system under test — its orchestration, guards, and transaction behavior are what the tests verify.
-- src/shared/db/index.ts (IUnitOfWork) — The transaction boundary the approve/reject atomicity tests exercise via a fake.
-- src/modules/balance/index.ts (IBalanceRepository, LeaveBalance) — Balance counter deltas (pendingDays/usedDays) asserted in submit/approve/reject tests.
-- src/modules/audit/index.ts (IAuditService) and src/modules/notification/index.ts (INotificationService) — Side-effect collaborators whose record/create calls the tests assert as part of the atomic unit of work.
-- src/modules/validation/index.ts (IValidationService), src/modules/employee/index.ts (IEmployeeService), src/modules/policy/index.ts (IPolicyService) — Validation, manager-resolution, and policy/balance-resolution collaborators that must be faked for create and decide flows.
+- Reuse or extend `AuditAction`: AuditAction is a string-literal enum whose members are the canonical persisted audit-action values; it must contain exactly CREATE, UPDATE, DELETE, APPROVE, REJECT, CANCEL in that order, each with an uppercase string-literal value equal to its member name.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:

@@ -27,6 +27,7 @@ export enum AuditAction {
   DELETE = 'DELETE',
   APPROVE = 'APPROVE',
   REJECT = 'REJECT',
+  CANCEL = 'CANCEL',
 }
 
 export enum NotificationStatus {
