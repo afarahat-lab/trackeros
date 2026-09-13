@@ -1,0 +1,112 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "employee",
+      "leave"
+    ],
+    "affectedLayers": [
+      "types",
+      "repository",
+      "service"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "LeaveRequestQueryParams in src/shared/types/index.ts exposes an optional `employeeIds?: string[]` field and no other new field.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "IEmployeeRepository declares `findByManagerId(managerId: string, client?: PoolClient): Promise<Employee[]>`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "PgEmployeeRepository.findByManagerId returns every employee whose manager_id equals the supplied managerId, mapped through the existing mapRow, and does not select or reference password_hash.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "IEmployeeService declares `getEmployeesByManagerId(managerId: string): Promise<Employee[]>`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "EmployeeService.getEmployeesByManagerId delegates to `this.repository.findByManagerId(managerId)` and returns its result unchanged.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Add only the single field `employeeIds?: string[]` to LeaveRequestQueryParams; do not add any other field to that interface.",
+    "findByManagerId must reuse the existing `mapRow` helper and the existing employee column list (id, employee_number, first_name, last_name, email, role, manager_id, department, hire_date, termination_date, employment_status).",
+    "Do not touch `password_hash` anywhere \u2014 the column does not exist yet and arrives with the Phase 2 migration.",
+    "Do not modify the Employee model or CreateEmployeeInput.",
+    "Do not add routes, controllers, or tests in this phase.",
+    "Database access must go through the repository layer (no-direct-db-outside-repository); findByManagerId takes an optional PoolClient as its last parameter and falls back to the shared pool when omitted."
+  ],
+  "outOfScope": [
+    "Honouring `employeeIds` in the leave `findByQuery` implementation (Phase 4).",
+    "Adding routes, controllers, or HTTP endpoints for the new read support.",
+    "Adding tests for the new type field, repository method, or service method.",
+    "Adding the `password_hash` column or any migration.",
+    "Adding validation or not-found semantics to getEmployeesByManagerId (empty result is a valid empty array)."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "The Employee entity shape is unchanged; findByManagerId returns Employee instances whose managerId equals the queried managerId, preserving the existing field mapping (including managerId: string | null)."
+    },
+    {
+      "entity": "LeaveRequestQueryParams",
+      "mustExistOrExtend": true,
+      "invariant": "employeeIds is an optional array of employee id strings used to scope leave queries by employee; it is additive and does not alter existing query-param semantics."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "findByManagerId(managerId: string, client?: PoolClient): Promise<Employee[]>",
+      "authRule": "None at this layer; authorization is applied by the consuming service/controller in later phases.",
+      "idempotent": true,
+      "errorSemantics": "Read-only; returns an empty array when no employees match (no throw for empty result)."
+    },
+    {
+      "operation": "getEmployeesByManagerId(managerId: string): Promise<Employee[]>",
+      "authRule": "None at this layer; role-scoping/authorization is deferred to later phases.",
+      "idempotent": true,
+      "errorSemantics": "Pure delegation to repository.findByManagerId; returns empty array for no matches, no not-found throw."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "findByManagerId must reuse the existing `mapRow` helper and the exact employee column list already used by findById/findByEmployeeNumber/findByEmail.",
+      "referencePath": "src/modules/employee/employee.repository.ts"
+    },
+    {
+      "requirement": "The Employee return type of findByManagerId/getEmployeesByManagerId must match the existing Employee interface (field names and types).",
+      "referencePath": "src/modules/employee/employee.model.ts"
+    },
+    {
+      "requirement": "employeeIds must be added to the existing LeaveRequestQueryParams interface without disturbing the other fields.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The repository method signature must follow the existing optional-client-last pattern (client?: PoolClient) with fallback to the shared pool.",
+      "referencePath": "src/modules/employee/employee.repository.interface.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/leave (Phase 4 findByQuery)",
+      "why": "employeeIds on LeaveRequestQueryParams is the role-scoping hook that leave findByQuery will honour in Phase 4."
+    },
+    {
+      "target": "Manager team-view / time-off calendar surfaces (later phases)",
+      "why": "getEmployeesByManagerId provides the manager-listing read support those surfaces consume."
+    }
+  ]
+}
