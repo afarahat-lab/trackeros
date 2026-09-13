@@ -26,6 +26,10 @@ export class LeaveTypeService implements ILeaveTypeService {
     return leaveType;
   }
 
+  async getAllLeaveTypes(): Promise<LeaveType[]> {
+    return this.repository.findAll();
+  }
+
   private validate(input: CreateLeaveTypeInput): void {
     if (!Object.values(LeaveTypeCode).includes(input.code)) {
       throw new ValidationError('Invalid code');

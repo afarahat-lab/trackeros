@@ -14,6 +14,7 @@ import {
   UnauthorizedError,
 } from '../../shared/errors';
 import { IUnitOfWork, PgUnitOfWork } from '../../shared/db';
+import { startOfUtcDay, periodContaining } from '../../shared/date/accrual';
 import { IBalanceRepository, LeaveBalance, PgLeaveBalanceRepository } from '../balance';
 import { IAuditService, AuditService, PgAuditLogRepository } from '../audit';
 import {
@@ -292,7 +293,7 @@ export class LeaveService implements ILeaveService {
     // startDate of today (or earlier) is blocked, which is what removes any need to
     // pro-rate the released balance.
     if (
-      this.startOfUtcDay(request.startDate).getTime() <= this.startOfUtcDay(new Date()).getTime()
+      startOfUtcDay(request.startDate).getTime() <= startOfUtcDay(new Date()).getTime()
     ) {
       throw new ConflictError('Leave that has already begun cannot be cancelled');
     }
@@ -441,7 +442,7 @@ export class LeaveService implements ILeaveService {
     const policy = await this.policyService.getPolicyByLeaveTypeCode(leaveTypeCode);
     const employee = await this.employeeService.getEmployeeById(employeeId);
 
-    const period = this.periodContaining(employee.hireDate, policy.accrualPeriodMonths, date);
+    const period = periodContaining(employee.hireDate, policy.accrualPeriodMonths, date);
     const balance = await this.balanceRepository.findByKey(
       employeeId,
       leaveTypeCode,
@@ -461,43 +462,6 @@ export class LeaveService implements ILeaveService {
     if (balance.pendingDays < days) {
       throw new ConflictError('Leave balance pendingDays would go negative');
     }
-  }
-
-  private periodContaining(
-    anchor: Date,
-    accrualMonths: number,
-    date: Date,
-  ): { start: Date; end: Date } {
-    if (date.getTime() < anchor.getTime()) {
-      throw new ConflictError('Requested date precedes the accrual anchor');
-    }
-
-    let start = this.startOfUtcDay(anchor);
-    // Safety bound: a finite date always lands within a finite number of periods.
-    for (let i = 0; i < 10_000; i += 1) {
-      const end = this.addMonths(start, accrualMonths);
-      if (date.getTime() >= start.getTime() && date.getTime() < end.getTime()) {
-        return { start, end };
-      }
-      start = end;
-    }
-    throw new ConflictError('Unable to resolve accrual period');
-  }
-
-  private startOfUtcDay(date: Date): Date {
-    return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-  }
-
-  private addMonths(date: Date, months: number): Date {
-    const result = new Date(date.getTime());
-    const day = result.getUTCDate();
-    result.setUTCDate(1);
-    result.setUTCMonth(result.getUTCMonth() + months);
-    const lastDay = new Date(
-      Date.UTC(result.getUTCFullYear(), result.getUTCMonth() + 1, 0),
-    ).getUTCDate();
-    result.setUTCDate(Math.min(day, lastDay));
-    return result;
   }
 }
 

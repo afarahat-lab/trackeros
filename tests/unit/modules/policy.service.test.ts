@@ -45,6 +45,10 @@ class FakeLeaveTypeService implements ILeaveTypeService {
     }
     return leaveType;
   }
+
+  async getAllLeaveTypes(): Promise<LeaveType[]> {
+    return this.rows;
+  }
 }
 
 function makeLeaveType(code: LeaveTypeCode = LeaveTypeCode.ANNUAL): LeaveType {

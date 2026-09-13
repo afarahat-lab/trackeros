@@ -11,6 +11,7 @@ import {
   LeavePolicy,
   LeavePolicyStatus,
 } from '../../../../src/modules/policy';
+import { ILeaveTypeService, LeaveType } from '../../../../src/modules/leave-type';
 import { ValidationError, NotFoundError, ConflictError } from '../../../../src/shared/errors';
 import { IUnitOfWork } from '../../../../src/shared/db';
 import { LeaveTypeCode, EmployeeRole, EmploymentStatus } from '../../../../src/shared/types';
@@ -104,6 +105,26 @@ class FakePolicyService implements IPolicyService {
   }
 }
 
+class FakeLeaveTypeService implements ILeaveTypeService {
+  constructor(private rows: LeaveType[] = []) {}
+
+  async createLeaveType(): Promise<LeaveType> {
+    throw new Error('Not implemented');
+  }
+
+  async getLeaveTypeByCode(code: LeaveTypeCode): Promise<LeaveType> {
+    const leaveType = this.rows.find((lt) => lt.code === code);
+    if (!leaveType) {
+      throw new NotFoundError('Leave type not found');
+    }
+    return leaveType;
+  }
+
+  async getAllLeaveTypes(): Promise<LeaveType[]> {
+    return this.rows;
+  }
+}
+
 class FakeUnitOfWork implements IUnitOfWork {
   async withTransaction<T>(work: (client: import('pg').PoolClient) => Promise<T>): Promise<T> {
     return work({} as import('pg').PoolClient);
@@ -145,6 +166,16 @@ function makePolicy(overrides: Partial<LeavePolicy> = {}): LeavePolicy {
   };
 }
 
+function makeLeaveType(code: LeaveTypeCode = LeaveTypeCode.ANNUAL): LeaveType {
+  return {
+    code,
+    name: 'Annual Leave',
+    requiresApproval: true,
+    maxConsecutiveDays: 30,
+    isPaid: true,
+  };
+}
+
 function makeOpenInput(
   overrides: Partial<OpenBalancePeriodInput> = {}
 ): OpenBalancePeriodInput {
@@ -161,6 +192,7 @@ describe('BalanceService', () => {
   let repository: FakeBalanceRepository;
   let employeeService: FakeEmployeeService;
   let policyService: FakePolicyService;
+  let leaveTypeService: FakeLeaveTypeService;
   let uow: FakeUnitOfWork;
   let service: BalanceService;
 
@@ -168,8 +200,9 @@ describe('BalanceService', () => {
     repository = new FakeBalanceRepository();
     employeeService = new FakeEmployeeService([makeEmployee('emp-1')]);
     policyService = new FakePolicyService([makePolicy()]);
+    leaveTypeService = new FakeLeaveTypeService([makeLeaveType()]);
     uow = new FakeUnitOfWork();
-    service = new BalanceService(repository, employeeService, policyService, uow);
+    service = new BalanceService(repository, employeeService, policyService, leaveTypeService, uow);
   });
 
   describe('openPeriod (accrual)', () => {
@@ -192,7 +225,7 @@ describe('BalanceService', () => {
       policyService = new FakePolicyService([
         makePolicy({ annualEntitlementDays: 0 }),
       ]);
-      service = new BalanceService(repository, employeeService, policyService, uow);
+      service = new BalanceService(repository, employeeService, policyService, leaveTypeService, uow);
 
       await expect(service.openPeriod(makeOpenInput())).rejects.toThrow(ValidationError);
     });
@@ -207,14 +240,14 @@ describe('BalanceService', () => {
 
     it('rejects an unknown employee with NotFoundError', async () => {
       employeeService = new FakeEmployeeService([]);
-      service = new BalanceService(repository, employeeService, policyService, uow);
+      service = new BalanceService(repository, employeeService, policyService, leaveTypeService, uow);
 
       await expect(service.openPeriod(makeOpenInput())).rejects.toThrow(NotFoundError);
     });
 
     it('rejects an unknown policy (leave type) with NotFoundError', async () => {
       policyService = new FakePolicyService([]);
-      service = new BalanceService(repository, employeeService, policyService, uow);
+      service = new BalanceService(repository, employeeService, policyService, leaveTypeService, uow);
 
       await expect(service.openPeriod(makeOpenInput())).rejects.toThrow(NotFoundError);
     });

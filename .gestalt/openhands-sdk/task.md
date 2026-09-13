@@ -1,6 +1,14 @@
-# Implement this phase: Phase 2 — auth module + migration
+# Continue the previous attempt (it hit the iteration limit before finishing)
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/d5341a09-a78c-4569-9d2f-9f6630b45d6d/2`. Do not clone anything; work only in this directory.
+A prior code-agent attempt on this work dir (`/tmp/gestalt/phase/d5341a09-a78c-4569-9d2f-9f6630b45d6d/3`) was stopped after reaching its iteration limit. Its work is ALREADY on disk here — do NOT restart from scratch or re-read everything; build on what exists. It made 20 file edit(s). Its last verification PASSED (`cd /tmp/gestalt/phase/d5341a09-a78c-4569-9d2f-9f6630b45d6d/3 && npm test 2>&1 | tail -60`).
+
+Finish the task now: fix any failing build/type-check/tests, then RUN the build and the tests and fix anything still failing. Stop as soon as the build and tests pass. The full original task (with all mandatory constraints) follows for reference.
+
+---
+
+# Implement this phase: Phase 3 — balance read endpoint
+
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/d5341a09-a78c-4569-9d2f-9f6630b45d6d/3`. Do not clone anything; work only in this directory.
 
 You are the IMPLEMENTATION agent, not a planner. The platform measures your work EXCLUSIVELY by the files you create or modify in this working tree (`git status`). Ending your turn with a plan, a summary, or an announcement of what you are 'about to' do — without having actually edited files — is a FAILURE: a turn that leaves the working tree untouched is discarded. Explore only as much as you need, then MAKE the edits with your file-editing tool. Never end your turn before the files exist on disk.
 
@@ -8,25 +16,21 @@ You are the IMPLEMENTATION agent, not a planner. The platform measures your work
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Add the nullable `password_hash` credential column and the `POST /auth/login` endpoint. Approximately 7 files.
+Extract the accrual-period UTC helpers into a shared module and add `GET /balances/me`. Approximately 6 files.
 
-1. `migrations/<new timestamp>_add_password_hash.js` — a knex migration adding a nullable `password_hash` column to `employees` using `t.text('password_hash')` (nullable, no default), following the conventions in `migrations/20260913000000_initial_schema.js`. Provide a matching `down` that drops the column.
+1. `src/shared/date/accrual.ts` — NEW file exporting `startOfUtcDay(date: Date): Date`, `addMonths(date: Date, months: number): Date`, and `periodContaining(anchor: Date, accrualMonths: number, date: Date): { start: Date; end: Date }`. Copy the exact UTC arithmetic currently in `LeaveService` (private `startOfUtcDay`/`addMonths`/`periodContaining`), including the 10,000-iteration safety bound and the ConflictError on a date preceding the anchor. This is the single source of truth for accrual-period derivation.
 
-2. `src/modules/employee/employee.model.ts` — add `passwordHash: string | null` to the `Employee` interface (canonical entity field).
+2. `src/modules/leave/leave.service.ts` — delete the private `startOfUtcDay`, `addMonths`, and `periodContaining` methods and import the three helpers from `src/shared/date/accrual.ts` instead. `resolveBalance` must call the shared `periodContaining`. No behaviour change.
 
-3. `src/modules/employee/employee.repository.ts` — add `password_hash` to every SELECT column list and to `mapRow` (map to `passwordHash`). The `EmployeeRow` interface gains `password_hash: string | null`.
+3. `src/modules/balance/balance.service.ts` — add `getBalanceForEmployee(employeeId: string): Promise<...>` to `IBalanceService` and implement it in `BalanceService`. It returns ALL leave-type balances for the caller's CURRENT period as a LIST (never a single object, even when one element). For each leave type, resolve the policy's `accrualPeriodMonths`, compute the current period via the shared `periodContaining(employee.hireDate, accrualMonths, new Date())`, and look the balance up with `findByKey`. Each returned entry includes `leaveTypeCode`, `periodStart`, `periodEnd`, `entitledDays`, `usedDays`, `pendingDays`, and a computed `available = entitledDays - usedDays - pendingDays`. Read-only — no transaction, no writes.
 
-4. `src/modules/auth/auth.service.ts` — declare `LoginInput { email: string; password: string }`, `LoginResult { token: string; employee: Employee }`, `IAuthService { login(input: LoginInput): Promise<LoginResult> }`, and `AuthService`. `login` looks up the account via `IEmployeeRepository.findByEmail` (already exists — do NOT add a new lookup), compares with `bcrypt.compare` against `employee.passwordHash`, and mints a token via `signToken({ id: employee.id, role: employee.role })` from `src/shared/auth`. A wrong email and a wrong password MUST be indistinguishable (same status/message — throw `UnauthorizedError`). Never return `passwordHash` in any response.
+4. `src/modules/balance/balance.routes.ts` — NEW file: `balanceRoutes(fastify)` registering `GET /balances/me` (200). Resolve the actor from `request.user` (never a client-supplied id) with a `resolveActor` helper matching `leave.routes.ts`, call `getBalanceForEmployee(actor.id)`, and map errors via `sendError`.
 
-5. `src/modules/auth/auth.routes.ts` — `authRoutes(fastify)` registering `POST /auth/login` (200). Parse/validate the body (reject missing/non-string email/password with `ValidationError`), call the service, and map errors via a `sendError` helper matching `src/modules/leave/leave.routes.ts`. Resolve the service from `fastify.authService` if present, else construct it.
+5. `src/modules/balance/index.ts` — export `balanceRoutes`.
 
-6. `src/modules/auth/index.ts` — re-export `LoginInput`, `LoginResult`, `IAuthService`, `AuthService`, `authRoutes`.
+6. `src/app.ts` — register `balanceRoutes`.
 
-7. `src/shared/auth/index.ts` — add `'/auth/login'` to the `PUBLIC_PATHS` set so the endpoint is reachable without a token. Do NOT change the token payload contract (`sub` = employee id, `role` = EmployeeRole).
-
-8. `src/app.ts` — register `authRoutes` (import from `./modules/auth`).
-
-This phase depends on Phase 1 (`src/modules/employee/employee.repository.ts`, `employee.model.ts`) and the existing `src/shared/auth/index.ts` (`signToken`), `src/shared/errors/index.ts`, and `src/shared/types/index.ts` (`EmployeeRole`). Read them before generating. `bcrypt` and `jsonwebtoken` are already dependencies — use them, do not add libraries.
+This phase depends on Phase 1 (`src/modules/employee` service for `getEmployeeById`), the existing `src/modules/balance/balance.service.ts` / `balance.repository.ts` / `balance.model.ts`, `src/modules/policy` (`getPolicyByLeaveTypeCode`), and `src/modules/leave/leave.service.ts`. Read them before generating. Do not add unit tests here (they land in Phase 5).
 
 ## Your iteration budget — and how to get more (READ BEFORE YOU START)
 
@@ -82,6 +86,27 @@ TWO FACTS THAT AFFECT THE IMPLEMENTATION — check these against the code before
   - `employee.repository` has create, findById, findByEmployeeNumber and findByEmail — but nothing that lists by manager. Add a `findByManagerId` (or equivalent) to the employee repository and its interface for the MANAGER case. `findByEmail` already exists and is what POST /auth/login should use to look up the account.
 
 Everything else in the original brief stands unchanged, including that the smoke check must be extended with real-value assertions for each new endpoint and that its existing stages must keep passing unweakened. [BINDING RULE — operator decision resolving: Are the date-range filter boundaries (startDateFrom/startDateTo/endDateFrom/endDateTo) inclusive or exclusive at each edge?; GET /balances/me returns "the caller's current leave balance" — but balances are per leave type. Which leave type (or all types) is returned?; How should the accrual-period derivation be shared between LeaveService.resolveBalance and the new GET /balances/me path?; What is the exact visibility scope for MANAGER on GET /leaves and GET /leaves/:id?; apply everywhere these apply, not in one place only]
+
+## Constraints & consistency
+You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
+### Reuse & consistency — match these exactly
+- The extracted startOfUtcDay/addMonths/periodContaining must reproduce the exact UTC arithmetic, safety bound, and ConflictError semantics of the current private helpers in LeaveService.resolveBalance. (see `src/modules/leave/leave.service.ts`)
+- The balance route's resolveActor and sendError helpers must match the behaviour of the existing leave route helpers (actor from request.user, role membership check, AppError → { error, code } with status, other → 500). (see `src/modules/leave/leave.routes.ts`)
+- getBalanceForEmployee must resolve the policy's accrualPeriodMonths via IPolicyService.getPolicyByLeaveTypeCode and the employee's hireDate via IEmployeeService.getEmployeeById, matching how LeaveService.resolveBalance derives the period. (see `src/modules/leave/leave.service.ts`)
+- The balance lookup must use IBalanceRepository.findByKey(employeeId, leaveTypeCode, periodStart, periodEnd) with the same key semantics (at-most-one row per key). (see `src/modules/balance/balance.repository.ts`)
+- The returned entry's available field must equal entitledDays - usedDays - pendingDays, the same sufficiency arithmetic used by validateSufficiency. (see `src/modules/validation/validation.service.ts`)
+### Entity invariants — enforce these
+- Reuse or extend `LeaveBalance`: A balance entry returned by getBalanceForEmployee is a projection of an existing LeaveBalance row: leaveTypeCode, periodStart, periodEnd, entitledDays, usedDays, pendingDays are the persisted values, and available is derived as entitledDays - usedDays - pendingDays (never persisted).
+- Reuse or extend `Accrual period (shared date helper)`: periodContaining(anchor, accrualMonths, date) returns the half-open UTC period [start, end) containing date, anchored at startOfUtcDay(anchor), stepping accrualMonths at a time with a 10,000-iteration bound; a date strictly before the anchor throws ConflictError.
+### Interface contract — expose these operations (their shape is yours)
+- getBalanceForEmployee(employeeId: string): Promise<BalanceEntry[]> — Caller is the authenticated actor; the employeeId is the actor's own id resolved at the route boundary from request.user.; idempotent; Read-only; throws NotFoundError when the employee or a policy is missing, and propagates ConflictError from periodContaining when the current date precedes the hire-date anchor.
+- GET /balances/me — Requires an authenticated actor (request.user with a valid EmployeeRole); missing/invalid actor → 401.; idempotent; 200 with a list of balance entries; AppError mapped to { error, code } with its status, other throws → 500.
+### Integration points — connect to these
+- src/modules/employee (IEmployeeService.getEmployeeById) — Resolve the employee's hireDate, the accrual anchor for periodContaining.
+- src/modules/policy (IPolicyService.getPolicyByLeaveTypeCode) — Resolve accrualPeriodMonths per leave type to compute the current period.
+- src/modules/leave-type (ILeaveTypeService.getLeaveTypeByCode / repository findAll) — Enumerate the leave types whose balances must be returned.
+- src/shared/date/accrual.ts — Single source of truth for accrual-period derivation consumed by both LeaveService and BalanceService.
+- src/shared/errors (ConflictError, NotFoundError) — Error semantics for missing employee/policy and pre-anchor dates.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
