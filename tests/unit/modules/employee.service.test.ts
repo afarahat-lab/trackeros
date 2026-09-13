@@ -51,6 +51,7 @@ function makeInput(overrides: Partial<CreateEmployeeInput> = {}): CreateEmployee
     hireDate: new Date('2020-01-01T00:00:00.000Z'),
     terminationDate: null,
     employmentStatus: EmploymentStatus.ACTIVE,
+    passwordHash: null,
     ...overrides,
   };
 }

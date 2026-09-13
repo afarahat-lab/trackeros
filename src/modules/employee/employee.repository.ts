@@ -16,6 +16,7 @@ interface EmployeeRow {
   hire_date: Date;
   termination_date: Date | null;
   employment_status: string;
+  password_hash: string | null;
 }
 
 function mapRow(row: EmployeeRow): Employee {
@@ -31,6 +32,7 @@ function mapRow(row: EmployeeRow): Employee {
     hireDate: row.hire_date,
     terminationDate: row.termination_date,
     employmentStatus: row.employment_status as Employee['employmentStatus'],
+    passwordHash: row.password_hash,
   };
 }
 
@@ -49,7 +51,7 @@ export class PgEmployeeRepository implements IEmployeeRepository {
         department, hire_date, termination_date, employment_status
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       RETURNING id, employee_number, first_name, last_name, email, role, manager_id,
-        department, hire_date, termination_date, employment_status
+        department, hire_date, termination_date, employment_status, password_hash
     `;
     const values = [
       id,
@@ -71,7 +73,7 @@ export class PgEmployeeRepository implements IEmployeeRepository {
   async findById(id: string, client?: PoolClient): Promise<Employee | null> {
     const query = `
       SELECT id, employee_number, first_name, last_name, email, role, manager_id,
-        department, hire_date, termination_date, employment_status
+        department, hire_date, termination_date, employment_status, password_hash
       FROM employees WHERE id = $1
     `;
     const result: QueryResult<EmployeeRow> = await this.db(client).query(query, [id]);
@@ -84,7 +86,7 @@ export class PgEmployeeRepository implements IEmployeeRepository {
   ): Promise<Employee | null> {
     const query = `
       SELECT id, employee_number, first_name, last_name, email, role, manager_id,
-        department, hire_date, termination_date, employment_status
+        department, hire_date, termination_date, employment_status, password_hash
       FROM employees WHERE employee_number = $1
     `;
     const result: QueryResult<EmployeeRow> = await this.db(client).query(query, [
@@ -96,7 +98,7 @@ export class PgEmployeeRepository implements IEmployeeRepository {
   async findByEmail(email: string, client?: PoolClient): Promise<Employee | null> {
     const query = `
       SELECT id, employee_number, first_name, last_name, email, role, manager_id,
-        department, hire_date, termination_date, employment_status
+        department, hire_date, termination_date, employment_status, password_hash
       FROM employees WHERE email = $1
     `;
     const result: QueryResult<EmployeeRow> = await this.db(client).query(query, [email]);
@@ -106,7 +108,7 @@ export class PgEmployeeRepository implements IEmployeeRepository {
   async findByManagerId(managerId: string, client?: PoolClient): Promise<Employee[]> {
     const query = `
       SELECT id, employee_number, first_name, last_name, email, role, manager_id,
-        department, hire_date, termination_date, employment_status
+        department, hire_date, termination_date, employment_status, password_hash
       FROM employees WHERE manager_id = $1
     `;
     const result: QueryResult<EmployeeRow> = await this.db(client).query(query, [managerId]);

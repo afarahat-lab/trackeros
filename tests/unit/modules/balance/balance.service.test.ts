@@ -123,6 +123,7 @@ function makeEmployee(id = 'emp-1'): Employee {
     hireDate: new Date('2020-01-01'),
     terminationDate: null,
     employmentStatus: EmploymentStatus.ACTIVE,
+    passwordHash: null,
   };
 }
 

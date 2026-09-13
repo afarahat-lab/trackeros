@@ -285,6 +285,7 @@ function makeEmployee(id = REQUESTER_ID, overrides: Partial<Employee> = {}): Emp
     hireDate: new Date('2020-01-01T00:00:00Z'),
     terminationDate: null,
     employmentStatus: EmploymentStatus.ACTIVE,
+    passwordHash: null,
     ...overrides,
   };
 }

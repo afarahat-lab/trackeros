@@ -1,6 +1,6 @@
-# Implement this phase: Phase 1 — shared-types + employee read support
+# Implement this phase: Phase 2 — auth module + migration
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/d5341a09-a78c-4569-9d2f-9f6630b45d6d/1`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/d5341a09-a78c-4569-9d2f-9f6630b45d6d/2`. Do not clone anything; work only in this directory.
 
 You are the IMPLEMENTATION agent, not a planner. The platform measures your work EXCLUSIVELY by the files you create or modify in this working tree (`git status`). Ending your turn with a plan, a summary, or an announcement of what you are 'about to' do — without having actually edited files — is a FAILURE: a turn that leaves the working tree untouched is discarded. Explore only as much as you need, then MAKE the edits with your file-editing tool. Never end your turn before the files exist on disk.
 
@@ -8,19 +8,25 @@ You are the IMPLEMENTATION agent, not a planner. The platform measures your work
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Add the employee filter to the leave query params and the employee manager-listing read support that later phases consume. Approximately 5 files.
+Add the nullable `password_hash` credential column and the `POST /auth/login` endpoint. Approximately 7 files.
 
-1. `src/shared/types/index.ts` — add `employeeIds?: string[]` to the existing `LeaveRequestQueryParams` interface (do NOT add any other field). This is the role-scoping hook that `findByQuery` will honour in Phase 4.
+1. `migrations/<new timestamp>_add_password_hash.js` — a knex migration adding a nullable `password_hash` column to `employees` using `t.text('password_hash')` (nullable, no default), following the conventions in `migrations/20260913000000_initial_schema.js`. Provide a matching `down` that drops the column.
 
-2. `src/modules/employee/employee.repository.interface.ts` — add `findByManagerId(managerId: string, client?: PoolClient): Promise<Employee[]>` to `IEmployeeRepository`.
+2. `src/modules/employee/employee.model.ts` — add `passwordHash: string | null` to the `Employee` interface (canonical entity field).
 
-3. `src/modules/employee/employee.repository.ts` — implement `findByManagerId` with `SELECT id, employee_number, first_name, last_name, email, role, manager_id, department, hire_date, termination_date, employment_status FROM employees WHERE manager_id = $1`, reusing the existing `mapRow`. Do NOT touch `password_hash` here (that column does not exist yet — it arrives with the Phase 2 migration).
+3. `src/modules/employee/employee.repository.ts` — add `password_hash` to every SELECT column list and to `mapRow` (map to `passwordHash`). The `EmployeeRow` interface gains `password_hash: string | null`.
 
-4. `src/modules/employee/employee.service.interface.ts` — add `getEmployeesByManagerId(managerId: string): Promise<Employee[]>` to `IEmployeeService`.
+4. `src/modules/auth/auth.service.ts` — declare `LoginInput { email: string; password: string }`, `LoginResult { token: string; employee: Employee }`, `IAuthService { login(input: LoginInput): Promise<LoginResult> }`, and `AuthService`. `login` looks up the account via `IEmployeeRepository.findByEmail` (already exists — do NOT add a new lookup), compares with `bcrypt.compare` against `employee.passwordHash`, and mints a token via `signToken({ id: employee.id, role: employee.role })` from `src/shared/auth`. A wrong email and a wrong password MUST be indistinguishable (same status/message — throw `UnauthorizedError`). Never return `passwordHash` in any response.
 
-5. `src/modules/employee/employee.service.ts` — implement `getEmployeesByManagerId` by delegating to `this.repository.findByManagerId(managerId)`.
+5. `src/modules/auth/auth.routes.ts` — `authRoutes(fastify)` registering `POST /auth/login` (200). Parse/validate the body (reject missing/non-string email/password with `ValidationError`), call the service, and map errors via a `sendError` helper matching `src/modules/leave/leave.routes.ts`. Resolve the service from `fastify.authService` if present, else construct it.
 
-This phase depends on the existing files `src/modules/employee/employee.model.ts`, `employee.repository.ts`, `employee.repository.interface.ts`, `employee.service.ts`, `employee.service.interface.ts`, and `src/shared/types/index.ts` — read them before generating. Do not add routes, services beyond the above, or tests in this phase.
+6. `src/modules/auth/index.ts` — re-export `LoginInput`, `LoginResult`, `IAuthService`, `AuthService`, `authRoutes`.
+
+7. `src/shared/auth/index.ts` — add `'/auth/login'` to the `PUBLIC_PATHS` set so the endpoint is reachable without a token. Do NOT change the token payload contract (`sub` = employee id, `role` = EmployeeRole).
+
+8. `src/app.ts` — register `authRoutes` (import from `./modules/auth`).
+
+This phase depends on Phase 1 (`src/modules/employee/employee.repository.ts`, `employee.model.ts`) and the existing `src/shared/auth/index.ts` (`signToken`), `src/shared/errors/index.ts`, and `src/shared/types/index.ts` (`EmployeeRole`). Read them before generating. `bcrypt` and `jsonwebtoken` are already dependencies — use them, do not add libraries.
 
 ## Your iteration budget — and how to get more (READ BEFORE YOU START)
 
@@ -76,39 +82,6 @@ TWO FACTS THAT AFFECT THE IMPLEMENTATION — check these against the code before
   - `employee.repository` has create, findById, findByEmployeeNumber and findByEmail — but nothing that lists by manager. Add a `findByManagerId` (or equivalent) to the employee repository and its interface for the MANAGER case. `findByEmail` already exists and is what POST /auth/login should use to look up the account.
 
 Everything else in the original brief stands unchanged, including that the smoke check must be extended with real-value assertions for each new endpoint and that its existing stages must keep passing unweakened. [BINDING RULE — operator decision resolving: Are the date-range filter boundaries (startDateFrom/startDateTo/endDateFrom/endDateTo) inclusive or exclusive at each edge?; GET /balances/me returns "the caller's current leave balance" — but balances are per leave type. Which leave type (or all types) is returned?; How should the accrual-period derivation be shared between LeaveService.resolveBalance and the new GET /balances/me path?; What is the exact visibility scope for MANAGER on GET /leaves and GET /leaves/:id?; apply everywhere these apply, not in one place only]
-
-## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
-The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
-- `Employee` — the entity MUST have exactly these fields:
-    - id: string
-    - employeeNumber: string
-    - firstName: string
-    - lastName: string
-    - email: string
-    - role: EmployeeRole
-    - managerId: string | null
-    - department: string
-    - hireDate: Date
-    - terminationDate: Date | null
-    - employmentStatus: EmploymentStatus
-    - passwordHash: string | null
-
-## Constraints & consistency
-You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
-### Reuse & consistency — match these exactly
-- findByManagerId must reuse the existing `mapRow` helper and the exact employee column list already used by findById/findByEmployeeNumber/findByEmail. (see `src/modules/employee/employee.repository.ts`)
-- The Employee return type of findByManagerId/getEmployeesByManagerId must match the existing Employee interface (field names and types). (see `src/modules/employee/employee.model.ts`)
-- employeeIds must be added to the existing LeaveRequestQueryParams interface without disturbing the other fields. (see `src/shared/types/index.ts`)
-- The repository method signature must follow the existing optional-client-last pattern (client?: PoolClient) with fallback to the shared pool. (see `src/modules/employee/employee.repository.interface.ts`)
-### Entity invariants — enforce these
-- Reuse or extend `Employee`: The Employee entity shape is unchanged; findByManagerId returns Employee instances whose managerId equals the queried managerId, preserving the existing field mapping (including managerId: string | null).
-- Reuse or extend `LeaveRequestQueryParams`: employeeIds is an optional array of employee id strings used to scope leave queries by employee; it is additive and does not alter existing query-param semantics.
-### Interface contract — expose these operations (their shape is yours)
-- findByManagerId(managerId: string, client?: PoolClient): Promise<Employee[]> — None at this layer; authorization is applied by the consuming service/controller in later phases.; idempotent; Read-only; returns an empty array when no employees match (no throw for empty result).
-- getEmployeesByManagerId(managerId: string): Promise<Employee[]> — None at this layer; role-scoping/authorization is deferred to later phases.; idempotent; Pure delegation to repository.findByManagerId; returns empty array for no matches, no not-found throw.
-### Integration points — connect to these
-- src/modules/leave (Phase 4 findByQuery) — employeeIds on LeaveRequestQueryParams is the role-scoping hook that leave findByQuery will honour in Phase 4.
-- Manager team-view / time-off calendar surfaces (later phases) — getEmployeesByManagerId provides the manager-listing read support those surfaces consume.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
