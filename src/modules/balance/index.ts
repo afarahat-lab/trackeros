@@ -5,4 +5,6 @@ export {
   BalanceService,
   OpenBalancePeriodInput,
   CarryForwardInput,
+  BalanceEntry,
 } from './balance.service';
+export { balanceRoutes, createBalanceService } from './balance.routes';
