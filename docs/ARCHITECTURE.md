@@ -354,3 +354,48 @@ This phase adds the Jest unit tests for `LeaveService.cancel` to `tests/unit/mod
 - Whether APPROVED cancellation is allowed after startDate/endDate has passed — **resolved**: blocked once `startDate <= today` (ConflictError).
 - Whether usedDays release is full or pro-rated when leave has partially elapsed — **resolved**: full release, no pro-rating, because the timing guard makes cancellation possible only before the leave starts.
 <!-- gestalt:architecture feature=621bb1fd-0965-415a-bf2e-ec2c42b15f04 END -->
+
+<!-- gestalt:architecture feature=d5341a09-a78c-4569-9d2f-9f6630b45d6d START -->
+## Authentication and read endpoints
+
+### Domain entities
+- **Employee** — authenticated caller and subject of leave/balance reads. Gains nullable `passwordHash` credential; lifecycle states: `ACTIVE`, `TERMINATED`, `ON_LEAVE`.
+- **AuthToken** — bearer credential minted on login; payload fixed as `sub` = employee id, `role` = EmployeeRole; lifecycle states: `ISSUED`, `EXPIRED`.
+- **LeaveRequest** — read subject of `GET /leaves` and `GET /leaves/:id`; lifecycle states: `DRAFT`, `SUBMITTED`, `APPROVED`, `REJECTED`, `CANCELLED`.
+- **LeaveBalance** — read subject of `GET /balances/me`; lifecycle states: `OPEN`, `CLOSED`.
+
+### Conceptual tables
+- **employees** — `id`, `employee_number`, `first_name`, `last_name`, `email`, `role`, `manager_id`, `department`, `hire_date`, `termination_date`, `employment_status`, `password_hash`; PK `id`; FK `manager_id -> employees.id`; indexes: unique `email`, unique `employee_number`, `manager_id`.
+- **leave_requests** — `id`, `employee_id`, `leave_type_code`, `start_date`, `end_date`, `requested_days`, `reason`, `status`, `approver_id`, `approval_comment`, `submitted_at`, `decided_at`, `cancelled_by`, `cancelled_at`; PK `id`; FKs to `employees`, `leave_types`, `employees`, `employees`; indexes: `employee_id`, `status`, `(employee_id, status)`, `(leave_type_code, start_date)`.
+- **leave_balances** — `id`, `employee_id`, `leave_type_code`, `period_start`, `period_end`, `entitled_days`, `used_days`, `pending_days`; PK `id`; FKs to `employees`, `leave_types`; indexes: unique `(employee_id, leave_type_code, period_start, period_end)`, `employee_id`.
+
+### Repositories
+- `IEmployeeRepository` → `PgEmployeeRepository`: `create`, `findById`, `findByEmployeeNumber`, `findByEmail`, `findCredentialsByEmail`, `findByManagerId`.
+- `ILeaveRepository` → `PgLeaveRequestRepository`: `create`, `findById`, `update`, `findByQuery`.
+- `IBalanceRepository` → `PgLeaveBalanceRepository`: `create`, `findById`, `findByKey`, `update`.
+
+### Modules and boundaries
+- `auth` (`src/modules/auth/`) — login input/result, `IAuthService`/`AuthService`, `POST /auth/login`.
+- `employee` (`src/modules/employee/`) — `findCredentialsByEmail`, `findByManagerId`, `getEmployeesByManagerId`, `GET /employees/me`.
+- `leave` (`src/modules/leave/`) — `ILeaveService.list`, `ILeaveService.getById`, `GET /leaves`, `GET /leaves/:id`.
+- `balance` (`src/modules/balance/`) — `resolveAccrualPeriod`, `getBalanceForEmployee`, `GET /balances/me`.
+- `shared-types`, `shared-auth`, `shared-errors`, `shared-db`, `policy` — cross-cutting support.
+
+### Dependency map
+- `auth` → `employee`, `shared-auth`, `shared-types`, `shared-errors`
+- `employee` → `shared-types`, `shared-errors`, `shared-db`
+- `leave` → `employee`, `shared-types`, `shared-errors`, `shared-db`
+- `balance` → `employee`, `policy`, `shared-types`, `shared-errors`, `shared-db`
+
+### Phases
+1. shared-types + employee read support
+2. auth module + migration
+3. balance read endpoint
+4. leave read endpoints
+5. employee/me route + smoke + unit tests
+
+### Contracts
+- **Auth**: `request.user: { id: string; role: EmployeeRole }`; `EmployeeRole = 'EMPLOYEE' | 'MANAGER' | 'ADMIN'`; JWT bearer verified by `registerAuth` preHandler hook; token payload `{ sub: id, role }`; RBAC enforced at route boundary via `resolveActor` and in service; `POST /auth/login` added to `PUBLIC_PATHS`.
+- **Error**: `{ error: string; code: string }`; validation → 400 `VALIDATION_ERROR`; authentication → 401 `UNAUTHORIZED`; authorization → 403 `FORBIDDEN`; not found → 404 `NOT_FOUND`; conflict → 409 `CONFLICT`; other → 500. Login failure (wrong email or password) returns same 401 + message; `GET /leaves/:id` returns 404 for both not found and not visible.
+- **Transaction**: none — feature is read-only (login performs credential read + bcrypt compare + JWT mint; GET endpoints perform reads only).
+<!-- gestalt:architecture feature=d5341a09-a78c-4569-9d2f-9f6630b45d6d END -->
