@@ -102,6 +102,10 @@ class FakePolicyService implements IPolicyService {
     }
     return policy;
   }
+
+  async listEffectivePolicies(): Promise<LeavePolicy[]> {
+    return this.rows;
+  }
 }
 
 class FakeUnitOfWork implements IUnitOfWork {
