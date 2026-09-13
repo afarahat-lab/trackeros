@@ -3,8 +3,7 @@ import { LeaveTypeCode } from '../../shared/types';
 import { ValidationError, NotFoundError, ConflictError } from '../../shared/errors';
 import { IUnitOfWork, PgUnitOfWork } from '../../shared/db';
 import { IEmployeeService, EmployeeService, PgEmployeeRepository } from '../employee';
-import { IPolicyService, PolicyService, PgLeavePolicyRepository } from '../policy';
-import { PgLeaveTypeRepository, LeaveTypeService } from '../leave-type';
+import { IPolicyService, createPolicyService } from '../policy';
 import { LeaveBalance, CreateLeaveBalanceInput } from './balance.model';
 import { IBalanceRepository, PgLeaveBalanceRepository } from './balance.repository';
 import { addMonths, periodContaining } from '../../shared/date/accrual';
@@ -245,7 +244,7 @@ export function createBalanceService(): IBalanceService {
   return new BalanceService(
     new PgLeaveBalanceRepository(),
     new EmployeeService(new PgEmployeeRepository()),
-    new PolicyService(new PgLeavePolicyRepository(), new LeaveTypeService(new PgLeaveTypeRepository())),
+    createPolicyService(),
     new PgUnitOfWork(),
   );
 }

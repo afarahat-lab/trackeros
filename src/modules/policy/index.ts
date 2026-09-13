@@ -2,4 +2,4 @@ export { LeavePolicy, CreateLeavePolicyInput, LeavePolicyStatus } from './policy
 export { IPolicyRepository } from './policy.repository.interface';
 export { PgLeavePolicyRepository } from './policy.repository';
 export { IPolicyService } from './policy.service.interface';
-export { PolicyService } from './policy.service';
+export { PolicyService, createPolicyService } from './policy.service';

@@ -1,7 +1,8 @@
 import { ValidationError, NotFoundError } from '../../shared/errors';
 import { LeaveTypeCode } from '../../shared/types';
-import { ILeaveTypeService } from '../leave-type';
+import { ILeaveTypeService, LeaveTypeService, PgLeaveTypeRepository } from '../leave-type';
 import { LeavePolicy, CreateLeavePolicyInput, LeavePolicyStatus } from './policy.model';
+import { PgLeavePolicyRepository } from './policy.repository';
 import { IPolicyRepository } from './policy.repository.interface';
 import { IPolicyService } from './policy.service.interface';
 
@@ -122,4 +123,18 @@ export class PolicyService implements IPolicyService {
       throw new ValidationError('Invalid status');
     }
   }
+}
+
+/**
+ * Convenience factory wiring the concrete PostgreSQL-backed collaborators (the
+ * policy repository and the leave-type collaborator PolicyService requires),
+ * exposed via the policy module's public entry point. Consumers that need an
+ * `IPolicyService` should obtain it here rather than constructing a
+ * `LeaveTypeService` directly in their own factory.
+ */
+export function createPolicyService(): IPolicyService {
+  return new PolicyService(
+    new PgLeavePolicyRepository(),
+    new LeaveTypeService(new PgLeaveTypeRepository()),
+  );
 }
