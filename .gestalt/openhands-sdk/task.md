@@ -1,6 +1,6 @@
-# Implement this phase: Phase 4 — LeaveService cancel unit tests
+# Implement this phase: Phase 1 — shared-types + employee read support
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/621bb1fd-0965-415a-bf2e-ec2c42b15f04/4`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/d5341a09-a78c-4569-9d2f-9f6630b45d6d/1`. Do not clone anything; work only in this directory.
 
 You are the IMPLEMENTATION agent, not a planner. The platform measures your work EXCLUSIVELY by the files you create or modify in this working tree (`git status`). Ending your turn with a plan, a summary, or an announcement of what you are 'about to' do — without having actually edited files — is a FAILURE: a turn that leaves the working tree untouched is discarded. Explore only as much as you need, then MAKE the edits with your file-editing tool. Never end your turn before the files exist on disk.
 
@@ -8,17 +8,19 @@ You are the IMPLEMENTATION agent, not a planner. The platform measures your work
 (no phase architecture provided — infer from the success criteria below)
 
 ## Success criteria
-Add Jest unit tests for the `LeaveService.cancel` operation to `tests/unit/modules/leave/leave.service.test.ts` (extend the existing suite from Phase 6c). This phase depends on `src/modules/leave/leave.service.ts` (the `cancel` implementation from Phase 2) and the existing `tests/unit/modules/leave/leave.service.test.ts` (the eight in-memory fakes — FakeLeaveRepository, FakeBalanceRepository, FakeAuditService, FakeNotificationService, FakeValidationService, FakeEmployeeService, FakePolicyService, FakeUnitOfWork — and the containment-based transaction assertions) — read both before generating code. Treat the Phase 2/3 deliverables as fixed contracts; do not modify production source.
+Add the employee filter to the leave query params and the employee manager-listing read support that later phases consume. Approximately 5 files.
 
-Coverage for `cancel`:
-- Authorization guards: owner may cancel own DRAFT/SUBMITTED (ForbiddenError on non-owner); direct manager may cancel an APPROVED request for their direct report (ForbiddenError when actor is not the direct manager); ADMIN may cancel an APPROVED request for anyone (ADMIN exempt from the direct-manager check); no acting on your own request where that rule applies.
-- Timing guard: ConflictError when `startDate <= today` (today or past).
-- Balance release (full `requestedDays`, no pro-rating): DRAFT → no balance change; SUBMITTED → `pendingDays -= requestedDays`; APPROVED → `usedDays -= requestedDays`. Assert the balance row is read with the row lock (`forUpdate` flag) before writing.
-- Status transition: status → CANCELLED with `cancelledBy = actor.id` and `cancelledAt` set.
-- Side effects: a CANCEL audit entry (action `AuditAction.CANCEL`) and a synchronous cancellation notification to the affected employee.
-- Atomicity: assert all steps occur inside the single `withTransaction` callback with the stub client forwarded to each repository/service call (containment-based, matching the existing suite's convention).
+1. `src/shared/types/index.ts` — add `employeeIds?: string[]` to the existing `LeaveRequestQueryParams` interface (do NOT add any other field). This is the role-scoping hook that `findByQuery` will honour in Phase 4.
 
-This phase touches approximately 1 file (`tests/unit/modules/leave/leave.service.test.ts`).
+2. `src/modules/employee/employee.repository.interface.ts` — add `findByManagerId(managerId: string, client?: PoolClient): Promise<Employee[]>` to `IEmployeeRepository`.
+
+3. `src/modules/employee/employee.repository.ts` — implement `findByManagerId` with `SELECT id, employee_number, first_name, last_name, email, role, manager_id, department, hire_date, termination_date, employment_status FROM employees WHERE manager_id = $1`, reusing the existing `mapRow`. Do NOT touch `password_hash` here (that column does not exist yet — it arrives with the Phase 2 migration).
+
+4. `src/modules/employee/employee.service.interface.ts` — add `getEmployeesByManagerId(managerId: string): Promise<Employee[]>` to `IEmployeeService`.
+
+5. `src/modules/employee/employee.service.ts` — implement `getEmployeesByManagerId` by delegating to `this.repository.findByManagerId(managerId)`.
+
+This phase depends on the existing files `src/modules/employee/employee.model.ts`, `employee.repository.ts`, `employee.repository.interface.ts`, `employee.service.ts`, `employee.service.interface.ts`, and `src/shared/types/index.ts` — read them before generating. Do not add routes, services beyond the above, or tests in this phase.
 
 ## Your iteration budget — and how to get more (READ BEFORE YOU START)
 
@@ -54,42 +56,59 @@ Then delegate the implementation slices.
 
 ## Binding architecture rules (operator decisions — NON-NEGOTIABLE, apply everywhere)
 These are resolved, feature-wide decisions. Wherever this phase touches the concept a rule names, implement it EXACTLY as stated — do not re-derive, re-interpret, or apply it in one place and omit it in another:
-- CONSOLIDATED DECISION — all 5 questions. Guiding principle: pick the rule set that makes the hardest sub-problem disappear rather than the one that needs the most logic. Questions 2, 3 and 5 are the same decision asked three ways (what happens to leave that has already begun); answering 2 determines 3 and 5, and they are answered consistently below.
+- Answers to all four, plus two facts about the existing code that change how 3 and 4 must be implemented.
 
-1. ADMIN AUTHORIZATION: ADMIN may cancel an APPROVED request for anyone. Mirror the existing `assertCanDecide` exactly — ADMIN is exempt from the direct-manager check, MANAGER is not. Do NOT invent a second, different authorization shape for cancel: same roles, same exemption, same "may not act on your own request" rule where it applies. Concretely: owner may cancel their own DRAFT or SUBMITTED request; the direct manager (employee.managerId === actor.id) may cancel an APPROVED request; ADMIN may cancel an APPROVED request for anyone.
+1. DATE-RANGE BOUNDARIES — inclusive on both edges, which is also "match the existing findByQuery semantics exactly". These are the same answer: LeaveRequestRepository.findByQuery already builds `start_date >= $n`, `start_date <= $n`, `end_date >= $n`, `end_date <= $n`. Do not change those operators. A calendar-day range in this domain is inclusive throughout — `requestedDays = endDate - startDate + 1` is documented as the canonical inclusive count in shared/types — so an exclusive upper bound would contradict the rest of the model.
 
-2. TIMING: Allow cancellation ONLY before startDate. A request whose startDate is today or in the past may NOT be cancelled — throw ConflictError. This is the binding rule; it is what makes questions 3 and 5 trivial.
+2. GET /balances/me — return ALL leave-type balances for the caller's current period, as a list. Rationale: the endpoint exists so a client can render a leave screen, which shows every balance at once; a required leaveTypeCode param would force the client into N calls to draw one screen, and picking annual-only would silently hide sick and emergency. The singular wording in the brief was imprecise — this answer supersedes it. Return a list even when it has one element; do not special-case the single-balance shape. Include the leave type code, the period start/end, and entitled/used/pending/available on each entry.
 
-3. PRO-RATING: Release the FULL requestedDays. No pro-rating, ever. This follows directly from decision 2: if cancellation is only possible before the leave starts, then no day has been consumed, so a partial release can never be correct. Do NOT implement elapsed-day arithmetic — there is no case that needs it.
+3. ACCRUAL-PERIOD DERIVATION — extract into a shared module (option 1). Create something like `src/shared/date/accrual.ts` exporting `startOfUtcDay`, `addMonths` and `periodContaining`, and have BOTH LeaveService and the balance path import it. LeaveService.resolveBalance must be changed to call the shared version, so exactly one copy exists.
 
-4. AUDIT ACTION: Add `CANCEL = 'CANCEL'` to the AuditAction enum in src/shared/types and use it. Do NOT reuse UPDATE or DELETE. GP-002 requires state changes to be auditable, and an audit trail that cannot distinguish a cancellation from an ordinary edit fails that purpose — the whole value of the entry is knowing what happened. This is a deliberate shared-enum change; update every consumer that switches exhaustively on AuditAction.
+   Not option 2 (move into balance): these are pure UTC date arithmetic with no balance-domain knowledge, so they do not belong to that module, and a shared home makes them unit-testable without either module. That matters specifically here — this arithmetic is where a real timezone defect already lived: node-pg parses `date` columns to LOCAL midnight while these helpers use getUTC*, which silently shifted every accrual period by a day on any non-UTC server. `src/shared/db/connection.ts` now pins DATE parsing to UTC. Add direct unit tests for the extracted helpers, including a non-UTC case (e.g. run with TZ=Asia/Riyadh) so that defect cannot come back unnoticed.
 
-5. DUPLICATE of question 2 — same decision, stated as the guard: block cancellation once startDate <= today with a ConflictError. Because that guard exists, the usedDays release is unconditional and always the full requestedDays; there is no over-release case to defend against.
+   Not option 3 (duplicate) under any circumstances.
 
-BALANCE EFFECTS (making the state transitions explicit, since they are the risky part):
-- Cancelling a DRAFT request: no balance change (a DRAFT reserved nothing).
-- Cancelling a SUBMITTED request: pendingDays -= requestedDays.
-- Cancelling an APPROVED request: usedDays -= requestedDays.
-In every case the balance row MUST be read with the row lock before it is written (the repository's `forUpdate` flag) — the deltas are computed in application code, so an unlocked read lets two concurrent operations lose one another's update. Cancel is a write path and must take the lock, exactly as submit/approve/reject do. The whole operation — status change, balance release, audit entry, notification — is ONE unit of work via IUnitOfWork.withTransaction, with the client threaded through every call. [BINDING RULE — operator decision resolving: Should ADMIN be able to cancel an APPROVED request (consistent with the existing assertCanDecide which exempts ADMIN from the direct-manager check), or is cancellation strictly limited to the owner (DRAFT/SUBMITTED) and the direct manager (APPROVED)?; Should a manager be allowed to cancel an APPROVED request after the leave start date has already passed (or after it has fully elapsed)?; When cancelling an APPROVED request that has already partially elapsed, should the released usedDays be pro-rated to only the unelapsed portion, or released in full?; The AuditAction enum (src/shared/types) has CREATE/UPDATE/DELETE/APPROVE/REJECT but no CANCEL. The cancel operation must record an audit entry (GP-002); which action value should it use?; Should cancelling an APPROVED request whose startDate is already in the past (leave partially or fully taken) be blocked, or is the full usedDays release always permitted regardless of elapsed time?; apply everywhere these apply, not in one place only]
+4. MANAGER VISIBILITY — direct reports plus self. `employee.manager_id === actor.id`, one level only, plus the manager's own requests. NOT transitive: a subtree query is a recursive CTE for a scope nobody has asked for, and "my team" in this domain means the people who report to me. ADMIN sees all; EMPLOYEE sees only their own. Apply the identical rule to GET /leaves and GET /leaves/:id, and remember that a request the caller may not see must return the SAME response as one that does not exist.
+
+TWO FACTS THAT AFFECT THE IMPLEMENTATION — check these against the code before you design:
+
+  - `LeaveRequestQueryParams` (src/shared/types) currently has status, leaveTypeCode, the four date bounds, limit and offset — and NO employee filter. So role scoping cannot be expressed through findByQuery as it stands. EXTEND the params type (e.g. an `employeeIds?: string[]` matched with `employee_id = ANY($n)`, which covers all three roles: one id for EMPLOYEE, manager+reports for MANAGER, omitted for ADMIN) and extend findByQuery to honour it. Do not bypass the repository by writing SQL in a service, and do not filter in application code after fetching every row — the scope must be in the query.
+  - `employee.repository` has create, findById, findByEmployeeNumber and findByEmail — but nothing that lists by manager. Add a `findByManagerId` (or equivalent) to the employee repository and its interface for the MANAGER case. `findByEmail` already exists and is what POST /auth/login should use to look up the account.
+
+Everything else in the original brief stands unchanged, including that the smoke check must be extended with real-value assertions for each new endpoint and that its existing stages must keep passing unweakened. [BINDING RULE — operator decision resolving: Are the date-range filter boundaries (startDateFrom/startDateTo/endDateFrom/endDateTo) inclusive or exclusive at each edge?; GET /balances/me returns "the caller's current leave balance" — but balances are per leave type. Which leave type (or all types) is returned?; How should the accrual-period derivation be shared between LeaveService.resolveBalance and the new GET /balances/me path?; What is the exact visibility scope for MANAGER on GET /leaves and GET /leaves/:id?; apply everywhere these apply, not in one place only]
+
+## Authoritative entity shape (from the reconciled architecture — MANDATORY, not your choice)
+The entities below are shared, cross-module DATA CONTRACTS. Implement each one with EXACTLY these fields and types — identical names and types, with no additions, renames, splits (e.g. do NOT split a `fullName` into first/last), or omissions. This is a fixed contract other modules and later phases depend on; it is NOT an implementation choice, and it OVERRIDES any field list you might infer from PLAN.md or the phase description:
+- `Employee` — the entity MUST have exactly these fields:
+    - id: string
+    - employeeNumber: string
+    - firstName: string
+    - lastName: string
+    - email: string
+    - role: EmployeeRole
+    - managerId: string | null
+    - department: string
+    - hireDate: Date
+    - terminationDate: Date | null
+    - employmentStatus: EmploymentStatus
+    - passwordHash: string | null
 
 ## Constraints & consistency
 You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
 ### Reuse & consistency — match these exactly
-- The cancel tests must match the existing suite's containment-based transaction assertion convention: assert uow.callCount === 1 and that each participating call receives uow.stubClient, exactly as the submit/approve/reject tests do. (see `tests/unit/modules/leave/leave.service.test.ts`)
-- The cancel tests must exercise the real cancel implementation and its authorization/timing/balance-release semantics as defined in the service, without re-deriving or contradicting them. (see `src/modules/leave/leave.service.ts`)
-- The cancel tests must use AuditAction.CANCEL (value 'CANCEL') for the audit assertion, matching the shared enum member added in Phase 1. (see `src/shared/types/index.ts`)
-- The cancel tests must reuse the existing fakes and fixtures (makeRequest, makeActor, makeBalance, makeEmployee, makePolicy) and their recorded-call arrays rather than introducing parallel test doubles. (see `tests/unit/modules/leave/leave.service.test.ts`)
+- findByManagerId must reuse the existing `mapRow` helper and the exact employee column list already used by findById/findByEmployeeNumber/findByEmail. (see `src/modules/employee/employee.repository.ts`)
+- The Employee return type of findByManagerId/getEmployeesByManagerId must match the existing Employee interface (field names and types). (see `src/modules/employee/employee.model.ts`)
+- employeeIds must be added to the existing LeaveRequestQueryParams interface without disturbing the other fields. (see `src/shared/types/index.ts`)
+- The repository method signature must follow the existing optional-client-last pattern (client?: PoolClient) with fallback to the shared pool. (see `src/modules/employee/employee.repository.interface.ts`)
 ### Entity invariants — enforce these
-- Reuse or extend `LeaveRequest`: A cancelled request ends in status CANCELLED with cancelledBy set to the acting actor's id and cancelledAt set to a Date; cancellation is only reachable from DRAFT (owner), SUBMITTED (owner), or APPROVED (direct manager or ADMIN), and only while startDate is strictly in the future.
-- Reuse or extend `LeaveBalance`: Cancellation releases the full requestedDays with no pro-rating: DRAFT releases nothing, SUBMITTED decrements pendingDays by requestedDays, APPROVED decrements usedDays by requestedDays; the balance row is always read with a row lock (forUpdate=true) before any write.
-- Reuse or extend `AuditLog`: Every cancellation writes exactly one audit record with action AuditAction.CANCEL, entityType 'leave_request', entityId equal to the request id, and actorId equal to the acting actor's id.
-- Reuse or extend `Notification`: Every cancellation produces exactly one synchronous notification to the affected employee (recipientId = request.employeeId) with relatedEntityType 'leave_request' and relatedEntityId equal to the request id.
+- Reuse or extend `Employee`: The Employee entity shape is unchanged; findByManagerId returns Employee instances whose managerId equals the queried managerId, preserving the existing field mapping (including managerId: string | null).
+- Reuse or extend `LeaveRequestQueryParams`: employeeIds is an optional array of employee id strings used to scope leave queries by employee; it is additive and does not alter existing query-param semantics.
 ### Interface contract — expose these operations (their shape is yours)
-- LeaveService.cancel(actor, requestId) — Owner may cancel own DRAFT/SUBMITTED; direct manager (employee.managerId === actor.id) may cancel APPROVED; ADMIN may cancel APPROVED for anyone (exempt from direct-manager check); no acting on own request where the manager/ADMIN rule applies. Violations throw ForbiddenError.; ForbiddenError on authorization failure; ConflictError when startDate <= today; NotFoundError on unknown request; UnauthorizedError on missing/invalid actor.
+- findByManagerId(managerId: string, client?: PoolClient): Promise<Employee[]> — None at this layer; authorization is applied by the consuming service/controller in later phases.; idempotent; Read-only; returns an empty array when no employees match (no throw for empty result).
+- getEmployeesByManagerId(managerId: string): Promise<Employee[]> — None at this layer; role-scoping/authorization is deferred to later phases.; idempotent; Pure delegation to repository.findByManagerId; returns empty array for no matches, no not-found throw.
 ### Integration points — connect to these
-- src/modules/leave/leave.service.ts (LeaveService.cancel) — The operation under test; its authorization, timing guard, balance release, status transition, and side effects define the assertions.
-- tests/unit/modules/leave/leave.service.test.ts (existing fakes + fixtures) — The suite to extend; its eight fakes and containment-based transaction assertions are the test harness for the new cancel cases.
-- src/shared/types/index.ts (AuditAction.CANCEL, LeaveStatus.CANCELLED) — The enum values the audit and status assertions must reference.
+- src/modules/leave (Phase 4 findByQuery) — employeeIds on LeaveRequestQueryParams is the role-scoping hook that leave findByQuery will honour in Phase 4.
+- Manager team-view / time-off calendar surfaces (later phases) — getEmployeesByManagerId provides the manager-listing read support those surfaces consume.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:

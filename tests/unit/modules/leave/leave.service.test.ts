@@ -214,6 +214,10 @@ class FakeEmployeeService implements IEmployeeService {
     }
     return employee;
   }
+
+  async getEmployeesByManagerId(managerId: string): Promise<Employee[]> {
+    return this.rows.filter((e) => e.managerId === managerId);
+  }
 }
 
 class FakePolicyService implements IPolicyService {

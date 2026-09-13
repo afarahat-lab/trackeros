@@ -33,6 +33,10 @@ class FakeEmployeeRepository implements IEmployeeRepository {
   async findByEmail(email: string): Promise<Employee | null> {
     return this.rows.find((e) => e.email === email) ?? null;
   }
+
+  async findByManagerId(managerId: string): Promise<Employee[]> {
+    return this.rows.filter((e) => e.managerId === managerId);
+  }
 }
 
 function makeInput(overrides: Partial<CreateEmployeeInput> = {}): CreateEmployeeInput {

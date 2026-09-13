@@ -31,6 +31,10 @@ export class EmployeeService implements IEmployeeService {
     return employee;
   }
 
+  async getEmployeesByManagerId(managerId: string): Promise<Employee[]> {
+    return this.repository.findByManagerId(managerId);
+  }
+
   private validate(input: CreateEmployeeInput): void {
     const requiredStrings: Array<[keyof CreateEmployeeInput, string]> = [
       ['employeeNumber', 'employeeNumber'],

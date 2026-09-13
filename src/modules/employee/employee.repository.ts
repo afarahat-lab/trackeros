@@ -102,4 +102,14 @@ export class PgEmployeeRepository implements IEmployeeRepository {
     const result: QueryResult<EmployeeRow> = await this.db(client).query(query, [email]);
     return result.rows.length ? mapRow(result.rows[0]) : null;
   }
+
+  async findByManagerId(managerId: string, client?: PoolClient): Promise<Employee[]> {
+    const query = `
+      SELECT id, employee_number, first_name, last_name, email, role, manager_id,
+        department, hire_date, termination_date, employment_status
+      FROM employees WHERE manager_id = $1
+    `;
+    const result: QueryResult<EmployeeRow> = await this.db(client).query(query, [managerId]);
+    return result.rows.map(mapRow);
+  }
 }

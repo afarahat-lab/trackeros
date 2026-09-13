@@ -77,6 +77,7 @@ export interface LeaveRequestQueryParams {
   endDateTo?: Date;
   limit?: number;
   offset?: number;
+  employeeIds?: string[];
 }
 
 /**
