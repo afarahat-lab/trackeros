@@ -1,0 +1,105 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave",
+      "shared/date"
+    ],
+    "affectedLayers": [
+      "service",
+      "shared utility"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "src/shared/date/accrual.ts exists and exports exactly three functions with the signatures `startOfUtcDay(date: Date): Date`, `addMonths(date: Date, months: number): Date`, and `periodContaining(anchor: Date, accrualMonths: number, date: Date): { start: Date; end: Date }`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The shared helpers preserve the exact existing UTC arithmetic and error semantics: `periodContaining` throws ConflictError('Requested date precedes the accrual anchor') when date < anchor, uses a 10,000-iteration safety bound, returns an exclusive end boundary, and throws ConflictError('Unable to resolve accrual period') when the bound is exhausted; `addMonths` clamps to the last day of the target month.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/modules/leave/leave.service.ts no longer declares private `startOfUtcDay`, `addMonths`, or `periodContaining` methods, and imports the three helpers from `src/shared/date/accrual.ts`; `resolveBalance` calls the shared `periodContaining` and `cancel` calls the shared `startOfUtcDay`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The refactor is behaviour-preserving: `tsc --noEmit` passes and the existing LeaveService unit tests (tests/unit/modules/leave/leave.service.test.ts) still pass unchanged, with no observable change to balance resolution or cancellation outcomes.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Copy the three helpers verbatim from LeaveService \u2014 do not alter the UTC arithmetic, the 10,000-iteration bound, the exclusive end boundary, or the two ConflictError messages.",
+    "The new module must import ConflictError from '../../errors' (relative to src/shared/date/), the shared errors entry point.",
+    "Do not add tests in this sub-phase (they land in a later phase).",
+    "Do not touch src/modules/balance/balance.service.ts or any other balance-module file \u2014 that code is owned by sibling sub-phase 3b."
+  ],
+  "outOfScope": [
+    "Sub-phase 3b deliverables: src/modules/balance/balance.service.ts (getBalanceForEmployee), src/modules/balance/balance.routes.ts, src/modules/balance/index.ts.",
+    "Sub-phase 3c deliverable: registering balance routes in src/app.ts.",
+    "Refactoring the identical private addMonths in balance.service.ts \u2014 out of scope for this sub-phase.",
+    "Adding unit tests for the extracted helpers (tests/unit/shared/date/accrual.test.ts) \u2014 deferred to a later phase."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "Accrual period derivation (shared/date/accrual)",
+      "mustExistOrExtend": true,
+      "invariant": "A period is anchored on the employee's hireDate and steps forward by accrualMonths; the returned period is half-open [start, end) with start at UTC midnight of the anchor, and any date strictly before the anchor is rejected with ConflictError."
+    },
+    {
+      "entity": "LeaveService.resolveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "resolveBalance continues to derive the accrual period from employee.hireDate and policy.accrualPeriodMonths via the shared periodContaining, and looks the balance up by (employeeId, leaveTypeCode, period.start, period.end) \u2014 unchanged from before the extraction."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "periodContaining(anchor, accrualMonths, date)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws ConflictError('Requested date precedes the accrual anchor') when date < anchor and ConflictError('Unable to resolve accrual period') when the 10,000-iteration bound is exhausted; otherwise returns { start, end } with an exclusive end."
+    },
+    {
+      "operation": "startOfUtcDay(date)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns a Date at UTC midnight of the input's UTC year/month/day; pure, no side effects, no errors."
+    },
+    {
+      "operation": "addMonths(date, months)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns a new Date shifted by months with the day clamped to the last day of the target month; does not mutate the input."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The three exported helpers must be byte-for-byte equivalent in arithmetic and error behaviour to the private methods currently in LeaveService (startOfUtcDay, addMonths, periodContaining), including the 10,000-iteration bound and both ConflictError messages.",
+      "referencePath": "src/modules/leave/leave.service.ts"
+    },
+    {
+      "requirement": "ConflictError must be imported from the shared errors entry point so the thrown error type and code (409 / CONFLICT) match the platform error contract.",
+      "referencePath": "src/shared/errors/index.ts"
+    },
+    {
+      "requirement": "LeaveService must import the helpers from the shared module and no longer define its own copies, so src/shared/date/accrual.ts is the single source of truth for accrual-period derivation.",
+      "referencePath": "src/shared/date/accrual.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/leave/leave.service.ts",
+      "why": "The sole consumer in this sub-phase: resolveBalance and cancel switch from private methods to the shared helpers."
+    },
+    {
+      "target": "src/shared/errors/index.ts",
+      "why": "Provides ConflictError used by periodContaining for the two error paths."
+    }
+  ]
+}
