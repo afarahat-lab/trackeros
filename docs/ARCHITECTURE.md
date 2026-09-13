@@ -26,6 +26,7 @@ src/shared/errors/index.ts       — AppError base + Validation/NotFound/Unautho
 src/shared/db/connection.ts      — the single pg Pool (DATABASE_URL, SSL in production)
 src/shared/db/unit-of-work.ts    — IUnitOfWork + PgUnitOfWork (BEGIN/COMMIT/ROLLBACK)
 src/shared/db/index.ts           — public entry point (pool, IUnitOfWork, PgUnitOfWork)
+src/shared/date/accrual.ts       — startOfUtcDay / addMonths / periodContaining (pure UTC accrual-period arithmetic)
 ```
 
 ## Key patterns
@@ -379,12 +380,12 @@ This phase adds the Jest unit tests for `LeaveService.cancel` to `tests/unit/mod
 - `employee` (`src/modules/employee/`) — `findCredentialsByEmail`, `findByManagerId`, `getEmployeesByManagerId`, `GET /employees/me`.
 - `leave` (`src/modules/leave/`) — `ILeaveService.list`, `ILeaveService.getById`, `GET /leaves`, `GET /leaves/:id`.
 - `balance` (`src/modules/balance/`) — `resolveAccrualPeriod`, `getBalanceForEmployee`, `GET /balances/me`.
-- `shared-types`, `shared-auth`, `shared-errors`, `shared-db`, `policy` — cross-cutting support.
+- `shared-types`, `shared-auth`, `shared-errors`, `shared-db`, `shared-date`, `policy` — cross-cutting support.
 
 ### Dependency map
 - `auth` → `employee`, `shared-auth`, `shared-types`, `shared-errors`
 - `employee` → `shared-types`, `shared-errors`, `shared-db`
-- `leave` → `employee`, `shared-types`, `shared-errors`, `shared-db`
+- `leave` → `employee`, `shared-types`, `shared-errors`, `shared-db`, `shared-date`
 - `balance` → `employee`, `policy`, `shared-types`, `shared-errors`, `shared-db`
 
 ### Phases
@@ -435,4 +436,15 @@ This phase delivers the credential column and the `POST /auth/login` endpoint (P
 **Divergences from the plan worth noting:**
 - PLAN.md Phase 2 prescribed `LoginResult { token; employee: Employee }`; the implementation types the employee as `Omit<Employee, 'passwordHash'>` and strips the field at runtime — a stronger guarantee than the plan's "never return passwordHash" note, enforced at the type level.
 - The `create` INSERT does not write `password_hash` (only the RETURNING reads it back as null); the plan's "add password_hash to every SELECT column list" is honoured for all reads, but the insert column list is unchanged.
+
+### Phase 3a delivered (shared accrual date helpers + LeaveService refactor)
+
+This sub-phase extracts the accrual-period UTC arithmetic out of `LeaveService` into a shared module, so the balance read path (sibling sub-phase 3b) can reuse it. It is the first of the split Phase 3 sub-phases; the balance service method, balance routes, and `app.ts` registration (3b/3c) are not yet implemented.
+
+- `src/shared/date/accrual.ts` — NEW file exporting exactly three pure functions: `startOfUtcDay(date: Date): Date` (UTC midnight of the input's UTC year/month/day), `addMonths(date: Date, months: number): Date` (new Date shifted by months, day clamped to the last day of the target month, input not mutated), and `periodContaining(anchor: Date, accrualMonths: number, date: Date): { start: Date; end: Date }` (half-open `[start, end)` period anchored at `startOfUtcDay(anchor)`, stepping `accrualMonths` at a time with a 10,000-iteration safety bound; throws `ConflictError('Requested date precedes the accrual anchor')` when `date < anchor` and `ConflictError('Unable to resolve accrual period')` when the bound is exhausted). The arithmetic is copied verbatim from the former private `LeaveService` helpers, and `ConflictError` is imported from `src/shared/errors`. The module is the single source of truth for accrual-period derivation.
+- `src/modules/leave/leave.service.ts` — deleted the private `startOfUtcDay`, `addMonths`, and `periodContaining` methods and imports the three helpers from `src/shared/date/accrual.ts` instead. `resolveBalance` now calls the shared `periodContaining`, and `cancel` calls the shared `startOfUtcDay`. No observable behaviour change to create/submit/approve/reject/cancel.
+
+**Divergences from the plan worth noting:**
+- The sub-phase spec's out-of-scope note explicitly deferred refactoring the identical private `addMonths` in `src/modules/balance/balance.service.ts` (owned by sibling sub-phase 3b). As committed, `BalanceService` still carries its own private `addMonths` — so the shared module is not yet the sole copy of that arithmetic; the balance module's duplicate remains until 3b consumes the shared helper.
+- No tests were added in this sub-phase (the spec deferred `tests/unit/shared/date/accrual.test.ts` to a later phase); the existing `LeaveService` unit tests pass unchanged, confirming the refactor is behaviour-preserving.
 <!-- gestalt:architecture feature=d5341a09-a78c-4569-9d2f-9f6630b45d6d END -->
