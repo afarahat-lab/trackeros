@@ -1,0 +1,150 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "balance",
+      "leave",
+      "shared-date"
+    ],
+    "affectedLayers": [
+      "service",
+      "routes",
+      "shared-utility",
+      "app-wiring"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "A new shared module exports startOfUtcDay, addMonths, and periodContaining whose UTC arithmetic is byte-for-byte equivalent to the current private LeaveService helpers, including the 10,000-iteration safety bound and the ConflictError when the date precedes the anchor.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "LeaveService no longer defines private startOfUtcDay/addMonths/periodContaining and its resolveBalance calls the shared periodContaining, with no observable behaviour change to create/submit/approve/reject/cancel.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "IBalanceService gains getBalanceForEmployee(employeeId) returning a LIST (array) of balance entries \u2014 never a single object \u2014 where each entry carries leaveTypeCode, periodStart, periodEnd, entitledDays, usedDays, pendingDays, and available = entitledDays - usedDays - pendingDays.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "getBalanceForEmployee resolves the current period for each leave type via the shared periodContaining(employee.hireDate, policy.accrualPeriodMonths, new Date()) and looks each balance up with findByKey, performing no writes and opening no transaction.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A balance route registers GET /balances/me (200) that resolves the actor from request.user (never a client-supplied id) via a resolveActor helper matching leave.routes.ts, calls getBalanceForEmployee(actor.id), and maps errors via sendError.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "balance/index.ts exports balanceRoutes and app.ts registers it so the endpoint is reachable at runtime.",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "The shared accrual helpers must be the single source of truth: LeaveService must import them and delete its private copies; no duplicate period-derivation logic may remain in leave.service.ts or balance.service.ts.",
+    "getBalanceForEmployee is read-only: it must not open a transaction, not call uow.withTransaction, and not perform any repository write (create/update).",
+    "The actor identity must come exclusively from request.user; the route must never accept or honour a client-supplied employee id.",
+    "No unit tests are added in this phase (they land in Phase 5)."
+  ],
+  "outOfScope": [
+    "Unit tests for the extracted accrual helpers, the balance service, and the balance route (Phase 5).",
+    "GET /leaves and GET /leaves/:id read endpoints and their role-scoped visibility (Phase 4).",
+    "GET /employees/me route and smoke-check extensions (Phase 5).",
+    "Any audit-log writes, notifications, or state-changing balance operations \u2014 this phase is read-only."
+  ],
+  "ambiguities": [
+    {
+      "description": "How getBalanceForEmployee enumerates the set of leave types to return balances for (all LeaveTypeCode enum members vs. only leave types that have a persisted row/policy).",
+      "options": [
+        "Iterate all LeaveTypeCode enum members",
+        "Iterate leave types returned by ILeaveTypeService.findAll",
+        "Iterate only leave types that have a policy via getPolicyByLeaveTypeCode"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "What getBalanceForEmployee returns when a leave type has a policy but no balance row exists for the current period (skip the type vs. throw NotFoundError).",
+      "options": [
+        "Skip the leave type (omit from the list)",
+        "Throw NotFoundError for the missing balance"
+      ],
+      "impactIfWrong": "medium"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "A balance entry returned by getBalanceForEmployee is a projection of an existing LeaveBalance row: leaveTypeCode, periodStart, periodEnd, entitledDays, usedDays, pendingDays are the persisted values, and available is derived as entitledDays - usedDays - pendingDays (never persisted)."
+    },
+    {
+      "entity": "Accrual period (shared date helper)",
+      "mustExistOrExtend": true,
+      "invariant": "periodContaining(anchor, accrualMonths, date) returns the half-open UTC period [start, end) containing date, anchored at startOfUtcDay(anchor), stepping accrualMonths at a time with a 10,000-iteration bound; a date strictly before the anchor throws ConflictError."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "getBalanceForEmployee(employeeId: string): Promise<BalanceEntry[]>",
+      "authRule": "Caller is the authenticated actor; the employeeId is the actor's own id resolved at the route boundary from request.user.",
+      "idempotent": true,
+      "errorSemantics": "Read-only; throws NotFoundError when the employee or a policy is missing, and propagates ConflictError from periodContaining when the current date precedes the hire-date anchor."
+    },
+    {
+      "operation": "GET /balances/me",
+      "authRule": "Requires an authenticated actor (request.user with a valid EmployeeRole); missing/invalid actor \u2192 401.",
+      "idempotent": true,
+      "errorSemantics": "200 with a list of balance entries; AppError mapped to { error, code } with its status, other throws \u2192 500."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The extracted startOfUtcDay/addMonths/periodContaining must reproduce the exact UTC arithmetic, safety bound, and ConflictError semantics of the current private helpers in LeaveService.resolveBalance.",
+      "referencePath": "src/modules/leave/leave.service.ts"
+    },
+    {
+      "requirement": "The balance route's resolveActor and sendError helpers must match the behaviour of the existing leave route helpers (actor from request.user, role membership check, AppError \u2192 { error, code } with status, other \u2192 500).",
+      "referencePath": "src/modules/leave/leave.routes.ts"
+    },
+    {
+      "requirement": "getBalanceForEmployee must resolve the policy's accrualPeriodMonths via IPolicyService.getPolicyByLeaveTypeCode and the employee's hireDate via IEmployeeService.getEmployeeById, matching how LeaveService.resolveBalance derives the period.",
+      "referencePath": "src/modules/leave/leave.service.ts"
+    },
+    {
+      "requirement": "The balance lookup must use IBalanceRepository.findByKey(employeeId, leaveTypeCode, periodStart, periodEnd) with the same key semantics (at-most-one row per key).",
+      "referencePath": "src/modules/balance/balance.repository.ts"
+    },
+    {
+      "requirement": "The returned entry's available field must equal entitledDays - usedDays - pendingDays, the same sufficiency arithmetic used by validateSufficiency.",
+      "referencePath": "src/modules/validation/validation.service.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/employee (IEmployeeService.getEmployeeById)",
+      "why": "Resolve the employee's hireDate, the accrual anchor for periodContaining."
+    },
+    {
+      "target": "src/modules/policy (IPolicyService.getPolicyByLeaveTypeCode)",
+      "why": "Resolve accrualPeriodMonths per leave type to compute the current period."
+    },
+    {
+      "target": "src/modules/leave-type (ILeaveTypeService.getLeaveTypeByCode / repository findAll)",
+      "why": "Enumerate the leave types whose balances must be returned."
+    },
+    {
+      "target": "src/shared/date/accrual.ts",
+      "why": "Single source of truth for accrual-period derivation consumed by both LeaveService and BalanceService."
+    },
+    {
+      "target": "src/shared/errors (ConflictError, NotFoundError)",
+      "why": "Error semantics for missing employee/policy and pre-anchor dates."
+    }
+  ]
+}
