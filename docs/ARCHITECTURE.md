@@ -445,6 +445,25 @@ This sub-phase extracts the accrual-period UTC arithmetic out of `LeaveService` 
 - `src/modules/leave/leave.service.ts` — deleted the private `startOfUtcDay`, `addMonths`, and `periodContaining` methods and imports the three helpers from `src/shared/date/accrual.ts` instead. `resolveBalance` now calls the shared `periodContaining`, and `cancel` calls the shared `startOfUtcDay`. No observable behaviour change to create/submit/approve/reject/cancel.
 
 **Divergences from the plan worth noting:**
-- The sub-phase spec's out-of-scope note explicitly deferred refactoring the identical private `addMonths` in `src/modules/balance/balance.service.ts` (owned by sibling sub-phase 3b). As committed, `BalanceService` still carries its own private `addMonths` — so the shared module is not yet the sole copy of that arithmetic; the balance module's duplicate remains until 3b consumes the shared helper.
+- The sub-phase spec's out-of-scope note explicitly deferred refactoring the identical private `addMonths` in `src/modules/balance/balance.service.ts` (owned by sibling sub-phase 3b). As committed at the time, `BalanceService` still carried its own private `addMonths`; sub-phase 3b deleted it and now imports the shared helper, making `src/shared/date/accrual.ts` the sole copy of that arithmetic.
 - No tests were added in this sub-phase (the spec deferred `tests/unit/shared/date/accrual.test.ts` to a later phase); the existing `LeaveService` unit tests pass unchanged, confirming the refactor is behaviour-preserving.
+
+### Phase 3b delivered (balance read endpoint)
+
+This sub-phase delivers the `GET /balances/me` read endpoint (PLAN.md Phase 3) and resolves the Phase 3a divergence by making the shared accrual helpers the sole copy of that arithmetic.
+
+**balance service** — `IBalanceService` gained `getBalanceForEmployee(employeeId: string): Promise<BalanceEntry[]>` and a new `BalanceEntry` value type (`{ leaveTypeCode, periodStart, periodEnd, entitledDays, usedDays, pendingDays, available }`, where `available = entitledDays - usedDays - pendingDays`). The implementation resolves the employee once (`getEmployeeById`), lists the policies in effect as of `now` via a NEW `IPolicyService.listEffectivePolicies(asOf)` method, and for each effective policy derives the current accrual period via the shared `periodContaining(employee.hireDate, policy.accrualPeriodMonths, now)` and looks the row up with `findByKey`. A leave type with an effective policy but no balance row is **skipped** (no NotFoundError) — this is a listing, not a single-balance fetch. The returned `periodStart`/`periodEnd` come from the found balance row (not the computed period). Read-only: no transaction, no writes, no `forUpdate`.
+
+**balance service refactor** — the private `addMonths` helper was deleted; `carryForward` now imports `addMonths` from `src/shared/date/accrual.ts` (resolving the Phase 3a divergence — the shared module is now the sole copy of the accrual arithmetic).
+
+**policy module** — `IPolicyService` gained `listEffectivePolicies(asOf: Date): Promise<LeavePolicy[]>`; `PolicyService.listEffectivePolicies` filters `findAll()` to ACTIVE policies whose `effectiveFrom <= asOf` and (`effectiveTo` null or `>= asOf`), then keeps the latest-`effectiveFrom` policy per `leaveTypeCode` (at most one per type). Returns an empty array (never throws) when none apply.
+
+**routes** — NEW `src/modules/balance/balance.routes.ts` registering `GET /balances/me` (200), with a `resolveActor` helper (extracts `request.user`, enforces role membership at the API boundary, UnauthorizedError on missing/invalid) and a `sendError` helper matching `leave.routes.ts`. The service is resolved from `fastify.balanceService` if present, else `createBalanceService()`.
+
+**index.ts** — `src/modules/balance/index.ts` now exports `balanceRoutes` (and `BalanceEntry`).
+
+**Divergences from the plan worth noting:**
+- PLAN.md Phase 3 step 6 prescribed registering `balanceRoutes` in `src/app.ts`; the committed `app.ts` registers only `uptimeRoutes`, `leaveRoutes`, and `authRoutes` — `balanceRoutes` is **not mounted**, so `GET /balances/me` is unreachable at runtime (the same "exported but imported by nothing" failure mode the deployability brief flagged for `leaveRoutes`).
+- The plan prescribed iterating leave types and calling `getPolicyByLeaveTypeCode` per type; the implementation instead added `listEffectivePolicies` to the policy service and iterates effective policies, skipping types with no balance row rather than throwing NotFoundError.
+- No unit tests were added for `getBalanceForEmployee` (the plan deferred tests to Phase 5); `tests/unit/modules/balance/balance.service.test.ts` was touched only to add `listEffectivePolicies` to `FakePolicyService` so the widened interface compiles under `tsc --noEmit`.
 <!-- gestalt:architecture feature=d5341a09-a78c-4569-9d2f-9f6630b45d6d END -->
