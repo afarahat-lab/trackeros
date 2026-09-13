@@ -34,7 +34,19 @@ module.exports = {
   // Real-Postgres smoke — the brief's Q1 target. Used by `npm run smoke` whenever
   // SMOKE_DATABASE_URL is set, so all three stages run against the SAME engine the
   // repositories dial. This is what closes the persistence caveat the sqlite path prints.
-  smoke_pg: { ...base, client: 'pg', connection: process.env.SMOKE_DATABASE_URL },
+  smoke_pg: {
+    client: 'pg',
+    connection: process.env.SMOKE_DATABASE_URL,
+    // Per-run schema (set by scripts/smoke.js) so concurrent verifications cannot collide
+    // in a shared scratch database. Migrations and their bookkeeping table live in it too,
+    // so `migrate:latest` always starts from empty without a rollback step.
+    searchPath: [process.env.SMOKE_SCHEMA || 'public'],
+    migrations: {
+      directory: './migrations',
+      tableName: 'knex_migrations',
+      schemaName: process.env.SMOKE_SCHEMA || 'public',
+    },
+  },
   // Throwaway file DB for the smoke check — no container, no credentials. The fallback
   // when no Postgres is available: it still catches a missing schema mechanism and a
   // column no migration created, but NOT anything the handler does with the database.
