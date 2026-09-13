@@ -411,4 +411,28 @@ This phase delivered only the first of the five planned phases — the shared qu
 
 **Divergences from the plan worth noting:**
 - PLAN.md Phase 1 prescribed "do not add tests in this phase"; the committed diff nevertheless touches three test files — `tests/unit/modules/employee.service.test.ts`, `tests/unit/modules/balance/balance.service.test.ts`, and `tests/unit/modules/leave/leave.service.test.ts`. These are not new test coverage: the in-memory fakes (`FakeEmployeeRepository` / `FakeEmployeeService`) had to implement the newly-added `findByManagerId` / `getEmployeesByManagerId` methods to satisfy the widened interfaces under `tsc --noEmit`. No new assertions were added.
+
+### Phase 2 delivered (auth module + migration)
+
+This phase delivers the credential column and the `POST /auth/login` endpoint (PLAN.md Phase 2). Phases 3–5 (balance/leave read endpoints, `GET /employees/me`, smoke + route tests) are not yet implemented.
+
+**migration** — `migrations/20260913000001_add_password_hash.js` adds a nullable `password_hash` text column to `employees` (no default), with a matching `down` that drops the column.
+
+**employee model/repository** — `Employee` gained `passwordHash: string | null` (so `CreateEmployeeInput = Omit<Employee, 'id'>` now carries it). `EmployeeRow` gained `password_hash: string | null`; `mapRow` maps it to `passwordHash`; every SELECT column list (`create` RETURNING, `findById`, `findByEmployeeNumber`, `findByEmail`, `findByManagerId`) now selects `password_hash`. The `create` INSERT still writes the original 11 columns (no `password_hash`) — the RETURNING clause reads the column back as `null` from the DB default.
+
+**auth module** (`src/modules/auth/`) — split-file layout (service, routes, `index.ts`; no model/repository — auth reuses the employee repository).
+
+- `auth.service.ts` — `LoginInput { email: string; password: string }`, `LoginResult { token: string; employee: Omit<Employee, 'passwordHash'> }`, `IAuthService { login }`, `AuthService` (constructor-injects `IEmployeeRepository`). `login` looks the account up via the existing `findByEmail`, then: a missing account OR a null `passwordHash` short-circuits to `UnauthorizedError('Invalid credentials')` before any bcrypt work; a wrong password throws the same error — so wrong email and wrong password are indistinguishable (same 401 + message). On success it mints `signToken({ id, role })` and strips `passwordHash` via destructuring, returning `Omit<Employee, 'passwordHash'>` so the hash can never reach a caller.
+- `auth.routes.ts` — `authRoutes(fastify)` registers `POST /auth/login` (200). `parseLoginBody` rejects a missing/non-string email/password with `ValidationError` (GP-003) before the service runs; `sendError` maps `AppError` → `{ error, code }` with the correct status and any other throw to 500. The service is resolved from `fastify.authService` if present, else `new AuthService(new PgEmployeeRepository())`.
+- `index.ts` — re-exports `LoginInput`, `LoginResult`, `IAuthService`, `AuthService`, `authRoutes`.
+
+**shared-auth** — `PUBLIC_PATHS` gained `'/auth/login'` (now `/uptime`, `/health`, `/auth/login`), so the endpoint is reachable without a bearer token. The token payload contract is unchanged (`sub` = employee id, `role` = EmployeeRole).
+
+**app.ts** — imports and registers `authRoutes` (after `leaveRoutes`), so the endpoint is mounted at runtime.
+
+**tests** — the three existing unit-test files (`employee.service.test.ts`, `balance/balance.service.test.ts`, `leave/leave.service.test.ts`) were touched only to satisfy the widened `Employee` interface: the `makeEmployee`/`makeInput` fixtures gained `passwordHash: null`. No new assertions were added (auth route/service tests land in Phase 5).
+
+**Divergences from the plan worth noting:**
+- PLAN.md Phase 2 prescribed `LoginResult { token; employee: Employee }`; the implementation types the employee as `Omit<Employee, 'passwordHash'>` and strips the field at runtime — a stronger guarantee than the plan's "never return passwordHash" note, enforced at the type level.
+- The `create` INSERT does not write `password_hash` (only the RETURNING reads it back as null); the plan's "add password_hash to every SELECT column list" is honoured for all reads, but the insert column list is unchanged.
 <!-- gestalt:architecture feature=d5341a09-a78c-4569-9d2f-9f6630b45d6d END -->
