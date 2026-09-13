@@ -1,32 +1,27 @@
-# Implement this phase: Phase 2 — auth module + migration
+# Implement this phase: Sub-phase 3a — shared accrual date helpers + LeaveService refactor
 
-You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/d5341a09-a78c-4569-9d2f-9f6630b45d6d/2`. Do not clone anything; work only in this directory.
+You are an autonomous coding agent working INSIDE an already-cloned git repository at `/tmp/gestalt/phase/d5341a09-a78c-4569-9d2f-9f6630b45d6d/3`. Do not clone anything; work only in this directory.
 
 You are the IMPLEMENTATION agent, not a planner. The platform measures your work EXCLUSIVELY by the files you create or modify in this working tree (`git status`). Ending your turn with a plan, a summary, or an announcement of what you are 'about to' do — without having actually edited files — is a FAILURE: a turn that leaves the working tree untouched is discarded. Explore only as much as you need, then MAKE the edits with your file-editing tool. Never end your turn before the files exist on disk.
 
 ## What to build
-(no phase architecture provided — infer from the success criteria below)
+src/shared/date/accrual.ts exists and exports startOfUtcDay, addMonths, and periodContaining with the exact UTC arithmetic, 10,000-iteration safety bound, and ConflictError behaviour copied from LeaveService.
+src/modules/leave/leave.service.ts no longer defines private startOfUtcDay/addMonths/periodContaining and imports the three helpers from src/shared/date/accrual.ts.
+resolveBalance in LeaveService calls the shared periodContaining and its behaviour is unchanged.
 
 ## Success criteria
-Add the nullable `password_hash` credential column and the `POST /auth/login` endpoint. Approximately 7 files.
+Extract the accrual-period UTC helpers into a shared module and refactor LeaveService to use them.
 
-1. `migrations/<new timestamp>_add_password_hash.js` — a knex migration adding a nullable `password_hash` column to `employees` using `t.text('password_hash')` (nullable, no default), following the conventions in `migrations/20260913000000_initial_schema.js`. Provide a matching `down` that drops the column.
+1. `src/shared/date/accrual.ts` — NEW file exporting `startOfUtcDay(date: Date): Date`, `addMonths(date: Date, months: number): Date`, and `periodContaining(anchor: Date, accrualMonths: number, date: Date): { start: Date; end: Date }`. Copy the exact UTC arithmetic currently in `LeaveService` (private `startOfUtcDay`/`addMonths`/`periodContaining`), including the 10,000-iteration safety bound and the ConflictError on a date preceding the anchor. This becomes the single source of truth for accrual-period derivation.
 
-2. `src/modules/employee/employee.model.ts` — add `passwordHash: string | null` to the `Employee` interface (canonical entity field).
+2. `src/modules/leave/leave.service.ts` — delete the private `startOfUtcDay`, `addMonths`, and `periodContaining` methods and import the three helpers from `src/shared/date/accrual.ts` instead. `resolveBalance` must call the shared `periodContaining`. No behaviour change.
 
-3. `src/modules/employee/employee.repository.ts` — add `password_hash` to every SELECT column list and to `mapRow` (map to `passwordHash`). The `EmployeeRow` interface gains `password_hash: string | null`.
+Read `src/modules/leave/leave.service.ts` before generating. Do not add tests here.
 
-4. `src/modules/auth/auth.service.ts` — declare `LoginInput { email: string; password: string }`, `LoginResult { token: string; employee: Employee }`, `IAuthService { login(input: LoginInput): Promise<LoginResult> }`, and `AuthService`. `login` looks up the account via `IEmployeeRepository.findByEmail` (already exists — do NOT add a new lookup), compares with `bcrypt.compare` against `employee.passwordHash`, and mints a token via `signToken({ id: employee.id, role: employee.role })` from `src/shared/auth`. A wrong email and a wrong password MUST be indistinguishable (same status/message — throw `UnauthorizedError`). Never return `passwordHash` in any response.
-
-5. `src/modules/auth/auth.routes.ts` — `authRoutes(fastify)` registering `POST /auth/login` (200). Parse/validate the body (reject missing/non-string email/password with `ValidationError`), call the service, and map errors via a `sendError` helper matching `src/modules/leave/leave.routes.ts`. Resolve the service from `fastify.authService` if present, else construct it.
-
-6. `src/modules/auth/index.ts` — re-export `LoginInput`, `LoginResult`, `IAuthService`, `AuthService`, `authRoutes`.
-
-7. `src/shared/auth/index.ts` — add `'/auth/login'` to the `PUBLIC_PATHS` set so the endpoint is reachable without a token. Do NOT change the token payload contract (`sub` = employee id, `role` = EmployeeRole).
-
-8. `src/app.ts` — register `authRoutes` (import from `./modules/auth`).
-
-This phase depends on Phase 1 (`src/modules/employee/employee.repository.ts`, `employee.model.ts`) and the existing `src/shared/auth/index.ts` (`signToken`), `src/shared/errors/index.ts`, and `src/shared/types/index.ts` (`EmployeeRole`). Read them before generating. `bcrypt` and `jsonwebtoken` are already dependencies — use them, do not add libraries.
+## Owned by SIBLING sub-phases (OUT OF SCOPE for this sub-phase)
+This is ONE sub-phase of a split phase. The deliverables below belong to sibling sub-phases — do NOT create them here, do NOT list them as success criteria, and this sub-phase MUST NOT be gated on their presence (they are produced by a sibling, not missing):
+- "Sub-phase 3b — balance service method + routes + index export": src/modules/balance/balance.service.ts, src/modules/balance/balance.routes.ts, src/modules/balance/index.ts
+- "Sub-phase 3c — register balance routes in app": src/app.ts
 
 ## Your iteration budget — and how to get more (READ BEFORE YOU START)
 
@@ -82,6 +77,23 @@ TWO FACTS THAT AFFECT THE IMPLEMENTATION — check these against the code before
   - `employee.repository` has create, findById, findByEmployeeNumber and findByEmail — but nothing that lists by manager. Add a `findByManagerId` (or equivalent) to the employee repository and its interface for the MANAGER case. `findByEmail` already exists and is what POST /auth/login should use to look up the account.
 
 Everything else in the original brief stands unchanged, including that the smoke check must be extended with real-value assertions for each new endpoint and that its existing stages must keep passing unweakened. [BINDING RULE — operator decision resolving: Are the date-range filter boundaries (startDateFrom/startDateTo/endDateFrom/endDateTo) inclusive or exclusive at each edge?; GET /balances/me returns "the caller's current leave balance" — but balances are per leave type. Which leave type (or all types) is returned?; How should the accrual-period derivation be shared between LeaveService.resolveBalance and the new GET /balances/me path?; What is the exact visibility scope for MANAGER on GET /leaves and GET /leaves/:id?; apply everywhere these apply, not in one place only]
+
+## Constraints & consistency
+You CHOOSE the implementation shape (files, types, routes, components). It MUST satisfy EVERY item below — these are requirements, not suggestions.
+### Reuse & consistency — match these exactly
+- The three exported helpers must be byte-for-byte equivalent in arithmetic and error behaviour to the private methods currently in LeaveService (startOfUtcDay, addMonths, periodContaining), including the 10,000-iteration bound and both ConflictError messages. (see `src/modules/leave/leave.service.ts`)
+- ConflictError must be imported from the shared errors entry point so the thrown error type and code (409 / CONFLICT) match the platform error contract. (see `src/shared/errors/index.ts`)
+- LeaveService must import the helpers from the shared module and no longer define its own copies, so src/shared/date/accrual.ts is the single source of truth for accrual-period derivation. (see `src/shared/date/accrual.ts`)
+### Entity invariants — enforce these
+- Reuse or extend `Accrual period derivation (shared/date/accrual)`: A period is anchored on the employee's hireDate and steps forward by accrualMonths; the returned period is half-open [start, end) with start at UTC midnight of the anchor, and any date strictly before the anchor is rejected with ConflictError.
+- Reuse or extend `LeaveService.resolveBalance`: resolveBalance continues to derive the accrual period from employee.hireDate and policy.accrualPeriodMonths via the shared periodContaining, and looks the balance up by (employeeId, leaveTypeCode, period.start, period.end) — unchanged from before the extraction.
+### Interface contract — expose these operations (their shape is yours)
+- periodContaining(anchor, accrualMonths, date) — Throws ConflictError('Requested date precedes the accrual anchor') when date < anchor and ConflictError('Unable to resolve accrual period') when the 10,000-iteration bound is exhausted; otherwise returns { start, end } with an exclusive end.
+- startOfUtcDay(date) — Returns a Date at UTC midnight of the input's UTC year/month/day; pure, no side effects, no errors.
+- addMonths(date, months) — Returns a new Date shifted by months with the day clamped to the last day of the target month; does not mutate the input.
+### Integration points — connect to these
+- src/modules/leave/leave.service.ts — The sole consumer in this sub-phase: resolveBalance and cancel switch from private methods to the shared helpers.
+- src/shared/errors/index.ts — Provides ConflictError used by periodContaining for the two error paths.
 
 ## Project constraints (NON-NEGOTIABLE — the gate enforces these; satisfy them now)
 Your code MUST obey every rule below. These are not style preferences — the quality gate rejects the phase on any violation, so comply up front:
