@@ -1,0 +1,106 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "balance",
+      "policy",
+      "shared-date"
+    ],
+    "affectedLayers": [
+      "service",
+      "factory wiring"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "Exactly one `addMonths` implementation exists in the codebase \u2014 the export in `src/shared/date/accrual.ts` \u2014 and `src/modules/balance/balance.service.ts` imports it from that module with no local/private `addMonths` definition.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The balance module (`src/modules/balance/`) contains no import of the leave-type module; `LeaveTypeService` and `PgLeaveTypeRepository` are not referenced anywhere under `src/modules/balance/`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`createBalanceService()` still returns a working `IBalanceService` whose `getBalanceForEmployee` resolves effective policies and returns correct `BalanceEntry` values \u2014 the existing balance unit tests pass unchanged, proving no behavior change.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`npm run build` (tsc --noEmit) succeeds and the full Jest suite passes after the refactor.",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "No observable behavior change to any balance operation (openPeriod, carryForward, getBalance, getBalanceById, getBalanceForEmployee) or to the GET /balances/me route.",
+    "Cross-module imports only through public entry points (index.ts); the balance module must not reach into leave-type internals.",
+    "The shared `addMonths` in src/shared/date/accrual.ts remains the single source of truth for month arithmetic \u2014 no re-implementation in any consumer.",
+    "Dependency direction is balance \u2192 policy \u2192 leave-type; balance must not depend directly on leave-type."
+  ],
+  "outOfScope": [
+    "No changes to the leave module's own construction of LeaveTypeService (leave \u2192 leave-type is permitted as the orchestrator).",
+    "No new endpoints, entities, migrations, or audit/notification behavior.",
+    "No changes to the shared addMonths/periodContaining/startOfUtcDay arithmetic itself."
+  ],
+  "ambiguities": [
+    {
+      "description": "Where the LeaveTypeService construction should live after removal from the balance module.",
+      "options": [
+        "A factory in the policy module (e.g. createPolicyService) that balance calls",
+        "Balance receives IPolicyService via constructor injection and app.ts wires it",
+        "PolicyService stops requiring ILeaveTypeService"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "The intent names balance.routes.ts as the construction site, but the actual LeaveTypeService construction is in balance.service.ts's createBalanceService factory.",
+      "options": [
+        "Treat balance.service.ts createBalanceService as the site to fix",
+        "There is an additional construction site in balance.routes.ts to also address"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [],
+  "interfaceConstraints": [
+    {
+      "operation": "createBalanceService() factory",
+      "authRule": "none (factory)",
+      "idempotent": false,
+      "errorSemantics": "unchanged \u2014 returns a concrete IBalanceService wired with PostgreSQL-backed collaborators"
+    },
+    {
+      "operation": "IBalanceService.getBalanceForEmployee",
+      "authRule": "auth enforced at route boundary (resolveActor); service method itself is unauthenticated",
+      "idempotent": true,
+      "errorSemantics": "unchanged \u2014 read-only, no transaction; NotFoundError only for unknown employee via getEmployeeById"
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "`addMonths` must be the shared symbol imported from `src/shared/date/accrual.ts` (not a local re-implementation).",
+      "referencePath": "src/shared/date/accrual.ts"
+    },
+    {
+      "requirement": "The balance module must obtain its `IPolicyService` through the policy module's public entry point rather than constructing a `LeaveTypeService`.",
+      "referencePath": "src/modules/policy/index.ts"
+    },
+    {
+      "requirement": "The balance module's public entry point must continue to export `createBalanceService`, `IBalanceService`, `BalanceService`, `BalanceEntry`, and `balanceRoutes` unchanged.",
+      "referencePath": "src/modules/balance/index.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/policy/",
+      "why": "balance obtains its policy service from policy's public entry point instead of constructing leave-type directly"
+    },
+    {
+      "target": "src/shared/date/accrual.ts",
+      "why": "single source of truth for addMonths consumed by balance.service.ts"
+    }
+  ]
+}
