@@ -31,10 +31,29 @@ const DB = path.join(__dirname, '..', '.smoke.sqlite');
 const PG = process.env.SMOKE_DATABASE_URL || '';
 const MODE = PG ? 'postgres' : 'sqlite';
 
+// A PER-RUN SCHEMA, so concurrent verifications cannot collide in a shared scratch
+// database and nothing is left behind. Both halves must agree on it: knex migrates into
+// it, and the app's own pool must resolve unqualified table names to it.
+const SCHEMA = `smoke_${process.pid}_${Math.floor(Date.now() / 1000)}`;
+const pgUrlWithSchema = () => {
+  const u = new URL(PG);
+  u.searchParams.set('options', `-c search_path=${SCHEMA}`);
+  return u.toString();
+};
+
 process.env.NODE_ENV = 'test';
 process.env.SMOKE_DB = DB;
+process.env.SMOKE_SCHEMA = SCHEMA;
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'smoke-check-secret';
-if (PG) process.env.DATABASE_URL = PG;
+
+// NEVER inherit DATABASE_URL. This process runs inside the Gestalt server container
+// during `verification.command`, and `build_subprocess_env` passes the SERVER's whole
+// environment down — including its own DATABASE_URL, which points at the PLATFORM's
+// database. Left alone, the application under test would boot and dial Gestalt's own
+// Postgres. Reads against missing tables would merely fail, but a check that silently
+// connects the subject to the platform's database is not a check anyone should trust.
+if (PG) process.env.DATABASE_URL = pgUrlWithSchema();
+else delete process.env.DATABASE_URL;
 
 function ok(s) { console.log(`  ✓ ${s}`); }
 function die(stage, err) {
@@ -50,10 +69,12 @@ console.log(`\n  smoke mode: ${MODE}${PG ? '' : '  (persistence NOT covered — 
   // ── Stage 1 — migrate against a throwaway database ────────────────────────
   try {
     fs.rmSync(DB, { force: true });
-    const env = PG ? 'smoke_pg' : 'test';
-    if (PG) execSync('npx knex migrate:rollback --all --env smoke_pg', { stdio: 'pipe', env: process.env });
-    execSync(`npx knex migrate:latest --env ${env}`, { stdio: 'pipe', env: process.env });
-    ok(`stage 1 migrate — schema applied from empty (${MODE})`);
+    if (PG) {
+      const knex = require('knex')({ client: 'pg', connection: PG });
+      try { await knex.raw(`CREATE SCHEMA "${SCHEMA}"`); } finally { await knex.destroy(); }
+    }
+    execSync(`npx knex migrate:latest --env ${PG ? 'smoke_pg' : 'test'}`, { stdio: 'pipe', env: process.env });
+    ok(`stage 1 migrate — schema applied from empty (${MODE}${PG ? `, schema ${SCHEMA}` : ''})`);
   } catch (e) { die('migrate', new Error(String(e.stdout || e))); }
 
   // ── Stage 2 — boot ────────────────────────────────────────────────────────
@@ -116,7 +137,7 @@ console.log(`\n  smoke mode: ${MODE}${PG ? '' : '  (persistence NOT covered — 
       // 3d — the real assertion: a seeded request COMPLETES. This is the only stage that
       // proves the migrated schema and the repositories' queries agree, which is the
       // failure the whole brief is about.
-      const knex = require('knex')(require('../knexfile').smoke_pg);
+      const knex = require('knex')(require('../knexfile').smoke_pg);  // searchPath = SCHEMA
       try {
         await knex('employees').insert({
           id: EMP, employee_number: 'E-0001', first_name: 'Smoke', last_name: 'Test',
@@ -159,7 +180,17 @@ console.log(`\n  smoke mode: ${MODE}${PG ? '' : '  (persistence NOT covered — 
       ok(`stage 3d persistence — a seeded leave request was created end to end (${authed.statusCode})`);
     }
   } catch (e) { die('probe', e); }
-  finally { try { await app.close(); } catch {} fs.rmSync(DB, { force: true }); }
+  finally {
+    try { await app.close(); } catch {}
+    fs.rmSync(DB, { force: true });
+    if (PG) {
+      // Always drop, even on failure — a scratch database must not accumulate schemas.
+      const knex = require('knex')({ client: 'pg', connection: PG });
+      try { await knex.raw(`DROP SCHEMA IF EXISTS "${SCHEMA}" CASCADE`); }
+      catch (e) { console.log(`  ! could not drop schema ${SCHEMA}: ${e.message}`); }
+      finally { await knex.destroy(); }
+    }
+  }
 
   console.log(
     sawDbGap
