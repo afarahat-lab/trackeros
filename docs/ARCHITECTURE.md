@@ -398,4 +398,17 @@ This phase adds the Jest unit tests for `LeaveService.cancel` to `tests/unit/mod
 - **Auth**: `request.user: { id: string; role: EmployeeRole }`; `EmployeeRole = 'EMPLOYEE' | 'MANAGER' | 'ADMIN'`; JWT bearer verified by `registerAuth` preHandler hook; token payload `{ sub: id, role }`; RBAC enforced at route boundary via `resolveActor` and in service; `POST /auth/login` added to `PUBLIC_PATHS`.
 - **Error**: `{ error: string; code: string }`; validation → 400 `VALIDATION_ERROR`; authentication → 401 `UNAUTHORIZED`; authorization → 403 `FORBIDDEN`; not found → 404 `NOT_FOUND`; conflict → 409 `CONFLICT`; other → 500. Login failure (wrong email or password) returns same 401 + message; `GET /leaves/:id` returns 404 for both not found and not visible.
 - **Transaction**: none — feature is read-only (login performs credential read + bcrypt compare + JWT mint; GET endpoints perform reads only).
+
+### Phase 1 delivered (shared-types + employee read support)
+
+This phase delivered only the first of the five planned phases — the shared query-param hook and the employee manager-listing read support. The auth module, balance/leave read endpoints, `GET /employees/me`, smoke assertions, and route unit tests (phases 2–5) are not yet implemented.
+
+- `src/shared/types/index.ts` — `LeaveRequestQueryParams` gained `employeeIds?: string[]` (the role-scoping hook that `findByQuery` will honour in Phase 4). No other field or enum changed.
+- `src/modules/employee/employee.repository.interface.ts` — `IEmployeeRepository` gained `findByManagerId(managerId: string, client?: PoolClient): Promise<Employee[]>`.
+- `src/modules/employee/employee.repository.ts` — implemented `findByManagerId` with `SELECT id, employee_number, first_name, last_name, email, role, manager_id, department, hire_date, termination_date, employment_status FROM employees WHERE manager_id = $1`, reusing the existing `mapRow`. `password_hash` is untouched (the column does not exist yet — it arrives with the Phase 2 migration).
+- `src/modules/employee/employee.service.interface.ts` — `IEmployeeService` gained `getEmployeesByManagerId(managerId: string): Promise<Employee[]>`.
+- `src/modules/employee/employee.service.ts` — implemented `getEmployeesByManagerId` by delegating to `this.repository.findByManagerId(managerId)`.
+
+**Divergences from the plan worth noting:**
+- PLAN.md Phase 1 prescribed "do not add tests in this phase"; the committed diff nevertheless touches three test files — `tests/unit/modules/employee.service.test.ts`, `tests/unit/modules/balance/balance.service.test.ts`, and `tests/unit/modules/leave/leave.service.test.ts`. These are not new test coverage: the in-memory fakes (`FakeEmployeeRepository` / `FakeEmployeeService`) had to implement the newly-added `findByManagerId` / `getEmployeesByManagerId` methods to satisfy the widened interfaces under `tsc --noEmit`. No new assertions were added.
 <!-- gestalt:architecture feature=d5341a09-a78c-4569-9d2f-9f6630b45d6d END -->
