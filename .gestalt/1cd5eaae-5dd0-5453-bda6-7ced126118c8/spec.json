@@ -1,0 +1,102 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "policy"
+    ],
+    "affectedLayers": [
+      "service",
+      "module-entry-point"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "IPolicyService exposes getActivePolicies(asOf: Date): Promise<LeavePolicy[]> and PolicyService implements it.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "getActivePolicies returns at most one policy per leaveTypeCode: only rows with status ACTIVE, effectiveFrom <= asOf, and (effectiveTo === null || effectiveTo >= asOf); ties broken by latest effectiveFrom.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "getActivePolicies returns an empty array (not null/undefined, no throw) when no policy is active as of the given date.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "policy/index.ts exports a createPolicyService() factory returning new PolicyService(new PgLeavePolicyRepository(), new LeaveTypeService(new PgLeaveTypeRepository())).",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Do NOT add or modify any IPolicyRepository method \u2014 getActivePolicies must reuse the existing findAll(client?) and filter in service code.",
+    "getActivePolicies is read-only: it must not open a transaction or forward a PoolClient (no unit-of-work contract for this phase).",
+    "Do NOT touch the balance module in this phase; the factory is consumed by balance in Phase 5.",
+    "Import LeavePolicyStatus from ./policy.model (already imported in policy.service.ts); do not re-declare or move the enum."
+  ],
+  "outOfScope": [
+    "No routes, controllers, or RBAC for the policy module \u2014 this phase is service + factory only.",
+    "No audit-log writes (GP-002) \u2014 getActivePolicies is a read-only enumeration.",
+    "No balance-module changes (getBalancesForEmployee / GET /balances/me) \u2014 Phase 5.",
+    "No repository method additions or changes to PgLeavePolicyRepository."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "At most one ACTIVE policy applies per leaveTypeCode as of any given date; when multiple ACTIVE policies overlap for a code, the one with the latest effectiveFrom wins."
+    },
+    {
+      "entity": "LeavePolicyStatus",
+      "mustExistOrExtend": true,
+      "invariant": "LeavePolicyStatus remains a module-local enum (DRAFT | ACTIVE | SUPERSEDED) declared in policy.model.ts; it is not moved to shared/types."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IPolicyService.getActivePolicies(asOf: Date): Promise<LeavePolicy[]>",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Read-only; returns an array (possibly empty) and never throws for an empty result."
+    },
+    {
+      "operation": "createPolicyService(): IPolicyService",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Pure wiring factory; no I/O, no error cases."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "getActivePolicies must call the existing IPolicyRepository.findAll(client?) and filter in service code \u2014 do not add a repository method.",
+      "referencePath": "src/modules/policy/policy.repository.interface.ts"
+    },
+    {
+      "requirement": "The factory must wire the exact composition already hand-wired in leave.service.ts: new PolicyService(new PgLeavePolicyRepository(), new LeaveTypeService(new PgLeaveTypeRepository())).",
+      "referencePath": "src/modules/leave/leave.service.ts"
+    },
+    {
+      "requirement": "LeavePolicyStatus.ACTIVE and the LeavePolicy effectiveFrom/effectiveTo/status fields must match the model exactly (effectiveTo is Date | null).",
+      "referencePath": "src/modules/policy/policy.model.ts"
+    },
+    {
+      "requirement": "The factory must import LeaveTypeService/PgLeaveTypeRepository through the leave-type public entry point, not by direct file path.",
+      "referencePath": "src/modules/leave-type/index.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/balance/balance.service.ts (Phase 5)",
+      "why": "getBalancesForEmployee will call policyService.getActivePolicies(new Date()) and createPolicyService() \u2014 this phase provides both."
+    },
+    {
+      "target": "src/modules/leave-type/index.ts",
+      "why": "createPolicyService wires LeaveTypeService(PgLeaveTypeRepository) \u2014 policy owns its leave-type dependency."
+    }
+  ]
+}
