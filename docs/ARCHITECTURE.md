@@ -492,4 +492,26 @@ This phase delivers the policy-module active-policy enumeration (recommended pha
 **Divergences from the plan worth noting:**
 - PLAN.md Phase 3 prescribed no tests (tests were Phase 7); the implementation updated the two existing test fakes to satisfy the widened `IPolicyService` contract, but added no new `getActivePolicies` unit tests (those belong to Phase 7's balance tests).
 - No routes, controllers, or the `GET /balances/me` endpoint (Phase 5); no auth/login logic (Phase 4); no audit-log writes (GP-002) — this phase is read-only.
+
+### Phase 4 delivered (auth module: login service + POST /auth/login + public path)
+
+This phase delivers the auth module (recommended phase 4): the login service, the `POST /auth/login` route, and the `PUBLIC_PATHS` exemption. The balance/leave read work and the `/me` route (phases 5–7) are not yet implemented.
+
+**auth.service.ts** — `PublicEmployee = Omit<Employee, 'passwordHash'>`, `LoginResult = { token: string; employee: PublicEmployee }`, `IAuthService` (`login(email, password): Promise<LoginResult>`), `AuthService`, and `createAuthService()`. The constructor injects `IEmployeeService` (cross-module dependency through the public entry point).
+
+- `login` calls `employeeService.getEmployeeByEmail(email)`; a `NotFoundError` is caught and rethrown as `UnauthorizedError('Invalid email or password')` (any other error propagates). A `null` `passwordHash` and a `bcrypt.compare` mismatch each throw the same `UnauthorizedError('Invalid email or password')` — wrong email, wrong password, and a null stored hash are indistinguishable (single 401, single message). On success it mints the token via `signToken({ id: employee.id, role: employee.role })` from `src/shared/auth` (the `sub`/`role` contract is unchanged) and returns `{ token, employee: toPublicEmployee(employee) }`.
+- `toPublicEmployee(employee)` is a private **whitelist** helper that copies every `Employee` field except `passwordHash` into a fresh object — it does not use destructuring-omit, so a future field added to `Employee` cannot leak into a response body unless explicitly whitelisted.
+- `createAuthService()` wires `new AuthService(new EmployeeService(new PgEmployeeRepository()))`.
+
+**auth.routes.ts** — `authRoutes(fastify)` registers `POST /auth/login` (200). `parseLoginBody(body: unknown)` validates the wire body explicitly (GP-003, no-any): `email` and `password` must each be a non-empty string (after trim), else `ValidationError` (400). `sendError` maps `AppError` to `{ error, code }` with the correct status and any other throw to 500 `{ error: 'Internal Server Error' }`. The service is resolved from `fastify.authService` if present, else `createAuthService()`.
+
+**index.ts** — re-exports `IAuthService`, `AuthService`, `createAuthService`, and `authRoutes`.
+
+**shared-auth** — `src/shared/auth/index.ts` `PUBLIC_PATHS` gained `'/auth/login'` (now `['/uptime', '/health', '/auth/login']`). No change to `registerAuth`, `signToken`, or the `sub`/`role` token contract.
+
+**Divergences from the plan worth noting:**
+- The plan prescribed returning the employee "WITHOUT passwordHash (strip it)"; the implementation introduced a named `PublicEmployee` type and a field-by-field `toPublicEmployee` whitelist rather than a destructuring-omit — a stricter (leak-proof) interpretation of the same invariant.
+- The plan's `IAuthService.login` return type was `{ token: string; employee: Employee }`; the implementation names it `LoginResult` with `employee: PublicEmployee` (the `Omit` type), which is the accurate type for the stripped profile.
+- No tests were delivered in this phase (PLAN.md Phase 4 prescribed none — tests are Phase 7), and `authRoutes` was **not** mounted in `src/app.ts` (deferred to Phase 7, per the spec's `outOfScope`).
+- No audit-log writes (GP-002) — login is a read-only credential check plus token mint, not a state-changing operation.
 <!-- gestalt:architecture feature=ddd25cae-d790-4d70-9054-a1e5f568359f END -->
