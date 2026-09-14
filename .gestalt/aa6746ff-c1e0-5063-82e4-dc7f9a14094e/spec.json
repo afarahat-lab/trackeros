@@ -1,0 +1,139 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared-date",
+      "shared-types"
+    ],
+    "affectedLayers": [
+      "shared utilities",
+      "types/contracts",
+      "unit tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "A new module `src/shared/date/accrual.ts` exists and exports exactly three named functions with the signatures `startOfUtcDay(date: Date): Date`, `addMonths(date: Date, months: number): Date`, and `periodContaining(anchor: Date, accrualMonths: number, date: Date): { start: Date; end: Date }`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`startOfUtcDay` returns `new Date(Date.UTC(y, m, d))` \u2014 i.e. a Date whose UTC time-of-day is 00:00:00.000 for the input's UTC year/month/day, reading only UTC fields (getUTCFullYear/getUTCMonth/getUTCDate) and never local-time fields.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`addMonths` is byte-for-byte semantically identical to the private `addMonths` in `src/modules/leave/leave.service.ts` and `src/modules/balance/balance.service.ts`: it sets UTCDate to 1, advances the UTC month by `months`, then clamps the day to the last day of the target month (e.g. Jan 31 + 1 month \u2192 Feb 28/29).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`periodContaining` steps `accrualMonths` at a time from `startOfUtcDay(anchor)` with a 10,000-iteration safety bound, returns the `{ start, end }` half-open period where `start <= date < end`, and throws `ConflictError` (imported from `src/shared/errors`) when `date < anchor` or no period resolves within the bound.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`LeaveRequestQueryParams` in `src/shared/types/index.ts` gains `employeeIds?: string[]` and no other type/enum/DTO in that file changes.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A Jest suite at `tests/unit/shared/accrual.test.ts` covers `startOfUtcDay`, `addMonths` (including month-end clamping), and `periodContaining`, and includes a non-UTC case (e.g. `TZ=Asia/Riyadh`) asserting the helpers read UTC fields only and produce identical results regardless of local timezone.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The three helpers are pure UTC date arithmetic with NO balance-domain knowledge \u2014 they must not import or reference balance/leave/policy/employee modules, entities, or concepts.",
+    "Copy the exact implementations currently private in `src/modules/leave/leave.service.ts` (startOfUtcDay/addMonths/periodContaining) and `src/modules/balance/balance.service.ts` (addMonths) \u2014 do NOT change their semantics.",
+    "`periodContaining` must import `ConflictError` from `src/shared/errors` (the shared error entry point), not define or re-export a local error.",
+    "This phase does NOT refactor `leave.service.ts` or `balance.service.ts` to import the new helpers \u2014 those private copies remain in place and are removed in later phases.",
+    "No other type changes beyond `employeeIds?: string[]` on `LeaveRequestQueryParams`; enums, DTOs, and the `requestedDays` helper in `src/shared/types/index.ts` are untouched."
+  ],
+  "outOfScope": [
+    "Refactoring `leave.service.ts` or `balance.service.ts` to import the new shared helpers \u2014 deferred to later phases.",
+    "Any balance/leave/policy domain logic, repositories, services, routes, controllers, or RBAC \u2014 this phase is pure shared date arithmetic plus one query-param type field.",
+    "Implementing `findByQuery` support for `employeeIds` (the `employee_id = ANY($n)` query change) \u2014 that belongs to Phase 6; this phase only adds the type field.",
+    "Any database access, migrations, or transaction/unit-of-work work \u2014 the helpers are pure functions and the type change is compile-time only."
+  ],
+  "ambiguities": [
+    {
+      "description": "Whether `src/shared/date/accrual.ts` should also expose a public `index.ts` entry point (matching the `shared/db` and `shared/errors` convention) or be imported directly by path.",
+      "options": [
+        "Direct path import only (src/shared/date/accrual.ts), no index.ts",
+        "Add src/shared/date/index.ts re-exporting the three helpers"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "description": "Whether the non-UTC test case should set `TZ` via the Jest environment (e.g. `process.env.TZ` before importing, or a per-test `jest` config) versus constructing Dates with explicit UTC offsets \u2014 both prove the helpers read UTC fields only.",
+      "options": [
+        "Set process.env.TZ = 'Asia/Riyadh' at the top of the test file",
+        "Use a dedicated jest config / testEnvironment option for the TZ case",
+        "Construct Date inputs with explicit UTC offsets and assert UTC-field independence"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "shared-date module (src/shared/date/accrual.ts)",
+      "mustExistOrExtend": true,
+      "invariant": "Exposes exactly three pure, side-effect-free UTC helpers (startOfUtcDay, addMonths, periodContaining) that read only UTC fields of their Date inputs and never mutate their input arguments; it carries no balance-domain knowledge and depends only on shared-errors (ConflictError)."
+    },
+    {
+      "entity": "LeaveRequestQueryParams (src/shared/types/index.ts)",
+      "mustExistOrExtend": true,
+      "invariant": "Gains an optional `employeeIds?: string[]` role-scoping filter; all existing fields remain unchanged and the type stays a plain optional-filter query-params shape."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "startOfUtcDay(date: Date): Date",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Pure function; never throws for a valid Date. Returns a new Date at UTC midnight of the input's UTC calendar day."
+    },
+    {
+      "operation": "addMonths(date: Date, months: number): Date",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Pure function; never throws for a valid Date. Returns a new Date (input not mutated) with the UTC month advanced by `months` and the day clamped to the last day of the target month."
+    },
+    {
+      "operation": "periodContaining(anchor: Date, accrualMonths: number, date: Date): { start: Date; end: Date }",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws ConflictError (409) when `date < anchor` or no period resolves within the 10,000-iteration bound; otherwise returns the half-open `{ start, end }` period containing `date`."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The exported `startOfUtcDay`, `addMonths`, and `periodContaining` must be semantically identical to the private implementations in `src/modules/leave/leave.service.ts` (and `addMonths` in `src/modules/balance/balance.service.ts`) \u2014 same UTC-field reads, same month-end clamping, same 10,000-iteration bound, same ConflictError conditions.",
+      "referencePath": "src/modules/leave/leave.service.ts"
+    },
+    {
+      "requirement": "`periodContaining` must throw the same `ConflictError` class (statusCode 409, code 'CONFLICT_ERROR') that the rest of the system uses, imported from the shared errors entry point.",
+      "referencePath": "src/shared/errors/index.ts"
+    },
+    {
+      "requirement": "`employeeIds?: string[]` must be added to the existing `LeaveRequestQueryParams` interface without altering any other member, so later phases (leave `findByQuery`) can consume it from the shared entry point.",
+      "referencePath": "src/shared/types/index.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/errors/index.ts",
+      "why": "`periodContaining` imports `ConflictError` from here so the shared helper surfaces the same typed error contract as the rest of the system."
+    },
+    {
+      "target": "src/shared/types/index.ts",
+      "why": "`LeaveRequestQueryParams` is extended here so Phase 6's `findByQuery` and the leave read surface can consume `employeeIds` from the canonical shared entry point."
+    },
+    {
+      "target": "src/modules/balance/balance.service.ts (Phase 5) and src/modules/leave/leave.service.ts (Phase 6)",
+      "why": "Future consumers of the shared helpers \u2014 `getBalancesForEmployee` will call `periodContaining` and the leave service will replace its private copies; this phase only establishes the shared module they will import."
+    }
+  ]
+}
