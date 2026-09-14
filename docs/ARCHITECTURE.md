@@ -476,4 +476,20 @@ This phase delivers the employee-module credential field and the direct-report r
 - The spec's `ambiguities` left open whether to add the `manager_id` index in this migration. The implementation left it out (out of scope; only the `password_hash` column).
 - PLAN.md Phase 2 prescribed no tests (tests were Phase 7); the implementation delivered the employee service tests together with the service, and updated the balance/leave test fakes to satisfy the widened `IEmployeeService`/`Employee` contracts.
 - No routes, controllers, or the `GET /employees/me` endpoint (Phase 7); no auth/login logic, bcrypt hashing, or token minting (Phase 4); no audit-log writes (GP-002) — this phase is read-only plus a schema change.
+
+### Phase 3 delivered (policy: getActivePolicies service exposure)
+
+This phase delivers the policy-module active-policy enumeration (recommended phase 3). The auth/balance/leave read work (phases 4–7) is not yet implemented.
+
+**service interface** — `IPolicyService` in `policy.service.interface.ts` gained `getActivePolicies(asOf: Date): Promise<LeavePolicy[]>`. No repository method was added — `IPolicyRepository.findAll()` already existed.
+
+**service** — `PolicyService.getActivePolicies(asOf)` calls `repository.findAll()` (unfiltered) and filters in service code to at most one policy per `leaveTypeCode`: keeps rows with `status === LeavePolicyStatus.ACTIVE`, `effectiveFrom <= asOf`, and (`effectiveTo === null || effectiveTo >= asOf`); when more than one remains for a code, keeps the one with the latest `effectiveFrom`. Returns the resulting array (possibly empty). `LeavePolicyStatus` is imported from `./policy.model`.
+
+**index.ts** — added `createPolicyService()` factory wiring `new PolicyService(new PgLeavePolicyRepository(), new LeaveTypeService(new PgLeaveTypeRepository()))` — policy owns its leave-type dependency; the balance module must call this factory, never hand-wire policy internals. Exported alongside the existing re-exports.
+
+**tests** — no new test file; the existing `tests/unit/modules/balance/balance.service.test.ts` and `tests/unit/modules/leave/leave.service.test.ts` were updated so their `FakePolicyService` fakes implement the new `getActivePolicies` method (returning `rows.filter(p => p.status === LeavePolicyStatus.ACTIVE)`), required because `IPolicyService` gained a member.
+
+**Divergences from the plan worth noting:**
+- PLAN.md Phase 3 prescribed no tests (tests were Phase 7); the implementation updated the two existing test fakes to satisfy the widened `IPolicyService` contract, but added no new `getActivePolicies` unit tests (those belong to Phase 7's balance tests).
+- No routes, controllers, or the `GET /balances/me` endpoint (Phase 5); no auth/login logic (Phase 4); no audit-log writes (GP-002) — this phase is read-only.
 <!-- gestalt:architecture feature=ddd25cae-d790-4d70-9054-a1e5f568359f END -->
