@@ -1,0 +1,126 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "employee",
+      "auth",
+      "balance",
+      "leave",
+      "app"
+    ],
+    "affectedLayers": [
+      "routes",
+      "app wiring",
+      "smoke",
+      "unit tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "GET /employees/me returns 200 with the authenticated employee's profile resolved from request.user (never a client-supplied id), and the response body contains no passwordHash field under any circumstance.",
+      "testable": true,
+      "layer": "e2e"
+    },
+    {
+      "description": "src/app.ts mounts authRoutes, balanceRoutes, and employeeRoutes alongside the existing uptimeRoutes/leaveRoutes, and registerAuth(app) remains registered before the routes so the preHandler hook still applies.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "scripts/smoke.js gains new stages that log in via POST /auth/login with a seeded employee's credentials and use the returned token to fetch GET /employees/me, GET /leaves, GET /leaves/:id, and GET /balances/me, asserting real values (the seeded leave request and the seeded balance numbers), while existing stages 1 through 3d remain byte-for-byte intact with no weakened or removed assertion.",
+      "testable": true,
+      "layer": "e2e"
+    },
+    {
+      "description": "The smoke seed creates two leave types with effective policies but a balance row for only one, and GET /balances/me returns exactly the one seeded balance (pinning the binding omission rule that a leave type with no current-period balance row is omitted, not synthesized).",
+      "testable": true,
+      "layer": "e2e"
+    },
+    {
+      "description": "Jest unit tests exist and pass: tests/unit/modules/auth/auth.service.test.ts (login success, wrong email vs wrong password indistinguishable, null passwordHash, token payload sub/role, passwordHash stripped), tests/unit/modules/balance/balance.service.test.ts getBalancesForEmployee block (list shape, available computation, omission when no balance row, [] when no periods, one missing period does not fail the whole request), and tests/unit/modules/leave/leave.service.test.ts list/getById additions (EMPLOYEE self, MANAGER self+direct reports one level, ADMIN all, status-independent visibility, getById NotFoundError for invisible/missing).",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The new employee route must resolve the actor from request.user via the resolveActor pattern (never a client-supplied id) and map AppError via sendError, matching src/modules/balance/balance.routes.ts as the closest single-GET template.",
+    "passwordHash must never be serialized into any response body; the employee route must strip it locally (whitelist or destructure-omit) since no shared public strip helper exists.",
+    "The existing smoke stages 1 through 3d must keep working exactly as they do now \u2014 no deletion, skipping, weakening, or loosening of any existing assertion.",
+    "The smoke login requires a seeded bcrypt password_hash for the seeded employee (the current stage-3d seed omits it), and the login must use the corresponding plaintext password.",
+    "New unit tests must follow the style of tests/unit/modules/leave/leave.routes.test.ts (Fastify instance decorated with a fake service + preHandler setting request.user) and reuse the existing in-memory fake pattern for service tests."
+  ],
+  "outOfScope": [
+    "No changes to the leave/balance/auth service implementations or their existing read/write semantics \u2014 this phase only wires routes, mounts them, extends smoke, and adds tests.",
+    "No new leave-type/policy/balance business logic beyond what Phases 3-6 already delivered; the smoke seed extension is test-only and does not alter production modules."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "passwordHash is a canonical field that may be null but is never serialized into any response body; any endpoint returning an Employee profile must strip it."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "A leave type with no current-period balance row is omitted from getBalancesForEmployee output (never synthesized, never an error); available is always derived as entitledDays - usedDays - pendingDays."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "getEmployeeById (employee read for /me)",
+      "authRule": "Actor resolved from request.user; role membership enforced at the API boundary; caller id never client-supplied.",
+      "idempotent": false,
+      "errorSemantics": "NotFoundError -> 404 NOT_FOUND; AppError -> { error, code } with correct status; other -> 500 Internal Server Error."
+    },
+    {
+      "operation": "login (auth)",
+      "authRule": "Public endpoint (no token required); wrong email, wrong password, and null passwordHash are indistinguishable (single 401, single message).",
+      "idempotent": false,
+      "errorSemantics": "ValidationError -> 400; UnauthorizedError -> 401; success returns token + stripped employee profile."
+    },
+    {
+      "operation": "getBalancesForEmployee (balance read)",
+      "authRule": "Actor resolved from request.user; role membership enforced at the API boundary.",
+      "idempotent": false,
+      "errorSemantics": "Read-only, never opens a transaction; empty result is a valid 200 (not 404); one missing period does not fail the whole request."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Reuse the resolveActor and sendError patterns (actor from request.user, AppError -> { error, code }, non-AppError -> 500) exactly as implemented in the leave routes.",
+      "referencePath": "src/modules/leave/leave.routes.ts"
+    },
+    {
+      "requirement": "The employee route's service resolution must follow the fastify.<service> ?? factory fallback convention, and the factory must wire new EmployeeService(new PgEmployeeRepository()) (no hand-wired internals).",
+      "referencePath": "src/modules/balance/balance.routes.ts"
+    },
+    {
+      "requirement": "The token payload contract (sub = employee id, role = employee role) must match what src/shared/auth verifies; login must mint via signToken({ id, role }) and never change the sub/role contract.",
+      "referencePath": "src/shared/auth/index.ts"
+    },
+    {
+      "requirement": "The employee route must strip passwordHash using the same field set as the auth module's PublicEmployee/toPublicEmployee whitelist (every Employee field except passwordHash), so the two public profiles stay consistent.",
+      "referencePath": "src/modules/auth/auth.service.ts"
+    },
+    {
+      "requirement": "The balance omission rule and available computation asserted in smoke/tests must match the getBalancesForEmployee implementation (omit when findByKey returns null; available = entitled - used - pending).",
+      "referencePath": "src/modules/balance/balance.service.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/employee/index.ts",
+      "why": "Must export employeeRoutes so app.ts can mount it; the route resolves EmployeeService/PgEmployeeRepository through this public entry point."
+    },
+    {
+      "target": "src/app.ts",
+      "why": "Mounts authRoutes, balanceRoutes, and employeeRoutes alongside uptimeRoutes/leaveRoutes; registerAuth(app) must remain registered before routes."
+    },
+    {
+      "target": "scripts/smoke.js",
+      "why": "Extended with login + authenticated GET probes and the two-leave-type/one-balance seed to pin the omission rule over real HTTP."
+    }
+  ]
+}

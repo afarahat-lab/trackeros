@@ -576,4 +576,18 @@ This sub-phase is test-only: no production source under `src/` was modified. It 
 - The spec's `ambiguities` left open where the tests live and how to exercise the real repository. The implementation added a new `leave.repository.test.ts` for the repository and extended the two existing files for service/routes; the repository test injects a recording fake `dbPool`/`PoolClient` (not a subclass override, not a re-implementing fake).
 - The spec's `consistencyRequirements` asked the service tests to extend `FakeLeaveRepository.findByQuery` to record params — done via a `findByQueryCalls` array.
 - No production source changed; the 6.1/6.2 deliverables (repository `findByQuery` `employeeIds`, service `list`/`getById`, routes `GET /leaves`/`GET /leaves/:id`) are asserted against, not modified.
+
+### Phase 7a delivered (employee /me route + route mounting)
+
+This phase delivers the self-profile read endpoint and wires the three new route modules into the app (the route/mounting portion of recommended phase 7). The smoke-check extension (7b) and the unit tests (7c) are not yet implemented.
+
+**employee.routes.ts** (new) — `employeeRoutes(fastify)` registers `GET /employees/me` (200) following the leave/balance route conventions exactly: `resolveActor` extracts `request.user` and enforces role membership at the API boundary (UnauthorizedError on missing/invalid actor), the actor id is always taken from `request.user` (never a client-supplied id), `sendError` maps `AppError` to `{ error, code }` with the correct status and any other throw to 500, and the service is resolved from `fastify.employeeService` if present, else `new EmployeeService(new PgEmployeeRepository())`. The handler calls `employeeService.getEmployeeById(actor.id)` and returns the profile stripped of `passwordHash` via a local `toPublicEmployee` helper. The route also declares a local `PublicEmployee = Omit<Employee, 'passwordHash'>` type (same shape as the auth module's).
+
+**index.ts** — re-exports `employeeRoutes` (the model/repository/service re-exports were already present).
+
+**app.ts** — mounts `authRoutes`, `balanceRoutes`, and `employeeRoutes` alongside the existing `uptimeRoutes`/`leaveRoutes`, with `registerAuth(app)` still registered before the routes so the preHandler hook populates `request.user` for the new endpoint.
+
+**Divergences from the plan worth noting:**
+- PLAN.md Phase 7 prescribed a single phase delivering the `/me` route, the smoke-check extension, AND the unit tests. The implementation split it: this phase (7a) delivers only the route + mounting; the smoke extension (7b) and unit tests (7c) are deferred.
+- The spec's consistency requirement asked the employee route to strip `passwordHash` "using the same field set as the auth module's PublicEmployee/toPublicEmployee whitelist". The implementation instead uses a **destructure-omit** (`const { passwordHash: _passwordHash, ...rest } = employee; return rest;`) — functionally identical for the current `Employee` shape, but unlike the auth module's field-by-field whitelist it would leak a future field added to `Employee` into the response body. The `PublicEmployee` type is still `Omit<Employee, 'passwordHash'>` (same as auth), so the two public profiles are type-consistent even though the strip implementations differ.
 <!-- gestalt:architecture feature=ddd25cae-d790-4d70-9054-a1e5f568359f END -->

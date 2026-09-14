@@ -1,0 +1,102 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "employee",
+      "auth",
+      "balance"
+    ],
+    "affectedLayers": [
+      "routes",
+      "app-composition"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "A self-profile read endpoint exists that returns HTTP 200 with the authenticated employee's profile, and the response body never contains `passwordHash` (the field is stripped before serialization).",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "The actor is resolved exclusively from `request.user` (never a client-supplied id); a missing/invalid authenticated user yields a 401 UnauthorizedError, matching the `resolveActor` behavior in `src/modules/leave/leave.routes.ts`.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "`employeeRoutes` is exported from `src/modules/employee/index.ts` and mounted in `src/app.ts` alongside `authRoutes` and `balanceRoutes`, with `registerAuth(app)` still registered before the routes.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "`AppError` failures (e.g. `NotFoundError` when the employee does not exist) are mapped to `{ error, code }` with the correct status via the `sendError` pattern, not a bare 500.",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "The service is resolved from `fastify.employeeService` when present, else `new EmployeeService(new PgEmployeeRepository())` \u2014 never hand-wire a different repository or bypass the repository pattern.",
+    "`passwordHash` must never be serialized into any response body; the profile returned to the caller is the `Employee` shape minus `passwordHash`.",
+    "The caller's identity comes only from `request.user` (populated by `registerAuth`); no client-supplied id, query param, or body field may select the employee.",
+    "This is a read-only operation \u2014 no transaction is opened and no write occurs."
+  ],
+  "outOfScope": [
+    "Extending `scripts/smoke.js` with new authenticated stages (Phase 7b \u2014 Smoke check extension).",
+    "Unit/integration tests for auth, balance, and leave services (Phase 7c \u2014 Unit tests).",
+    "Creating or modifying `authRoutes`/`balanceRoutes`/`leaveRoutes` implementations \u2014 only mounting them in `src/app.ts` is in scope."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "`passwordHash` is a canonical field on the `Employee` entity (nullable) but is a write-only/never-serialized field: it may be read by the auth service for comparison but must never appear in any HTTP response body."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "getEmployeeById(id: string): Promise<Employee>",
+      "authRule": "The id is the authenticated actor's id from `request.user`; the route enforces authentication before invoking the service.",
+      "idempotent": false,
+      "errorSemantics": "Throws NotFoundError('Employee not found') when no employee matches; the route maps it to 404 `{ error, code }`."
+    },
+    {
+      "operation": "employeeRoutes(fastify: FastifyInstance): Promise<void>",
+      "authRule": "The self-profile endpoint is authenticated (not in PUBLIC_PATHS); unauthenticated requests are rejected by the preHandler hook with 401.",
+      "idempotent": false,
+      "errorSemantics": "AppError is mapped via sendError to `{ error, code }` with the correct status; unexpected errors become 500."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Reuse the `resolveActor` pattern (validate `request.user`, throw `UnauthorizedError('Missing authenticated user')` / `'Invalid user role'`, return `{ id, role }`) exactly as implemented in the leave routes.",
+      "referencePath": "src/modules/leave/leave.routes.ts"
+    },
+    {
+      "requirement": "Reuse the `sendError` mapping (AppError \u2192 `{ error, code }` with `error.statusCode`; otherwise 500 `{ error: 'Internal Server Error' }`) exactly as in the leave routes.",
+      "referencePath": "src/modules/leave/leave.routes.ts"
+    },
+    {
+      "requirement": "The `Employee` entity returned by `getEmployeeById` includes `passwordHash: string | null`; the route must strip it before responding, matching the auth service's strip behavior.",
+      "referencePath": "src/modules/employee/employee.model.ts"
+    },
+    {
+      "requirement": "`registerAuth(app)` must remain registered before route mounting so the preHandler hook populates `request.user` for the new endpoint.",
+      "referencePath": "src/app.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/employee/employee.service.ts (EmployeeService.getEmployeeById)",
+      "why": "The route delegates profile lookup to the existing service method, which already throws NotFoundError when the employee is missing."
+    },
+    {
+      "target": "src/shared/auth/index.ts (registerAuth / request.user)",
+      "why": "The authenticated actor id/role is supplied by the auth preHandler hook; the route reads it rather than trusting client input."
+    },
+    {
+      "target": "src/modules/auth/index.ts (authRoutes) and src/modules/balance/index.ts (balanceRoutes)",
+      "why": "These sibling-phase routes are mounted in src/app.ts in this phase alongside employeeRoutes."
+    }
+  ]
+}
