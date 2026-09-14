@@ -1,0 +1,105 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "repository",
+      "service"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "`findByQuery` honours `params.employeeIds`: when it is a non-empty array, the generated SQL includes a single `employee_id = ANY($n)` condition with the array pushed as one parameter value (not expanded into per-element placeholders), and the condition is placed before the LIMIT/OFFSET clauses.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`ILeaveService` and `LeaveService` expose `list(actor, query)` and `getById(actor, requestId)` returning `Promise<LeaveRequest>` / `Promise<LeaveRequest>` respectively, and `createLeaveService()` continues to satisfy `ILeaveService`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`list` applies role scoping: EMPLOYEE \u2192 `employeeIds = [actor.id]`; MANAGER \u2192 `[actor.id, ...directReportIds]` where direct reports come from `employeeService.getEmployeesByManagerId(actor.id)` (one level only); ADMIN \u2192 no `employeeIds` filter. The scoped value is merged into the query and delegated to `repository.findByQuery`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`getById` loads via `repository.findById`; when the request is null OR the actor may not see it under the same visibility rule as `list`, it throws `NotFoundError('Leave request not found')` \u2014 identical response for missing and non-visible requests.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Visibility is status-independent: a manager sees direct reports' requests in every status, and no status filter is introduced by the scoping logic.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Read-only operations: `list` and `getById` must never open a transaction or pass an optional client \u2014 call `repository.findByQuery` / `repository.findById` without the `client` argument.",
+    "No SQL in the service layer and no fetch-all-and-filter in application code: the `employeeIds` filter must be expressed as a repository WHERE condition, not post-filtered in the service.",
+    "No other repository changes beyond extending `findByQuery` to honour `employeeIds`.",
+    "No new shared type additions or constructor wiring changes: `employeeIds` already exists on `LeaveRequestQueryParams` and `employeeService` is already injected into `LeaveService`."
+  ],
+  "outOfScope": [
+    "Sub-phase 6.2 \u2014 Routes: GET /leaves and GET /leaves/:id (src/modules/leave/leave.routes.ts).",
+    "Sub-phase 6.3 \u2014 Tests for leave reads (leave.repository.test.ts, leave.service.test.ts, leave.routes.test.ts). No test files, test-existence, or coverage criteria are required by this sub-phase."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "The `LeaveRequest` shape is unchanged by this phase \u2014 no field is added, removed, or renamed; reads return the existing canonical contract."
+    },
+    {
+      "entity": "LeaveRequestQueryParams",
+      "mustExistOrExtend": true,
+      "invariant": "`employeeIds` remains an optional `string[]`; an empty/undefined array means \"no employee filter\", a non-empty array restricts results to those employee ids."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "list(actor, query)",
+      "authRule": "Authenticated actor required; EMPLOYEE sees only own requests, MANAGER sees own + direct reports' requests, ADMIN sees all.",
+      "idempotent": true,
+      "errorSemantics": "Read-only; no transaction; returns LeaveRequest[] (possibly empty)."
+    },
+    {
+      "operation": "getById(actor, requestId)",
+      "authRule": "Authenticated actor required; same visibility rule as list \u2014 a caller who may not see the request receives the same NotFoundError as a non-existent request.",
+      "idempotent": true,
+      "errorSemantics": "Throws NotFoundError('Leave request not found') for missing or non-visible requests; read-only, no transaction."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Reuse the existing `NotFoundError('Leave request not found')` message/type already thrown by the private `getRequest` helper and `repository.update`.",
+      "referencePath": "src/modules/leave/leave.service.ts"
+    },
+    {
+      "requirement": "Reuse `LeaveRequestQueryParams` (including its existing `employeeIds?: string[]`) and `LeaveRequest` from the shared types without modification.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "Match the existing `findByQuery` placeholder/`values` ordering convention (`$n` = `values.length`) so the new `employee_id = ANY($n)` condition composes correctly with existing status/date conditions and LIMIT/OFFSET.",
+      "referencePath": "src/modules/leave/leave.repository.ts"
+    },
+    {
+      "requirement": "Use `IEmployeeService.getEmployeesByManagerId(managerId)` for direct-report resolution (one level only), matching the existing manager-visibility semantics used elsewhere in the service.",
+      "referencePath": "src/modules/employee/employee.service.interface.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "IEmployeeService.getEmployeesByManagerId",
+      "why": "Resolves a manager's direct reports (one level) to build the MANAGER visibility scope for list/getById."
+    },
+    {
+      "target": "ILeaveRepository.findByQuery / findById",
+      "why": "The service delegates all read data access to these repository methods; findByQuery must honour the merged employeeIds filter."
+    }
+  ]
+}
