@@ -1,0 +1,131 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "repository",
+      "service",
+      "routes"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "`PgLeaveRequestRepository.findByQuery` honours `params.employeeIds` by adding an `employee_id = ANY($n)` condition where the array is pushed as a single parameter, and the filter is applied in the SQL query (not fetched-then-filtered in application code).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`ILeaveService` exposes `list(actor, query)` and `getById(actor, requestId)`, both implemented in `LeaveService` and read-only (never open a transaction).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`list` scopes visibility by role: EMPLOYEE \u2192 `employeeIds = [actor.id]`; MANAGER \u2192 `[actor.id, ...directReportIds]` (one level via `getEmployeesByManagerId`, not transitive); ADMIN \u2192 no `employeeIds` filter.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`getById` returns the request when visible, and throws `NotFoundError('Leave request not found')` when the request is null OR the caller may not see it \u2014 invisible and nonexistent produce the identical 404 response.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Visibility is status-independent: a MANAGER sees direct reports' requests in every status (DRAFT/SUBMITTED/APPROVED/REJECTED/CANCELLED), applied identically to `list` and `getById`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The leave routes expose list and single-read endpoints that parse wire query params (status/leaveTypeCode enum-validated, four date bounds via a `toDate` helper, limit/offset as integers), resolve the actor from `request.user`, return 200 with the array/single request, and map `AppError` via `sendError`.",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "Read-only phase: no `IUnitOfWork.withTransaction` is opened by `list`/`getById` or the new routes; no audit-log writes (GP-002 applies only to state-changing operations).",
+    "The `employeeIds` scope must be applied in the SQL query (`employee_id = ANY($n)`), never by fetching all rows and filtering in application code; no SQL is written in the service.",
+    "The actor id is always taken from `request.user` via `resolveActor` \u2014 never a client-supplied id; RBAC/visibility is enforced at the API boundary and in the service, not inline in route handlers.",
+    "No new module is mounted in `src/app.ts` \u2014 `leaveRoutes` is already mounted; only new handlers inside the existing leave routes module are added.",
+    "No other repository changes beyond `findByQuery`; `findById`/`update`/`create` and the existing `ORDER BY start_date DESC` + `LIMIT`/`OFFSET` ordering are preserved."
+  ],
+  "outOfScope": [
+    "Mounting new routes in `src/app.ts` (leaveRoutes is already mounted) and the Phase 7 smoke-check extension / unit-test additions.",
+    "Any change to the write operations (create/submit/approve/reject/cancel), their authorization, or their transaction/audit semantics.",
+    "Transitive (multi-level) manager visibility \u2014 direct reports only, one level."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "A LeaveRequest is visible to an actor iff the actor is ADMIN, or the actor is the request's owner (`employeeId === actor.id`), or the actor is a MANAGER who is the direct manager of the owner (owner's `managerId === actor.id`). Visibility is status-independent and identical for list and single-read; an invisible request is indistinguishable from a nonexistent one."
+    },
+    {
+      "entity": "LeaveRequestQueryParams",
+      "mustExistOrExtend": true,
+      "invariant": "`employeeIds` is an optional array filter; when present it restricts results to requests whose `employee_id` is in the set, applied in the query. The service may override/merge it for role scoping but must never widen an EMPLOYEE/MANAGER scope beyond the role rule."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "ILeaveService.list(actor, query)",
+      "authRule": "Authenticated actor required; role scoping: EMPLOYEE \u2192 own requests only, MANAGER \u2192 own + direct reports, ADMIN \u2192 all. Read-only, no transaction.",
+      "idempotent": true,
+      "errorSemantics": "Returns an array (possibly empty); no NotFoundError for an empty result."
+    },
+    {
+      "operation": "ILeaveService.getById(actor, requestId)",
+      "authRule": "Authenticated actor required; same visibility rule as list. Read-only, no transaction.",
+      "idempotent": true,
+      "errorSemantics": "NotFoundError('Leave request not found') for a null request OR one the caller may not see \u2014 identical 404 for invisible and nonexistent."
+    },
+    {
+      "operation": "ILeaveRepository.findByQuery(params)",
+      "authRule": "None (data-access layer; scoping is the service's responsibility).",
+      "idempotent": true,
+      "errorSemantics": "Returns an array (possibly empty); applies `employee_id = ANY($n)` when `employeeIds` is provided."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Reuse the existing `resolveActor` helper (reads `request.user`, enforces role membership, throws UnauthorizedError) and `sendError` (maps AppError to `{ error, code }`, other throws to 500) \u2014 do not re-implement them.",
+      "referencePath": "src/modules/leave/leave.routes.ts"
+    },
+    {
+      "requirement": "Reuse the existing `toDate` conversion convention from `parseCreateBody` (accepts Date/string/number, throws ValidationError on invalid) for the four date-bound query params.",
+      "referencePath": "src/modules/leave/leave.routes.ts"
+    },
+    {
+      "requirement": "Resolve direct reports via `IEmployeeService.getEmployeesByManagerId(actor.id)` (one level, empty array when none, no throw) \u2014 do not re-implement manager traversal.",
+      "referencePath": "src/modules/employee/employee.service.interface.ts"
+    },
+    {
+      "requirement": "`employeeIds` filter must match the `LeaveRequestQueryParams.employeeIds?: string[]` field already declared in shared types; no shared-type change.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "`getById` must reuse the existing `NotFoundError('Leave request not found')` message/type so invisible and nonexistent requests produce the identical 404 body.",
+      "referencePath": "src/modules/leave/leave.service.ts"
+    },
+    {
+      "requirement": "Preserve the existing `findByQuery` condition-building and `ORDER BY start_date DESC` + `LIMIT`/`OFFSET` ordering; add the `employeeIds` condition alongside the existing filters.",
+      "referencePath": "src/modules/leave/leave.repository.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/employee/index.ts (IEmployeeService.getEmployeesByManagerId)",
+      "why": "MANAGER role scoping resolves direct reports for the visibility filter."
+    },
+    {
+      "target": "src/shared/types/index.ts (LeaveRequestQueryParams.employeeIds, LeaveStatus, LeaveTypeCode)",
+      "why": "Query param shape and enum validation for the read surface."
+    },
+    {
+      "target": "src/shared/errors/index.ts (NotFoundError, ValidationError, UnauthorizedError)",
+      "why": "Typed error semantics for invisible/nonexistent (404), invalid query params (400), and missing actor (401)."
+    }
+  ]
+}
