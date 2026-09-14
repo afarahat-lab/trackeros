@@ -514,4 +514,17 @@ This phase delivers the auth module (recommended phase 4): the login service, th
 - The plan's `IAuthService.login` return type was `{ token: string; employee: Employee }`; the implementation names it `LoginResult` with `employee: PublicEmployee` (the `Omit` type), which is the accurate type for the stripped profile.
 - No tests were delivered in this phase (PLAN.md Phase 4 prescribed none — tests are Phase 7), and `authRoutes` was **not** mounted in `src/app.ts` (deferred to Phase 7, per the spec's `outOfScope`).
 - No audit-log writes (GP-002) — login is a read-only credential check plus token mint, not a state-changing operation.
+
+### Phase 5 delivered (balance: getBalancesForEmployee + GET /balances/me)
+
+This phase delivers the balance read surface (recommended phase 5): the `BalanceSummary` value type, `IBalanceService.getBalancesForEmployee`, and the `GET /balances/me` route. The leave read work and the `/me` route (phases 6–7) are not yet implemented.
+
+**service** — `balance.service.ts` gained `BalanceSummary` (`{ leaveTypeCode: LeaveTypeCode; periodStart: Date; periodEnd: Date; entitledDays: number; usedDays: number; pendingDays: number; available: number }`, where `available = entitledDays - usedDays - pendingDays` is always derived, never stored or independently settable) and `getBalancesForEmployee(employeeId): Promise<BalanceSummary[]>` on `IBalanceService`, implemented in `BalanceService`. The method is read-only (never opens a transaction, never forwards a `PoolClient`): it validates a non-empty `employeeId`, resolves the employee via `employeeService.getEmployeeById`, fetches active policies via `policyService.getActivePolicies(now)` (Phase 3), and for each policy computes the current accrual period with the shared `periodContaining(employee.hireDate, policy.accrualPeriodMonths, now)` from `src/shared/date/accrual.ts` (Phase 1 — no re-derived private copy). It looks up the balance via `repository.findByKey(...)`; when no balance row exists for a policy's current period, that leave type is **omitted** (no synthesized entry, no throw), so an employee with no open periods returns `[]` (valid 200, not 404) and one missing period does not fail the whole request. `now` is computed once (`new Date()`) and reused for both the policy filter and the period computation.
+
+**routes** — `balance.routes.ts` (new) registers `GET /balances/me` (200) following the leave-routes conventions exactly: `resolveActor` extracts `request.user` and enforces role membership at the API boundary (UnauthorizedError on missing/invalid actor), the actor id is always taken from `request.user` (never a client-supplied id), `sendError` maps `AppError` to `{ error, code }` with the correct status and any other throw to 500, and the service is resolved from `fastify.balanceService` if present, else `createBalanceService()`.
+
+**index.ts** — re-exports `BalanceSummary`, `OpenBalancePeriodInput`, `CarryForwardInput` (service), and `balanceRoutes` (routes); `IBalanceService`/`BalanceService`/`createBalanceService` were already exported.
+
+**Divergences from the plan worth noting:**
+- None material — this phase matches PLAN.md Phase 5. `balanceRoutes` is **not** mounted in `src/app.ts` (deferred to Phase 7, per the spec's `outOfScope`), and no tests were delivered (deferred to Phase 7).
 <!-- gestalt:architecture feature=ddd25cae-d790-4d70-9054-a1e5f568359f END -->
