@@ -157,6 +157,10 @@ export class PgLeaveRequestRepository implements ILeaveRepository {
       values.push(params.leaveTypeCode);
       conditions.push(`leave_type_code = $${values.length}`);
     }
+    if (params.employeeIds !== undefined) {
+      values.push(params.employeeIds);
+      conditions.push(`employee_id = ANY($${values.length})`);
+    }
     if (params.startDateFrom !== undefined) {
       values.push(params.startDateFrom);
       conditions.push(`start_date >= $${values.length}`);

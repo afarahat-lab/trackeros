@@ -3,6 +3,7 @@ import {
   AuditAction,
   CreateLeaveRequestDto,
   EmployeeRole,
+  LeaveRequestQueryParams,
   LeaveStatus,
   LeaveTypeCode,
   requestedDays,
@@ -43,6 +44,8 @@ export interface ILeaveService {
   approve(actor: LeaveActor, requestId: string): Promise<LeaveRequest>;
   reject(actor: LeaveActor, requestId: string): Promise<LeaveRequest>;
   cancel(actor: LeaveActor, requestId: string): Promise<LeaveRequest>;
+  list(actor: LeaveActor, query: LeaveRequestQueryParams): Promise<LeaveRequest[]>;
+  getById(actor: LeaveActor, requestId: string): Promise<LeaveRequest>;
 }
 
 /**
@@ -361,6 +364,55 @@ export class LeaveService implements ILeaveService {
 
       return updated;
     });
+  }
+
+  async list(actor: LeaveActor, query: LeaveRequestQueryParams): Promise<LeaveRequest[]> {
+    this.assertAuthenticated(actor);
+
+    const employeeIds = await this.resolveScopedEmployeeIds(actor);
+    const params: LeaveRequestQueryParams = { ...query };
+
+    if (employeeIds !== undefined) {
+      // Role scoping is authoritative: a non-ADMIN caller can never widen the
+      // visibility set with a client-supplied employeeIds filter.
+      params.employeeIds = employeeIds;
+    }
+
+    return this.repository.findByQuery(params);
+  }
+
+  async getById(actor: LeaveActor, requestId: string): Promise<LeaveRequest> {
+    this.assertAuthenticated(actor);
+
+    const request = await this.repository.findById(requestId);
+    if (!request) {
+      // Invisible and nonexistent requests produce the identical 404 body.
+      throw new NotFoundError('Leave request not found');
+    }
+
+    const employeeIds = await this.resolveScopedEmployeeIds(actor);
+    if (employeeIds !== undefined && !employeeIds.includes(request.employeeId)) {
+      throw new NotFoundError('Leave request not found');
+    }
+
+    return request;
+  }
+
+  /**
+   * Resolves the set of employee ids an actor may see, fully status-independent.
+   * EMPLOYEE -> only self; MANAGER -> self plus one level of direct reports;
+   * ADMIN -> undefined, meaning no filter (sees all).
+   */
+  private async resolveScopedEmployeeIds(actor: LeaveActor): Promise<string[] | undefined> {
+    if (actor.role === EmployeeRole.ADMIN) {
+      return undefined;
+    }
+    if (actor.role === EmployeeRole.EMPLOYEE) {
+      return [actor.id];
+    }
+
+    const directReports = await this.employeeService.getEmployeesByManagerId(actor.id);
+    return [actor.id, ...directReports.map((employee) => employee.id)];
   }
 
   private async getRequest(requestId: string): Promise<LeaveRequest> {

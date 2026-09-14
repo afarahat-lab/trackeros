@@ -7,6 +7,7 @@ import {
   EmployeeRole,
   LeaveStatus,
   LeaveTypeCode,
+  LeaveRequestQueryParams,
 } from '../../../../src/shared/types';
 
 /**
@@ -42,13 +43,22 @@ describe('leave routes — the HTTP boundary', () => {
     cancelledAt: null,
   } as unknown as LeaveRequest;
 
+  let listMock: jest.Mock;
+  let getByIdMock: jest.Mock;
+  let authenticated = true;
+
   beforeEach(async () => {
+    authenticated = true;
     received = null;
+    listMock = jest.fn(async (_a: LeaveActor, _q: LeaveRequestQueryParams) => [created]);
+    getByIdMock = jest.fn(async (_a: LeaveActor, _id: string) => created);
     const service = {
       create: jest.fn(async (_a: LeaveActor, dto: CreateLeaveRequestDto) => {
         received = dto;
         return created;
       }),
+      list: listMock,
+      getById: getByIdMock,
     } as unknown as ILeaveService;
 
     app = Fastify();
@@ -57,7 +67,7 @@ describe('leave routes — the HTTP boundary', () => {
     (app as unknown as { leaveService: ILeaveService }).leaveService = service;
     app.decorateRequest('user', undefined);
     app.addHook('preHandler', async (request) => {
-      (request as unknown as { user: unknown }).user = actor;
+      (request as unknown as { user: unknown }).user = authenticated ? actor : undefined;
     });
     await app.register(leaveRoutes);
     await app.ready();
@@ -122,5 +132,49 @@ describe('leave routes — the HTTP boundary', () => {
     // The service overwrites employeeId with the actor's id; assert the boundary does not
     // quietly drop the field in a way that would hide a future regression there.
     expect(received!.employeeId).toBe('somebody-else');
+  });
+
+  it('GET /leaves parses enums, dates, limit and offset from the query string', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url:
+        '/leaves?status=APPROVED&leaveTypeCode=annual' +
+        '&startDateFrom=2030-03-01&startDateTo=2030-03-04' +
+        '&endDateFrom=2030-03-05&endDateTo=2030-03-10&limit=5&offset=10',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const passedQuery = listMock.mock.calls[0][1] as LeaveRequestQueryParams;
+    expect(passedQuery.status).toBe(LeaveStatus.APPROVED);
+    expect(passedQuery.leaveTypeCode).toBe(LeaveTypeCode.ANNUAL);
+    expect(passedQuery.startDateFrom).toBeInstanceOf(Date);
+    expect(passedQuery.startDateTo).toBeInstanceOf(Date);
+    expect(passedQuery.endDateFrom).toBeInstanceOf(Date);
+    expect(passedQuery.endDateTo).toBeInstanceOf(Date);
+    expect(passedQuery.limit).toBe(5);
+    expect(passedQuery.offset).toBe(10);
+  });
+
+  it('GET /leaves rejects an invalid enum query param with 400', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/leaves?status=NOT_A_STATUS',
+    });
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({ code: 'VALIDATION_ERROR' });
+  });
+
+  it('GET /leaves/:id returns the single request', async () => {
+    const response = await app.inject({ method: 'GET', url: '/leaves/lr-1' });
+    expect(response.statusCode).toBe(200);
+    expect(getByIdMock.mock.calls[0][1]).toBe('lr-1');
+    expect(response.json()).toMatchObject({ id: 'lr-1' });
+  });
+
+  it('GET /leaves/:id requires an authenticated actor', async () => {
+    authenticated = false;
+    const response = await app.inject({ method: 'GET', url: '/leaves/lr-1' });
+    // The boundary resolves the actor from request.user and goes no further without it.
+    expect(response.statusCode).toBe(401);
   });
 });
