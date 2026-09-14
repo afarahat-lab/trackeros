@@ -448,4 +448,32 @@ The module carries no balance/leave/policy/employee domain knowledge and depends
 - The spec's `consistencyRequirements` described `ConflictError` as having `code 'CONFLICT_ERROR'`; the actual shared `ConflictError` (unchanged) uses `code 'CONFLICT'` (statusCode 409). The implementation imports the existing class as-is — no error class was modified.
 - The spec's non-UTC ambiguity (set `process.env.TZ` vs a dedicated jest config vs explicit UTC offsets) was resolved in favor of a **child-process `TZ=Asia/Riyadh` evaluation** rather than mutating the test process's own timezone.
 - Per the spec's `outOfScope`, `leave.service.ts` and `balance.service.ts` were **not** refactored to import the new helpers — their private copies remain in place for removal in later phases.
+
+### Phase 2 delivered (employee: password_hash migration, findByManagerId, service methods)
+
+This phase delivers the employee-module credential field and the direct-report read paths (recommended phase 2). The policy/auth/balance/leave read work (phases 3–7) is not yet implemented.
+
+**migration** — `migrations/20260913010000_add_password_hash.js` adds a nullable `password_hash` column to `employees` via `t.text('password_hash')` (NOT `t.json`/`t.jsonb`), with `up` (alterTable add column) and `down` (drop column). No `manager_id` index or any other schema change is included.
+
+**model** — `Employee` in `employee.model.ts` gained `passwordHash: string | null` (canonical field, never serialized into any response body). `CreateEmployeeInput` remains `Omit<Employee, 'id'>`, so `create` now supplies `passwordHash` (see below).
+
+**repository** — `IEmployeeRepository` gained `findByManagerId(managerId, client?)`. `PgEmployeeRepository`:
+- `EmployeeRow` gained `password_hash: string | null`; `mapRow` maps it to `passwordHash`.
+- `create` now inserts 12 values including `input.passwordHash` (the 12th value) and returns `password_hash` in its RETURNING list.
+- `findById`/`findByEmployeeNumber`/`findByEmail`/`findByManagerId` all SELECT `password_hash` and map it.
+- `findByManagerId` is a parameterized `SELECT ... WHERE manager_id = $1` mapped via `mapRow`, returning an array (possibly empty) without throwing on empty.
+
+**service** — `IEmployeeService` gained `getEmployeeByEmail(email)` and `getEmployeesByManagerId(managerId)`. `EmployeeService`:
+- `getEmployeeByEmail` calls `repository.findByEmail` and throws `NotFoundError('Employee not found')` when null (reusing the existing `getEmployeeById` message convention).
+- `getEmployeesByManagerId` returns `repository.findByManagerId(managerId)` unchanged (array, possibly empty, no error on empty).
+
+**index.ts** — unchanged: the new methods are on `IEmployeeRepository`/`IEmployeeService`, which were already re-exported, so they are reachable through the public entry point without modification.
+
+**tests** — `tests/unit/modules/employee.service.test.ts` (new) covers `getEmployeeByEmail` (found / NotFoundError on unknown email) and `getEmployeesByManagerId` (only direct reports, empty array when none). The existing `tests/unit/modules/balance/balance.service.test.ts` and `tests/unit/modules/leave/leave.service.test.ts` were updated so their `FakeEmployeeService` fakes implement the two new `IEmployeeService` methods and their `makeEmployee` fixtures carry `passwordHash: null` (required because `IEmployeeService` gained members and `Employee` gained a field).
+
+**Divergences from the plan worth noting:**
+- The spec's `ambiguities` left open whether `create` should always insert `null` for `password_hash` or insert `input.passwordHash` when present. The implementation chose the latter: `create` inserts `input.passwordHash` (null when absent), so callers may set it — the field is passed through unvalidated (the service's `validate` does not touch `passwordHash`).
+- The spec's `ambiguities` left open whether to add the `manager_id` index in this migration. The implementation left it out (out of scope; only the `password_hash` column).
+- PLAN.md Phase 2 prescribed no tests (tests were Phase 7); the implementation delivered the employee service tests together with the service, and updated the balance/leave test fakes to satisfy the widened `IEmployeeService`/`Employee` contracts.
+- No routes, controllers, or the `GET /employees/me` endpoint (Phase 7); no auth/login logic, bcrypt hashing, or token minting (Phase 4); no audit-log writes (GP-002) — this phase is read-only plus a schema change.
 <!-- gestalt:architecture feature=ddd25cae-d790-4d70-9054-a1e5f568359f END -->
