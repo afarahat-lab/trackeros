@@ -1,0 +1,131 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "balance",
+      "policy"
+    ],
+    "affectedLayers": [
+      "service",
+      "routes",
+      "public-entry-point"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "IBalanceService.getBalanceForEmployee(employeeId) returns a LIST (array) of balance entries \u2014 never a single object even when only one leave type has an effective policy \u2014 with one entry per effective policy, each carrying leaveTypeCode, periodStart, periodEnd, entitledDays, usedDays, pendingDays, and available.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "For each entry, available === entitledDays - usedDays - pendingDays (computed, not stored), and a leave type with an effective policy but no balance row for the current period is returned with zeroed counters (entitled/used/pending/available = 0) rather than throwing NotFoundError or failing the whole request.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The current period for each leave type is derived via the shared periodContaining(employee.hireDate, policy.accrualPeriodMonths, now) helper, and the balance is looked up with IBalanceRepository.findByKey \u2014 no inline period arithmetic or SQL in the service.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The read path is read-only: getBalanceForEmployee performs no writes and opens no transaction (no IUnitOfWork.withTransaction, no client forwarding).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The balance route resolves the actor from request.user (never a client-supplied id), enforces role membership at the API boundary, and maps AppError to { error, code } with the correct status (any other throw \u2192 500).",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "IPolicyService.listEffectivePolicies(asOf) returns at most ONE policy per leaveTypeCode: status ACTIVE, effectiveFrom <= asOf, effectiveTo null or >= asOf, latest effectiveFrom winning on ties \u2014 so a superseded policy never yields duplicate balance entries for the same type.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Read-only phase: getBalanceForEmployee and the balance route must not open a transaction, write any row, or forward a PoolClient \u2014 no IUnitOfWork.withTransaction in the read path.",
+    "No new repository method and no new module dependency: listEffectivePolicies must reuse the existing IPolicyRepository.findAll() and filter in the service (or, if a filtered query is preferred, it lives in the policy repository behind the existing interface \u2014 never SQL inside a service).",
+    "The balance module must respect the committed dependency map balance -> policy (and employee/shared-*); it must not gain a balance -> leave-type dependency.",
+    "Actor identity comes exclusively from request.user; the route must never accept a client-supplied employee id."
+  ],
+  "outOfScope": [
+    "Registering balanceRoutes in src/app.ts (Sub-phase 3c) \u2014 balanceRoutes is exported but not mounted at runtime in this sub-phase.",
+    "src/shared/date/accrual.ts and the LeaveService refactor (Sub-phase 3a) \u2014 the shared periodContaining/addMonths helpers are consumed, not created, here.",
+    "Unit tests for getBalanceForEmployee / balance routes and the smoke-check seeding/assertions (Phase 5) \u2014 no tests are added in this sub-phase."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "BalanceEntry",
+      "mustExistOrExtend": true,
+      "invariant": "A read-only projection of a LeaveBalance for the current accrual period; available is always derived (entitledDays - usedDays - pendingDays), never persisted, and a missing balance row yields a zeroed entry rather than an error."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "At most one policy is in effect per leaveTypeCode at any given date (status ACTIVE, effectiveFrom <= asOf, effectiveTo null or >= asOf, latest effectiveFrom wins), so a superseded policy never produces a second balance entry for the same type."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IBalanceService.getBalanceForEmployee(employeeId: string): Promise<BalanceEntry[]>",
+      "authRule": "Caller must be authenticated; the employeeId is the resolved actor's own id (route enforces this, service trusts it).",
+      "idempotent": true,
+      "errorSemantics": "Read-only; throws NotFoundError only for an unknown employee (via getEmployeeById); a missing balance row is NOT an error (zeroed entry)."
+    },
+    {
+      "operation": "IPolicyService.listEffectivePolicies(asOf: Date): Promise<LeavePolicy[]>",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns an empty array when no policy is in effect; never throws for an empty result."
+    },
+    {
+      "operation": "balanceRoutes(fastify) \u2014 GET /balances/me",
+      "authRule": "resolveActor enforces presence and EmployeeRole membership at the API boundary (GP-005); UnauthorizedError on missing/invalid actor.",
+      "idempotent": true,
+      "errorSemantics": "200 with the balance list on success; AppError mapped to { error, code } with its status; any other throw \u2192 500."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The current-period derivation must reuse the shared periodContaining (and its half-open [start,end) UTC-pinned semantics) rather than any private copy \u2014 the balance service imports from src/shared/date/accrual.ts.",
+      "referencePath": "src/shared/date/accrual.ts"
+    },
+    {
+      "requirement": "The route's resolveActor and sendError helpers must match the existing leave.routes.ts pattern (request.user extraction, role membership check, AppError \u2192 { error, code } mapping, 500 fallback).",
+      "referencePath": "src/modules/leave/leave.routes.ts"
+    },
+    {
+      "requirement": "listEffectivePolicies must reuse the existing IPolicyRepository.findAll() (already declared and implemented) and the LeavePolicyStatus.ACTIVE enum \u2014 no new repository method.",
+      "referencePath": "src/modules/policy/policy.repository.interface.ts"
+    },
+    {
+      "requirement": "The balance lookup must go through IBalanceRepository.findByKey(employeeId, leaveTypeCode, periodStart, periodEnd) with the period boundaries from periodContaining \u2014 matching the unique (employee_id, leave_type_code, period_start, period_end) key.",
+      "referencePath": "src/modules/balance/balance.repository.ts"
+    },
+    {
+      "requirement": "The employee must be resolved via IEmployeeService.getEmployeeById (throws NotFoundError on unknown id) to obtain hireDate for the period anchor.",
+      "referencePath": "src/modules/employee/employee.service.interface.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/date/accrual.ts (periodContaining)",
+      "why": "Single source of truth for accrual-period derivation; the balance read path must not re-derive periods."
+    },
+    {
+      "target": "src/modules/policy (IPolicyService.listEffectivePolicies)",
+      "why": "Enumerates the leave types (and their accrualPeriodMonths) that should each yield one balance entry, filtering superseded policies."
+    },
+    {
+      "target": "src/modules/employee (IEmployeeService.getEmployeeById)",
+      "why": "Resolves the caller's hireDate (period anchor) and validates the employee exists."
+    },
+    {
+      "target": "src/modules/balance (IBalanceRepository.findByKey)",
+      "why": "Looks up the balance row for the derived current period; returns null when absent (zeroed entry)."
+    }
+  ]
+}
