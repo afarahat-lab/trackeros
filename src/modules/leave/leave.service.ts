@@ -27,6 +27,7 @@ import { IPolicyService, PolicyService, PgLeavePolicyRepository } from '../polic
 import { PgLeaveTypeRepository, LeaveTypeService } from '../leave-type';
 import { ILeaveRepository, PgLeaveRequestRepository } from './leave.repository';
 import { CreateLeaveRequestInput, LeaveRequest } from './leave.model';
+import { LeaveRequestQueryParams } from '../../shared/types';
 
 /**
  * The authenticated identity passed to every LeaveService operation. The
@@ -43,6 +44,8 @@ export interface ILeaveService {
   approve(actor: LeaveActor, requestId: string): Promise<LeaveRequest>;
   reject(actor: LeaveActor, requestId: string): Promise<LeaveRequest>;
   cancel(actor: LeaveActor, requestId: string): Promise<LeaveRequest>;
+  list(actor: LeaveActor, query: LeaveRequestQueryParams): Promise<LeaveRequest[]>;
+  getById(actor: LeaveActor, requestId: string): Promise<LeaveRequest>;
 }
 
 /**
@@ -361,6 +364,50 @@ export class LeaveService implements ILeaveService {
 
       return updated;
     });
+  }
+
+  async list(actor: LeaveActor, query: LeaveRequestQueryParams): Promise<LeaveRequest[]> {
+    this.assertAuthenticated(actor);
+
+    const employeeIds = await this.resolveVisibilityScope(actor);
+    return this.repository.findByQuery(
+      employeeIds ? { ...query, employeeIds } : query,
+    );
+  }
+
+  async getById(actor: LeaveActor, requestId: string): Promise<LeaveRequest> {
+    this.assertAuthenticated(actor);
+
+    const request = await this.repository.findById(requestId);
+    if (!request) {
+      throw new NotFoundError('Leave request not found');
+    }
+
+    const employeeIds = await this.resolveVisibilityScope(actor);
+    if (employeeIds && !employeeIds.includes(request.employeeId)) {
+      throw new NotFoundError('Leave request not found');
+    }
+
+    return request;
+  }
+
+  /**
+   * Computes the employee-id visibility scope for the actor's role: EMPLOYEE sees
+   * only themselves, MANAGER sees themselves plus their direct reports (one level,
+   * not transitive), and ADMIN (null) sees all requests. Visibility is
+   * status-independent.
+   */
+  private async resolveVisibilityScope(
+    actor: LeaveActor,
+  ): Promise<string[] | undefined> {
+    if (actor.role === EmployeeRole.ADMIN) {
+      return undefined;
+    }
+    if (actor.role === EmployeeRole.EMPLOYEE) {
+      return [actor.id];
+    }
+    const directReports = await this.employeeService.getEmployeesByManagerId(actor.id);
+    return [actor.id, ...directReports.map((employee) => employee.id)];
   }
 
   private async getRequest(requestId: string): Promise<LeaveRequest> {

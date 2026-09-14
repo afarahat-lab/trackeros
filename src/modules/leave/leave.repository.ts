@@ -173,6 +173,10 @@ export class PgLeaveRequestRepository implements ILeaveRepository {
       values.push(params.endDateTo);
       conditions.push(`end_date <= $${values.length}`);
     }
+    if (params.employeeIds !== undefined && params.employeeIds.length > 0) {
+      values.push(params.employeeIds);
+      conditions.push(`employee_id = ANY($${values.length})`);
+    }
 
     let query = `SELECT ${COLUMNS} FROM leave_requests`;
     if (conditions.length > 0) {
