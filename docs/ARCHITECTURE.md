@@ -527,4 +527,20 @@ This phase delivers the balance read surface (recommended phase 5): the `Balance
 
 **Divergences from the plan worth noting:**
 - None material — this phase matches PLAN.md Phase 5. `balanceRoutes` is **not** mounted in `src/app.ts` (deferred to Phase 7, per the spec's `outOfScope`), and no tests were delivered (deferred to Phase 7).
+
+### Phase 6 delivered (leave reads: findByQuery employeeIds + list/getById)
+
+This phase delivers the leave read surface's repository and service layers (sub-phase 6.1). The `GET /leaves` / `GET /leaves/:id` routes (sub-phase 6.2) and the read tests (sub-phase 6.3) are not yet implemented.
+
+**repository** — `PgLeaveRequestRepository.findByQuery` now honours `params.employeeIds`: when it is a non-empty array, the array is pushed as a single parameter and an `employee_id = ANY($n)` condition is appended to the existing WHERE conditions (before the `LIMIT`/`OFFSET` clauses, which are appended after the conditions are joined). The filter is expressed in SQL — no fetch-all-and-filter in application code. No other repository method changed; `findById`/`update`/`create` and the `ORDER BY start_date DESC` + `LIMIT`/`OFFSET` ordering are preserved.
+
+**service** — `ILeaveService` gained `list(actor, query)` and `getById(actor, requestId)`, both implemented in `LeaveService` and read-only (never open a transaction, never forward a `PoolClient`).
+
+- `list(actor, query)` asserts the actor is authenticated, computes the visibility scope via a private `resolveVisibilityScope(actor)`, and delegates to `repository.findByQuery`. When a scope is returned it is merged into the query as `{ ...query, employeeIds }` — the scoped `employeeIds` **overrides** any client-supplied value (an EMPLOYEE/MANAGER can never widen their own scope); when the scope is `undefined` (ADMIN) the query is passed through unchanged, so an ADMIN may still supply their own `employeeIds` filter.
+- `getById(actor, requestId)` asserts the actor is authenticated, loads via `repository.findById` (throwing `NotFoundError('Leave request not found')` when null), computes the same visibility scope, and throws the **identical** `NotFoundError('Leave request not found')` when the request's `employeeId` is not in the scope — an invisible request is indistinguishable from a nonexistent one.
+- `resolveVisibilityScope(actor)` returns `undefined` for ADMIN (sees all), `[actor.id]` for EMPLOYEE (self only), and `[actor.id, ...directReportIds]` for MANAGER, where direct reports come from `employeeService.getEmployeesByManagerId(actor.id)` (one level, not transitive). Visibility is status-independent — a manager sees direct reports' requests in every status, and no status filter is introduced.
+
+**Divergences from the plan worth noting:**
+- PLAN.md Phase 6 prescribed a single phase delivering the repository extension, the service methods, AND the `GET /leaves` / `GET /leaves/:id` routes. The implementation split it into sub-phases: this phase (6.1) delivers only the repository + service layers; the routes (6.2) and tests (6.3) are deferred and not yet present.
+- No routes, no tests, and no audit-log writes (GP-002) — this phase is read-only (list/getById never open a transaction or forward a client).
 <!-- gestalt:architecture feature=ddd25cae-d790-4d70-9054-a1e5f568359f END -->
