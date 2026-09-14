@@ -3,6 +3,9 @@ export { IBalanceRepository, PgLeaveBalanceRepository } from './balance.reposito
 export {
   IBalanceService,
   BalanceService,
+  createBalanceService,
+  BalanceSummary,
   OpenBalancePeriodInput,
   CarryForwardInput,
 } from './balance.service';
+export { balanceRoutes } from './balance.routes';
