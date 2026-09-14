@@ -1,0 +1,137 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "employee",
+      "shared-db"
+    ],
+    "affectedLayers": [
+      "data-access",
+      "domain",
+      "schema"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "A new knex migration under migrations/ adds a nullable `password_hash` column to `employees` using `t.text('password_hash')` (not `t.json`), with an `up` that alters the table to add the column and a `down` that drops it.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "`Employee` in employee.model.ts exposes `passwordHash: string | null` alongside the existing canonical fields, and `CreateEmployeeInput` remains `Omit<Employee, 'id'>` (so create supplies passwordHash as null).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`IEmployeeRepository.findByManagerId(managerId, client?)` returns every employee whose `manager_id` equals the argument, mapped through the existing `mapRow`, as an array (possibly empty) without throwing on empty.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`EmployeeRow`, `mapRow`, `create`, `findById`, `findByEmployeeNumber`, and `findByEmail` all select and map the new `password_hash` column so a persisted employee round-trips `passwordHash` correctly.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`IEmployeeService.getEmployeeByEmail(email)` returns the employee found via `repository.findByEmail`, and throws `NotFoundError('Employee not found')` when the lookup returns null.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`IEmployeeService.getEmployeesByManagerId(managerId)` returns `repository.findByManagerId(managerId)` unchanged (array, possibly empty, no error on empty).",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The migration must use `t.text('password_hash')` (NOT `t.json`/`t.jsonb`), matching the existing `audit_logs.before_state`/`after_state` text-column convention in migrations/20260913000000_initial_schema.js.",
+    "`passwordHash` is a canonical model field but must never be serialized into any response body; this phase only adds the field and read paths \u2014 no route may expose it.",
+    "All database access stays behind the repository: `findByManagerId` is the only new SQL, and it must be a parameterized `SELECT ... WHERE manager_id = $1` mapped via the existing `mapRow`.",
+    "New repository/service methods accept an optional trailing `PoolClient` and fall back to the shared pool when omitted (per AGENTS.md transaction-boundary rule), even though this phase's operations are read-only and open no transaction."
+  ],
+  "outOfScope": [
+    "No routes, controllers, or the `GET /employees/me` endpoint \u2014 that is Phase 7.",
+    "No auth/login logic, bcrypt hashing, or token minting \u2014 that is Phase 4; this phase only stores/reads the nullable hash.",
+    "No audit-log writes (GP-002) \u2014 this phase is read-only plus a schema change; no state-changing service operation is introduced.",
+    "No `manager_id` index creation or any other schema change beyond the nullable `password_hash` column."
+  ],
+  "ambiguities": [
+    {
+      "description": "Whether `create` should accept a `passwordHash` value from `CreateEmployeeInput` or always insert `null` for the new column (the phase says \"update create to select and map password_hash\" but does not say whether callers may set it).",
+      "options": [
+        "create always inserts null for password_hash (callers cannot set it this phase)",
+        "create inserts input.passwordHash when present, else null"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "description": "Whether the migration should also add the `manager_id` index noted in the reconciled schema (indexes: manager_id \"currently unindexed and must be added\") or leave it out of this phase.",
+      "options": [
+        "Add the manager_id index in this migration",
+        "Leave the index out (out of scope; only the password_hash column)"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "An Employee may carry a nullable credential (`passwordHash: string | null`); null means \"no local password set\". The field is canonical on the entity but is never serialized into any response body."
+    },
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "`managerId` is the single source of the direct-report relationship: `findByManagerId` returns exactly the employees whose `manager_id` equals the given id (one level, not transitive)."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IEmployeeRepository.findByManagerId(managerId, client?)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an array (possibly empty); never throws on an empty result set."
+    },
+    {
+      "operation": "IEmployeeService.getEmployeeByEmail(email)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Throws NotFoundError('Employee not found') when the repository returns null; otherwise returns the Employee."
+    },
+    {
+      "operation": "IEmployeeService.getEmployeesByManagerId(managerId)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the repository result unchanged (array, possibly empty); never throws on empty."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The migration's `up`/`down` shape and column style must follow the existing initial-schema migration (alterTable add column in up, drop column in down; text column for a string payload).",
+      "referencePath": "migrations/20260913000000_initial_schema.js"
+    },
+    {
+      "requirement": "`EmployeeRow`/`mapRow` must map `password_hash` \u2192 `passwordHash` exactly as the existing snake_case\u2192camelCase mapping does for the other columns, and `create`/`findById`/`findByEmployeeNumber`/`findByEmail` must include `password_hash` in their SELECT/RETURNING lists.",
+      "referencePath": "src/modules/employee/employee.repository.ts"
+    },
+    {
+      "requirement": "`getEmployeeByEmail` must reuse the existing `NotFoundError` class and message convention already used by `getEmployeeById` ('Employee not found').",
+      "referencePath": "src/modules/employee/employee.service.ts"
+    },
+    {
+      "requirement": "The `Employee` model's `passwordHash` field must match the reconciled entity shape (`passwordHash: string | null`) and the `CreateEmployeeInput = Omit<Employee, 'id'>` derivation must be preserved.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/employee/index.ts",
+      "why": "The new repository/service methods must be reachable through the public entry point so Phase 4 (auth) and Phase 6 (leave list) can consume getEmployeeByEmail/getEmployeesByManagerId without importing internals."
+    },
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "findByManagerId and the updated read methods fall back to the shared pool when no client is supplied, matching the existing repository's `db(client)` pattern."
+    }
+  ]
+}
