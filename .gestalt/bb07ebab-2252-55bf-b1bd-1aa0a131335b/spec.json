@@ -1,0 +1,154 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "A repository test asserts that when `findByQuery` receives a non-empty `employeeIds` array, the generated SQL contains an `employee_id = ANY($n)` condition and the array is passed as a single parameter value (not spread into individual placeholders), with the placeholder index consistent with the other conditions.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A repository test asserts that when `employeeIds` is absent or an empty array, `findByQuery` emits no `employee_id` condition (no `ANY` clause) and returns rows unfiltered by employee.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Service tests assert `list` role scoping: EMPLOYEE delegates to `repository.findByQuery` with `employeeIds = [actor.id]`; MANAGER with `[actor.id, ...directReportIds]` where direct reports come from `employeeService.getEmployeesByManagerId(actor.id)` (one level, not transitive); ADMIN with no `employeeIds` filter.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Service tests assert `list` merges the scoped `employeeIds` into the query (overriding any client-supplied value for EMPLOYEE/MANAGER) and delegates to `repository.findByQuery` exactly once, returning its result unchanged.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Service tests assert `getById` returns the request when visible and throws `NotFoundError('Leave request not found')` with the identical message for a null request AND for a request whose `employeeId` is outside the actor's visibility scope, with visibility status-independent (a manager sees a direct report's request in every status).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Route tests assert `GET /leaves` parses/validates query params (status/leaveTypeCode enum membership, the four date bounds via the existing `toDate` helper, limit/offset as integers) and returns 200 with the array; invalid params yield a 400 `ValidationError` mapped through `sendError`.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "Route tests assert `GET /leaves/:id` returns 200 with the single request, and that a `NotFoundError` from the service is mapped via `sendError` to a 404 `{ error, code }` body (the same 404 for invisible and nonexistent ids).",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "The new tests pass under the project's Jest runner (`npx jest`) and do not modify any production source file under `src/` \u2014 the 6.1/6.2 deliverables are treated as fixed contracts.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "This sub-phase is test-only: no production source under `src/` may be modified. The repository/service/routes delivered in 6.1 and 6.2 are fixed contracts to be asserted against, not changed.",
+    "Repository `findByQuery` tests must exercise the real `PgLeaveRequestRepository` (or a subclass) against a fake `dbPool`/`PoolClient` that captures the SQL text and parameter array \u2014 they must not re-implement the query logic in a fake repository, or the `employee_id = ANY($n)` single-parameter invariant is untested.",
+    "Service tests must use in-memory fakes for the injected collaborators (matching the existing `leave.service.test.ts` pattern) and must not open a transaction or forward a `PoolClient` \u2014 `list`/`getById` are read-only.",
+    "Route tests must follow the existing `leave.routes.test.ts` seam: register `leaveRoutes` on a Fastify instance decorated with a fake `leaveService` and a `preHandler` that sets `request.user`, and inject requests \u2014 no real DB, no real auth token.",
+    "Tests must not assert implementation shape (no assertions on private helper names, SQL string literals beyond the `ANY`/single-parameter invariant, or route internals) \u2014 only the observable contracts."
+  ],
+  "outOfScope": [
+    "Implementing or modifying `findByQuery`, `list`, `getById`, or the GET routes \u2014 those are owned by sibling sub-phases 6.1/6.2 and are already delivered; this sub-phase only tests them.",
+    "The `POST /leaves`, submit/approve/reject/cancel endpoints and their existing tests \u2014 already covered; this sub-phase adds only the read-surface tests.",
+    "The `GET /employees/me`, `GET /balances/me`, and `POST /auth/login` surfaces and their tests (Phase 7 / other phases) \u2014 not part of the leave read surface.",
+    "End-to-end smoke-check assertions over real HTTP (scripts/smoke.js) \u2014 that belongs to Phase 7, not this unit/integration test sub-phase."
+  ],
+  "ambiguities": [
+    {
+      "description": "How to exercise the real `PgLeaveRequestRepository.findByQuery` without a live PostgreSQL database.",
+      "options": [
+        "Inject a fake `dbPool`/`PoolClient` whose `query(sql, values)` records the SQL text and parameter array, then assert on the captured values",
+        "Subclass `PgLeaveRequestRepository` and override `db()` to return a recording client",
+        "Use an in-memory fake repository that re-implements the ANY logic (NOT recommended \u2014 would not test the real code)"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "Where the new tests should live given the existing files already cover the leave module.",
+      "options": [
+        "Extend the existing `tests/unit/modules/leave/leave.service.test.ts` and `leave.routes.test.ts` with new describe blocks",
+        "Add a new `tests/unit/modules/leave/leave.repository.test.ts` for the repository and extend the two existing files for service/routes"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "Visibility is status-independent: a MANAGER may read a direct report's request in every status (DRAFT/SUBMITTED/APPROVED/REJECTED/CANCELLED); visibility is governed solely by the employee-id scope (EMPLOYEE self, MANAGER self + one-level direct reports, ADMIN all), never by status."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "A request the caller may not see is indistinguishable from one that does not exist: `getById` returns the same `NotFoundError('Leave request not found')` for both a null lookup and an out-of-scope `employeeId`."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "ILeaveRepository.findByQuery(params, client?)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Read-only; returns an array (possibly empty); never throws on empty results. When `params.employeeIds` is a non-empty array it is pushed as a single parameter for an `employee_id = ANY($n)` condition; when absent/empty no employee filter is applied."
+    },
+    {
+      "operation": "ILeaveService.list(actor, query)",
+      "authRule": "Requires an authenticated actor (missing/invalid actor \u2192 UnauthorizedError/ForbiddenError); scopes results by role (EMPLOYEE self, MANAGER self + one-level direct reports, ADMIN all) and delegates to repository.findByQuery.",
+      "idempotent": false,
+      "errorSemantics": "Read-only; never opens a transaction or forwards a PoolClient; returns the repository result unchanged."
+    },
+    {
+      "operation": "ILeaveService.getById(actor, requestId)",
+      "authRule": "Requires an authenticated actor; visibility scoped by role (same rule as list).",
+      "idempotent": false,
+      "errorSemantics": "Throws NotFoundError('Leave request not found') for a null request AND for an out-of-scope request (identical response); read-only, no transaction."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The `NotFoundError('Leave request not found')` message asserted in `getById` tests must match the exact string thrown by `LeaveService.getById` (and the repository's `update`/`findById` conventions) in `src/modules/leave/leave.service.ts`.",
+      "referencePath": "src/modules/leave/leave.service.ts"
+    },
+    {
+      "requirement": "The `employee_id = ANY($n)` single-parameter behaviour asserted in repository tests must match the implementation in `PgLeaveRequestRepository.findByQuery` (array pushed as one value, condition appended before LIMIT/OFFSET).",
+      "referencePath": "src/modules/leave/leave.repository.ts"
+    },
+    {
+      "requirement": "Route tests must reuse the existing `resolveActor`/`sendError`/`toDate`/`parseListQuery` behaviour and the `fastify.leaveService` decoration seam exactly as in the existing route test file, asserting the same error/status mapping.",
+      "referencePath": "tests/unit/modules/leave/leave.routes.test.ts"
+    },
+    {
+      "requirement": "Service tests must reuse the existing in-memory fake pattern and fixtures (FakeLeaveRepository, FakeEmployeeService, makeActor/makeEmployee/makeRequest) from the existing leave service test, extending `FakeLeaveRepository.findByQuery` to record the received params rather than ignoring them.",
+      "referencePath": "tests/unit/modules/leave/leave.service.test.ts"
+    },
+    {
+      "requirement": "The `LeaveRequestQueryParams.employeeIds` type and `LeaveStatus`/`LeaveTypeCode` enum members referenced in tests must match `src/shared/types/index.ts` (the Phase 1 extension).",
+      "referencePath": "src/shared/types/index.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/leave/leave.repository.ts (PgLeaveRequestRepository.findByQuery)",
+      "why": "The repository test drives the real implementation through its injected `dbPool` to capture the SQL and parameter array, proving the `employee_id = ANY($n)` single-parameter invariant."
+    },
+    {
+      "target": "src/modules/leave/leave.service.ts (LeaveService.list/getById)",
+      "why": "The service tests exercise the real `LeaveService` with in-memory fakes to assert role scoping, delegation, and the identical NotFoundError for invisible/missing requests."
+    },
+    {
+      "target": "src/modules/leave/leave.routes.ts (GET /leaves, GET /leaves/:id)",
+      "why": "The route tests inject requests through a Fastify instance with a fake `leaveService` to assert query parsing/validation, 200 responses, and `sendError` mapping."
+    }
+  ]
+}
