@@ -426,4 +426,26 @@ Only schema change: nullable `password_hash` on `employees` (text contract, `t.t
 ## Open questions
 1. GET /balances/me available computation when no balance row exists for a policy's current period — synthesize entry vs omit leave type.
 2. GET /leaves/:id visibility for a MANAGER whose direct report's request is APPROVED/REJECTED/CANCELLED vs DRAFT/SUBMITTED — status-unrestricted vs SUBMITTED-only.
+
+### Phase 1 delivered (shared-date module + query-param extension)
+
+This phase delivered only the shared foundations (recommended phase 1); the employee/policy/auth/balance/leave read work (phases 2–7) is not yet implemented.
+
+**shared-date** — new module `src/shared/date/accrual.ts` exporting exactly three pure UTC helpers, copied verbatim from the private implementations in `src/modules/leave/leave.service.ts` (startOfUtcDay/addMonths/periodContaining) and `src/modules/balance/balance.service.ts` (addMonths), with no semantic change:
+
+- `startOfUtcDay(date: Date): Date` — returns `new Date(Date.UTC(y, m, d))` reading only `getUTCFullYear`/`getUTCMonth`/`getUTCDate`; never mutates its input.
+- `addMonths(date: Date, months: number): Date` — returns a new Date (input not mutated) with the UTC month advanced by `months`, clamping the day to the last day of the target month (Jan 31 + 1 → Feb 28/29).
+- `periodContaining(anchor: Date, accrualMonths: number, date: Date): { start: Date; end: Date }` — steps `accrualMonths` at a time from `startOfUtcDay(anchor)` with a 10,000-iteration safety bound, returning the half-open `{ start, end }` period where `start <= date < end`; throws `ConflictError` (imported from `src/shared/errors`) when `date < anchor` or no period resolves within the bound.
+
+The module carries no balance/leave/policy/employee domain knowledge and depends only on `src/shared/errors` (for `ConflictError`).
+
+**shared-types** — `LeaveRequestQueryParams` in `src/shared/types/index.ts` gained `employeeIds?: string[]` (the role-scoping filter for Phase 6's `findByQuery`). No other type, enum, DTO, or the `requestedDays` helper changed.
+
+**tests** — `tests/unit/shared/accrual.test.ts` covers `startOfUtcDay` (UTC-midnight result, no input mutation), `addMonths` (month advance, year-boundary carry, month-end clamping including leap-year cases, no input mutation), and `periodContaining` (half-open containment, inclusive-start/exclusive-end boundary, anchor-at-UTC-midnight, month-end-clamping stepping, ConflictError on `date < anchor` and on the 0-month non-advancing bound). A non-UTC case spawns a child process under `TZ=Asia/Riyadh` (via `execFileSync` + `ts-node/register`) asserting the helpers read UTC fields only and produce identical results regardless of local timezone.
+
+**Divergences from the plan worth noting:**
+- The spec's `ambiguities` left open whether `src/shared/date/` should expose a public `index.ts` (matching `shared/db`/`shared/errors`) or be imported by direct path. The implementation chose **direct path import only** (`src/shared/date/accrual.ts`, no `index.ts`), and the test imports the three helpers directly from that path.
+- The spec's `consistencyRequirements` described `ConflictError` as having `code 'CONFLICT_ERROR'`; the actual shared `ConflictError` (unchanged) uses `code 'CONFLICT'` (statusCode 409). The implementation imports the existing class as-is — no error class was modified.
+- The spec's non-UTC ambiguity (set `process.env.TZ` vs a dedicated jest config vs explicit UTC offsets) was resolved in favor of a **child-process `TZ=Asia/Riyadh` evaluation** rather than mutating the test process's own timezone.
+- Per the spec's `outOfScope`, `leave.service.ts` and `balance.service.ts` were **not** refactored to import the new helpers — their private copies remain in place for removal in later phases.
 <!-- gestalt:architecture feature=ddd25cae-d790-4d70-9054-a1e5f568359f END -->
