@@ -1,0 +1,102 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "balance",
+      "policy"
+    ],
+    "affectedLayers": [
+      "service",
+      "routes"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "A project-wide search for `LeaveTypeService` and `PgLeaveTypeRepository` under `src/modules/balance/` returns zero matches \u2014 the balance module (routes, service, repository, index) has no direct import of, or reference to, the leave-type module.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`src/modules/balance/balance.routes.ts` imports only Fastify types, shared errors/types, and the balance service (`IBalanceService`/`createBalanceService`); it contains no inline construction of a policy service and no leave-type import.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The balance module's dependency chain is `balance \u2192 policy` only: `createBalanceService()` obtains its `IPolicyService` via the policy module's public entry point (`createPolicyService` from `src/modules/policy`), and no balance file imports from `src/modules/leave-type`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`npm run build` (tsc --noEmit) and the existing Jest suite pass with no new failures, confirming the dependency removal is behaviour-preserving.",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "The leave-type dependency must remain encapsulated inside the policy module's public factory `createPolicyService()` in `src/modules/policy/policy.service.ts` \u2014 it is the only non-test, non-leave-type-module location allowed to construct `LeaveTypeService`/`PgLeaveTypeRepository`.",
+    "Cross-module imports must go through the module's public entry point (`index.ts`) only \u2014 balance may import `createPolicyService`/`IPolicyService` from `src/modules/policy`, never from `src/modules/leave-type`.",
+    "No circular dependency may be introduced: policy must not import from balance; the dependency direction stays balance \u2192 policy \u2192 leave-type.",
+    "The change is a pure dependency-graph refactor: no observable behaviour of `GET /balances/me` or any balance service operation may change (same inputs, outputs, and error semantics)."
+  ],
+  "outOfScope": [
+    "Refactoring the leave-type dependency out of the policy module itself \u2014 `createPolicyService()` continues to construct `LeaveTypeService(new PgLeaveTypeRepository())`.",
+    "Any change to balance service behaviour, routes, or the `GET /balances/me` response shape \u2014 this phase is a dependency-graph cleanup only.",
+    "Adding new tests or new endpoints \u2014 the phase only verifies the existing dependency chain is already balance \u2192 policy."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "BalanceService",
+      "mustExistOrExtend": true,
+      "invariant": "Obtains its policy collaborator only as an `IPolicyService` (via the policy module's public factory), never by constructing or importing leave-type classes directly; its constructor dependency on `IPolicyService` is unchanged."
+    },
+    {
+      "entity": "PolicyService",
+      "mustExistOrExtend": true,
+      "invariant": "Remains the sole owner of the leave-type dependency: it injects `ILeaveTypeService` and `createPolicyService()` is the only place that wires `LeaveTypeService(new PgLeaveTypeRepository())`."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "createPolicyService(): IPolicyService",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Must remain the policy module's public factory returning a fully-wired `IPolicyService`; consumers (including balance) obtain policy services through it rather than constructing leave-type collaborators themselves."
+    },
+    {
+      "operation": "createBalanceService(): IBalanceService",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Must continue to return a fully-wired `IBalanceService` whose policy collaborator is resolved via `createPolicyService()` (balance \u2192 policy only), with no leave-type import in the balance module."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The policy service factory signature and export must match the existing `createPolicyService(): IPolicyService` in `src/modules/policy/policy.service.ts` and its re-export in `src/modules/policy/index.ts` \u2014 balance must reuse this exact factory, not a new or divergent one.",
+      "referencePath": "src/modules/policy/policy.service.ts"
+    },
+    {
+      "requirement": "The balance service factory must keep the same `createBalanceService(): IBalanceService` signature and wiring (repository, employee service, policy service, unit of work) as currently declared in `src/modules/balance/balance.service.ts`, changing only the source of the policy collaborator if any change is needed.",
+      "referencePath": "src/modules/balance/balance.service.ts"
+    },
+    {
+      "requirement": "`balance.routes.ts` must keep its `resolveActor`/`sendError` helpers and `GET /balances/me` handler behaviour identical to the current file \u2014 the only permitted change is the removal of any leave-type/policy construction, which is already absent.",
+      "referencePath": "src/modules/balance/balance.routes.ts"
+    },
+    {
+      "requirement": "The `IPolicyService` interface (including `listEffectivePolicies` and `getPolicyByLeaveTypeCode`) must remain unchanged and be the only policy surface balance depends on, matching `src/modules/policy/policy.service.interface.ts`.",
+      "referencePath": "src/modules/policy/policy.service.interface.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/policy/index.ts (createPolicyService / IPolicyService)",
+      "why": "The single allowed policy-module surface through which balance obtains its policy collaborator, keeping the leave-type dependency hidden behind the policy module."
+    },
+    {
+      "target": "src/modules/leave-type (LeaveTypeService / PgLeaveTypeRepository)",
+      "why": "Must NOT be imported by the balance module; it remains reachable only through the policy module's factory."
+    }
+  ]
+}
