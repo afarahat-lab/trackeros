@@ -1,0 +1,137 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "balance",
+      "policy",
+      "employee",
+      "shared-date"
+    ],
+    "affectedLayers": [
+      "service",
+      "routes",
+      "public-entry-point"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "IBalanceService exposes getBalancesForEmployee(employeeId: string): Promise<BalanceSummary[]> and BalanceService implements it, returning one BalanceSummary per leave type that has an open balance row in its current accrual period.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Each BalanceSummary computes available = entitledDays - usedDays - pendingDays and carries leaveTypeCode, periodStart, periodEnd, entitledDays, usedDays, pendingDays from the matched balance row.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "When no balance row exists for a policy's current period, that leave type is omitted (no synthesized entry, no throw); an employee with no open periods returns [] and one missing period does not fail the whole request.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The current accrual period is computed via the shared periodContaining(employee.hireDate, policy.accrualPeriodMonths, new Date()) from src/shared/date/accrual.ts \u2014 no re-derived private copy is used.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The route resolves the actor from request.user (never a client-supplied id), returns 200 with the array, and maps AppError via sendError; the service is resolved from fastify.balanceService or a createBalanceService() factory.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "index.ts exports BalanceSummary, getBalancesForEmployee (via IBalanceService), createBalanceService, and balanceRoutes.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Read-only operation: getBalancesForEmployee must never open a transaction (no uow.withTransaction) and must not forward a PoolClient to repository/service calls.",
+    "The balance module must obtain the policy service via createPolicyService() from ../policy \u2014 never hand-wire PolicyService/LeaveTypeService/PgLeavePolicyRepository internals.",
+    "The accrual period must be computed with the shared periodContaining from src/shared/date/accrual.ts; do not re-derive or duplicate the private addMonths/periodContaining logic.",
+    "The actor id must come from request.user via the resolveActor pattern; never accept a client-supplied employee id.",
+    "balanceRoutes must not be mounted in src/app.ts in this phase."
+  ],
+  "outOfScope": [
+    "Mounting balanceRoutes in src/app.ts (deferred to Phase 7).",
+    "Synthesizing a balance entry for a leave type whose current period has no balance row.",
+    "Opening/closing balance periods or any write to leave_balances (openPeriod/carryForward are unchanged).",
+    "Unit tests and smoke-check extension for this endpoint (deferred to Phase 7)."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "BalanceSummary",
+      "mustExistOrExtend": true,
+      "invariant": "A pure value type derived from a LeaveBalance row; available is always entitledDays - usedDays - pendingDays (never stored, never independently settable), and it is only produced for a leave type whose current-period balance row exists."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "Unchanged: at most one row per (employeeId, leaveTypeCode, periodStart, periodEnd); OPEN vs CLOSED inferred from period boundaries, not stored. getBalancesForEmployee reads it without mutation."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "getBalancesForEmployee(employeeId: string): Promise<BalanceSummary[]>",
+      "authRule": "Caller is the authenticated actor; the route passes actor.id (never a client-supplied id).",
+      "idempotent": true,
+      "errorSemantics": "Read-only; returns [] (not 404) when no open periods; omits a leave type with no balance row rather than throwing; propagates NotFoundError only if the employee itself is unknown."
+    },
+    {
+      "operation": "balanceRoutes registration (GET /balances/me)",
+      "authRule": "resolveActor enforces request.user presence and role membership at the API boundary (GP-005); missing/invalid actor -> 401 UnauthorizedError.",
+      "idempotent": true,
+      "errorSemantics": "200 with the array (possibly empty); AppError mapped via sendError to { error, code } with correct status; other throws -> 500."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Compute the current accrual period using the shared periodContaining(anchor, accrualMonths, date) \u2014 match its exact signature and half-open { start, end } semantics; do not re-derive it.",
+      "referencePath": "src/shared/date/accrual.ts"
+    },
+    {
+      "requirement": "Obtain active policies via IPolicyService.getActivePolicies(asOf) (at most one ACTIVE policy per leaveTypeCode, latest effectiveFrom) \u2014 reuse the Phase 3 contract, not a re-implementation.",
+      "referencePath": "src/modules/policy/policy.service.interface.ts"
+    },
+    {
+      "requirement": "Resolve the employee via IEmployeeService.getEmployeeById(employeeId) and read employee.hireDate as the accrual anchor.",
+      "referencePath": "src/modules/employee/employee.service.interface.ts"
+    },
+    {
+      "requirement": "Look up the balance via IBalanceRepository.findByKey(employeeId, leaveTypeCode, periodStart, periodEnd) and reuse its at-most-one-row-per-key semantics.",
+      "referencePath": "src/modules/balance/balance.repository.ts"
+    },
+    {
+      "requirement": "Reuse the resolveActor and sendError patterns (actor from request.user, AppError -> { error, code } with correct status) exactly as in the leave routes.",
+      "referencePath": "src/modules/leave/leave.routes.ts"
+    },
+    {
+      "requirement": "Wire the fallback service via createPolicyService() from the policy module's public entry point \u2014 never hand-wire policy internals.",
+      "referencePath": "src/modules/policy/index.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/date/accrual.ts (periodContaining)",
+      "why": "Single source of truth for accrual-period computation; the balance read must not re-derive it."
+    },
+    {
+      "target": "src/modules/policy/index.ts (createPolicyService / IPolicyService.getActivePolicies)",
+      "why": "Enumerates the effective policies whose current periods drive the balance list."
+    },
+    {
+      "target": "src/modules/employee/index.ts (IEmployeeService.getEmployeeById)",
+      "why": "Resolves the employee and its hireDate anchor for period computation."
+    },
+    {
+      "target": "src/modules/balance/balance.repository.ts (IBalanceRepository.findByKey)",
+      "why": "Reads the current-period balance row (or null to omit the type)."
+    },
+    {
+      "target": "src/modules/leave/leave.routes.ts (resolveActor / sendError)",
+      "why": "Reused actor resolution and error-mapping conventions for the new route."
+    }
+  ]
+}
