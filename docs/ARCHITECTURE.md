@@ -354,3 +354,76 @@ This phase adds the Jest unit tests for `LeaveService.cancel` to `tests/unit/mod
 - Whether APPROVED cancellation is allowed after startDate/endDate has passed — **resolved**: blocked once `startDate <= today` (ConflictError).
 - Whether usedDays release is full or pro-rated when leave has partially elapsed — **resolved**: full release, no pro-rating, because the timing guard makes cancellation possible only before the leave starts.
 <!-- gestalt:architecture feature=621bb1fd-0965-415a-bf2e-ec2c42b15f04 END -->
+
+<!-- gestalt:architecture feature=ddd25cae-d790-4d70-9054-a1e5f568359f START -->
+# Authentication and read endpoints (v2) — Reconciled Architecture
+
+## Stack compliance
+TypeScript, Node 20, npm, Jest, Fastify, PostgreSQL via pg Pool, modular monolith. React Native frontend unaffected. No framework deviations.
+
+## Domain entities and lifecycle states
+- **Employee**: id, employeeNumber, firstName, lastName, email, role, managerId, department, hireDate, terminationDate, employmentStatus, passwordHash (nullable, never serialized). Lifecycle: ACTIVE, TERMINATED, ON_LEAVE.
+- **AuthToken**: stateless JWT bearer credential. Payload contract fixed: sub = employee id, role = EmployeeRole. Lifecycle: ISSUED, EXPIRED.
+- **LeaveRequest**: id, employeeId, leaveTypeCode, startDate, endDate, requestedDays, reason, status, approverId, approvalComment, submittedAt, decidedAt, cancelledBy, cancelledAt. Lifecycle: DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED.
+- **LeaveBalance**: id, employeeId, leaveTypeCode, periodStart, periodEnd, entitledDays, usedDays, pendingDays, available (computed = entitledDays - usedDays - pendingDays). Lifecycle: OPEN, CLOSED.
+- **LeavePolicy**: id, leaveTypeCode, policyName, annualEntitlementDays, accrualPeriodMonths, carryForwardDays, minNoticeDays, maxRequestDays, requiresManagerApproval, effectiveFrom, effectiveTo, status. Lifecycle: DRAFT, ACTIVE, SUPERSEDED.
+
+## Conceptual tables (no DDL)
+- **employees**: id, employee_number, first_name, last_name, email, password_hash, role, manager_id, department, hire_date, termination_date, employment_status. PK id. FK manager_id -> employees.id. Indexes: email unique, employee_number unique, manager_id (new).
+- **leave_requests**: id, employee_id, leave_type_code, start_date, end_date, requested_days, reason, status, approver_id, approval_comment, submitted_at, decided_at, cancelled_by, cancelled_at. PK id. FKs employee_id -> employees.id, leave_type_code -> leave_types.code, approver_id -> employees.id, cancelled_by -> employees.id. Indexes: employee_id, status, (employee_id, status), (leave_type_code, start_date).
+- **leave_balances**: id, employee_id, leave_type_code, period_start, period_end, entitled_days, used_days, pending_days. PK id. FKs employee_id -> employees.id, leave_type_code -> leave_types.code. Indexes: unique (employee_id, leave_type_code, period_start, period_end), employee_id.
+- **leave_policies**: id, leave_type_code, policy_name, annual_entitlement_days, accrual_period_months, carry_forward_days, min_notice_days, max_request_days, requires_manager_approval, effective_from, effective_to, status. PK id. FK leave_type_code -> leave_types.code. Index: leave_type_code.
+- **leave_types**: code, name. PK code. Referenced by leave_requests and leave_balances.
+
+Only schema change: nullable `password_hash` on `employees` (text contract, `t.text(...)`).
+
+## Repository interfaces and concrete implementations
+- **IEmployeeRepository / PgEmployeeRepository**: create, findById, findByEmployeeNumber, findByEmail, findByManagerId (new).
+- **ILeaveRepository / PgLeaveRequestRepository**: create, findById, update, findByQuery (extended to honour `employeeIds?: string[]` via `employee_id = ANY($n)`).
+- **IPolicyRepository / PgLeavePolicyRepository**: create, findById, findByLeaveTypeCode, findAll.
+- **IBalanceRepository / PgLeaveBalanceRepository**: create, findById, findByKey, update.
+- **IPolicyService / PolicyService**: createLeavePolicy, getLeavePolicyById, getPolicyByLeaveTypeCode, getActivePolicies(asOf) (new).
+- **IAuthService / AuthService**: login(email, password) (new).
+- **IEmployeeService**: createEmployee, getEmployeeById, getEmployeeByEmail (new), getEmployeesByManagerId (new).
+- **IBalanceService**: openPeriod, carryForward, getBalance, getBalanceById, getBalancesForEmployee (new).
+- **ILeaveService**: create, submit, approve, reject, cancel, list(actor, query) (new), getById(actor, requestId) (new).
+
+## Module boundaries
+- **shared-date** (`src/shared/date/accrual.ts`): startOfUtcDay, addMonths, periodContaining.
+- **shared-types** (`src/shared/types/index.ts`): LeaveRequestQueryParams gains employeeIds.
+- **shared-auth** (`src/shared/auth/index.ts`): registerAuth hook, signToken, verifyToken, PUBLIC_PATHS.
+- **shared-errors**: error classes and response shape.
+- **shared-db** (`src/shared/db/connection.ts`): defaultPool, UTC DATE parsing.
+- **auth** (`src/modules/auth/`): login service, POST /auth/login, body parsing.
+- **employee** (`src/modules/employee/`): passwordHash, findByManagerId, getEmployeeByEmail, getEmployeesByManagerId, GET /employees/me.
+- **policy** (`src/modules/policy/`): getActivePolicies, createPolicyService factory.
+- **balance** (`src/modules/balance/`): getBalancesForEmployee, BalanceSummary, GET /balances/me.
+- **leave** (`src/modules/leave/`): list, getById, findByQuery employeeIds, GET /leaves, GET /leaves/:id.
+- Existing unchanged modules: leave-type, audit, notification, validation.
+
+## Dependency map
+- auth -> employee, shared-auth, shared-errors, shared-types
+- employee -> shared-types, shared-errors, shared-db
+- policy -> leave-type, shared-types, shared-errors, shared-db
+- balance -> employee, policy, shared-date, shared-types, shared-errors, shared-db
+- leave -> balance, employee, policy, audit, notification, validation, shared-date, shared-types, shared-errors, shared-db
+- shared-date -> shared-types
+
+## Cross-cutting contracts
+- **Auth contract**: `request.user: { id: string; role: EmployeeRole }` where `EmployeeRole = 'EMPLOYEE' | 'MANAGER' | 'ADMIN'`. Identity/role obtained from a JWT bearer token verified by the existing `registerAuth` preHandler hook (`src/shared/auth/index.ts`), which decodes `sub` -> id and `role` and populates `request.user`; missing/invalid token -> 401 UnauthorizedError. RBAC enforced at the API boundary via `resolveActor` and in services (leave visibility scoping). `POST /auth/login` is the sole public endpoint added to `PUBLIC_PATHS`.
+- **Error contract**: errors return `{ error: string; code: string }`. Validation failure -> 400 ValidationError; authentication failure -> 401 UnauthorizedError; authorization failure -> 403 ForbiddenError; not found -> 404 NotFoundError (GET /leaves/:id returns the SAME 404 for invisible and nonexistent ids); invalid state -> 409 ConflictError; other -> 500 `{ error: 'Internal Server Error' }`. Login failure (wrong email OR password) returns a single indistinguishable 401.
+- **Transaction contract**: EMPTY — this feature is read-only plus a single-read login (bcrypt compare + token mint). No multi-step writes exist, so no unit-of-work contract is introduced. Existing write endpoints and their PgUnitOfWork semantics are unchanged.
+
+## Recommended phases
+1. Shared foundations: accrual date helpers + query param extension (3 files).
+2. Employee: password_hash migration, findByManagerId, service methods (5 files).
+3. Policy: getActivePolicies service exposure (2 files).
+4. Auth module: login service + POST /auth/login + public path (4 files).
+5. Balance: getBalancesForEmployee + GET /balances/me (3 files).
+6. Leave reads: findByQuery employeeIds, list/getById, GET /leaves + /leaves/:id (4 files).
+7. Employee /me route + smoke check extension + unit tests (5 files).
+
+## Open questions
+1. GET /balances/me available computation when no balance row exists for a policy's current period — synthesize entry vs omit leave type.
+2. GET /leaves/:id visibility for a MANAGER whose direct report's request is APPROVED/REJECTED/CANCELLED vs DRAFT/SUBMITTED — status-unrestricted vs SUBMITTED-only.
+<!-- gestalt:architecture feature=ddd25cae-d790-4d70-9054-a1e5f568359f END -->
