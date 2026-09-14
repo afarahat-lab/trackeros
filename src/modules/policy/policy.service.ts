@@ -43,6 +43,33 @@ export class PolicyService implements IPolicyService {
     return policy;
   }
 
+  /**
+   * Returns the single policy in effect per leaveTypeCode at `asOf`, or an empty
+   * array when no policy matches. A policy is in effect when status is ACTIVE,
+   * effectiveFrom <= asOf, and (effectiveTo is null OR effectiveTo >= asOf); when
+   * multiple rows still match, the latest effectiveFrom wins.
+   */
+  async listEffectivePolicies(asOf: Date): Promise<LeavePolicy[]> {
+    const rows = await this.repository.findAll();
+
+    const filtered = rows.filter((p) => {
+      if (p.status !== LeavePolicyStatus.ACTIVE) return false;
+      if (p.effectiveFrom.getTime() > asOf.getTime()) return false;
+      if (p.effectiveTo !== null && p.effectiveTo.getTime() < asOf.getTime()) return false;
+      return true;
+    });
+
+    const byType = new Map<LeaveTypeCode, LeavePolicy>();
+    for (const policy of filtered) {
+      const current = byType.get(policy.leaveTypeCode);
+      if (!current || policy.effectiveFrom.getTime() > current.effectiveFrom.getTime()) {
+        byType.set(policy.leaveTypeCode, policy);
+      }
+    }
+
+    return [...byType.values()];
+  }
+
   private validate(input: CreateLeavePolicyInput): void {
     if (typeof input.policyName !== 'string' || input.policyName.trim() === '') {
       throw new ValidationError('Invalid policyName');

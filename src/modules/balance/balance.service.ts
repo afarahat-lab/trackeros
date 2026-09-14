@@ -6,6 +6,7 @@ import { IEmployeeService } from '../employee';
 import { IPolicyService } from '../policy';
 import { LeaveBalance, CreateLeaveBalanceInput } from './balance.model';
 import { IBalanceRepository } from './balance.repository';
+import { addMonths, periodContaining } from '../../shared/date/accrual';
 
 export interface OpenBalancePeriodInput {
   employeeId: string;
@@ -18,6 +19,16 @@ export interface CarryForwardInput {
   sourceBalanceId: string;
 }
 
+export interface BalanceEntry {
+  leaveTypeCode: LeaveTypeCode;
+  periodStart: Date;
+  periodEnd: Date;
+  entitledDays: number;
+  usedDays: number;
+  pendingDays: number;
+  available: number;
+}
+
 export interface IBalanceService {
   openPeriod(input: OpenBalancePeriodInput): Promise<LeaveBalance>;
   carryForward(input: CarryForwardInput): Promise<LeaveBalance>;
@@ -28,6 +39,7 @@ export interface IBalanceService {
     periodEnd: Date
   ): Promise<LeaveBalance | null>;
   getBalanceById(id: string): Promise<LeaveBalance>;
+  getBalanceForEmployee(employeeId: string): Promise<BalanceEntry[]>;
 }
 
 export class BalanceService implements IBalanceService {
@@ -107,7 +119,7 @@ export class BalanceService implements IBalanceService {
       const carry = Math.min(unused, policy.carryForwardDays);
 
       const nextPeriodStart = source.periodEnd;
-      const nextPeriodEnd = this.addMonths(source.periodEnd, policy.accrualPeriodMonths);
+      const nextPeriodEnd = addMonths(source.periodEnd, policy.accrualPeriodMonths);
 
       const existingNext = await this.repository.findByKey(
         source.employeeId,
@@ -158,6 +170,37 @@ export class BalanceService implements IBalanceService {
     return balance;
   }
 
+  async getBalanceForEmployee(employeeId: string): Promise<BalanceEntry[]> {
+    const employee = await this.employeeService.getEmployeeById(employeeId);
+    const policies = await this.policyService.listEffectivePolicies(new Date());
+
+    const entries: BalanceEntry[] = [];
+    for (const policy of policies) {
+      const period = periodContaining(employee.hireDate, policy.accrualPeriodMonths, new Date());
+      const balance = await this.repository.findByKey(
+        employeeId,
+        policy.leaveTypeCode,
+        period.start,
+        period.end,
+      );
+
+      entries.push({
+        leaveTypeCode: policy.leaveTypeCode,
+        periodStart: period.start,
+        periodEnd: period.end,
+        entitledDays: balance?.entitledDays ?? 0,
+        usedDays: balance?.usedDays ?? 0,
+        pendingDays: balance?.pendingDays ?? 0,
+        available:
+          (balance?.entitledDays ?? 0) -
+          (balance?.usedDays ?? 0) -
+          (balance?.pendingDays ?? 0),
+      });
+    }
+
+    return entries;
+  }
+
   private validateOpenInput(input: OpenBalancePeriodInput): void {
     if (typeof input.employeeId !== 'string' || input.employeeId.trim() === '') {
       throw new ValidationError('Invalid employeeId');
@@ -178,17 +221,5 @@ export class BalanceService implements IBalanceService {
     if (input.periodStart.getTime() >= input.periodEnd.getTime()) {
       throw new ValidationError('periodStart must be before periodEnd');
     }
-  }
-
-  private addMonths(date: Date, months: number): Date {
-    const result = new Date(date.getTime());
-    const day = result.getUTCDate();
-    result.setUTCDate(1);
-    result.setUTCMonth(result.getUTCMonth() + months);
-    const lastDay = new Date(
-      Date.UTC(result.getUTCFullYear(), result.getUTCMonth() + 1, 0)
-    ).getUTCDate();
-    result.setUTCDate(Math.min(day, lastDay));
-    return result;
   }
 }
