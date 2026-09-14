@@ -43,6 +43,30 @@ export class PolicyService implements IPolicyService {
     return policy;
   }
 
+  async getActivePolicies(asOf: Date): Promise<LeavePolicy[]> {
+    const all = await this.repository.findAll();
+
+    const activeByCode = new Map<LeaveTypeCode, LeavePolicy>();
+    for (const policy of all) {
+      if (policy.status !== LeavePolicyStatus.ACTIVE) {
+        continue;
+      }
+      if (policy.effectiveFrom > asOf) {
+        continue;
+      }
+      if (policy.effectiveTo !== null && policy.effectiveTo < asOf) {
+        continue;
+      }
+
+      const existing = activeByCode.get(policy.leaveTypeCode);
+      if (!existing || policy.effectiveFrom > existing.effectiveFrom) {
+        activeByCode.set(policy.leaveTypeCode, policy);
+      }
+    }
+
+    return Array.from(activeByCode.values());
+  }
+
   private validate(input: CreateLeavePolicyInput): void {
     if (typeof input.policyName !== 'string' || input.policyName.trim() === '') {
       throw new ValidationError('Invalid policyName');

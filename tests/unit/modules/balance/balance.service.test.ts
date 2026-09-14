@@ -110,6 +110,10 @@ class FakePolicyService implements IPolicyService {
     }
     return policy;
   }
+
+  async getActivePolicies(): Promise<LeavePolicy[]> {
+    return this.rows.filter((p) => p.status === LeavePolicyStatus.ACTIVE);
+  }
 }
 
 class FakeUnitOfWork implements IUnitOfWork {
