@@ -1,0 +1,97 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "balance",
+      "policy",
+      "leave-type"
+    ],
+    "affectedLayers": [
+      "service",
+      "module-boundary"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "No file under src/modules/balance/ imports the leave-type module (no `from '../leave-type'` or `from '../../modules/leave-type'` import anywhere in the balance module's own source), and `tsc --noEmit` passes.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The balance module's service factory (the wiring path reachable from balance.routes.ts) constructs a PolicyService without the balance module importing or instantiating LeaveTypeService or PgLeaveTypeRepository; the leave-type dependency is supplied from within the policy module.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "GET /balances/me still returns the same list of BalanceEntry values (leaveTypeCode, periodStart, periodEnd, entitledDays, usedDays, pendingDays, available) for the same seeded data, and the existing balance service unit tests pass unchanged.",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "The balance module's only cross-module dependencies remain employee, policy, shared-types, shared-errors, shared-db, and shared-date (per the reconciled dependency map). It must not gain a direct dependency on leave-type.",
+    "All cross-module imports go through the target module's public entry point (index.ts), never its internals.",
+    "This is a wiring/dependency refactor only: no change to the observable behaviour of getBalanceForEmployee, openPeriod, carryForward, or the GET /balances/me route."
+  ],
+  "outOfScope": [
+    "No change to the GET /balances/me route handler, resolveActor/sendError helpers, or the balance service's business logic (getBalanceForEmployee/openPeriod/carryForward).",
+    "No change to the leave module's own leave-type import (leave.service.ts) \u2014 that dependency is allowed and out of scope for this phase.",
+    "No new tests, migrations, or schema changes; no changes to the policy service's business rules or the leave-type module's internals."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "BalanceEntry",
+      "mustExistOrExtend": true,
+      "invariant": "Shape and computation are unchanged: available === entitledDays - usedDays - pendingDays, and periodStart/periodEnd come from the found balance row (not the computed period)."
+    },
+    {
+      "entity": "PolicyService",
+      "mustExistOrExtend": true,
+      "invariant": "PolicyService still receives its ILeaveTypeService collaborator via constructor injection and still enforces the leaveTypeCode-references-existing-leave-type invariant; the refactor only changes who supplies that collaborator, not the invariant."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "createPolicyService (policy module factory)",
+      "authRule": "n/a (internal wiring, no auth)",
+      "idempotent": true,
+      "errorSemantics": "Returns a fully-wired IPolicyService; no new error semantics."
+    },
+    {
+      "operation": "createBalanceService (balance module factory)",
+      "authRule": "n/a (internal wiring, no auth)",
+      "idempotent": true,
+      "errorSemantics": "Returns a fully-wired IBalanceService; must not import or construct leave-type collaborators."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The balance module must continue to obtain its IPolicyService through the policy module's public entry point, matching the existing import `import { IPolicyService, createPolicyService } from '../policy'` in balance.service.ts.",
+      "referencePath": "src/modules/balance/balance.service.ts"
+    },
+    {
+      "requirement": "The policy module's factory must keep the same signature and return type (IPolicyService) so balance.service.ts's `createPolicyService()` call site remains valid without change.",
+      "referencePath": "src/modules/policy/policy.service.ts"
+    },
+    {
+      "requirement": "The leave-type module's public entry point must keep exporting ILeaveTypeService, LeaveTypeService, and PgLeaveTypeRepository so the policy module can continue to supply them internally.",
+      "referencePath": "src/modules/leave-type/index.ts"
+    },
+    {
+      "requirement": "The reconciled dependency map (balance \u2192 employee, policy, shared-types, shared-errors, shared-db, shared-date) must remain the authoritative boundary; the implementation must not introduce a balance \u2192 leave-type edge.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/policy/index.ts (createPolicyService)",
+      "why": "The balance module's factory must obtain a fully-wired IPolicyService from here so the leave-type dependency stays inside the policy module."
+    },
+    {
+      "target": "src/modules/leave-type/index.ts",
+      "why": "The policy module continues to source ILeaveTypeService/LeaveTypeService/PgLeaveTypeRepository from here; the balance module must not."
+    }
+  ]
+}
