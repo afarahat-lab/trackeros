@@ -543,4 +543,22 @@ This phase delivers the leave read surface's repository and service layers (sub-
 **Divergences from the plan worth noting:**
 - PLAN.md Phase 6 prescribed a single phase delivering the repository extension, the service methods, AND the `GET /leaves` / `GET /leaves/:id` routes. The implementation split it into sub-phases: this phase (6.1) delivers only the repository + service layers; the routes (6.2) and tests (6.3) are deferred and not yet present.
 - No routes, no tests, and no audit-log writes (GP-002) — this phase is read-only (list/getById never open a transaction or forward a client).
+
+### Phase 6.2 delivered (leave read routes: GET /leaves + GET /leaves/:id)
+
+This phase delivers the HTTP surface for the leave read endpoints (sub-phase 6.2), consuming the `list`/`getById` service methods and the `findByQuery` `employeeIds` support delivered in 6.1. The read tests (sub-phase 6.3) are not yet implemented.
+
+**routes** — `leaveRoutes(fastify)` in `src/modules/leave/leave.routes.ts` gained two GET endpoints, `GET /leaves` and `GET /leaves/:id` (both 200), following the existing conventions exactly: no controller file (the route calls `leaveService.list(actor, query)` / `leaveService.getById(actor, id)` directly), `resolveActor` extracts `request.user` and enforces role membership at the API boundary (UnauthorizedError on missing/invalid actor), `sendError` maps `AppError` to `{ error, code }` with the correct status and any other throw to 500, and the service instance is resolved from `fastify.leaveService` if present, else `createLeaveService()`. Both handlers wrap the call in try/catch → `request.log.error` → `sendError`.
+
+**query parsing** — a new private `parseListQuery(query: Record<string, unknown>): LeaveRequestQueryParams` helper validates the wire query string before it reaches the service (GP-003), reusing the existing `toDate` helper (from `parseCreateBody`) rather than introducing a parallel date parser:
+
+- `status` — when present, must be a string and a member of `LeaveStatus`, else `ValidationError('status must be one of the valid leave statuses')`.
+- `leaveTypeCode` — when present, must be a string and a member of `LeaveTypeCode`, else `ValidationError('leaveTypeCode must be one of the valid leave type codes')`.
+- The four date bounds (`startDateFrom`/`startDateTo`/`endDateFrom`/`endDateTo`) are each converted via the existing `toDate(value, field)` helper (Date passthrough, string/number required, invalid date → `ValidationError`).
+- `limit`/`offset` are parsed by a private `parseIntParam` helper: `undefined` when absent, else `Number.parseInt(String(value), 10)`, throwing `ValidationError('<field> must be an integer')` on NaN/non-integer.
+- The parsed object never carries `employeeIds` — the visibility scope is resolved by the service from the actor, so a client-supplied `employeeIds` cannot reach the service.
+
+**Divergences from the plan worth noting:**
+- None material — this phase matches PLAN.md Phase 6's route portion and the spec's success criteria. The spec's constraint to "reuse the existing resolveActor, sendError, and the toDate helper pattern" is satisfied: `resolveActor`/`sendError`/`toDate` are reused unchanged, and the only new helper is `parseListQuery` (a query-string parser, not a parallel actor/error/date helper).
+- No tests were delivered (owned by sub-phase 6.3), and no route mounting changed in `src/app.ts` (`leaveRoutes` was already mounted).
 <!-- gestalt:architecture feature=ddd25cae-d790-4d70-9054-a1e5f568359f END -->
