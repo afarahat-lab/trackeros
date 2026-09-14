@@ -1,0 +1,103 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "auth",
+      "shared-auth",
+      "employee"
+    ],
+    "affectedLayers": [
+      "service",
+      "routes",
+      "shared"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "A login operation exists that, given a valid email + password, returns a signed JWT whose verified payload has `sub` equal to the employee id and `role` equal to the employee role, plus the employee profile with `passwordHash`/`password_hash` absent.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Wrong email, wrong password, and a null stored password hash are indistinguishable: each produces a single UnauthorizedError with message 'Invalid email or password' (status 401, code UNAUTHORIZED).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The login route parses the wire body as unknown and rejects missing/non-string/empty `email` or `password` with a ValidationError (status 400, code VALIDATION_ERROR) \u2014 never via an unchecked cast.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "'/auth/login' is added to PUBLIC_PATHS so the endpoint is reachable without a bearer token, while the token contract (sub/role) and signToken/verifyToken semantics are unchanged.",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "Use only bcrypt (^5.0.1) and jsonwebtoken (^8.5.1) already in package.json \u2014 no new libraries.",
+    "The token payload must be produced via signToken({ id, role }) from src/shared/auth; do not re-implement signing or alter the sub/role contract.",
+    "Never return passwordHash/password_hash in any response body \u2014 the returned employee must be stripped of it.",
+    "Do not mount authRoutes in src/app.ts in this phase (deferred to Phase 7).",
+    "Follow the no-any rule: parse request.body as unknown with type guards, not `request.body as SomeDto`."
+  ],
+  "outOfScope": [
+    "Mounting authRoutes in src/app.ts (Phase 7).",
+    "Token refresh, logout, password reset/change, and registration endpoints.",
+    "Changing the JWT token contract (sub/role) or signToken/verifyToken semantics."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "AuthService",
+      "mustExistOrExtend": true,
+      "invariant": "login(email, password) resolves to { token, employee } only when the email exists AND passwordHash is non-null AND bcrypt.compare is true; any other credential state throws UnauthorizedError('Invalid email or password')."
+    },
+    {
+      "entity": "Employee (returned profile)",
+      "mustExistOrExtend": true,
+      "invariant": "The employee returned from login is the profile with passwordHash stripped; password_hash must never appear in any response body."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "login(email: string, password: string): Promise<{ token: string; employee: Employee }>",
+      "authRule": "Public (unauthenticated) \u2014 reachable without a bearer token via PUBLIC_PATHS.",
+      "idempotent": false,
+      "errorSemantics": "NotFoundError, null passwordHash, and bcrypt mismatch all collapse to UnauthorizedError('Invalid email or password') (401/UNAUTHORIZED); invalid body \u2192 ValidationError (400/VALIDATION_ERROR)."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Token payload must match what verifyToken reads: signToken({ id: employee.id, role: employee.role }) so `sub` = id and `role` = role.",
+      "referencePath": "src/shared/auth/index.ts"
+    },
+    {
+      "requirement": "Error mapping must reuse the AppError \u2192 { error, code } shape with correct status (sendError pattern).",
+      "referencePath": "src/modules/leave/leave.routes.ts"
+    },
+    {
+      "requirement": "Employee lookup must go through IEmployeeService.getEmployeeByEmail, which throws NotFoundError when absent.",
+      "referencePath": "src/modules/employee/employee.service.interface.ts"
+    },
+    {
+      "requirement": "Use UnauthorizedError and ValidationError from the shared error contract (status 401/400, codes UNAUTHORIZED/VALIDATION_ERROR).",
+      "referencePath": "src/shared/errors/index.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/auth/index.ts",
+      "why": "signToken for minting the token and PUBLIC_PATHS for making login reachable without a token."
+    },
+    {
+      "target": "src/modules/employee/index.ts",
+      "why": "IEmployeeService.getEmployeeByEmail and the Employee model for credential lookup and profile return."
+    },
+    {
+      "target": "src/shared/errors/index.ts",
+      "why": "UnauthorizedError and ValidationError for credential and body-validation failures."
+    }
+  ]
+}
