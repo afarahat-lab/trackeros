@@ -33,6 +33,10 @@ class FakeEmployeeRepository implements IEmployeeRepository {
   async findByEmail(email: string): Promise<Employee | null> {
     return this.rows.find((e) => e.email === email) ?? null;
   }
+
+  async findByManagerId(managerId: string): Promise<Employee[]> {
+    return this.rows.filter((e) => e.managerId === managerId);
+  }
 }
 
 function makeInput(overrides: Partial<CreateEmployeeInput> = {}): CreateEmployeeInput {
@@ -47,6 +51,7 @@ function makeInput(overrides: Partial<CreateEmployeeInput> = {}): CreateEmployee
     hireDate: new Date('2020-01-01T00:00:00.000Z'),
     terminationDate: null,
     employmentStatus: EmploymentStatus.ACTIVE,
+    passwordHash: null,
     ...overrides,
   };
 }
@@ -110,6 +115,48 @@ describe('EmployeeService', () => {
 
     it('throws NotFoundError when the id is unknown', async () => {
       await expect(service.getEmployeeById('nonexistent')).rejects.toThrow(NotFoundError);
+    });
+  });
+
+  describe('getEmployeeByEmail', () => {
+    it('returns the employee when found', async () => {
+      const created = await service.createEmployee(makeInput());
+      const found = await service.getEmployeeByEmail(created.email);
+
+      expect(found).toEqual(created);
+    });
+
+    it('throws NotFoundError when the email is unknown', async () => {
+      await expect(service.getEmployeeByEmail('unknown@example.com')).rejects.toThrow(
+        NotFoundError
+      );
+    });
+  });
+
+  describe('getEmployeesByManagerId', () => {
+    it('returns only the direct reports of the given manager', async () => {
+      const manager = await service.createEmployee(makeInput({ email: 'manager@example.com' }));
+      const report = await service.createEmployee(
+        makeInput({
+          employeeNumber: 'EMP-002',
+          email: 'report@example.com',
+          managerId: manager.id,
+        })
+      );
+      await service.createEmployee(
+        makeInput({ employeeNumber: 'EMP-003', email: 'other@example.com' })
+      );
+
+      const reports = await service.getEmployeesByManagerId(manager.id);
+
+      expect(reports).toHaveLength(1);
+      expect(reports[0]).toEqual(report);
+    });
+
+    it('returns an empty array when the manager has no direct reports', async () => {
+      const reports = await service.getEmployeesByManagerId('no-such-manager');
+
+      expect(reports).toEqual([]);
     });
   });
 });

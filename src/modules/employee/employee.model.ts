@@ -12,6 +12,7 @@ export interface Employee {
   hireDate: Date;
   terminationDate: Date | null;
   employmentStatus: EmploymentStatus;
+  passwordHash: string | null;
 }
 
 export type CreateEmployeeInput = Omit<Employee, 'id'>;

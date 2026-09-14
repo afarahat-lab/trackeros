@@ -214,6 +214,18 @@ class FakeEmployeeService implements IEmployeeService {
     }
     return employee;
   }
+
+  async getEmployeeByEmail(email: string): Promise<Employee> {
+    const employee = this.rows.find((e) => e.email === email);
+    if (!employee) {
+      throw new NotFoundError('Employee not found');
+    }
+    return employee;
+  }
+
+  async getEmployeesByManagerId(managerId: string): Promise<Employee[]> {
+    return this.rows.filter((e) => e.managerId === managerId);
+  }
 }
 
 class FakePolicyService implements IPolicyService {
@@ -281,6 +293,7 @@ function makeEmployee(id = REQUESTER_ID, overrides: Partial<Employee> = {}): Emp
     hireDate: new Date('2020-01-01T00:00:00Z'),
     terminationDate: null,
     employmentStatus: EmploymentStatus.ACTIVE,
+    passwordHash: null,
     ...overrides,
   };
 }
