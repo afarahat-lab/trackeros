@@ -1,0 +1,113 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "routes"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The list read endpoint returns HTTP 200 with the array produced by leaveService.list(actor, parsedQuery), where actor is resolved from request.user and parsedQuery is the validated LeaveRequestQueryParams.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "The single-read endpoint returns HTTP 200 with the LeaveRequest produced by leaveService.getById(actor, id), where id is read from the route params and actor is resolved from request.user.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "Wire query strings are parsed and validated before reaching the service: status and leaveTypeCode are rejected with ValidationError unless they are members of LeaveStatus / LeaveTypeCode; the four date bounds are converted via a toDate-style helper that throws ValidationError on invalid dates; limit and offset are parsed as integers when present and left undefined when absent.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The actor is always derived from request.user via the existing resolveActor helper; no client-supplied actor/employee id is accepted for either read endpoint.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Any AppError thrown by parsing or the service is mapped through the existing sendError helper inside a try/catch that also logs via request.log.error, preserving the { error, code } contract and status codes.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Do not mount any new routes in src/app.ts \u2014 leaveRoutes is already mounted; only add handlers inside src/modules/leave/leave.routes.ts.",
+    "Do not implement or modify leaveService.list / getById or the repository findByQuery \u2014 they are owned by sibling sub-phase 6.1 and already exist; this sub-phase only consumes them.",
+    "Reuse the existing resolveActor, sendError, and the toDate helper pattern from parseCreateBody rather than introducing parallel helpers.",
+    "No unit/integration test files may be created in this sub-phase (owned by sibling 6.3); the gate must not require test existence or coverage."
+  ],
+  "outOfScope": [
+    "Sub-phase 6.1 \u2014 Repository findByQuery employeeIds + Service list/getById (src/modules/leave/leave.repository.ts, src/modules/leave/leave.service.ts).",
+    "Sub-phase 6.3 \u2014 Tests for leave reads (leave.repository.test.ts, leave.service.test.ts, leave.routes.test.ts); no test files or coverage requirements here.",
+    "Any change to src/app.ts route mounting or to the shared types/enums in src/shared/types/index.ts."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequestQueryParams",
+      "mustExistOrExtend": true,
+      "invariant": "A parsed query object passed to the service must contain only typed values: status/leaveTypeCode as enum members, the four date bounds as Date, limit/offset as integers or undefined, and must never carry a client-supplied employeeIds (visibility scope is resolved by the service from the actor)."
+    },
+    {
+      "entity": "LeaveActor",
+      "mustExistOrExtend": true,
+      "invariant": "The actor for read operations is derived solely from request.user via resolveActor and is never synthesized from query/body/param input."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "leaveService.list(actor, query)",
+      "authRule": "Requires an authenticated actor resolved from request.user; visibility scope is enforced inside the service by role (EMPLOYEE self-only, MANAGER self+direct reports, ADMIN all).",
+      "idempotent": true,
+      "errorSemantics": "Read-only; returns LeaveRequest[] or throws AppError (UnauthorizedError/ForbiddenError) mapped via sendError."
+    },
+    {
+      "operation": "leaveService.getById(actor, requestId)",
+      "authRule": "Requires an authenticated actor resolved from request.user; out-of-scope requests are indistinguishable from missing (NotFoundError).",
+      "idempotent": true,
+      "errorSemantics": "Read-only; returns LeaveRequest or throws NotFoundError/UnauthorizedError mapped via sendError."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The parsed query object must conform to the LeaveRequestQueryParams shape (status/leaveTypeCode enums, Date bounds, integer limit/offset) declared in src/shared/types/index.ts.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "Enum membership validation must match the exact LeaveStatus and LeaveTypeCode values defined in src/shared/types/index.ts.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "Date parsing must mirror the toDate(value, field) helper semantics in parseCreateBody (Date passthrough, string/number required, invalid date \u2192 ValidationError).",
+      "referencePath": "src/modules/leave/leave.routes.ts"
+    },
+    {
+      "requirement": "Error mapping must reuse sendError and the AppError subclasses (ValidationError 400, UnauthorizedError 401, NotFoundError 404) defined in src/shared/errors/index.ts.",
+      "referencePath": "src/shared/errors/index.ts"
+    },
+    {
+      "requirement": "Handlers must call leaveService.list(actor, query) and leaveService.getById(actor, id) with the exact signatures declared in ILeaveService.",
+      "referencePath": "src/modules/leave/leave.service.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/leave/leave.service.ts (ILeaveService.list / getById)",
+      "why": "The read handlers delegate to these already-implemented service methods; the route layer must not re-implement visibility or data access."
+    },
+    {
+      "target": "src/shared/types/index.ts (LeaveStatus, LeaveTypeCode, LeaveRequestQueryParams)",
+      "why": "Enum membership validation and the parsed query shape are defined here."
+    },
+    {
+      "target": "src/shared/errors/index.ts (AppError, ValidationError, UnauthorizedError, NotFoundError)",
+      "why": "sendError maps these typed errors to the { error, code } HTTP contract."
+    }
+  ]
+}
