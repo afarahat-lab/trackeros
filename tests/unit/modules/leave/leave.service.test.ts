@@ -44,6 +44,7 @@ import {
   EmploymentStatus,
   CreateLeaveRequestDto,
   UpdateLeaveRequestDto,
+  LeaveRequestQueryParams,
 } from '../../../../src/shared/types';
 
 // ---------------------------------------------------------------------------
@@ -55,6 +56,7 @@ class FakeLeaveRepository implements ILeaveRepository {
   createCalls: { input: CreateLeaveRequestInput; client?: PoolClient }[] = [];
   updateCalls: { id: string; changes: UpdateLeaveRequestDto; client?: PoolClient }[] = [];
   findByIdCalls: { id: string; client?: PoolClient }[] = [];
+  findByQueryCalls: LeaveRequestQueryParams[] = [];
   private idCounter = 0;
 
   async create(input: CreateLeaveRequestInput, client?: PoolClient): Promise<LeaveRequest> {
@@ -84,7 +86,11 @@ class FakeLeaveRepository implements ILeaveRepository {
     return { ...this.rows[index] };
   }
 
-  async findByQuery(): Promise<LeaveRequest[]> {
+  async findByQuery(
+    params: LeaveRequestQueryParams,
+    _client?: PoolClient
+  ): Promise<LeaveRequest[]> {
+    this.findByQueryCalls.push(params);
     return [...this.rows];
   }
 }
@@ -942,5 +948,149 @@ describe('LeaveService concurrency and atomicity guarantees', () => {
     auditService.failNext = true;
     await expect(service.create(makeActor(), makeDto())).rejects.toThrow('audit insert failed');
     expect(uow.rolledBack).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Read surface: list and getById
+// ---------------------------------------------------------------------------
+
+describe('LeaveService list and getById (read surface)', () => {
+  let repository: FakeLeaveRepository;
+  let service: LeaveService;
+
+  function buildService(employees: Employee[]): LeaveService {
+    return new LeaveService(
+      repository,
+      new FakeBalanceRepository(),
+      new FakeAuditService(),
+      new FakeNotificationService(),
+      new FakeValidationService(),
+      new FakeEmployeeService(employees),
+      new FakePolicyService([makePolicy()]),
+      new FakeUnitOfWork()
+    );
+  }
+
+  beforeEach(() => {
+    repository = new FakeLeaveRepository();
+    const employees = [
+      makeEmployee(REQUESTER_ID),
+      makeEmployee(MANAGER_ID, { role: EmployeeRole.MANAGER }),
+    ];
+    service = buildService(employees);
+  });
+
+  describe('list', () => {
+    it('scopes an EMPLOYEE to only their own requests', async () => {
+      await service.list(makeActor(), { status: LeaveStatus.DRAFT });
+
+      expect(repository.findByQueryCalls).toHaveLength(1);
+      expect(repository.findByQueryCalls[0].employeeIds).toEqual(['emp-1']);
+      expect(repository.findByQueryCalls[0].status).toBe(LeaveStatus.DRAFT);
+    });
+
+    it('scopes a MANAGER to themselves plus one-level direct reports only', async () => {
+      const directReport = makeEmployee('emp-2', { managerId: MANAGER_ID });
+      const secondLevel = makeEmployee('emp-3', { managerId: 'emp-2' });
+      const otherManager = makeEmployee('mgr-2', { role: EmployeeRole.MANAGER, managerId: MANAGER_ID });
+      const elsewhere = makeEmployee('emp-4', { managerId: 'mgr-2' });
+      service = buildService([
+        makeEmployee(MANAGER_ID, { role: EmployeeRole.MANAGER, managerId: 'top-boss' }),
+        directReport,
+        secondLevel,
+        otherManager,
+        elsewhere,
+      ]);
+
+      const manager = makeActor({ id: MANAGER_ID, role: EmployeeRole.MANAGER });
+      await service.list(manager, {});
+
+      expect(repository.findByQueryCalls).toHaveLength(1);
+      expect(repository.findByQueryCalls[0].employeeIds).toEqual([
+        MANAGER_ID,
+        'emp-2',
+        'mgr-2',
+      ]);
+      expect(repository.findByQueryCalls[0].employeeIds).not.toContain('emp-3');
+      expect(repository.findByQueryCalls[0].employeeIds).not.toContain('emp-4');
+    });
+
+    it('scopes an ADMIN to no filter (original query unchanged)', async () => {
+      const admin = makeActor({ id: 'admin-1', role: EmployeeRole.ADMIN });
+      await service.list(admin, { status: LeaveStatus.SUBMITTED });
+
+      expect(repository.findByQueryCalls).toHaveLength(1);
+      expect(repository.findByQueryCalls[0].employeeIds).toBeUndefined();
+      expect(repository.findByQueryCalls[0].status).toBe(LeaveStatus.SUBMITTED);
+    });
+
+    it('delegates to repository.findByQuery and returns its rows', async () => {
+      const request = makeRequest({ status: LeaveStatus.DRAFT });
+      repository.rows = [request];
+
+      const result = await service.list(makeActor(), {});
+
+      expect(result).toEqual([request]);
+    });
+
+    it('rejects a missing actor with UnauthorizedError', async () => {
+      await expect(service.list({ id: '', role: EmployeeRole.EMPLOYEE }, {})).rejects.toThrow(
+        UnauthorizedError
+      );
+    });
+
+    it('rejects an invalid actor role with ForbiddenError', async () => {
+      await expect(
+        service.list({ id: REQUESTER_ID, role: 'GUEST' as EmployeeRole }, {})
+      ).rejects.toThrow(ForbiddenError);
+    });
+  });
+
+  describe('getById', () => {
+    it('returns the request when it is visible to the actor', async () => {
+      const request = makeRequest();
+      repository.rows = [request];
+
+      const result = await service.getById(makeActor(), 'lr-1');
+
+      expect(result).toEqual(request);
+    });
+
+    it('throws NotFoundError when the request is missing', async () => {
+      repository.rows = [];
+      await expect(service.getById(makeActor(), 'lr-1')).rejects.toThrow(
+        'Leave request not found'
+      );
+    });
+
+    it('throws the same NotFoundError when the request exists but is out of scope', async () => {
+      repository.rows = [makeRequest({ employeeId: 'other-emp' })];
+
+      await expect(service.getById(makeActor(), 'lr-1')).rejects.toThrow(
+        'Leave request not found'
+      );
+    });
+
+    it.each([
+      ['APPROVED', LeaveStatus.APPROVED],
+      ['REJECTED', LeaveStatus.REJECTED],
+      ['CANCELLED', LeaveStatus.CANCELLED],
+    ])(
+      'makes a direct report request visible regardless of %s status',
+      async (_label, status) => {
+        const directReport = makeEmployee('emp-2', { managerId: MANAGER_ID });
+        service = buildService([
+          makeEmployee(MANAGER_ID, { role: EmployeeRole.MANAGER }),
+          directReport,
+        ]);
+        repository.rows = [makeRequest({ id: 'lr-1', employeeId: 'emp-2', status })];
+
+        const manager = makeActor({ id: MANAGER_ID, role: EmployeeRole.MANAGER });
+        const result = await service.getById(manager, 'lr-1');
+
+        expect(result.status).toBe(status);
+      }
+    );
   });
 });
