@@ -1,6 +1,9 @@
 import Fastify from 'fastify';
 import { uptimeRoutes } from './modules/uptime/uptime.routes';
 import { leaveRoutes } from './modules/leave';
+import { authRoutes } from './modules/auth';
+import { balanceRoutes } from './modules/balance';
+import { employeeRoutes } from './modules/employee';
 import { registerAuth } from './shared/auth';
 import { AppError } from './shared/errors';
 
@@ -14,6 +17,9 @@ registerAuth(app);
 // leave features built was unreachable. Mounting it is what makes the feature exist at
 // runtime rather than only in the module.
 app.register(uptimeRoutes);
+app.register(authRoutes);
+app.register(balanceRoutes);
+app.register(employeeRoutes);
 app.register(leaveRoutes);
 
 // A thrown AppError from a hook (e.g. UnauthorizedError from auth) must become its own
