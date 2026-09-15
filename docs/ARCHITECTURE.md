@@ -542,6 +542,16 @@ This phase delivers the employee profile route and the leave read-route unit tes
 - The plan prescribed "reuse resolveActor/sendError shape from `src/modules/leave/leave.routes.ts`"; the implementation uses local copies (matching the `balance.routes.ts`/`auth.routes.ts` precedent) rather than importing from `leave.routes.ts` — the shape is identical, but there is no shared helper module.
 - The plan's Phase 7 item (5) also prescribed a profile-route unit test; the profile route (`GET /employees/me`) has no dedicated route test — it is covered only indirectly by the `employee.service.test.ts` `getEmployeeProfileById` service tests (which assert `passwordHash`/`terminationDate` are never leaked).
 
+### Phase 8 delivered (leave read-route test fix)
+
+This phase is a test-only fix confined to `tests/unit/modules/leave/leave.routes.test.ts`; no production source changed.
+
+- The `getById` mock in `buildApp` was corrected to enforce the same role-based visibility as the real `LeaveService.getById`: ADMIN sees any request; MANAGER sees `actor.id` plus direct reports; EMPLOYEE sees only `actor.id`; any other request throws `NotFoundError`. Previously the mock was a naive find-by-id that returned any found request regardless of visibility, so the "not visible" test failed (the invisible request was returned with 200 instead of 404).
+- The invisible-request and nonexistent-id responses are now byte-identical (404, `{ code: 'NOT_FOUND' }`), preserving the information-hiding contract the test asserts.
+
+**Divergences from the plan worth noting:**
+- None — this phase matches the spec exactly (test-only, no production changes).
+
 ### Open questions
 - Q1: Should a controller layer be introduced, or continue with routes calling services directly? (candidates: continue routes-call-services; introduce controllers)
 - Q2: Should LeavePolicyStatus be promoted into src/shared/types as a canonical enum? (candidates: promote to shared/types; keep module-local and import via policy index.ts)
