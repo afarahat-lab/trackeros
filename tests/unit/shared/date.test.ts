@@ -143,7 +143,10 @@ describe('date helpers under a non-UTC timezone', () => {
   });
 
   it('startOfUtcDay is unaffected by the process timezone', () => {
-    const input = new Date(Date.UTC(2023, 5, 15, 14, 30, 45, 123));
+    // Local-time construction under a non-UTC zone: this would regress to a
+    // different instant if the helper used local getters (getFullYear/getMonth/
+    // getDate) instead of UTC accessors.
+    const input = new Date(2023, 5, 15, 14, 30, 45, 123);
     expect(startOfUtcDay(input).getTime()).toBe(Date.UTC(2023, 5, 15));
   });
 
