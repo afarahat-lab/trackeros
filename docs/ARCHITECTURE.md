@@ -478,6 +478,19 @@ This phase delivers the policy read-through (recommended phase 3); the auth/bala
 **Divergences from the plan worth noting:**
 - None — this phase matches PLAN.md Phase 3 and the phase spec exactly: a two-file service-layer change (interface + implementation) delegating to the existing `IPolicyRepository.findAll()`, with no filtering (the ACTIVE/effective-date/latest-effectiveFrom selection remains deferred to Phase 5) and no balance -> leave-type dependency.
 
+### Phase 4 delivered (auth module: POST /auth/login)
+
+This phase delivers the auth module and login endpoint (recommended phase 4); the balance/leave-read/employee-route work (phases 5–7) is not yet implemented.
+
+- `src/modules/auth/auth.service.ts` — `IAuthService` with `login(email, password): Promise<{ token: string; profile: EmployeeProfile }>` and `AuthService`. The constructor injects `IEmployeeService` (from `../employee`). `login` calls `employeeService.getEmployeeByEmail(email)` inside a try/catch that maps `NotFoundError` to `UnauthorizedError('Invalid email or password')` (indistinguishable from a failed compare), then `bcrypt.compare(password, employee.passwordHash ?? '')` — a failed compare throws the SAME `UnauthorizedError('Invalid email or password')`. On success it builds the `EmployeeProfile` inline (an object literal, NOT the employee module's `toEmployeeProfile` helper — omitting `passwordHash` and `terminationDate`) and returns `{ token: signToken({ id: employee.id, role: employee.role }), profile }`. A `createAuthService()` factory wires `new AuthService(new EmployeeService(new PgEmployeeRepository()))`.
+- `src/modules/auth/auth.routes.ts` — `authRoutes(fastify)` registers `POST /auth/login` (200). `parseLoginBody` rejects a non-string `email`/`password` with `ValidationError` (400). The handler calls `authService.login` and returns `{ token, profile }`; a local `sendError` maps `AppError` to `{ error, code }` with the correct status and any other throw to 500 (the same shape as `leave.routes.ts`, but a local copy — no `resolveActor` is used since login is public). The service instance is resolved from `fastify.authService` if present, else `createAuthService()`.
+- `src/modules/auth/index.ts` — re-exports `IAuthService`, `AuthService`, `createAuthService`, and `authRoutes`.
+- `src/shared/auth/index.ts` — added `'/auth/login'` to the `PUBLIC_PATHS` set so the endpoint is reachable WITHOUT a bearer token.
+- `src/app.ts` — `app.register(authRoutes)` (after `leaveRoutes`, and after `registerAuth` so the public-path exemption applies).
+
+**Divergences from the plan worth noting:**
+- None — this phase matches PLAN.md Phase 4 and the phase spec exactly: bcrypt.compare + signToken, indistinguishable wrong-email/wrong-password (both `UnauthorizedError('Invalid email or password')`), no controller file, no transaction/audit/repository access in the auth module, and the profile mapper is defined inline in the service (not the employee module's `toEmployeeProfile`).
+
 ### Open questions
 - Q1: Should a controller layer be introduced, or continue with routes calling services directly? (candidates: continue routes-call-services; introduce controllers)
 - Q2: Should LeavePolicyStatus be promoted into src/shared/types as a canonical enum? (candidates: promote to shared/types; keep module-local and import via policy index.ts)
