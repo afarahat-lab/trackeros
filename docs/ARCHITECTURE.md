@@ -603,6 +603,16 @@ This phase is a set of small follow-up fixes and test-strengthening changes deli
 **Divergences from the plan worth noting:**
 - None of these changes were prescribed by PLAN.md Phase 7; they are follow-up hardening fixes that correct the two divergences documented in Phase 11 (the missing JWT_SECRET restore and the partial fake) and add the explicit nonexistent-id/date-clamp coverage the review flagged.
 
+### Phase 13 delivered (employee route test full-fake hardening)
+
+This phase is a test-only hardening change confined to `tests/unit/modules/employee/employee.routes.test.ts`; no production source changed. It resolves the divergence documented in Phase 11/12 — the employee route test's `IEmployeeService` fake was a partial object behind an `as IEmployeeService` cast.
+
+- `tests/unit/modules/employee/employee.routes.test.ts` — the `IEmployeeService` fake passed to the `employeeService` decoration seam is now a complete five-method object (`createEmployee`, `getEmployeeById`, `getEmployeeByEmail`, `getEmployeesByManagerId`, `getEmployeeProfileById`) with the exact signatures from `src/modules/employee/employee.service.interface.ts`. The four methods the route does not call are throwing stubs (each throws an `Error` naming the method), so any accidental invocation fails loudly rather than silently returning `undefined`. The `as IEmployeeService` partial-object cast is removed. The route under test, the `employeeService` seam, the `decorateRequest('user', undefined)` + preHandler actor hook, the `EmployeeProfile` fixture, and all four existing tests (200 profile, 401 no user, 401 invalid role, 404 no profile) and their assertions are unchanged.
+- `tests/unit/modules/auth/auth.service.test.ts` — verified already compliant (full five-method `IEmployeeService` fake with throwing stubs, and `JWT_SECRET` captured before `beforeAll` and restored in `afterAll`); no modification required per the spec.
+
+**Divergences from the plan worth noting:**
+- None — this phase matches the spec exactly: test-only, single file in scope, the fake satisfies `IEmployeeService` structurally with throwing stubs for the unused methods, and no existing assertion or seam was altered.
+
 ### Open questions
 - Q1: Should a controller layer be introduced, or continue with routes calling services directly? (candidates: continue routes-call-services; introduce controllers)
 - Q2: Should LeavePolicyStatus be promoted into src/shared/types as a canonical enum? (candidates: promote to shared/types; keep module-local and import via policy index.ts)
