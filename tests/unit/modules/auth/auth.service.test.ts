@@ -56,8 +56,16 @@ describe('AuthService.login', () => {
     return new AuthService(employeeService);
   }
 
+  // Capture the prior value so the success-path token assertion can run against a
+  // known secret without leaking it into any later test file in the same Jest process.
+  const originalJwtSecret = process.env.JWT_SECRET;
+
   beforeAll(() => {
     process.env.JWT_SECRET = 'unit-test-jwt-secret';
+  });
+
+  afterAll(() => {
+    process.env.JWT_SECRET = originalJwtSecret;
   });
 
   it('returns a token and a profile (never passwordHash) on correct credentials', async () => {

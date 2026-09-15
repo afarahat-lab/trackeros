@@ -33,7 +33,7 @@ describe('employee routes — GET /employees/me', () => {
     actor: AuthUser | undefined,
     getEmployeeProfileById: (id: string) => Promise<EmployeeProfile>,
   ): FastifyInstance {
-    const service = { getEmployeeProfileById } as unknown as IEmployeeService;
+    const service = { getEmployeeProfileById } as IEmployeeService;
 
     const instance = Fastify();
     (instance as unknown as { employeeService: IEmployeeService }).employeeService = service;
