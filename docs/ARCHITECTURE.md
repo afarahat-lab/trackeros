@@ -26,6 +26,8 @@ src/shared/errors/index.ts       — AppError base + Validation/NotFound/Unautho
 src/shared/db/connection.ts      — the single pg Pool (DATABASE_URL, SSL in production)
 src/shared/db/unit-of-work.ts    — IUnitOfWork + PgUnitOfWork (BEGIN/COMMIT/ROLLBACK)
 src/shared/db/index.ts           — public entry point (pool, IUnitOfWork, PgUnitOfWork)
+src/shared/date/accrual.ts       — startOfUtcDay, addMonths, periodContaining (pure UTC accrual helpers)
+src/shared/date/index.ts         — public entry point re-exporting the three date helpers
 ```
 
 ## Key patterns
@@ -436,6 +438,18 @@ Migration note: add nullable `password_hash` to `employees` using `t.text(...)` 
 - **Auth**: `request.user: { id: string; role: EmployeeRole }` where `EmployeeRole = 'EMPLOYEE' | 'MANAGER' | 'ADMIN'`. Identity/role obtained from a JWT bearer token verified by the existing `registerAuth` preHandler (`src/shared/auth/index.ts`), which populates `request.user` from `payload.sub` (id) and `payload.role`. RBAC enforced at the API boundary by `resolveActor` and in services (role-scoped visibility), never inline in routes. `POST /auth/login` is added to the public path set; all other new endpoints require a valid token.
 - **Error**: errors return `{ error: string; code: string }`. Validation failure -> HTTP 400 (ValidationError); authentication failure -> 401 (UnauthorizedError); authorization failure -> 403 (ForbiddenError); not found -> 404 (NotFoundError); invalid state transition -> 409 (ConflictError); other -> 500. `POST /auth/login` returns the SAME status and message for wrong email and wrong password (401 UnauthorizedError). `GET /leaves/:id` returns the SAME 404 NotFoundError for a request the caller may not see as for one that does not exist.
 - **Transaction**: none required — this feature is read-only plus a single non-persistent login write; read endpoints must not open a transaction.
+
+### Phase 1 delivered (shared date helpers + shared types)
+
+This phase delivered only the shared foundations (recommended phase 1); the employee/policy/auth/balance/leave-read work (phases 2–7) is not yet implemented.
+
+- `src/shared/date/accrual.ts` — three pure UTC helpers copied verbatim from the private implementations in `src/modules/leave/leave.service.ts` (`startOfUtcDay`, `addMonths`, `periodContaining`) and `src/modules/balance/balance.service.ts` (`addMonths`), with unchanged arithmetic, error messages, and the 10,000-iteration safety bound. `startOfUtcDay` returns `Date.UTC(y,m,d)` of the input's UTC components; `addMonths` clones, sets UTC date to 1, adds months via `setUTCMonth`, and clamps the day to the last day of the target month; `periodContaining` steps `accrualMonths` periods from the anchor's UTC day start and throws `ConflictError` when `date < anchor` ('Requested date precedes the accrual anchor') or when no period resolves within the bound ('Unable to resolve accrual period'). `ConflictError` is imported from `src/shared/errors`.
+- `src/shared/date/index.ts` — public entry point re-exporting `startOfUtcDay`, `addMonths`, `periodContaining`.
+- `src/shared/types/index.ts` — added `EmployeeProfile` (id, employeeNumber, firstName, lastName, email, role: EmployeeRole, managerId: string | null, department, hireDate: Date, employmentStatus: EmploymentStatus — **no** passwordHash or terminationDate, reusing the existing enums) and added `employeeIds?: string[]` to `LeaveRequestQueryParams`. No other enum or DTO changed.
+- `tests/unit/shared/date.test.ts` — Jest coverage for `startOfUtcDay` (UTC midnight, no input mutation), `addMonths` (advance, month-end clamping incl. leap-year February, negative offsets, no mutation), `periodContaining` (period containment, anchor-day start, multi-month periods, month-end clamp, ConflictError on date-before-anchor), plus a describe block setting `process.env.TZ = 'Asia/Riyadh'` proving the helpers are unaffected by the host timezone.
+
+**Divergences from the plan worth noting:**
+- None — this phase matches PLAN.md Phase 1 and the phase spec exactly. The three helpers are behaviorally identical to their private sources, `EmployeeProfile` omits `passwordHash`/`terminationDate`, and `leave.service.ts`/`balance.service.ts` were **not** refactored to import the shared helpers (deferred to a later phase, per the spec's out-of-scope constraint).
 
 ### Open questions
 - Q1: Should a controller layer be introduced, or continue with routes calling services directly? (candidates: continue routes-call-services; introduce controllers)
