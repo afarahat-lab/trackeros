@@ -49,6 +49,19 @@ export enum EmployeeRole {
   ADMIN = 'ADMIN',
 }
 
+export interface EmployeeProfile {
+  id: string;
+  employeeNumber: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: EmployeeRole;
+  managerId: string | null;
+  department: string;
+  hireDate: Date;
+  employmentStatus: EmploymentStatus;
+}
+
 export interface CreateLeaveRequestDto {
   employeeId: string;
   leaveTypeCode: LeaveTypeCode;
@@ -75,6 +88,7 @@ export interface LeaveRequestQueryParams {
   startDateTo?: Date;
   endDateFrom?: Date;
   endDateTo?: Date;
+  employeeIds?: string[];
   limit?: number;
   offset?: number;
 }
