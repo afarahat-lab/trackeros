@@ -1,4 +1,5 @@
 import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
 import { AuthService } from '../../../../src/modules/auth';
 import { Employee, IEmployeeService } from '../../../../src/modules/employee';
 import { NotFoundError, UnauthorizedError } from '../../../../src/shared/errors';
@@ -82,6 +83,13 @@ describe('AuthService.login', () => {
 
     expect(typeof token).toBe('string');
     expect(token.length).toBeGreaterThan(0);
+
+    // The token must be a real JWT minted under the test JWT_SECRET carrying the
+    // actor's claims — not just a non-empty string — so decode and re-check it.
+    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as jwt.JwtPayload;
+    expect(decoded.sub).toBe(employee.id);
+    expect(decoded.role).toBe(employee.role);
+
     expect(profile.id).toBe(employee.id);
     expect(profile.employeeNumber).toBe(employee.employeeNumber);
     expect(profile.email).toBe(employee.email);
