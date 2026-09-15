@@ -658,6 +658,16 @@ No conceptual tables, repositories, or migrations are added or modified. `Accrua
 2. Phase 2 — Deduplicate `balance.service.ts` `addMonths` (1 file).
 3. Phase 3 — Add deduplication regression test (1 file).
 
+### Phase 1 delivered (leave.service.ts date-helper deduplication)
+
+This phase delivered only recommended phase 1 — the `leave.service.ts` deduplication. Phases 2 (balance `addMonths`) and 3 (regression test) are **not** yet implemented.
+
+- `src/modules/leave/leave.service.ts` — added `import { startOfUtcDay, addMonths, periodContaining } from '../../shared/date';` and deleted the three private methods at the bottom of the `LeaveService` class (`private periodContaining`, `private startOfUtcDay`, `private addMonths`). The two `cancel` call sites now use the free `startOfUtcDay(...)` (both `startOfUtcDay(request.startDate)` and `startOfUtcDay(new Date())`), and `resolveBalance` now uses the free `periodContaining(employee.hireDate, policy.accrualPeriodMonths, date)`. No arithmetic, `ConflictError` guard, `10_000` safety bound, or `getUTC*` accessor changed — the move is behaviour-preserving.
+
+**Divergences from the plan worth noting:**
+- The plan prescribed importing all three helpers; the implementation imports all three, but `addMonths` is **unused** in `leave.service.ts` after the private methods were removed (only `startOfUtcDay` and `periodContaining` have call sites in this file). The import is harmless but technically dead.
+- Phases 2 and 3 were not delivered: `src/modules/balance/balance.service.ts` still declares its own `private addMonths` (used by `carryForward` via `this.addMonths(...)`), and no deduplication regression test was added to `tests/unit/shared/date.test.ts`. The feature's "exactly one canonical definition" binding rule is therefore only partially realized — `addMonths` still has a private duplicate in the balance module.
+
 ### Verification
 - `grep -rn "private addMonths\|private startOfUtcDay\|private periodContaining" src/` returns nothing.
 - `npm run build` clean.
