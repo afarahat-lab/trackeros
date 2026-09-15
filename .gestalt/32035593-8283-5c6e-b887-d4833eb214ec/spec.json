@@ -1,0 +1,71 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "balance"
+    ],
+    "affectedLayers": [
+      "service"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The private `addMonths` method is removed from `BalanceService` \u2014 `grep -rn \"private addMonths\" src/modules/balance/` returns no matches.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`carryForward` computes `nextPeriodEnd` via the shared `addMonths(source.periodEnd, policy.accrualPeriodMonths)` import, producing a value identical to the removed private method for the same inputs (same UTC day/month clamping behaviour).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`npm run build` completes cleanly and the existing test suite passes with no behavioural change.",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "Edit ONLY src/modules/balance/balance.service.ts. Do not touch the shared date module, repositories, routes, or DTOs.",
+    "Do not change the arithmetic or the `getUTC*` accessors \u2014 the shared `addMonths` logic must remain byte-for-byte equivalent to the removed private method.",
+    "Do not add any cross-module import beyond extending the existing `../../shared/date` import to include `addMonths`."
+  ],
+  "outOfScope": [
+    "Any change to the shared date module (`src/shared/date/accrual.ts` / `index.ts`), repositories, routes, or DTOs.",
+    "Any behavioural change to `carryForward`, `openPeriod`, `getCurrentBalances`, or other service methods \u2014 this is a pure move.",
+    "Adding any other cross-module import or refactoring beyond the single `addMonths` import extension."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "BalanceService",
+      "mustExistOrExtend": true,
+      "invariant": "The service exposes the same public interface (`IBalanceService`) and the same `carryForward`/`openPeriod`/`getCurrentBalances` behaviour after the move; only the private `addMonths` helper is removed in favour of the shared import."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "carryForward",
+      "authRule": "Unchanged from existing implementation.",
+      "idempotent": false,
+      "errorSemantics": "Unchanged: ValidationError/NotFoundError/ConflictError semantics preserved."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The `addMonths` function used by `carryForward` must be the shared implementation re-exported from `src/shared/date/index.ts` (originating in `src/shared/date/accrual.ts`), not a local reimplementation.",
+      "referencePath": "src/shared/date/accrual.ts"
+    },
+    {
+      "requirement": "The `carryForward` method's observable behaviour (validation errors, transaction boundaries, `nextPeriodStart`/`nextPeriodEnd` computation, carry cap, create-vs-update decision) must remain unchanged.",
+      "referencePath": "src/modules/balance/balance.service.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/date (addMonths re-export)",
+      "why": "The service now consumes the shared `addMonths` function instead of its private copy, eliminating duplication."
+    }
+  ]
+}

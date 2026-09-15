@@ -2,7 +2,7 @@ import { PoolClient } from 'pg';
 import { LeaveTypeCode } from '../../shared/types';
 import { ValidationError, NotFoundError, ConflictError } from '../../shared/errors';
 import { IUnitOfWork, PgUnitOfWork } from '../../shared/db';
-import { periodContaining } from '../../shared/date';
+import { periodContaining, addMonths } from '../../shared/date';
 import { EmployeeService, IEmployeeService, PgEmployeeRepository } from '../employee';
 import {
   IPolicyService,
@@ -116,7 +116,7 @@ export class BalanceService implements IBalanceService {
       const carry = Math.min(unused, policy.carryForwardDays);
 
       const nextPeriodStart = source.periodEnd;
-      const nextPeriodEnd = this.addMonths(source.periodEnd, policy.accrualPeriodMonths);
+      const nextPeriodEnd = addMonths(source.periodEnd, policy.accrualPeriodMonths);
 
       const existingNext = await this.repository.findByKey(
         source.employeeId,
@@ -236,18 +236,6 @@ export class BalanceService implements IBalanceService {
     if (input.periodStart.getTime() >= input.periodEnd.getTime()) {
       throw new ValidationError('periodStart must be before periodEnd');
     }
-  }
-
-  private addMonths(date: Date, months: number): Date {
-    const result = new Date(date.getTime());
-    const day = result.getUTCDate();
-    result.setUTCDate(1);
-    result.setUTCMonth(result.getUTCMonth() + months);
-    const lastDay = new Date(
-      Date.UTC(result.getUTCFullYear(), result.getUTCMonth() + 1, 0)
-    ).getUTCDate();
-    result.setUTCDate(Math.min(day, lastDay));
-    return result;
   }
 }
 

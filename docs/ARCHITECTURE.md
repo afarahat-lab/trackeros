@@ -666,14 +666,24 @@ This phase delivered only recommended phase 1 — the `leave.service.ts` dedupli
 
 **Divergences from the plan worth noting:**
 - The plan prescribed importing all three helpers; the implementation imports all three, but `addMonths` is **unused** in `leave.service.ts` after the private methods were removed (only `startOfUtcDay` and `periodContaining` have call sites in this file). The import is harmless but technically dead.
-- Phases 2 and 3 were not delivered: `src/modules/balance/balance.service.ts` still declares its own `private addMonths` (used by `carryForward` via `this.addMonths(...)`), and no deduplication regression test was added to `tests/unit/shared/date.test.ts`. The feature's "exactly one canonical definition" binding rule is therefore only partially realized — `addMonths` still has a private duplicate in the balance module.
+- Phases 2 and 3 were not delivered in this phase: `src/modules/balance/balance.service.ts` still declared its own `private addMonths` (used by `carryForward` via `this.addMonths(...)`), and no deduplication regression test was added to `tests/unit/shared/date.test.ts`. Phase 2 was delivered in a later phase (see "Phase 2 delivered" below); Phase 3 (the regression test) remains outstanding.
+
+### Phase 2 delivered (balance.service.ts addMonths deduplication)
+
+This phase delivered recommended phase 2 — the `balance.service.ts` `addMonths` deduplication. Phase 3 (the regression test) is **not** yet implemented.
+
+- `src/modules/balance/balance.service.ts` — extended the existing shared-date import from `import { periodContaining } from '../../shared/date';` to `import { periodContaining, addMonths } from '../../shared/date';` and deleted the private `addMonths(date, months)` method at the bottom of the `BalanceService` class. The single call site in `carryForward` now uses the free `addMonths(source.periodEnd, policy.accrualPeriodMonths)` instead of `this.addMonths(...)`. No arithmetic, `getUTC*` accessor, or month-end clamping behaviour changed — the move is behaviour-preserving.
+
+**Divergences from the plan worth noting:**
+- None — this phase matches PLAN.md Phase 2 and the phase spec exactly: a single-file change, the shared `addMonths` import extension, the private method removed, and no other cross-module import or behavioural change.
+- Phase 3 (the deduplication regression test in `tests/unit/shared/date.test.ts`) is still not delivered. The feature's "exactly one canonical definition" binding rule is now fully realized for `addMonths` (no private duplicate remains in the balance module), but the regression test that pins the deduplication is outstanding.
 
 ### Verification
 - `grep -rn "private addMonths\|private startOfUtcDay\|private periodContaining" src/` returns nothing.
 - `npm run build` clean.
 - Full unit suite passes unchanged (178 tests).
 - `npm run smoke` passes all stages.
-- New regression test pins shared helpers for a period boundary case under `TZ=Asia/Riyadh`.
+- New regression test pins shared helpers for a period boundary case under `TZ=Asia/Riyadh` (Phase 3 — not yet delivered).
 
 ### Open questions
 None.
