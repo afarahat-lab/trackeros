@@ -1,0 +1,76 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "auth",
+      "employee"
+    ],
+    "affectedLayers": [
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The stage 4 login assertion in scripts/smoke.js verifies the login profile's id, email, and role equal the seeded employee's values (id 'smoke-employee', email 'smoke@example.com', role EmployeeRole.EMPLOYEE).",
+      "testable": true,
+      "layer": "e2e"
+    },
+    {
+      "description": "The stage 4 login assertion verifies the login profile object has exactly the 10 EmployeeProfile fields (id, employeeNumber, firstName, lastName, email, role, managerId, department, hireDate, employmentStatus) and no others.",
+      "testable": true,
+      "layer": "e2e"
+    },
+    {
+      "description": "The stage 4 login assertion verifies passwordHash and terminationDate are absent from the login profile object.",
+      "testable": true,
+      "layer": "e2e"
+    },
+    {
+      "description": "The stage 4 login assertion verifies the remaining seeded profile values: employeeNumber 'E-0001', firstName 'Smoke', lastName 'Test', managerId null, department null, hireDate '2020-01-01T00:00:00.000Z', employmentStatus EmploymentStatus.ACTIVE.",
+      "testable": true,
+      "layer": "e2e"
+    },
+    {
+      "description": "The existing stage 4 token assertion (non-empty string token) and the 200 status check remain intact \u2014 the change extends, not weakens, the login stage.",
+      "testable": true,
+      "layer": "e2e"
+    }
+  ],
+  "constraints": [
+    "The change is confined to the stage 4 login assertion in scripts/smoke.js (around line 230); stages 1\u20133d and 5\u20138 must not be weakened, deleted, or reordered.",
+    "The assertion must compare hireDate against the serialized ISO string '2020-01-01T00:00:00.000Z' (the JSON wire form of the Date), not the raw seed string '2020-01-01'.",
+    "EmployeeRole and EmploymentStatus are already imported in the stage 3 import line and must be used directly rather than re-imported or hardcoded as bare strings."
+  ],
+  "outOfScope": [
+    "No production code changes (AuthService, EmployeeProfile mapping, routes) \u2014 this phase only strengthens the existing smoke-test assertion against the already-shipped login behavior."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "EmployeeProfile",
+      "mustExistOrExtend": true,
+      "invariant": "A serialized EmployeeProfile exposes exactly 10 fields and never leaks passwordHash or terminationDate."
+    }
+  ],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [
+    {
+      "requirement": "The 10-field profile shape asserted in stage 4 must match the EmployeeProfile interface (id, employeeNumber, firstName, lastName, email, role, managerId, department, hireDate, employmentStatus) with no passwordHash or terminationDate.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The stage 4 profile assertion must mirror the existing stage 5 /employees/me assertion pattern (same expected values, same absence checks for passwordHash/terminationDate).",
+      "referencePath": "scripts/smoke.js"
+    },
+    {
+      "requirement": "The asserted seeded values must match the employee row inserted in stage 3d (id 'smoke-employee', employeeNumber 'E-0001', firstName 'Smoke', lastName 'Test', email 'smoke@example.com', role EmployeeRole.EMPLOYEE, managerId null, department null, hireDate '2020-01-01', employmentStatus EmploymentStatus.ACTIVE).",
+      "referencePath": "scripts/smoke.js"
+    },
+    {
+      "requirement": "The login profile under test is produced by AuthService.login, which maps the Employee to EmployeeProfile via toEmployeeProfile and omits passwordHash/terminationDate; the assertion must reflect that contract.",
+      "referencePath": "src/modules/auth/auth.service.ts"
+    }
+  ],
+  "integrationPoints": []
+}

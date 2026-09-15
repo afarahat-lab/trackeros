@@ -559,7 +559,7 @@ This phase delivers the `scripts/smoke.js` extension prescribed by PLAN.md Phase
 **Seed block (stage 3d, Postgres mode only)** — the seed now mints the seeded employee's `password_hash` via `bcrypt.hashSync(SMOKE_PASSWORD, 10)` (plaintext from `process.env.SMOKE_PASSWORD`, defaulting to `'smoke-check-password'` — no credential string hardcoded, per no-hardcoded-secrets), and seeds a second leave type (`LeaveTypeCode.SICK`) with an effective ACTIVE policy (`pol-2`) but **no** `leave_balances` row — the fixture that proves `getCurrentBalances` omits an effective policy lacking a balance.
 
 **New stages (4–8, Postgres mode only; skipped with the existing caveat in sqlite mode):**
-- **Stage 4 — login**: `POST /auth/login` with the seeded email + `SMOKE_PASSWORD`; asserts 200, a non-empty `token`, and a `profile` whose `id`/`email` match the seeded employee. The returned token is a genuine login token (minted under the same `JWT_SECRET` `registerAuth` verifies), not the hand-minted `signToken` used by stages 3b/3c.
+- **Stage 4 — login**: `POST /auth/login` with the seeded email + `SMOKE_PASSWORD`; asserts 200, a non-empty `token`, and a `profile` whose `id`/`email` match the seeded employee (the full 10-field profile assertion was added in Phase 10). The returned token is a genuine login token (minted under the same `JWT_SECRET` `registerAuth` verifies), not the hand-minted `signToken` used by stages 3b/3c.
 - **Stage 5 — profile**: `GET /employees/me` with the login token; asserts the exact 10-field `EmployeeProfile` (id, employeeNumber, firstName, lastName, email, role, managerId, department, hireDate serialized as UTC midnight, employmentStatus) and that `passwordHash`/`terminationDate` are absent.
 - **Stage 6 — list**: `GET /leaves` with the login token; asserts the request created in stage 3d is present (EMPLOYEE role scoping to `employeeIds=[actor.id]`).
 - **Stage 7 — getById**: `GET /leaves/:id` using the id captured from the stage 3d `POST /leaves` response body (not predicted — the repository generates it via `randomUUID()`); asserts the seeded request is returned.
@@ -567,6 +567,18 @@ This phase delivers the `scripts/smoke.js` extension prescribed by PLAN.md Phase
 
 **Divergences from the plan worth noting:**
 - None — this phase matches PLAN.md Phase 7 item (4) and the phase spec's six success criteria exactly: the second leave type + password_hash seeding, the login/profile/list/getById/balances stages, real-value assertions (not just status codes), Postgres-only gating, and the `periodContaining`-derived current-period re-key.
+
+### Phase 10 delivered (smoke.js stage 4 login assertion strengthening)
+
+This phase is a test-only change confined to `scripts/smoke.js`; no production source changed. It strengthens the stage 4 login assertion (previously only a non-empty token + `id`/`email` match) to verify the full 10-field `EmployeeProfile` returned by `POST /auth/login`.
+
+- The stage 4 login assertion now builds an `expectedLoginProfile` object literal with all 10 `EmployeeProfile` fields (id, employeeNumber, firstName, lastName, email, role, managerId, department, hireDate, employmentStatus) and asserts each field equals the seeded employee's value: id `'smoke-employee'`, employeeNumber `'E-0001'`, firstName `'Smoke'`, lastName `'Test'`, email `'smoke@example.com'`, role `EmployeeRole.EMPLOYEE`, managerId `null`, department `null`, hireDate `'2020-01-01T00:00:00.000Z'` (the JSON wire form of the Date, not the raw seed string `'2020-01-01'`), employmentStatus `EmploymentStatus.ACTIVE`.
+- It asserts `passwordHash` and `terminationDate` are absent from the login profile (`'passwordHash' in loginProfile || 'terminationDate' in loginProfile` throws).
+- The existing token assertion (non-empty string) and the 200 status check remain intact — the change extends, not weakens, the login stage. Stages 1–3d and 5–8 are untouched.
+- `EmployeeRole` and `EmploymentStatus` are reused from the existing stage 3 import line (not re-imported or hardcoded as bare strings).
+
+**Divergences from the plan worth noting:**
+- None — this phase matches the phase spec's five success criteria exactly: id/email/role equality, exactly-10-fields, passwordHash/terminationDate absence, the remaining seeded values, and the preserved token/status assertions.
 
 ### Open questions
 - Q1: Should a controller layer be introduced, or continue with routes calling services directly? (candidates: continue routes-call-services; introduce controllers)
