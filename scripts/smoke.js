@@ -227,13 +227,13 @@ console.log(`\n  smoke mode: ${MODE}${PG ? '' : '  (persistence NOT covered — 
       if (!loginBody.profile || typeof loginBody.profile !== 'object') {
         throw new Error(`POST /auth/login returned no profile: ${String(login.payload)}`);
       }
-      // 10 fields of EmployeeProfile: no passwordHash, no terminationDate; managerId and
-      // department are null because the seed left them unset. Mirrors the stage 5 assertion.
+      // 10 fields of EmployeeProfile: no passwordHash, no terminationDate; managerId is
+      // null because the seed left it unset. Mirrors the stage 5 assertion.
       const loginProfile = loginBody.profile;
       const expectedLoginProfile = {
         id: EMP, employeeNumber: 'E-0001', firstName: 'Smoke', lastName: 'Test',
         email: 'smoke@example.com', role: EmployeeRole.EMPLOYEE,
-        managerId: null, department: null,
+        managerId: null, department: 'Engineering',
         hireDate: '2020-01-01T00:00:00.000Z', employmentStatus: EmploymentStatus.ACTIVE,
       };
       for (const key of Object.keys(expectedLoginProfile)) {
