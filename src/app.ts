@@ -1,6 +1,9 @@
 import Fastify from 'fastify';
 import { uptimeRoutes } from './modules/uptime/uptime.routes';
 import { leaveRoutes } from './modules/leave';
+import { balanceRoutes } from './modules/balance';
+import { authRoutes } from './modules/auth';
+import { employeeRoutes } from './modules/employee';
 import { registerAuth } from './shared/auth';
 import { AppError } from './shared/errors';
 
@@ -15,6 +18,9 @@ registerAuth(app);
 // runtime rather than only in the module.
 app.register(uptimeRoutes);
 app.register(leaveRoutes);
+app.register(balanceRoutes);
+app.register(authRoutes);
+app.register(employeeRoutes);
 
 // A thrown AppError from a hook (e.g. UnauthorizedError from auth) must become its own
 // status code, not a bare 500.

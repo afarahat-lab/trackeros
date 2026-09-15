@@ -1,0 +1,159 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "employee",
+      "auth",
+      "leave",
+      "balance"
+    ],
+    "affectedLayers": [
+      "routes",
+      "tests",
+      "smoke/verification"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "The employee profile endpoint is registered on the Fastify router and, given a valid bearer token, returns the authenticated employee's profile with status 200 and NO `passwordHash` (and no `terminationDate`) field anywhere in the response body.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "scripts/smoke.js still runs stages 1\u20133d unchanged and additionally: seeds a second leave type + effective policy with NO balance row and a `password_hash` (bcrypt.hashSync), then asserts (a) login returns a token + profile, (b) GET /employees/me returns a profile matching the seeded employee, (c) GET /leaves contains the seeded request, (d) GET /leaves/:id returns the seeded request, and (e) GET /balances/me contains EXACTLY the seeded balance (the no-balance-row leave type is omitted) \u2014 asserting real field values, not just status codes.",
+      "testable": true,
+      "layer": "e2e"
+    },
+    {
+      "description": "A unit test proves login success returns a token + profile (no passwordHash) and that wrong-email and wrong-password both throw the SAME UnauthorizedError with the same message, so the two failure modes are indistinguishable.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Unit tests prove leave list/getById role scoping (EMPLOYEE sees self only, MANAGER sees self + direct reports one level, ADMIN sees all) and that getById throws NotFoundError identically for a nonexistent id and for an id the caller may not see.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A unit test proves the profile route resolves the actor from `request.user`, calls the profile service with `actor.id`, and returns the profile (never passwordHash), with a 401 for a missing/invalid actor.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No controller file is introduced \u2014 the profile route calls the employee service directly, matching the existing leave/balance/auth route shape.",
+    "The profile route must reuse the resolveActor/sendError shape from src/modules/leave/leave.routes.ts (resolve actor from request.user, enforce EmployeeRole membership at the API boundary, map AppError to { error, code } and any other throw to 500).",
+    "The profile response must never contain passwordHash (or terminationDate) \u2014 the profile is produced by the existing getEmployeeProfileById/toEmployeeProfile mapping, not a raw Employee.",
+    "scripts/smoke.js stages 1\u20133d must be EXTENDED, not weakened or deleted; the new stages run after 3d and assert real values.",
+    "The seeded employee's password_hash must be produced via bcrypt.hashSync (cost 10) in the seed block; no plaintext password is stored.",
+    "This phase is read-only plus a login probe \u2014 no new transaction, no writes, no audit/notification side effects are introduced by the new route or tests."
+  ],
+  "outOfScope": [
+    "Refactoring leave.service.ts / balance.service.ts to import the shared date helpers (deferred to a later phase).",
+    "Promoting LeavePolicyStatus into src/shared/types (keep module-local, import via policy index.ts).",
+    "Introducing a controller layer \u2014 routes continue to call services directly.",
+    "Any new state-changing operations, audit writes, or notifications \u2014 this phase is read-only plus a login probe."
+  ],
+  "ambiguities": [
+    {
+      "description": "Whether the new employee.routes.ts carries local copies of resolveActor/sendError (like balance.routes.ts and auth.routes.ts) or imports them from leave.routes.ts.",
+      "options": [
+        "Local copies matching the balance/auth precedent",
+        "Import from leave.routes.ts (no shared helper module exists)"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "description": "Whether the smoke seed's second leave type/policy (no balance row) should use a distinct LeaveTypeCode (e.g. 'sick') or a second policy on the same 'annual' code.",
+      "options": [
+        "Distinct leave type code (e.g. sick) with its own policy",
+        "Second policy on the same annual code"
+      ],
+      "impactIfWrong": "medium"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "EmployeeProfile",
+      "mustExistOrExtend": true,
+      "invariant": "A profile is always derived from an Employee via the existing toEmployeeProfile mapping and never carries passwordHash or terminationDate; it is the only Employee-derived shape returned over the wire."
+    },
+    {
+      "entity": "LeaveBalance (read surface)",
+      "mustExistOrExtend": true,
+      "invariant": "getCurrentBalances returns at most one entry per leaveTypeCode and omits any leave type whose current period has no balance row; a leave type with an effective policy but no balance row is absent from the result, never synthesized."
+    },
+    {
+      "entity": "LeaveRequest (read surface)",
+      "mustExistOrExtend": true,
+      "invariant": "Visibility is role-scoped and status-unrestricted: EMPLOYEE sees self, MANAGER sees self + direct reports (one level), ADMIN sees all; an invisible id is indistinguishable from a nonexistent id (both NotFoundError)."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "getEmployeeProfileById (employee service)",
+      "authRule": "Resolves the actor from the verified token (request.user), never a client-supplied id; returns the caller's own profile.",
+      "idempotent": false,
+      "errorSemantics": "NotFoundError (404) on unknown id; never returns passwordHash/terminationDate."
+    },
+    {
+      "operation": "login (auth service)",
+      "authRule": "Public (no token required).",
+      "idempotent": false,
+      "errorSemantics": "Wrong email and wrong password both throw the SAME UnauthorizedError('Invalid email or password') \u2014 indistinguishable; success returns { token, profile } with no passwordHash."
+    },
+    {
+      "operation": "list / getById (leave service)",
+      "authRule": "Role-scoped: EMPLOYEE self, MANAGER self + direct reports (one level), ADMIN all.",
+      "idempotent": false,
+      "errorSemantics": "getById returns NotFoundError identically for nonexistent and not-visible ids (no id probing)."
+    },
+    {
+      "operation": "getCurrentBalances (balance service)",
+      "authRule": "Resolves the actor from the verified token; returns the caller's own balances.",
+      "idempotent": false,
+      "errorSemantics": "Omit leave types with no balance row; empty list (200) when none, never an error."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The profile route reuses the resolveActor/sendError helper shape (actor from request.user, EmployeeRole membership check, AppError -> { error, code }, else 500) exactly as implemented in the leave routes.",
+      "referencePath": "src/modules/leave/leave.routes.ts"
+    },
+    {
+      "requirement": "The profile returned by the route is produced by the existing getEmployeeProfileById/toEmployeeProfile mapping (omitting passwordHash and terminationDate), not a raw Employee.",
+      "referencePath": "src/modules/employee/employee.service.ts"
+    },
+    {
+      "requirement": "Login error indistinguishability and the { token, profile } return shape match the existing AuthService.login contract.",
+      "referencePath": "src/modules/auth/auth.service.ts"
+    },
+    {
+      "requirement": "The employeeRoutes export is re-exported from the employee module's public entry point and registered in app.ts alongside the other route modules.",
+      "referencePath": "src/modules/employee/index.ts"
+    },
+    {
+      "requirement": "Unit tests follow the existing leave route test style (Fastify inject, decorated service seam, preHandler populating request.user).",
+      "referencePath": "tests/unit/modules/leave/leave.routes.test.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/employee/employee.service.ts (getEmployeeProfileById)",
+      "why": "The profile route delegates to this existing service method; no new service logic is needed."
+    },
+    {
+      "target": "src/shared/auth (signToken / registerAuth / PUBLIC_PATHS)",
+      "why": "Login mints the token the smoke probe uses; the profile/leaves/balances endpoints rely on the existing auth hook populating request.user."
+    },
+    {
+      "target": "src/app.ts (route registration)",
+      "why": "employeeRoutes must be mounted for the profile endpoint to exist at runtime."
+    },
+    {
+      "target": "scripts/smoke.js (seed block + probe stages)",
+      "why": "The end-to-end verification of login + authenticated reads depends on the seeded employee/password_hash/leave-type/policy/balance rows."
+    }
+  ]
+}

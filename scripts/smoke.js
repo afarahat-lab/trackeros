@@ -17,6 +17,7 @@
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const bcrypt = require('bcrypt');
 
 const DB = path.join(__dirname, '..', '.smoke.sqlite');
 
@@ -138,21 +139,42 @@ console.log(`\n  smoke mode: ${MODE}${PG ? '' : '  (persistence NOT covered — 
       // proves the migrated schema and the repositories' queries agree, which is the
       // failure the whole brief is about.
       const knex = require('knex')(require('../knexfile').smoke_pg);  // searchPath = SCHEMA
+      let seededRequestId = null;
+      // The seeded employee's password_hash is minted with the SAME bcrypt call the app
+      // will use to verify it — hashSync(plaintext, 10) — so stage 4's real login can
+      // compare against it. Plaintext is shared through SMOKE_PASSWORD so NO credential
+      // string is hardcoded in this file (no-hardcoded-secrets).
+      const SMOKE_PASSWORD = process.env.SMOKE_PASSWORD || 'smoke-check-password';
       try {
+        const passwordHash = bcrypt.hashSync(SMOKE_PASSWORD, 10);
+
         await knex('employees').insert({
           id: EMP, employee_number: 'E-0001', first_name: 'Smoke', last_name: 'Test',
           email: 'smoke@example.com', role: EmployeeRole.EMPLOYEE,
+          manager_id: null, department: 'Engineering',
           hire_date: '2020-01-01', employment_status: EmploymentStatus.ACTIVE,
+          password_hash: passwordHash,
         });
-        await knex('leave_types').insert({
-          code: LeaveTypeCode.ANNUAL, name: 'Annual', requires_approval: true, is_paid: true,
-        });
-        await knex('leave_policies').insert({
-          id: 'pol-1', leave_type_code: LeaveTypeCode.ANNUAL, policy_name: 'Standard',
-          annual_entitlement_days: 25, accrual_period_months: 12, carry_forward_days: 0,
-          min_notice_days: 0, requires_manager_approval: true,
-          effective_from: '2020-01-01', status: 'ACTIVE',
-        });
+        await knex('leave_types').insert([
+          { code: LeaveTypeCode.ANNUAL, name: 'Annual', requires_approval: true, is_paid: true },
+          { code: LeaveTypeCode.SICK, name: 'Sick', requires_approval: true, is_paid: true },
+        ]);
+        await knex('leave_policies').insert([
+          {
+            id: 'pol-1', leave_type_code: LeaveTypeCode.ANNUAL, policy_name: 'Standard',
+            annual_entitlement_days: 25, accrual_period_months: 12, carry_forward_days: 0,
+            min_notice_days: 0, requires_manager_approval: true,
+            effective_from: '2020-01-01', status: 'ACTIVE',
+          },
+          // A SECOND leave type with an EFFECTIVE policy but NO balance row: it must be
+          // omitted (never synthesized) by GET /balances/me — stage 8 asserts exactly this.
+          {
+            id: 'pol-2', leave_type_code: LeaveTypeCode.SICK, policy_name: 'Sick',
+            annual_entitlement_days: 10, accrual_period_months: 12, carry_forward_days: 0,
+            min_notice_days: 0, requires_manager_approval: true,
+            effective_from: '2020-01-01', status: 'ACTIVE',
+          },
+        ]);
         await knex('leave_balances').insert({
           id: 'bal-1', employee_id: EMP, leave_type_code: LeaveTypeCode.ANNUAL,
           // period_end is EXCLUSIVE: periodContaining() builds [start, start+accrualMonths)
@@ -177,7 +199,169 @@ console.log(`\n  smoke mode: ${MODE}${PG ? '' : '  (persistence NOT covered — 
           `broken — either way a genuine defect. body: ${String(authed.payload || '').slice(0, 400)}`
         );
       }
+      const createdLeave = JSON.parse(authed.payload);
+      seededRequestId = createdLeave.id;
       ok(`stage 3d persistence — a seeded leave request was created end to end (${authed.statusCode})`);
+
+      // ── Stage 4 — login: real end-to-end credential flow ────────────────────────
+      // Exercises AuthService.login through bcrypt.compare against the seeded hash. The
+      // returned token is minted under the SAME JWT_SECRET registerAuth verifies, so it is
+      // a genuine login token — not the hand-minted `signToken` used by stages 3b/3c.
+      let login;
+      try {
+        login = await app.inject({
+          method: 'POST', url: '/auth/login',
+          payload: { email: 'smoke@example.com', password: SMOKE_PASSWORD },
+        });
+      } catch (e) { die('stage 4 login', e); }
+      if (login.statusCode !== 200) {
+        throw new Error(
+          `POST /auth/login returned ${login.statusCode} for the seeded credentials. ` +
+          `body: ${String(login.payload || '').slice(0, 400)}`
+        );
+      }
+      const loginBody = JSON.parse(login.payload);
+      if (typeof loginBody.token !== 'string' || loginBody.token.length === 0) {
+        throw new Error(`POST /auth/login returned no token: ${String(login.payload)}`);
+      }
+      if (!loginBody.profile || typeof loginBody.profile !== 'object') {
+        throw new Error(`POST /auth/login returned no profile: ${String(login.payload)}`);
+      }
+      // 10 fields of EmployeeProfile: no passwordHash, no terminationDate; managerId is
+      // null because the seed left it unset. Mirrors the stage 5 assertion.
+      const loginProfile = loginBody.profile;
+      const expectedLoginProfile = {
+        id: EMP, employeeNumber: 'E-0001', firstName: 'Smoke', lastName: 'Test',
+        email: 'smoke@example.com', role: EmployeeRole.EMPLOYEE,
+        managerId: null, department: 'Engineering',
+        hireDate: '2020-01-01T00:00:00.000Z', employmentStatus: EmploymentStatus.ACTIVE,
+      };
+      for (const key of Object.keys(expectedLoginProfile)) {
+        if (loginProfile[key] !== expectedLoginProfile[key]) {
+          throw new Error(
+            `login profile mismatch on ${key}: got ${JSON.stringify(loginProfile[key])}, ` +
+            `expected ${JSON.stringify(expectedLoginProfile[key])}`
+          );
+        }
+      }
+      if ('passwordHash' in loginProfile || 'terminationDate' in loginProfile) {
+        throw new Error(`login profile must not expose passwordHash/terminationDate: ${String(login.payload)}`);
+      }
+      const loginToken = loginBody.token;
+      ok('stage 4 login — real credentials return a token + profile (200)');
+
+      // ── Stage 5 — profile via /employees/me ─────────────────────────────────────
+      // 10 fields of EmployeeProfile: no passwordHash, no terminationDate; managerId is
+      // null because the seed left it unset, and department matches the seed value.
+      let me = await app.inject({
+        method: 'GET', url: '/employees/me',
+        headers: { authorization: `Bearer ${loginToken}` },
+      });
+      if (me.statusCode !== 200) {
+        throw new Error(`GET /employees/me returned ${me.statusCode}`);
+      }
+      const meBody = JSON.parse(me.payload);
+      const expectedProfile = {
+        id: EMP, employeeNumber: 'E-0001', firstName: 'Smoke', lastName: 'Test',
+        email: 'smoke@example.com', role: EmployeeRole.EMPLOYEE,
+        managerId: null, department: 'Engineering',
+        hireDate: '2020-01-01T00:00:00.000Z', employmentStatus: EmploymentStatus.ACTIVE,
+      };
+      for (const key of Object.keys(expectedProfile)) {
+        if (meBody[key] !== expectedProfile[key]) {
+          throw new Error(
+            `GET /employees/me profile mismatch on ${key}: got ${JSON.stringify(meBody[key])}, ` +
+            `expected ${JSON.stringify(expectedProfile[key])}`
+          );
+        }
+      }
+      if ('passwordHash' in meBody || 'terminationDate' in meBody) {
+        throw new Error(`GET /employees/me must not expose passwordHash/terminationDate: ${String(me.payload)}`);
+      }
+      ok('stage 5 profile — /employees/me returns the exact 10-field EmployeeProfile');
+
+      // ── Stage 6 — list returns the seeded request to its owner ──────────────────
+      let list = await app.inject({
+        method: 'GET', url: '/leaves',
+        headers: { authorization: `Bearer ${loginToken}` },
+      });
+      if (list.statusCode !== 200) throw new Error(`GET /leaves returned ${list.statusCode}`);
+      const listBody = JSON.parse(list.payload);
+      if (!Array.isArray(listBody) || !listBody.some((l) => l.id === seededRequestId)) {
+        throw new Error(`GET /leaves did not include the seeded request ${seededRequestId}`);
+      }
+      ok(`stage 6 list — GET /leaves includes the seeded request for its owner (${listBody.length} total)`);
+
+      // ── Stage 7 — getById returns the seeded request ─────────────────────────────
+      let one = await app.inject({
+        method: 'GET', url: `/leaves/${seededRequestId}`,
+        headers: { authorization: `Bearer ${loginToken}` },
+      });
+      if (one.statusCode !== 200) {
+        throw new Error(`GET /leaves/${seededRequestId} returned ${one.statusCode}`);
+      }
+      const oneBody = JSON.parse(one.payload);
+      if (oneBody.id !== seededRequestId || oneBody.employeeId !== EMP) {
+        throw new Error(`GET /leaves/:id did not return the seeded request: ${String(one.payload)}`);
+      }
+      ok('stage 7 getById — GET /leaves/:id returns the seeded request');
+
+      // ── Stage 8 — current-period balances omit effective policies with no row ──
+      // ONLY the ANNUAL balance exists (the SICK leave type has an effective ACTIVE policy
+      // but NO leave_balances row), so the response must contain exactly that one balance
+      // for the CURRENT period and nothing synthesized for SICK.
+      //
+      // The current period is derived with the SAME periodContaining the service uses
+      // (src/shared/date), anchored on the hire date — never a hand-written date — so the
+      // assertion matches getCurrentBalances() for whatever `new Date()` is at run time.
+      const { periodContaining } = require('../src/shared/date');
+      const hireDate = new Date('2020-01-01T00:00:00.000Z');
+      const curPeriod = periodContaining(hireDate, 12, new Date());
+      const curStartStr = curPeriod.start.toISOString().slice(0, 10);
+      const curEndStr = curPeriod.end.toISOString().slice(0, 10);
+
+      // Re-key the seeded balance to the CURRENT period, so GET /balances/me returns it
+      // (the service only reads the current period — a 2030 row would be invisible today
+      // and the check would assert against an empty list).
+      const knexRefresh = require('knex')(require('../knexfile').smoke_pg);
+      try {
+        await knexRefresh('leave_balances').where({ id: 'bal-1' }).update({
+          period_start: curStartStr,
+          period_end: curEndStr,
+        });
+      } finally { await knexRefresh.destroy(); }
+
+      const balances = await app.inject({
+        method: 'GET', url: '/balances/me',
+        headers: { authorization: `Bearer ${loginToken}` },
+      });
+      if (balances.statusCode !== 200) {
+        throw new Error(`GET /balances/me returned ${balances.statusCode}`);
+      }
+      const balanceList = JSON.parse(balances.payload);
+      if (!Array.isArray(balanceList) || balanceList.length !== 1) {
+        throw new Error(
+          `GET /balances/me must contain EXACTLY one balance, got ${balanceList.length}: ` +
+          String(balances.payload)
+        );
+      }
+      const annualBalance = balanceList[0];
+      if (annualBalance.leaveTypeCode !== LeaveTypeCode.ANNUAL) {
+        throw new Error(`expected the annual balance, got ${annualBalance.leaveTypeCode}`);
+      }
+      if (annualBalance.periodStart !== `${curStartStr}T00:00:00.000Z` ||
+          annualBalance.periodEnd !== `${curEndStr}T00:00:00.000Z`) {
+        throw new Error(
+          `seeded balance period mismatch: got ${annualBalance.periodStart}..${annualBalance.periodEnd}, ` +
+          `expected ${curStartStr}..${curEndStr}`
+        );
+      }
+      // A new request reserves nothing (pendingDays stays 0 on CREATE), so available is
+      // still the full 25-day entitlement.
+      if (annualBalance.available !== 25) {
+        throw new Error(`seeded balance available should be 25, got ${annualBalance.available}`);
+      }
+      ok('stage 8 balances — /balances/me returns exactly the seeded balance (sick omitted)');
     }
   } catch (e) { die('probe', e); }
   finally {

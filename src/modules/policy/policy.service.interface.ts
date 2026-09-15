@@ -5,4 +5,5 @@ export interface IPolicyService {
   createLeavePolicy(input: CreateLeavePolicyInput): Promise<LeavePolicy>;
   getLeavePolicyById(id: string): Promise<LeavePolicy>;
   getPolicyByLeaveTypeCode(leaveTypeCode: LeaveTypeCode): Promise<LeavePolicy>;
+  getAllPolicies(): Promise<LeavePolicy[]>;
 }

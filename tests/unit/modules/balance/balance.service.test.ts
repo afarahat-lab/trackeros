@@ -13,7 +13,7 @@ import {
 } from '../../../../src/modules/policy';
 import { ValidationError, NotFoundError, ConflictError } from '../../../../src/shared/errors';
 import { IUnitOfWork } from '../../../../src/shared/db';
-import { LeaveTypeCode, EmployeeRole, EmploymentStatus } from '../../../../src/shared/types';
+import { LeaveTypeCode, EmployeeRole, EmploymentStatus, EmployeeProfile } from '../../../../src/shared/types';
 
 class FakeBalanceRepository implements IBalanceRepository {
   rows: LeaveBalance[] = [];
@@ -74,6 +74,22 @@ class FakeEmployeeService implements IEmployeeService {
     }
     return employee;
   }
+
+  async getEmployeeByEmail(email: string): Promise<Employee> {
+    const employee = this.rows.find((e) => e.email === email);
+    if (!employee) {
+      throw new NotFoundError('Employee not found');
+    }
+    return employee;
+  }
+
+  async getEmployeesByManagerId(managerId: string): Promise<Employee[]> {
+    return this.rows.filter((e) => e.managerId === managerId);
+  }
+
+  async getEmployeeProfileById(id: string): Promise<EmployeeProfile> {
+    throw new Error('Not implemented');
+  }
 }
 
 class FakePolicyService implements IPolicyService {
@@ -98,6 +114,10 @@ class FakePolicyService implements IPolicyService {
     }
     return policy;
   }
+
+  async getAllPolicies(): Promise<LeavePolicy[]> {
+    return this.rows;
+  }
 }
 
 class FakeUnitOfWork implements IUnitOfWork {
@@ -119,6 +139,7 @@ function makeEmployee(id = 'emp-1'): Employee {
     hireDate: new Date('2020-01-01'),
     terminationDate: null,
     employmentStatus: EmploymentStatus.ACTIVE,
+    passwordHash: null,
   };
 }
 

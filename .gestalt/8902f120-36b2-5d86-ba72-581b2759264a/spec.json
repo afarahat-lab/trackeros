@@ -1,0 +1,131 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "employee",
+      "shared-types"
+    ],
+    "affectedLayers": [
+      "migration",
+      "model",
+      "repository",
+      "service",
+      "tests"
+    ],
+    "isBreakingChange": true,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "A new migration adds a nullable `password_hash` column to the `employees` table (up) and drops it (down), following the async up/down convention of `migrations/20260913000000_initial_schema.js`.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "`Employee` gains `passwordHash: string | null`, and `PgEmployeeRepository` persists and reads it end-to-end: `EmployeeRow`/`mapRow` carry `password_hash`, every SELECT list and the INSERT column/value + RETURNING lists include it, and `create` persists `input.passwordHash`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`IEmployeeRepository.findByManagerId(managerId, client?)` returns all employees whose `manager_id` equals the argument (empty array when none), accepting an optional trailing `PoolClient`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`IEmployeeService` exposes `getEmployeeByEmail`, `getEmployeesByManagerId`, and `getEmployeeProfileById`; `getEmployeeByEmail` throws `NotFoundError` on an unknown email and `getEmployeesByManagerId` delegates to `findByManagerId`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`getEmployeeProfileById` returns an `EmployeeProfile` (imported from `src/shared/types`) whose mapping never exposes `passwordHash` or `terminationDate`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Unit tests cover `findByManagerId`, `getEmployeeByEmail` (including the `NotFoundError` case), and assert the profile mapping never leaks `passwordHash`.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The `password_hash` column must be added as a nullable text column (`t.text`), not `json`/`jsonb`, and the migration must use async `exports.up`/`exports.down` with `knex.schema.alterTable('employees', ...)`.",
+    "`Employee.passwordHash` must be typed `string | null` (nullable \u2014 an employee may have no login credential yet).",
+    "`EmployeeProfile` must be imported from `src/shared/types` \u2014 it must not be re-declared or re-exported from the employee module.",
+    "The profile mapping must omit both `passwordHash` and `terminationDate`; `passwordHash` must never appear in any returned profile.",
+    "`findByManagerId` must filter with `WHERE manager_id = $1` and return an array (possibly empty), never throw when no rows match."
+  ],
+  "outOfScope": [
+    "No routes/controllers/RBAC for the employee module in this phase \u2014 the `GET /employees/me` route and its wiring belong to Phase 7.",
+    "No auth/login logic (bcrypt compare, token minting) \u2014 that is Phase 4; this phase only adds the credential column and read surface it depends on.",
+    "No audit-log writes (GP-002) \u2014 this phase is read-only plus a schema/column addition; no state-changing business operation is introduced.",
+    "No refactor of `leave.service.ts`/`balance.service.ts` to import the shared date helpers \u2014 that is a later phase."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "An Employee may exist without a login credential: `passwordHash` is nullable and `null` means no credential is set; it is never synthesized or defaulted to a non-null value by the repository or service."
+    },
+    {
+      "entity": "EmployeeProfile",
+      "mustExistOrExtend": true,
+      "invariant": "An EmployeeProfile is a credential-free projection of an Employee: it carries identity/role/employment fields but never `passwordHash` or `terminationDate`, so it is safe to return to any authenticated caller."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "getEmployeeByEmail(email)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the matching Employee; throws NotFoundError when no employee has that email (delegating to the existing findByEmail)."
+    },
+    {
+      "operation": "getEmployeesByManagerId(managerId)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns the (possibly empty) list of direct reports; never throws for an unknown manager id."
+    },
+    {
+      "operation": "getEmployeeProfileById(id)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Returns an EmployeeProfile for the employee; throws NotFoundError on an unknown id; the returned value never contains passwordHash or terminationDate."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The `EmployeeProfile` shape (fields and the absence of `passwordHash`/`terminationDate`) must match the canonical definition in `src/shared/types/index.ts`; the mapping must not introduce a divergent local type.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The migration must follow the async `exports.up`/`exports.down` convention and column style of the initial schema (string/text columns, snake_case), so `password_hash` is consistent with the existing `employees` table.",
+      "referencePath": "migrations/20260913000000_initial_schema.js"
+    },
+    {
+      "requirement": "`EmployeeRow`/`mapRow` and the SELECT/INSERT lists must stay consistent with the existing snake_case\u2194camelCase mapping in `PgEmployeeRepository`, so `password_hash` is mapped to `passwordHash` exactly like the other columns.",
+      "referencePath": "src/modules/employee/employee.repository.ts"
+    },
+    {
+      "requirement": "`getEmployeeByEmail` must reuse the existing `IEmployeeRepository.findByEmail` and the existing null\u2192NotFoundError pattern already used by `getEmployeeById`.",
+      "referencePath": "src/modules/employee/employee.service.ts"
+    },
+    {
+      "requirement": "`CreateEmployeeInput` (Omit<Employee,'id'>) must now require `passwordHash`; the existing test helper `makeInput` and `FakeEmployeeRepository.create` must be updated to supply/handle it so the suite still type-checks.",
+      "referencePath": "tests/unit/modules/employee.service.test.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts (EmployeeProfile)",
+      "why": "The profile mapping's return type is the canonical EmployeeProfile from Phase 1; the employee module must import it rather than re-declare it."
+    },
+    {
+      "target": "src/shared/errors/index.ts (NotFoundError)",
+      "why": "getEmployeeByEmail and getEmployeeProfileById surface unknown-email/unknown-id as the shared NotFoundError, matching existing service error semantics."
+    },
+    {
+      "target": "src/shared/db/connection.ts (pool) and pg PoolClient",
+      "why": "findByManagerId must accept an optional trailing PoolClient and fall back to the shared pool, per the transaction-boundary convention."
+    }
+  ]
+}

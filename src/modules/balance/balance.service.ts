@@ -1,11 +1,19 @@
 import { PoolClient } from 'pg';
 import { LeaveTypeCode } from '../../shared/types';
 import { ValidationError, NotFoundError, ConflictError } from '../../shared/errors';
-import { IUnitOfWork } from '../../shared/db';
-import { IEmployeeService } from '../employee';
-import { IPolicyService } from '../policy';
+import { IUnitOfWork, PgUnitOfWork } from '../../shared/db';
+import { periodContaining } from '../../shared/date';
+import { EmployeeService, IEmployeeService, PgEmployeeRepository } from '../employee';
+import {
+  IPolicyService,
+  LeavePolicy,
+  LeavePolicyStatus,
+  PolicyService,
+  PgLeavePolicyRepository,
+} from '../policy';
+import { LeaveTypeService, PgLeaveTypeRepository } from '../leave-type';
 import { LeaveBalance, CreateLeaveBalanceInput } from './balance.model';
-import { IBalanceRepository } from './balance.repository';
+import { IBalanceRepository, PgLeaveBalanceRepository } from './balance.repository';
 
 export interface OpenBalancePeriodInput {
   employeeId: string;
@@ -28,6 +36,7 @@ export interface IBalanceService {
     periodEnd: Date
   ): Promise<LeaveBalance | null>;
   getBalanceById(id: string): Promise<LeaveBalance>;
+  getCurrentBalances(employeeId: string): Promise<Array<LeaveBalance & { available: number }>>;
 }
 
 export class BalanceService implements IBalanceService {
@@ -158,6 +167,55 @@ export class BalanceService implements IBalanceService {
     return balance;
   }
 
+  async getCurrentBalances(
+    employeeId: string
+  ): Promise<Array<LeaveBalance & { available: number }>> {
+    const employee = await this.employeeService.getEmployeeById(employeeId);
+    const policies = await this.policyService.getAllPolicies();
+
+    const asOf = new Date();
+
+    // Select at most one effective policy per leaveTypeCode: ACTIVE status, within
+    // its effective window, tie-broken by the latest effectiveFrom.
+    const effectiveByType = new Map<LeaveTypeCode, LeavePolicy>();
+    for (const policy of policies) {
+      if (policy.status !== LeavePolicyStatus.ACTIVE) {
+        continue;
+      }
+      if (policy.effectiveFrom.getTime() > asOf.getTime()) {
+        continue;
+      }
+      if (policy.effectiveTo !== null && policy.effectiveTo.getTime() < asOf.getTime()) {
+        continue;
+      }
+      const current = effectiveByType.get(policy.leaveTypeCode);
+      if (!current || policy.effectiveFrom.getTime() > current.effectiveFrom.getTime()) {
+        effectiveByType.set(policy.leaveTypeCode, policy);
+      }
+    }
+
+    const results: Array<LeaveBalance & { available: number }> = [];
+
+    for (const policy of effectiveByType.values()) {
+      const period = periodContaining(employee.hireDate, policy.accrualPeriodMonths, asOf);
+      const balance = await this.repository.findByKey(
+        employeeId,
+        policy.leaveTypeCode,
+        period.start,
+        period.end
+      );
+      if (!balance) {
+        continue;
+      }
+      results.push({
+        ...balance,
+        available: balance.entitledDays - balance.usedDays - balance.pendingDays,
+      });
+    }
+
+    return results;
+  }
+
   private validateOpenInput(input: OpenBalancePeriodInput): void {
     if (typeof input.employeeId !== 'string' || input.employeeId.trim() === '') {
       throw new ValidationError('Invalid employeeId');
@@ -191,4 +249,17 @@ export class BalanceService implements IBalanceService {
     result.setUTCDate(Math.min(day, lastDay));
     return result;
   }
+}
+
+/**
+ * Convenience factory wiring the concrete PostgreSQL-backed collaborators the
+ * routes layer needs so route handlers construct a single service instance.
+ */
+export function createBalanceService(): IBalanceService {
+  return new BalanceService(
+    new PgLeaveBalanceRepository(),
+    new EmployeeService(new PgEmployeeRepository()),
+    new PolicyService(new PgLeavePolicyRepository(), new LeaveTypeService(new PgLeaveTypeRepository())),
+    new PgUnitOfWork(),
+  );
 }
