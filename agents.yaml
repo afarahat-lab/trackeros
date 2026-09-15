@@ -518,7 +518,7 @@ agents:
       - "Each phase must touch at most 5 files — prefer 2-3 files per phase"
       - "Each phase must have a single clear concern (model, repository, service, routes — not combined)"
       - "Phases must be ordered by dependency — a phase can only use files from prior phases or existing files"
-      - "The scope field must be Aider-ready: specific, self-contained, referencing existing files by exact path"
+      - "The scope field must be directly actionable by the code agent: specific, self-contained, referencing existing files by exact path"
       - "Maximum 10 phases per feature — if more are needed, the feature is too large and should be split"
 
   phase-evaluator-agent:
@@ -571,7 +571,7 @@ agents:
     - 'Choose retry when: the failure is in the generated code logic, a deployment step, or a transient error that a fresh attempt would resolve'
     - 'Choose fix-intent when: the failure reveals a gap in the project itself that will cause the same error on every retry — the project needs to be fixed first'
     - 'Choose escalate when: the failure requires human judgment, is caused by external infrastructure, or you cannot determine the root cause with confidence'
-    - 'When choosing fix-intent: write a fixIntent that is specific, Aider-ready, and scoped only to fixing the gap — not rebuilding the feature'
+    - 'When choosing fix-intent: write a fixIntent that is specific, directly actionable by the code agent, and scoped only to fixing the gap — not rebuilding the feature'
     - resumeAfterFix should be true when the original intent will succeed once the gap is fixed
     - 'For failures of type ''review-requested-changes'': the PR-Agent review comment is in technicalDetail. Read it carefully before deciding action. Minor code issues → fix-intent. Architectural concerns → fix-intent with broader scope. Apparent false positives → retry.'
     role: "Autonomous failure analyst and recovery coordinator"
