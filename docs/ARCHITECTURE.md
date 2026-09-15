@@ -537,7 +537,7 @@ This phase delivers the employee profile route and the leave read-route unit tes
 - `tests/unit/modules/leave/leave.routes.test.ts` — added a `GET /leaves and GET /leaves/:id role scoping` describe block exercising the Phase 6 read endpoints at the HTTP boundary with an in-memory `ILeaveService` fake (decorated on the Fastify instance via the existing `leaveService` seam): `GET /leaves` scopes visible requests per role (EMPLOYEE → 1, MANAGER → 2, ADMIN → 3); `GET /leaves/:id` returns a visible request for its owner; and `GET /leaves/:id` returns a byte-identical 404 (`code: 'NOT_FOUND'`) for both a not-visible id and a nonexistent id (asserting `invisible.json()` equals `missing.json()`).
 
 **Divergences from the plan worth noting:**
-- PLAN.md Phase 7 item (4) — extending `scripts/smoke.js` with login + authenticated read probes (seed a second leave type with no balance row, `POST /auth/login`, `GET /employees/me`, `GET /leaves`, `GET /leaves/:id`, `GET /balances/me`) — was **not** delivered. `scripts/smoke.js` is unchanged from its pre-feature state (stages 1–3d only; no `password_hash` seeding, no login/read probes).
+- PLAN.md Phase 7 item (4) — extending `scripts/smoke.js` with login + authenticated read probes — was **not** delivered in this phase; it was delivered in a later sub-phase (see "Phase 9 delivered" below).
 - PLAN.md Phase 7 item (5) — the `tests/unit/modules/auth/auth.service.test.ts` unit tests (login success/failure, indistinguishable wrong-email vs wrong-password) were **not** delivered. No such file exists; the only auth coverage is indirect (the `AuthService` is exercised only through the smoke check's eventual login probe, which is itself not yet implemented).
 - The plan prescribed "reuse resolveActor/sendError shape from `src/modules/leave/leave.routes.ts`"; the implementation uses local copies (matching the `balance.routes.ts`/`auth.routes.ts` precedent) rather than importing from `leave.routes.ts` — the shape is identical, but there is no shared helper module.
 - The plan's Phase 7 item (5) also prescribed a profile-route unit test; the profile route (`GET /employees/me`) has no dedicated route test — it is covered only indirectly by the `employee.service.test.ts` `getEmployeeProfileById` service tests (which assert `passwordHash`/`terminationDate` are never leaked).
@@ -551,6 +551,22 @@ This phase is a test-only fix confined to `tests/unit/modules/leave/leave.routes
 
 **Divergences from the plan worth noting:**
 - None — this phase matches the spec exactly (test-only, no production changes).
+
+### Phase 9 delivered (smoke.js e2e extension)
+
+This phase delivers the `scripts/smoke.js` extension prescribed by PLAN.md Phase 7 item (4) — the login + authenticated read probes previously documented as not delivered. No production source changed; the only project file touched is `scripts/smoke.js`.
+
+**Seed block (stage 3d, Postgres mode only)** — the seed now mints the seeded employee's `password_hash` via `bcrypt.hashSync(SMOKE_PASSWORD, 10)` (plaintext from `process.env.SMOKE_PASSWORD`, defaulting to `'smoke-check-password'` — no credential string hardcoded, per no-hardcoded-secrets), and seeds a second leave type (`LeaveTypeCode.SICK`) with an effective ACTIVE policy (`pol-2`) but **no** `leave_balances` row — the fixture that proves `getCurrentBalances` omits an effective policy lacking a balance.
+
+**New stages (4–8, Postgres mode only; skipped with the existing caveat in sqlite mode):**
+- **Stage 4 — login**: `POST /auth/login` with the seeded email + `SMOKE_PASSWORD`; asserts 200, a non-empty `token`, and a `profile` whose `id`/`email` match the seeded employee. The returned token is a genuine login token (minted under the same `JWT_SECRET` `registerAuth` verifies), not the hand-minted `signToken` used by stages 3b/3c.
+- **Stage 5 — profile**: `GET /employees/me` with the login token; asserts the exact 10-field `EmployeeProfile` (id, employeeNumber, firstName, lastName, email, role, managerId, department, hireDate serialized as UTC midnight, employmentStatus) and that `passwordHash`/`terminationDate` are absent.
+- **Stage 6 — list**: `GET /leaves` with the login token; asserts the request created in stage 3d is present (EMPLOYEE role scoping to `employeeIds=[actor.id]`).
+- **Stage 7 — getById**: `GET /leaves/:id` using the id captured from the stage 3d `POST /leaves` response body (not predicted — the repository generates it via `randomUUID()`); asserts the seeded request is returned.
+- **Stage 8 — balances**: re-keys the seeded `bal-1` balance to the CURRENT accrual period via `periodContaining(hireDate, 12, new Date())` (imported from `src/shared/date`, the same helper `getCurrentBalances` uses — never a hand-written date), then `GET /balances/me`; asserts exactly one balance (the ANNUAL one), with `leaveTypeCode === ANNUAL`, the current-period `periodStart`/`periodEnd`, and `available === 25` (a new request reserves nothing, so pendingDays stays 0). The SICK leave type (effective policy, no balance row) is omitted.
+
+**Divergences from the plan worth noting:**
+- None — this phase matches PLAN.md Phase 7 item (4) and the phase spec's six success criteria exactly: the second leave type + password_hash seeding, the login/profile/list/getById/balances stages, real-value assertions (not just status codes), Postgres-only gating, and the `periodContaining`-derived current-period re-key.
 
 ### Open questions
 - Q1: Should a controller layer be introduced, or continue with routes calling services directly? (candidates: continue routes-call-services; introduce controllers)
