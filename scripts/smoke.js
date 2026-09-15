@@ -151,7 +151,7 @@ console.log(`\n  smoke mode: ${MODE}${PG ? '' : '  (persistence NOT covered — 
         await knex('employees').insert({
           id: EMP, employee_number: 'E-0001', first_name: 'Smoke', last_name: 'Test',
           email: 'smoke@example.com', role: EmployeeRole.EMPLOYEE,
-          manager_id: null, department: null,
+          manager_id: null, department: 'Engineering',
           hire_date: '2020-01-01', employment_status: EmploymentStatus.ACTIVE,
           password_hash: passwordHash,
         });
@@ -234,8 +234,8 @@ console.log(`\n  smoke mode: ${MODE}${PG ? '' : '  (persistence NOT covered — 
       ok('stage 4 login — real credentials return a token + profile (200)');
 
       // ── Stage 5 — profile via /employees/me ─────────────────────────────────────
-      // 10 fields of EmployeeProfile: no passwordHash, no terminationDate; managerId and
-      // department are null because the seed left them unset.
+      // 10 fields of EmployeeProfile: no passwordHash, no terminationDate; managerId is
+      // null because the seed left it unset, and department matches the seed value.
       let me = await app.inject({
         method: 'GET', url: '/employees/me',
         headers: { authorization: `Bearer ${loginToken}` },
@@ -247,7 +247,7 @@ console.log(`\n  smoke mode: ${MODE}${PG ? '' : '  (persistence NOT covered — 
       const expectedProfile = {
         id: EMP, employeeNumber: 'E-0001', firstName: 'Smoke', lastName: 'Test',
         email: 'smoke@example.com', role: EmployeeRole.EMPLOYEE,
-        managerId: null, department: null,
+        managerId: null, department: 'Engineering',
         hireDate: '2020-01-01T00:00:00.000Z', employmentStatus: EmploymentStatus.ACTIVE,
       };
       for (const key of Object.keys(expectedProfile)) {
