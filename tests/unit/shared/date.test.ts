@@ -44,6 +44,15 @@ describe('addMonths', () => {
     );
   });
 
+  it('clamps a 31-day month down to a 30-day month', () => {
+    expect(addMonths(new Date(Date.UTC(2023, 0, 31)), 3).getTime()).toBe(
+      Date.UTC(2023, 3, 30),
+    );
+    expect(addMonths(new Date(Date.UTC(2023, 2, 31)), 1).getTime()).toBe(
+      Date.UTC(2023, 3, 30),
+    );
+  });
+
   it('clamps correctly across a leap-year February', () => {
     expect(addMonths(new Date(Date.UTC(2024, 0, 31)), 1).getTime()).toBe(
       Date.UTC(2024, 1, 29),
