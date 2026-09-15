@@ -169,9 +169,19 @@ describe('leave routes — GET /leaves and GET /leaves/:id role scoping', () => 
         }
         return store.filter((r) => r.employeeId === a.id);
       }),
-      getById: jest.fn(async (_a: LeaveActor, id: string) => {
+      getById: jest.fn(async (a: LeaveActor, id: string) => {
         const found = store.find((r) => r.id === id);
         if (!found) {
+          throw new NotFoundError('Leave request not found');
+        }
+        if (a.role === EmployeeRole.ADMIN) {
+          return found;
+        }
+        const visibleIds = [a.id];
+        if (a.role === EmployeeRole.MANAGER) {
+          visibleIds.push('emp-2');
+        }
+        if (!visibleIds.includes(found.employeeId)) {
           throw new NotFoundError('Leave request not found');
         }
         return found;
