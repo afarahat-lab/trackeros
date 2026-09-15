@@ -467,6 +467,17 @@ This phase delivers the employee credential column and read surface (recommended
 - PLAN.md Phase 2 item (7) prescribed editing `src/modules/employee/index.ts` to "re-export nothing new (types already exported) but confirm `EmployeeProfile` is imported from shared-types, not re-declared." No change was needed: `index.ts` already re-exports the model/repository/service types, and `EmployeeProfile` is imported from `src/shared/types` in `employee.service.ts` (not re-declared), so `index.ts` was left untouched.
 - The plan's file count (~6) did not account for the two existing test fakes that implement `IEmployeeService` — `tests/unit/modules/balance/balance.service.test.ts` and `tests/unit/modules/leave/leave.service.test.ts` — which had to gain the three new methods (`getEmployeeByEmail`, `getEmployeesByManagerId`, `getEmployeeProfileById`) to keep satisfying the expanded interface. Those fakes were updated in this phase (the balance/leave fakes now implement the new methods, with `getEmployeeProfileById` throwing `Not implemented`).
 
+### Phase 3 delivered (policy getAllPolicies exposure)
+
+This phase delivers the policy read-through (recommended phase 3); the auth/balance/leave-read work (phases 4–7) is not yet implemented.
+
+- `src/modules/policy/policy.service.interface.ts` — `IPolicyService` gained `getAllPolicies(): Promise<LeavePolicy[]>`.
+- `src/modules/policy/policy.service.ts` — `PolicyService.getAllPolicies()` delegates verbatim to `this.repository.findAll()` with no filtering, sorting, transformation, or validation; it returns the repository's rows unchanged (any status, repository ordering) and returns `[]` when empty (never throws). No repository method was added or modified, and no new files, imports, or barrel changes were made.
+- `tests/unit/modules/balance/balance.service.test.ts` and `tests/unit/modules/leave/leave.service.test.ts` — the `FakePolicyService` fakes gained `getAllPolicies(): Promise<LeavePolicy[]>` (returning `this.rows`) to keep satisfying the expanded `IPolicyService` interface. No new test file was added; the method is a plain read-through with no behavior of its own to assert beyond the existing fakes.
+
+**Divergences from the plan worth noting:**
+- None — this phase matches PLAN.md Phase 3 and the phase spec exactly: a two-file service-layer change (interface + implementation) delegating to the existing `IPolicyRepository.findAll()`, with no filtering (the ACTIVE/effective-date/latest-effectiveFrom selection remains deferred to Phase 5) and no balance -> leave-type dependency.
+
 ### Open questions
 - Q1: Should a controller layer be introduced, or continue with routes calling services directly? (candidates: continue routes-call-services; introduce controllers)
 - Q2: Should LeavePolicyStatus be promoted into src/shared/types as a canonical enum? (candidates: promote to shared/types; keep module-local and import via policy index.ts)
