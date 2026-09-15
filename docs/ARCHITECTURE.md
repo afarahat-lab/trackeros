@@ -538,9 +538,9 @@ This phase delivers the employee profile route and the leave read-route unit tes
 
 **Divergences from the plan worth noting:**
 - PLAN.md Phase 7 item (4) — extending `scripts/smoke.js` with login + authenticated read probes — was **not** delivered in this phase; it was delivered in a later sub-phase (see "Phase 9 delivered" below).
-- PLAN.md Phase 7 item (5) — the `tests/unit/modules/auth/auth.service.test.ts` unit tests (login success/failure, indistinguishable wrong-email vs wrong-password) were **not** delivered. No such file exists; the only auth coverage is indirect (the `AuthService` is exercised only through the smoke check's eventual login probe, which is itself not yet implemented).
+- PLAN.md Phase 7 item (5) — the `tests/unit/modules/auth/auth.service.test.ts` unit tests (login success/failure, indistinguishable wrong-email vs wrong-password) were **not** delivered in this phase; they were delivered in a later sub-phase (see "Phase 11 delivered" below).
 - The plan prescribed "reuse resolveActor/sendError shape from `src/modules/leave/leave.routes.ts`"; the implementation uses local copies (matching the `balance.routes.ts`/`auth.routes.ts` precedent) rather than importing from `leave.routes.ts` — the shape is identical, but there is no shared helper module.
-- The plan's Phase 7 item (5) also prescribed a profile-route unit test; the profile route (`GET /employees/me`) has no dedicated route test — it is covered only indirectly by the `employee.service.test.ts` `getEmployeeProfileById` service tests (which assert `passwordHash`/`terminationDate` are never leaked).
+- The plan's Phase 7 item (5) also prescribed a profile-route unit test; the profile route (`GET /employees/me`) had no dedicated route test in this phase — it was delivered in a later sub-phase (see "Phase 11 delivered" below).
 
 ### Phase 8 delivered (leave read-route test fix)
 
@@ -579,6 +579,18 @@ This phase is a test-only change confined to `scripts/smoke.js`; no production s
 
 **Divergences from the plan worth noting:**
 - The phase spec's success criterion #4 described the login profile's `department` as `null`; the implementation asserts `department: 'Engineering'` — the value the stage 3d seed actually inserts (and the same value stage 5's `/employees/me` assertion checks). `managerId` remains `null` as the seed leaves it unset. This is a divergence from the spec's stated value, not a regression: the assertion matches the seeded row and the stage 5 profile assertion.
+
+### Phase 11 delivered (auth + employee route unit tests)
+
+This phase is a test-only phase confined to two NEW test files; no production source changed. It delivers the `auth.service.test.ts` and profile-route unit tests that PLAN.md Phase 7 item (5) prescribed and that the Phase 7 delivered section documented as not yet delivered.
+
+- `tests/unit/modules/auth/auth.service.test.ts` — NEW. Jest coverage for `AuthService.login` using the real `bcrypt` and `signToken` dependencies (not mocks): a `makeEmployee` fixture seeds `passwordHash` via `bcrypt.hashSync(CORRECT_PASSWORD, 4)` (low cost, test-only); `beforeAll` sets `process.env.JWT_SECRET = 'unit-test-jwt-secret'`. Four tests: (1) correct credentials return `{ token, profile }` with a non-empty string token and a profile carrying id/employeeNumber/email/role/managerId but `not.toHaveProperty('passwordHash')` / `not.toHaveProperty('terminationDate')`; (2) unknown email → `UnauthorizedError` (the fake `getEmployeeByEmail` throws `NotFoundError`, which `login` maps); (3) wrong password → `UnauthorizedError`; (4) wrong-email and wrong-password failures are indistinguishable (both `UnauthorizedError` with the identical message `'Invalid email or password'`).
+- `tests/unit/modules/employee/employee.routes.test.ts` — NEW. Route-level tests for `GET /employees/me` using the established route-test seam (build a Fastify instance, decorate the `employeeService` seam with a `jest.fn` fake cast `as unknown as IEmployeeService`, `decorateRequest('user', undefined)`, a `preHandler` hook setting `request.user = actor`, register `employeeRoutes`, `app.ready()`, then `app.inject`). Three tests: (1) 200 returns the profile and asserts `receivedId === actor.id` plus `not.toHaveProperty('passwordHash')` / `not.toHaveProperty('terminationDate')`; (2) 401 (`{ code: 'UNAUTHORIZED' }`) when there is no authenticated user; (3) 401 when the actor has an invalid role (`'SUPERUSER'`).
+
+**Divergences from the plan worth noting:**
+- The phase spec's success criterion #4 — a profile-route test asserting `NotFoundError` (404 / `NOT_FOUND`) for an actor id with no employee — is **not** covered: `employee.routes.test.ts` has no such test (the service is stubbed, so the 404 path is exercised only indirectly by `employee.service.test.ts`'s `getEmployeeProfileById` NotFoundError coverage).
+- The phase spec's constraint that "a fake IEmployeeService must implement all five methods" is **not** followed: the auth test's fake provides only `getEmployeeByEmail` (cast `as unknown as IEmployeeService`), and the employee route test's fake provides only `getEmployeeProfileById`. Both rely on the established `as unknown as I<X>Service` fake seam rather than implementing the full interface.
+- The phase spec's constraint that the success-path test "set process.env.JWT_SECRET before the test and restore it afterward" is **partially** followed: `beforeAll` sets `JWT_SECRET`, but it is never restored (no `afterAll`/`afterEach` cleanup).
 
 ### Open questions
 - Q1: Should a controller layer be introduced, or continue with routes calling services directly? (candidates: continue routes-call-services; introduce controllers)
