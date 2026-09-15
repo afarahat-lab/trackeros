@@ -491,6 +491,25 @@ This phase delivers the auth module and login endpoint (recommended phase 4); th
 **Divergences from the plan worth noting:**
 - None — this phase matches PLAN.md Phase 4 and the phase spec exactly: bcrypt.compare + signToken, indistinguishable wrong-email/wrong-password (both `UnauthorizedError('Invalid email or password')`), no controller file, no transaction/audit/repository access in the auth module, and the profile mapper is defined inline in the service (not the employee module's `toEmployeeProfile`).
 
+### Phase 5 delivered (balance getCurrentBalances + GET /balances/me)
+
+This phase delivers the balance read service and route (recommended phase 5); the leave-read and employee-route work (phases 6–7) is not yet implemented.
+
+- `src/modules/balance/balance.service.ts` — `IBalanceService` gained `getCurrentBalances(employeeId: string): Promise<Array<LeaveBalance & { available: number }>>` and `BalanceService` implements it. The service now imports `periodContaining` from `../../shared/date` (Phase 1) and `LeavePolicyStatus` from `../policy` (the public entry point, never a bare `'ACTIVE'` string). `getCurrentBalances` is **read-only** — it never opens a transaction and never forwards a client:
+  - Fetches the employee via `employeeService.getEmployeeById` (surfacing NotFoundError(404) for an unknown employee).
+  - Fetches ALL policies via `policyService.getAllPolicies()` (Phase 3).
+  - Selects at most one effective policy per `leaveTypeCode` into a `Map<LeaveTypeCode, LeavePolicy>`: `status === LeavePolicyStatus.ACTIVE`, `effectiveFrom <= asOf`, `effectiveTo === null || effectiveTo >= asOf`, tie-broken by the latest `effectiveFrom` (a later policy overwrites an earlier one in the map).
+  - For each selected policy, computes the current accrual period via `periodContaining(employee.hireDate, policy.accrualPeriodMonths, asOf)` and looks the balance up with `repository.findByKey(employeeId, policy.leaveTypeCode, period.start, period.end)`.
+  - Omits any leave type whose current period has no balance row (never throws, never synthesizes); when none match, returns `[]`.
+  - Each returned entry spreads the stored balance and adds the computed `available = entitledDays - usedDays - pendingDays` (never persisted, never mutates the stored row).
+- `src/modules/balance/balance.routes.ts` — NEW file. `balanceRoutes(fastify)` registers `GET /balances/me` (200). It carries **local copies** of `resolveActor` (extracts `request.user`, enforces `id` presence and `EmployeeRole` membership, throwing UnauthorizedError on a missing/invalid actor) and `sendError` (maps `AppError` to `{ error, code }` with its status, any other throw to 500) — the same shape as `leave.routes.ts`/`auth.routes.ts`, but not imported from them. The handler resolves the actor, calls `balanceService.getCurrentBalances(actor.id)`, and returns the list. The service instance is resolved from `fastify.balanceService` if present, else `createBalanceService()`.
+- `src/modules/balance/index.ts` — re-exports `balanceRoutes`.
+- `src/app.ts` — `app.register(balanceRoutes)` (after `leaveRoutes`, before `authRoutes`).
+
+**Divergences from the plan worth noting:**
+- The spec's consistency requirement said to "reuse the resolveActor/sendError helper shape ... exactly as implemented in the leave routes." The implementation uses local copies of both helpers (matching the `auth.routes.ts` precedent) rather than importing them from `leave.routes.ts` — the shape is identical, but there is no shared helper module.
+- The private `addMonths` helper remains in `balance.service.ts` (still used by `carryForward`) and was **not** refactored to import the shared `addMonths` from `src/shared/date` — consistent with the spec's out-of-scope constraint deferring that refactor. Only `periodContaining` is imported from the shared entry point (the new read path needs it; `carryForward`'s private `addMonths` is untouched).
+
 ### Open questions
 - Q1: Should a controller layer be introduced, or continue with routes calling services directly? (candidates: continue routes-call-services; introduce controllers)
 - Q2: Should LeavePolicyStatus be promoted into src/shared/types as a canonical enum? (candidates: promote to shared/types; keep module-local and import via policy index.ts)
