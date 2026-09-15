@@ -106,6 +106,29 @@ describe('periodContaining', () => {
       new ConflictError('Unable to resolve accrual period'),
     );
   });
+
+  it('treats the period end as exclusive and rolls into the next period', () => {
+    const result = periodContaining(anchor, 1, new Date(Date.UTC(2023, 1, 10)));
+    expect(result.start.getTime()).toBe(Date.UTC(2023, 1, 10));
+    expect(result.end.getTime()).toBe(Date.UTC(2023, 2, 10));
+  });
+
+  it('resolves a date several accrual periods ahead of the anchor', () => {
+    const result = periodContaining(anchor, 1, new Date(Date.UTC(2025, 6, 15)));
+    expect(result.start.getTime()).toBe(Date.UTC(2025, 6, 10));
+    expect(result.end.getTime()).toBe(Date.UTC(2025, 7, 10));
+  });
+
+  it('throws ConflictError carrying statusCode 409 and code CONFLICT when date precedes anchor', () => {
+    try {
+      periodContaining(anchor, 1, new Date(Date.UTC(2023, 0, 9)));
+      throw new Error('expected periodContaining to throw');
+    } catch (error) {
+      expect(error).toBeInstanceOf(ConflictError);
+      expect((error as ConflictError).statusCode).toBe(409);
+      expect((error as ConflictError).code).toBe('CONFLICT');
+    }
+  });
 });
 
 describe('date helpers under a non-UTC timezone', () => {
