@@ -572,13 +572,13 @@ This phase delivers the `scripts/smoke.js` extension prescribed by PLAN.md Phase
 
 This phase is a test-only change confined to `scripts/smoke.js`; no production source changed. It strengthens the stage 4 login assertion (previously only a non-empty token + `id`/`email` match) to verify the full 10-field `EmployeeProfile` returned by `POST /auth/login`.
 
-- The stage 4 login assertion now builds an `expectedLoginProfile` object literal with all 10 `EmployeeProfile` fields (id, employeeNumber, firstName, lastName, email, role, managerId, department, hireDate, employmentStatus) and asserts each field equals the seeded employee's value: id `'smoke-employee'`, employeeNumber `'E-0001'`, firstName `'Smoke'`, lastName `'Test'`, email `'smoke@example.com'`, role `EmployeeRole.EMPLOYEE`, managerId `null`, department `null`, hireDate `'2020-01-01T00:00:00.000Z'` (the JSON wire form of the Date, not the raw seed string `'2020-01-01'`), employmentStatus `EmploymentStatus.ACTIVE`.
+- The stage 4 login assertion now builds an `expectedLoginProfile` object literal with all 10 `EmployeeProfile` fields (id, employeeNumber, firstName, lastName, email, role, managerId, department, hireDate, employmentStatus) and asserts each field equals the seeded employee's value: id `'smoke-employee'`, employeeNumber `'E-0001'`, firstName `'Smoke'`, lastName `'Test'`, email `'smoke@example.com'`, role `EmployeeRole.EMPLOYEE`, managerId `null`, department `'Engineering'`, hireDate `'2020-01-01T00:00:00.000Z'` (the JSON wire form of the Date, not the raw seed string `'2020-01-01'`), employmentStatus `EmploymentStatus.ACTIVE`.
 - It asserts `passwordHash` and `terminationDate` are absent from the login profile (`'passwordHash' in loginProfile || 'terminationDate' in loginProfile` throws).
 - The existing token assertion (non-empty string) and the 200 status check remain intact — the change extends, not weakens, the login stage. Stages 1–3d and 5–8 are untouched.
 - `EmployeeRole` and `EmploymentStatus` are reused from the existing stage 3 import line (not re-imported or hardcoded as bare strings).
 
 **Divergences from the plan worth noting:**
-- None — this phase matches the phase spec's five success criteria exactly: id/email/role equality, exactly-10-fields, passwordHash/terminationDate absence, the remaining seeded values, and the preserved token/status assertions.
+- The phase spec's success criterion #4 described the login profile's `department` as `null`; the implementation asserts `department: 'Engineering'` — the value the stage 3d seed actually inserts (and the same value stage 5's `/employees/me` assertion checks). `managerId` remains `null` as the seed leaves it unset. This is a divergence from the spec's stated value, not a regression: the assertion matches the seeded row and the stage 5 profile assertion.
 
 ### Open questions
 - Q1: Should a controller layer be introduced, or continue with routes calling services directly? (candidates: continue routes-call-services; introduce controllers)
