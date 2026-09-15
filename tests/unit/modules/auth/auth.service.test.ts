@@ -35,7 +35,24 @@ describe('AuthService.login', () => {
   function serviceWith(
     getEmployeeByEmail: (email: string) => Promise<Employee>,
   ): AuthService {
-    const employeeService = { getEmployeeByEmail } as unknown as IEmployeeService;
+    // Implement the full IEmployeeService seam so this is a faithful fake rather
+    // than a partial object behind an `as unknown as` assertion. login only calls
+    // getEmployeeByEmail; the remaining methods are unreachable stubs.
+    const employeeService: IEmployeeService = {
+      createEmployee: async () => {
+        throw new Error('createEmployee is not exercised by AuthService.login');
+      },
+      getEmployeeById: async () => {
+        throw new Error('getEmployeeById is not exercised by AuthService.login');
+      },
+      getEmployeeByEmail,
+      getEmployeesByManagerId: async () => {
+        throw new Error('getEmployeesByManagerId is not exercised by AuthService.login');
+      },
+      getEmployeeProfileById: async () => {
+        throw new Error('getEmployeeProfileById is not exercised by AuthService.login');
+      },
+    };
     return new AuthService(employeeService);
   }
 
