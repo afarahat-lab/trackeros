@@ -100,6 +100,12 @@ describe('periodContaining', () => {
     expect(result.start.getTime()).toBe(Date.UTC(2023, 0, 31));
     expect(result.end.getTime()).toBe(Date.UTC(2023, 1, 28));
   });
+
+  it('throws ConflictError when the accrual period cannot be resolved', () => {
+    expect(() => periodContaining(anchor, 0, new Date(Date.UTC(2023, 0, 10)))).toThrow(
+      new ConflictError('Unable to resolve accrual period'),
+    );
+  });
 });
 
 describe('date helpers under a non-UTC timezone', () => {
