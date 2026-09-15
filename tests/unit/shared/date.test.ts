@@ -42,6 +42,9 @@ describe('addMonths', () => {
     expect(addMonths(new Date(Date.UTC(2023, 0, 31)), 2).getTime()).toBe(
       Date.UTC(2023, 2, 31),
     );
+    expect(addMonths(new Date(Date.UTC(2023, 0, 31)), 3).getTime()).toBe(
+      Date.UTC(2023, 3, 30),
+    );
   });
 
   it('clamps a 31-day month down to a 30-day month', () => {
