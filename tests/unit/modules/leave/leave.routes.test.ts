@@ -257,4 +257,33 @@ describe('leave routes — GET /leaves and GET /leaves/:id role scoping', () => 
     expect(response.json()).toMatchObject({ code: 'NOT_FOUND' });
     await app.close();
   });
+
+  it('GET /leaves/:id scopes getById for MANAGER', async () => {
+    app = buildApp({ id: 'emp-1', role: EmployeeRole.MANAGER });
+    await app.register(leaveRoutes);
+    await app.ready();
+
+    // A direct report's (emp-2) request is visible to the manager.
+    const report = await app.inject({ method: 'GET', url: '/leaves/lr-2' });
+    expect(report.statusCode).toBe(200);
+    expect(report.json()).toMatchObject({ id: 'lr-2', employeeId: 'emp-2' });
+
+    // An unrelated outsider's (emp-3) request is not — same 404 as nonexistent.
+    const outsider = await app.inject({ method: 'GET', url: '/leaves/lr-3' });
+    expect(outsider.statusCode).toBe(404);
+    expect(outsider.json()).toMatchObject({ code: 'NOT_FOUND' });
+    await app.close();
+  });
+
+  it('GET /leaves/:id scopes getById for ADMIN (any request)', async () => {
+    app = buildApp({ id: 'emp-1', role: EmployeeRole.ADMIN });
+    await app.register(leaveRoutes);
+    await app.ready();
+
+    // An admin may read a request belonging to an unrelated employee (emp-3).
+    const foreign = await app.inject({ method: 'GET', url: '/leaves/lr-3' });
+    expect(foreign.statusCode).toBe(200);
+    expect(foreign.json()).toMatchObject({ id: 'lr-3', employeeId: 'emp-3' });
+    await app.close();
+  });
 });
