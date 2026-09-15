@@ -354,3 +354,90 @@ This phase adds the Jest unit tests for `LeaveService.cancel` to `tests/unit/mod
 - Whether APPROVED cancellation is allowed after startDate/endDate has passed — **resolved**: blocked once `startDate <= today` (ConflictError).
 - Whether usedDays release is full or pro-rated when leave has partially elapsed — **resolved**: full release, no pro-rating, because the timing guard makes cancellation possible only before the leave starts.
 <!-- gestalt:architecture feature=621bb1fd-0965-415a-bf2e-ec2c42b15f04 END -->
+
+<!-- gestalt:architecture feature=e8c586bc-23c0-4c59-9111-ee280659da9a START -->
+## Authentication and read endpoints (v3) — Reconciled Architecture
+
+### Stack compliance
+TypeScript 20, Fastify, PostgreSQL, modular monolith, Jest. No controller layer is introduced; routes call services directly (open question Q1).
+
+### Domain entities and lifecycle states
+- **Employee**: id, employeeNumber, firstName, lastName, email, role, managerId, department, hireDate, terminationDate, employmentStatus, passwordHash. Lifecycle: ACTIVE, TERMINATED, ON_LEAVE.
+- **AuthToken**: sub, role, expiresIn. Lifecycle: ISSUED, EXPIRED.
+- **LeaveRequest**: id, employeeId, leaveTypeCode, startDate, endDate, requestedDays, reason, status, approverId, approvalComment, submittedAt, decidedAt, cancelledBy, cancelledAt. Lifecycle: DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED.
+- **LeaveBalance**: id, employeeId, leaveTypeCode, periodStart, periodEnd, entitledDays, usedDays, pendingDays, available (computed). Lifecycle: OPEN, CLOSED.
+- **LeavePolicy**: id, leaveTypeCode, policyName, annualEntitlementDays, accrualPeriodMonths, carryForwardDays, minNoticeDays, maxRequestDays, requiresManagerApproval, effectiveFrom, effectiveTo, status. Lifecycle: DRAFT, ACTIVE, SUPERSEDED.
+- **LeaveType**: code, name, requiresApproval, maxConsecutiveDays, isPaid. Lifecycle: none (static catalog).
+
+### Binding business rules
+- requestedDays = endDate - startDate + 1 (inclusive calendar days, whole-day UTC, no weekend/holiday exclusion) is the single canonical day-count derivation.
+- Date-range filtering is inclusive on both edges: startDateFrom <= startDate <= startDateTo and endDateFrom <= endDate <= endDateTo.
+- Leave visibility is role-scoped: EMPLOYEE sees only their own requests; MANAGER sees their own plus direct reports (employee.managerId === actor.id), one level only, not transitive; ADMIN sees all. Same rule for list and single-read.
+- Manager visibility is status-unrestricted; visibility and decide authority are separate (decide stays SUBMITTED-only).
+- Unauthorized single-read returns the same 404 as a nonexistent id (no id probing).
+- Login: wrong email vs wrong password indistinguishable; passwordHash never in any response.
+- Accrual-period derivation shared (startOfUtcDay/addMonths/periodContaining, pure UTC, anchored on hireDate) — one implementation reused by leave and balance paths.
+- Effective policy selection: at most one per leaveTypeCode (ACTIVE, effectiveFrom <= asOf, effectiveTo null or >= asOf; tie-break latest effectiveFrom).
+- No balance row for a policy's current period → omit that leave type; no open periods → empty list (200), never an error.
+- available = entitledDays - usedDays - pendingDays.
+- Actor always resolved from the verified token, never a client-supplied id.
+
+### Conceptual tables
+- **employees**: fields id, employee_number, first_name, last_name, email, password_hash, role, manager_id, department, hire_date, termination_date, employment_status. PK id. FK manager_id -> employees.id. Indexes: email unique, employee_number unique, manager_id.
+- **leave_requests**: fields id, employee_id, leave_type_code, start_date, end_date, requested_days, reason, status, approver_id, approval_comment, submitted_at, decided_at, cancelled_by, cancelled_at. PK id. FKs employee_id -> employees.id, leave_type_code -> leave_types.code, approver_id -> employees.id, cancelled_by -> employees.id. Indexes: employee_id, status, (leave_type_code, start_date).
+- **leave_balances**: fields id, employee_id, leave_type_code, period_start, period_end, entitled_days, used_days, pending_days. PK id. FKs employee_id -> employees.id, leave_type_code -> leave_types.code. Indexes: (employee_id, leave_type_code, period_start, period_end) unique, employee_id.
+- **leave_policies**: fields id, leave_type_code, policy_name, annual_entitlement_days, accrual_period_months, carry_forward_days, min_notice_days, max_request_days, requires_manager_approval, effective_from, effective_to, status. PK id. FK leave_type_code -> leave_types.code. Index: leave_type_code.
+- **leave_types**: fields code, name, requires_approval, max_consecutive_days, is_paid. PK code. Index: code natural key.
+
+Migration note: add nullable `password_hash` to `employees` using `t.text(...)` per initial-schema convention; date columns are UTC-parsed by `src/shared/db/connection.ts`.
+
+### Repositories
+- **IEmployeeRepository / PgEmployeeRepository**: create, findById, findByEmployeeNumber, findByEmail, findByManagerId.
+- **ILeaveRepository / PgLeaveRequestRepository**: create, findById, update, findByQuery.
+- **IPolicyRepository / PgLeavePolicyRepository**: create, findById, findByLeaveTypeCode, findAll.
+- **IBalanceRepository / PgLeaveBalanceRepository**: create, findById, findByKey, update.
+- **ILeaveTypeRepository / PgLeaveTypeRepository** (existing, referenced by policy): findById/findByCode.
+
+### Modules and boundaries
+- **shared-date** (`src/shared/date/`): startOfUtcDay, addMonths, periodContaining, index.ts.
+- **shared-types** (`src/shared/types/`): EmployeeProfile, LeaveRequestQueryParams.employeeIds, canonical enums, requestedDays.
+- **shared-auth** (`src/shared/auth/`): registerAuth, signToken, verifyToken, public path set.
+- **shared-errors** (`src/shared/errors/`): AppError, ValidationError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError.
+- **shared-db** (`src/shared/db/`): connection.ts, pg Pool, IUnitOfWork.
+- **validation** (`src/shared/validation/`): validation helpers.
+- **audit** (`src/modules/audit/`): audit logging.
+- **notification** (`src/modules/notification/`): notification dispatch.
+- **leave-type** (`src/modules/leave-type/`): LeaveType, ILeaveTypeRepository, PgLeaveTypeRepository, LeaveTypeService.
+- **auth** (`src/modules/auth/`): IAuthService, AuthService, authRoutes (POST /auth/login), login flow (bcrypt compare + signToken).
+- **employee** (`src/modules/employee/`): Employee (incl passwordHash), IEmployeeRepository (+findByManagerId), PgEmployeeRepository, IEmployeeService (+getEmployeeByEmail, getEmployeesByManagerId, getEmployeeProfileById), EmployeeService, employeeRoutes (GET /employees/me), toEmployeeProfile mapping.
+- **policy** (`src/modules/policy/`): LeavePolicy, IPolicyRepository, PgLeavePolicyRepository, IPolicyService (+getAllPolicies), PolicyService.
+- **balance** (`src/modules/balance/`): LeaveBalance, IBalanceRepository, PgLeaveBalanceRepository, IBalanceService (+getCurrentBalances), BalanceService, balanceRoutes (GET /balances/me).
+- **leave** (`src/modules/leave/`): LeaveRequest, ILeaveRepository, PgLeaveRequestRepository, ILeaveService (+list, getById), LeaveService, leaveRoutes (+GET /leaves, GET /leaves/:id).
+
+### Dependency map
+- auth -> employee, shared-auth, shared-types, shared-errors
+- employee -> shared-types, shared-errors, shared-db
+- policy -> leave-type, shared-types, shared-errors
+- balance -> employee, policy, shared-date, shared-types, shared-errors, shared-db
+- leave -> balance, validation, policy, employee, audit, notification, leave-type, shared-date, shared-types, shared-errors, shared-db
+- shared-date -> shared-types
+- shared-auth -> shared-types, shared-errors
+
+### Recommended phases
+1. **Shared foundations: date helpers + shared types** — extract accrual helpers and add shared types. (3 files)
+2. **Employee: password_hash, findByManagerId, profile mapping** — migration, repository/service extensions, toEmployeeProfile. (6 files)
+3. **Policy: getAllPolicies exposure** — add IPolicyService.getAllPolicies() calling existing findAll(). (2 files)
+4. **Auth module: POST /auth/login** — bcrypt.compare + signToken, indistinguishable error, public path. (4 files)
+5. **Balance: getCurrentBalances + GET /balances/me** — iterate active policies, derive period, omit missing rows. (3 files)
+6. **Leave reads: list/getById + GET /leaves, GET /leaves/:id** — extend findByQuery with employeeIds, role scoping, 404-equivalence. (4 files)
+7. **GET /employees/me route + smoke/unit tests** — wire profile route, extend smoke.js, add unit tests. (5 files)
+
+### Cross-cutting contracts
+- **Auth**: `request.user: { id: string; role: EmployeeRole }` where `EmployeeRole = 'EMPLOYEE' | 'MANAGER' | 'ADMIN'`. Identity/role obtained from a JWT bearer token verified by the existing `registerAuth` preHandler (`src/shared/auth/index.ts`), which populates `request.user` from `payload.sub` (id) and `payload.role`. RBAC enforced at the API boundary by `resolveActor` and in services (role-scoped visibility), never inline in routes. `POST /auth/login` is added to the public path set; all other new endpoints require a valid token.
+- **Error**: errors return `{ error: string; code: string }`. Validation failure -> HTTP 400 (ValidationError); authentication failure -> 401 (UnauthorizedError); authorization failure -> 403 (ForbiddenError); not found -> 404 (NotFoundError); invalid state transition -> 409 (ConflictError); other -> 500. `POST /auth/login` returns the SAME status and message for wrong email and wrong password (401 UnauthorizedError). `GET /leaves/:id` returns the SAME 404 NotFoundError for a request the caller may not see as for one that does not exist.
+- **Transaction**: none required — this feature is read-only plus a single non-persistent login write; read endpoints must not open a transaction.
+
+### Open questions
+- Q1: Should a controller layer be introduced, or continue with routes calling services directly? (candidates: continue routes-call-services; introduce controllers)
+- Q2: Should LeavePolicyStatus be promoted into src/shared/types as a canonical enum? (candidates: promote to shared/types; keep module-local and import via policy index.ts)
+<!-- gestalt:architecture feature=e8c586bc-23c0-4c59-9111-ee280659da9a END -->
