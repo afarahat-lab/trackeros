@@ -1,6 +1,12 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { AppError, UnauthorizedError, ValidationError } from '../../shared/errors';
-import { CreateLeaveRequestDto, EmployeeRole } from '../../shared/types';
+import {
+  CreateLeaveRequestDto,
+  EmployeeRole,
+  LeaveStatus,
+  LeaveTypeCode,
+  LeaveRequestQueryParams,
+} from '../../shared/types';
 import { LeaveActor, ILeaveService, createLeaveService } from './leave.service';
 
 interface AuthUser {
@@ -70,6 +76,81 @@ function parseCreateBody(body: unknown): CreateLeaveRequestDto {
   };
 }
 
+function isLeaveStatus(value: unknown): value is LeaveStatus {
+  return typeof value === 'string' && Object.values(LeaveStatus).includes(value as LeaveStatus);
+}
+
+function isLeaveTypeCode(value: unknown): value is LeaveTypeCode {
+  return (
+    typeof value === 'string' && Object.values(LeaveTypeCode).includes(value as LeaveTypeCode)
+  );
+}
+
+/**
+ * Parse the list query params from the wire. Dates arrive as strings and are
+ * converted here - the same boundary conversion that `parseCreateBody` performs -
+ * so the service keeps receiving real `Date` values rather than wire strings.
+ */
+function parseQuery(query: Record<string, unknown>): LeaveRequestQueryParams {
+  const toDate = (value: unknown, field: string): Date => {
+    if (value instanceof Date) return value;
+    if (typeof value !== 'string') {
+      throw new ValidationError(`${field} must be a date string`);
+    }
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new ValidationError(`${field} is not a valid date`);
+    }
+    return parsed;
+  };
+
+  const toInteger = (value: unknown, field: string): number => {
+    if (value === undefined) {
+      throw new ValidationError(`${field} must be an integer`);
+    }
+    const num = typeof value === 'string' ? Number(value) : value;
+    if (typeof num !== 'number' || !Number.isInteger(num)) {
+      throw new ValidationError(`${field} must be an integer`);
+    }
+    return num;
+  };
+
+  const params: LeaveRequestQueryParams = {};
+
+  if (query.status !== undefined) {
+    if (!isLeaveStatus(query.status)) {
+      throw new ValidationError('status is invalid');
+    }
+    params.status = query.status;
+  }
+  if (query.leaveTypeCode !== undefined) {
+    if (!isLeaveTypeCode(query.leaveTypeCode)) {
+      throw new ValidationError('leaveTypeCode is invalid');
+    }
+    params.leaveTypeCode = query.leaveTypeCode;
+  }
+  if (query.startDateFrom !== undefined) {
+    params.startDateFrom = toDate(query.startDateFrom, 'startDateFrom');
+  }
+  if (query.startDateTo !== undefined) {
+    params.startDateTo = toDate(query.startDateTo, 'startDateTo');
+  }
+  if (query.endDateFrom !== undefined) {
+    params.endDateFrom = toDate(query.endDateFrom, 'endDateFrom');
+  }
+  if (query.endDateTo !== undefined) {
+    params.endDateTo = toDate(query.endDateTo, 'endDateTo');
+  }
+  if (query.limit !== undefined) {
+    params.limit = toInteger(query.limit, 'limit');
+  }
+  if (query.offset !== undefined) {
+    params.offset = toInteger(query.offset, 'offset');
+  }
+
+  return params;
+}
+
 function sendError(reply: FastifyReply, error: unknown): FastifyReply {
   if (error instanceof AppError) {
     return reply.status(error.statusCode).send({ error: error.message, code: error.code });
@@ -86,6 +167,30 @@ export async function leaveRoutes(fastify: FastifyInstance): Promise<void> {
       const actor = resolveActor(request);
       const created = await leaveService.create(actor, parseCreateBody(request.body));
       return reply.status(201).send(created);
+    } catch (error) {
+      request.log.error(error);
+      return sendError(reply, error);
+    }
+  });
+
+  fastify.get('/leaves', async (request: LeaveAuthRequest, reply) => {
+    try {
+      const actor = resolveActor(request);
+      const query = (request.query ?? {}) as Record<string, unknown>;
+      const results = await leaveService.list(actor, parseQuery(query));
+      return reply.status(200).send(results);
+    } catch (error) {
+      request.log.error(error);
+      return sendError(reply, error);
+    }
+  });
+
+  fastify.get('/leaves/:id', async (request: LeaveAuthRequest, reply) => {
+    try {
+      const actor = resolveActor(request);
+      const { id } = request.params as { id: string };
+      const leave = await leaveService.getById(actor, id);
+      return reply.status(200).send(leave);
     } catch (error) {
       request.log.error(error);
       return sendError(reply, error);

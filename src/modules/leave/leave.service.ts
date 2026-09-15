@@ -3,6 +3,7 @@ import {
   AuditAction,
   CreateLeaveRequestDto,
   EmployeeRole,
+  LeaveRequestQueryParams,
   LeaveStatus,
   LeaveTypeCode,
   requestedDays,
@@ -43,6 +44,8 @@ export interface ILeaveService {
   approve(actor: LeaveActor, requestId: string): Promise<LeaveRequest>;
   reject(actor: LeaveActor, requestId: string): Promise<LeaveRequest>;
   cancel(actor: LeaveActor, requestId: string): Promise<LeaveRequest>;
+  list(actor: LeaveActor, params: LeaveRequestQueryParams): Promise<LeaveRequest[]>;
+  getById(actor: LeaveActor, requestId: string): Promise<LeaveRequest>;
 }
 
 /**
@@ -361,6 +364,42 @@ export class LeaveService implements ILeaveService {
 
       return updated;
     });
+  }
+
+  async list(actor: LeaveActor, params: LeaveRequestQueryParams): Promise<LeaveRequest[]> {
+    this.assertAuthenticated(actor);
+
+    const query: LeaveRequestQueryParams = { ...params };
+    if (actor.role === EmployeeRole.EMPLOYEE) {
+      query.employeeIds = [actor.id];
+    } else if (actor.role === EmployeeRole.MANAGER) {
+      const reports = await this.employeeService.getEmployeesByManagerId(actor.id);
+      query.employeeIds = [actor.id, ...reports.map((e) => e.id)];
+    }
+    // ADMIN: no employeeIds filter — sees every request.
+
+    return this.repository.findByQuery(query);
+  }
+
+  async getById(actor: LeaveActor, requestId: string): Promise<LeaveRequest> {
+    this.assertAuthenticated(actor);
+
+    const request = await this.getRequest(requestId);
+
+    if (actor.role === EmployeeRole.ADMIN) {
+      return request;
+    }
+
+    const visibleIds: string[] = [actor.id];
+    if (actor.role === EmployeeRole.MANAGER) {
+      const reports = await this.employeeService.getEmployeesByManagerId(actor.id);
+      visibleIds.push(...reports.map((e) => e.id));
+    }
+
+    if (!visibleIds.includes(request.employeeId)) {
+      throw new NotFoundError('Leave request not found');
+    }
+    return request;
   }
 
   private async getRequest(requestId: string): Promise<LeaveRequest> {
