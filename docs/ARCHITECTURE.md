@@ -510,6 +510,23 @@ This phase delivers the balance read service and route (recommended phase 5); th
 - The spec's consistency requirement said to "reuse the resolveActor/sendError helper shape ... exactly as implemented in the leave routes." The implementation uses local copies of both helpers (matching the `auth.routes.ts` precedent) rather than importing them from `leave.routes.ts` — the shape is identical, but there is no shared helper module.
 - The private `addMonths` helper remains in `balance.service.ts` (still used by `carryForward`) and was **not** refactored to import the shared `addMonths` from `src/shared/date` — consistent with the spec's out-of-scope constraint deferring that refactor. Only `periodContaining` is imported from the shared entry point (the new read path needs it; `carryForward`'s private `addMonths` is untouched).
 
+### Phase 6 delivered (leave reads: list/getById + GET /leaves, GET /leaves/:id)
+
+This phase delivers the leave read surface (recommended phase 6); the employee-route and smoke/unit-test work (phase 7) is not yet implemented.
+
+**repository** — `PgLeaveRequestRepository.findByQuery` gained the `employeeIds` filter: when `params.employeeIds` is present and non-empty it pushes `employee_id = ANY($n)` with the array bound as a single parameter; when absent/empty it applies no employee filter (ADMIN sees all). No other repository method changed.
+
+**service** — `ILeaveService` gained `list(actor, params)` and `getById(actor, requestId)`; `LeaveService` implements both. Both are read-only (no `uow.withTransaction`, no client forwarding, no writes/audit/notifications).
+
+- `list` copies `params`, then scopes `employeeIds` by role: EMPLOYEE → `[actor.id]`; MANAGER → `[actor.id, ...(await employeeService.getEmployeesByManagerId(actor.id)).map(e => e.id)]` (direct reports plus self, one level only); ADMIN → no `employeeIds` filter (sees all). It then delegates to `repository.findByQuery(query)` — no SQL in the service.
+- `getById` loads via `repository.findById` (NotFoundError on a nonexistent id), returns immediately for ADMIN, and otherwise builds `visibleIds = [actor.id]` (plus direct reports for MANAGER) and throws `NotFoundError('Leave request not found')` when `request.employeeId` is not in the set — byte-identical to the nonexistent-id case, so the endpoint cannot probe ids. Reads are status-unrestricted (no status filter or rejection).
+
+**routes** — `leaveRoutes(fastify)` gained `GET /leaves` (200) and `GET /leaves/:id` (200), following the existing conventions (no controller, `resolveActor` at the API boundary, `sendError` mapping). A new `parseQuery` helper converts wire query params to `LeaveRequestQueryParams`: `status`/`leaveTypeCode` validated against their enums (invalid → ValidationError), `startDateFrom`/`startDateTo`/`endDateFrom`/`endDateTo` converted from strings to `Date` via the same `new Date(value)` + `Number.isNaN(parsed.getTime())` pattern as `parseCreateBody` (invalid → ValidationError), and `limit`/`offset` parsed as integers (non-integer → ValidationError). The handlers resolve the actor, call `leaveService.list`/`leaveService.getById`, and return the result.
+
+**Divergences from the plan worth noting:**
+- The spec's out-of-scope constraint said state-changing operations (create/submit/approve/reject/cancel) are untouched this phase. The implementation also made `create` transactional: the DRAFT insert and its CREATE audit entry now run inside a single `uow.withTransaction` (with the client forwarded to both `repository.create` and `auditService.record`), closing the previously-documented gap where a failed audit insert left a committed DRAFT row with no audit trail. This is a deliberate fix beyond the read-only scope, not a regression.
+- No tests were delivered this phase — the plan's Phase 6 prescribed only the repository/service/routes edits (tests belong to Phase 7), and the committed diff contains exactly those three files (`leave.repository.ts`, `leave.service.ts`, `leave.routes.ts`); `leave/index.ts` was correctly left untouched (no new exports needed).
+
 ### Open questions
 - Q1: Should a controller layer be introduced, or continue with routes calling services directly? (candidates: continue routes-call-services; introduce controllers)
 - Q2: Should LeavePolicyStatus be promoted into src/shared/types as a canonical enum? (candidates: promote to shared/types; keep module-local and import via policy index.ts)
