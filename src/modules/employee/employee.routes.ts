@@ -1,7 +1,8 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { AppError, UnauthorizedError } from '../../shared/errors';
 import { EmployeeRole } from '../../shared/types';
-import { IEmployeeService, EmployeeService } from './employee.service';
+import { EmployeeService } from './employee.service';
+import { IEmployeeService } from './employee.service.interface';
 import { PgEmployeeRepository } from './employee.repository';
 
 interface AuthUser {
