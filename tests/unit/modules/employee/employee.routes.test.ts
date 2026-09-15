@@ -1,5 +1,5 @@
 import Fastify, { FastifyInstance } from 'fastify';
-import { employeeRoutes, IEmployeeService } from '../../../../src/modules/employee';
+import { CreateEmployeeInput, Employee, employeeRoutes, IEmployeeService } from '../../../../src/modules/employee';
 import { AuthUser } from '../../../../src/shared/auth';
 import { NotFoundError } from '../../../../src/shared/errors';
 import { EmployeeProfile, EmployeeRole, EmploymentStatus } from '../../../../src/shared/types';
@@ -33,7 +33,24 @@ describe('employee routes — GET /employees/me', () => {
     actor: AuthUser | undefined,
     getEmployeeProfileById: (id: string) => Promise<EmployeeProfile>,
   ): FastifyInstance {
-    const service = { getEmployeeProfileById } as IEmployeeService;
+    // Implement the full IEmployeeService seam so this is a faithful fake rather than a
+    // partial object behind an `as IEmployeeService` assertion. The route only calls
+    // getEmployeeProfileById; the remaining methods are unreachable throwing stubs.
+    const service: IEmployeeService = {
+      createEmployee: async (_input: CreateEmployeeInput): Promise<Employee> => {
+        throw new Error('createEmployee is not exercised by GET /employees/me');
+      },
+      getEmployeeById: async (_id: string): Promise<Employee> => {
+        throw new Error('getEmployeeById is not exercised by GET /employees/me');
+      },
+      getEmployeeByEmail: async (_email: string): Promise<Employee> => {
+        throw new Error('getEmployeeByEmail is not exercised by GET /employees/me');
+      },
+      getEmployeesByManagerId: async (_managerId: string): Promise<Employee[]> => {
+        throw new Error('getEmployeesByManagerId is not exercised by GET /employees/me');
+      },
+      getEmployeeProfileById,
+    };
 
     const instance = Fastify();
     (instance as unknown as { employeeService: IEmployeeService }).employeeService = service;

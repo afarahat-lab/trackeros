@@ -65,7 +65,14 @@ describe('AuthService.login', () => {
   });
 
   afterAll(() => {
-    process.env.JWT_SECRET = originalJwtSecret;
+    // Restore the exact prior state: when JWT_SECRET was unset, assigning the
+    // undefined captured value would coerce it to the string "undefined" and leak a
+    // bogus secret into every later test file in the same Jest process.
+    if (originalJwtSecret === undefined) {
+      delete process.env.JWT_SECRET;
+    } else {
+      process.env.JWT_SECRET = originalJwtSecret;
+    }
   });
 
   it('returns a token and a profile (never passwordHash) on correct credentials', async () => {
