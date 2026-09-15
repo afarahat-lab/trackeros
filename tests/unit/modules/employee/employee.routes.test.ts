@@ -1,6 +1,7 @@
 import Fastify, { FastifyInstance } from 'fastify';
 import { employeeRoutes, IEmployeeService } from '../../../../src/modules/employee';
 import { AuthUser } from '../../../../src/shared/auth';
+import { NotFoundError } from '../../../../src/shared/errors';
 import { EmployeeProfile, EmployeeRole, EmploymentStatus } from '../../../../src/shared/types';
 
 /**
@@ -97,5 +98,20 @@ describe('employee routes — GET /employees/me', () => {
 
     expect(response.statusCode).toBe(401);
     expect(response.json()).toMatchObject({ code: 'UNAUTHORIZED' });
+  });
+
+  it('returns 404 / NOT_FOUND when the actor has no employee profile', async () => {
+    const actor: AuthUser = { id: 'emp-none', role: EmployeeRole.EMPLOYEE };
+
+    app = buildApp(actor, jest.fn(async () => {
+      throw new NotFoundError('Employee profile not found');
+    }));
+    await app.register(employeeRoutes);
+    await app.ready();
+
+    const response = await app.inject({ method: 'GET', url: '/employees/me' });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json()).toMatchObject({ code: 'NOT_FOUND' });
   });
 });
