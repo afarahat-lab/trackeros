@@ -617,3 +617,54 @@ This phase is a test-only hardening change confined to `tests/unit/modules/emplo
 - Q1: Should a controller layer be introduced, or continue with routes calling services directly? (candidates: continue routes-call-services; introduce controllers)
 - Q2: Should LeavePolicyStatus be promoted into src/shared/types as a canonical enum? (candidates: promote to shared/types; keep module-local and import via policy index.ts)
 <!-- gestalt:architecture feature=e8c586bc-23c0-4c59-9111-ee280659da9a END -->
+
+<!-- gestalt:architecture feature=d359d157-77db-453a-9be6-e6b4da0b184f START -->
+## Feature: Deduplicate the UTC accrual date helpers
+
+### Summary
+Pure refactor: remove private copies of `startOfUtcDay`, `addMonths`, and `periodContaining` from `src/modules/leave/leave.service.ts` and `src/modules/balance/balance.service.ts`; import the canonical copies from `src/shared/date`. No behaviour change, no persistence/API changes.
+
+### Domain
+- `AccrualPeriod` is a derived, non-persisted value object `{ start, end }` representing the half-open interval `[start, end)` containing a date.
+- Lifecycle states: none introduced or changed.
+- Binding rules:
+  - Accrual date arithmetic reads UTC fields only (`getUTCFullYear`/`getUTCMonth`/`getUTCDate`) and derives day boundaries at UTC midnight; never use local-time getters.
+  - Period containment is half-open: `start <= date < end`.
+  - `addMonths` advances the month and clamps the day-of-month to the last day of the target month; it never rolls over into the following month.
+  - `periodContaining` anchors on the hireDate's UTC day start, steps `accrualPeriodMonths` periods at a time, and throws `ConflictError('Requested date precedes the accrual anchor')` when `date < anchor` and `ConflictError('Unable to resolve accrual period')` when no period resolves within the 10,000-iteration safety bound.
+  - Exactly one canonical definition of `startOfUtcDay`, `addMonths`, and `periodContaining` exists in `src/shared/date/accrual.ts`; every consumer imports them from `src/shared/date`.
+
+### Modules
+- `shared-date` (`src/shared/date`): owns `startOfUtcDay`, `addMonths`, `periodContaining`, and index re-exports.
+- `leave` (`src/modules/leave`): owns `LeaveService`, `ILeaveService`, `leave.repository`, `leave.model`, and `createLeaveService` factory.
+- `balance` (`src/modules/balance`): owns `BalanceService`, `IBalanceService`, `balance.repository`, `balance.model`, and `createBalanceService` factory.
+
+### Dependency map
+- `leave -> shared-date`
+- `balance -> shared-date`
+
+No new cross-module imports are introduced; both edges are already allowed in the committed dependency map.
+
+### Persistence
+No conceptual tables, repositories, or migrations are added or modified. `AccrualPeriod` is derived, not persisted.
+
+### Cross-cutting contracts
+- Auth contract: empty — this feature exposes no API surface and has no role-gated access.
+- Error response contract: empty — this feature exposes no API surface.
+- Transaction contract: empty — this feature has no writes and no multi-step atomic operations.
+
+### Recommended phases
+1. Phase 1 — Deduplicate `leave.service.ts` date helpers (1 file).
+2. Phase 2 — Deduplicate `balance.service.ts` `addMonths` (1 file).
+3. Phase 3 — Add deduplication regression test (1 file).
+
+### Verification
+- `grep -rn "private addMonths\|private startOfUtcDay\|private periodContaining" src/` returns nothing.
+- `npm run build` clean.
+- Full unit suite passes unchanged (178 tests).
+- `npm run smoke` passes all stages.
+- New regression test pins shared helpers for a period boundary case under `TZ=Asia/Riyadh`.
+
+### Open questions
+None.
+<!-- gestalt:architecture feature=d359d157-77db-453a-9be6-e6b4da0b184f END -->
