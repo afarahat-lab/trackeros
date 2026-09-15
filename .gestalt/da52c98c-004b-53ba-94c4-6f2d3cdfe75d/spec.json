@@ -1,0 +1,57 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "service"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The three private date helpers are removed from LeaveService: `grep -rn \"private addMonths\\|private startOfUtcDay\\|private periodContaining\" src/modules/leave/` returns no matches.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All four call sites use the imported free functions: two `startOfUtcDay(...)` calls in `cancel` and one `periodContaining(...)` call in `resolveBalance` no longer reference `this.`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`npm run build` completes cleanly and the existing test suite still passes, proving the move is behaviour-preserving.",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "Edit ONLY src/modules/leave/leave.service.ts. Do not touch the shared module, repositories, routes, or DTOs.",
+    "Do not change the arithmetic, the ConflictError guards, the 10_000 safety bound, or the getUTC* accessors \u2014 the move must be behaviour-preserving.",
+    "Do not add any cross-module import other than `import { startOfUtcDay, addMonths, periodContaining } from '../../shared/date';`."
+  ],
+  "outOfScope": [
+    "Any change to the shared date helpers in src/shared/date (accrual.ts / index.ts) \u2014 they are the canonical source and must not be modified.",
+    "Any change to leave-request behaviour, balance arithmetic, authorization, or audit/notification semantics."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [
+    {
+      "requirement": "The imported `startOfUtcDay`, `addMonths`, and `periodContaining` must be the canonical shared helpers re-exported from the directory barrel, so LeaveService no longer owns a divergent copy.",
+      "referencePath": "src/shared/date/index.ts"
+    },
+    {
+      "requirement": "The free-function bodies must remain byte-for-byte identical to the deleted private methods (modulo `this.` prefixes and indentation), preserving the ConflictError guards, the 10_000 safety bound, and the getUTC* accessors.",
+      "referencePath": "src/shared/date/accrual.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/date (barrel re-exporting startOfUtcDay, addMonths, periodContaining)",
+      "why": "LeaveService now consumes the canonical shared date helpers instead of its private duplicates."
+    }
+  ]
+}
