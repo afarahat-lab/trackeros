@@ -227,8 +227,25 @@ console.log(`\n  smoke mode: ${MODE}${PG ? '' : '  (persistence NOT covered — 
       if (!loginBody.profile || typeof loginBody.profile !== 'object') {
         throw new Error(`POST /auth/login returned no profile: ${String(login.payload)}`);
       }
-      if (loginBody.profile.id !== EMP || loginBody.profile.email !== 'smoke@example.com') {
-        throw new Error(`login profile did not match the seeded employee: ${String(login.payload)}`);
+      // 10 fields of EmployeeProfile: no passwordHash, no terminationDate; managerId and
+      // department are null because the seed left them unset. Mirrors the stage 5 assertion.
+      const loginProfile = loginBody.profile;
+      const expectedLoginProfile = {
+        id: EMP, employeeNumber: 'E-0001', firstName: 'Smoke', lastName: 'Test',
+        email: 'smoke@example.com', role: EmployeeRole.EMPLOYEE,
+        managerId: null, department: null,
+        hireDate: '2020-01-01T00:00:00.000Z', employmentStatus: EmploymentStatus.ACTIVE,
+      };
+      for (const key of Object.keys(expectedLoginProfile)) {
+        if (loginProfile[key] !== expectedLoginProfile[key]) {
+          throw new Error(
+            `login profile mismatch on ${key}: got ${JSON.stringify(loginProfile[key])}, ` +
+            `expected ${JSON.stringify(expectedLoginProfile[key])}`
+          );
+        }
+      }
+      if ('passwordHash' in loginProfile || 'terminationDate' in loginProfile) {
+        throw new Error(`login profile must not expose passwordHash/terminationDate: ${String(login.payload)}`);
       }
       const loginToken = loginBody.token;
       ok('stage 4 login — real credentials return a token + profile (200)');
