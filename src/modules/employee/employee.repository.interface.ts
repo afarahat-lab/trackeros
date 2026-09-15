@@ -6,4 +6,5 @@ export interface IEmployeeRepository {
   findById(id: string, client?: PoolClient): Promise<Employee | null>;
   findByEmployeeNumber(employeeNumber: string, client?: PoolClient): Promise<Employee | null>;
   findByEmail(email: string, client?: PoolClient): Promise<Employee | null>;
+  findByManagerId(managerId: string, client?: PoolClient): Promise<Employee[]>;
 }

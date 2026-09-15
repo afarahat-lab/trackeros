@@ -33,6 +33,10 @@ class FakeEmployeeRepository implements IEmployeeRepository {
   async findByEmail(email: string): Promise<Employee | null> {
     return this.rows.find((e) => e.email === email) ?? null;
   }
+
+  async findByManagerId(managerId: string): Promise<Employee[]> {
+    return this.rows.filter((e) => e.managerId === managerId);
+  }
 }
 
 function makeInput(overrides: Partial<CreateEmployeeInput> = {}): CreateEmployeeInput {
@@ -47,6 +51,7 @@ function makeInput(overrides: Partial<CreateEmployeeInput> = {}): CreateEmployee
     hireDate: new Date('2020-01-01T00:00:00.000Z'),
     terminationDate: null,
     employmentStatus: EmploymentStatus.ACTIVE,
+    passwordHash: null,
     ...overrides,
   };
 }
@@ -110,6 +115,70 @@ describe('EmployeeService', () => {
 
     it('throws NotFoundError when the id is unknown', async () => {
       await expect(service.getEmployeeById('nonexistent')).rejects.toThrow(NotFoundError);
+    });
+  });
+
+  describe('getEmployeeByEmail', () => {
+    it('returns the employee when found', async () => {
+      const created = await service.createEmployee(makeInput());
+      const found = await service.getEmployeeByEmail(created.email);
+
+      expect(found).toEqual(created);
+    });
+
+    it('throws NotFoundError when the email is unknown', async () => {
+      await expect(
+        service.getEmployeeByEmail('unknown@example.com')
+      ).rejects.toThrow(NotFoundError);
+    });
+  });
+
+  describe('getEmployeesByManagerId', () => {
+    it('returns the direct reports of a manager, and empty for an unknown manager', async () => {
+      const manager = await service.createEmployee(makeInput({ role: EmployeeRole.MANAGER }));
+      const directReport = await service.createEmployee(
+        makeInput({ employeeNumber: 'EMP-002', email: 'report@example.com', managerId: manager.id })
+      );
+      await service.createEmployee(
+        makeInput({ employeeNumber: 'EMP-003', email: 'other@example.com', managerId: null })
+      );
+
+      const reports = await service.getEmployeesByManagerId(manager.id);
+      expect(reports).toEqual([directReport]);
+
+      await expect(service.getEmployeesByManagerId('unknown-manager')).resolves.toEqual([]);
+    });
+  });
+
+  describe('getEmployeeProfileById', () => {
+    it('maps an Employee to an EmployeeProfile omitting passwordHash and terminationDate', async () => {
+      const created = await service.createEmployee(
+        makeInput({
+          passwordHash: 'hashed-secret',
+          terminationDate: new Date('2021-01-01T00:00:00.000Z'),
+        })
+      );
+
+      const profile = await service.getEmployeeProfileById(created.id);
+
+      expect(profile).toEqual({
+        id: created.id,
+        employeeNumber: created.employeeNumber,
+        firstName: created.firstName,
+        lastName: created.lastName,
+        email: created.email,
+        role: created.role,
+        managerId: created.managerId,
+        department: created.department,
+        hireDate: created.hireDate,
+        employmentStatus: created.employmentStatus,
+      });
+      expect(profile).not.toHaveProperty('passwordHash');
+      expect(profile).not.toHaveProperty('terminationDate');
+    });
+
+    it('throws NotFoundError when the id is unknown', async () => {
+      await expect(service.getEmployeeProfileById('nonexistent')).rejects.toThrow(NotFoundError);
     });
   });
 });

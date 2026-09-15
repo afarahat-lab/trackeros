@@ -1,8 +1,23 @@
-import { EmployeeRole, EmploymentStatus } from '../../shared/types';
+import { EmployeeRole, EmploymentStatus, EmployeeProfile } from '../../shared/types';
 import { ValidationError, NotFoundError, ConflictError } from '../../shared/errors';
 import { Employee, CreateEmployeeInput } from './employee.model';
 import { IEmployeeRepository } from './employee.repository.interface';
 import { IEmployeeService } from './employee.service.interface';
+
+function toEmployeeProfile(employee: Employee): EmployeeProfile {
+  return {
+    id: employee.id,
+    employeeNumber: employee.employeeNumber,
+    firstName: employee.firstName,
+    lastName: employee.lastName,
+    email: employee.email,
+    role: employee.role,
+    managerId: employee.managerId,
+    department: employee.department,
+    hireDate: employee.hireDate,
+    employmentStatus: employee.employmentStatus,
+  };
+}
 
 export class EmployeeService implements IEmployeeService {
   constructor(private readonly repository: IEmployeeRepository) {}
@@ -29,6 +44,26 @@ export class EmployeeService implements IEmployeeService {
       throw new NotFoundError('Employee not found');
     }
     return employee;
+  }
+
+  async getEmployeeByEmail(email: string): Promise<Employee> {
+    const employee = await this.repository.findByEmail(email);
+    if (!employee) {
+      throw new NotFoundError('Employee not found');
+    }
+    return employee;
+  }
+
+  async getEmployeesByManagerId(managerId: string): Promise<Employee[]> {
+    return this.repository.findByManagerId(managerId);
+  }
+
+  async getEmployeeProfileById(id: string): Promise<EmployeeProfile> {
+    const employee = await this.repository.findById(id);
+    if (!employee) {
+      throw new NotFoundError('Employee not found');
+    }
+    return toEmployeeProfile(employee);
   }
 
   private validate(input: CreateEmployeeInput): void {
