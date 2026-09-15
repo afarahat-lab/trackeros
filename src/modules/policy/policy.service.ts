@@ -43,6 +43,10 @@ export class PolicyService implements IPolicyService {
     return policy;
   }
 
+  async getAllPolicies(): Promise<LeavePolicy[]> {
+    return this.repository.findAll();
+  }
+
   private validate(input: CreateLeavePolicyInput): void {
     if (typeof input.policyName !== 'string' || input.policyName.trim() === '') {
       throw new ValidationError('Invalid policyName');

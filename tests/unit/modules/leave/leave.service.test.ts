@@ -255,6 +255,10 @@ class FakePolicyService implements IPolicyService {
     }
     return policy;
   }
+
+  async getAllPolicies(): Promise<LeavePolicy[]> {
+    return this.rows;
+  }
 }
 
 class FakeUnitOfWork implements IUnitOfWork {
