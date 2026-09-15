@@ -20,7 +20,7 @@ export interface AuthUser {
 export type AuthedRequest = FastifyRequest & { user?: AuthUser };
 
 /** Routes that must serve an UNAUTHENTICATED caller (liveness, and auth itself). */
-const PUBLIC_PATHS = new Set<string>(['/uptime', '/health']);
+const PUBLIC_PATHS = new Set<string>(['/uptime', '/health', '/auth/login']);
 
 /**
  * Verify a bearer token and decorate the request.
