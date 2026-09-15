@@ -1,0 +1,60 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared/date"
+    ],
+    "affectedLayers": [
+      "unit-test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The addMonths describe block in tests/unit/shared/date.test.ts contains a test case asserting that a 31-day month transition to a 30-day month clamps the day to 30 (result.getTime() equals the Date.UTC instant for the 30th of the target month).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The test suite passes (npx jest) with the addMonths 31-to-30-day clamping coverage present, and the new/retained test does not mutate the input date (input.getTime() unchanged after addMonths).",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Do not change the semantics of addMonths in src/shared/date/accrual.ts \u2014 this phase is test-only; the implementation is already correct and must remain untouched.",
+    "Follow the existing test conventions in tests/unit/shared/date.test.ts: construct inputs with Date.UTC(...) and assert via result.getTime() compared to Date.UTC(...).",
+    "Do not duplicate an already-present assertion verbatim; if the requested 31-to-30 transition is already covered, either retain the existing case or add a distinct adjacent scenario (different month pair or negative offset) rather than a redundant copy."
+  ],
+  "outOfScope": [
+    "Refactoring src/modules/leave/leave.service.ts or src/modules/balance/balance.service.ts to import the shared date helpers \u2014 deferred to a later phase.",
+    "Changing addMonths/startOfUtcDay/periodContaining semantics or the 10,000-iteration safety bound in src/shared/date/accrual.ts."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "addMonths (src/shared/date/accrual.ts)",
+      "mustExistOrExtend": true,
+      "invariant": "addMonths(date, months) returns a new Date whose UTC day is clamped to the last day of the target month when the source day exceeds it, and never mutates the input date."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "addMonths(date: Date, months: number): Date",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": ""
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "New/retained test assertions must match the existing Date.UTC(...) construction and getTime() comparison convention used throughout the addMonths describe block.",
+      "referencePath": "tests/unit/shared/date.test.ts"
+    },
+    {
+      "requirement": "The test must exercise the actual addMonths export re-exported from src/shared/date (index.ts), not a re-implementation, so the assertion validates the production helper.",
+      "referencePath": "src/shared/date/index.ts"
+    }
+  ],
+  "integrationPoints": []
+}
