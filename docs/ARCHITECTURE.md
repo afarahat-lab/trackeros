@@ -617,3 +617,53 @@ This phase is a test-only hardening change confined to `tests/unit/modules/emplo
 - Q1: Should a controller layer be introduced, or continue with routes calling services directly? (candidates: continue routes-call-services; introduce controllers)
 - Q2: Should LeavePolicyStatus be promoted into src/shared/types as a canonical enum? (candidates: promote to shared/types; keep module-local and import via policy index.ts)
 <!-- gestalt:architecture feature=e8c586bc-23c0-4c59-9111-ee280659da9a END -->
+
+<!-- gestalt:architecture feature=5710baba-c42d-4743-bc05-ce5effb0f951 START -->
+## Feature: Deduplicate the UTC accrual date helpers (v2)
+
+### Status
+Reconciled architecture — pure refactor, no behavior change.
+
+### Domain
+- **AccrualPeriod** (value object): `{ start: Date (UTC midnight, inclusive), end: Date (UTC midnight, exclusive) }`. Half-open accrual window `[start, end)` produced by `periodContaining`. No lifecycle states.
+- Binding rules:
+  - `startOfUtcDay` derives UTC midnight from UTC calendar fields (`getUTCFullYear/getUTCMonth/getUTCDate`), never local fields.
+  - `addMonths` advances calendar month and clamps day-of-month to target month's last day; does not mutate input.
+  - `periodContaining` returns half-open `[start, end)`; rejects dates before anchor with `ConflictError('Requested date precedes the accrual anchor')`; steps at most 10,000 periods and throws `ConflictError('Unable to resolve accrual period')`.
+  - All three helpers are pure UTC functions independent of host TZ.
+  - Exactly one definition of each helper exists in `src/shared/date/accrual.ts`; leave and balance import from shared entry point.
+
+### Modules
+- `shared-date` (`src/shared/date/`) owns `startOfUtcDay`, `addMonths`, `periodContaining`, `index.ts`.
+- `leave` (`src/modules/leave/`) owns `LeaveService`; deletes private copies, imports all three from `../../shared/date`.
+- `balance` (`src/modules/balance/`) owns `BalanceService`; deletes private `addMonths`, adds to existing shared import.
+
+### Dependency map
+- `leave -> shared-date`
+- `balance -> shared-date`
+No new cross-module imports. Pre-existing `balance -> ../leave-type` remains out of scope.
+
+### Data
+No schema changes. Existing tables (`leave_requests`, `leave_balances`, etc.) and repositories (`PgLeaveRequestRepository`, `PgLeaveBalanceRepository`, etc.) untouched. No new repository interfaces or implementations. No transaction contract.
+
+### Contracts
+- Auth: none (no API surface).
+- Error response: none (no API surface).
+- Transaction: none (no writes).
+
+### Phases
+1. Phase 1 — Deduplicate leave.service.ts date helpers (1 file)
+2. Phase 2 — Deduplicate balance.service.ts addMonths (1 file)
+3. Phase 3 — Deduplication pin test (1 file)
+
+### Verification
+- `npm run build` clean.
+- Full unit suite (178 tests) and `npm run smoke` pass unchanged.
+- New test pins shared helpers at a period boundary under `TZ=Asia/Riyadh`.
+
+### Acceptance
+Exactly one definition of `startOfUtcDay`, `addMonths`, `periodContaining`; both services import from `src/shared/date`; build, unit suite, smoke pass unchanged.
+
+### Open questions
+None.
+<!-- gestalt:architecture feature=5710baba-c42d-4743-bc05-ce5effb0f951 END -->
