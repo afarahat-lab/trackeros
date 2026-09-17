@@ -664,6 +664,16 @@ No schema changes. Existing tables (`leave_requests`, `leave_balances`, etc.) an
 ### Acceptance
 Exactly one definition of `startOfUtcDay`, `addMonths`, `periodContaining`; both services import from `src/shared/date`; build, unit suite, smoke pass unchanged.
 
+### Phase 1 delivered (leave.service.ts date-helper deduplication)
+
+This phase delivered only recommended Phase 1 (the `leave.service.ts` dedup); Phase 2 (`balance.service.ts` `addMonths`) and Phase 3 (the deduplication pin test) are not yet implemented.
+
+- `src/modules/leave/leave.service.ts` — added `import { startOfUtcDay, addMonths, periodContaining } from '../../shared/date';` and deleted the three private methods (`private startOfUtcDay`, `private addMonths`, `private periodContaining`) from the `LeaveService` class. Call sites were updated to drop the `this.` prefix: `cancel()` now calls `startOfUtcDay(request.startDate)` and `startOfUtcDay(new Date())`; `resolveBalance()` now calls `periodContaining(employee.hireDate, policy.accrualPeriodMonths, date)`. No arithmetic changed — a pure move, no behavior change.
+
+**Divergences from the plan worth noting:**
+- `addMonths` is imported but never called in `leave.service.ts` (the file only uses `startOfUtcDay` and `periodContaining`); the plan prescribed importing all three helpers, and the implementation followed that literally, leaving `addMonths` as an unused import.
+- Phase 2 (`balance.service.ts`) and Phase 3 (the deduplication pin test) were **not** delivered this phase — `balance.service.ts` still declares its own `private addMonths` and calls `this.addMonths(...)` in `carryForward()`, and no `date.deduplication.test.ts` exists.
+
 ### Open questions
 None.
 <!-- gestalt:architecture feature=5710baba-c42d-4743-bc05-ce5effb0f951 END -->
