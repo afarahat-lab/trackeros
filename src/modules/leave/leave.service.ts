@@ -24,8 +24,7 @@ import {
 } from '../notification';
 import { IValidationService, ValidationService } from '../validation';
 import { IEmployeeService, EmployeeService, PgEmployeeRepository } from '../employee';
-import { IPolicyService, PolicyService, PgLeavePolicyRepository } from '../policy';
-import { PgLeaveTypeRepository, LeaveTypeService } from '../leave-type';
+import { IPolicyService, createPolicyService } from '../policy';
 import { ILeaveRepository, PgLeaveRequestRepository } from './leave.repository';
 import { CreateLeaveRequestInput, LeaveRequest } from './leave.model';
 import { startOfUtcDay, addMonths, periodContaining } from '../../shared/date';
@@ -516,7 +515,7 @@ export function createLeaveService(): ILeaveService {
     new NotificationService(new PgNotificationRepository()),
     new ValidationService(),
     new EmployeeService(new PgEmployeeRepository()),
-    new PolicyService(new PgLeavePolicyRepository(), new LeaveTypeService(new PgLeaveTypeRepository())),
+    createPolicyService(),
     new PgUnitOfWork(),
   );
 }
