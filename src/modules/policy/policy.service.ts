@@ -1,7 +1,8 @@
 import { ValidationError, NotFoundError } from '../../shared/errors';
 import { LeaveTypeCode } from '../../shared/types';
-import { ILeaveTypeService } from '../leave-type';
+import { ILeaveTypeService, LeaveTypeService, PgLeaveTypeRepository } from '../leave-type';
 import { LeavePolicy, CreateLeavePolicyInput, LeavePolicyStatus } from './policy.model';
+import { PgLeavePolicyRepository } from './policy.repository';
 import { IPolicyRepository } from './policy.repository.interface';
 import { IPolicyService } from './policy.service.interface';
 
@@ -100,4 +101,11 @@ export class PolicyService implements IPolicyService {
       throw new ValidationError('Invalid status');
     }
   }
+}
+
+export function createPolicyService(): IPolicyService {
+  return new PolicyService(
+    new PgLeavePolicyRepository(),
+    new LeaveTypeService(new PgLeaveTypeRepository()),
+  );
 }
