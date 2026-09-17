@@ -738,4 +738,14 @@ No lifecycle states introduced or changed. Existing states remain: Employee ACTI
 
 ### Acceptance
 `npm run build` clean, existing tests pass, `npm run smoke` green, and no file under `src/modules/balance` or `src/modules/leave` imports from `../leave-type`.
+
+### Phase 1 delivered (createPolicyService factory)
+
+This phase delivered only recommended Phase 1 (the policy composition factory); Phases 2 and 3 (rewiring `createBalanceService()` and `createLeaveService()`) are not yet implemented.
+
+- `src/modules/policy/policy.service.ts` — added an exported `createPolicyService(): IPolicyService` factory function (alongside the existing `PolicyService` class). It constructs and returns `new PolicyService(new PgLeavePolicyRepository(), new LeaveTypeService(new PgLeaveTypeRepository()))`. The `PolicyService` class, its constructor signature, and its runtime behaviour are unchanged — the factory is additive only. No new imports were required: `PgLeavePolicyRepository` was already imported from `./policy.repository`, and `LeaveTypeService`/`PgLeaveTypeRepository` were already imported from `../leave-type` (the policy -> leave-type edge is allowed by the dependency map).
+- `src/modules/policy/index.ts` — added `createPolicyService` to the existing `./policy.service` re-export (`export { PolicyService, createPolicyService } from './policy.service';`). All existing exports are preserved.
+
+**Divergences from the plan worth noting:**
+- Phases 2 and 3 were **not** delivered this phase — `src/modules/balance/balance.service.ts` and `src/modules/leave/leave.service.ts` still construct `PolicyService` inline (`new PolicyService(new PgLeavePolicyRepository(), new LeaveTypeService(new PgLeaveTypeRepository()))`) and still import `LeaveTypeService`/`PgLeaveTypeRepository` from `../leave-type`. The `balance -> leave-type` and `leave -> leave-type` edges remain until those phases land.
 <!-- gestalt:architecture feature=7dc62161-0bad-4567-84a9-bea333846c6b END -->
