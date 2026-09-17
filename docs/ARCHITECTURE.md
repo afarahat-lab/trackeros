@@ -674,6 +674,15 @@ This phase delivered only recommended Phase 1 (the `leave.service.ts` dedup); Ph
 - `addMonths` is imported but never called in `leave.service.ts` (the file only uses `startOfUtcDay` and `periodContaining`); the plan prescribed importing all three helpers, and the implementation followed that literally, leaving `addMonths` as an unused import.
 - Phase 2 (`balance.service.ts`) and Phase 3 (the deduplication pin test) were **not** delivered this phase — `balance.service.ts` still declares its own `private addMonths` and calls `this.addMonths(...)` in `carryForward()`, and no `date.deduplication.test.ts` exists.
 
+### Phase 2 delivered (balance.service.ts addMonths deduplication)
+
+This phase delivered recommended Phase 2 (the `balance.service.ts` `addMonths` dedup); Phase 3 (the deduplication pin test) is not yet implemented.
+
+- `src/modules/balance/balance.service.ts` — extended the existing shared-date import to `import { periodContaining, addMonths } from '../../shared/date';` and deleted the `private addMonths` method from the `BalanceService` class. The single call site in `carryForward()` now calls `addMonths(source.periodEnd, policy.accrualPeriodMonths)` (dropped the `this.` prefix). No arithmetic changed — a pure move, no behavior change. The unrelated `../leave-type` import (`LeaveTypeService`, `PgLeaveTypeRepository`) was left exactly as it was, per the plan's out-of-scope constraint.
+
+**Divergences from the plan worth noting:**
+- Phase 3 (the deduplication pin test) was **not** delivered this phase — no `date.deduplication.test.ts` exists, and the source-level "exactly one definition" pin assertion has not yet been added.
+
 ### Open questions
 None.
 <!-- gestalt:architecture feature=5710baba-c42d-4743-bc05-ce5effb0f951 END -->
