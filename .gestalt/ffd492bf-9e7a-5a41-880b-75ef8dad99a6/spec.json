@@ -1,0 +1,95 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "policy"
+    ],
+    "affectedLayers": [
+      "service",
+      "composition"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The policy module's public entry point (src/modules/policy/index.ts) exports a `createPolicyService` binding alongside its existing exports.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`createPolicyService()` returns an object satisfying `IPolicyService` (src/modules/policy/policy.service.interface.ts) whose construction wires `PolicyService` with `PgLeavePolicyRepository` and `LeaveTypeService(new PgLeaveTypeRepository())`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`npm run build` completes cleanly with no TypeScript or compilation errors.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "No module other than the policy module is modified in this phase (balance and leave modules remain untouched).",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The `PolicyService` class, its constructor signature, and its runtime behaviour must not change.",
+    "The factory must construct `PolicyService` with `PgLeavePolicyRepository` and `LeaveTypeService(new PgLeaveTypeRepository())` \u2014 no other dependency wiring.",
+    "The policy -> leave-type dependency is the only cross-module dependency introduced; it must match the architecture's dependency map.",
+    "All existing exports in src/modules/policy/index.ts must be preserved."
+  ],
+  "outOfScope": [
+    "Rewiring balance/leave modules to consume createPolicyService (deferred to Phases 2 and 3).",
+    "Any change to PolicyService business logic, validation, or repository behaviour.",
+    "Introducing dependency injection containers or new composition patterns beyond the single factory function."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "createPolicyService factory",
+      "mustExistOrExtend": true,
+      "invariant": "Every invocation returns a fresh, fully-wired IPolicyService instance (no shared/singleton state)."
+    },
+    {
+      "entity": "PolicyService",
+      "mustExistOrExtend": true,
+      "invariant": "Constructor signature and all method behaviour remain identical to the pre-phase implementation."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "createPolicyService",
+      "authRule": "None \u2014 pure composition factory, no auth boundary.",
+      "idempotent": true,
+      "errorSemantics": "No runtime errors expected; construction must not throw under normal conditions."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The factory's return type must be the existing `IPolicyService` interface.",
+      "referencePath": "src/modules/policy/policy.service.interface.ts"
+    },
+    {
+      "requirement": "The factory must reuse `PgLeavePolicyRepository` exactly as exported by the policy repository module.",
+      "referencePath": "src/modules/policy/policy.repository.ts"
+    },
+    {
+      "requirement": "The factory must reuse `LeaveTypeService` and `PgLeaveTypeRepository` exactly as exported by the leave-type public entry point.",
+      "referencePath": "src/modules/leave-type/index.ts"
+    },
+    {
+      "requirement": "The policy -> leave-type dependency must conform to the dependency map in the architecture document.",
+      "referencePath": "docs/ARCHITECTURE.md"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/leave-type/index.ts",
+      "why": "Supplies LeaveTypeService and PgLeaveTypeRepository consumed by the factory."
+    },
+    {
+      "target": "src/modules/policy/policy.repository.ts",
+      "why": "Supplies PgLeavePolicyRepository consumed by the factory."
+    }
+  ]
+}
