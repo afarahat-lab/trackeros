@@ -1,6 +1,6 @@
 import { ValidationError, NotFoundError } from '../../shared/errors';
 import { LeaveTypeCode } from '../../shared/types';
-import { ILeaveTypeService, LeaveTypeService, PgLeaveTypeRepository } from '../leave-type';
+import * as leaveType from '../leave-type';
 import { LeavePolicy, CreateLeavePolicyInput, LeavePolicyStatus } from './policy.model';
 import { PgLeavePolicyRepository } from './policy.repository';
 import { IPolicyRepository } from './policy.repository.interface';
@@ -9,7 +9,7 @@ import { IPolicyService } from './policy.service.interface';
 export class PolicyService implements IPolicyService {
   constructor(
     private readonly repository: IPolicyRepository,
-    private readonly leaveTypeService: ILeaveTypeService,
+    private readonly leaveTypeService: leaveType.ILeaveTypeService,
   ) {}
 
   async createLeavePolicy(input: CreateLeavePolicyInput): Promise<LeavePolicy> {
@@ -106,6 +106,6 @@ export class PolicyService implements IPolicyService {
 export function createPolicyService(): IPolicyService {
   return new PolicyService(
     new PgLeavePolicyRepository(),
-    new LeaveTypeService(new PgLeaveTypeRepository()),
+    new leaveType.LeaveTypeService(new leaveType.PgLeaveTypeRepository()),
   );
 }
