@@ -1,0 +1,75 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "balance",
+      "policy"
+    ],
+    "affectedLayers": [
+      "service"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "`npm run build` completes cleanly with no TypeScript errors after the factory rewiring.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`src/modules/balance/balance.service.ts` no longer contains any import from `../leave-type` (the `import { LeaveTypeService, PgLeaveTypeRepository } from '../leave-type';` line is removed).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`createBalanceService()` constructs its `IPolicyService` dependency by calling `createPolicyService()` imported from `../policy`, not by inlining `new PolicyService(new PgLeavePolicyRepository(), new LeaveTypeService(new PgLeaveTypeRepository()))`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `../policy` import block in `balance.service.ts` retains only `IPolicyService`, `LeavePolicy`, and `LeavePolicyStatus`; `PolicyService` and `PgLeavePolicyRepository` are removed.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All existing tests pass unchanged (no test file is modified and no test assertion changes).",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The `BalanceService` class, its constructor signature, and all runtime behaviour are unchanged \u2014 only the `createBalanceService()` factory body and the import statements change.",
+    "`createPolicyService` must be imported from the policy module's public entry point (`../policy`), never from a deep file path such as `../policy/policy.service`.",
+    "`src/modules/balance/index.ts` is not modified \u2014 its existing re-export of `createBalanceService` is unaffected.",
+    "No file outside `src/modules/balance/balance.service.ts` is modified in this phase (the policy factory from Phase 1 and the leave module's factory are out of scope)."
+  ],
+  "outOfScope": [
+    "Rewiring `createLeaveService()` in `src/modules/leave/leave.service.ts` to call `createPolicyService()` and removing the `leave -> leave-type` import (Phase 3).",
+    "Any change to the `PolicyService` class, `createPolicyService()`, or the policy module's public entry point (delivered in Phase 1).",
+    "Any change to the `BalanceService` class, its constructor signature, its methods, or its runtime behaviour.",
+    "Adding, removing, or modifying tests, routes, controllers, or any other module."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [
+    {
+      "requirement": "`createBalanceService()` must delegate to the exact `createPolicyService()` factory exported from the policy public entry point, which constructs `new PolicyService(new PgLeavePolicyRepository(), new LeaveTypeService(new PgLeaveTypeRepository()))` \u2014 the same collaborators the balance factory previously inlined, so the constructed `IPolicyService` is behaviourally identical.",
+      "referencePath": "src/modules/policy/index.ts"
+    },
+    {
+      "requirement": "The retained `../policy` imports (`IPolicyService`, `LeavePolicy`, `LeavePolicyStatus`) must resolve to the same symbols the class already uses, so the `BalanceService` constructor parameter type and the `getCurrentBalances` policy-selection logic are unchanged.",
+      "referencePath": "src/modules/policy/index.ts"
+    },
+    {
+      "requirement": "The resulting dependency direction must match the documented map: `balance -> policy` and `policy -> leave-type`, with no `balance -> leave-type` edge.",
+      "referencePath": "docs/ARCHITECTURE.md"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/policy/index.ts (createPolicyService)",
+      "why": "The balance factory now obtains its `IPolicyService` dependency from the policy module's composition factory instead of constructing it inline."
+    }
+  ]
+}
