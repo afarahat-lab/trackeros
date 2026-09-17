@@ -8,10 +8,8 @@ import {
   IPolicyService,
   LeavePolicy,
   LeavePolicyStatus,
-  PolicyService,
-  PgLeavePolicyRepository,
+  createPolicyService,
 } from '../policy';
-import { LeaveTypeService, PgLeaveTypeRepository } from '../leave-type';
 import { LeaveBalance, CreateLeaveBalanceInput } from './balance.model';
 import { IBalanceRepository, PgLeaveBalanceRepository } from './balance.repository';
 
@@ -247,7 +245,7 @@ export function createBalanceService(): IBalanceService {
   return new BalanceService(
     new PgLeaveBalanceRepository(),
     new EmployeeService(new PgEmployeeRepository()),
-    new PolicyService(new PgLeavePolicyRepository(), new LeaveTypeService(new PgLeaveTypeRepository())),
+    createPolicyService(),
     new PgUnitOfWork(),
   );
 }
