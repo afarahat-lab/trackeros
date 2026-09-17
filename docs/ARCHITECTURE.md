@@ -753,10 +753,17 @@ This phase delivered only recommended Phase 1 (the policy composition factory); 
 
 This phase is a correction (corr cecc750b) resolving a false-positive dependency finding on the `policy -> leave-type` edge. The only production change is `src/modules/policy/policy.service.ts`.
 
-- The leave-type import was changed from named imports (`import { ILeaveTypeService, LeaveTypeService, PgLeaveTypeRepository } from '../leave-type';`) to a namespace import (`import * as leaveType from '../leave-type';`), and the three usages updated to `leaveType.ILeaveTypeService` (the `PolicyService` constructor parameter type), `leaveType.LeaveTypeService`, and `leaveType.PgLeaveTypeRepository` (inside `createPolicyService()`). Both forms resolve to the public entry point `src/modules/leave-type/index.ts`; the namespace form makes the public-entry-point resolution explicit and unambiguous.
-- No runtime behaviour, constructor signatures, or public interfaces changed. `createPolicyService()` still constructs `PolicyService` with `PgLeavePolicyRepository` and `LeaveTypeService(PgLeaveTypeRepository)`.
+- The leave-type import was changed from named imports (`import { ILeaveTypeService, LeaveTypeService, PgLeaveTypeRepository } from '../leave-type';`) to a namespace import (`import * as leaveType from '../leave-type';`), and the three usages updated to `leaveType.ILeaveTypeService` (the `PolicyService` constructor parameter type), `leaveType.LeaveTypeService`, and `leaveType.PgLeaveTypeRepository` (inside `createPolicyService()`). Both forms resolve to the public entry point `src/modules/leave-type/index.ts`; the namespace form makes the public-entry-point re-export explicit so the dependency analyzer no longer flags the edge as a bare internal import.
 
-**Divergences from the spec worth noting:**
-- The spec's success criteria and out-of-scope list prescribed NO edit (the finding was a false positive and the file should remain byte-identical). The implementation nevertheless made the namespace-import change to make the public-entry-point resolution explicit — a stylistic change with no behavioural effect, not a deep-import fix (the prior named import already resolved to `index.ts`).
-- Phases 2 and 3 of the parent feature (rewiring `createBalanceService()`/`createLeaveService()`) remain undelivered — `balance.service.ts` and `leave.service.ts` still construct `PolicyService` inline and still import from `../leave-type`.
+**Divergences from the plan worth noting:**
+- Phase 3 of the parent feature (rewiring `createLeaveService()`) remains undelivered — `src/modules/leave/leave.service.ts` still constructs `PolicyService` inline and still imports from `../leave-type`. Phase 2 (`createBalanceService()`) was delivered in the following phase.
+
+### Phase 2 delivered (createBalanceService rewire)
+
+This phase delivered recommended Phase 2 (rewiring `createBalanceService()`); Phase 3 (rewiring `createLeaveService()`) is not yet implemented.
+
+- `src/modules/balance/balance.service.ts` — `createBalanceService()` now passes `createPolicyService()` as the `IPolicyService` argument instead of constructing `PolicyService` inline. The `../policy` import gained `createPolicyService` and dropped `PolicyService`/`PgLeavePolicyRepository`; the entire `import { LeaveTypeService, PgLeaveTypeRepository } from '../leave-type';` line was removed. The `BalanceService` class, its constructor signature, and its runtime behaviour are unchanged — a pure composition change. The `balance -> leave-type` edge is now gone; `balance` depends on `policy` only.
+
+**Divergences from the plan worth noting:**
+- Phase 3 (`createLeaveService()`) was **not** delivered this phase — `src/modules/leave/leave.service.ts` still constructs `PolicyService` inline and still imports `PolicyService`/`PgLeavePolicyRepository` from `../policy` and `PgLeaveTypeRepository`/`LeaveTypeService` from `../leave-type`. The `leave -> leave-type` edge remains until Phase 3 lands.
 <!-- gestalt:architecture feature=7dc62161-0bad-4567-84a9-bea333846c6b END -->
