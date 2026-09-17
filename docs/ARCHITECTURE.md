@@ -698,3 +698,44 @@ This phase delivers recommended Phase 3 — the deduplication pin test — compl
 ### Open questions
 None.
 <!-- gestalt:architecture feature=5710baba-c42d-4743-bc05-ce5effb0f951 END -->
+
+<!-- gestalt:architecture feature=7dc62161-0bad-4567-84a9-bea333846c6b START -->
+## Feature: Remove balance -> leave-type dependency via policy composition factory
+
+### Summary
+Composition-only refactor. Adds `createPolicyService()` to the policy module, exports it from the policy public entry point, and rewires `createBalanceService()` and `createLeaveService()` to call it instead of constructing `PolicyService` themselves. Removes the undocumented `balance -> leave-type` and `leave -> leave-type` imports. No runtime behaviour, constructor signatures, or public interfaces change.
+
+### Module boundaries
+- `policy` owns `createPolicyService()` and exports it from `src/modules/policy/index.ts`. The factory constructs `PolicyService` with `PgLeavePolicyRepository` and `LeaveTypeService(PgLeaveTypeRepository)`.
+- `balance` and `leave` no longer import from `../leave-type`; they import `createPolicyService` from `../policy`.
+- `leave-type` remains unchanged and is depended on only by `policy`.
+
+### Dependency map (changed/owned edges)
+- policy -> leave-type
+- policy -> shared-types
+- policy -> shared-errors
+- policy -> shared-db
+- balance -> policy
+- leave -> policy
+
+### Repository interfaces and concrete implementations
+- `IPolicyRepository` -> `PgLeavePolicyRepository` (PostgreSQL via shared/db Pool; optional trailing PoolClient for caller-owned transactions)
+- `ILeaveTypeRepository` -> `PgLeaveTypeRepository` (PostgreSQL via shared/db Pool; optional trailing PoolClient for caller-owned transactions)
+- Existing `IBalanceRepository` -> `PgLeaveBalanceRepository` and `ILeaveRepository` -> `PgLeaveRequestRepository` are unchanged.
+
+### Lifecycle states
+No lifecycle states introduced or changed. Existing states remain: Employee ACTIVE|TERMINATED|ON_LEAVE; LeaveType static; LeavePolicy DRAFT|ACTIVE|SUPERSEDED; LeaveRequest DRAFT|SUBMITTED|APPROVED|REJECTED|CANCELLED; LeaveBalance OPEN|CLOSED; AuditLog RECORDED; Notification PENDING|SENT|READ|ARCHIVED.
+
+### Cross-cutting contracts
+- Auth contract: unchanged; no new API surface or role-gated access.
+- Error/response contract: unchanged; no new endpoints.
+- Transaction contract: none for this feature; no writes or new data-access paths.
+
+### Phases
+1. Add `createPolicyService()` to the policy module and export it.
+2. Rewire `createBalanceService()` to call it; remove the `../leave-type` import.
+3. Rewire `createLeaveService()` to call it; remove the `../leave-type` import.
+
+### Acceptance
+`npm run build` clean, existing tests pass, `npm run smoke` green, and no file under `src/modules/balance` or `src/modules/leave` imports from `../leave-type`.
+<!-- gestalt:architecture feature=7dc62161-0bad-4567-84a9-bea333846c6b END -->
