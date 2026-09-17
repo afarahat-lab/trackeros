@@ -683,6 +683,18 @@ This phase delivered recommended Phase 2 (the `balance.service.ts` `addMonths` d
 **Divergences from the plan worth noting:**
 - Phase 3 (the deduplication pin test) was **not** delivered this phase — no `date.deduplication.test.ts` exists, and the source-level "exactly one definition" pin assertion has not yet been added.
 
+### Phase 3 delivered (deduplication pin test)
+
+This phase delivers recommended Phase 3 — the deduplication pin test — completing the three recommended phases. No production source changed; the only project file touched is `tests/unit/shared/date.deduplication.test.ts` (NEW).
+
+- `tests/unit/shared/date.deduplication.test.ts` — NEW. Two describe blocks:
+  - **"shared helpers at a period boundary under a non-UTC timezone"** — captures `process.env.TZ` before `beforeAll` sets it to `'Asia/Riyadh'` and restores it in `afterAll` (matching the existing `date.test.ts` pattern). One test asserts the three helpers produce the expected UTC instants at a boundary: `startOfUtcDay(new Date(Date.UTC(2023, 0, 10)))` → `Date.UTC(2023, 0, 10)`; `addMonths(anchor, 1)` → `Date.UTC(2023, 1, 10)`; and `periodContaining(anchor, 1, new Date(Date.UTC(2023, 1, 10)))` — a date exactly at the period end — rolls into the next period `{ start: Date.UTC(2023, 1, 10), end: Date.UTC(2023, 2, 10) }`, proving the UTC accessors are load-bearing and unaffected by the process timezone.
+  - **"exactly one definition of each helper exists"** — reads `src/modules/leave/leave.service.ts` and `src/modules/balance/balance.service.ts` via `fs.readFileSync` (path resolved with `join(__dirname, '..', '..', '..', 'src', ...)`) and asserts neither contains the tokens `private startOfUtcDay`, `private addMonths`, or `private periodContaining`, so a future re-introduced private copy is caught at the source level rather than merely discouraged.
+- The helpers are imported from `../../../src/shared/date` (the public entry point), not from `accrual.ts` directly.
+
+**Divergences from the plan worth noting:**
+- None — this phase matches PLAN.md Phase 3 and the phase spec exactly: the TZ save/restore, the boundary assertions under `TZ=Asia/Riyadh`, the source-level "exactly one definition" pin via `fs` reads of both service files, and the import from the public entry point. No production source was modified.
+
 ### Open questions
 None.
 <!-- gestalt:architecture feature=5710baba-c42d-4743-bc05-ce5effb0f951 END -->
