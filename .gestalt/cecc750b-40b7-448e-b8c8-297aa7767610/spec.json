@@ -1,0 +1,70 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "policy",
+      "leave-type"
+    ],
+    "affectedLayers": [
+      "service",
+      "composition"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The `policy` module's dependency on `leave-type` is satisfied exclusively through the owning module's public entry point (`src/modules/leave-type/index.ts`); no import in `src/modules/policy/policy.service.ts` reaches into leave-type internals (e.g. `../leave-type/leave-type.service`).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The committed dependency map (`.gestalt/architecture/reconciled.json` and `.gestalt/architecture/app.json`) contains the `policy -> leave-type` edge, confirming the flagged import is a sanctioned dependency and the finding is a false positive.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "No code change is made to line 3 of `src/modules/policy/policy.service.ts`; the file remains byte-identical and `npm run build` plus the existing test suite remain green.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The `policy -> leave-type` dependency must be expressed only through `src/modules/leave-type/index.ts` (the owning module's public entry point); no deep import into leave-type internals is permitted.",
+    "The three imported symbols (`ILeaveTypeService`, `LeaveTypeService`, `PgLeaveTypeRepository`) must remain in use: `ILeaveTypeService` as the `PolicyService` constructor parameter type, and `LeaveTypeService`/`PgLeaveTypeRepository` inside `createPolicyService()`. Removing or rewriting the import would break the composition factory.",
+    "No runtime behaviour, constructor signatures, or public interfaces may change; this is a false-positive resolution, not a refactor."
+  ],
+  "outOfScope": [
+    "Any code change to `src/modules/policy/policy.service.ts` line 3 or elsewhere \u2014 the finding is a false positive and no edit is required.",
+    "Moving the `leave-type` dependency out of `policy` or into the shared layer \u2014 the reconciled architecture intentionally owns the `policy -> leave-type` edge.",
+    "Rewiring `balance`/`leave` composition factories (Phases 2\u20133 of the parent feature) \u2014 those are separate phases."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "createPolicyService() composition factory",
+      "mustExistOrExtend": true,
+      "invariant": "Must continue to construct `PolicyService` with `PgLeavePolicyRepository` and `LeaveTypeService(PgLeaveTypeRepository)`; it owns the `policy -> leave-type` composition and must not be altered."
+    },
+    {
+      "entity": "PolicyService",
+      "mustExistOrExtend": true,
+      "invariant": "Must retain its `ILeaveTypeService` constructor dependency; the leave-type service is injected and used to validate `leaveTypeCode` during policy creation."
+    }
+  ],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [
+    {
+      "requirement": "The `policy -> leave-type` dependency edge must match the committed dependency map; it is present in both `.gestalt/architecture/reconciled.json` and `.gestalt/architecture/app.json`.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "The import must resolve to the owning module's public entry point, which re-exports `ILeaveTypeService`, `LeaveTypeService`, and `PgLeaveTypeRepository`.",
+      "referencePath": "src/modules/leave-type/index.ts"
+    },
+    {
+      "requirement": "The `policy -> leave-type` edge must remain documented as an owned/sanctioned edge (feature `7dc62161`) in the architecture doc.",
+      "referencePath": "docs/ARCHITECTURE.md"
+    }
+  ],
+  "integrationPoints": []
+}
