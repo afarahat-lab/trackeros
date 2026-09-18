@@ -1,0 +1,144 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "web-infrastructure",
+      "web-api-client",
+      "web-token-storage"
+    ],
+    "affectedLayers": [
+      "infrastructure",
+      "api-client"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The token storage persists the bearer token in sessionStorage: setToken writes it, getToken reads it back, clear removes it, and getToken returns null when no token is stored. The token must survive a page reload (sessionStorage semantics) and must NOT be written to localStorage or held only in memory.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Every authenticated API call attaches an `Authorization: Bearer <token>` header when a token is present in storage, and omits the header when no token is present (e.g. the public login call). This is verifiable by a unit test that stubs fetch and asserts the request headers.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "On a 401 response, the API client clears the token via the injected ITokenStorage and throws an ApiError with status 401, so callers can route to login. A unit test asserts sessionStorage is empty after a 401 and that the thrown error carries status 401. No JWT `exp` claim is decoded client-side.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The API client exposes typed methods returning the Phase 1 shared types: login \u2192 LoginResponse, getMe \u2192 EmployeeProfile, getLeaves \u2192 LeaveRequestView[], getLeave \u2192 LeaveRequestView, getBalances \u2192 LeaveBalanceView[]. Each method's return type is the imported shared type (not a locally re-declared shape).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Non-2xx responses (other than the 401 path) surface a typed ApiError whose `message` is sourced from the backend `error` field and `code` from the backend `code` field, with `status` set to the HTTP status code. A unit test asserts a 404/400 response body `{ error, code }` maps to ApiError with matching message/code/status.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`npm run build` in web/ completes with zero TypeScript errors (strict mode, noUnusedLocals, noUnusedParameters) and `npm test` passes, including the Authorization-header and 401-clears-token tests.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Persist the bearer token in sessionStorage only \u2014 never localStorage and never in-memory only. The token must survive a reload and be cleared on tab close.",
+    "Detect unauthorized access solely from the server's HTTP 401 response. Do NOT decode the JWT `exp` claim (or any JWT payload) client-side to determine expiry.",
+    "Use the native fetch API; do not add a new HTTP client dependency (axios or similar).",
+    "Satisfy strict TypeScript: no unused imports/locals/parameters, strict null checks, no `any` (use `unknown` with type guards).",
+    "Import LoginResponse, EmployeeProfile, LeaveRequestView, LeaveBalanceView (and any related enums) from web/src/shared/types/index.ts \u2014 do not re-declare or duplicate these shapes locally.",
+    "The login call is public and must NOT attach an Authorization header (no token is sent on login).",
+    "Do not log tokens, passwords, or PII (GP-004)."
+  ],
+  "outOfScope": [
+    "No auth session/context, login UI, route guards, or redirect-to-login behavior \u2014 those belong to Phase 3/5. This phase only provides the API client + token storage primitives.",
+    "No create/submit/approve/reject/cancel leave operations or any state-changing endpoints \u2014 only the read endpoints listed in the phase scope.",
+    "No client-side JWT decoding/expiry logic and no token refresh mechanism.",
+    "No changes to the Vite dev proxy or backend \u2014 the existing /auth, /employees, /leaves, /balances proxies already cover these endpoints."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "ITokenStorage / TokenStorage",
+      "mustExistOrExtend": true,
+      "invariant": "The token storage is the single owner of bearer-token persistence. It exposes exactly getToken/setToken/clear; getToken returns null when absent; setToken overwrites any prior token; clear removes it. All persistence goes through sessionStorage."
+    },
+    {
+      "entity": "ApiError",
+      "mustExistOrExtend": true,
+      "invariant": "ApiError is a typed error carrying message (string), status (number), and optional code (string). It is the only error type the API client throws for HTTP failures, so callers can branch on status/code without string-matching."
+    },
+    {
+      "entity": "IApiClient / ApiClient",
+      "mustExistOrExtend": true,
+      "invariant": "The API client is the single place that attaches the Authorization header and handles the 401-clears-token behavior. It is constructed with an ITokenStorage and never reads sessionStorage directly. On 401 it clears the token and throws ApiError(status 401); on other non-2xx it throws ApiError with the backend error/code mapped."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "login(email, password) \u2192 LoginResponse",
+      "authRule": "Public \u2014 no Authorization header attached.",
+      "idempotent": false,
+      "errorSemantics": "Non-2xx throws ApiError with status and backend error/code mapped."
+    },
+    {
+      "operation": "getMe() \u2192 EmployeeProfile",
+      "authRule": "Authenticated \u2014 attaches Authorization: Bearer <token> when a token is present.",
+      "idempotent": false,
+      "errorSemantics": "401 clears the token and throws ApiError(status 401); other non-2xx throws ApiError with backend error/code."
+    },
+    {
+      "operation": "getLeaves() \u2192 LeaveRequestView[]",
+      "authRule": "Authenticated \u2014 attaches Authorization: Bearer <token> when a token is present.",
+      "idempotent": false,
+      "errorSemantics": "401 clears the token and throws ApiError(status 401); other non-2xx throws ApiError with backend error/code."
+    },
+    {
+      "operation": "getLeave(id) \u2192 LeaveRequestView",
+      "authRule": "Authenticated \u2014 attaches Authorization: Bearer <token> when a token is present.",
+      "idempotent": false,
+      "errorSemantics": "401 clears the token and throws ApiError(status 401); other non-2xx throws ApiError with backend error/code."
+    },
+    {
+      "operation": "getBalances() \u2192 LeaveBalanceView[]",
+      "authRule": "Authenticated \u2014 attaches Authorization: Bearer <token> when a token is present.",
+      "idempotent": false,
+      "errorSemantics": "401 clears the token and throws ApiError(status 401); other non-2xx throws ApiError with backend error/code."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The API client's typed method return types must reuse the canonical shared types (LoginResponse, EmployeeProfile, LeaveRequestView, LeaveBalanceView) rather than re-declaring them.",
+      "referencePath": "web/src/shared/types/index.ts"
+    },
+    {
+      "requirement": "ApiError's message/code mapping must match the backend error contract `{ error: string; code: string }` \u2014 `error` maps to message, `code` maps to code, and the HTTP status maps to status.",
+      "referencePath": "src/shared/errors/index.ts"
+    },
+    {
+      "requirement": "The barrel must re-export IApiClient, ApiClient, ITokenStorage, TokenStorage, and ApiError so later phases import from the public entry point only.",
+      "referencePath": "web/src/infrastructure/api/index.ts"
+    },
+    {
+      "requirement": "Tests must run under the existing Vitest/jsdom configuration (globals enabled, setupTests.ts loaded) \u2014 no new test runner or config.",
+      "referencePath": "web/vite.config.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "web/src/shared/types/index.ts",
+      "why": "Source of the canonical LoginResponse, EmployeeProfile, LeaveRequestView, LeaveBalanceView types the API client returns."
+    },
+    {
+      "target": "Backend REST endpoints (/auth/login, /employees/me, /leaves, /leaves/:id, /balances/me)",
+      "why": "The API client's typed methods are the web client's contract against these endpoints; response shapes and the { error, code } error contract must match."
+    },
+    {
+      "target": "web/src/modules/auth (Phase 3) and web/src/modules/employee|leave (Phase 4)",
+      "why": "These later phases consume IApiClient and ITokenStorage from the barrel; the interfaces must be stable and complete for their constructors."
+    }
+  ]
+}
