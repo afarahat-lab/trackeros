@@ -1,0 +1,55 @@
+{
+  "scope": {
+    "affectedDomains": [],
+    "affectedLayers": [],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "A unit test verifies AuthService.login returns { token, profile } for valid credentials, where token is a non-empty string and profile is an EmployeeProfile that does NOT expose passwordHash or terminationDate.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A unit test verifies AuthService.login throws the SAME UnauthorizedError for an unknown email and for a wrong password, and that the two failures are indistinguishable (identical error type and message).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A unit test verifies the profile route returns the EmployeeProfile for the authenticated actor and never leaks passwordHash or terminationDate.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A unit test verifies the profile route returns NotFoundError (404 / NOT_FOUND) for an actor id with no employee.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Unit tests verify GET /leaves list scoping returns 1/2/3 visible requests for EMPLOYEE/MANAGER/ADMIN respectively, and GET /leaves/:id returns NotFoundError (404 / NOT_FOUND) with identical responses for both a nonexistent id and a not-visible id.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "All new tests pass under the Jest runner (npx jest) and the suite type-checks under strict TypeScript (tsc --noEmit) with no `any` casts beyond the established `as unknown as I<X>Service` fake seam.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Tests must follow the existing route-test seam: build a Fastify instance, decorate the service seam, decorateRequest('user', undefined), add a preHandler hook setting request.user = actor, register the routes, await app.ready(), then app.inject(...) with jest.fn fakes cast as unknown as I<X>Service.",
+    "AuthService.login success-path tests must set process.env.JWT_SECRET before the test and restore it afterward, and seed employee.passwordHash with a real bcrypt hash (bcrypt.hashSync) \u2014 bcrypt and signToken are real dependencies, not mocks.",
+    "A fake IEmployeeService must implement all five methods: createEmployee, getEmployeeById, getEmployeeByEmail, getEmployeesByManagerId, getEmployeeProfileById.",
+    "This sub-phase produces only test files; it must not create or modify src/modules/employee/employee.routes.ts, src/modules/employee/index.ts, src/app.ts, or scripts/smoke.js (owned by sibling sub-phases 7.1 and 7.2)."
+  ],
+  "outOfScope": [
+    "Implementing GET /employees/me (src/modules/employee/employee.routes.ts, src/modules/employee/index.ts, src/app.ts) \u2014 owned by sibling sub-phase 7.1.",
+    "Extending scripts/smoke.js with profile/leave/balance stages \u2014 owned by sibling sub-phase 7.2."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [],
+  "integrationPoints": []
+}

@@ -1,0 +1,134 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "shared-types",
+      "repository",
+      "service"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "UpdateLeaveRequestDto in src/shared/types/index.ts exposes optional approverId (string | null) and decidedAt (Date | null) fields alongside the existing startDate/endDate/reason/status.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "FIELD_COLUMNS in src/modules/leave/leave.repository.ts maps approverId -> approver_id and decidedAt -> decided_at so the repository.update dynamic SET clause can persist both columns.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "approve() in src/modules/leave/leave.service.ts sets approverId = actor.id and decidedAt = now (a Date) in the same repository.update call that flips status to APPROVED, inside the existing uow.withTransaction.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "reject() in src/modules/leave/leave.service.ts sets approverId = actor.id and decidedAt = now (a Date) in the same repository.update call that flips status to REJECTED, inside the existing uow.withTransaction.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The persisted row returned by approve/reject has non-null approverId equal to the deciding actor's id and a non-null decidedAt timestamp; the audit afterState reflects these values (no longer null).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Existing Jest tests for the leave service still pass and new/updated tests assert approverId/decidedAt are populated on approve and reject (and remain null on create/submit).",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The approverId/decidedAt write must happen inside the existing uow.withTransaction block in approve/reject \u2014 it is part of the atomic status-change + balance-update + audit + notification unit of work, not a separate write.",
+    "The repository.update call must forward the transaction's PoolClient as the optional last argument (per AGENTS.md transaction-boundary rule); no new pool/client import in the service.",
+    "approverId/decidedAt must be added to the existing UpdateLeaveRequestDto and FIELD_COLUMNS \u2014 do not introduce a new DTO type or a separate repository method for the decision write.",
+    "The LeaveRequest model's 12-field canonical shape is unchanged \u2014 this phase only populates existing approverId/decidedAt fields; no field is added, renamed, or removed from the model.",
+    "decidedAt must be a real Date (the decision timestamp), not a string; it must round-trip through the repository's mapRow as a Date."
+  ],
+  "outOfScope": [
+    "Populating approvalComment or submittedAt \u2014 this phase only adds approverId and decidedAt; approvalComment/submittedAt remain out of scope.",
+    "Adding a cancel operation, a GET/list route, or any new endpoint \u2014 the phase is confined to the existing approve/reject update path.",
+    "Changing authorization rules, balance-counter math, audit/notification side effects, or the transaction boundary itself \u2014 those are already correct and untouched."
+  ],
+  "ambiguities": [
+    {
+      "description": "Whether decidedAt should be captured as the exact decision moment (new Date() at the point of the update) or derived from a single timestamp shared with the audit occurredAt.",
+      "options": [
+        "Use new Date() at the point of the repository.update call",
+        "Reuse the audit entry's occurredAt timestamp for consistency"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "description": "Whether approverId/decidedAt should be optional (string | null / Date | null) or required in UpdateLeaveRequestDto.",
+      "options": [
+        "Optional (consistent with the existing all-optional DTO shape)",
+        "Required (only ever set together on decision)"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "A LeaveRequest in APPROVED or REJECTED state must have a non-null approverId (the deciding actor's id) and a non-null decidedAt timestamp; a DRAFT or SUBMITTED request keeps both null."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "approverId must equal the authenticated deciding actor's id (never the requester, per the no-self-approval rule already enforced by assertCanDecide)."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "approve",
+      "authRule": "MANAGER or ADMIN only; no self-approval; a MANAGER must be the requester's direct manager (unchanged \u2014 this phase does not alter authorization).",
+      "idempotent": false,
+      "errorSemantics": "ConflictError on non-SUBMITTED status; ForbiddenError on unauthorized actor; NotFoundError on unknown request/balance \u2014 unchanged from current behavior."
+    },
+    {
+      "operation": "reject",
+      "authRule": "MANAGER or ADMIN only; no self-rejection; a MANAGER must be the requester's direct manager (unchanged).",
+      "idempotent": false,
+      "errorSemantics": "ConflictError on non-SUBMITTED status; ForbiddenError on unauthorized actor; NotFoundError on unknown request/balance \u2014 unchanged."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "UpdateLeaveRequestDto must extend the existing DTO in src/shared/types/index.ts (add approverId/decidedAt) rather than define a parallel type; the repository's UpdateField/FIELD_COLUMNS typing must remain keyed off UpdateLeaveRequestDto.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "FIELD_COLUMNS additions must map to the exact snake_case columns approver_id and decided_at already present in the COLUMNS constant and LeaveRequestRow/mapRow in leave.repository.ts, so update() and mapRow stay in sync.",
+      "referencePath": "src/modules/leave/leave.repository.ts"
+    },
+    {
+      "requirement": "The approve/reject transaction must continue to satisfy the reconciled transaction_contract: status change + approver_id/decided_at + balance counters + audit insert + notification insert all inside one IUnitOfWork.withTransaction, with the client forwarded to each participating call.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "The LeaveRequest model's approverId/decidedAt nullability (string | null / Date | null) must remain unchanged; this phase only populates them, matching the canonical 12-field shape in leave.model.ts.",
+      "referencePath": "src/modules/leave/leave.model.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/leave/leave.repository.ts (PgLeaveRequestRepository.update + FIELD_COLUMNS)",
+      "why": "The dynamic SET clause must be able to persist approver_id/decided_at; the service's update call depends on this mapping."
+    },
+    {
+      "target": "src/shared/types/index.ts (UpdateLeaveRequestDto)",
+      "why": "The DTO is the shared contract the service passes to repository.update; it must carry approverId/decidedAt for the decision write."
+    },
+    {
+      "target": "src/modules/audit (AuditService.record) \u2014 afterState of the APPROVE/REJECT audit entry",
+      "why": "The audit afterState must now reflect the populated approverId/decidedAt, closing the divergence noted in ARCHITECTURE.md."
+    }
+  ]
+}

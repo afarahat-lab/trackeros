@@ -1,0 +1,62 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "employee"
+    ],
+    "affectedLayers": [
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "A new test in tests/unit/modules/employee/employee.routes.test.ts stubs getEmployeeProfileById to throw new NotFoundError('Employee not found') and asserts the injected GET /employees/me response has statusCode 404 and a JSON body matching { code: 'NOT_FOUND' }.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The new test builds the app with a valid authenticated actor (id + EmployeeRole.EMPLOYEE) so the 404 originates from the stubbed service throw, not from the resolveActor guard.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The test suite still passes (no existing employee route test regressed) and the new test fails if the route returns any status other than 404 or omits the NOT_FOUND code.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Import NotFoundError from '../../../../src/shared/errors' (the same relative depth the leave route test uses); do not re-declare or inline a local error class.",
+    "Reuse the existing buildApp helper and its employeeService decoration seam unchanged; only the getEmployeeProfileById stub behavior may throw. Do not alter the helper signature or the IEmployeeService stub shape.",
+    "Assert the response body with toMatchObject({ code: 'NOT_FOUND' }) (or an equivalent code-only assertion), matching the leave route test pattern; do not assert on the error message string as a hard requirement.",
+    "This is a test-only change: no production source, route, service, repository, or error class may be modified."
+  ],
+  "outOfScope": [
+    "No production code changes: the route, service, repository, error classes, and app wiring remain untouched.",
+    "No changes to the existing buildApp helper, its service stub signature, or the existing 200/401 employee route tests.",
+    "No new test files or additional error-path coverage (e.g. 500 mapping, other AppError subclasses) beyond the single 404 case."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [
+    {
+      "requirement": "The 404 assertion must match the error contract emitted by sendError in src/modules/employee/employee.routes.ts: AppError -> reply.status(error.statusCode).send({ error, code }), so NotFoundError yields statusCode 404 and code 'NOT_FOUND'.",
+      "referencePath": "src/modules/employee/employee.routes.ts"
+    },
+    {
+      "requirement": "NotFoundError must carry statusCode 404 and code 'NOT_FOUND' as defined in the shared error contract; the test relies on these exact values.",
+      "referencePath": "src/shared/errors/index.ts"
+    },
+    {
+      "requirement": "The new test must follow the existing buildApp/decoration-seam and assertion style already established in the employee routes test file (actor decoration via preHandler, service stubbed at the employeeService decoration).",
+      "referencePath": "tests/unit/modules/employee/employee.routes.test.ts"
+    },
+    {
+      "requirement": "The 404 assertion pattern must mirror the leave route test's NotFoundError assertions (statusCode 404 + toMatchObject({ code: 'NOT_FOUND' })).",
+      "referencePath": "tests/unit/modules/leave/leave.routes.test.ts"
+    }
+  ],
+  "integrationPoints": []
+}

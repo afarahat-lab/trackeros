@@ -1,0 +1,79 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "api"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "A cancel endpoint is registered in leaveRoutes that delegates to ILeaveService.cancel(actor, id) and returns HTTP 200 with the resulting LeaveRequest on success.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "The handler resolves the actor via resolveActor(request) before invoking the service, so a missing/invalid request.user yields an UnauthorizedError at the API boundary.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Errors are routed through sendError(reply, error): AppError maps to { error, code } with its statusCode, and any non-AppError throw maps to 500.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The handler uses the single leaveService instance already resolved at the top of leaveRoutes (fastify.leaveService ?? createLeaveService()), not a new resolution.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No controller file: the route handler calls the service directly, matching the existing four endpoints in leave.routes.ts.",
+    "No service logic, no repository changes, and no tests in this phase \u2014 the cancel operation is already implemented in LeaveService (Phase 2) and is treated as a fixed contract.",
+    "The handler must mirror the existing submit/approve/reject handlers: resolveActor, destructure id from request.params, await leaveService.cancel(actor, id), reply.status(200).send(...), wrapped in try/catch with request.log.error(error) then sendError(reply, error).",
+    "The endpoint returns 200 on success (not 201), consistent with the other state-transition endpoints."
+  ],
+  "outOfScope": [
+    "Implementing or modifying the cancel service logic, authorization, timing guard, balance release, audit, or notification behavior (Phase 2 deliverable).",
+    "Adding tests for the cancel endpoint or the cancel service operation (Phase 4 deliverable).",
+    "Changing src/modules/leave/index.ts or the route registration signature \u2014 leaveRoutes is already re-exported."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [],
+  "interfaceConstraints": [
+    {
+      "operation": "cancel(actor: LeaveActor, requestId: string): Promise<LeaveRequest>",
+      "authRule": "Actor is resolved and role-validated at the API boundary by resolveActor before the service is invoked; the service enforces cancellation authorization.",
+      "idempotent": false,
+      "errorSemantics": "AppError (UnauthorizedError, ForbiddenError, ConflictError, NotFoundError) surfaces as { error, code } with its statusCode; any other throw becomes 500."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The new handler must reuse the existing resolveActor and sendError helpers and follow the identical try/catch + request.log.error + reply.status(200).send pattern of the submit/approve/reject handlers.",
+      "referencePath": "src/modules/leave/leave.routes.ts"
+    },
+    {
+      "requirement": "The handler must call the ILeaveService.cancel(actor, id) method exactly as declared, passing the resolved actor and the :id path parameter.",
+      "referencePath": "src/modules/leave/leave.service.ts"
+    },
+    {
+      "requirement": "The service instance must be resolved once as fastify.leaveService ?? createLeaveService(), matching the existing endpoints' resolution.",
+      "referencePath": "src/modules/leave/leave.routes.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "ILeaveService.cancel (LeaveService)",
+      "why": "The route delegates the entire cancel operation to the already-implemented service method."
+    },
+    {
+      "target": "resolveActor / sendError helpers in leave.routes.ts",
+      "why": "Reused for API-boundary authentication and error mapping, keeping the new endpoint consistent with existing ones."
+    }
+  ]
+}
