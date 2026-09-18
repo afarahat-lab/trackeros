@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import * as api from '../../infrastructure/api';
+import { ApiError, TokenStorage } from '../../infrastructure/api';
+import type { IApiClient } from '../../infrastructure/api';
 import {
   AuthSessionStatus,
   EmployeeRole,
@@ -21,12 +22,12 @@ const profile: EmployeeProfile = {
   employmentStatus: EmploymentStatus.ACTIVE,
 };
 
-function makeApiClient(login: api.IApiClient['login']): api.IApiClient {
+function makeApiClient(login: IApiClient['login']): IApiClient {
   return {
     login,
     getMe: () => Promise.resolve(profile),
     getLeaves: () => Promise.resolve([]),
-    getLeave: () => Promise.reject(new api.ApiError('Not found', 404)),
+    getLeave: () => Promise.reject(new ApiError('Not found', 404)),
     getBalances: () => Promise.resolve([]),
   };
 }
@@ -37,7 +38,7 @@ describe('AuthService', () => {
   });
 
   it('login stores the token and returns an authenticated session', async () => {
-    const storage = new api.TokenStorage();
+    const storage = new TokenStorage();
     const apiClient = makeApiClient(() =>
       Promise.resolve({ token: 'abc123', profile }),
     );
@@ -54,10 +55,10 @@ describe('AuthService', () => {
   });
 
   it('login propagates the server error message without an email-existence hint', async () => {
-    const storage = new api.TokenStorage();
+    const storage = new TokenStorage();
     storage.setToken('existing-token');
     const apiClient = makeApiClient(() =>
-      Promise.reject(new api.ApiError('Invalid credentials', 401, 'UNAUTHORIZED')),
+      Promise.reject(new ApiError('Invalid credentials', 401, 'UNAUTHORIZED')),
     );
     const service = new AuthService(apiClient, storage);
 
@@ -70,9 +71,9 @@ describe('AuthService', () => {
   });
 
   it('logout clears the token and is safe to call when already logged out', () => {
-    const storage = new api.TokenStorage();
+    const storage = new TokenStorage();
     storage.setToken('abc123');
-    const apiClient = makeApiClient(() => Promise.reject(new api.ApiError('x', 0)));
+    const apiClient = makeApiClient(() => Promise.reject(new ApiError('x', 0)));
     const service = new AuthService(apiClient, storage);
 
     expect(() => service.logout()).not.toThrow();

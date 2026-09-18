@@ -8,7 +8,7 @@ import {
 } from 'react';
 import type { ReactNode } from 'react';
 import { AuthSessionStatus } from '../../shared/types/index';
-import * as api from '../../infrastructure/api';
+import type { IApiClient, ITokenStorage } from '../../infrastructure/api';
 import type { AuthSession } from './auth-session';
 import type { IAuthService } from './auth.service';
 
@@ -20,8 +20,8 @@ interface IAuthContextValue {
 
 interface AuthProviderProps {
   authService: IAuthService;
-  tokenStorage: api.ITokenStorage;
-  apiClient: api.IApiClient;
+  tokenStorage: ITokenStorage;
+  apiClient: IApiClient;
   children: ReactNode;
 }
 
