@@ -55,6 +55,7 @@ describe('AuthService', () => {
 
   it('login propagates the server error message without an email-existence hint', async () => {
     const storage = new api.TokenStorage();
+    storage.setToken('existing-token');
     const apiClient = makeApiClient(() =>
       Promise.reject(new api.ApiError('Invalid credentials', 401, 'UNAUTHORIZED')),
     );
@@ -63,8 +64,9 @@ describe('AuthService', () => {
     await expect(service.login('ada@example.com', 'wrong')).rejects.toThrow(
       'Invalid credentials',
     );
-    // A failed login must not clear an already-stored token.
-    expect(storage.getToken()).toBeNull();
+    // A failed login must not clear an already-stored token and must not
+    // reveal whether the email exists (the message stays a generic 401).
+    expect(storage.getToken()).toBe('existing-token');
   });
 
   it('logout clears the token and is safe to call when already logged out', () => {
