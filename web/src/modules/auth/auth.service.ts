@@ -1,5 +1,5 @@
 import { AuthSessionStatus } from '../../shared/types/index';
-import type { IApiClient, ITokenStorage } from '../../infrastructure/api/index';
+import * as api from '../../infrastructure/api';
 import type { AuthSession } from './auth-session';
 
 export interface IAuthService {
@@ -18,10 +18,10 @@ export interface IAuthService {
  * failed login attempt.
  */
 export class AuthService implements IAuthService {
-  private readonly apiClient: IApiClient;
-  private readonly tokenStorage: ITokenStorage;
+  private readonly apiClient: api.IApiClient;
+  private readonly tokenStorage: api.ITokenStorage;
 
-  constructor(apiClient: IApiClient, tokenStorage: ITokenStorage) {
+  constructor(apiClient: api.IApiClient, tokenStorage: api.ITokenStorage) {
     this.apiClient = apiClient;
     this.tokenStorage = tokenStorage;
   }
