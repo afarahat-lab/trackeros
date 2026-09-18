@@ -1,0 +1,164 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "auth",
+      "employee",
+      "leave",
+      "balance",
+      "policy",
+      "leave-type"
+    ],
+    "affectedLayers": [
+      "verification/smoke (scripts/smoke.js)"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "scripts/smoke.js retains stages 1\u20133d (migrate, boot, probe incl. 3a mount / 3b auth-enforced / 3c token-populates-user / 3d persistence) unchanged in behavior \u2014 the edit only EXTENDS after 3d and never weakens or deletes an existing assertion.",
+      "testable": true,
+      "layer": "e2e"
+    },
+    {
+      "description": "The Postgres seed block mints the seeded employee's password_hash via bcrypt.hashSync(SMOKE_PASSWORD, 10) where SMOKE_PASSWORD comes from process.env (defaulting to a non-secret placeholder) \u2014 no credential string is hardcoded in the file.",
+      "testable": true,
+      "layer": "e2e"
+    },
+    {
+      "description": "The seed block adds a second leave type (SICK) with an effective ACTIVE policy (pol-2) but NO leave_balances row, alongside the existing ANNUAL type/policy/balance \u2014 the fixture that proves getCurrentBalances omits an effective policy lacking a balance row.",
+      "testable": true,
+      "layer": "e2e"
+    },
+    {
+      "description": "A login stage POSTs the seeded employee's email + SMOKE_PASSWORD and asserts a 200 with a non-empty token string and a profile whose id and email match the seeded employee (real values, not just status).",
+      "testable": true,
+      "layer": "e2e"
+    },
+    {
+      "description": "A profile stage uses the login token to GET /employees/me and asserts the exact 10-field EmployeeProfile (id, employeeNumber, firstName, lastName, email, role, managerId, department, hireDate, employmentStatus) with passwordHash and terminationDate absent.",
+      "testable": true,
+      "layer": "e2e"
+    },
+    {
+      "description": "A list stage uses the login token to GET /leaves and asserts the request created in stage 3d is present in the returned array (EMPLOYEE role scoping to the owner).",
+      "testable": true,
+      "layer": "e2e"
+    },
+    {
+      "description": "A getById stage uses the login token to GET /leaves/:id with the id captured from the stage 3d POST response body (not predicted) and asserts the seeded request is returned with matching id and employeeId.",
+      "testable": true,
+      "layer": "e2e"
+    },
+    {
+      "description": "A balances stage re-keys the seeded balance to the CURRENT accrual period via periodContaining(hireDate, 12, new Date()) imported from src/shared/date, then GET /balances/me and asserts EXACTLY one balance (ANNUAL) with correct periodStart/periodEnd and available === 25 \u2014 the SICK type (effective policy, no balance row) is omitted.",
+      "testable": true,
+      "layer": "e2e"
+    }
+  ],
+  "constraints": [
+    "The new stages (login/profile/list/getById/balances) run ONLY in Postgres mode (SMOKE_DATABASE_URL set); in sqlite mode they are skipped with the existing persistence caveat and must not fail the run.",
+    "No credential string is hardcoded in scripts/smoke.js \u2014 the seeded password plaintext comes from process.env.SMOKE_PASSWORD (no-hardcoded-secrets).",
+    "Stages 1\u20133d (migrate, boot, 3a mount, 3b auth-enforced, 3c token-populates-user, 3d persistence) are preserved verbatim \u2014 the edit only appends after 3d and never weakens or deletes an existing assertion.",
+    "Stages 5\u20138 must authenticate with the token returned by POST /auth/login (a genuine login token minted under the same JWT_SECRET registerAuth verifies), not the hand-minted signToken used by stages 3b/3c."
+  ],
+  "outOfScope": [
+    "Unit/integration tests (tests/unit/modules/leave/leave.routes.test.ts, tests/unit/modules/auth/auth.service.test.ts) \u2014 owned by Sub-phase 7.3; do not create or require them here.",
+    "Sub-phase 7.1 deliverables (src/modules/employee/employee.routes.ts, src/modules/employee/index.ts, src/app.ts) \u2014 produced by a sibling; this phase must not create them and must not be gated on their presence.",
+    "No production source changes \u2014 the only project file touched is scripts/smoke.js."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "The seeded employee's passwordHash is a bcrypt hash of SMOKE_PASSWORD (cost 10); it is never returned in any response (profile omits passwordHash)."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "Exactly one balance row exists for the seeded employee (ANNUAL); the SICK leave type has an effective ACTIVE policy but no balance row, so getCurrentBalances omits it rather than synthesizing."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "The request created in stage 3d is owned by the seeded employee (employeeId = EMP) and is visible to that employee via list and getById."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "POST /auth/login",
+      "authRule": "Public (no token required); returns 200 with { token, profile } for the seeded credentials.",
+      "idempotent": false,
+      "errorSemantics": "Non-200 (e.g. 401) fails the stage; token must be a non-empty string and profile.id/email must match the seed."
+    },
+    {
+      "operation": "GET /employees/me",
+      "authRule": "Requires a valid bearer token (the login token); actor resolved from request.user, never a client-supplied id.",
+      "idempotent": false,
+      "errorSemantics": "200 with the exact 10-field EmployeeProfile; passwordHash/terminationDate absent."
+    },
+    {
+      "operation": "GET /leaves",
+      "authRule": "Requires a valid bearer token; EMPLOYEE role scoping to the owner's own requests.",
+      "idempotent": false,
+      "errorSemantics": "200 with an array containing the seeded request id."
+    },
+    {
+      "operation": "GET /leaves/:id",
+      "authRule": "Requires a valid bearer token; EMPLOYEE may read only their own request.",
+      "idempotent": false,
+      "errorSemantics": "200 returning the seeded request (id and employeeId match)."
+    },
+    {
+      "operation": "GET /balances/me",
+      "authRule": "Requires a valid bearer token; actor resolved from request.user.",
+      "idempotent": false,
+      "errorSemantics": "200 with EXACTLY one balance (ANNUAL); SICK omitted; available === 25."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The current-period re-key must use periodContaining imported from src/shared/date (the same helper getCurrentBalances uses), never a hand-written date, so the assertion matches the service for whatever new Date() is at run time.",
+      "referencePath": "src/shared/date/index.ts"
+    },
+    {
+      "requirement": "The seeded employee's password_hash must be minted with the SAME bcrypt call the app verifies against (hashSync(plaintext, 10)) so the login stage's bcrypt.compare succeeds.",
+      "referencePath": "src/modules/auth/auth.service.ts"
+    },
+    {
+      "requirement": "The stage 5 profile assertion must match the exact 10-field EmployeeProfile shape (no passwordHash, no terminationDate) returned by getEmployeeProfileById.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The stage 8 balance assertion must match getCurrentBalances' output contract: available = entitledDays - usedDays - pendingDays, and an effective policy with no balance row is omitted (never synthesized).",
+      "referencePath": "src/modules/balance/balance.service.ts"
+    },
+    {
+      "requirement": "The stage 6/7 list/getById assertions must match the EMPLOYEE role scoping in LeaveService.list/getById (owner sees only their own requests).",
+      "referencePath": "src/modules/leave/leave.service.ts"
+    },
+    {
+      "requirement": "The login token must be verified by the same registerAuth preHandler that populates request.user from payload.sub/role, so stages 5\u20138 exercise real auth end to end.",
+      "referencePath": "src/shared/auth/index.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/date/index.ts (periodContaining)",
+      "why": "Re-key the seeded balance to the current accrual period using the same helper getCurrentBalances uses, so the assertion is date-independent."
+    },
+    {
+      "target": "src/shared/auth/index.ts (signToken / registerAuth)",
+      "why": "Stages 3b/3c mint a hand token; stages 5\u20138 must use the genuine login token verified by registerAuth."
+    },
+    {
+      "target": "src/shared/types/index.ts (EmployeeRole, EmploymentStatus, LeaveTypeCode)",
+      "why": "Seed rows and assertions reference the canonical enums so values match the app's persisted/returned values."
+    },
+    {
+      "target": "knexfile (smoke_pg) / knex",
+      "why": "Seed and re-key queries run against the per-run SCHEMA search_path so they hit the same schema the app serves."
+    }
+  ]
+}
