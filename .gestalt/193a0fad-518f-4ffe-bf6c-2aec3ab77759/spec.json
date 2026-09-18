@@ -1,0 +1,59 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "validation"
+    ],
+    "affectedLayers": [
+      "service",
+      "test"
+    ],
+    "isBreakingChange": true,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The `calculateRequestedDays` function is removed from `src/modules/validation/validation.service.ts` and no longer exported from `src/modules/validation/index.ts`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`validateLeaveRequest` derives the requested day count by calling `requestedDays(dto.startDate, dto.endDate)` directly (the canonical helper imported from `src/shared/types/index.ts`), producing identical results to the removed wrapper.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The validation service test file no longer imports `calculateRequestedDays` and its wrapper-specific test block is removed; the remaining `validateLeaveRequest` tests still pass.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A full repository search finds no remaining code references to `calculateRequestedDays` (only optional descriptive documentation mentions may remain).",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The canonical `requestedDays` helper in `src/shared/types/index.ts` is the single source of truth for the inclusive day-count rule and must not be modified or re-derived; this phase only removes the delegate and points the call site at the canonical helper.",
+    "The public behavior of `validateLeaveRequest` (input validation, date-range validation, sufficiency check, and the exact day-count result) must remain unchanged \u2014 this is a pure refactor with no behavioral change.",
+    "The `requestedDays` import already present in `validation.service.ts` must be retained and used; no new derivation logic may be introduced in the validation module."
+  ],
+  "outOfScope": [
+    "Modifying the canonical `requestedDays` helper or its existing tests in `tests/unit/shared/types.test.ts`.",
+    "Updating documentation references (`docs/ARCHITECTURE.md`, `PLAN.md`) that describe the delegate \u2014 these are informational and optional.",
+    "Changing the behavior, signature, or error semantics of `validateLeaveRequest`, `validateDateRange`, or `validateSufficiency`."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [
+    {
+      "requirement": "The day-count derivation used by `validateLeaveRequest` must match the canonical `requestedDays` implementation (inclusive `endDate - startDate + 1`, whole-day only, no weekend/holiday exclusion) \u2014 call it directly rather than re-deriving.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The validation module's public surface must remain consistent with the documented `IValidationService` contract (validateDateRange, validateSufficiency, validateLeaveRequest) \u2014 only the standalone `calculateRequestedDays` export is removed.",
+      "referencePath": "src/modules/validation/validation.service.ts"
+    }
+  ],
+  "integrationPoints": []
+}

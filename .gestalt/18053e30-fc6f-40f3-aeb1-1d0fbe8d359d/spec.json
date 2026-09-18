@@ -1,0 +1,102 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared/date"
+    ],
+    "affectedLayers": [
+      "unit-test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The Jest suite in tests/unit/shared/date.test.ts asserts exact UTC timestamps (via getTime()) for startOfUtcDay, addMonths, and periodContaining across normal, boundary, and month-end-clamping cases, and the full suite passes under `npx jest`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The non-UTC timezone block sets process.env.TZ to a non-UTC zone (e.g. 'Asia/Riyadh') and constructs at least one input using local-time Date construction (e.g. `new Date(2023, 5, 15, 14, 30, 45, 123)`) so the test would fail if the helpers used local getFullYear/getMonth/getDate instead of UTC accessors; it restores the original TZ in afterAll.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "addMonths month-end clamping is covered for: 31-day to 30-day month, 31-day to non-leap February (28), 31-day to leap-year February (29), and negative offsets that clamp backward (e.g. Mar 31 -> Feb 28).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "periodContaining is covered for: date equal to anchor start (inclusive), date equal to period end (exclusive, rolls to next period), multi-month accrual periods, a date several periods ahead, anchor-day-exceeds-target-month clamping, and the ConflictError thrown when date precedes anchor and when the period cannot be resolved (accrualMonths <= 0).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Any flagged/incorrect assertion line in the existing test file is corrected so that every assertion reflects the actual semantics of src/shared/date/accrual.ts (e.g. the ConflictError message 'Requested date precedes the accrual anchor' and statusCode 409 / code 'CONFLICT'), with no test asserting behavior the implementation does not provide.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Do not modify src/shared/date/accrual.ts, src/shared/date/index.ts, or src/shared/errors/index.ts \u2014 this phase only updates tests/unit/shared/date.test.ts (and corrects flagged lines within it).",
+    "Tests must assert exact UTC instants via getTime()/Date.UTC comparisons, not locale-formatted strings or local getters, so results are timezone-independent.",
+    "The non-UTC timezone block must save and restore process.env.TZ (beforeAll/afterAll) so no test leaks a mutated TZ into sibling suites.",
+    "Tests must not mutate their Date inputs; where non-mutation is asserted, capture the input's getTime() before the call and compare after."
+  ],
+  "outOfScope": [
+    "Refactoring src/modules/leave/leave.service.ts or src/modules/balance/balance.service.ts to import the shared date helpers (deferred to a later phase per PLAN.md).",
+    "Changing the behavior or signatures of startOfUtcDay, addMonths, or periodContaining \u2014 semantics are copied verbatim and must not be altered.",
+    "Adding integration/e2e tests or touching the EmployeeProfile / LeaveRequestQueryParams shared-type changes from Phase 1."
+  ],
+  "ambiguities": [
+    {
+      "description": "Whether the non-UTC timezone block should use local-time Date construction (new Date(y, m, d, ...)) to genuinely exercise timezone sensitivity, or keep Date.UTC inputs (which would not actually test the timezone independence).",
+      "options": [
+        "Use local-time construction for at least one input so the test is meaningful",
+        "Keep Date.UTC inputs and only assert TZ is set"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "Which specific line(s) the review flagged as incorrect \u2014 the intent says 'correct any flagged line' but does not identify them; the code agent must infer from the implementation semantics.",
+      "options": [
+        "The ConflictError message assertion ('Unable to resolve accrual period' vs actual 'Requested date precedes the accrual anchor')",
+        "A clamping expectation that mismatches addMonths behavior",
+        "No flagged line exists; only coverage gaps remain"
+      ],
+      "impactIfWrong": "medium"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "startOfUtcDay",
+      "mustExistOrExtend": true,
+      "invariant": "Returns a new Date at UTC midnight of the input's UTC calendar day (UTC hours/minutes/seconds/milliseconds all 0) and never mutates its input; the result is independent of the process timezone."
+    },
+    {
+      "entity": "addMonths",
+      "mustExistOrExtend": true,
+      "invariant": "Returns a new Date advanced by the given integer month offset, clamping the day-of-month to the last day of the target month (including leap-year February), supports negative offsets, and never mutates its input; arithmetic is UTC-based and timezone-independent."
+    },
+    {
+      "entity": "periodContaining",
+      "mustExistOrExtend": true,
+      "invariant": "Returns { start, end } where start is the UTC day start of the anchor and end is start advanced by accrualMonths (clamped); the period is half-open [start, end); throws ConflictError when date < anchor or when the period cannot be resolved within the 10,000-iteration bound."
+    }
+  ],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [
+    {
+      "requirement": "Test expectations must match the exact semantics of the exported helpers (UTC accessors, half-open period, 10,000-iteration bound, ConflictError messages 'Requested date precedes the accrual anchor' and 'Unable to resolve accrual period').",
+      "referencePath": "src/shared/date/accrual.ts"
+    },
+    {
+      "requirement": "ConflictError assertions must match the shared error contract: instanceof ConflictError, statusCode 409, code 'CONFLICT'.",
+      "referencePath": "src/shared/errors/index.ts"
+    },
+    {
+      "requirement": "Imports must use the public re-export surface (startOfUtcDay, addMonths, periodContaining) rather than deep-importing the accrual module.",
+      "referencePath": "src/shared/date/index.ts"
+    }
+  ],
+  "integrationPoints": []
+}

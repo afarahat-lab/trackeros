@@ -1,0 +1,81 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "policy"
+    ],
+    "affectedLayers": [
+      "service"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "IPolicyService exposes getAllPolicies(): Promise<LeavePolicy[]> and PolicyService implements it by delegating to this.repository.findAll() with no additional filtering, transformation, or validation logic.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "getAllPolicies() returns every row the repository's findAll() returns (unfiltered), preserving the LeavePolicy shape and ordering as produced by the repository, and returns an empty array when no policies exist rather than throwing.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "No repository method is added or modified; the change is limited to the two service-layer files (policy.service.interface.ts and policy.service.ts) with no new files, imports, or barrel changes.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "getAllPolicies() must delegate directly to this.repository.findAll() and perform NO filtering, sorting, or selection \u2014 the ACTIVE/effective-date/latest-effectiveFrom selection is deferred to Phase 5 (balance module).",
+    "Do NOT add a balance -> leave-type dependency in this phase; getAllPolicies is a plain read-through with no cross-module coupling.",
+    "No new files, imports, or barrel/export changes are permitted; LeavePolicy is already imported in both edited files and the repository findAll already exists.",
+    "The method must not throw when the result set is empty; it returns an empty array (matching repository.findAll semantics)."
+  ],
+  "outOfScope": [
+    "Filtering by ACTIVE status, effective-date window, or latest-effectiveFrom selection \u2014 deferred to Phase 5 (balance module).",
+    "Adding or modifying any repository method (findAll already exists in IPolicyRepository and PgLeavePolicyRepository).",
+    "Any HTTP route/endpoint, controller, or wire-level exposure of getAllPolicies.",
+    "Introducing a balance -> leave-type dependency or any cross-module coupling."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "getAllPolicies returns LeavePolicy instances exactly as produced by the repository's mapRow \u2014 no field is added, dropped, renamed, or re-typed; the returned array may contain policies in any status (DRAFT/ACTIVE/SUPERSEDED) since no filtering occurs at this layer."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "getAllPolicies",
+      "authRule": "No auth rule at this layer \u2014 it is a service-layer read with no actor/authorization; any access control is the caller's concern (deferred to later phases).",
+      "idempotent": true,
+      "errorSemantics": "Read-only; returns an empty array (never throws) when no policies exist; propagates repository/database errors unchanged (no wrapping or swallowing)."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "getAllPolicies() must match the existing IPolicyRepository.findAll(client?: PoolClient): Promise<LeavePolicy[]> signature and semantics \u2014 delegate to it verbatim without reimplementing the query or reshaping results.",
+      "referencePath": "src/modules/policy/policy.repository.interface.ts"
+    },
+    {
+      "requirement": "The returned element type must be the canonical LeavePolicy model (id, leaveTypeCode, policyName, annualEntitlementDays, accrualPeriodMonths, carryForwardDays, minNoticeDays, maxRequestDays, requiresManagerApproval, effectiveFrom, effectiveTo, status) \u2014 no divergence from the model used by the repository.",
+      "referencePath": "src/modules/policy/policy.model.ts"
+    },
+    {
+      "requirement": "The new method must be declared on IPolicyService and implemented by PolicyService, consistent with the existing service methods (createLeavePolicy, getLeavePolicyById, getPolicyByLeaveTypeCode) that delegate to this.repository.",
+      "referencePath": "src/modules/policy/policy.service.interface.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "IPolicyRepository.findAll (src/modules/policy/policy.repository.interface.ts)",
+      "why": "The sole dependency getAllPolicies delegates to; already implemented by PgLeavePolicyRepository with an unfiltered SELECT over leave_policies."
+    },
+    {
+      "target": "Phase 5 balance module (getCurrentBalances)",
+      "why": "The downstream consumer that will call policyService.getAllPolicies() and apply ACTIVE/effective-date/latest-effectiveFrom selection."
+    }
+  ]
+}

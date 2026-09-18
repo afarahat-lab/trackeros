@@ -1,0 +1,61 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared",
+      "audit"
+    ],
+    "affectedLayers": [
+      "domain",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The AuditAction enum in src/shared/types/index.ts exposes a CANCEL member whose value is the string literal 'CANCEL', appended after REJECT in the existing member order (CREATE, UPDATE, DELETE, APPROVE, REJECT, CANCEL).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The existing AuditAction test in tests/unit/shared/types.test.ts is extended so Object.values(AuditAction) equals ['CREATE','UPDATE','DELETE','APPROVE','REJECT','CANCEL'], and the test description reflects the new member.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The project typechecks and the full Jest suite passes (npm run build && npx jest) with no non-exhaustive-switch or other type errors introduced by the new enum member.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The CANCEL member must use the string-literal value 'CANCEL' (uppercase), matching the existing AuditAction member style; do NOT reuse UPDATE or DELETE as the value.",
+    "Append CANCEL after REJECT; do not reorder or rename the existing CREATE, UPDATE, DELETE, APPROVE, REJECT members.",
+    "No new modules, routes, service logic, or database changes; the change is limited to the shared enum definition and its unit test."
+  ],
+  "outOfScope": [
+    "Any production consumer changes (audit.service.ts, audit.model.ts, leave.service.ts) \u2014 Object.values(AuditAction).includes(...) validation and value-only references already accept the new member without modification.",
+    "Adding exhaustive switch handling for CANCEL \u2014 no switch statements over AuditAction exist in the codebase, so none need updating.",
+    "Any persistence, migration, or audit-log write logic that actually records a CANCEL action \u2014 this phase only adds the enum member and its test."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "AuditAction",
+      "mustExistOrExtend": true,
+      "invariant": "AuditAction is a string-literal enum whose members are the canonical persisted audit-action values; it must contain exactly CREATE, UPDATE, DELETE, APPROVE, REJECT, CANCEL in that order, each with an uppercase string-literal value equal to its member name."
+    }
+  ],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [
+    {
+      "requirement": "The new CANCEL member must match the existing string-literal member style (uppercase value equal to member name) of the AuditAction enum.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The updated test must extend the existing AuditAction member-list assertion in the shared enum test file rather than introducing a divergent assertion style.",
+      "referencePath": "tests/unit/shared/types.test.ts"
+    }
+  ],
+  "integrationPoints": []
+}

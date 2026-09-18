@@ -1,0 +1,157 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "unit tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "A Jest test file exists under tests/unit/modules/leave/ that exercises the LeaveService orchestration for all four operations \u2014 create (DRAFT), submit (SUBMITTED), approve (APPROVED), reject (REJECTED) \u2014 with every collaborator (ILeaveRepository, IBalanceRepository, IAuditService, INotificationService, IValidationService, IEmployeeService, IPolicyService, IUnitOfWork) mocked/faked, and the suite passes under `npx jest`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The approve and reject tests assert the atomic transaction behavior: within a single IUnitOfWork.withTransaction callback the service performs the status change, the balance update (approve: pendingDays decremented AND usedDays incremented; reject: pendingDays decremented only), the audit insert, and the synchronous notification insert \u2014 and that a failure in any participating step propagates so the unit of work rolls back (no partial commit).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Tests cover the authorization and state-transition guards: unauthenticated actor \u2192 UnauthorizedError; non-owner submit \u2192 ForbiddenError; non-MANAGER/ADMIN decide \u2192 ForbiddenError; self-approval \u2192 ForbiddenError; MANAGER who is not the requester's direct manager \u2192 ForbiddenError; wrong-state transitions (submit a non-DRAFT, approve/reject a non-SUBMITTED) \u2192 ConflictError; missing request \u2192 NotFoundError; insufficient pendingDays on approve/reject \u2192 ConflictError.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Tests assert create() forces employeeId = actor.id (ignoring any client-supplied id), computes requestedDays via the shared helper, persists a DRAFT row, and records a CREATE audit entry; and that approve/reject set approverId = actor.id and decidedAt to a timestamp.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Tests are pure unit tests: no real PostgreSQL, no real pool, no network. All eight collaborators are in-memory fakes/mocks; the IUnitOfWork fake runs its callback with a stub PoolClient (matching the existing tests/unit/modules/balance/balance.service.test.ts FakeUnitOfWork pattern).",
+    "Tests import the service and its collaborators ONLY through public entry points (src/modules/leave/index.ts, src/modules/balance/index.ts, src/modules/audit/index.ts, src/modules/notification/index.ts, src/modules/validation/index.ts, src/modules/employee/index.ts, src/modules/policy/index.ts, src/shared/db/index.ts, src/shared/errors/index.ts, src/shared/types/index.ts) \u2014 never from module internals.",
+    "Tests must not assert on implementation shape (no HTTP routes/verbs, no component names, no private-method calls); they assert observable behavior \u2014 returned LeaveRequest state, balance counter deltas, audit/notification records, and thrown typed errors.",
+    "No production source files are modified in this phase \u2014 only test files under tests/unit/modules/leave/ are added. The service, model, repository, routes, and index.ts delivered in 6a/6b are treated as fixed contracts."
+  ],
+  "outOfScope": [
+    "Creating or modifying src/modules/leave/leave.model.ts, leave.repository.ts, leave.service.ts, leave.routes.ts, or index.ts \u2014 those are Phase 6a/6b deliverables and are fixed contracts for this test phase.",
+    "Integration/e2e tests against a real PostgreSQL database, real Fastify routes, or the actual PgUnitOfWork transaction semantics \u2014 this phase is unit-level only.",
+    "Testing the CANCELLED lifecycle state or a cancel operation \u2014 the service exposes only create/submit/approve/reject (no cancel exists).",
+    "Testing the repository's findByQuery/list behavior or any GET/list endpoint \u2014 not surfaced by the service orchestration under test."
+  ],
+  "ambiguities": [
+    {
+      "description": "Whether the atomicity test should assert rollback by having a fake collaborator throw mid-transaction and verifying no partial writes, or by asserting all four steps were invoked within the single withTransaction callback. The service already owns the boundary, so the latter (invocation-order/containment) is sufficient at unit level; the former risks over-asserting fake internals.",
+      "options": [
+        "Assert all four steps occur inside one withTransaction callback (containment)",
+        "Additionally simulate a mid-transaction throw and assert no partial state",
+        "Both"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "description": "Whether the fake IUnitOfWork should record the PoolClient it passes (to assert the client is forwarded to repository/service calls) or pass an opaque stub. The existing balance test passes an opaque `{} as PoolClient`; matching it keeps consistency but forgoes client-forwarding assertions.",
+      "options": [
+        "Opaque stub client (match balance test)",
+        "Recorded client with forwarding assertions"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "Lifecycle transitions under test are strictly DRAFT \u2192 SUBMITTED \u2192 APPROVED|REJECTED; a request may only be submitted from DRAFT and only decided from SUBMITTED, and any other transition is rejected with ConflictError."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "employeeId is always the authenticated actor's id (the requester owns the request); approverId and decidedAt are null until an approve/reject decision, at which point approverId = actor.id and decidedAt is set."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "Reservation lifecycle counters: submit increments pendingDays by requestedDays; approve decrements pendingDays and increments usedDays by requestedDays; reject decrements pendingDays only; pendingDays must never go negative (guarded by ConflictError)."
+    },
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "Every state-changing operation (create, submit, approve, reject) produces exactly one audit record with the matching AuditAction (CREATE/UPDATE/APPROVE/REJECT) and entityType 'leave_request'."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "create(actor, input)",
+      "authRule": "Requires an authenticated actor (non-empty id, valid EmployeeRole); the created request's employeeId is forced to actor.id.",
+      "idempotent": false,
+      "errorSemantics": "UnauthorizedError on missing/invalid actor; ValidationError/ConflictError from validateLeaveRequest; NotFoundError when no balance exists for the requested period."
+    },
+    {
+      "operation": "submit(actor, requestId)",
+      "authRule": "Owner-only: actor.id must equal request.employeeId.",
+      "idempotent": false,
+      "errorSemantics": "ForbiddenError on non-owner; ConflictError on non-DRAFT state; NotFoundError on unknown request."
+    },
+    {
+      "operation": "approve(actor, requestId)",
+      "authRule": "MANAGER or ADMIN only; no self-approval; a MANAGER must be the requester's direct manager (ADMIN exempt).",
+      "idempotent": false,
+      "errorSemantics": "ForbiddenError on role/self/manager violations; ConflictError on non-SUBMITTED state or insufficient pendingDays; NotFoundError on unknown request."
+    },
+    {
+      "operation": "reject(actor, requestId)",
+      "authRule": "MANAGER or ADMIN only; no self-rejection; a MANAGER must be the requester's direct manager (ADMIN exempt).",
+      "idempotent": false,
+      "errorSemantics": "ForbiddenError on role/self/manager violations; ConflictError on non-SUBMITTED state or insufficient pendingDays; NotFoundError on unknown request."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The fake IUnitOfWork must mirror the FakeUnitOfWork pattern in the existing balance test (withTransaction runs the callback with a stub PoolClient) so transaction-boundary assertions are consistent across modules.",
+      "referencePath": "tests/unit/modules/balance/balance.service.test.ts"
+    },
+    {
+      "requirement": "The LeaveService constructor signature and its eight injected collaborators (ILeaveRepository, IBalanceRepository, IAuditService, INotificationService, IValidationService, IEmployeeService, IPolicyService, IUnitOfWork) must be matched exactly as declared \u2014 tests must not assume a different dependency set.",
+      "referencePath": "src/modules/leave/leave.service.ts"
+    },
+    {
+      "requirement": "The LeaveRequest shape (12 canonical fields incl. nullable reason/approverId/approvalComment/submittedAt/decidedAt) and CreateLeaveRequestInput used in test fixtures must match the model contract.",
+      "referencePath": "src/modules/leave/leave.model.ts"
+    },
+    {
+      "requirement": "Typed error assertions must use the shared error classes (UnauthorizedError, ForbiddenError, ConflictError, NotFoundError, ValidationError) with their canonical status codes, not string matching.",
+      "referencePath": "src/shared/errors/index.ts"
+    },
+    {
+      "requirement": "Enum values used in fixtures (LeaveStatus, LeaveTypeCode, EmployeeRole, AuditAction) must be the canonical members re-exported from shared types.",
+      "referencePath": "src/shared/types/index.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/leave/leave.service.ts (LeaveService + ILeaveService + LeaveActor)",
+      "why": "The system under test \u2014 its orchestration, guards, and transaction behavior are what the tests verify."
+    },
+    {
+      "target": "src/shared/db/index.ts (IUnitOfWork)",
+      "why": "The transaction boundary the approve/reject atomicity tests exercise via a fake."
+    },
+    {
+      "target": "src/modules/balance/index.ts (IBalanceRepository, LeaveBalance)",
+      "why": "Balance counter deltas (pendingDays/usedDays) asserted in submit/approve/reject tests."
+    },
+    {
+      "target": "src/modules/audit/index.ts (IAuditService) and src/modules/notification/index.ts (INotificationService)",
+      "why": "Side-effect collaborators whose record/create calls the tests assert as part of the atomic unit of work."
+    },
+    {
+      "target": "src/modules/validation/index.ts (IValidationService), src/modules/employee/index.ts (IEmployeeService), src/modules/policy/index.ts (IPolicyService)",
+      "why": "Validation, manager-resolution, and policy/balance-resolution collaborators that must be faked for create and decide flows."
+    }
+  ]
+}

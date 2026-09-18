@@ -1,0 +1,140 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "balance",
+      "policy",
+      "employee",
+      "shared-date"
+    ],
+    "affectedLayers": [
+      "service",
+      "routes",
+      "app wiring"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "IBalanceService exposes getCurrentBalances(employeeId: string): Promise<Array<LeaveBalance & { available: number }>> and BalanceService implements it, returning a list (possibly []) where every entry carries leaveTypeCode, periodStart, periodEnd, entitledDays, usedDays, pendingDays and a computed available.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "getCurrentBalances selects AT MOST ONE policy per leaveTypeCode: status ACTIVE (via LeavePolicyStatus imported from ../policy, never a bare 'ACTIVE' string), effectiveFrom <= asOf, effectiveTo null or >= asOf, tie-break latest effectiveFrom.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "For each selected policy, getCurrentBalances computes the current accrual period via periodContaining(employee.hireDate, policy.accrualPeriodMonths, new Date()) imported from src/shared/date, and looks the balance up with repository.findByKey.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A leave type whose current period has no balance row is OMITTED (never throws, never synthesizes a row); when no leave type has a balance row the result is an empty list, not an error.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "available is computed as entitledDays - usedDays - pendingDays for every returned entry.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The balance module exposes a route that resolves the actor from request.user (reusing the resolveActor/sendError shape from src/modules/leave/leave.routes.ts), calls getCurrentBalances(actor.id), and returns the list with a 200 status; the route is re-exported from src/modules/balance/index.ts and registered in src/app.ts.",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "Read-only: getCurrentBalances and its route must not open a transaction (no IUnitOfWork.withTransaction) and must not perform any writes.",
+    "No controller file: the route calls the service directly, matching the existing leave/auth route shape.",
+    "Use LeavePolicyStatus imported from ../policy (the policy module's public entry point), never a bare 'ACTIVE' string literal.",
+    "Import periodContaining from src/shared/date (Phase 1), not a local/private copy.",
+    "Actor identity comes from request.user (verified token); never a client-supplied id.",
+    "All database access goes through the repository (IBalanceRepository.findByKey); no inline SQL in the service or route."
+  ],
+  "outOfScope": [
+    "No audit-log writes (GP-002) \u2014 this phase is read-only.",
+    "No balance writes: openPeriod/carryForward and any accrual/entitlement mutation are unchanged and out of scope.",
+    "No promotion of LeavePolicyStatus into src/shared/types \u2014 it stays module-local and is imported via ../policy.",
+    "No refactor of leave.service.ts/balance.service.ts private date helpers to import the shared helpers (deferred).",
+    "No leave-type catalog enumeration \u2014 balances are derived from policies, not the leave-type table."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "available is a computed, derived value (entitledDays - usedDays - pendingDays) \u2014 it is never persisted and never mutates the stored LeaveBalance row; the stored entity keeps exactly its 7 persisted fields."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "Effective-policy selection yields at most one policy per leaveTypeCode for a given asOf: ACTIVE status, effectiveFrom <= asOf, effectiveTo null or >= asOf, tie-break latest effectiveFrom."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "A leave type is represented in the result only when a balance row exists for the current accrual period (findByKey hit); absence of a row means omission, never a synthesized or thrown balance."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "getCurrentBalances(employeeId: string): Promise<Array<LeaveBalance & { available: number }>>",
+      "authRule": "Caller must be authenticated; the employeeId is the resolved actor's id (from the verified token), never client-supplied.",
+      "idempotent": true,
+      "errorSemantics": "Read-only: returns [] when no balance rows exist; never throws for a missing balance row. Unknown employee surfaces NotFoundError (404) via employeeService.getEmployeeById."
+    },
+    {
+      "operation": "balanceRoutes(fastify) \u2014 the balance read endpoint",
+      "authRule": "Requires a valid bearer token; resolveActor validates presence + role membership at the API boundary (UnauthorizedError on missing/invalid actor).",
+      "idempotent": true,
+      "errorSemantics": "Errors return { error, code }; AppError mapped to its status, any other throw to 500, matching the leave/auth sendError shape."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Reuse the resolveActor/sendError helper shape (actor resolution from request.user, AppError -> { error, code }, else 500) exactly as implemented in the leave routes.",
+      "referencePath": "src/modules/leave/leave.routes.ts"
+    },
+    {
+      "requirement": "Import periodContaining (and the accrual helpers) from the shared date entry point, not a local copy.",
+      "referencePath": "src/shared/date/index.ts"
+    },
+    {
+      "requirement": "Import LeavePolicyStatus from the policy module's public entry point (never a bare 'ACTIVE' string).",
+      "referencePath": "src/modules/policy/index.ts"
+    },
+    {
+      "requirement": "Use the existing IBalanceRepository.findByKey(employeeId, leaveTypeCode, periodStart, periodEnd) signature for the balance lookup.",
+      "referencePath": "src/modules/balance/balance.repository.ts"
+    },
+    {
+      "requirement": "Use employeeService.getEmployeeById and policyService.getAllPolicies() as the cross-module read surface (no new repository/service methods).",
+      "referencePath": "src/modules/policy/policy.service.interface.ts"
+    },
+    {
+      "requirement": "Follow the createLeaveService-style factory pattern for wiring the concrete service in the route (resolve from fastify instance if present, else construct).",
+      "referencePath": "src/modules/leave/leave.service.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/employee (IEmployeeService.getEmployeeById)",
+      "why": "Resolve the employee to obtain hireDate (the accrual anchor) and to surface NotFoundError for an unknown employee."
+    },
+    {
+      "target": "src/modules/policy (IPolicyService.getAllPolicies, LeavePolicyStatus)",
+      "why": "Enumerate policies to derive which leave types have a current period and to select the effective policy per leaveTypeCode."
+    },
+    {
+      "target": "src/shared/date (periodContaining)",
+      "why": "Compute the current accrual period for each policy anchored on hireDate."
+    },
+    {
+      "target": "src/shared/auth (registerAuth preHandler populating request.user)",
+      "why": "The route's actor is resolved from the verified token; the endpoint requires a valid bearer token."
+    }
+  ]
+}

@@ -1,0 +1,119 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "auth",
+      "shared-auth",
+      "employee",
+      "shared-types",
+      "shared-errors"
+    ],
+    "affectedLayers": [
+      "service",
+      "routes",
+      "shared"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "A successful login returns an object with a `token` (minted via signToken for the employee's id+role) and a `profile` that is an EmployeeProfile containing no `passwordHash` and no `terminationDate`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Wrong email and wrong password produce the SAME error \u2014 a single UnauthorizedError('Invalid email or password') \u2014 so the two failure modes are indistinguishable (no account enumeration).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The login endpoint is reachable WITHOUT a bearer token (its path is in the public-path set) and returns 200 with `{ token, profile }` on valid credentials.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "A request body whose `email` or `password` is not a string is rejected with a ValidationError (400), not a 500.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "The auth module's public entry point re-exports IAuthService, AuthService, and authRoutes, and the app registers authRoutes so the endpoint is mounted at runtime.",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "Use only the already-installed bcrypt (^5.0.1) and jsonwebtoken (^8.5.1) with their existing @types packages; add no new libraries.",
+    "No controller file \u2014 the route handler calls the auth service directly, matching the codebase's universal routes-call-services shape.",
+    "The auth service must not import the employee module's module-local toEmployeeProfile helper; it defines its own EmployeeProfile mapper that omits passwordHash and terminationDate.",
+    "Login is a read-only credential check plus a non-persistent token mint \u2014 no transaction, no IUnitOfWork, no audit record, no repository access in the auth module.",
+    "Never log the password, the token, or the passwordHash (GP-004); the route's error logging must not emit credentials."
+  ],
+  "outOfScope": [
+    "No token refresh, logout, registration, or password reset \u2014 only the single login operation.",
+    "No OIDC/corporate identity integration \u2014 local bcrypt credential check only.",
+    "No audit-log write for login (GP-002 does not apply to a non-persistent credential check).",
+    "No GET /employees/me or other authenticated read endpoints \u2014 those are later phases."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "AuthToken",
+      "mustExistOrExtend": true,
+      "invariant": "The token minted at login carries sub = employee.id and role = employee.role (the AuthUser contract), and is produced by the existing signToken \u2014 its payload shape must not change."
+    },
+    {
+      "entity": "EmployeeProfile",
+      "mustExistOrExtend": true,
+      "invariant": "The profile returned from login is the shared EmployeeProfile shape and must never contain passwordHash or terminationDate."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IAuthService.login(email, password)",
+      "authRule": "Public \u2014 no authentication required; the endpoint is exempted from the auth preHandler via the public-path set.",
+      "idempotent": false,
+      "errorSemantics": "Missing employee and failed password compare both throw the SAME UnauthorizedError('Invalid email or password'); non-string email/password rejected with ValidationError."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Reuse signToken (not a local jwt.sign) to mint the token, passing { id, role } matching the AuthUser shape.",
+      "referencePath": "src/shared/auth/index.ts"
+    },
+    {
+      "requirement": "Reuse the resolveActor/sendError error-mapping shape (AppError -> { error, code } with correct status, else 500) so error mapping stays identical across modules.",
+      "referencePath": "src/modules/leave/leave.routes.ts"
+    },
+    {
+      "requirement": "The returned profile must match the shared EmployeeProfile type (imported from shared/types), not a locally re-declared shape.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "Use the existing UnauthorizedError and ValidationError classes (not new error types) so the { error, code } contract and status codes stay consistent.",
+      "referencePath": "src/shared/errors/index.ts"
+    },
+    {
+      "requirement": "Call IEmployeeService.getEmployeeByEmail (which throws NotFoundError on unknown email) and convert that NotFoundError to the same UnauthorizedError as a failed compare.",
+      "referencePath": "src/modules/employee/employee.service.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/employee (IEmployeeService.getEmployeeByEmail)",
+      "why": "Resolves the caller by email and supplies the passwordHash to compare; its NotFoundError must be mapped to UnauthorizedError."
+    },
+    {
+      "target": "src/shared/auth (signToken, PUBLIC_PATHS)",
+      "why": "Mints the JWT and exempts the login path from the auth preHandler."
+    },
+    {
+      "target": "src/shared/types (EmployeeProfile, EmployeeRole)",
+      "why": "The profile return type and the role carried in the token payload."
+    },
+    {
+      "target": "src/app.ts (registerAuth + route registration)",
+      "why": "authRoutes must be registered after registerAuth so the public-path exemption applies and the endpoint is mounted."
+    }
+  ]
+}
