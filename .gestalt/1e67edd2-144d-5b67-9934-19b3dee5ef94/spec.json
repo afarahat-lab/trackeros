@@ -1,0 +1,208 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave",
+      "balance",
+      "audit",
+      "notification",
+      "validation",
+      "employee"
+    ],
+    "affectedLayers": [
+      "service",
+      "routes",
+      "public-api"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "large"
+  },
+  "successCriteria": [
+    {
+      "description": "src/modules/leave/leave.service.ts exports ILeaveService and LeaveService exposing create, submit, approve, and reject operations that orchestrate the DRAFT \u2192 SUBMITTED \u2192 APPROVED/REJECTED workflow.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "create persists a LeaveRequest in DRAFT status with requestedDays derived from the shared requestedDays(startDate, endDate) helper (never re-derived locally).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "submit transitions a DRAFT request to SUBMITTED and increments the employee's pendingDays for the matching balance; a non-DRAFT request is rejected with a typed error.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "approve runs inside PgUnitOfWork.withTransaction and atomically performs: status \u2192 APPROVED (with approverId/decidedAt), pendingDays decrement + usedDays increment, an audit-log insert, and a synchronous notification insert.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "reject runs inside PgUnitOfWork.withTransaction and atomically performs: status \u2192 REJECTED (with approverId/decidedAt), pendingDays decrement only, an audit-log insert, and a synchronous notification insert.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/modules/leave/leave.routes.ts registers Fastify routes that call the LeaveService directly (matching src/modules/uptime/uptime.routes.ts), with no separate controller file.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "src/modules/leave/index.ts re-exports the public surface (model, repository, service) so other modules import leave only through its entry point.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The approve/reject unit of work MUST run inside PgUnitOfWork.withTransaction (from src/shared/db/unit-of-work.ts); the service receives IUnitOfWork via constructor injection and never imports a pool, client, or module-level db helper.",
+    "requestedDays MUST be computed via the shared requestedDays helper (canonical source src/shared/types/index.ts) \u2014 never re-derived in the leave service.",
+    "Routes call the service DIRECTLY (matching src/modules/uptime/uptime.routes.ts); no separate controller file may be created.",
+    "All cross-module imports go through each module's public index.ts only (balance, audit, notification, validation, employee, shared types/errors/db) \u2014 never into module internals.",
+    "Participating repository/service methods take the transaction client as an optional LAST parameter and fall back to the shared pool when omitted; withTransaction is never placed on a repository.",
+    "Every state-changing operation (create, submit, approve, reject) writes an audit record (GP-002); notifications are synchronous direct inserts, no BullMQ.",
+    "No tests may be created in this sub-phase (unit/integration tests belong to Phase 6c)."
+  ],
+  "outOfScope": [
+    "src/modules/leave/leave.model.ts and src/modules/leave/leave.repository.ts (Phase 6a \u2014 already delivered by a sibling sub-phase).",
+    "Unit/integration tests for the leave service (tests/unit/modules/leave/leave.service.test.ts \u2014 Phase 6c).",
+    "Cancel operation and CANCELLED status handling (not in this sub-phase's create/submit/approve/reject scope).",
+    "RBAC middleware/guards and JWT auth wiring (enforced at route level per GP-005, but the guard implementation itself is not a deliverable of this sub-phase)."
+  ],
+  "ambiguities": [
+    {
+      "description": "Whether the leave service should expose a list/query operation (findByQuery) in this sub-phase, given the repository already supports it but the intent only names create/submit/approve/reject.",
+      "options": [
+        "Include a read-only list operation in ILeaveService",
+        "Omit list \u2014 repository query is consumed by a later phase"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "description": "How the service resolves the employee's balance for the request's leave type/period (which balance row to mutate) \u2014 the balance module exposes findByKey/getBalance but no explicit \"current open period\" resolver.",
+      "options": [
+        "Service locates the balance via IBalanceRepository.findByKey using the request's dates",
+        "Service uses IBalanceService.getBalance with a derived period",
+        "Defer balance-location to a later phase and mutate by explicit balance id"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "Whether approval authorization (manager-of-requester check, no self-approval) is enforced inside the service or left to route-level RBAC middleware.",
+      "options": [
+        "Enforce in the service (business rule)",
+        "Enforce at route middleware only",
+        "Both: middleware for role, service for manager/self-approval"
+      ],
+      "impactIfWrong": "medium"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "Lifecycle is strictly DRAFT \u2192 SUBMITTED \u2192 APPROVED|REJECTED (CANCELLED out of scope here); a request may only be submitted from DRAFT, and only a SUBMITTED request may be approved or rejected."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "requestedDays is always the canonical inclusive day count (endDate - startDate + 1) computed by the shared helper; the service never stores a locally-derived value."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "Reservation lifecycle: submit increments pendingDays; approve decrements pendingDays and increments usedDays; reject decrements pendingDays only \u2014 counters must never go negative."
+    },
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "Every state-changing leave operation (create/submit/approve/reject) produces exactly one AuditLog row with the correct AuditAction (CREATE/UPDATE/APPROVE/REJECT) and the actor as actorId."
+    },
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "Approve/reject produces a synchronous Notification insert (status PENDING) inside the same transaction as the status change and balance update."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "create",
+      "authRule": "Requires an authenticated actor (EMPLOYEE or above); the created request's employeeId is the requester.",
+      "idempotent": false,
+      "errorSemantics": "Invalid input \u2192 ValidationError (400); insufficient balance \u2192 ConflictError (409)."
+    },
+    {
+      "operation": "submit",
+      "authRule": "Requires an authenticated actor; only the request's owner may submit.",
+      "idempotent": false,
+      "errorSemantics": "Unknown request \u2192 NotFoundError (404); invalid state transition (not DRAFT) \u2192 ConflictError (409)."
+    },
+    {
+      "operation": "approve",
+      "authRule": "Requires MANAGER or ADMIN; no self-approval; approver must be the requester's manager or an ADMIN.",
+      "idempotent": false,
+      "errorSemantics": "Unknown request \u2192 NotFoundError (404); invalid state transition (not SUBMITTED) \u2192 ConflictError (409); unauthorized actor \u2192 ForbiddenError (403)."
+    },
+    {
+      "operation": "reject",
+      "authRule": "Requires MANAGER or ADMIN; no self-rejection; approver must be the requester's manager or an ADMIN.",
+      "idempotent": false,
+      "errorSemantics": "Unknown request \u2192 NotFoundError (404); invalid state transition (not SUBMITTED) \u2192 ConflictError (409); unauthorized actor \u2192 ForbiddenError (403)."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "requestedDays must be computed by calling the canonical requestedDays(startDate, endDate) helper \u2014 the single source of truth is src/shared/types/index.ts (the validation module imports it from there rather than re-exporting it).",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The approve/reject transaction must use IUnitOfWork.withTransaction exactly as defined (service owns the boundary, data-access opens it); match the signature and client-forwarding pattern.",
+      "referencePath": "src/shared/db/unit-of-work.ts"
+    },
+    {
+      "requirement": "Balance updates must go through IBalanceRepository.update with the same Partial<Omit<LeaveBalance,'id'>> changes shape and optional trailing PoolClient.",
+      "referencePath": "src/modules/balance/balance.repository.ts"
+    },
+    {
+      "requirement": "Audit inserts must use IAuditService.record(input, client?) with CreateAuditLogInput (actorId, action, entityType, entityId, beforeState, afterState) and forward the transaction client.",
+      "referencePath": "src/modules/audit/audit.service.interface.ts"
+    },
+    {
+      "requirement": "Notification inserts must use INotificationService.create(input, client?) with CreateNotificationInput and forward the transaction client (status defaults to PENDING).",
+      "referencePath": "src/modules/notification/notification.service.interface.ts"
+    },
+    {
+      "requirement": "Leave persistence must go through ILeaveRepository (create/findById/update) with the exact 12-field LeaveRequest shape and UpdateLeaveRequestDto changes.",
+      "referencePath": "src/modules/leave/leave.repository.ts"
+    },
+    {
+      "requirement": "Route handlers must follow the direct-service-call pattern (instantiate service, call it, map AppError to status codes) rather than a controller layer.",
+      "referencePath": "src/modules/uptime/uptime.routes.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/balance/index.ts",
+      "why": "LeaveService reads and mutates LeaveBalance (pendingDays/usedDays) during submit/approve/reject via IBalanceRepository/IBalanceService."
+    },
+    {
+      "target": "src/modules/audit/index.ts",
+      "why": "LeaveService writes an AuditLog for every state-changing operation (GP-002)."
+    },
+    {
+      "target": "src/modules/notification/index.ts",
+      "why": "LeaveService inserts synchronous notifications on approve/reject within the transaction."
+    },
+    {
+      "target": "src/modules/validation/index.ts",
+      "why": "LeaveService delegates date-range and balance-sufficiency validation (and derives requestedDays via the shared helper)."
+    },
+    {
+      "target": "src/modules/employee/index.ts",
+      "why": "LeaveService resolves the requester/approver (manager relationship, self-approval guard) via IEmployeeService."
+    },
+    {
+      "target": "src/shared/db/unit-of-work.ts",
+      "why": "LeaveService injects IUnitOfWork and runs approve/reject inside withTransaction."
+    }
+  ]
+}

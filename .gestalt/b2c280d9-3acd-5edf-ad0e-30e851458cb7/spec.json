@@ -1,0 +1,122 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "repository",
+      "service",
+      "routes"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "`PgLeaveRequestRepository.findByQuery` honors `params.employeeIds`: when present and non-empty it adds an `employee_id = ANY($n)` condition with the array passed as a single bound parameter, and when absent/empty it applies no employee filter (ADMIN sees all).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`ILeaveService` exposes `list(actor, params)` and `getById(actor, requestId)` and `LeaveService` implements both; `list` scopes `employeeIds` by role (EMPLOYEE \u2192 `[actor.id]`; MANAGER \u2192 `[actor.id, ...directReportIds]` via `employeeService.getEmployeesByManagerId`, one level only; ADMIN \u2192 no filter) and delegates the actual query to the repository (no SQL in the service).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`getById` loads via `repository.findById` and applies the SAME role-scoped visibility rule as `list`; a request the caller may not see throws `NotFoundError('Leave request not found')` \u2014 byte-for-byte identical to a nonexistent id, so the endpoint cannot probe ids.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Reads are status-unrestricted: a MANAGER sees direct reports' requests in EVERY status (DRAFT/SUBMITTED/APPROVED/REJECTED/CANCELLED), and neither `list` nor `getById` filters or rejects on `status`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The read routes parse wire query params: `status`/`leaveTypeCode` validated against their enums (invalid \u2192 ValidationError), `startDateFrom`/`startDateTo`/`endDateFrom`/`endDateTo` converted from strings to `Date` (invalid \u2192 ValidationError, mirroring `parseCreateBody`), and `limit`/`offset` as integers; the handler resolves the actor via the existing `resolveActor` and returns the service result.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Neither `list` nor `getById` opens a transaction or forwards a client; both are read-only and perform no writes, no audit records, and no notifications.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No SQL in the service layer \u2014 the `employeeIds` filter is expressed only inside `PgLeaveRequestRepository.findByQuery`; `LeaveService.list` builds the `employeeIds` array and passes it through `LeaveRequestQueryParams`.",
+    "Read endpoints must not open a transaction (no `uow.withTransaction`, no client forwarding) \u2014 this phase is read-only.",
+    "No new exports from `src/modules/leave/index.ts` \u2014 `ILeaveService` is already exported and the new methods ride on it.",
+    "No controller file is introduced \u2014 routes call the service directly, matching the existing `leave.routes.ts` shape.",
+    "No shared-type change is permitted this phase \u2014 `LeaveRequestQueryParams.employeeIds` already exists (Phase 1) and must be reused as-is."
+  ],
+  "outOfScope": [
+    "No writes, audit records, or notifications \u2014 this phase is strictly read-only; state-changing operations (create/submit/approve/reject/cancel) are untouched.",
+    "No smoke.js changes or end-to-end probes \u2014 those belong to Phase 7.",
+    "No refactor of `leave.service.ts`/`balance.service.ts` to import the shared date helpers \u2014 deferred to a later phase.",
+    "No promotion of `LeavePolicyStatus` into shared types and no controller-layer introduction \u2014 both are separate concerns outside this phase."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "Visibility is role-scoped and status-unrestricted: EMPLOYEE sees only their own requests; MANAGER sees their own plus direct reports (employee.managerId === actor.id), one level only, not transitive; ADMIN sees all. The same rule governs both list and single-read, and a request the caller may not see is indistinguishable from a nonexistent one (404)."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "Reads never mutate lifecycle state: `list`/`getById` return the persisted row unchanged and do not alter `status`, `approverId`, `decidedAt`, `cancelledBy`, `cancelledAt`, or any balance counters."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "ILeaveService.list(actor, params)",
+      "authRule": "Actor must be authenticated (missing/invalid \u2192 UnauthorizedError/ForbiddenError via the existing assertAuthenticated); visibility is role-scoped (EMPLOYEE self, MANAGER self+direct reports, ADMIN all).",
+      "idempotent": true,
+      "errorSemantics": "Read-only; returns an array (possibly empty); no NotFoundError for an empty result set."
+    },
+    {
+      "operation": "ILeaveService.getById(actor, requestId)",
+      "authRule": "Actor must be authenticated; visibility is role-scoped with the same rule as list.",
+      "idempotent": true,
+      "errorSemantics": "NotFoundError('Leave request not found') for both a nonexistent id and an id the caller may not see (identical 404, no id probing)."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Reuse the existing `resolveActor` and `sendError` helper shape from `leave.routes.ts` for the new read routes so error mapping stays identical across modules.",
+      "referencePath": "src/modules/leave/leave.routes.ts"
+    },
+    {
+      "requirement": "Reuse the existing `parseCreateBody` date-conversion pattern (`new Date(value)` + `Number.isNaN(parsed.getTime())` \u2192 ValidationError) for the date query params.",
+      "referencePath": "src/modules/leave/leave.routes.ts"
+    },
+    {
+      "requirement": "Reuse `LeaveRequestQueryParams` (including its existing `employeeIds?: string[]`) and the `LeaveStatus`/`LeaveTypeCode` enums from shared types \u2014 do not re-declare or diverge.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "Reuse `IEmployeeService.getEmployeesByManagerId(actor.id)` (returns `[]` for an unknown manager) to derive MANAGER direct reports \u2014 one level only, no transitive expansion.",
+      "referencePath": "src/modules/employee/employee.service.interface.ts"
+    },
+    {
+      "requirement": "Reuse the existing `NotFoundError` type and its `'Leave request not found'` message so the invisible-id and nonexistent-id cases are byte-identical.",
+      "referencePath": "src/shared/errors/index.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "IEmployeeService.getEmployeesByManagerId",
+      "why": "MANAGER role scoping derives the direct-report id list (one level only) for the `employeeIds` filter."
+    },
+    {
+      "target": "ILeaveRepository.findByQuery / findById",
+      "why": "The service delegates all data access to the repository; `findByQuery` applies the `employeeIds` ANY($n) filter and `findById` supplies the row for `getById` visibility checks."
+    },
+    {
+      "target": "LeaveRequestQueryParams (shared types)",
+      "why": "The wire query params map onto this existing DTO (status, leaveTypeCode, date ranges, employeeIds, limit, offset) \u2014 the contract between routes and service."
+    }
+  ]
+}

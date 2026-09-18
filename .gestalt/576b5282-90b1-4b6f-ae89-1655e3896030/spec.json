@@ -1,0 +1,86 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "notification"
+    ],
+    "affectedLayers": [
+      "service",
+      "service-interface"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "NotificationService.create accepts an optional PoolClient as its last parameter and forwards it to the repository's create method, so the notification insert executes on the caller's transaction client when one is supplied.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "When no client is supplied, create behaves exactly as before (falls back to the shared pool) \u2014 existing single-step callers are unaffected and no caller is required to pass a client.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A unit test verifies that when a client is passed to create, the repository's create is invoked with that same client instance (forwarded, not dropped or replaced).",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The client parameter must be optional and positioned LAST in the signature, matching the existing repository convention (INotificationRepository.create(input, client?)) and the AGENTS.md transaction-boundary decision.",
+    "The service must NOT open, begin, commit, or roll back a transaction itself \u2014 it only forwards a client it was given. BEGIN/COMMIT/ROLLBACK remain exclusively in PgUnitOfWork.",
+    "The service must not import the pg Pool or a module-level db helper; it receives the client as a parameter and passes it through to the repository.",
+    "Validation semantics are unchanged: create still validates required strings and status enum membership and throws ValidationError before any repository call, regardless of whether a client is supplied."
+  ],
+  "outOfScope": [
+    "AuditService.record does NOT gain client forwarding in this phase \u2014 only NotificationService.create is in scope, even though the audit service has the same gap.",
+    "No change to getById or markRead \u2014 only create is wired for transaction participation in this phase.",
+    "No transaction is opened by the notification service itself, and no BullMQ/async fanout is introduced \u2014 notifications remain synchronous direct inserts."
+  ],
+  "ambiguities": [
+    {
+      "description": "Whether the optional client should also be forwarded by getById/markRead (for read-consistency within a transaction) or only create.",
+      "options": [
+        "Only create forwards the client (getById/markRead unchanged)",
+        "All service methods accept and forward the optional client"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "A Notification created through the service is always persisted with a status (defaulting to PENDING when omitted) and a generated id/createdAt; forwarding a client does not alter these creation semantics."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "NotificationService.create(input, client?)",
+      "authRule": "No auth rule at this layer \u2014 the service is invoked by an already-authorized caller; RBAC remains a route-level concern (out of scope for this phase).",
+      "idempotent": false,
+      "errorSemantics": "Throws ValidationError on invalid input before any repository call; otherwise propagates repository errors unchanged. No new error types introduced."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The service's client parameter must match the existing repository signature: optional PoolClient as the last parameter, defaulting to the shared pool when omitted \u2014 mirror INotificationRepository.create(input, client?).",
+      "referencePath": "src/modules/notification/notification.repository.interface.ts"
+    },
+    {
+      "requirement": "The forwarded client must be the same PoolClient type and reuse semantics defined by the transaction-boundary decision (service owns the unit of work, data-access opens it; repositories take optional last-param client).",
+      "referencePath": "AGENTS.md"
+    },
+    {
+      "requirement": "The service interface change must stay consistent with the public entry point exports so the updated INotificationService signature is re-exported unchanged.",
+      "referencePath": "src/modules/notification/index.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/leave (Phase 6 orchestrator)",
+      "why": "The leave approve/reject transaction will call NotificationService.create with the transaction client so the notification insert joins the same atomic unit as the status change, balance update, and audit insert."
+    }
+  ]
+}

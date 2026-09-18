@@ -10,7 +10,7 @@
     "packageManager": "npm",
     "testFramework": "Jest",
     "framework": "Fastify",
-    "frontend": "React Native",
+    "frontend": "React (Vite SPA)",
     "database": "PostgreSQL",
     "architectureStyle": "modular-monolith"
   },

@@ -1,0 +1,62 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "service"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The three private date-helper methods (private periodContaining, private startOfUtcDay, private addMonths) are fully removed from LeaveService, so `grep -rn \"private addMonths\\|private startOfUtcDay\\|private periodContaining\" src/modules/leave/` returns nothing.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "leave.service.ts imports startOfUtcDay, addMonths, and periodContaining from '../../shared/date' (the public entry point), and every former `this.` call site in cancel() and resolveBalance() now calls the imported helpers without the `this.` prefix.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`npm run build` completes cleanly and the existing unit suite passes unchanged, proving the move is behaviour-preserving and introduces no new module dependency.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Edit ONLY src/modules/leave/leave.service.ts. Do not modify the shared module, repositories, routes, DTOs, or any other file.",
+    "This is a pure move: the arithmetic and error semantics must not change. The shared helpers are used as-is (byte-for-byte identical bodies, including the ConflictError guards, the 10_000 safety bound, and the final ConflictError('Unable to resolve accrual period')).",
+    "Do not touch the unrelated `../leave-type` import (it lives in balance.service.ts and belongs to Phase 2)."
+  ],
+  "outOfScope": [
+    "Deduplicating balance.service.ts's private addMonths (Phase 2) and the `../leave-type` import.",
+    "Adding the deduplication pin test (Phase 3) and any change to the shared date module or its tests.",
+    "Any arithmetic, logic, or error-semantics change to the date helpers themselves."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [
+    {
+      "requirement": "The imported helpers must be the canonical shared implementations re-exported from src/shared/date/index.ts (startOfUtcDay, addMonths, periodContaining), whose bodies are byte-for-byte identical to the deleted private methods.",
+      "referencePath": "src/shared/date/index.ts"
+    },
+    {
+      "requirement": "The call sites must preserve the exact arguments and semantics of the deleted private methods: cancel() uses startOfUtcDay(request.startDate) and startOfUtcDay(new Date()); resolveBalance() uses periodContaining(employee.hireDate, policy.accrualPeriodMonths, date).",
+      "referencePath": "src/modules/leave/leave.service.ts"
+    },
+    {
+      "requirement": "The shared helpers must continue to throw ConflictError for the same conditions (date precedes anchor; unable to resolve accrual period), preserving the existing error contract consumed by cancel() and resolveBalance().",
+      "referencePath": "src/shared/date/accrual.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/date (public entry point src/shared/date/index.ts)",
+      "why": "LeaveService now depends on the canonical shared date helpers instead of its private copies; leave -> shared-date is an allowed dependency per the reconciled architecture."
+    }
+  ]
+}

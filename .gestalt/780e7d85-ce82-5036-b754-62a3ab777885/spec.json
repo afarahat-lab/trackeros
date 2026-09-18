@@ -1,0 +1,59 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared/date",
+      "leave",
+      "balance"
+    ],
+    "affectedLayers": [
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "A test exists (in tests/unit/shared/date.deduplication.test.ts or added to tests/unit/shared/date.test.ts) that sets process.env.TZ='Asia/Riyadh' in beforeAll and restores the original TZ in afterAll, and within that block asserts startOfUtcDay, addMonths, and periodContaining produce the expected UTC instants at a period boundary \u2014 specifically that periodContaining(anchor=Date.UTC(2023,0,10), 1, date=Date.UTC(2023,1,10)) returns start=Date.UTC(2023,1,10) and end=Date.UTC(2023,2,10) (the exclusive-end roll into the next period).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A source-level assertion reads src/modules/leave/leave.service.ts and src/modules/balance/balance.service.ts via fs and asserts neither file contains the substrings 'private startOfUtcDay', 'private addMonths', or 'private periodContaining', so a future re-introduced private copy fails the suite.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The new test imports the helpers from '../../../src/shared/date' (the public entry point) and does not modify any source file; npm run build is clean, the full unit suite passes, and npm run smoke passes every stage.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Do NOT modify any source file (src/**) \u2014 this phase is test-only.",
+    "Import the helpers from the public entry point '../../../src/shared/date' (src/shared/date/index.ts), not from src/shared/date/accrual.ts directly.",
+    "Match the existing TZ save/restore pattern: capture the original process.env.TZ, set it in beforeAll, restore it in afterAll.",
+    "The source-level assertion must target the exact substrings 'private startOfUtcDay', 'private addMonths', and 'private periodContaining' in both leave.service.ts and balance.service.ts."
+  ],
+  "outOfScope": [
+    "Modifying any source file (src/**) \u2014 including the shared date module, leave.service.ts, balance.service.ts, repositories, routes, or DTOs.",
+    "Changing the arithmetic or behavior of startOfUtcDay, addMonths, or periodContaining."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [
+    {
+      "requirement": "The boundary-roll assertion must match the canonical periodContaining semantics in src/shared/date/accrual.ts: the period end is exclusive (date < end), so a date exactly at the period end rolls into the next period.",
+      "referencePath": "src/shared/date/accrual.ts"
+    },
+    {
+      "requirement": "The TZ save/restore pattern and import path must match the existing pattern in tests/unit/shared/date.test.ts (import from '../../../src/shared/date'; capture originalTZ, set in beforeAll, restore in afterAll).",
+      "referencePath": "tests/unit/shared/date.test.ts"
+    },
+    {
+      "requirement": "The source-level assertion must reflect the deduplication already completed in Phases 1 and 2: leave.service.ts and balance.service.ts import the helpers from '../../shared/date' and contain no private copies.",
+      "referencePath": "PLAN.md"
+    }
+  ],
+  "integrationPoints": []
+}

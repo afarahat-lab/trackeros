@@ -1,0 +1,134 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "shared-types",
+      "shared-errors",
+      "shared-db"
+    ],
+    "affectedLayers": [
+      "shared-foundation",
+      "data-access"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "src/shared/types/index.ts exports all six canonical enums \u2014 LeaveStatus (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED), LeaveTypeCode (annual, sick, emergency, unpaid, maternity, paternity \u2014 lowercase persisted values), AuditAction (CREATE, UPDATE, DELETE, APPROVE, REJECT), NotificationStatus (PENDING, SENT, READ, ARCHIVED), EmploymentStatus (ACTIVE, TERMINATED, ON_LEAVE), EmployeeRole (EMPLOYEE, MANAGER, ADMIN) \u2014 and the three DTO interfaces CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveRequestQueryParams.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "CreateLeaveRequestDto exposes exactly employeeId, leaveTypeCode, startDate, endDate, reason; UpdateLeaveRequestDto exposes exactly startDate, endDate, reason, status; LeaveRequestQueryParams uses leaveTypeCode (not leaveTypeId) \u2014 matching the canonical LeaveRequest entity field names in .gestalt/architecture/reconciled.json.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/shared/errors/index.ts exports AppError (message, statusCode, code) and subclasses ValidationError(400), NotFoundError(404), UnauthorizedError(401), ForbiddenError(403), ConflictError(409), each carrying the correct statusCode and a stable code string.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "src/shared/db/unit-of-work.ts exports IUnitOfWork with withTransaction<T>(work: (tx: unknown) => Promise<T>): Promise<T>, and PgUnitOfWork that acquires a client from the existing pool in src/shared/db/connection.ts, issues BEGIN, runs the callback, COMMITs on success, ROLLBACKs on throw, and always releases the client in a finally.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests exist under tests/unit/shared/ covering the error classes (statusCode + code per subclass) and the enum member sets, and the suite passes via `npx jest`.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "LeaveTypeCode members MUST be lowercase (annual, sick, emergency, unpaid, maternity, paternity) \u2014 DOMAIN.md's scheme is canonical per binding rule #7, overriding the uppercase wording in the task and the stale root ARCHITECTURE.md position.",
+    "Use `unknown` with type guards, never `any` (HARNESS.json constraint `no-any`, high severity); strict TypeScript (`strict: true`) must compile via `tsc --noEmit`.",
+    "PgUnitOfWork must reuse the existing `pool` export from src/shared/db/connection.ts \u2014 do not create a second pool or import a module-level db helper elsewhere.",
+    "BEGIN/COMMIT/ROLLBACK are issued ONLY by PgUnitOfWork; a nested withTransaction must reuse an already-supplied client rather than opening a second transaction.",
+    "Tests are Jest-only and live under tests/unit/shared/ (tests/ is excluded from the tsc build via tsconfig `exclude`); no test file may be placed under src/."
+  ],
+  "outOfScope": [
+    "No domain modules (employee, leave-type, policy, audit, notification, balance, validation, leave) are built in this phase \u2014 only the shared foundation files and their tests.",
+    "No base repository, knex migrations, knexfile, or SQL DDL are created in this phase (persistence infrastructure beyond the unit-of-work is deferred).",
+    "No HTTP routes, controllers, auth/RBAC guards, or error-response middleware are introduced in this phase."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveStatus",
+      "mustExistOrExtend": true,
+      "invariant": "Exposes exactly the five lifecycle states DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED as persisted string values; no extra members."
+    },
+    {
+      "entity": "LeaveTypeCode",
+      "mustExistOrExtend": true,
+      "invariant": "Exposes exactly six lowercase members annual, sick, emergency, unpaid, maternity, paternity; these are the persisted string values in leave_requests.leave_type_code / leave_policies.leave_type."
+    },
+    {
+      "entity": "AuditAction",
+      "mustExistOrExtend": true,
+      "invariant": "Exposes exactly CREATE, UPDATE, DELETE, APPROVE, REJECT."
+    },
+    {
+      "entity": "NotificationStatus",
+      "mustExistOrExtend": true,
+      "invariant": "Exposes exactly PENDING, SENT, READ, ARCHIVED."
+    },
+    {
+      "entity": "EmploymentStatus",
+      "mustExistOrExtend": true,
+      "invariant": "Exposes exactly ACTIVE, TERMINATED, ON_LEAVE."
+    },
+    {
+      "entity": "EmployeeRole",
+      "mustExistOrExtend": true,
+      "invariant": "Exposes exactly EMPLOYEE, MANAGER, ADMIN."
+    },
+    {
+      "entity": "AppError",
+      "mustExistOrExtend": true,
+      "invariant": "Base error carries message, statusCode, and code; every subclass fixes its own statusCode (400/401/403/404/409) and a distinct code, and instances are instanceof AppError."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IUnitOfWork.withTransaction",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "On callback throw, ROLLBACK is issued and the original error re-thrown; the client is released in a finally regardless of outcome."
+    },
+    {
+      "operation": "PgUnitOfWork.withTransaction",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Acquires a client from the shared pool, issues BEGIN before the callback and COMMIT after it resolves; any throw triggers ROLLBACK; release always happens."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "PgUnitOfWork must obtain its client from the existing `pool` export in src/shared/db/connection.ts (the only pool, built from DATABASE_URL with SSL only in production).",
+      "referencePath": "src/shared/db/connection.ts"
+    },
+    {
+      "requirement": "Enum member sets and DTO field names must match the canonical entity shapes and module ownership declared in the reconciled architecture (LeaveStatus/LeaveTypeCode/AuditAction/NotificationStatus/EmploymentStatus/EmployeeRole; CreateLeaveRequestDto/UpdateLeaveRequestDto/LeaveRequestQueryParams).",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "The withTransaction contract must follow the AGENTS.md transaction-boundary decision: service owns the unit of work, data-access layer opens it, repositories take an optional client as the last parameter, and BEGIN/COMMIT/ROLLBACK live only in PgUnitOfWork.",
+      "referencePath": "AGENTS.md"
+    },
+    {
+      "requirement": "Error classes must satisfy the cross-cutting error contract { error, code } with 400/401/403/404/409 semantics (ValidationError\u2192400, UnauthorizedError\u2192401, ForbiddenError\u2192403, NotFoundError\u2192404, ConflictError\u2192409).",
+      "referencePath": "docs/ARCHITECTURE.md"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/db/connection.ts",
+      "why": "PgUnitOfWork depends on its `pool` export; must be read before generating the implementation."
+    },
+    {
+      "target": "src/modules/employee, leave-type, policy, audit, notification, balance, validation, leave (Phase 2\u20136)",
+      "why": "These later modules import the enums, DTOs, error classes, and IUnitOfWork produced here; the public index.ts files are the authoritative entry points they will consume."
+    }
+  ]
+}
