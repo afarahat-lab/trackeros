@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { ApiError, TokenStorage } from '../../infrastructure/api';
-import type { IApiClient } from '../../infrastructure/api';
+import { ApiError, TokenStorage } from '../../infrastructure/api/index';
+import type { IApiClient } from '../../infrastructure/api/index';
 import {
   AuthSessionStatus,
   EmployeeRole,

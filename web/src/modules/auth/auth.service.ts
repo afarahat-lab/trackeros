@@ -1,5 +1,5 @@
 import { AuthSessionStatus } from '../../shared/types/index';
-import type { IApiClient, ITokenStorage } from '../../infrastructure/api';
+import type { IApiClient, ITokenStorage } from '../../infrastructure/api/index';
 import type { AuthSession } from './auth-session';
 
 export interface IAuthService {
