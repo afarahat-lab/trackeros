@@ -1,0 +1,126 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "auth"
+    ],
+    "affectedLayers": [
+      "web frontend (React + Vite)"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "An `AuthSession` type exists in the auth module with the exact canonical shape `{ token: string; profile: EmployeeProfile; status: AuthSessionStatus }`, importing `EmployeeProfile` and `AuthSessionStatus` from `web/src/shared/types/index.ts` rather than re-declaring them.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`AuthService.login(email, password)` calls `apiClient.login`, persists the returned token via `tokenStorage.setToken`, and resolves an `AuthSession` whose `status` is `AuthSessionStatus.AUTHENTICATED` and whose `token`/`profile` come from the API response.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "On login failure, `AuthService.login` surfaces the server's error message verbatim (the `ApiError.message`) and adds no email-existence hint \u2014 no distinction between wrong-email and wrong-password is introduced anywhere in the module.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`AuthService.logout()` clears the token via `tokenStorage.clear()` and returns the session to an anonymous state (no authenticated token/profile remains).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`AuthProvider`/`useAuth()` hold the current `AuthSession` in React state (no state-management library), expose `login`, `logout`, and the current session, and on mount initialize an authenticated session when a token already exists in storage (re-fetching the profile via `getMe`).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The auth barrel (`web/src/modules/auth/index.ts`) re-exports `IAuthService`, `AuthService`, `AuthProvider`, `useAuth`, and `AuthSession`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Vitest unit tests cover `AuthService.login` success (token stored + authenticated session returned), login failure (server message surfaced with no email-existence hint), and `logout` (token cleared).",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The auth module must import `EmployeeProfile`, `AuthSessionStatus`, and `LoginResponse` from `web/src/shared/types/index.ts` and `IApiClient`/`ITokenStorage` from `web/src/infrastructure/api/index.ts` \u2014 never re-declare these types or import from module internals.",
+    "`AuthService` must depend only on the injected `IApiClient` and `ITokenStorage`; it must not import `sessionStorage`, `fetch`, or any pool/client directly, and must not decode the JWT or inspect token expiry client-side.",
+    "Login failure must not reveal whether the email exists: surface `ApiError.message` as-is and add no email-existence hint, no wrong-email vs wrong-password branching, and no extra error text.",
+    "A failed login must not assume the stored token was cleared \u2014 the login path is unauthenticated, so the API client does not auto-clear storage on a 401 from login; the service must not clear the token on login failure.",
+    "The auth context must hold session state in React state only \u2014 no state-management library, no UI component library.",
+    "Tests must use Vitest with jsdom, globals enabled, and the existing `setupFiles`/`setupTests.ts`; imports come from `vitest`."
+  ],
+  "outOfScope": [
+    "No presentation layer, routing, route guards, or pages are built in this phase \u2014 the auth context is consumed by Phase 5, not wired to any UI here.",
+    "No employee/leave/balance service modules (Phase 4) and no proactive JWT-expiry detection \u2014 the frontend relies solely on the server's 401, which is handled by the API client, not the auth module.",
+    "No backend changes: nothing under `src/` is modified, and no new SQL schema, tables, or repositories are introduced."
+  ],
+  "ambiguities": [
+    {
+      "description": "The concrete representation of the logged-out state is unresolved: after `logout()` (and before any login), should the context expose `null` (no `AuthSession` object) or a non-null `AuthSession` whose `status` is `AuthSessionStatus.ANONYMOUS`? This is a representation choice, distinct from the already-settled decision that `AuthSessionStatus` (including `ANONYMOUS`) is the enum to use.",
+      "options": [
+        "null session (no AuthSession object when not authenticated)",
+        "AuthSession with status: AuthSessionStatus.ANONYMOUS and empty token/profile"
+      ],
+      "impactIfWrong": "medium"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "AuthSession",
+      "mustExistOrExtend": true,
+      "invariant": "An `AuthSession` is always exactly `{ token: string; profile: EmployeeProfile; status: AuthSessionStatus }`; `status` is `AUTHENTICATED` when a valid token+profile are held, and the session is cleared (no token/profile) when the user is logged out. `profile` never carries `passwordHash` or `terminationDate`."
+    },
+    {
+      "entity": "AuthSession",
+      "mustExistOrExtend": true,
+      "invariant": "The anonymous/not-authenticated state is represented consistently across the service and the context provider \u2014 a single representation (either a `null` session or a session with `status: AuthSessionStatus.ANONYMOUS`) is used everywhere, never mixed."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IAuthService.login(email, password): Promise<AuthSession>",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "On failure, propagate the server's error message verbatim (ApiError.message) with no email-existence hint; do not clear the stored token on failure."
+    },
+    {
+      "operation": "IAuthService.logout(): void",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Clears the token and returns to the anonymous state; must not throw and must be safe to call when already logged out."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "`AuthSession` must reuse `EmployeeProfile` and `AuthSessionStatus` exactly as declared (field-for-field, no additions/omissions/renames) rather than re-declaring them.",
+      "referencePath": "web/src/shared/types/index.ts"
+    },
+    {
+      "requirement": "`AuthService` must consume `IApiClient.login`/`IApiClient.getMe` and `ITokenStorage.setToken`/`clear` exactly as declared, and treat `ApiError` as the only error type thrown by API calls.",
+      "referencePath": "web/src/infrastructure/api/index.ts"
+    },
+    {
+      "requirement": "The token persistence key and semantics must match the existing `TokenStorage` (sessionStorage under `trackeros.token`); the auth module must not introduce a second storage mechanism.",
+      "referencePath": "web/src/infrastructure/api/token-storage.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "web/src/infrastructure/api/index.ts (IApiClient, ITokenStorage, ApiError)",
+      "why": "AuthService delegates login/getMe to the API client and token persistence to token storage; the API client is the single source of the bearer header and 401-clearing behaviour."
+    },
+    {
+      "target": "web/src/shared/types/index.ts (EmployeeProfile, AuthSessionStatus, LoginResponse)",
+      "why": "AuthSession and the login return value are assembled from these canonical shared types."
+    },
+    {
+      "target": "web/src/presentation/ (Phase 5 consumers: RequireAuth, LoginPage, LogoutButton)",
+      "why": "The auth context's `login`/`logout`/session are the single source the presentation layer will consume for guards and the login/logout flow."
+    }
+  ]
+}
