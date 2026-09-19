@@ -227,6 +227,14 @@ agents:
 
   # ── Gate layer (Amendment 2026-06: tools enabled by default) ──
   constraint-agent:
+    # Raised from the 400k platform default after run ecef04ad's gate came back
+    # INCONCLUSIVE: both gate agents were cut at ~817k/~795k against an effective
+    # budget of 790k (the platform scales the default with diff size). The frontend
+    # phase adds a whole second build — package.json, tsconfig, vite config and a
+    # component tree — so the diff the gate must read is far larger than a backend
+    # phase's. 1.2M matches the documented ceiling the whole-codebase global gate
+    # already runs under, so it is a known-survivable bound rather than a guess.
+    token_budget: 1200000
     rules:
     - Data access is only permitted in the designated data access layer of this project. Code in business logic, presentation, or routing layers must delegate all data operations to the data access layer.
     - The data access layer is the only layer permitted to contain connection management, query execution, and direct interaction with the data store.
@@ -261,6 +269,14 @@ agents:
     prompt_extensions: []
 
   review-agent:
+    # Raised from the 400k platform default after run ecef04ad's gate came back
+    # INCONCLUSIVE: both gate agents were cut at ~817k/~795k against an effective
+    # budget of 790k (the platform scales the default with diff size). The frontend
+    # phase adds a whole second build — package.json, tsconfig, vite config and a
+    # component tree — so the diff the gate must read is far larger than a backend
+    # phase's. 1.2M matches the documented ceiling the whole-codebase global gate
+    # already runs under, so it is a known-survivable bound rather than a guess.
+    token_budget: 1200000
     rules:
     - Only flag violations for concerns explicitly in scope for this intent.
     - Do not flag items as missing if they already exist on the project main branch.
