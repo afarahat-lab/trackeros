@@ -1,0 +1,111 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "auth"
+    ],
+    "affectedLayers": [
+      "web/src/modules/auth"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "`AuthSession` is exported from `web/src/modules/auth/auth-session.ts` with the exact canonical shape `{ token: string; profile: EmployeeProfile; status: AuthSessionStatus }`, importing `EmployeeProfile` and `AuthSessionStatus` from `web/src/shared/types/index.ts` (not re-declaring them).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`AuthService.login(email, password)` calls the injected `IApiClient.login`, persists the returned token via `ITokenStorage.setToken`, and resolves an `AuthSession` with `status: AuthSessionStatus.AUTHENTICATED`; a Vitest test asserts the token is stored and the returned session equals `{ token, profile, status: 'AUTHENTICATED' }`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "On login failure, `AuthService.login` propagates the server's error message verbatim (no email-existence hint added) and does not clear an already-stored token; a Vitest test asserts the rejection message equals the server's message and the pre-existing token survives.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`AuthService.logout()` clears the token via `ITokenStorage.clear()` and is idempotent (safe to call when already logged out); a Vitest test asserts the token is null after logout and a second call does not throw.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`AuthProvider` holds the current session in plain React state (no state-management library), exposes `login`/`logout`/`session`, and on mount re-initializes an authenticated session from a stored token (re-fetching the profile via `getMe`); `useAuth()` throws when used outside `AuthProvider`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`web/src/modules/auth/index.ts` re-exports `IAuthService`, `AuthService`, `AuthProvider`, `useAuth`, and `AuthSession` (the barrel is the module's public entry point).",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The anonymous/not-authenticated state is represented by a `null` session (not a session with `status: AuthSessionStatus.ANONYMOUS`); `logout` and the context provider both converge on this single representation.",
+    "Login failure must not reveal whether the email exists: surface the server's `ApiError.message` verbatim and add no email-existence hint; the API is enumeration-safe.",
+    "The auth module must not decode the JWT `exp` client-side or otherwise proactively detect expiry \u2014 token invalidation relies solely on the server's 401 (handled by the API client), per the binding rule.",
+    "No state-management library is introduced; the session lives in React state only.",
+    "The auth module performs no direct HTTP or storage access of its own \u2014 it depends on the injected `IApiClient` and `ITokenStorage` from `web/src/infrastructure/api/index.ts`."
+  ],
+  "outOfScope": [
+    "No role-gated screens, manager/HR surfaces, or leave create/submit/approve/reject/cancel \u2014 the frontend is read-only for leave requests.",
+    "No proactive JWT expiry detection (client-side `exp` decoding) \u2014 token invalidation relies solely on the server's 401.",
+    "No UI component library or state-management library is introduced in this phase."
+  ],
+  "ambiguities": [
+    {
+      "description": "Whether the existing Vitest tests have been executed in this environment to confirm they currently pass (the files exist and are coherent, but execution status is unverified).",
+      "options": [
+        "Run `npm test` in web/ to confirm the auth tests pass before treating the phase as complete",
+        "Treat the existing test file as sufficient evidence without re-running"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "AuthSession",
+      "mustExistOrExtend": true,
+      "invariant": "AuthSession has exactly the canonical shape `{ token: string; profile: EmployeeProfile; status: AuthSessionStatus }`; it is created on successful login with `status: AUTHENTICATED` and cleared (represented as `null`) on logout or any 401. It never carries `passwordHash` or `terminationDate` (those are absent from `EmployeeProfile`)."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IAuthService.login(email, password): Promise<AuthSession>",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "On failure, propagate the server's error message verbatim without revealing whether the email exists; do not clear an already-stored token on a failed login."
+    },
+    {
+      "operation": "IAuthService.logout(): void",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Clears the token and returns to the anonymous (null-session) state; must not throw when already logged out."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "`AuthSession` must import `EmployeeProfile` and `AuthSessionStatus` from the shared-types module rather than re-declaring them, so the canonical field shapes and enum member sets stay single-sourced.",
+      "referencePath": "web/src/shared/types/index.ts"
+    },
+    {
+      "requirement": "`AuthService` must depend on the injected `IApiClient` and `ITokenStorage` from the infrastructure API module (not a pool/client/db helper), matching the declared `auth -> api-client` dependency edge.",
+      "referencePath": "web/src/infrastructure/api/index.ts"
+    },
+    {
+      "requirement": "The `AuthSession` shape and the `auth` module's owned symbols (`IAuthService`, `AuthService`, `AuthProvider`, `useAuth`, `AuthSession`) must match the reconciled architecture's `auth` module boundary and the `AuthSession` domain entity.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "web/src/infrastructure/api/index.ts (IApiClient, ITokenStorage)",
+      "why": "AuthService consumes the API client's login/getMe and the token storage's getToken/setToken/clear; the API client owns bearer-header and 401-clearing behaviour."
+    },
+    {
+      "target": "web/src/shared/types/index.ts (EmployeeProfile, AuthSessionStatus, LoginResponse)",
+      "why": "AuthSession and AuthService assemble the canonical session from the shared profile type and session-status enum."
+    }
+  ]
+}
