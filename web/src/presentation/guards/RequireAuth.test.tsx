@@ -4,6 +4,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from '../../modules/auth/index';
 import type { IAuthService } from '../../modules/auth/index';
+import { ApiError } from '../../infrastructure/api/index';
 import type {
   EmployeeProfile,
   LeaveBalanceView,
@@ -106,5 +107,31 @@ describe('RequireAuth', () => {
       expect(screen.getByText('protected-content')).toBeInTheDocument();
     });
     expect(screen.queryByText('login-page')).not.toBeInTheDocument();
+  });
+
+  it('routes to /login rather than an empty page when a 401 clears the token', async () => {
+    const tokenStorage = buildTokenStorage(() => 'tok');
+    const apiClient = buildApiClient();
+    // Reproduce the real ApiClient contract: an authenticated 401 clears the
+    // stored token before surfacing ApiError(status 401).
+    (tokenStorage.clear as ReturnType<typeof vi.fn>).mockImplementation(
+      () => {
+        tokenStorage.getToken = () => null;
+      },
+    );
+    (apiClient.getMe as ReturnType<typeof vi.fn>).mockImplementation(
+      async () => {
+        tokenStorage.clear();
+        throw new ApiError('Unauthorized', 401);
+      },
+    );
+
+    renderGuardedRoute(buildAuthService(), tokenStorage, apiClient);
+
+    await waitFor(() => {
+      expect(screen.getByText('login-page')).toBeInTheDocument();
+    });
+    expect(tokenStorage.clear).toHaveBeenCalled();
+    expect(screen.queryByText('protected-content')).not.toBeInTheDocument();
   });
 });
