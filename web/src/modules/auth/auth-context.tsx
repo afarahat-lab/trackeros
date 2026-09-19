@@ -14,6 +14,13 @@ import type { IAuthService } from './auth.service';
 
 interface IAuthContextValue {
   session: AuthSession | null;
+  /**
+   * True while a token found in storage is being revalidated against the API
+   * (`getMe`) on mount. The presentation guard uses this to hold off on the
+   * redirect-to-login until restoration completes, so a page refresh with a
+   * valid sessionStorage token does not throw the user back to `/login`.
+   */
+  isRestoring: boolean;
   login: (email: string, password: string) => Promise<AuthSession>;
   logout: () => void;
 }
@@ -39,6 +46,12 @@ export function AuthProvider({
   children,
 }: AuthProviderProps) {
   const [session, setSession] = useState<AuthSession | null>(null);
+  // A token in storage means a session may be restorable; start in the
+  // restoring state synchronously so the guard does not redirect away before
+  // the revalidation effect below has a chance to run.
+  const [isRestoring, setIsRestoring] = useState(
+    () => tokenStorage.getToken() !== null,
+  );
 
   useEffect(() => {
     const token = tokenStorage.getToken();
@@ -63,6 +76,11 @@ export function AuthProvider({
         // A failure here is non-fatal — the session stays anonymous and the
         // presentation guards redirect to login (the ApiClient's 401 handler
         // already cleared the token from storage on expiry).
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsRestoring(false);
+        }
       });
 
     return () => {
@@ -85,8 +103,8 @@ export function AuthProvider({
   }, [authService]);
 
   const value = useMemo(
-    () => ({ session, login, logout }),
-    [session, login, logout],
+    () => ({ session, isRestoring, login, logout }),
+    [session, isRestoring, login, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

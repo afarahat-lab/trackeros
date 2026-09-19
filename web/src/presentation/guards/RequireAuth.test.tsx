@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ComponentProps } from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from '../../modules/auth/index';
 import type { IAuthService } from '../../modules/auth/index';
@@ -93,5 +93,18 @@ describe('RequireAuth', () => {
 
     expect(screen.getByText('login-page')).toBeInTheDocument();
     expect(screen.queryByText('protected-content')).not.toBeInTheDocument();
+  });
+
+  it('renders children when a stored token restores an authenticated session', async () => {
+    renderGuardedRoute(
+      buildAuthService(),
+      buildTokenStorage(() => 'tok'),
+      buildApiClient(),
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('protected-content')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('login-page')).not.toBeInTheDocument();
   });
 });
