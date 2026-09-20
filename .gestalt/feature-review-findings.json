@@ -1,0 +1,32 @@
+{
+  "scope": "feature 929ac8c1-da81-40b3-a672-38f9c35bffdc",
+  "attempts": 1,
+  "findings": [
+    {
+      "rule_id": "review/architecture",
+      "file_path": "src/modules/seed/seed.service.ts",
+      "line": 0,
+      "message": "[review/architecture] The phase spec's consistency requirement mandates using `LeavePolicyStatus.ACTIVE` (referencePath `src/modules/policy/policy.model.ts`), and the constraint \"Every type is imported from the exact module path the architecture declares for it\" requires the enum be imported rather than re-declared. The seed instead hardcodes the raw string `'ACTIVE'` and types `SeedLeavePolicyInput.status` as `string`, losing the enum type safety the spec requires. The value is correct at runtime, but this is a genuine deviation from a stated consistency invariant.\n  Evidence: \"const POLICY_STATUS_ACTIVE = 'ACTIVE';\"",
+      "quoted_line": "const POLICY_STATUS_ACTIVE = 'ACTIVE';",
+      "severity": "",
+      "agent_role": "",
+      "status": "open",
+      "first_seen_attempt": 1,
+      "last_seen_attempt": 1,
+      "fixed_at_attempt": null
+    },
+    {
+      "rule_id": "review/architecture",
+      "file_path": "README.md",
+      "line": 0,
+      "message": "[review/architecture] README's \"Running locally\" section documents `npm run dev` as a command, but `package.json` has no `dev` script (scripts are start/build/test/lint/migrate/migrate:rollback/migrate:make/seed/smoke:migrate/smoke). Running `npm run dev` fails with \"Missing script: dev\". The spec's ambiguity required the code agent to either add a `dev` script mapping to `node scripts/dev.js` or document `node scripts/dev.js` instead; the README documents the `npm run dev` form without wiring the script, so the primary documented command is broken.\n  Evidence: \"npm run dev\"",
+      "quoted_line": "npm run dev",
+      "severity": "",
+      "agent_role": "",
+      "status": "open",
+      "first_seen_attempt": 1,
+      "last_seen_attempt": 1,
+      "fixed_at_attempt": null
+    }
+  ]
+}
