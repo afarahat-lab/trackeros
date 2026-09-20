@@ -1,0 +1,82 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "developer-tooling"
+    ],
+    "affectedLayers": [
+      "scripts",
+      "package.json"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "Running `npm run dev` at the repo root starts BOTH the API server (via the root `start` script, `ts-node src/index.ts`) and the web dev server (via `web/`'s `dev` script, `vite`) as concurrent child processes, and both are alive and producing output after startup.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "Each line of a child's stdout/stderr is forwarded to the parent terminal prefixed with a stable per-process label, so output from the API and the web server is distinguishable in the combined stream.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "When either child process exits, the runner terminates the sibling process and exits with the exited child's exit code (a non-zero child code yields a non-zero runner exit).",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "Sending SIGINT (Ctrl-C) or SIGTERM to the runner tears down BOTH children and then exits, leaving no orphaned API or Vite process behind.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "The root `package.json` `scripts` block contains a `dev` entry whose value is exactly `node scripts/dev.js`.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "`scripts/dev.js` must be CommonJS (use `require`), matching the repo root convention \u2014 the root `package.json` has no `\"type\"` field (defaults to CommonJS) and the existing `scripts/smoke.js` already uses `require`.",
+    "The spawned commands must match the existing scripts exactly: the API is `npm run start` with `cwd` set to the repo root, and the web dev server is `npm run dev` with `cwd` set to `web/`. Do not inline `ts-node src/index.ts` or `vite` directly.",
+    "Use Node's `child_process.spawn` with `stdio` piped and a per-process prefix applied to each stream; do not use `exec`/`execSync` for the long-running children.",
+    "The API server must remain on port 3000 \u2014 do not modify `src/index.ts` or `web/vite.config.ts` (the Vite proxy targets `http://localhost:3000`)."
+  ],
+  "outOfScope": [
+    "No changes to `src/index.ts`, `web/vite.config.ts`, or `web/package.json` \u2014 the API port and the Vite proxy configuration are out of scope for this phase.",
+    "No dependency on Phase 1 (seed module / `npm run seed`); the dev runner must work without the seed having been run.",
+    "No process-manager features: no daemonization, no automatic restart-on-crash, no watch/rebuild of the API process, no log-file persistence."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [
+    {
+      "requirement": "The API child command must reuse the root `start` script verbatim (`ts-node src/index.ts`) as defined in the root `package.json` `scripts.start`.",
+      "referencePath": "package.json"
+    },
+    {
+      "requirement": "The web child command must reuse the `web/` `dev` script verbatim (`vite`) as defined in `web/package.json` `scripts.dev`.",
+      "referencePath": "web/package.json"
+    },
+    {
+      "requirement": "The new `scripts/dev.js` must follow the CommonJS `require` convention already established by the existing `scripts/smoke.js`.",
+      "referencePath": "scripts/smoke.js"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "root package.json `scripts.start` (`ts-node src/index.ts`)",
+      "why": "The API child process is spawned by invoking this script; the runner must not re-implement the API boot command."
+    },
+    {
+      "target": "web/package.json `scripts.dev` (`vite`)",
+      "why": "The web dev server child process is spawned by invoking this script with cwd `web/`."
+    },
+    {
+      "target": "web/vite.config.ts proxy (targets http://localhost:3000)",
+      "why": "The web client proxies API routes to the API server, so the API must be reachable on port 3000 for the combined dev experience to function."
+    }
+  ]
+}
