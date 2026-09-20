@@ -22,6 +22,7 @@ module.exports = {
   development: {
     ...base,
     client: 'pg',
+    seeds: { directory: './seeds' },
     connection: process.env.DATABASE_URL || {
       host: process.env.PGHOST || 'localhost',
       port: Number(process.env.PGPORT || 5432),
