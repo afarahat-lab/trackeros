@@ -1,0 +1,19 @@
+{
+  "scope": "feature b020624d-f000-464a-871e-edfa5e57ac4e",
+  "attempts": 1,
+  "findings": [
+    {
+      "rule_id": "review/architecture",
+      "file_path": "seeds/seed.service.ts",
+      "line": 175,
+      "message": "[review/architecture] The seeded leave requests are dated relative to `employeeHireDate` (a fixed 2022-07-01 instant), while the seeded balances are derived for the CURRENT accrual period via `periodContaining(hireDate, policy.accrualPeriodMonths, now)` (line 243). Because `countersFor` (line 244) sums requests by (employeeId, leaveTypeCode) only — never by period — the APPROVED request dated 2022-07-05 contributes its 4 `requestedDays` to `used_days`, and the SUBMITTED request dated 2022-07-15 contributes 2 to `pending_days`, on a balance whose period is 2026-07-01→2027-07-01. Success criterion #4 requires `pending_days`/`used_days` to equal the sum of requests \"for that (employee, leave type, period)\"; there are zero SUBMITTED/APPROVED requests inside the current period, so the counters are inconsistent with the period they claim to represent (an APPROVED request from 2022 counting against a 2026–2027 balance).\n  Evidence: \"  const approvedStart = addDays(employeeHireDate, 4);\"",
+      "quoted_line": "  const approvedStart = addDays(employeeHireDate, 4);",
+      "severity": "",
+      "agent_role": "",
+      "status": "open",
+      "first_seen_attempt": 1,
+      "last_seen_attempt": 1,
+      "fixed_at_attempt": null
+    }
+  ]
+}
