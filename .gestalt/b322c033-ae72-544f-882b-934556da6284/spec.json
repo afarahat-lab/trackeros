@@ -1,0 +1,107 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "seed",
+      "database/migrations"
+    ],
+    "affectedLayers": [
+      "data-access",
+      "tooling"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "`npm run seed` invokes `knex seed:run --env development` and completes successfully (exit 0) against a migrated development database, populating demo data via SeedService.seed().",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "`seeds/development_seed.js` loads the TS seed module via `require('ts-node/register')` then `require('../src/modules/seed')`, instantiates `SeedService` with a knex client, and awaits `seed()`; it exports both `up` and `down`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`knexfile.js` `development` environment gains a `seeds: { directory: './seeds' }` block while `production`, `test`, and `smoke_pg` remain without any seeds configuration, and the existing `migrations` config is unchanged.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Running `npm run migrate` (knex migrate:latest) does NOT execute the seed \u2014 seeding is reachable only through the separate `knex seed:run` step.",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "The seed entry must target the DEVELOPMENT environment only; seeds must not be wired into production, test, or smoke_pg.",
+    "The seed must NOT run automatically as part of migrate \u2014 it is reachable only via the separate `knex seed:run` step.",
+    "`down` must be a no-op (or a documented destructive reset); prefer no-op to avoid destroying hand-edited demo data.",
+    "No new service logic \u2014 SeedService from Phase 1 is a fixed contract; this phase only wires the entry, knexfile, and npm script.",
+    "Do not alter existing package.json scripts; only add the `seed` script.",
+    "No new unit tests are required; if any are added, keep them minimal."
+  ],
+  "outOfScope": [
+    "Any change to SeedService seeding logic, entity field shapes, or idempotency behavior (Phase 1 is a fixed contract).",
+    "Wiring seeds into production, test, or smoke_pg environments.",
+    "The Phase 3 dev script, web test-script fix, and README documentation."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "seeds/development_seed.js",
+      "mustExistOrExtend": true,
+      "invariant": "Must export `up` and `down` functions; `up` loads the TS module via ts-node/register, instantiates SeedService with a knex client, and awaits seed(); `down` is a no-op (or documented destructive reset)."
+    },
+    {
+      "entity": "knexfile.js development environment",
+      "mustExistOrExtend": true,
+      "invariant": "Must expose a `seeds` config pointing at the seeds directory, while retaining the existing `migrations` config unchanged."
+    },
+    {
+      "entity": "package.json scripts block",
+      "mustExistOrExtend": true,
+      "invariant": "Must contain a `seed` script that runs `knex seed:run --env development`; all existing scripts remain unchanged."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "seed()",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Must be safe to run repeatedly: skips rows whose natural key exists, never deletes-and-reinserts; a failure propagates and aborts the seed run with a non-zero exit."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The seed entry must import `SeedService` (and may reference `ISeedService`) from the exact module path `src/modules/seed`, using the exported symbol names and the `seed(): Promise<void>` signature exactly as declared.",
+      "referencePath": "src/modules/seed/index.ts"
+    },
+    {
+      "requirement": "The seed entry must follow the established ts-node/register-then-require pattern for loading TS modules from plain JS.",
+      "referencePath": "scripts/smoke.js"
+    },
+    {
+      "requirement": "The `seed` npm script must match the existing knex invocation style (`knex ... --env <env>`) and the `migrations` config in knexfile.js must remain intact.",
+      "referencePath": "knexfile.js"
+    },
+    {
+      "requirement": "The `seed` script must be added without altering the existing scripts block entries.",
+      "referencePath": "package.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/seed (SeedService / ISeedService)",
+      "why": "The seed entry instantiates SeedService with a knex client and calls seed() to populate demo data."
+    },
+    {
+      "target": "knex seed mechanism (knex seed:run)",
+      "why": "The seed file is discovered and executed by knex's seed runner via the development environment's seeds directory config."
+    },
+    {
+      "target": "ts-node/register",
+      "why": "Enables the plain-JS seed entry to require the TypeScript seed module."
+    }
+  ]
+}
