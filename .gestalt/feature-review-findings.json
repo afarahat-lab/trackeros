@@ -1,6 +1,6 @@
 {
   "scope": "feature 929ac8c1-da81-40b3-a672-38f9c35bffdc",
-  "attempts": 1,
+  "attempts": 2,
   "findings": [
     {
       "rule_id": "review/architecture",
@@ -10,22 +10,22 @@
       "quoted_line": "const POLICY_STATUS_ACTIVE = 'ACTIVE';",
       "severity": "",
       "agent_role": "",
-      "status": "open",
+      "status": "fixed",
       "first_seen_attempt": 1,
       "last_seen_attempt": 1,
-      "fixed_at_attempt": null
+      "fixed_at_attempt": 2
     },
     {
       "rule_id": "review/architecture",
       "file_path": "README.md",
-      "line": 0,
-      "message": "[review/architecture] README's \"Running locally\" section documents `npm run dev` as a command, but `package.json` has no `dev` script (scripts are start/build/test/lint/migrate/migrate:rollback/migrate:make/seed/smoke:migrate/smoke). Running `npm run dev` fails with \"Missing script: dev\". The spec's ambiguity required the code agent to either add a `dev` script mapping to `node scripts/dev.js` or document `node scripts/dev.js` instead; the README documents the `npm run dev` form without wiring the script, so the primary documented command is broken.\n  Evidence: \"npm run dev\"",
+      "line": 15,
+      "message": "[review/architecture] README's \"Running locally\" section documents `npm run dev` as a command, but package.json has no `dev` script (scripts are start/build/test/lint/migrate/migrate:rollback/migrate:make/seed/smoke:migrate/smoke). Running `npm run dev` fails with \"Missing script: dev\". The spec's ambiguity required either adding a `dev` script mapping to `node scripts/dev.js` or documenting `node scripts/dev.js`; the README documents the `npm run dev` form without wiring the script, so the primary documented command is broken.\n  Evidence: \"npm run dev\"\n  Fix: Document the invocation as `node scripts/dev.js` in the README (the spec's outOfScope forbids adding a `dev` script to package.json), or add `\"dev\": \"node scripts/dev.js\"` to package.json scripts so `npm run dev` resolves.",
       "quoted_line": "npm run dev",
       "severity": "",
       "agent_role": "",
       "status": "open",
       "first_seen_attempt": 1,
-      "last_seen_attempt": 1,
+      "last_seen_attempt": 2,
       "fixed_at_attempt": null
     }
   ]
