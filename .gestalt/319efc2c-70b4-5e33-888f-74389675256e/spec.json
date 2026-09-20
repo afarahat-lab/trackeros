@@ -1,0 +1,48 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "web-frontend"
+    ],
+    "affectedLayers": [
+      "build/tooling"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The `test` script in `web/package.json` is exactly `\"vitest run\"` (not `\"vitest\"`), so invoking `npm test` from the `web/` directory runs the Vitest suite once and exits rather than entering watch mode.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Running `npm test` in `web/` terminates with a non-interactive exit (no watch-mode prompt) after the test run completes, returning the test runner's exit code.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Only `web/package.json` may change; no other file is modified.",
+    "The web subproject must remain on Vitest \u2014 do not migrate to Jest (Vitest is the accepted runner for the React/Vite frontend).",
+    "The change is limited to the `test` script value; no dependency, devDependency, or other script is added, removed, or altered."
+  ],
+  "outOfScope": [
+    "Migrating the web subproject to Jest or any other test runner.",
+    "Adding, removing, or modifying any test files, Vitest configuration (`web/vite.config.ts`), or setup files (`web/src/setupTests.ts`).",
+    "Changing any other script in `web/package.json` (e.g. `dev`, `build`) or the root `package.json`."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [
+    {
+      "requirement": "The `test` script must invoke the already-installed `vitest` devDependency (version `^2.1.8`) and remain compatible with the existing Vitest configuration in `web/vite.config.ts` (which defines the `test` block) and the setup file `web/src/setupTests.ts`.",
+      "referencePath": "web/package.json"
+    },
+    {
+      "requirement": "The `test` script must remain a valid npm script (JSON string) in the `scripts` block of `web/package.json`, preserving the existing `\"type\": \"module\"` and other scripts unchanged.",
+      "referencePath": "web/package.json"
+    }
+  ],
+  "integrationPoints": []
+}
