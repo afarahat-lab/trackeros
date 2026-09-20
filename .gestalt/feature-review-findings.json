@@ -1,6 +1,6 @@
 {
   "scope": "feature 929ac8c1-da81-40b3-a672-38f9c35bffdc",
-  "attempts": 2,
+  "attempts": 3,
   "findings": [
     {
       "rule_id": "review/architecture",
@@ -19,13 +19,13 @@
       "rule_id": "review/architecture",
       "file_path": "README.md",
       "line": 15,
-      "message": "[review/architecture] README's \"Running locally\" section documents `npm run dev` as a command, but package.json has no `dev` script (scripts are start/build/test/lint/migrate/migrate:rollback/migrate:make/seed/smoke:migrate/smoke). Running `npm run dev` fails with \"Missing script: dev\". The spec's ambiguity required either adding a `dev` script mapping to `node scripts/dev.js` or documenting `node scripts/dev.js`; the README documents the `npm run dev` form without wiring the script, so the primary documented command is broken.\n  Evidence: \"npm run dev\"\n  Fix: Document the invocation as `node scripts/dev.js` in the README (the spec's outOfScope forbids adding a `dev` script to package.json), or add `\"dev\": \"node scripts/dev.js\"` to package.json scripts so `npm run dev` resolves.",
+      "message": "[review/architecture] README's \"Running locally\" section documents `npm run dev` as a command, but package.json has no `dev` script (scripts are start/build/test/lint/migrate/migrate:rollback/migrate:make/seed/smoke:migrate/smoke). Running `npm run dev` fails with \"Missing script: dev\". The phase spec's ambiguity (365e6218) required either adding a `dev` script mapping to `node scripts/dev.js` or documenting `node scripts/dev.js`; the implementation documents the `npm run dev` form without wiring the script, so the primary documented command is broken. The spec constraint \"the README's `npm run dev` reference must correspond to the new scripts/dev.js entry point the code agent wires up\" is unmet.\n  Evidence: \"npm run dev\"\n  Fix: Either add `\"dev\": \"node scripts/dev.js\"` to the package.json scripts block so `npm run dev` resolves, or change the README to document the invocation as `node scripts/dev.js` (scripts/dev.js already exists and is the entry point the spec references).",
       "quoted_line": "npm run dev",
       "severity": "",
       "agent_role": "",
       "status": "open",
       "first_seen_attempt": 1,
-      "last_seen_attempt": 2,
+      "last_seen_attempt": 3,
       "fixed_at_attempt": null
     }
   ]
