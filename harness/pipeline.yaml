@@ -183,14 +183,6 @@ phases:
           - id: gate
             type: action
             action: gate
-            # The per-phase gate runs the DETERMINISTIC check only. Subjective code review
-            # moved to one pass per feature (see `feature-review` in finalize): this gate
-            # re-reads an accumulating codebase every phase, so an N-phase feature paid for
-            # N reviews of a tree that mostly had to be judged as a whole. constraint-agent
-            # stays because its rules are mechanical and are cheapest to enforce in the
-            # phase that breaks them — a violation is still caught before the next phase
-            # builds on it.
-            params: { agents: "constraint-agent" }
             inputs: [phase_branch, intent_id, commit_sha, ci_judgment]
             output: { name: gate_verdict, channel: workflow_state }
           # gap-B — the merge MODE is a static param (not a workflow value): a phase
@@ -206,19 +198,6 @@ phases:
   finalize:
     repeats_per_phase: false
     stages:
-      # ONE review of everything this feature built, before any of it reaches main. Scope
-      # is the feature's own diff against the default branch — the change a human reviewer
-      # would be handed. On findings the platform attributes each to the phase that last
-      # wrote its file and runs one corrective pass per phase, then reviews again, up to
-      # `max_fix_rounds`; reaching that bound parks with the outstanding findings rather
-      # than merging. The running record is `.gestalt/feature-review-findings.md`.
-      - id: feature-review
-        type: action
-        action: feature_review
-        inputs: [feature_id]
-        # Quoted: pipeline `params` are `dict[str, str]`.
-        params: { agents: "review-agent", max_fix_rounds: "3" }
-        output: { name: feature_review_result, channel: workflow_state }
       - id: merge-feature
         type: action
         action: branch_merge

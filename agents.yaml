@@ -45,89 +45,9 @@ agents:
       # supported by DeepInfra OpenAI-compatible endpoint).
       model: fireworks/Deepseek-v4-pro
       temperature: 0.1
-      max_tokens: 2000
     tools:
       builtin: [readFile, searchFiles]   # §config-migration — explicit platform grant
     prompt_extensions: []
-    profile: intent
-    reference_paths:
-    - HARNESS.json
-    - docs/ARCHITECTURE.md
-    - docs/GOLDEN_PRINCIPLES.md
-    - AGENTS.md
-    - PLAN.md
-    - .gestalt/architecture/reconciled.json
-    artifact_path: .gestalt/{correlation_id}/intent-spec.json
-    schema:
-      models:
-        _SuccessCriterion:
-          fields:
-            description:
-              type: str
-              optional: false
-            testable:
-              type: bool
-              optional: false
-              default: true
-            layer:
-              type: str
-              optional: false
-              enum:
-              - unit
-              - integration
-              - e2e
-              default: unit
-        _Ambiguity:
-          fields:
-            description:
-              type: str
-              optional: false
-            options:
-              type: list[str]
-              optional: false
-              default_factory: list
-            impact_if_wrong:
-              type: str
-              optional: false
-              enum:
-              - low
-              - medium
-              - high
-              default: low
-        _StringValue:
-          fields:
-            value:
-              type: str
-              optional: false
-      fields: {}
-      append:
-        successCriteria: _SuccessCriterion
-        constraints: _StringValue
-        outOfScope: _StringValue
-        ambiguities: _Ambiguity
-      finalize:
-        affected_domains:
-          type: list[str]
-          optional: false
-          default_factory: list
-        affected_layers:
-          type: list[str]
-          optional: false
-          default_factory: list
-        is_breaking_change:
-          type: bool
-          optional: false
-          default: false
-        estimated_complexity:
-          type: str
-          optional: false
-          enum:
-          - small
-          - medium
-          - large
-          default: medium
-      required_non_empty:
-      - successCriteria
 
   design-agent:
     role: "Senior software architect"
@@ -136,123 +56,9 @@ agents:
       # TR_050 — DeepInfra DeepSeek-V3.2
       model: fireworks/Deepseek-v4-pro
       temperature: 0.1
-      max_tokens: 4000
     tools:
       builtin: [readFile, listDirectory, searchFiles]   # §config-migration — explicit platform grant
     prompt_extensions: []
-    profile: design
-    rules:
-    - 'Before finalizing your output, cross-check it against the project''s maintained architecture
-      (docs/ARCHITECTURE.md and .gestalt/architecture/reconciled.json) — provided to you as gathered
-      reference context, NOT as an expansion of your task. If your output would contradict a decision
-      already recorded there, do NOT silently diverge: flag the inconsistency (or consult the agent
-      that owns it) so it is resolved deliberately. The maintained document is the source of truth for
-      existing decisions.'
-    reference_paths:
-    - HARNESS.json
-    - docs/ARCHITECTURE.md
-    - docs/GOLDEN_PRINCIPLES.md
-    - AGENTS.md
-    - PLAN.md
-    - .gestalt/architecture/reconciled.json
-    artifact_path: .gestalt/{correlation_id}/design-spec.json
-    schema:
-      models:
-        _Field:
-          fields:
-            name:
-              type: str
-              optional: false
-            type:
-              type: str
-              optional: false
-            required:
-              type: bool
-              optional: false
-        _Relationship:
-          fields:
-            entity:
-              type: str
-              optional: false
-            type:
-              type: str
-              optional: false
-        _DomainChange:
-          fields:
-            entity_name:
-              type: str
-              optional: false
-            operation:
-              type: str
-              optional: false
-              enum:
-              - create
-              - update
-            fields:
-              type: list[_Field]
-              optional: false
-              default_factory: list
-            relationships:
-              type: list[_Relationship]
-              optional: false
-              default_factory: list
-        _ApiContract:
-          fields:
-            method:
-              type: str
-              optional: false
-              enum:
-              - GET
-              - POST
-              - PUT
-              - PATCH
-              - DELETE
-            path:
-              type: str
-              optional: false
-            description:
-              type: str
-              optional: false
-            request_body:
-              type: dict[str, str]
-              optional: true
-            response_body:
-              type: dict[str, str]
-              optional: true
-            auth_required:
-              type: bool
-              optional: false
-              default: false
-            roles:
-              type: list[str]
-              optional: false
-              default_factory: list
-        _ComponentSpec:
-          fields:
-            name:
-              type: str
-              optional: false
-            type:
-              type: str
-              optional: false
-              enum:
-              - page
-              - component
-              - hook
-              - service
-            description:
-              type: str
-              optional: false
-            props:
-              type: dict[str, str]
-              optional: true
-      fields: {}
-      append:
-        domainChanges: _DomainChange
-        apiContracts: _ApiContract
-        componentSpecs: _ComponentSpec
-      finalize: {}
-      required_non_empty: []
 
   intent-design-agent:
     rules:
@@ -269,143 +75,10 @@ agents:
       # high-impact spec agent was running on a weaker/different model than the rest of the pipeline.
       model: fireworks/Deepseek-v4-pro
       temperature: 0.15
-      max_tokens: 5000
     tools:
       builtin: [readFile, listDirectory, searchFiles]
     prompt_extensions:
       - "When your output is a collection of items, produce them one at a time — commit each item as you finish it, reason in free text between items, and signal completion when none remain. Never emit the entire collection in a single response."
-    profile: intent-design
-    reference_paths:
-    - HARNESS.json
-    - docs/ARCHITECTURE.md
-    - docs/GOLDEN_PRINCIPLES.md
-    - AGENTS.md
-    - PLAN.md
-    - .gestalt/architecture/reconciled.json
-    artifact_path: .gestalt/{correlation_id}/spec.json
-    max_iterations: 10
-    token_budget: 600000
-    schema:
-      models:
-        _SuccessCriterion:
-          fields:
-            description:
-              type: str
-              optional: false
-            testable:
-              type: bool
-              optional: false
-              default: true
-            layer:
-              type: str
-              optional: false
-              enum:
-              - unit
-              - integration
-              - e2e
-              default: unit
-        _Ambiguity:
-          fields:
-            description:
-              type: str
-              optional: false
-            options:
-              type: list[str]
-              optional: false
-              default_factory: list
-            impact_if_wrong:
-              type: str
-              optional: false
-              enum:
-              - low
-              - medium
-              - high
-              default: low
-        _StringValue:
-          fields:
-            value:
-              type: str
-              optional: false
-        _EntityInvariant:
-          fields:
-            entity:
-              type: str
-              optional: false
-            must_exist_or_extend:
-              type: bool
-              optional: false
-              default: true
-            invariant:
-              type: str
-              optional: false
-        _InterfaceConstraint:
-          fields:
-            operation:
-              type: str
-              optional: false
-            auth_rule:
-              type: str
-              optional: false
-              default: ''
-            idempotent:
-              type: bool
-              optional: false
-              default: false
-            error_semantics:
-              type: str
-              optional: false
-              default: ''
-        _ConsistencyRequirement:
-          fields:
-            requirement:
-              type: str
-              optional: false
-            reference_path:
-              type: str
-              optional: false
-              default: ''
-        _IntegrationPoint:
-          fields:
-            target:
-              type: str
-              optional: false
-            why:
-              type: str
-              optional: false
-              default: ''
-      fields: {}
-      append:
-        successCriteria: _SuccessCriterion
-        constraints: _StringValue
-        outOfScope: _StringValue
-        ambiguities: _Ambiguity
-        entityInvariants: _EntityInvariant
-        interfaceConstraints: _InterfaceConstraint
-        consistencyRequirements: _ConsistencyRequirement
-        integrationPoints: _IntegrationPoint
-      finalize:
-        affected_domains:
-          type: list[str]
-          optional: false
-          default_factory: list
-        affected_layers:
-          type: list[str]
-          optional: false
-          default_factory: list
-        is_breaking_change:
-          type: bool
-          optional: false
-          default: false
-        estimated_complexity:
-          type: str
-          optional: false
-          enum:
-          - small
-          - medium
-          - large
-          default: medium
-      required_non_empty:
-      - successCriteria
 
   context-agent:
     role: "Technical writer"
@@ -418,7 +91,6 @@ agents:
       # explicitly to bypass the env-fallthrough.
       model: fireworks/Deepseek-v4-pro
       temperature: 0.1
-      max_tokens: 8000
     tools:
       builtin:
         - readFile          # read existing context files before updating
@@ -427,32 +99,6 @@ agents:
         - getFileTree       # understand project layout
         - gitDiff           # see this phase's diff before updating docs
     prompt_extensions: []
-    profile: context
-    reference_paths:
-    - HARNESS.json
-    - docs/ARCHITECTURE.md
-    - docs/GOLDEN_PRINCIPLES.md
-    - AGENTS.md
-    - PLAN.md
-    artifact_path: .gestalt/{correlation_id}/context-updates.json
-    token_budget: 800000
-    schema:
-      models:
-        _Update:
-          fields:
-            path:
-              type: str
-              optional: false
-              description: Context file path, e.g. docs/DOMAIN.md or AGENTS.md
-            content:
-              type: str
-              optional: false
-              description: Full new contents of the file
-      fields: {}
-      append:
-        updates: _Update
-      finalize: {}
-      required_non_empty: []
 
   code-agent:
     rules:
@@ -528,7 +174,6 @@ agents:
       temperature: 0.1
       # No reasoning_effort — Aider drives its own reasoning loop;
       # DeepInfra also does not support reasoning_effort.
-      max_tokens: 8000
     tools:
       builtin:
         - readFile          # read existing files before modifying
@@ -568,17 +213,6 @@ agents:
       - "Use ES module syntax with resolveJsonModule for JSON imports — never require()"
       - "Use async/await throughout, never callbacks"
       - "Do not use require() for JSON imports — import them using ES module syntax with resolveJsonModule enabled in tsconfig."
-    reference_paths:
-    - HARNESS.json
-    - docs/ARCHITECTURE.md
-    - docs/GOLDEN_PRINCIPLES.md
-    - AGENTS.md
-    - PLAN.md
-    max_iterations: 30
-    condenser_max_tokens: 50000
-    condenser_max_size: 80
-    delegation_max_subtasks: 4
-    delegation_subagent_iterations: 30
 
   test-agent:
     role: "Senior QA engineer"
@@ -589,7 +223,6 @@ agents:
       # is harmless and consistent.
       model: fireworks/Deepseek-v4-pro
       temperature: 0.1
-      max_tokens: 6000
     prompt_extensions: []
 
   # ── Gate layer (Amendment 2026-06: tools enabled by default) ──
@@ -631,56 +264,9 @@ agents:
       model: fireworks/Deepseek-v4-pro
       reasoning_effort: low
       temperature: 0.0
-      max_tokens: 4000
     tools:
       builtin: [executeScript, readFile, searchFiles, getFileTree]
     prompt_extensions: []
-    reference_paths:
-    - HARNESS.json
-    - docs/ARCHITECTURE.md
-    - docs/GOLDEN_PRINCIPLES.md
-    max_iterations: 40
-    schema:
-      models:
-        _Finding:
-          fields:
-            rule_id:
-              type: str
-              optional: false
-              description: Which rule was violated (the constraint id)
-            file:
-              type: str
-              optional: false
-              description: Path to the file containing the violation
-            line:
-              type: int
-              optional: true
-              description: 1-based line number, omit if file-wide
-            quoted_line:
-              type: str
-              optional: false
-              description: The exact offending line, copied verbatim
-            explanation:
-              type: str
-              optional: false
-              description: What is wrong and why this line violates the rule
-            severity:
-              type: str
-              optional: false
-              enum:
-              - low
-              - medium
-              - high
-              - critical
-      fields: {}
-      append:
-        findings: _Finding
-      finalize:
-        summary:
-          type: str
-          optional: false
-          description: One-line summary, e.g. "2 violations found"
-      required_non_empty: []
 
   review-agent:
     # Raised from the 400k platform default after run ecef04ad's gate came back
@@ -705,7 +291,6 @@ agents:
       # not supported by DeepInfra).
       model: fireworks/Deepseek-v4-pro
       temperature: 0.0
-      max_tokens: 4000
     tools:
       # TEST_REPORT_007 — gains executeScript so it can `tsc --noEmit`
       # to verify import resolution before flagging "Import cannot be
@@ -716,61 +301,6 @@ agents:
     prompt_extensions: []
 
   # ── Maintenance layer (Amendment 2026-06: tools enabled) ──────
-    gate_runtime: review
-    reference_paths:
-    - HARNESS.json
-    - docs/ARCHITECTURE.md
-    - docs/GOLDEN_PRINCIPLES.md
-    max_iterations: 40
-    schema:
-      models:
-        _Item:
-          fields:
-            file:
-              type: str
-              optional: true
-            line:
-              type: int
-              optional: true
-            quoted_line:
-              type: str
-              optional: false
-              description: The exact line the concern is about, verbatim
-            severity:
-              type: str
-              optional: true
-              enum:
-              - low
-              - medium
-              - high
-              - critical
-            severity_level:
-              type: str
-              optional: true
-            category:
-              type: str
-              optional: false
-              default: architecture
-            message:
-              type: str
-              optional: false
-              default: ''
-            fix_hint:
-              type: str
-              optional: true
-      fields: {}
-      append:
-        items: _Item
-      finalize:
-        summary:
-          type: str
-          optional: false
-          description: 2-4 sentence overall judgment
-        overall_verdict:
-          type: str
-          optional: false
-          description: pass | concerns | block
-      required_non_empty: []
   drift-agent:
     role: "Technical documentation specialist"
     goal: "Detect when project documentation has fallen behind the codebase"
@@ -778,7 +308,6 @@ agents:
       # TR_061-followup — pin off env-default Kimi-K2.6 fallthrough.
       model: fireworks/Deepseek-v4-pro
       temperature: 0.1
-      max_tokens: 2000
     tools:
       builtin: [readFile, listDirectory, searchFiles, getFileTree]
     prompt_extensions: []
@@ -790,7 +319,6 @@ agents:
       # TR_061-followup — pin off env-default Kimi-K2.6 fallthrough.
       model: fireworks/Deepseek-v4-pro
       temperature: 0.1
-      max_tokens: 2000
     tools:
       builtin: [readFile, listDirectory, searchFiles, getFileTree]
     prompt_extensions: []
@@ -802,7 +330,6 @@ agents:
       # TR_061-followup — pin off env-default Kimi-K2.6 fallthrough.
       model: fireworks/Deepseek-v4-pro
       temperature: 0.2
-      max_tokens: 8192
     tools:
       # Pared-down set — context-fixer verifies the current file
       # state before editing, but doesn't need to enumerate the tree.
@@ -851,7 +378,6 @@ agents:
       # agent where the prompt size is much smaller.
       model: fireworks/Deepseek-v4-pro
       temperature: 0.1
-      max_tokens: 3000
     tools:
       builtin: [readFile, listDirectory, searchFiles, getFileTree]   # §config-migration — explicit platform grant
     prompt_extensions:
@@ -896,17 +422,12 @@ agents:
     llm:
       model: fireworks/Deepseek-v4-pro
       temperature: 0.1
-      max_tokens: 6000
     tools:
       builtin: [readFile, searchFiles, getFileTree]   # §config-migration — explicit platform grant
     prompt_extensions:
       - "Focus exclusively on domain concepts — entities, attributes, lifecycle states, business rules"
       - "Do not specify persistence (data architect handles that) or modules / APIs (application architect handles that)"
       - "Every lifecycle state must be named explicitly so the chief can fold it into architectureMdUpdate"
-    profile: domain-architect
-    reference_paths:
-    - docs/ARCHITECTURE.md
-    - docs/GOLDEN_PRINCIPLES.md
 
   data-architect-agent:
     rules:
@@ -921,7 +442,6 @@ agents:
     llm:
       model: fireworks/Deepseek-v4-pro
       temperature: 0.1
-      max_tokens: 6000
     tools:
       builtin: [readFile, searchFiles, getFileTree]   # §config-migration — explicit platform grant
     prompt_extensions:
@@ -929,10 +449,6 @@ agents:
       - "Do NOT write SQL DDL — no CREATE TABLE statements; the code agent generates migrations from this specification"
       - "Every repository interface must name its concrete backing implementation using the declared stack — PostgreSQL via pg Pool"
       - "Index rationale must reflect the entity's lifecycle and access patterns"
-    profile: data-architect
-    reference_paths:
-    - docs/ARCHITECTURE.md
-    - docs/GOLDEN_PRINCIPLES.md
 
   app-architect-agent:
     rules:
@@ -949,7 +465,6 @@ agents:
     llm:
       model: fireworks/Deepseek-v4-pro
       temperature: 0.1
-      max_tokens: 6000
     tools:
       builtin: [readFile, searchFiles, getFileTree]   # §config-migration — explicit platform grant
     prompt_extensions:
@@ -957,10 +472,6 @@ agents:
       - "Dependencies flow inward only — outer layers toward inner layers; never the reverse"
       - "No circular dependencies between modules — verify dependencyMap before returning"
       - "Recommended phases should each fit within Aider's effective context window"
-    profile: app-architect
-    reference_paths:
-    - docs/ARCHITECTURE.md
-    - docs/GOLDEN_PRINCIPLES.md
 
   chief-architect-agent:
     rules:
@@ -981,7 +492,6 @@ agents:
       # the chief model choice once DeepInfra Kimi stability improves.
       model: fireworks/Deepseek-v4-pro
       temperature: 0.1
-      max_tokens: 12000
     tools:
       builtin: []   # §config-migration — explicit platform grant
     prompt_extensions:
@@ -990,7 +500,6 @@ agents:
       - "If any specialist missed a stack compliance requirement, correct it"
       - "If a specialist slice is missing, supply the smallest reconciliation that keeps the feature buildable"
       - "Keep SQL schemas CONCEPTUAL (table name, field names, keys, index rationale) — do NOT write CREATE TABLE / SQL DDL"
-    profile: chief-architect
 
   planner-agent:
     rules:
@@ -1019,7 +528,6 @@ agents:
       # TR_050 — DeepInfra DeepSeek-V3.2 (no reasoning_effort).
       model: fireworks/Deepseek-v4-pro
       temperature: 0.1
-      max_tokens: 3000
     tools:
       builtin: [readFile, listDirectory, searchFiles, getFileTree]   # §config-migration — explicit platform grant
     prompt_extensions:
@@ -1028,10 +536,6 @@ agents:
       - "Phases must be ordered by dependency — a phase can only use files from prior phases or existing files"
       - "The scope field must be directly actionable by the code agent: specific, self-contained, referencing existing files by exact path"
       - "Maximum 10 phases per feature — if more are needed, the feature is too large and should be split"
-    profile: planner
-    reference_paths:
-    - HARNESS.json
-    - docs/ARCHITECTURE.md
 
   phase-evaluator-agent:
     rules:
@@ -1222,69 +726,3 @@ agents:
 #     prompt: |
 #       Check JSDoc on these files: {{artifacts}}
 #       Return JSON: { "passed": true, "findings": [], "summary": "ok" }
-
-  # The BACKGROUND whole-codebase gate. Not on the phase pipeline, so the validator
-  # never demanded it while a platform baseline supplied it; the baseline is gone (a
-  # template owns its agents), so it is declared here.
-  global-gate-agent:
-    role: Whole-codebase architectural auditor
-    goal: 'Audit the ENTIRE codebase for cross-cutting architectural drift the per-phase diff-scoped
-      gate cannot see: duplicate/redefined types, layering violations visible from the importer''s
-      side, barrel-import violations, and accumulated rule breaches'
-    llm:
-      model: null
-      temperature: 0.0
-      max_tokens: 4000
-    tools:
-      builtin:
-      - executeScript
-      - readFile
-      - searchFiles
-      - getFileTree
-    reference_paths:
-    - HARNESS.json
-    - docs/ARCHITECTURE.md
-    - docs/GOLDEN_PRINCIPLES.md
-    max_iterations: 60
-    token_budget: 1200000
-    schema:
-      models:
-        _Finding:
-          fields:
-            rule_id:
-              type: str
-              optional: false
-              description: Which rule was violated (the constraint id)
-            file:
-              type: str
-              optional: false
-              description: Path to the file containing the violation
-            line:
-              type: int
-              optional: true
-              description: 1-based line number, omit if file-wide
-            quoted_line:
-              type: str
-              optional: false
-              description: The exact offending line, copied verbatim
-            explanation:
-              type: str
-              optional: false
-              description: What is wrong and why this line violates the rule
-            severity:
-              type: str
-              optional: false
-              enum:
-              - low
-              - medium
-              - high
-              - critical
-      fields: {}
-      append:
-        findings: _Finding
-      finalize:
-        summary:
-          type: str
-          optional: false
-          description: One-line summary, e.g. "2 violations found"
-      required_non_empty: []
