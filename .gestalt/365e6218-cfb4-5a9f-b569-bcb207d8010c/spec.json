@@ -1,0 +1,103 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "developer-tooling",
+      "documentation",
+      "web-test-config"
+    ],
+    "affectedLayers": [
+      "scripts",
+      "docs",
+      "web-config"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "scripts/dev.js spawns BOTH the API process (the command behind `npm run start`) and the web dev server (`npm --prefix web run dev`) as child processes, forwards each child's stdout and stderr to the parent, and propagates a child's exit code so the dev script exits non-zero when either process dies.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "scripts/dev.js uses only Node built-ins (child_process.spawn) and introduces no new dependency in package.json; it follows the plain-node-script pattern of scripts/smoke.js (shebang, no framework, no ts-node registration needed).",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "web/package.json `test` script is changed from `\"vitest\"` to `\"vitest run\"` so it terminates with a non-zero exit on failure instead of entering watch mode; no other script in web/package.json is altered.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "README.md gains a \"Running locally\" section documenting, in order, `npm run migrate`, `npm run seed`, `npm run dev` (or the API + web dev server separately), the demo login credentials (manager@trackeros.dev and employee@trackeros.dev with the SEED_PASSWORD default 'demo1234'), and an explicit note that the seed is development-only and never runs as part of migrate.",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "The documented commands in README.md must match the actual script names in package.json: `migrate` (knex migrate:latest), `seed` (knex seed:run --env development), and `start` (ts-node src/index.ts). There is no existing `dev` script, so the README's `npm run dev` reference must correspond to the new scripts/dev.js entry point the code agent wires up.",
+    "No seed/service logic changes: this phase must not modify src/modules/seed/*, seeds/development_seed.js, or knexfile.js. The seed entry and its idempotency/consistency behavior are a fixed contract from Phases 1-2.",
+    "The demo credentials documented in README.md must match the values the seed actually produces: manager@trackeros.dev and employee@trackeros.dev, with the SEED_PASSWORD default 'demo1234' (overridable via env). No credential string may be newly hardcoded beyond what the seed already defines.",
+    "scripts/dev.js must not add a devDependency (no concurrently/nodemon/etc.); it uses child_process.spawn from Node built-ins only."
+  ],
+  "outOfScope": [
+    "Any change to seed/service logic, the seed entry (seeds/development_seed.js), knexfile.js, or the migrate/seed/start script definitions in package.json \u2014 these are fixed contracts from Phases 1-2.",
+    "Unit tests for the dev script or the test-script fix \u2014 this phase is verified by the existing build/CI gate, not by new tests.",
+    "Adding a `dev` script to package.json or otherwise altering the root package.json scripts block \u2014 the phase only creates scripts/dev.js and documents the command; the code agent may wire the entry point but must not change existing script definitions."
+  ],
+  "ambiguities": [
+    {
+      "description": "The README must document `npm run dev`, but package.json currently has no `dev` script and the phase's file list does not include package.json. The code agent must decide whether to add a `dev` script mapping to `node scripts/dev.js` (a package.json change beyond the stated ~3 files) or document the invocation as `node scripts/dev.js`.",
+      "options": [
+        "Add a `dev` script to package.json pointing at scripts/dev.js so `npm run dev` works literally",
+        "Document `node scripts/dev.js` instead and phrase the README accordingly",
+        "Document both the API and web commands separately without a combined dev entry"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "The dev script must \"forward exit codes\" from two concurrent child processes. When one child exits non-zero while the other is still running, the behavior is unspecified: whether to kill the sibling and exit with the failed child's code, or wait for both and report the first failure.",
+      "options": [
+        "Kill the sibling on first child exit and propagate that child's exit code",
+        "Wait for both children, exit non-zero if either failed",
+        "Exit with the first non-zero code observed without killing the sibling"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [
+    {
+      "requirement": "scripts/dev.js follows the established plain-node-script pattern of scripts/smoke.js: a `#!/usr/bin/env node` shebang, CommonJS require of Node built-ins, no framework dependency, and no ts-node registration unless actually needed to spawn the API.",
+      "referencePath": "scripts/smoke.js"
+    },
+    {
+      "requirement": "The commands documented in README.md's \"Running locally\" section must match the actual script names in package.json (`migrate`, `seed`, `start`), and the dev script must invoke the API via the same command `npm run start` resolves to (ts-node src/index.ts).",
+      "referencePath": "package.json"
+    },
+    {
+      "requirement": "The dev script must launch the web dev server via `npm --prefix web run dev`, matching the `dev` script name in web/package.json, and the test-script fix must change only the `test` entry from `vitest` to `vitest run`.",
+      "referencePath": "web/package.json"
+    },
+    {
+      "requirement": "The demo credentials documented in README.md must match the seeded values: manager@trackeros.dev and employee@trackeros.dev, with the SEED_PASSWORD default 'demo1234' (the DEFAULT_SEED_PASSWORD constant in the seed service).",
+      "referencePath": "src/modules/seed/seed.service.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "package.json scripts (`start`, `migrate`, `seed`)",
+      "why": "The dev script spawns the API via `npm run start` and the README documents `migrate`/`seed`; these script names are the contract the dev tooling must match."
+    },
+    {
+      "target": "web/package.json scripts (`dev`, `test`)",
+      "why": "The dev script launches the web server via `npm --prefix web run dev`, and the test-script fix targets the `test` entry."
+    },
+    {
+      "target": "seeds/development_seed.js + knexfile.js (development seeds config)",
+      "why": "The README's `npm run seed` step depends on the Phase 2 seed entry and its development-only wiring; the docs must reflect that the seed never runs as part of migrate."
+    }
+  ]
+}
