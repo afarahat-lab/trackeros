@@ -826,3 +826,64 @@ No new SQL schemas, tables, or repositories. Existing backend tables (`employees
 - Existing backend build and its 181 tests still pass, untouched.
 - README documents how to run the frontend against a local API.
 <!-- gestalt:architecture feature=ecef04ad-9a9b-43d8-bac9-03098d9c566a END -->
+
+<!-- gestalt:architecture feature=929ac8c1-da81-40b3-a672-38f9c35bffdc START -->
+## Feature: Runnable end-to-end demo seed and dev run
+
+### Stack compliance
+- Language: TypeScript, Node 20, npm.
+- API: Fastify; frontend: React (Vite SPA); database: PostgreSQL; architecture: modular monolith.
+- Backend tests: Jest. Web tests: Vitest (existing web test runner; this feature fixes the script to `vitest run` so it terminates).
+- Seed uses knex and bcrypt (bcrypt.hashSync, cost 10, matching the auth service's bcrypt.compare).
+
+### Canonical naming
+- Domain entities: PascalCase (`Employee`, `LeaveType`, `LeavePolicy`, `LeaveBalance`, `LeaveRequest`, `DemoSeed`).
+- Database tables: snake_case (`employees`, `leave_types`, `leave_policies`, `leave_balances`, `leave_requests`).
+- Service: `ISeedService` / `SeedService` under `src/modules/seed/`.
+- Knex seed entry: `seeds/001_demo_data.ts` (root `seeds/` directory, wired into `knexfile.js` development environment only).
+
+### Domain entities and lifecycle states
+- `DemoSeed` (seed-only concept, no table): `UNAPPLIED` → `APPLIED`.
+- `Employee`: `ACTIVE` | `TERMINATED` | `ON_LEAVE`.
+- `LeaveType`: static catalog, no lifecycle states.
+- `LeavePolicy`: `DRAFT` | `ACTIVE` | `SUPERSEDED`.
+- `LeaveBalance`: `OPEN` | `CLOSED` (inferred from periodStart/periodEnd, not stored).
+- `LeaveRequest`: `DRAFT` | `SUBMITTED` | `APPROVED` | `REJECTED` | `CANCELLED`.
+
+### Conceptual tables (no DDL)
+- `employees`: id PK; unique email, unique employee_number; manager_id FK to employees.id; index on manager_id.
+- `leave_types`: code PK; static catalog.
+- `leave_policies`: id PK; leave_type_code FK to leave_types.code; index on leave_type_code.
+- `leave_balances`: id PK; employee_id FK, leave_type_code FK; unique (employee_id, leave_type_code, period_start, period_end); index on employee_id.
+- `leave_requests`: id PK; employee_id, leave_type_code, approver_id, cancelled_by FKs; indexes (employee_id, status) and (leave_type_code, start_date).
+
+### Modules and dependencies
+- New module `seed` at `src/modules/seed/` owns `ISeedService`, `SeedService`, `index.ts`.
+- Dependencies: `seed` → `shared-date` (periodContaining, startOfUtcDay, addMonths), `seed` → `shared-types` (LeaveTypeCode, EmployeeRole, EmploymentStatus, LeaveStatus).
+- No new repository interfaces or implementations; the seed writes directly via the knex client.
+
+### Seed requirements
+- Idempotent: natural keys for employees (employee_number/email), leave types (code), policies (leave_type_code + effective_from), balances (employee_id + leave_type_code + period_start + period_end). Leave request idempotency identity is an open question.
+- Password hashes minted with the same bcrypt call the auth service verifies (bcrypt.hashSync, cost 10); never plaintext.
+- All seeded dates are UTC calendar dates (whole-day UTC midnight).
+- Current-period balance derived via shared `periodContaining(hireDate, accrualPeriodMonths, now)`; never hand-written dates.
+- Seeded requests consistent with balance counters: SUBMITTED → pending_days, APPROVED → used_days; requested_days via shared `requestedDays(startDate, endDate)` helper.
+- Development-only; never runs automatically as part of migrate; wired into `knexfile.js` development seeds config.
+
+### Scripts and docs
+- `npm run seed` runs the knex seed for development.
+- Root `npm run dev` runs API and web dev server together (concurrency mechanism is an open question).
+- `web/package.json` test script fixed to `vitest run`.
+- README section documents: migrate, seed, start API, start web, and demo credentials.
+
+### Cross-cutting contracts
+- `authContract`: empty — no API surface or role-gated access introduced.
+- `errorResponseContract`: empty — no API endpoints introduced.
+- `transactionContract`: empty — seed is a one-shot dev script with no caller-controlled unit-of-work boundary; knex's built-in per-seed transaction may be used if atomicity is desired.
+
+### Open questions carried forward
+1. LeaveRequest idempotency identity (no natural key).
+2. Whether the MANAGER also gets a current-period balance.
+3. Whether seeded balance counters must be consistent with seeded request states.
+4. How root `npm run dev` runs API and web concurrently.
+<!-- gestalt:architecture feature=929ac8c1-da81-40b3-a672-38f9c35bffdc END -->
