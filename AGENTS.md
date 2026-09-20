@@ -27,7 +27,8 @@ Trackeros — a corporate operations web and mobile platform for
   backend's /auth endpoints; identity comes from corporate
   OIDC in production and from local users in development.
   
-  Tests: Jest for unit + integration. CI on GitHub Actions
+  Tests: Vitest for the React/Vite web frontend; Jest for the
+  Fastify API. CI on GitHub Actions
   runs lint (ESLint) + typecheck (tsc --noEmit) + unit tests +
   a Semgrep security pass on every PR. Conventional Commits +
   squash-merge. Strict TypeScript (no implicit any, strict
@@ -37,9 +38,9 @@ Trackeros — a corporate operations web and mobile platform for
 
 - Runtime: Node 20 LTS
 - Package manager: npm
-- Test framework: Jest
+- Test framework: Jest (API) / Vitest (web)
 - Backend: Fastify
-- Frontend: React Native
+- Frontend: React + Vite
 - Database: PostgreSQL
 
 See `docs/ARCHITECTURE.md` for the full architecture overview and
