@@ -22,6 +22,9 @@ module.exports = {
   development: {
     ...base,
     client: 'pg',
+    // Development-only demo data; deliberately NOT on the shared `base` so the seed can
+    // never be discovered by production/test/smoke_pg, nor run as part of `migrate`.
+    seeds: { directory: './seeds' },
     connection: process.env.DATABASE_URL || {
       host: process.env.PGHOST || 'localhost',
       port: Number(process.env.PGPORT || 5432),
