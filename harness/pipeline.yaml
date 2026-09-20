@@ -209,15 +209,22 @@ phases:
       # ONE review of everything this feature built, before any of it reaches main. Scope
       # is the feature's own diff against the default branch — the change a human reviewer
       # would be handed. On findings the platform attributes each to the phase that last
-      # wrote its file and runs one corrective pass per phase, then reviews again, up to
-      # `max_fix_rounds`; reaching that bound parks with the outstanding findings rather
-      # than merging. The running record is `.gestalt/feature-review-findings.md`.
+      # wrote its file, asks which findings share ONE root cause, and runs one corrective
+      # pass PER CAUSE — then reviews again, once per round, up to `max_fix_rounds`;
+      # reaching that bound parks with the outstanding findings rather than merging. The
+      # running record is `.gestalt/feature-review-findings.md`.
+      #
+      # `max_attempts_per_cause` (ADR-073) bounds ONE cause and is smaller than the round
+      # count on purpose: a cause that survives two focused passes at one problem is not
+      # one pass away from being fixed, and a third spent on it is a pass not spent on a
+      # cause nobody has tried. Per cause rather than one shared counter, so one stubborn
+      # item cannot starve the rest. An exhausted cause goes into the park, not the bin.
       - id: feature-review
         type: action
         action: feature_review
         inputs: [feature_id]
         # Quoted: pipeline `params` are `dict[str, str]`.
-        params: { agents: "review-agent", max_fix_rounds: "3" }
+        params: { agents: "review-agent", max_fix_rounds: "3", max_attempts_per_cause: "2" }
         output: { name: feature_review_result, channel: workflow_state }
       - id: merge-feature
         type: action
