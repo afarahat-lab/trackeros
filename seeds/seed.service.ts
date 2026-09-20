@@ -172,7 +172,12 @@ export async function seed(knex: Knex): Promise<void> {
 
   const requests: LeaveRequest[] = [];
 
-  const approvedStart = addDays(employeeHireDate, 4);
+  // Anchor the seeded requests to the CURRENT accrual period so the derived
+  // used/pending counters below (which total requests by employee + leave type
+  // only) stay consistent with the period those balances claim to represent.
+  const employeePeriod = periodContaining(employeeHireDate, ACCRUAL_PERIOD_MONTHS, now);
+
+  const approvedStart = addDays(employeePeriod.start, 4);
   const approvedEnd = addDays(approvedStart, 3);
   requests.push({
     id: 'seed-request-approved',
@@ -191,7 +196,7 @@ export async function seed(knex: Knex): Promise<void> {
     cancelledAt: null,
   });
 
-  const submittedStart = addDays(employeeHireDate, 14);
+  const submittedStart = addDays(employeePeriod.start, 14);
   const submittedEnd = addDays(submittedStart, 1);
   requests.push({
     id: 'seed-request-submitted',
@@ -210,7 +215,7 @@ export async function seed(knex: Knex): Promise<void> {
     cancelledAt: null,
   });
 
-  const rejectedStart = addDays(employeeHireDate, 7);
+  const rejectedStart = addDays(employeePeriod.start, 7);
   requests.push({
     id: 'seed-request-rejected',
     employeeId: EMPLOYEE_ID,
