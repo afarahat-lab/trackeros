@@ -1,0 +1,136 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "seed"
+    ],
+    "affectedLayers": [
+      "service",
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "`SeedService.seed()` is idempotent: invoking it twice against the same database inserts no duplicate rows \u2014 every entity is looked up by its natural key (employee by employeeNumber/email, leave type by code, policy by leaveTypeCode+effectiveFrom, balance by employeeId+leaveTypeCode+periodStart+periodEnd, request by the composite (employee_id, leave_type_code, start_date)) and skipped when present, with no delete-and-reinsert.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The seed produces a consistent dataset: for each seeded leave request, the owning employee's current-period balance reflects the reservation arithmetic \u2014 SUBMITTED requests contribute their `requestedDays` to `pendingDays` and APPROVED requests contribute to `usedDays` \u2014 so `entitledDays - usedDays - pendingDays` equals the true available days.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`src/modules/seed/index.ts` re-exports `ISeedService` and `SeedService` as the module's public entry point, and `ISeedService` declares exactly one method `seed(): Promise<void>`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Jest unit tests under `tests/unit/modules/seed/` pass, covering idempotency (running twice inserts no duplicates) and balance/request consistency, using an in-memory or fake knex client.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Seed writes go directly through the injected knex client \u2014 no repository layer is introduced for the seed module (the architecture declares seed depends only on shared-date and shared-types, with no repository interfaces).",
+    "No hardcoded credential string: the seeded password plaintext is read from `process.env.SEED_PASSWORD` with a documented default, and `passwordHash` is minted via `bcrypt.hashSync(plaintext, 10)` \u2014 the same call the auth service verifies with.",
+    "No magic id strings: every seeded row's `id` is generated via `randomUUID()`; the seed never invents sentinel ids and never delete-and-reinserts (a hand-edited demo DB must not be destroyed).",
+    "The current accrual period for each balance is derived with `periodContaining` from `src/shared/date` anchored on each employee's `hireDate` \u2014 never a hand-written date literal.",
+    "`requestedDays` is computed via the shared `requestedDays(startDate, endDate)` helper from `src/shared/types` \u2014 never re-derived locally.",
+    "Every type is imported from the exact module path the architecture declares for it (enums + `requestedDays` from `src/shared/types`, `periodContaining` from `src/shared/date`, entity models from their respective `src/modules/<name>/<name>.model.ts`), and entity field shapes are used verbatim \u2014 no field renamed, split, added, or omitted."
+  ],
+  "outOfScope": [
+    "The knex seed entry (`seeds/development_seed.js`), knexfile wiring, and the `npm run seed` script \u2014 these belong to Phase 2 and are intentionally absent.",
+    "Root `npm run dev` script, `web/package.json` test-script fix, and README documentation \u2014 Phase 3 deliverables.",
+    "Any HTTP routes, controllers, RBAC guards, audit-log writes, or notification side effects \u2014 the seed is a one-shot dev script with no API surface."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "Employee",
+      "mustExistOrExtend": true,
+      "invariant": "The seed mints exactly two employees \u2014 one MANAGER and one EMPLOYEE whose `managerId` links the employee to the manager \u2014 both with `employmentStatus = ACTIVE`, `terminationDate = null`, and a `passwordHash` minted via `bcrypt.hashSync(SEED_PASSWORD, 10)`."
+    },
+    {
+      "entity": "LeaveType",
+      "mustExistOrExtend": true,
+      "invariant": "The seed inserts at minimum the `annual` leave type plus every other leave type referenced by a seeded policy, using the canonical LeaveType field shape with `code` as the natural key."
+    },
+    {
+      "entity": "LeavePolicy",
+      "mustExistOrExtend": true,
+      "invariant": "Every seeded policy has `status = LeavePolicyStatus.ACTIVE` and a `leaveTypeCode` that references a seeded leave type, so the balance logic can resolve entitlements and accrual periods."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "A current-period balance is seeded for BOTH the manager and the employee, with `periodStart`/`periodEnd` derived from `periodContaining(hireDate, accrualPeriodMonths, now)` and counters consistent with the seeded requests."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "Two or three requests are seeded in different lifecycle states (e.g. SUBMITTED and APPROVED, optionally DRAFT/REJECTED), each with `requestedDays` computed via the shared helper and `id` generated via `randomUUID()`; idempotency is keyed on the deterministic composite (employee_id, leave_type_code, start_date)."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "seed(): Promise<void>",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Idempotent: safe to run repeatedly; skips any row whose natural key already exists rather than failing or duplicating."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Reuse the canonical `requestedDays(startDate, endDate)` inclusive day-count helper (endDate - startDate + 1) \u2014 never re-derive it locally.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "Reuse `periodContaining` (and its `startOfUtcDay`/`addMonths` companions) to derive the current accrual period anchored on each employee's hireDate \u2014 never a hand-written date.",
+      "referencePath": "src/shared/date/index.ts"
+    },
+    {
+      "requirement": "Match the Employee field shape exactly (id, employeeNumber, firstName, lastName, email, role, managerId, department, hireDate, terminationDate, employmentStatus, passwordHash) \u2014 no field renamed, split, added, or omitted.",
+      "referencePath": "src/modules/employee/employee.model.ts"
+    },
+    {
+      "requirement": "Match the LeaveType field shape exactly (code, name, requiresApproval, maxConsecutiveDays, isPaid).",
+      "referencePath": "src/modules/leave-type/leave-type.model.ts"
+    },
+    {
+      "requirement": "Match the LeavePolicy field shape exactly (id, leaveTypeCode, policyName, annualEntitlementDays, accrualPeriodMonths, carryForwardDays, minNoticeDays, maxRequestDays, requiresManagerApproval, effectiveFrom, effectiveTo, status) and use `LeavePolicyStatus.ACTIVE`.",
+      "referencePath": "src/modules/policy/policy.model.ts"
+    },
+    {
+      "requirement": "Match the LeaveBalance field shape exactly (id, employeeId, leaveTypeCode, periodStart, periodEnd, entitledDays, usedDays, pendingDays).",
+      "referencePath": "src/modules/balance/balance.model.ts"
+    },
+    {
+      "requirement": "Match the LeaveRequest field shape exactly (id, employeeId, leaveTypeCode, startDate, endDate, requestedDays, reason, status, approverId, approvalComment, submittedAt, decidedAt, cancelledBy, cancelledAt) and use `LeaveStatus` enum values.",
+      "referencePath": "src/modules/leave/leave.model.ts"
+    },
+    {
+      "requirement": "Write to the snake_case column names the schema declares (employee_number, first_name, last_name, password_hash, manager_id, hire_date, termination_date, employment_status, leave_type_code, policy_name, annual_entitlement_days, accrual_period_months, carry_forward_days, min_notice_days, max_request_days, requires_manager_approval, effective_from, effective_to, period_start, period_end, entitled_days, used_days, pending_days, start_date, end_date, requested_days, approver_id, approval_comment, submitted_at, decided_at, cancelled_by, cancelled_at).",
+      "referencePath": "migrations/20260913000000_initial_schema.js"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/types/index.ts",
+      "why": "Canonical enums (LeaveTypeCode, EmployeeRole, EmploymentStatus, LeaveStatus) and the `requestedDays` helper the seed must reuse."
+    },
+    {
+      "target": "src/shared/date/index.ts",
+      "why": "`periodContaining` (with startOfUtcDay/addMonths) to derive the current accrual period for each balance."
+    },
+    {
+      "target": "bcrypt",
+      "why": "`bcrypt.hashSync(plaintext, 10)` to mint password hashes the auth service's `bcrypt.compare` can verify."
+    },
+    {
+      "target": "knex (injected Knex client)",
+      "why": "The seed writes directly through the injected knex instance; no repository layer is introduced for the seed module."
+    }
+  ]
+}
