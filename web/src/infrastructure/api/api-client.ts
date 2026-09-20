@@ -1,4 +1,5 @@
 import type {
+  CreateLeaveRequestInput,
   EmployeeProfile,
   LeaveBalanceView,
   LeaveRequestView,
@@ -18,6 +19,11 @@ export interface IApiClient {
   getLeaves(): Promise<LeaveRequestView[]>;
   getLeave(id: string): Promise<LeaveRequestView>;
   getBalances(): Promise<LeaveBalanceView[]>;
+  createLeave(input: CreateLeaveRequestInput): Promise<LeaveRequestView>;
+  submitLeave(id: string): Promise<LeaveRequestView>;
+  approveLeave(id: string): Promise<LeaveRequestView>;
+  rejectLeave(id: string): Promise<LeaveRequestView>;
+  cancelLeave(id: string): Promise<LeaveRequestView>;
 }
 
 export class ApiClient implements IApiClient {
@@ -56,6 +62,42 @@ export class ApiClient implements IApiClient {
 
   getBalances(): Promise<LeaveBalanceView[]> {
     return this.request<LeaveBalanceView[]>('/balances/me', {
+      authenticated: true,
+    });
+  }
+
+  createLeave(input: CreateLeaveRequestInput): Promise<LeaveRequestView> {
+    return this.request<LeaveRequestView>('/leaves', {
+      method: 'POST',
+      body: JSON.stringify(input),
+      authenticated: true,
+    });
+  }
+
+  submitLeave(id: string): Promise<LeaveRequestView> {
+    return this.request<LeaveRequestView>(`/leaves/${id}/submit`, {
+      method: 'POST',
+      authenticated: true,
+    });
+  }
+
+  approveLeave(id: string): Promise<LeaveRequestView> {
+    return this.request<LeaveRequestView>(`/leaves/${id}/approve`, {
+      method: 'POST',
+      authenticated: true,
+    });
+  }
+
+  rejectLeave(id: string): Promise<LeaveRequestView> {
+    return this.request<LeaveRequestView>(`/leaves/${id}/reject`, {
+      method: 'POST',
+      authenticated: true,
+    });
+  }
+
+  cancelLeave(id: string): Promise<LeaveRequestView> {
+    return this.request<LeaveRequestView>(`/leaves/${id}/cancel`, {
+      method: 'POST',
       authenticated: true,
     });
   }

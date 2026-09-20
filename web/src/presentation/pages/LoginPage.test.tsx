@@ -56,8 +56,24 @@ function buildApiClient(): TestApiClient {
   const getBalances: TestApiClient['getBalances'] = vi.fn().mockResolvedValue(
     [] as LeaveBalanceView[],
   );
+  const createLeave: TestApiClient['createLeave'] = vi.fn();
+  const submitLeave: TestApiClient['submitLeave'] = vi.fn();
+  const approveLeave: TestApiClient['approveLeave'] = vi.fn();
+  const rejectLeave: TestApiClient['rejectLeave'] = vi.fn();
+  const cancelLeave: TestApiClient['cancelLeave'] = vi.fn();
 
-  return { login, getMe, getLeaves, getLeave, getBalances };
+  return {
+    login,
+    getMe,
+    getLeaves,
+    getLeave,
+    getBalances,
+    createLeave,
+    submitLeave,
+    approveLeave,
+    rejectLeave,
+    cancelLeave,
+  };
 }
 
 function renderAtLogin(

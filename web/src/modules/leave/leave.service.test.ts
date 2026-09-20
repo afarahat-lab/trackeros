@@ -35,6 +35,11 @@ function makeApiClient(
     getLeaves,
     getLeave,
     getBalances: () => Promise.resolve([]),
+    createLeave: () => Promise.reject(new ApiError('unused', 0)),
+    submitLeave: () => Promise.reject(new ApiError('unused', 0)),
+    approveLeave: () => Promise.reject(new ApiError('unused', 0)),
+    rejectLeave: () => Promise.reject(new ApiError('unused', 0)),
+    cancelLeave: () => Promise.reject(new ApiError('unused', 0)),
   };
 }
 

@@ -29,6 +29,11 @@ function makeApiClient(login: IApiClient['login']): IApiClient {
     getLeaves: () => Promise.resolve([]),
     getLeave: () => Promise.reject(new ApiError('Not found', 404)),
     getBalances: () => Promise.resolve([]),
+    createLeave: () => Promise.reject(new ApiError('unused', 0)),
+    submitLeave: () => Promise.reject(new ApiError('unused', 0)),
+    approveLeave: () => Promise.reject(new ApiError('unused', 0)),
+    rejectLeave: () => Promise.reject(new ApiError('unused', 0)),
+    cancelLeave: () => Promise.reject(new ApiError('unused', 0)),
   };
 }
 

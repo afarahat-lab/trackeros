@@ -79,3 +79,9 @@ export interface LoginResponse {
   token: string;
   profile: EmployeeProfile;
 }
+
+export interface CreateLeaveRequestInput {
+  leaveTypeCode: LeaveTypeCode;
+  startDate: string;
+  endDate: string;
+}
