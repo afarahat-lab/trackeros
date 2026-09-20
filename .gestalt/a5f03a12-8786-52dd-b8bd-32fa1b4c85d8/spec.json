@@ -1,0 +1,149 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "api-client",
+      "shared-types"
+    ],
+    "affectedLayers": [
+      "infrastructure",
+      "shared"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The IApiClient interface exposes five write methods \u2014 createLeave(input: CreateLeaveRequestInput), submitLeave(id), approveLeave(id), rejectLeave(id), cancelLeave(id) \u2014 each returning Promise<LeaveRequestView>.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "ApiClient implements all five methods by delegating to the existing private request<T>() with authenticated: true, so each attaches the bearer token from ITokenStorage and clears it on a 401 response.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "createLeave serializes the input as a JSON body (JSON.stringify) and the four action methods send no body, matching the backend contract.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A non-2xx response from any of the five methods is mapped to an ApiError carrying the backend's `error` message and `code` (e.g. an insufficient-balance rejection surfaces the API's own message verbatim).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "CreateLeaveRequestInput is added to web/src/shared/types/index.ts with leaveTypeCode: LeaveTypeCode and startDate/endDate as ISO 8601 strings (never Date), reusing the existing LeaveTypeCode enum and adding/renaming no other type.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Vitest coverage asserts each method issues the correct method/path/body (POST /leaves with the JSON body for create; POST /leaves/:id/submit|approve|reject|cancel with no body), attaches the bearer token, and maps a non-2xx body to ApiError.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "All five methods must use the existing private request<T>() pattern (authenticated: true) \u2014 no new fetch/error-handling path may be introduced; bearer-token attachment, 401 token clear, and ApiError mapping via toApiError are reused unchanged.",
+    "Dates cross the wire as ISO 8601 strings only; CreateLeaveRequestInput.startDate/endDate are strings, never Date objects.",
+    "The four action methods (submit/approve/reject/cancel) take no body, matching the backend contract.",
+    "Only the CreateLeaveRequestInput DTO is added to shared-types; the existing LeaveTypeCode enum is reused and no other type is added or renamed.",
+    "Web tests use Vitest (the existing web test runner), not Jest."
+  ],
+  "outOfScope": [
+    "No backend changes \u2014 the five endpoints already exist; this phase only extends the web transport layer.",
+    "No domain service, page, or composition-root changes \u2014 ILeaveService extension, RequestLeavePage, LeaveDetailPage, and route wiring belong to later phases.",
+    "No client-side validation or action-matrix logic (getAvailableLeaveActions / validateLeaveRequestInput) \u2014 those are Phase 2.",
+    "No change to LeaveRequestView's existing date typing (currently Date) \u2014 only the new CreateLeaveRequestInput DTO uses ISO strings."
+  ],
+  "ambiguities": [
+    {
+      "description": "LeaveRequestView currently types startDate/endDate as Date, while the new CreateLeaveRequestInput uses ISO strings. The phase only adds the DTO and does not change LeaveRequestView; the response type's Date fields remain as-is this phase.",
+      "options": [
+        "Leave LeaveRequestView dates as Date (out of scope this phase)",
+        "Also convert LeaveRequestView dates to ISO strings"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "CreateLeaveRequestInput",
+      "mustExistOrExtend": true,
+      "invariant": "A wire DTO owned by shared-types whose startDate/endDate are ISO 8601 strings (never Date objects) and whose leaveTypeCode is a member of the existing LeaveTypeCode enum; it is the only new type introduced this phase."
+    },
+    {
+      "entity": "IApiClient",
+      "mustExistOrExtend": true,
+      "invariant": "The transport interface gains exactly five write operations (createLeave, submitLeave, approveLeave, rejectLeave, cancelLeave), each returning Promise<LeaveRequestView>; the existing read/login operations are unchanged."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "createLeave",
+      "authRule": "authenticated (bearer token attached; 401 clears the stored token)",
+      "idempotent": false,
+      "errorSemantics": "non-2xx mapped to ApiError carrying the backend's error message and code"
+    },
+    {
+      "operation": "submitLeave",
+      "authRule": "authenticated (bearer token attached; 401 clears the stored token)",
+      "idempotent": false,
+      "errorSemantics": "non-2xx mapped to ApiError carrying the backend's error message and code"
+    },
+    {
+      "operation": "approveLeave",
+      "authRule": "authenticated (bearer token attached; 401 clears the stored token)",
+      "idempotent": false,
+      "errorSemantics": "non-2xx mapped to ApiError carrying the backend's error message and code"
+    },
+    {
+      "operation": "rejectLeave",
+      "authRule": "authenticated (bearer token attached; 401 clears the stored token)",
+      "idempotent": false,
+      "errorSemantics": "non-2xx mapped to ApiError carrying the backend's error message and code"
+    },
+    {
+      "operation": "cancelLeave",
+      "authRule": "authenticated (bearer token attached; 401 clears the stored token)",
+      "idempotent": false,
+      "errorSemantics": "non-2xx mapped to ApiError carrying the backend's error message and code"
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Reuse the existing private request<T>() method and its toApiError mapping exactly as implemented \u2014 the five new methods must not introduce a divergent fetch/error path.",
+      "referencePath": "web/src/infrastructure/api/api-client.ts"
+    },
+    {
+      "requirement": "Reuse the existing ApiError type (status, code, message) as the sole error type thrown by the new methods.",
+      "referencePath": "web/src/infrastructure/api/api-error.ts"
+    },
+    {
+      "requirement": "Reuse the existing ITokenStorage contract (getToken/clear) for bearer-token attachment and 401 clearing \u2014 no new token handling.",
+      "referencePath": "web/src/infrastructure/api/token-storage.ts"
+    },
+    {
+      "requirement": "Reuse the existing LeaveTypeCode enum and LeaveRequestView type; add only CreateLeaveRequestInput with ISO-string dates.",
+      "referencePath": "web/src/shared/types/index.ts"
+    },
+    {
+      "requirement": "Match the existing test style (vitest, vi.spyOn(globalThis, 'fetch'), jsonResponse helper, sessionStorage.clear in afterEach) when adding coverage.",
+      "referencePath": "web/src/infrastructure/api/api-client.test.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "Backend leave endpoints (POST /leaves, POST /leaves/:id/submit|approve|reject|cancel)",
+      "why": "The five write methods are the web transport for these already-served endpoints; the action endpoints take no body."
+    },
+    {
+      "target": "web/src/infrastructure/api/api-error.ts (ApiError)",
+      "why": "The sole error type the new methods surface to callers."
+    },
+    {
+      "target": "web/src/infrastructure/api/token-storage.ts (ITokenStorage)",
+      "why": "Supplies the bearer token and is cleared on 401 for the authenticated write calls."
+    }
+  ]
+}
