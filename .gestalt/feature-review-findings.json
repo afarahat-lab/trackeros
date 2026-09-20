@@ -1,6 +1,6 @@
 {
   "scope": "feature b020624d-f000-464a-871e-edfa5e57ac4e",
-  "attempts": 1,
+  "attempts": 2,
   "findings": [
     {
       "rule_id": "review/architecture",
@@ -10,10 +10,10 @@
       "quoted_line": "  const approvedStart = addDays(employeeHireDate, 4);",
       "severity": "",
       "agent_role": "",
-      "status": "open",
+      "status": "fixed",
       "first_seen_attempt": 1,
       "last_seen_attempt": 1,
-      "fixed_at_attempt": null
+      "fixed_at_attempt": 2
     }
   ]
 }
