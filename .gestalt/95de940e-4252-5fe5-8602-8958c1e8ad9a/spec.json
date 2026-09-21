@@ -1,0 +1,76 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave",
+      "presentation"
+    ],
+    "affectedLayers": [
+      "presentation"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "LeaveListPage renders a \"Request leave\" link (react-router-dom `Link`) targeting `/leaves/new`, and the link is reachable in every render state \u2014 error, loading, empty list, and populated list \u2014 not only inside the populated-list branch.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "App.tsx registers a `/leaves/new` route wrapped in `RequireAuth` that renders `RequestLeavePage` with `leaveService={leaveService}`, and the route is declared before the existing `/leaves/:id` route so `new` is not captured as an `:id` parameter.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "web/src/presentation/index.ts re-exports `RequestLeavePage` (value) and `RequestLeavePageProps` (type) alongside the existing page exports, following the established `export { X }` / `export type { XProps }` pattern.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Do not modify web/src/main.tsx \u2014 it already injects `employeeService` and `leaveService` into `<App>`; no composition-root change is required for this phase.",
+    "Keep the existing list rendering in LeaveListPage.tsx intact \u2014 the \"Request leave\" link is additive and must not alter the existing error/loading/empty/list markup or their early-return structure.",
+    "The `/leaves/new` route must be wrapped in `RequireAuth` (like the other protected routes) and must be registered before `/leaves/:id` so the literal segment `new` is not matched as an `:id` parameter.",
+    "Do not modify RequestLeavePage.tsx or LeaveDetailPage.tsx \u2014 this phase only wires the already-built page into routing and exports; the page's props and navigation contract are fixed by Phases 3\u20134."
+  ],
+  "outOfScope": [
+    "No changes to web/src/main.tsx \u2014 service injection is already complete and out of scope for this phase.",
+    "No changes to RequestLeavePage.tsx or LeaveDetailPage.tsx \u2014 their form, validation, action, and navigation behavior are fixed by Phases 3\u20134 and are not re-opened here.",
+    "No new service methods, API client endpoints, or backend changes \u2014 this phase is presentation-layer wiring only."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [
+    {
+      "requirement": "The `/leaves/new` route must pass `leaveService` from the existing `AppProps.leaveService` (type `ILeaveService`), matching the prop contract `RequestLeavePageProps.leaveService` declared in RequestLeavePage.tsx.",
+      "referencePath": "web/src/presentation/pages/RequestLeavePage.tsx"
+    },
+    {
+      "requirement": "The `/leaves/:id` route must continue to pass both `leaveService` and `employeeService` to `LeaveDetailPage`, matching the `LeaveDetailPageProps` contract established in Phase 4.",
+      "referencePath": "web/src/presentation/pages/LeaveDetailPage.tsx"
+    },
+    {
+      "requirement": "The barrel re-exports must use the same `export { X }` / `export type { XProps }` style as the existing page exports in the file.",
+      "referencePath": "web/src/presentation/index.ts"
+    },
+    {
+      "requirement": "The \"Request leave\" link must use the `Link` component already imported from `react-router-dom` in LeaveListPage.tsx and target the literal path `/leaves/new`.",
+      "referencePath": "web/src/presentation/pages/LeaveListPage.tsx"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "web/src/presentation/pages/RequestLeavePage.tsx",
+      "why": "The page component and its `RequestLeavePageProps` are the subject being wired into the route and barrel; its `leaveService` prop and `/leaves/${id}` success navigation are the contract this phase must satisfy."
+    },
+    {
+      "target": "web/src/presentation/pages/LeaveDetailPage.tsx",
+      "why": "The `/leaves/:id` route already passes `employeeService` (Phase 4); this phase must preserve that wiring and ensure `/leaves/new` is matched before it."
+    },
+    {
+      "target": "web/src/main.tsx",
+      "why": "Composition root already injects `leaveService` (and `employeeService`) into `<App>`; no change is needed, but the new route depends on that existing injection."
+    }
+  ]
+}
