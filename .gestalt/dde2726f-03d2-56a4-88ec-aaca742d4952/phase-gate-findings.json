@@ -1,0 +1,19 @@
+{
+  "scope": "phase 5",
+  "attempts": 1,
+  "findings": [
+    {
+      "rule_id": "success-criteria-1",
+      "file_path": "web/src/presentation/pages/LeaveListPage.tsx",
+      "line": 44,
+      "message": "[success-criteria-1] The \"Request leave\" link is placed only inside the final return, which is reached only when `error === null` AND `requests !== null`. The error state (`return <div role=\"alert\">{error}</div>`) and loading state (`return <div>Loading…</div>`) return early before this line, so the link is not reachable in those render states. Success criterion #1 requires the link to be reachable in every render state — error, loading, empty list, and populated list — not only inside the populated-list branch.\n  Evidence: \"<Link to=\"/leaves/new\">Request leave</Link>\"",
+      "quoted_line": "<Link to=\"/leaves/new\">Request leave</Link>",
+      "severity": "",
+      "agent_role": "",
+      "status": "open",
+      "first_seen_attempt": 1,
+      "last_seen_attempt": 1,
+      "fixed_at_attempt": null
+    }
+  ]
+}
