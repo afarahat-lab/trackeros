@@ -35,18 +35,14 @@ export function LeaveListPage({ leaveService }: LeaveListPageProps) {
     };
   }, [leaveService]);
 
-  if (error !== null) {
-    return <div role="alert">{error}</div>;
-  }
-
-  if (requests === null) {
-    return <div>Loading…</div>;
-  }
-
   return (
     <>
       <Link to="/leaves/new">Request leave</Link>
-      {requests.length === 0 ? (
+      {error !== null ? (
+        <div role="alert">{error}</div>
+      ) : requests === null ? (
+        <div>Loading…</div>
+      ) : requests.length === 0 ? (
         <div>No leave requests</div>
       ) : (
         <ul>
