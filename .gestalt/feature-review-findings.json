@@ -1,6 +1,6 @@
 {
   "scope": "feature b020624d-f000-464a-871e-edfa5e57ac4e",
-  "attempts": 2,
+  "attempts": 3,
   "findings": [
     {
       "rule_id": "review/architecture",
