@@ -8,6 +8,7 @@ import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { LeaveListPage } from './pages/LeaveListPage';
 import { LeaveDetailPage } from './pages/LeaveDetailPage';
+import { RequestLeavePage } from './pages/RequestLeavePage';
 
 type AuthProviderProps = ComponentProps<typeof AuthProvider>;
 
@@ -59,6 +60,14 @@ export function App({
             element={
               <RequireAuth>
                 <LeaveListPage leaveService={leaveService} />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/leaves/new"
+            element={
+              <RequireAuth>
+                <RequestLeavePage leaveService={leaveService} />
               </RequireAuth>
             }
           />

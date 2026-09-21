@@ -8,5 +8,7 @@ export { DashboardPage } from './pages/DashboardPage';
 export type { DashboardPageProps } from './pages/DashboardPage';
 export { LeaveListPage } from './pages/LeaveListPage';
 export type { LeaveListPageProps } from './pages/LeaveListPage';
+export { RequestLeavePage } from './pages/RequestLeavePage';
+export type { RequestLeavePageProps } from './pages/RequestLeavePage';
 export { LeaveDetailPage } from './pages/LeaveDetailPage';
 export type { LeaveDetailPageProps } from './pages/LeaveDetailPage';

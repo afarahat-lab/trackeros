@@ -43,19 +43,22 @@ export function LeaveListPage({ leaveService }: LeaveListPageProps) {
     return <div>Loading…</div>;
   }
 
-  if (requests.length === 0) {
-    return <div>No leave requests</div>;
-  }
-
   return (
-    <ul>
-      {requests.map((request) => (
-        <li key={request.id}>
-          <Link to={`/leaves/${request.id}`}>{request.leaveTypeCode}</Link>{' '}
-          {formatUtcDate(request.startDate)} to {formatUtcDate(request.endDate)} —{' '}
-          {request.status}
-        </li>
-      ))}
-    </ul>
+    <>
+      <Link to="/leaves/new">Request leave</Link>
+      {requests.length === 0 ? (
+        <div>No leave requests</div>
+      ) : (
+        <ul>
+          {requests.map((request) => (
+            <li key={request.id}>
+              <Link to={`/leaves/${request.id}`}>{request.leaveTypeCode}</Link>{' '}
+              {formatUtcDate(request.startDate)} to{' '}
+              {formatUtcDate(request.endDate)} — {request.status}
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
   );
 }
