@@ -66,7 +66,10 @@ export function App({
             path="/leaves/:id"
             element={
               <RequireAuth>
-                <LeaveDetailPage leaveService={leaveService} />
+                <LeaveDetailPage
+                  leaveService={leaveService}
+                  employeeService={employeeService}
+                />
               </RequireAuth>
             }
           />
