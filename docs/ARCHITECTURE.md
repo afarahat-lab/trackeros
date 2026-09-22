@@ -425,6 +425,34 @@ Migration note: add nullable `password_hash` to `employees` using `t.text(...)` 
 - shared-date -> shared-types
 - shared-auth -> shared-types, shared-errors
 
+#### The web build (`web/src/`)
+
+This repository holds TWO builds. The service above lives under `src/`; the React app lives
+under `web/src/` with its own `package.json` and its own module boundaries. They are declared
+as separate application roots in `HARNESS.json` (`qualityGate.applicationRoots`), and the web
+root carries the `web-` prefix — without it the two builds' `leave` modules would collide in
+this one flat map, which is how a frontend came to be checked against the backend's
+allow-list and had every import reported as a violation (run `ecef04ad`).
+
+Module names are DERIVED from the path, not chosen: `<prefix><name>` under the `modules`
+container, `<prefix><container>-<name>` under any other. A name that does not derive this way
+is not merely odd — the dependency check resolves the file, finds no entry, and stays silent.
+This map previously carried `api-client` and `presentation-pages`, which matched nothing, so
+the entire frontend was checked by nothing at all.
+
+The direction is: presentation -> modules -> infrastructure -> shared. `web-approvals`
+deliberately does NOT reach `web-infrastructure-api` directly; it goes through the
+`web-leave` and `web-employee` services, and that is the layering this map exists to hold.
+
+- web-infrastructure-api -> web-shared-types
+- web-auth -> web-infrastructure-api, web-shared-types
+- web-employee -> web-infrastructure-api, web-shared-types
+- web-leave -> web-infrastructure-api, web-shared-types
+- web-approvals -> web-employee, web-leave, web-shared-types
+- web-presentation-components -> web-auth
+- web-presentation-guards -> web-auth, web-shared-types
+- web-presentation-pages -> web-approvals, web-auth, web-employee, web-leave, web-presentation-components, web-shared-date, web-shared-types
+
 ### Recommended phases
 1. **Shared foundations: date helpers + shared types** — extract accrual helpers and add shared types. (3 files)
 2. **Employee: password_hash, findByManagerId, profile mapping** — migration, repository/service extensions, toEmployeeProfile. (6 files)

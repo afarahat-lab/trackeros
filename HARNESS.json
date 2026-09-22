@@ -42,7 +42,28 @@
       "LINT_FAILURE",
       "TEST_FAILURE"
     ],
-    "maxRetries": 3
+    "maxRetries": 3,
+    "_comment_applicationRoots": "The BUILDS the dependency map in docs/ARCHITECTURE.md describes. This repo holds two: a Fastify service under src/ and a React app under web/src/, with separate package.json files and separate module boundaries. Each root carries its own `prefix` so both may have a `leave` module without colliding in one flat map, and its own `containers` \u2014 the directories under it that hold modules. Without this the frontend resolved to no module at all and was checked by nothing: run e04c2d94 passed five gates with zero violations on a feature that touched only web/.",
+    "applicationRoots": [
+      {
+        "path": "src",
+        "prefix": "",
+        "containers": [
+          "modules",
+          "shared"
+        ]
+      },
+      {
+        "path": "web/src",
+        "prefix": "web-",
+        "containers": [
+          "modules",
+          "shared",
+          "presentation",
+          "infrastructure"
+        ]
+      }
+    ]
   },
   "constraints": {
     "rules": [
