@@ -1,0 +1,110 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "approvals"
+    ],
+    "affectedLayers": [
+      "service"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "web/src/modules/approvals/approvals.service.ts declares and exports the `ApprovalsQueueItem` read-model type with exactly these fields: requestId: string, employeeId: string, employeeName: string | null, leaveTypeCode: LeaveTypeCode, startDate: Date, endDate: Date, status: LeaveStatus.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "web/src/modules/approvals/approvals.service.ts declares the `IApprovalsService` interface exposing exactly `getQueue(): Promise<ApprovalsQueueItem[]>` and `decide(requestId: string, action: 'approve' | 'reject'): Promise<LeaveRequestView>`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`ApprovalsService.getQueue()` returns only rows where `status === LeaveStatus.SUBMITTED` AND `employeeId !== profile.id`, where `profile` is obtained from `employeeService.getMe()`; every returned item has `employeeName === null` and `status === LeaveStatus.SUBMITTED`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`ApprovalsService.decide(requestId, 'approve')` delegates to `leaveService.approve(requestId)` and returns the resulting `LeaveRequestView` unchanged; `decide(requestId, 'reject')` delegates to `leaveService.reject(requestId)` and returns its `LeaveRequestView` unchanged, without re-fetching the list.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "web/src/modules/approvals/index.ts re-exports `IApprovalsService`, `ApprovalsService`, and the `ApprovalsQueueItem` type as the module's public entry point.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "ApprovalsService must NOT import the api-client (web/src/infrastructure/api) directly; it obtains leave/employee operations only through the injected ILeaveService and IEmployeeService.",
+    "Do NOT redeclare LeaveTypeCode, LeaveStatus, LeaveRequestView, or EmployeeProfile; import them from web/src/shared/types/index.ts.",
+    "Do NOT add a status query parameter or any new api-client method; the API contract is unchanged. getQueue() filters client-side and decide() reuses the existing approve/reject methods.",
+    "Do NOT attempt employee-name resolution; ApprovalsQueueItem.employeeName must be null (no endpoint returns another employee's name).",
+    "Role is obtained from the EmployeeProfile returned by employeeService.getMe(), never decoded from the JWT."
+  ],
+  "outOfScope": [
+    "Unit tests for the approvals service (Phase 2), the RequireApprover route guard (Phase 3), ApprovalsPage + route wiring (Phase 4), and ApprovalsPage tests + dashboard link (Phase 5).",
+    "Any new api-client methods, status query parameters, or backend API changes; employee-name resolution (no endpoint exists).",
+    "UI/presentation rendering, route guards, and composition-root wiring (web/src/main.tsx) \u2014 these belong to later phases."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "ApprovalsQueueItem",
+      "mustExistOrExtend": true,
+      "invariant": "A derived read-model projection, never persisted: membership is computed from LeaveRequestView rows where status === LeaveStatus.SUBMITTED and employeeId !== the signed-in viewer's id. While in the queue, status is always LeaveStatus.SUBMITTED and employeeName is always null."
+    },
+    {
+      "entity": "ApprovalsService",
+      "mustExistOrExtend": true,
+      "invariant": "A stateless orchestration boundary over ILeaveService and IEmployeeService; it performs no lifecycle transition itself, delegates decide() verbatim to leaveService.approve/reject, and returns the LeaveRequestView unchanged."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "getQueue(): Promise<ApprovalsQueueItem[]>",
+      "authRule": "Identity/role derived from employeeService.getMe() profile; no JWT decoding. Returns [] for an empty queue (normal state, not an error).",
+      "idempotent": true,
+      "errorSemantics": "Read-only; propagates rejections from getMe()/list() unchanged (no swallowing)."
+    },
+    {
+      "operation": "decide(requestId: string, action: 'approve' | 'reject'): Promise<LeaveRequestView>",
+      "authRule": "Delegates to leaveService.approve/reject; authorization is enforced by the backend, not re-implemented here.",
+      "idempotent": false,
+      "errorSemantics": "Propagates the underlying approve/reject rejection unchanged; returns the LeaveRequestView unchanged (no re-fetch)."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Import LeaveTypeCode, LeaveStatus, LeaveRequestView, and EmployeeProfile from the shared types module; do not redeclare them.",
+      "referencePath": "web/src/shared/types/index.ts"
+    },
+    {
+      "requirement": "Match the ILeaveService.list/approve/reject signatures exactly (list(): Promise<LeaveRequestView[]>; approve(id): Promise<LeaveRequestView>; reject(id): Promise<LeaveRequestView>) and import ILeaveService from the leave public entry point.",
+      "referencePath": "web/src/modules/leave/index.ts"
+    },
+    {
+      "requirement": "Match the IEmployeeService.getMe(): Promise<EmployeeProfile> signature and import IEmployeeService from the employee public entry point.",
+      "referencePath": "web/src/modules/employee/index.ts"
+    },
+    {
+      "requirement": "The ApprovalsQueueItem fields requestId/employeeId/leaveTypeCode/startDate/endDate/status must map from LeaveRequestView.id/employeeId/leaveTypeCode/startDate/endDate/status, preserving the exact field types declared in the shared types module.",
+      "referencePath": "web/src/shared/types/index.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "web/src/modules/leave/index.ts (ILeaveService)",
+      "why": "getQueue() reads the visible request list via list(); decide() delegates to approve()/reject()."
+    },
+    {
+      "target": "web/src/modules/employee/index.ts (IEmployeeService)",
+      "why": "getQueue() obtains the signed-in profile (id + role) via getMe() to filter out the viewer's own requests."
+    },
+    {
+      "target": "web/src/shared/types/index.ts",
+      "why": "Canonical source for LeaveTypeCode, LeaveStatus, LeaveRequestView, and EmployeeProfile used by the read-model and service signatures."
+    }
+  ]
+}
