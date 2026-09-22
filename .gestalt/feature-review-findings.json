@@ -1,6 +1,6 @@
 {
   "scope": "feature b020624d-f000-464a-871e-edfa5e57ac4e",
-  "attempts": 4,
+  "attempts": 5,
   "findings": [
     {
       "rule_id": "review/architecture",
@@ -14,6 +14,19 @@
       "first_seen_attempt": 1,
       "last_seen_attempt": 1,
       "fixed_at_attempt": 2
+    },
+    {
+      "rule_id": "dependency-direction",
+      "file_path": "web/src/presentation/pages/DashboardPage.tsx",
+      "line": 55,
+      "message": "[dependency-direction] The binding domain rule states the loading condition must not be `employee === null || balances === null` (which conflates the two independent fetches). The code still retains that exact nullability-based sub-expression in the loading condition, even though an explicit `loading` boolean was added. The functional bug is mitigated (error takes precedence and `loading` is set false in both paths), but the rule explicitly forbids deriving the loading state from data nullability, and the leftover `employee === null || balances === null` remains.\n  Evidence: \"if (loading || employee === null || balances === null) {\"",
+      "quoted_line": "if (loading || employee === null || balances === null) {",
+      "severity": "",
+      "agent_role": "",
+      "status": "open",
+      "first_seen_attempt": 5,
+      "last_seen_attempt": 5,
+      "fixed_at_attempt": null
     }
   ]
 }
