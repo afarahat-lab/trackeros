@@ -2,7 +2,7 @@
 
 Findings from the FEATURE-level review — one pass over everything this feature built, scoped to its diff against the default branch. Per-phase gate findings live in each phase's `.gestalt/<correlation id>/` folder.
 
-**0 open · 1 fixed** after 3 attempts.
+**0 open · 1 fixed** after 4 attempts.
 
 A finding is `fixed` when an attempt stopped reporting it. Findings are never removed from this file — one that lists only what is currently broken cannot show you that anything got better.
 
