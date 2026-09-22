@@ -1,6 +1,6 @@
 {
   "scope": "feature b020624d-f000-464a-871e-edfa5e57ac4e",
-  "attempts": 5,
+  "attempts": 6,
   "findings": [
     {
       "rule_id": "review/architecture",
@@ -23,10 +23,10 @@
       "quoted_line": "if (loading || employee === null || balances === null) {",
       "severity": "",
       "agent_role": "",
-      "status": "open",
+      "status": "fixed",
       "first_seen_attempt": 5,
       "last_seen_attempt": 5,
-      "fixed_at_attempt": null
+      "fixed_at_attempt": 6
     }
   ]
 }
