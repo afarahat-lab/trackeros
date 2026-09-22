@@ -1,63 +1,77 @@
 # PLAN.md
 
-## Phase 1: Phase 1 — Extend IApiClient + ApiClient with write endpoints
+## Phase 1: Phase 1 — Approvals service module
 
-Extend the API client transport layer with the five write endpoints the backend already serves.
+Create the approvals service module under web/src/modules/approvals/ (the exact directory the architecture's Module Boundaries declare for this module).
 
-Files (approximately 3):
-1. web/src/shared/types/index.ts — add the `CreateLeaveRequestInput` DTO owned by shared-types: `{ leaveTypeCode: LeaveTypeCode; startDate: string; endDate: string }` where startDate/endDate are ISO 8601 strings (never Date objects). Reuse the existing `LeaveTypeCode` enum; do not add or rename any other type.
-2. web/src/infrastructure/api/api-client.ts — extend the `IApiClient` interface with five methods and implement them in `ApiClient`:
-   - `createLeave(input: CreateLeaveRequestInput): Promise<LeaveRequestView>` → `POST /leaves` with `JSON.stringify(input)` body.
-   - `submitLeave(id: string): Promise<LeaveRequestView>` → `POST /leaves/${id}/submit`.
-   - `approveLeave(id: string): Promise<LeaveRequestView>` → `POST /leaves/${id}/approve`.
-   - `rejectLeave(id: string): Promise<LeaveRequestView>` → `POST /leaves/${id}/reject`.
-   - `cancelLeave(id: string): Promise<LeaveRequestView>` → `POST /leaves/${id}/cancel`.
-   All five use the existing private `request<T>()` pattern with `authenticated: true` (bearer token attachment + 401 token clear + `ApiError` mapping via `toApiError`). The action endpoints take NO body (matching the backend contract). Dates cross the wire as ISO strings only.
-3. web/src/infrastructure/api/api-client.test.ts — add vitest coverage: each method issues the correct method/path/body (assert `fetch` called with `POST /leaves` and the JSON body for create; `POST /leaves/:id/submit|approve|reject|cancel` with no body for the actions), attaches the bearer token, and maps a non-2xx body to an `ApiError` carrying the backend's `error` message and `code` (cover a rejected create, e.g. insufficient balance, surfacing the API's own message).
+Files to create (approximately 2–3):
+- web/src/modules/approvals/approvals.service.ts — define the canonical `ApprovalsQueueItem` read-model type (requestId: string, employeeId: string, employeeName: string | null, leaveTypeCode: LeaveTypeCode, startDate: Date, endDate: Date, status: LeaveStatus) AND the `IApprovalsService` interface AND the `ApprovalsService` class in this one file. Import `LeaveTypeCode`, `LeaveStatus`, `LeaveRequestView`, `EmployeeProfile` from web/src/shared/types/index.ts (the existing shared types module — do NOT redeclare these enums/types).
+- web/src/modules/approvals/index.ts — public entry point re-exporting `IApprovalsService`, `ApprovalsService`, and the `ApprovalsQueueItem` type.
 
-This phase depends on the existing files web/src/infrastructure/api/api-client.ts, web/src/infrastructure/api/api-error.ts, web/src/infrastructure/api/token-storage.ts, and web/src/shared/types/index.ts — read them before generating.
+`IApprovalsService` exposes: `getQueue(): Promise<ApprovalsQueueItem[]>` and `decide(requestId: string, action: 'approve' | 'reject'): Promise<LeaveRequestView>`.
 
-## Phase 2: Phase 2 — Extend ILeaveService + LeaveService with write methods
+`ApprovalsService` constructor injects `ILeaveService` (from web/src/modules/leave/index.ts) and `IEmployeeService` (from web/src/modules/employee/index.ts). It must NOT import the api-client directly.
 
-Extend the leave domain service with the write workflow and add the two pure helpers the pages will consume.
+`getQueue()` implementation (BINDING rules):
+1. Call `employeeService.getMe()` to obtain the signed-in profile (role comes from the profile, never decoded from the JWT).
+2. Call `leaveService.list()` to fetch all visible requests.
+3. Filter defensively in the service: keep only rows where `status === LeaveStatus.SUBMITTED` AND `employeeId !== profile.id` (do NOT rely on backend role scoping, and do NOT add a status query param — the API contract is unchanged).
+4. Map each surviving `LeaveRequestView` to an `ApprovalsQueueItem` with `requestId = view.id`, `employeeId = view.employeeId`, `employeeName = null` (there is no endpoint returning another employee's name — do NOT attempt name resolution), `leaveTypeCode`, `startDate`, `endDate`, and `status` (always SUBMITTED while in queue).
 
-Files (approximately 5, all under web/src/modules/leave/):
-1. web/src/modules/leave/leave.service.ts — extend `ILeaveService` with `create(input: CreateLeaveRequestInput): Promise<LeaveRequestView>`, `submit(id: string)`, `approve(id: string)`, `reject(id: string)`, `cancel(id: string)` (all returning `Promise<LeaveRequestView>`). Implement each in `LeaveService` by delegating verbatim to the corresponding `IApiClient` method added in Phase 1 (`createLeave`, `submitLeave`, `approveLeave`, `rejectLeave`, `cancelLeave`). No lifecycle logic in the service — it returns the API client's value unchanged and propagates `ApiError` unchanged.
-2. web/src/modules/leave/leave.actions.ts — add the pure helper `getAvailableLeaveActions(status: LeaveStatus, role: EmployeeRole, isOwner: boolean): string[]` implementing the status+role action matrix: owner may `submit` (DRAFT) and `cancel` (DRAFT or SUBMITTED); MANAGER/ADMIN may `approve`/`reject` (SUBMITTED). Return an empty array for any combination the user may not take. No I/O, no imports beyond the enums.
-3. web/src/modules/leave/leave.validation.ts — add the pure helper `validateLeaveRequestInput(input: CreateLeaveRequestInput): string[]` enforcing ONLY the three spec rules: both dates required (non-empty), end date not before start date compared as calendar dates, and a leave type chosen. It must NOT mirror min-notice or max-duration (backend policy) and must fetch nothing. Return an array of human-readable error strings (empty when valid).
-4. web/src/modules/leave/index.ts — re-export the new symbols (`getAvailableLeaveActions`, `validateLeaveRequestInput`) alongside the existing exports.
-5. web/src/modules/leave/leave.service.test.ts — extend the existing vitest suite: each write method delegates to the matching apiClient method with the right argument and returns the value unchanged; each propagates an `ApiError` unchanged (cover a rejected create). Add tests for `getAvailableLeaveActions` (owner submit/cancel, manager approve/reject, forbidden combinations return empty) and `validateLeaveRequestInput` (missing dates, end-before-start, missing type, and the valid case returning empty).
+`decide(requestId, action)` implementation (BINDING rule): delegate to the existing api-client methods via `leaveService.approve(requestId)` or `leaveService.reject(requestId)` (reuse the existing methods — do NOT add new api-client methods). Return the `LeaveRequestView` the call returns unchanged (the caller replaces the decided row with it; do NOT re-fetch the list).
 
-This phase depends on web/src/infrastructure/api/api-client.ts (the extended `IApiClient` from Phase 1) and web/src/shared/types/index.ts (the `CreateLeaveRequestInput` DTO and enums) — read them before generating any code that references their types.
+This phase depends on existing files — read them before generating: web/src/modules/leave/leave.service.ts (for `ILeaveService.list/approve/reject`), web/src/modules/employee/employee.service.ts (for `IEmployeeService.getMe`), web/src/shared/types/index.ts (for `LeaveRequestView`, `EmployeeProfile`, `LeaveStatus`, `LeaveTypeCode`), and web/src/modules/leave/index.ts / web/src/modules/employee/index.ts (public entry points).
 
-## Phase 3: Phase 3 — RequestLeavePage form + route wiring
+## Phase 2: Phase 2 — Approvals service unit tests
 
-Create the "Request leave" form page.
+Create the vitest unit test suite for the approvals service, beside its subject (established web style — tests live next to the subject, not under a separate tests/ dir).
 
-Files (approximately 2):
-1. web/src/presentation/pages/RequestLeavePage.tsx — a new page component `RequestLeavePage({ leaveService }: { leaveService: ILeaveService })` that renders a form capturing leave type (select over the `LeaveTypeCode` enum values), start date, and end date (both as date inputs producing ISO strings). On submit it calls `validateLeaveRequestInput` (Phase 2) and, if errors are returned, shows them inline WITHOUT calling the network; if valid it calls `leaveService.create({ leaveTypeCode, startDate, endDate })`. On success it navigates to the new request's detail page via `useNavigate()` → `/leaves/${created.id}`. On failure it surfaces the API's own error message (e.g. insufficient balance) rather than a generic failure. No comment/reason input.
-2. web/src/presentation/pages/RequestLeavePage.test.tsx — vitest coverage: a validation failure (e.g. end before start, missing type) renders the error and never calls `leaveService.create`; a successful create navigates to `/leaves/${id}`; a rejected create (apiClient rejects with `ApiError`) surfaces the API's message. Use the established `*.test.tsx` style beside the subject.
+File to create (1):
+- web/src/modules/approvals/approvals.service.test.ts
 
-This phase depends on web/src/modules/leave/leave.service.ts (the extended `ILeaveService.create`), web/src/modules/leave/leave.validation.ts (`validateLeaveRequestInput`), and web/src/shared/types/index.ts (`LeaveTypeCode`, `CreateLeaveRequestInput`) from Phases 1–2 — read them before generating. Route registration in App.tsx is deferred to Phase 5.
+This phase depends on web/src/modules/approvals/approvals.service.ts and web/src/modules/approvals/index.ts from Phase 1 — read them before writing any test that references `ApprovalsService`, `IApprovalsService`, or `ApprovalsQueueItem`.
 
-## Phase 4: Phase 4 — LeaveDetailPage actions + role awareness
+Use in-memory fakes for `ILeaveService` and `IEmployeeService` (cast to the interface types imported from web/src/modules/leave/index.ts and web/src/modules/employee/index.ts). Cover:
+- `getQueue()` happy path: a MANAGER/ADMIN profile receives only SUBMITTED requests whose `employeeId !== profile.id`; DRAFT/APPROVED/REJECTED/CANCELLED rows and the viewer's own SUBMITTED rows are excluded; each returned item has `employeeName === null` and `status === LeaveStatus.SUBMITTED`.
+- `getQueue()` empty result: no SUBMITTED non-own rows → returns `[]` (the empty state is a normal condition, not an error).
+- `getQueue()` failure path: `getMe()` or `list()` rejects → the rejection propagates (assert the promise rejects).
+- `decide(requestId, 'approve')` delegates to `leaveService.approve(requestId)` and returns its `LeaveRequestView` unchanged.
+- `decide(requestId, 'reject')` delegates to `leaveService.reject(requestId)` and returns its `LeaveRequestView` unchanged.
+- `decide()` failure path: the underlying approve/reject rejects → the rejection propagates.
 
-Add workflow actions and role awareness to the leave detail page.
+Use `vi.fn()` for the fake methods and assert call arguments. Follow the existing web test conventions (see web/src/modules/leave/leave.service.test.ts and web/src/modules/employee/employee.service.test.ts for the fake/assertion style).
 
-Files (approximately 3):
-1. web/src/presentation/pages/LeaveDetailPage.tsx — extend `LeaveDetailPage` to accept an additional `employeeService: IEmployeeService` prop. On mount (alongside the existing `getById`), fetch the signed-in profile via `employeeService.getMe()` to obtain `role` and `id` (role awareness comes from GET /employees/me — never decode the JWT). Compute `isOwner = profile.id === request.employeeId` and call `getAvailableLeaveActions(request.status, profile.role, isOwner)` (Phase 2). Render ONLY the returned actions as buttons (submit/cancel for the owner, approve/reject for a manager); an action the user may not take must not be rendered at all. Each button calls the matching `leaveService` method (`submit`/`approve`/`reject`/`cancel`) and, on success, updates local state with the returned `LeaveRequestView` so the page reflects the new status without a manual reload; on failure surface the API's error message. approve/reject take NO comment input (backend takes no body). Per the binding rule, OMIT the approval-comment row entirely when `approvalComment` is null (do not render a dash/empty value).
-2. web/src/presentation/pages/LeaveDetailPage.test.tsx — vitest coverage: owner sees submit/cancel for a DRAFT and no approve/reject; a manager sees approve/reject for a SUBMITTED request and no submit/cancel; an action the role forbids is not rendered; a successful action updates the displayed status without reload; a failed action surfaces the API error; the approval-comment row is absent when null.
-3. web/src/presentation/App.tsx — pass the already-available `employeeService` prop into `<LeaveDetailPage leaveService={leaveService} employeeService={employeeService} />` so the page compiles and is deployable.
+## Phase 3: Phase 3 — RequireApprover route guard
 
-This phase depends on web/src/modules/leave/leave.service.ts and web/src/modules/leave/leave.actions.ts (Phase 2), web/src/modules/employee/employee.service.ts (`IEmployeeService.getMe`), and web/src/shared/types/index.ts (`LeaveStatus`, `EmployeeRole`) — read them before generating.
+Create the route-level role guard under web/src/presentation/guards/ (the exact directory the architecture's Module Boundaries declare for the presentation-guards module).
 
-## Phase 5: Phase 5 — LeaveListPage link + composition root wiring
+Files to create (approximately 2):
+- web/src/presentation/guards/RequireApprover.tsx — a `RequireApprover` component (route-level role guard) that wraps children and only renders them when the signed-in user's role is MANAGER or ADMIN. It must read the role from the auth session's profile (via `useAuth()` from web/src/modules/auth/index.ts), never decode the JWT. When the session is null, delegate to the existing `RequireAuth` behavior (redirect to /login) or render `<Navigate to="/" replace />`; when the session exists but `profile.role === EmployeeRole.EMPLOYEE`, redirect away (e.g. `<Navigate to="/" replace />`) so an EMPLOYEE visiting the route directly sees no other employee's data. Import `EmployeeRole` from web/src/shared/types/index.ts.
+- web/src/presentation/guards/RequireApprover.test.tsx — vitest coverage beside the subject.
 
-Wire the request-leave entry point and finish composition-root wiring.
+This phase depends on existing files — read them before generating: web/src/presentation/guards/RequireAuth.tsx (the existing guard pattern to mirror), web/src/modules/auth/index.ts (for `useAuth`), web/src/shared/types/index.ts (for `EmployeeRole`), and web/src/presentation/guards/RequireAuth.test.tsx (for the established guard-test style).
 
-Files (approximately 3):
-1. web/src/presentation/pages/LeaveListPage.tsx — add a "Request leave" link (using `Link` from react-router-dom) to `/leaves/new` so the form is reachable from the leave list. Keep the existing list rendering intact.
-2. web/src/presentation/App.tsx — register the new route: `<Route path="/leaves/new" element={<RequireAuth><RequestLeavePage leaveService={leaveService} /></RequireAuth>} />` (import `RequestLeavePage`). Confirm the `/leaves/:id` route already passes `employeeService` (from Phase 4).
-3. web/src/presentation/index.ts — re-export `RequestLeavePage` and `RequestLeavePageProps` alongside the existing page exports.
+Test coverage: a MANAGER session renders children; an ADMIN session renders children; an EMPLOYEE session does NOT render children (redirects); a null session redirects to login (or does not render children).
 
-This phase depends on web/src/presentation/pages/RequestLeavePage.tsx (Phase 3), web/src/presentation/pages/LeaveDetailPage.tsx (Phase 4), and the existing web/src/presentation/App.tsx / web/src/presentation/index.ts — read them before generating. No change to web/src/main.tsx is required (it already injects `employeeService` and `leaveService`).
+## Phase 4: Phase 4 — ApprovalsPage + route wiring
+
+Create the approvals queue page and wire its route.
+
+Files to create/modify (approximately 2):
+- web/src/presentation/pages/ApprovalsPage.tsx — the `ApprovalsPage` component (owned by the presentation-pages module). It receives an `IApprovalsService` prop (imported from web/src/modules/approvals/index.ts). On mount it calls `approvalsService.getQueue()` and renders the queue. Render a table with columns: "Employee" (render `employeeId` truncated to its first 8 characters in a monospace style — do NOT attempt name resolution), "Leave type" (`leaveTypeCode`), "Start" and "End" (`formatUtcDate` from web/src/shared/date/index.ts), and a link to the request's detail page (`/leaves/:requestId`). Include a short visible note near the Employee column, e.g. "employee names require an API change" (BINDING rule — a user-facing note, NOT a TODO comment in code). Each row shows Approve and Reject buttons that call `approvalsService.decide(requestId, 'approve'|'reject')`; on success, replace that row's data with the returned `LeaveRequestView` (render its new status and remove the approve/reject controls for that row) — do NOT remove the row and do NOT re-fetch the whole list (BINDING rule). Render an explicit empty state ("nothing waiting on you") when the queue is empty — distinct from the loading state and the error state. Show a loading state while the fetch is in flight and an error state (`role="alert"`) on failure.
+- web/src/presentation/App.tsx — add the `/approvals` route, wrapped in `<RequireAuth>` and `<RequireApprover>`, rendering `<ApprovalsPage approvalsService={approvalsService} />`. Add `approvalsService: IApprovalsService` to `AppProps` and destructure it.
+
+This phase depends on existing files — read them before generating: web/src/presentation/App.tsx (current route wiring and AppProps), web/src/presentation/guards/RequireApprover.tsx (Phase 3), web/src/modules/approvals/index.ts (Phase 1), web/src/presentation/pages/LeaveDetailPage.tsx (for the decide/row-replacement and action-button pattern), web/src/shared/date/index.ts (for `formatUtcDate`), and web/src/shared/types/index.ts (for `LeaveRequestView`/`LeaveStatus`).
+
+Note: the composition root web/src/main.tsx must be updated to construct and pass `approvalsService` — if main.tsx is not already in scope, note it as a required follow-up wiring edit in the same phase (the architecture agent will confirm the authoritative file list).
+
+## Phase 5: Phase 5 — ApprovalsPage tests + dashboard link
+
+Add the ApprovalsPage test suite and the role-gated dashboard link.
+
+Files to create/modify (approximately 3):
+- web/src/presentation/pages/ApprovalsPage.test.tsx — vitest coverage beside the subject. Use an in-memory fake `IApprovalsService` (cast to the interface from web/src/modules/approvals/index.ts). Cover: the queue renders rows with the truncated 8-character monospace employeeId, leave type, dates, and a detail link; the "employee names require an API change" note is visible; the explicit empty state ("nothing waiting on you") renders when `getQueue()` returns `[]` (and is distinct from loading/error); the loading state renders before the fetch resolves; the error state (`role="alert"`) renders when `getQueue()` rejects; clicking Approve calls `decide(requestId, 'approve')` and replaces the row with the returned `LeaveRequestView` (new status visible, controls gone) without re-fetching; clicking Reject calls `decide(requestId, 'reject')`; a rejected `decide` surfaces the error state.
+- web/src/presentation/pages/DashboardPage.tsx — add a link to `/approvals` that appears ONLY when the signed-in user's role is MANAGER or ADMIN (read role from the profile already fetched via `employeeService.getMe()`, or from `useAuth()` — do NOT decode the JWT). An EMPLOYEE must not see the link. Import `EmployeeRole` from web/src/shared/types/index.ts.
+- web/src/presentation/pages/DashboardPage.test.tsx — extend/add coverage asserting the approvals link is present for MANAGER/ADMIN and absent for EMPLOYEE.
+
+This phase depends on existing files — read them before generating: web/src/presentation/pages/ApprovalsPage.tsx (Phase 4), web/src/modules/approvals/index.ts (Phase 1), web/src/presentation/pages/DashboardPage.tsx (current dashboard), web/src/shared/types/index.ts (for `EmployeeRole`), and web/src/presentation/pages/LeaveDetailPage.test.tsx / LeaveListPage.test.tsx (for the established page-test style).
