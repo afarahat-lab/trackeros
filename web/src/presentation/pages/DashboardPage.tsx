@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { LogoutButton } from '../components/LogoutButton';
 import type { IEmployeeService } from '../../modules/employee/index';
 import type { IBalanceService } from '../../modules/leave/index';
 import type { EmployeeProfile, LeaveBalanceView } from '../../shared/types/index';
+import { EmployeeRole } from '../../shared/types/index';
 import { formatUtcDate } from '../../shared/date/index';
 
 export interface DashboardPageProps {
@@ -52,6 +54,8 @@ export function DashboardPage({
   return (
     <div>
       <LogoutButton />
+      {(employee.role === EmployeeRole.MANAGER ||
+        employee.role === EmployeeRole.ADMIN) && <Link to="/approvals">Approvals</Link>}
       <h1>
         {employee.firstName} {employee.lastName}
       </h1>
