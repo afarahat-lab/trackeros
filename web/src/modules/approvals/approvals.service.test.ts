@@ -127,6 +127,53 @@ describe('ApprovalsService', () => {
     expect(result[0].status).toBe(LeaveStatus.SUBMITTED);
   });
 
+  it('getQueue applies the same SUBMITTED/non-own filter for an ADMIN profile', async () => {
+    const admin: EmployeeProfile = {
+      ...profile,
+      id: 'emp-admin',
+      role: EmployeeRole.ADMIN,
+    };
+    const submittedOther = makeLeave({
+      id: 'leave-submitted',
+      employeeId: 'emp-2',
+      status: LeaveStatus.SUBMITTED,
+    });
+    const submittedOwn = makeLeave({
+      id: 'leave-own',
+      employeeId: admin.id,
+      status: LeaveStatus.SUBMITTED,
+    });
+    const approved = makeLeave({
+      id: 'leave-approved',
+      employeeId: 'emp-3',
+      status: LeaveStatus.APPROVED,
+    });
+    const getMe = vi.fn<IEmployeeService['getMe']>(() =>
+      Promise.resolve(admin),
+    );
+    const list = vi.fn<ILeaveService['list']>(() =>
+      Promise.resolve([approved, submittedOther, submittedOwn]),
+    );
+    const service = new ApprovalsService(
+      makeLeaveService({ list }),
+      makeEmployeeService(getMe),
+    );
+
+    const result = await service.getQueue();
+
+    expect(result).toEqual([
+      {
+        requestId: 'leave-submitted',
+        employeeId: 'emp-2',
+        employeeName: null,
+        leaveTypeCode: LeaveTypeCode.ANNUAL,
+        startDate: new Date('2024-07-01T00:00:00.000Z'),
+        endDate: new Date('2024-07-05T00:00:00.000Z'),
+        status: LeaveStatus.SUBMITTED,
+      },
+    ]);
+  });
+
   it('getQueue returns [] when there are no non-own SUBMITTED rows', async () => {
     const getMe = vi.fn<IEmployeeService['getMe']>(() =>
       Promise.resolve(profile),
