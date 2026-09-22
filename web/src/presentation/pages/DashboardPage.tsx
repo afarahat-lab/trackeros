@@ -18,10 +18,13 @@ export function DashboardPage({
 }: DashboardPageProps) {
   const [employee, setEmployee] = useState<EmployeeProfile | null>(null);
   const [balances, setBalances] = useState<LeaveBalanceView[] | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+
+    setLoading(true);
 
     Promise.all([employeeService.getMe(), balanceService.getBalances()])
       .then(([profile, balanceViews]) => {
@@ -30,12 +33,14 @@ export function DashboardPage({
         }
         setEmployee(profile);
         setBalances(balanceViews);
+        setLoading(false);
       })
       .catch((err: unknown) => {
         if (cancelled) {
           return;
         }
         setError(err instanceof Error ? err.message : 'Something went wrong');
+        setLoading(false);
       });
 
     return () => {
@@ -47,7 +52,7 @@ export function DashboardPage({
     return <div role="alert">{error}</div>;
   }
 
-  if (employee === null || balances === null) {
+  if (loading || employee === null || balances === null) {
     return <div>Loading…</div>;
   }
 
@@ -66,15 +71,25 @@ export function DashboardPage({
       <p>Hired: {formatUtcDate(employee.hireDate)}</p>
 
       <h2>Leave Balances</h2>
-      <ul>
-        {balances.map((balance) => (
-          <li key={balance.id}>
-            {balance.leaveTypeCode} — available: {balance.available} (
-            {formatUtcDate(balance.periodStart)} to{' '}
-            {formatUtcDate(balance.periodEnd)})
-          </li>
-        ))}
-      </ul>
+      {balances.length === 0 ? (
+        <p>No balances yet</p>
+      ) : (
+        <ul>
+          {balances.map((balance) => (
+            <li key={balance.id}>
+              <strong>{balance.leaveTypeCode}</strong> (
+              {formatUtcDate(balance.periodStart)} to{' '}
+              {formatUtcDate(balance.periodEnd)})
+              <ul>
+                <li>Entitled: {balance.entitledDays}</li>
+                <li>Used: {balance.usedDays}</li>
+                <li>Pending: {balance.pendingDays}</li>
+                <li>Available: {balance.available}</li>
+              </ul>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
