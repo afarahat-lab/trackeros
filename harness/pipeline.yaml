@@ -243,13 +243,41 @@ phases:
       # one pass away from being fixed, and a third spent on it is a pass not spent on a
       # cause nobody has tried. Per cause rather than one shared counter, so one stubborn
       # item cannot starve the rest. An exhausted cause goes into the park, not the bin.
-      - id: feature-review
-        type: action
-        action: feature_review
+      # ADR-074 — the feature-wide verification is a `verify` node, the SAME construct the
+      # phase loop uses. It was a bespoke fix loop in platform Python until #155: the right
+      # shape — judge, fix by root cause, judge again — in the wrong place, so two tiers
+      # carried two implementations of one idea and each improvement reached only one.
+      #
+      # `attribute_to_phases` is what a FEATURE-level verification needs and a phase's does
+      # not: its findings arrive with no phase while the fix machinery is phase-keyed, so each
+      # is attributed to the phase that last wrote its file (via the platform's own
+      # `(corr <8>)` commit marker), and the fix is then merged back into the feature branch —
+      # the branch this verification actually reads. Skip either half and the loop spends its
+      # rounds changing nothing.
+      #
+      # `constraint-agent` runs beside the reviewer because the feature diff is the last point
+      # anything sees the build as a WHOLE. Its checks here are the deterministic ones — the
+      # dependency map and `ownedDecisions` — and a rule duplicated ACROSS phases is invisible
+      # to any single phase's gate, which is exactly how a third copy of the approver rule
+      # reached `main`.
+      - id: feature-validation
+        type: verify
         inputs: [feature_id]
-        # Quoted: pipeline `params` are `dict[str, str]`.
-        params: { agents: "review-agent", max_fix_rounds: "3", max_attempts_per_cause: "2" }
         output: { name: feature_review_result, channel: workflow_state }
+        on_findings:
+          flow: fix-intent
+          resume_at: feature-review
+          attribute_to_phases: true
+          max_rounds: 3
+          max_attempts_per_cause: 2
+        steps:
+        - id: feature-review
+          type: action
+          action: feature_review
+          inputs: [feature_id]
+          # Quoted: pipeline `params` are `dict[str, str]`.
+          params: { agents: "review-agent,constraint-agent" }
+          output: { name: feature_review_result, channel: workflow_state }
       - id: merge-feature
         type: action
         action: branch_merge
