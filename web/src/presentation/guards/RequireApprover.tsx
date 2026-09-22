@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../modules/auth/index';
-import { EmployeeRole } from '../../shared/types/index';
+import { canApproveLeave } from '../../modules/leave/index';
 
 export interface RequireApproverProps { children: ReactNode; }
 
@@ -24,9 +24,15 @@ export function RequireApprover({ children }: RequireApproverProps) {
     return <Navigate to="/login" replace />;
   }
 
-  if (session.profile.role === EmployeeRole.EMPLOYEE) {
-    // An EMPLOYEE reaching an approver route directly must not see any other
-    // employee's data: send them away from the guarded content.
+  if (!canApproveLeave(session.profile.role)) {
+    // Someone who may not decide a leave request must not reach an approver route
+    // directly: send them away from the guarded content.
+    //
+    // Asks the `leave` module rather than testing the role here. This used to read
+    // `role === EMPLOYEE -> deny`, which is the same answer across today's three roles and
+    // the OPPOSITE answer the day a fourth exists — the canonical rule denies an
+    // unrecognised role, an inverted copy admits it, and it reaches other employees' data.
+    // Fail-closed is a property of asking the one rule, not of writing this one carefully.
     return <Navigate to="/" replace />;
   }
 

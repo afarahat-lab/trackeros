@@ -450,7 +450,10 @@ deliberately does NOT reach `web-infrastructure-api` directly; it goes through t
 - web-leave -> web-infrastructure-api, web-shared-types
 - web-approvals -> web-employee, web-leave, web-shared-types
 - web-presentation-components -> web-auth
-- web-presentation-guards -> web-auth, web-shared-types
+# `web-leave` is here for ONE import: `canApproveLeave`. A route guard asking the module
+# that owns the authorization rule is the point — the guard used to carry its own inverted
+# copy (`role === EMPLOYEE -> deny`), which fails OPEN the day a fourth role exists.
+- web-presentation-guards -> web-auth, web-leave, web-shared-types
 - web-presentation-pages -> web-approvals, web-auth, web-employee, web-leave, web-presentation-components, web-shared-date, web-shared-types
 
 ### Recommended phases

@@ -13,6 +13,24 @@ export const REJECT_ACTION = 'reject';
  * - The owner may submit and cancel a DRAFT, and cancel a SUBMITTED request.
  * - A MANAGER or ADMIN may approve or reject a SUBMITTED request.
  */
+/**
+ * Whether a role may decide (approve or reject) someone else's leave request.
+ *
+ * The ONE home for this rule. It is exported rather than inlined because two callers need
+ * it — `getAvailableLeaveActions` below, which decides whether to offer the buttons, and the
+ * `RequireApprover` route guard, which decides whether to render the approvals route at all.
+ *
+ * The guard previously carried its own copy written the other way round, as
+ * `role === EMPLOYEE -> deny`. Across today's three roles that is equivalent; add a fourth
+ * and the two diverge in the dangerous direction — this rule denies it, the inverted copy
+ * ADMITS it, and an unrecognised role reaches other employees' leave data. A rule expressed
+ * twice is a rule that will eventually be expressed inconsistently, and the failure here is
+ * fail-open.
+ */
+export function canApproveLeave(role: EmployeeRole): boolean {
+  return role === EmployeeRole.MANAGER || role === EmployeeRole.ADMIN;
+}
+
 export function getAvailableLeaveActions(
   status: LeaveStatus,
   role: EmployeeRole,
@@ -28,7 +46,7 @@ export function getAvailableLeaveActions(
     return [];
   }
 
-  if (role === EmployeeRole.MANAGER || role === EmployeeRole.ADMIN) {
+  if (canApproveLeave(role)) {
     if (status === LeaveStatus.SUBMITTED) {
       return [APPROVE_ACTION, REJECT_ACTION];
     }
