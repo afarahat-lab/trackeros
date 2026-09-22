@@ -418,11 +418,13 @@ Migration note: add nullable `password_hash` to `employees` using `t.text(...)` 
 
 ### Dependency map
 - auth -> employee, shared-auth, shared-types, shared-errors
-- employee -> shared-types, shared-errors, shared-db
+# `shared-auth` is here for the `AuthUser` type employee.routes.ts reads off the request.
+- employee -> shared-auth, shared-types, shared-errors, shared-db
 - policy -> leave-type, shared-types, shared-errors
 - balance -> employee, policy, shared-date, shared-types, shared-errors, shared-db
 - leave -> balance, validation, policy, employee, audit, notification, leave-type, shared-date, shared-types, shared-errors, shared-db
-- shared-date -> shared-types
+# `shared-errors` is here because accrual.ts throws ConflictError on an out-of-range date.
+- shared-date -> shared-errors, shared-types
 - shared-auth -> shared-types, shared-errors
 
 #### The web build (`web/src/`)

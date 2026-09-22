@@ -63,6 +63,17 @@
           "infrastructure"
         ]
       }
+    ],
+    "_comment_ownedDecisions": "Symbols whose meaning is a POLICY, and the modules allowed to branch on them. A rule expressed in two places is a rule that will eventually be expressed inconsistently, and the copy nobody re-reads is the one that decides wrongly. Measured: trackeros' approver rule lived in leave.actions.ts as `role === MANAGER || ADMIN -> allow`, and a route guard built a phase later wrote `role === EMPLOYEE -> deny` \u2014 identical across three roles, and the OPPOSITE answer the day a fourth exists, in the fail-open direction. The constraint agent had the whole diff and 847k tokens and did not report it. This check is deterministic for that reason: 'does this file branch on a symbol another module owns' is two lookups, not judgment. It flags COMPARISONS only \u2014 a type annotation or an import is a reference, not a decision \u2014 and only on lines the phase actually wrote. Declare nothing and it does nothing.",
+    "ownedDecisions": [
+      {
+        "symbol": "EmployeeRole",
+        "owners": [
+          "leave",
+          "web-leave"
+        ],
+        "why": "The approver rule lives in leave.actions.ts (canApproveLeave); ask it rather than re-deciding."
+      }
     ]
   },
   "constraints": {
