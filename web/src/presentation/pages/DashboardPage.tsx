@@ -3,8 +3,8 @@ import { Link } from 'react-router-dom';
 import { LogoutButton } from '../components/LogoutButton';
 import type { IEmployeeService } from '../../modules/employee/index';
 import type { IBalanceService } from '../../modules/leave/index';
+import { canApproveLeave } from '../../modules/leave/index';
 import type { EmployeeProfile, LeaveBalanceView } from '../../shared/types/index';
-import { EmployeeRole } from '../../shared/types/index';
 import { formatUtcDate } from '../../shared/date/index';
 
 export interface DashboardPageProps {
@@ -54,8 +54,10 @@ export function DashboardPage({
   return (
     <div>
       <LogoutButton />
-      {(employee.role === EmployeeRole.MANAGER ||
-        employee.role === EmployeeRole.ADMIN) && <Link to="/approvals">Approvals</Link>}
+      {/* Asks the `leave` module rather than testing the role here: the link must appear
+          exactly when the route behind it is reachable, and two copies of that rule drift.
+          `RequireApprover` asks the same function, so the link and the guard cannot disagree. */}
+      {canApproveLeave(employee.role) && <Link to="/approvals">Approvals</Link>}
       <h1>
         {employee.firstName} {employee.lastName}
       </h1>
