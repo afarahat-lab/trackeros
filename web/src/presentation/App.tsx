@@ -3,12 +3,15 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from '../modules/auth/index';
 import type { IEmployeeService } from '../modules/employee/index';
 import type { IBalanceService, ILeaveService } from '../modules/leave/index';
+import type { IApprovalsService } from '../modules/approvals/index';
 import { RequireAuth } from './guards/RequireAuth';
+import { RequireApprover } from './guards/RequireApprover';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { LeaveListPage } from './pages/LeaveListPage';
 import { LeaveDetailPage } from './pages/LeaveDetailPage';
 import { RequestLeavePage } from './pages/RequestLeavePage';
+import { ApprovalsPage } from './pages/ApprovalsPage';
 
 type AuthProviderProps = ComponentProps<typeof AuthProvider>;
 
@@ -19,6 +22,7 @@ export interface AppProps {
   employeeService: IEmployeeService;
   leaveService: ILeaveService;
   balanceService: IBalanceService;
+  approvalsService: IApprovalsService;
 }
 
 /**
@@ -34,6 +38,7 @@ export function App({
   employeeService,
   leaveService,
   balanceService,
+  approvalsService,
 }: AppProps) {
   return (
     <BrowserRouter>
@@ -79,6 +84,16 @@ export function App({
                   leaveService={leaveService}
                   employeeService={employeeService}
                 />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/approvals"
+            element={
+              <RequireAuth>
+                <RequireApprover>
+                  <ApprovalsPage approvalsService={approvalsService} />
+                </RequireApprover>
               </RequireAuth>
             }
           />

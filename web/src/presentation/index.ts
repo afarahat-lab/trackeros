@@ -12,3 +12,5 @@ export { RequestLeavePage } from './pages/RequestLeavePage';
 export type { RequestLeavePageProps } from './pages/RequestLeavePage';
 export { LeaveDetailPage } from './pages/LeaveDetailPage';
 export type { LeaveDetailPageProps } from './pages/LeaveDetailPage';
+export { ApprovalsPage } from './pages/ApprovalsPage';
+export type { ApprovalsPageProps } from './pages/ApprovalsPage';
