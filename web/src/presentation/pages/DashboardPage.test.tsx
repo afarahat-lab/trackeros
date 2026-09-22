@@ -16,6 +16,7 @@ import {
   LeaveTypeCode,
 } from '../../shared/types/index';
 import { DashboardPage } from './DashboardPage';
+import { formatUtcDate } from '../../shared/date/index';
 
 type AuthProviderProps = ComponentProps<typeof AuthProvider>;
 type TestApiClient = AuthProviderProps['apiClient'];
@@ -90,12 +91,20 @@ function buildBalance(
   };
 }
 
-function renderPage(role: EmployeeRole) {
+interface RenderPageOptions {
+  role?: EmployeeRole;
+  balances?: LeaveBalanceView[];
+  getBalances?: IBalanceService['getBalances'];
+}
+
+function renderPage(options: RenderPageOptions = {}) {
+  const { role = EmployeeRole.EMPLOYEE, balances, getBalances } = options;
   const employeeService: IEmployeeService = {
     getMe: vi.fn().mockResolvedValue(buildProfile({ role })),
   };
   const balanceService: IBalanceService = {
-    getBalances: vi.fn().mockResolvedValue([buildBalance()]),
+    getBalances:
+      getBalances ?? vi.fn().mockResolvedValue(balances ?? [buildBalance()]),
   };
 
   return render(
@@ -116,25 +125,68 @@ function renderPage(role: EmployeeRole) {
 
 describe('DashboardPage', () => {
   it('shows the approvals link for a MANAGER', async () => {
-    renderPage(EmployeeRole.MANAGER);
+    renderPage({ role: EmployeeRole.MANAGER });
 
     const link = await screen.findByRole('link', { name: 'Approvals' });
     expect(link).toHaveAttribute('href', '/approvals');
   });
 
   it('shows the approvals link for an ADMIN', async () => {
-    renderPage(EmployeeRole.ADMIN);
+    renderPage({ role: EmployeeRole.ADMIN });
 
     const link = await screen.findByRole('link', { name: 'Approvals' });
     expect(link).toHaveAttribute('href', '/approvals');
   });
 
   it('does not show the approvals link for an EMPLOYEE', async () => {
-    renderPage(EmployeeRole.EMPLOYEE);
+    renderPage({ role: EmployeeRole.EMPLOYEE });
 
     await screen.findByText('John Doe');
     expect(
       screen.queryByRole('link', { name: 'Approvals' }),
     ).not.toBeInTheDocument();
+  });
+
+  it('renders the full balance breakdown', async () => {
+    renderPage({
+      balances: [
+        buildBalance({
+          entitledDays: 20,
+          usedDays: 8,
+          pendingDays: 2,
+          available: 10,
+        }),
+      ],
+    });
+
+    await screen.findByText('John Doe');
+
+    expect(screen.getByText('Entitled: 20')).toBeInTheDocument();
+    expect(screen.getByText('Used: 8')).toBeInTheDocument();
+    expect(screen.getByText('Pending: 2')).toBeInTheDocument();
+    expect(screen.getByText('Available: 10')).toBeInTheDocument();
+
+    const start = formatUtcDate(new Date('2025-01-01T00:00:00.000Z'));
+    const end = formatUtcDate(new Date('2025-12-31T00:00:00.000Z'));
+    const balanceItem = screen.getByText('annual').closest('li');
+    expect(balanceItem).not.toBeNull();
+    expect(balanceItem).toHaveTextContent(`${start} to ${end}`);
+  });
+
+  it('shows the empty state when there are no balances', async () => {
+    renderPage({ balances: [] });
+
+    expect(await screen.findByText('No balances yet')).toBeInTheDocument();
+    expect(screen.queryByText('Loading…')).not.toBeInTheDocument();
+  });
+
+  it('shows an alert when loading balances fails', async () => {
+    renderPage({
+      getBalances: vi.fn().mockRejectedValue(new Error('balances failed')),
+    });
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('balances failed');
+    expect(screen.queryByText('Loading…')).not.toBeInTheDocument();
   });
 });
