@@ -160,39 +160,63 @@ phases:
           # platform action (gate_activity runs constraint + review + synthesis + §2
           # false-positive detection — those are class-(c) specialized runtimes, not
           # generic agent nodes), and it runs AFTER CI passes.
-          - id: open-pr
-            type: action
-            action: create_pr
-            inputs: [phase_branch, feature_branch, intent_id]
-            output: { name: pr_ref, channel: workflow_state }
-          - id: poll-ci
-            type: action
-            action: poll_ci
-            inputs: [pr_ref]
-            output: { name: ci_result, channel: workflow_state }
-          # CI-agent — judges the COMPLETED run's output (read-only) and classifies each finding
-          # by DevOps severity. Its verdict — not the raw exit code — decides block (→ self-heal,
-          # same path as a gate finding) / re-run (flaky) / proceed (non-blocking findings
-          # recorded). MUST directly follow poll_ci (validator + run-time guard enforced), which
-          # now hands it a completed run (pass or fail) instead of raising on failure.
-          - id: judge-ci
-            type: action
-            action: judge_ci
-            inputs: [ci_result]
-            output: { name: ci_judgment, channel: workflow_state }
-          - id: gate
-            type: action
-            action: gate
-            # The per-phase gate runs the DETERMINISTIC check only. Subjective code review
-            # moved to one pass per feature (see `feature-review` in finalize): this gate
-            # re-reads an accumulating codebase every phase, so an N-phase feature paid for
-            # N reviews of a tree that mostly had to be judged as a whole. constraint-agent
-            # stays because its rules are mechanical and are cheapest to enforce in the
-            # phase that breaks them — a violation is still caught before the next phase
-            # builds on it.
-            params: { agents: "constraint-agent" }
-            inputs: [phase_branch, intent_id, commit_sha, ci_judgment]
+          # ADR-074 — these four steps JUDGE this phase's work, so they are a `verify` node
+          # rather than four steps whose findings fall through to self-healing. A gate finding
+          # is not a fault: it is the gate doing its job, carrying file, line, rule and the
+          # offending line. The node runs them, groups whatever they find by root cause, runs
+          # one corrective pass per cause, re-enters at `resume_at`, and repeats until clean
+          # or bounded — with no diagnosis call, because nothing here is unknown.
+          #
+          # `resume_at: open-pr` because a corrective pass EDITS CODE: the steps worth
+          # repeating are the ones that check code. Resuming at `gate` would judge and merge a
+          # tree CI never ran on, and the validator rejects it.
+          #
+          # Still NOT absorbed here, and still reaching self-healing or a human: a
+          # golden-principle breach, findings carrying no file, a truncated gate, an infra
+          # drop. Those are unknowns; these steps only own what they can prescribe.
+          - id: phase-verify
+            type: verify
+            inputs: [phase_branch, feature_branch, intent_id, commit_sha]
             output: { name: gate_verdict, channel: workflow_state }
+            on_findings:
+              flow: fix-intent
+              resume_at: open-pr
+              max_rounds: 3
+              max_attempts_per_cause: 2
+            steps:
+            - id: open-pr
+              type: action
+              action: create_pr
+              inputs: [phase_branch, feature_branch, intent_id]
+              output: { name: pr_ref, channel: workflow_state }
+            - id: poll-ci
+              type: action
+              action: poll_ci
+              inputs: [pr_ref]
+              output: { name: ci_result, channel: workflow_state }
+            # CI-agent — judges the COMPLETED run's output (read-only) and classifies each finding
+            # by DevOps severity. Its verdict — not the raw exit code — decides block (→ self-heal,
+            # same path as a gate finding) / re-run (flaky) / proceed (non-blocking findings
+            # recorded). MUST directly follow poll_ci (validator + run-time guard enforced), which
+            # now hands it a completed run (pass or fail) instead of raising on failure.
+            - id: judge-ci
+              type: action
+              action: judge_ci
+              inputs: [ci_result]
+              output: { name: ci_judgment, channel: workflow_state }
+            - id: gate
+              type: action
+              action: gate
+              # The per-phase gate runs the DETERMINISTIC check only. Subjective code review
+              # moved to one pass per feature (see `feature-review` in finalize): this gate
+              # re-reads an accumulating codebase every phase, so an N-phase feature paid for
+              # N reviews of a tree that mostly had to be judged as a whole. constraint-agent
+              # stays because its rules are mechanical and are cheapest to enforce in the
+              # phase that breaks them — a violation is still caught before the next phase
+              # builds on it.
+              params: { agents: "constraint-agent" }
+              inputs: [phase_branch, intent_id, commit_sha, ci_judgment]
+              output: { name: gate_verdict, channel: workflow_state }
           # gap-B — the merge MODE is a static param (not a workflow value): a phase
           # branch merges INTO the feature branch here.
           - id: merge-phase
