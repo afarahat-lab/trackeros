@@ -1,0 +1,121 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "approvals"
+    ],
+    "affectedLayers": [
+      "unit-test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The test file web/src/modules/approvals/approvals.service.test.ts exists beside its subject and instantiates ApprovalsService directly with in-memory fakes for ILeaveService and IEmployeeService (cast to the interface types imported from web/src/modules/leave/index.ts and web/src/modules/employee/index.ts).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "getQueue() happy path: given a MANAGER/ADMIN profile and a list containing SUBMITTED rows (including one owned by the viewer) plus DRAFT/APPROVED/REJECTED/CANCELLED rows, the result contains only SUBMITTED rows whose employeeId !== profile.id, and each returned item has employeeName === null and status === LeaveStatus.SUBMITTED.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "getQueue() empty state: when no SUBMITTED non-own rows exist, getQueue() resolves to [] (empty result is a normal condition, not an error).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "getQueue() failure path: when getMe() or list() rejects, the rejection propagates unchanged (asserted via await expect(promise).rejects.toBe(error)).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "decide(requestId, 'approve') delegates to leaveService.approve(requestId) and returns the resulting LeaveRequestView unchanged; decide(requestId, 'reject') delegates to leaveService.reject(requestId) and returns the resulting LeaveRequestView unchanged.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "decide() failure path: when the underlying approve/reject rejects, the rejection propagates unchanged.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Use Vitest (describe/expect/it/vi) with vi.fn() fakes; assert calls with toHaveBeenCalledTimes(1), toHaveBeenCalledWith(...), not.toHaveBeenCalled(); use toBe for identity and toEqual for value equality; assert rejections with await expect(promise).rejects.toBe(error).",
+    "Provide helper factories (e.g. makeLeaveService(overrides) and makeEmployeeService(overrides)) returning the full ILeaveService/IEmployeeService interfaces, with unused methods rejecting via Promise.reject(new ApiError('unused', 0)); import ApiError from ../../infrastructure/api/index.",
+    "Tests must not import a pool, API client, or module-level db helper; the subject under test is the pure orchestration ApprovalsService, so fakes are in-memory and no network/HTTP is exercised.",
+    "The test file must not prescribe or assert implementation shape (no HTTP methods/paths, no component names beyond the existing ApprovalsService/IApprovalsService/ApprovalsQueueItem exports, no field lists beyond the documented ApprovalsQueueItem mapping)."
+  ],
+  "outOfScope": [
+    "No integration/e2e tests, no real API client, no HTTP layer, no persistence \u2014 this phase is unit tests only, using in-memory fakes.",
+    "No role-based authorization assertions in getQueue() (the viewer's role has no effect on filtering); no testing of ILeaveService/IEmployeeService internals."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "ApprovalsQueueItem",
+      "mustExistOrExtend": true,
+      "invariant": "ApprovalsQueueItem is a derived read-model projection, never persisted; every item in a getQueue() result has status === LeaveStatus.SUBMITTED and employeeName === null, and its employeeId is never the signed-in viewer's id."
+    },
+    {
+      "entity": "ApprovalsService",
+      "mustExistOrExtend": true,
+      "invariant": "ApprovalsService is stateless; getQueue() derives membership from LeaveRequestView rows (status === SUBMITTED and employeeId !== profile.id) and decide() delegates verbatim to ILeaveService.approve/reject, returning the LeaveRequestView unchanged."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "getQueue()",
+      "authRule": "Identity comes from employeeService.getMe(); the viewer's role is not consulted by the filtering logic.",
+      "idempotent": false,
+      "errorSemantics": "Errors from getMe() or list() propagate unchanged; an empty result is a normal [] return, not an error."
+    },
+    {
+      "operation": "decide(requestId, action)",
+      "authRule": "No auth logic in the service; it delegates to ILeaveService which owns the bearer-token/authorization handling.",
+      "idempotent": false,
+      "errorSemantics": "Errors from approve/reject propagate unchanged; the returned LeaveRequestView is passed through verbatim."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Fake ILeaveService must satisfy the ILeaveService interface (list/getById/create/submit/approve/reject/cancel) as declared in web/src/modules/leave/leave.service.ts.",
+      "referencePath": "web/src/modules/leave/leave.service.ts"
+    },
+    {
+      "requirement": "Fake IEmployeeService must satisfy the IEmployeeService interface (getMe) as declared in web/src/modules/employee/employee.service.ts.",
+      "referencePath": "web/src/modules/employee/employee.service.ts"
+    },
+    {
+      "requirement": "ApprovalsQueueItem mapping must match the fields declared in web/src/modules/approvals/approvals.service.ts (requestId, employeeId, employeeName, leaveTypeCode, startDate, endDate, status).",
+      "referencePath": "web/src/modules/approvals/approvals.service.ts"
+    },
+    {
+      "requirement": "Shared enums/types (LeaveStatus, LeaveTypeCode, LeaveRequestView, EmployeeProfile, EmployeeRole) must be imported from web/src/shared/types/index.ts and match its definitions.",
+      "referencePath": "web/src/shared/types/index.ts"
+    },
+    {
+      "requirement": "Test conventions (fake factories, vi.fn typing, assertion style, ApiError import) must match web/src/modules/leave/leave.service.test.ts and web/src/modules/employee/employee.service.test.ts.",
+      "referencePath": "web/src/modules/leave/leave.service.test.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "web/src/modules/approvals/approvals.service.ts",
+      "why": "Subject under test; ApprovalsService, IApprovalsService, ApprovalsQueueItem, ApprovalDecision are imported from here."
+    },
+    {
+      "target": "web/src/modules/leave/index.ts",
+      "why": "ILeaveService interface type imported for the fake leave service."
+    },
+    {
+      "target": "web/src/modules/employee/index.ts",
+      "why": "IEmployeeService interface type imported for the fake employee service."
+    },
+    {
+      "target": "web/src/shared/types/index.ts",
+      "why": "Shared enums and view/profile types used to build fixtures and assert results."
+    }
+  ]
+}
