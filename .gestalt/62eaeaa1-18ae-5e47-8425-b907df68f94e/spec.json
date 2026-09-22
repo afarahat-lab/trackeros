@@ -1,0 +1,102 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "web-leave",
+      "web-presentation"
+    ],
+    "affectedLayers": [
+      "presentation"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "Each rendered leave balance list item displays all four numeric components of LeaveBalanceView \u2014 entitledDays, usedDays, pendingDays, and available \u2014 alongside leaveTypeCode, with periodStart and periodEnd rendered via the existing formatUtcDate (no new date parsing or formatter introduced).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "When getBalances() resolves to an empty array, the page renders an explicit, visible \"no balances yet\" message that is distinct from both the loading state and the error state (not an empty <ul>).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "An explicit loading boolean is set true before the fetch and set false when the Promise.all settles on both success and failure paths (respecting the existing cancelled guard), so a balances-only failure reaches the error state rather than presenting as a permanently loading page.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The presentation state resolves to exactly one of loading / error / empty / populated: error (role=\"alert\") takes precedence, empty is reachable on success with an empty array, and populated preserves the existing employee name and approvals-link rendering.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The web build passes: `tsc --noEmit && vite build` exits 0, and the existing DashboardPage test file (unmodified) still passes.",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "Only web/src/presentation/pages/DashboardPage.tsx may be modified in this phase; no new route, page, backend, or API change.",
+    "Use the exact canonical LeaveBalanceView field names (id, employeeId, leaveTypeCode, periodStart, periodEnd, entitledDays, usedDays, pendingDays, available); do not rename or invent fields.",
+    "Render periodStart/periodEnd only via the existing formatUtcDate; do not add date parsing or a second formatter.",
+    "Do not modify the test file in this phase; preserve the existing employee name and approvals-link rendering so current tests remain valid.",
+    "Do not branch on EmployeeRole to decide the approvals link; continue delegating to canApproveLeave (owned decision)."
+  ],
+  "outOfScope": [
+    "Modifying the DashboardPage test file (deferred to a later phase).",
+    "Any backend/API change, new route, or new page.",
+    "Adding date parsing or a second date formatter."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveBalanceView",
+      "mustExistOrExtend": true,
+      "invariant": "A rendered balance item must reflect the canonical LeaveBalanceView shape: entitledDays, usedDays, pendingDays, and available are all displayed; available is display-only and passed through unchanged (never recomputed or mutated by the page)."
+    },
+    {
+      "entity": "DashboardPage presentation state",
+      "mustExistOrExtend": true,
+      "invariant": "The page's presentation state is a single mutually-exclusive resolution of loading / error / empty / populated, driven by an explicit loading boolean decoupled from data nullability."
+    }
+  ],
+  "interfaceConstraints": [],
+  "consistencyRequirements": [
+    {
+      "requirement": "Reuse the canonical LeaveBalanceView type (field names and types) rather than redefining or aliasing balance fields.",
+      "referencePath": "web/src/shared/types/index.ts"
+    },
+    {
+      "requirement": "Reuse formatUtcDate for periodStart/periodEnd rendering; do not introduce a second date formatter or parsing.",
+      "referencePath": "web/src/shared/date/index.ts"
+    },
+    {
+      "requirement": "Match the IBalanceService.getBalances() contract: returns Promise<LeaveBalanceView[]> (empty array is the success-with-no-data case, never null).",
+      "referencePath": "web/src/modules/leave/balance.service.ts"
+    },
+    {
+      "requirement": "Continue delegating the approvals-link visibility to canApproveLeave rather than re-deciding the role rule.",
+      "referencePath": "web/src/modules/leave/leave.actions.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "IBalanceService.getBalances()",
+      "why": "Source of the balances array whose full breakdown and empty state this phase renders."
+    },
+    {
+      "target": "IEmployeeService.getMe()",
+      "why": "Source of the employee profile whose name/email/department/hireDate rendering must remain unchanged."
+    },
+    {
+      "target": "formatUtcDate",
+      "why": "The single date formatter used for periodStart/periodEnd (and existing hireDate) rendering."
+    },
+    {
+      "target": "canApproveLeave",
+      "why": "Owned decision for approvals-link visibility that must not be re-implemented."
+    }
+  ]
+}
