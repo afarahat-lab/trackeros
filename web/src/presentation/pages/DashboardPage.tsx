@@ -52,7 +52,7 @@ export function DashboardPage({
     return <div role="alert">{error}</div>;
   }
 
-  if (loading || employee === null || balances === null) {
+  if (loading) {
     return <div>Loading…</div>;
   }
 
@@ -62,20 +62,20 @@ export function DashboardPage({
       {/* Asks the `leave` module rather than testing the role here: the link must appear
           exactly when the route behind it is reachable, and two copies of that rule drift.
           `RequireApprover` asks the same function, so the link and the guard cannot disagree. */}
-      {canApproveLeave(employee.role) && <Link to="/approvals">Approvals</Link>}
+      {canApproveLeave(employee!.role) && <Link to="/approvals">Approvals</Link>}
       <h1>
-        {employee.firstName} {employee.lastName}
+        {employee!.firstName} {employee!.lastName}
       </h1>
-      <p>{employee.email}</p>
-      <p>{employee.department}</p>
-      <p>Hired: {formatUtcDate(employee.hireDate)}</p>
+      <p>{employee!.email}</p>
+      <p>{employee!.department}</p>
+      <p>Hired: {formatUtcDate(employee!.hireDate)}</p>
 
       <h2>Leave Balances</h2>
-      {balances.length === 0 ? (
+      {balances!.length === 0 ? (
         <p>No balances yet</p>
       ) : (
         <ul>
-          {balances.map((balance) => (
+          {balances!.map((balance) => (
             <li key={balance.id}>
               <strong>{balance.leaveTypeCode}</strong> (
               {formatUtcDate(balance.periodStart)} to{' '}
