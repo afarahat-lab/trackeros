@@ -1,0 +1,127 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "approvals",
+      "presentation"
+    ],
+    "affectedLayers": [
+      "presentation-pages",
+      "presentation-routing",
+      "composition-root"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "ApprovalsPage renders a table whose rows show: Employee as employeeId truncated to its first 8 characters in a monospace style (no name resolution), Leave type as leaveTypeCode, Start and End formatted via formatUtcDate, and a link to /leaves/{requestId}.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A short user-facing note (e.g. \"employee names require an API change\") is visible near the Employee column \u2014 rendered text, not a code TODO comment.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Each queue row shows Approve and Reject buttons that call approvalsService.decide(requestId, 'approve'|'reject'); on success the row's data is replaced with the returned LeaveRequestView (new status rendered, approve/reject controls removed) without removing the row and without re-fetching the list.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The page renders three mutually distinct states: an explicit empty state (\"nothing waiting on you\") when getQueue() resolves to [], a loading state while the fetch is in flight, and an error state with role=\"alert\" when getQueue() rejects.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "App.tsx adds a /approvals route wrapped in RequireAuth and RequireApprover rendering ApprovalsPage with approvalsService, and AppProps gains approvalsService: IApprovalsService (destructured).",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "The composition root constructs ApprovalsService(leaveService, employeeService) and passes it to App, and ApprovalsPage is exported from web/src/presentation/index.ts.",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "ApprovalsPage must receive IApprovalsService via a prop (imported from web/src/modules/approvals/index.ts); it must not import the api-client or construct the service itself.",
+    "The Employee column must render employeeId truncated to its first 8 characters in a monospace style; do NOT attempt name resolution (employeeName is always null).",
+    "On a successful decide, replace the row's data with the returned LeaveRequestView (render new status, remove approve/reject controls); do NOT remove the row and do NOT re-fetch the whole list.",
+    "The \"employee names require an API change\" note must be user-facing rendered text, not a TODO comment in code.",
+    "The /approvals route must be wrapped in both RequireAuth and RequireApprover; role is read from the auth session profile, never decoded from the JWT.",
+    "Dates must be formatted with formatUtcDate from web/src/shared/date/index.ts (no ad-hoc date formatting)."
+  ],
+  "outOfScope": [
+    "Employee name resolution (employeeName is always null; the note explicitly flags this as requiring an API change).",
+    "ApprovalsPage test suite and the role-gated dashboard link (Phase 5).",
+    "Any change to the approvals service, leave service, or API contract (getQueue/decide already exist from Phase 1)."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "ApprovalsQueueItem",
+      "mustExistOrExtend": true,
+      "invariant": "A queue item is a derived read-model projection, never persisted; while in the queue its status is always LeaveStatus.SUBMITTED and employeeName is always null. It is consumed read-only by ApprovalsPage and never mutated by the page."
+    },
+    {
+      "entity": "LeaveRequestView",
+      "mustExistOrExtend": true,
+      "invariant": "The value returned by decide() is the authoritative post-decision state; the page must render its status verbatim and must not derive or guess a new status locally."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IApprovalsService.getQueue()",
+      "authRule": "Caller must be authenticated; role gating is enforced by the RequireApprover guard on the route, not by the service.",
+      "idempotent": false,
+      "errorSemantics": "Rejections from getMe()/list() propagate to the caller; the page surfaces them as the error state (role=\"alert\")."
+    },
+    {
+      "operation": "IApprovalsService.decide(requestId, action)",
+      "authRule": "Caller must be authenticated and an approver (MANAGER/ADMIN); enforced by the route guard.",
+      "idempotent": false,
+      "errorSemantics": "On failure the rejection propagates and the page surfaces the error state; on success the returned LeaveRequestView replaces the row."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Follow the LeaveDetailPage async pattern: useState for data/error, useEffect with a cancelled flag for the initial fetch, async action handler that updates state on success or sets error on failure, role=\"alert\" for errors, and a \"Loading\u2026\" state while data is null.",
+      "referencePath": "web/src/presentation/pages/LeaveDetailPage.tsx"
+    },
+    {
+      "requirement": "Use formatUtcDate for Start/End date rendering.",
+      "referencePath": "web/src/shared/date/index.ts"
+    },
+    {
+      "requirement": "Import LeaveStatus, LeaveTypeCode, LeaveRequestView from the shared types module; do not redeclare them.",
+      "referencePath": "web/src/shared/types/index.ts"
+    },
+    {
+      "requirement": "Import IApprovalsService from the approvals module public entry point.",
+      "referencePath": "web/src/modules/approvals/index.ts"
+    },
+    {
+      "requirement": "Wrap the /approvals route with RequireApprover (which already handles null-session redirect to /login and EMPLOYEE redirect to /).",
+      "referencePath": "web/src/presentation/guards/RequireApprover.tsx"
+    },
+    {
+      "requirement": "Detail links must target /leaves/{requestId}, matching the existing /leaves/:id route.",
+      "referencePath": "web/src/presentation/App.tsx"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "web/src/modules/approvals/index.ts (IApprovalsService)",
+      "why": "ApprovalsPage consumes getQueue()/decide() through this interface; the page must not reach into the api-client."
+    },
+    {
+      "target": "web/src/main.tsx (composition root)",
+      "why": "Must construct ApprovalsService(leaveService, employeeService) and pass it to App; required follow-up wiring edit in this phase."
+    },
+    {
+      "target": "web/src/presentation/index.ts",
+      "why": "ApprovalsPage (and its props type) must be exported so App/main can import it."
+    }
+  ]
+}
