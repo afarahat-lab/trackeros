@@ -54,9 +54,19 @@ user projects use whatever stack matches their description.
 
 1. Modules never import from each other's internals — only from index.ts
 2. All database access through the repository pattern
-3. Every state-changing operation produces an audit record (GP-001)
-4. RBAC enforced at middleware, never inline (GP-002)
+3. Every state-changing operation produces an audit record (GP-002)
+4. RBAC enforced at middleware, never inline (GP-005)
 5. Transactions: the SERVICE owns the unit of work, the DATA-ACCESS layer opens it
+6. Completed approvals are immutable (GP-007): once a leave request is APPROVED,
+   `status`/`approverId`/`approvalComment`/`decidedAt` are never written again.
+   Reversal inserts a NEW row; the original stays byte-identical.
+7. Write-once columns are enforced by omission: a column that must never change
+   after insert (e.g. `leave_requests.reverses_request_id`) is absent from the
+   `UpdateLeaveRequestDto` and from the repository's `FIELD_COLUMNS` map, so
+   `update` cannot reach it. Uniqueness that must hold only for non-null values
+   uses a PARTIAL unique index (`WHERE col IS NOT NULL`), and the repository maps
+   a Postgres `23505` on it to `ConflictError` (409) rather than leaking the
+   driver error.
 
 ### 5 — transaction boundaries (decided 2026-08-30)
 
@@ -113,6 +123,8 @@ services that already own them.
 - Violate principle GP-004 as defined in `GOLDEN_PRINCIPLES.md`.
 - Violate principle GP-005 as defined in `GOLDEN_PRINCIPLES.md`.
 - Violate principle GP-006 as defined in `GOLDEN_PRINCIPLES.md`.
+- Violate principle GP-007 as defined in `GOLDEN_PRINCIPLES.md`.
+- Violate principle GP-008 as defined in `GOLDEN_PRINCIPLES.md`.
 
 ## When context is missing
 

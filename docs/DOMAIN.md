@@ -26,19 +26,27 @@ Represents a leave record managed by the `leave` module, including leave request
 
 ### LeaveRequest
 
+Canonical 15-field shape (`src/modules/leave/leave.model.ts`). `CreateLeaveRequestInput = Omit<LeaveRequest, 'id'>` — the repository generates `id` via `randomUUID()`.
+
 | Field | Type | Required |
 |-------|------|----------|
 | id | string | true |
 | employeeId | string | true |
-| leaveTypeId | string | true |
+| leaveTypeCode | LeaveTypeCode | true |
 | startDate | Date | true |
 | endDate | Date | true |
-| reason | string \| undefined | false |
-| status | LeaveRequestStatus | true |
-| approvedBy | string \| null | false |
-| approvedAt | Date \| null | false |
-| createdAt | Date | true |
-| updatedAt | Date | true |
+| requestedDays | number | true |
+| reason | string \| null | false |
+| status | LeaveStatus | true |
+| approverId | string \| null | false |
+| approvalComment | string \| null | false |
+| submittedAt | Date \| null | false |
+| decidedAt | Date \| null | false |
+| cancelledBy | string \| null | false |
+| cancelledAt | Date \| null | false |
+| reversesRequestId | string \| null | false |
+
+`reversesRequestId` is null on every ordinary request; on a reversal instance it holds the id of the original request it reverses. It is set once at insert and is immutable thereafter — it is deliberately absent from `UpdateLeaveRequestDto` and from the repository's `FIELD_COLUMNS` map, so `update` can never change it. The `leave_requests.reverses_request_id` column is nullable with a self-referential FK to `leave_requests.id` and a PARTIAL unique index (`WHERE reverses_request_id IS NOT NULL`), which permits any number of ordinary rows while allowing at most one reversal per original; a Postgres `23505` on that index surfaces from the repository as `ConflictError` (409).
 
 **Relationships**
 - `Employee` — many-to-one
@@ -48,7 +56,7 @@ Represents a leave record managed by the `leave` module, including leave request
 | Field | Type | Required |
 |-------|------|----------|
 | employeeId | string | true |
-| leaveTypeId | string | true |
+| leaveTypeCode | LeaveTypeCode | true |
 | startDate | Date | true |
 | endDate | Date | true |
 | reason | string \| undefined | false |
@@ -60,17 +68,23 @@ Represents a leave record managed by the `leave` module, including leave request
 | startDate | Date | false |
 | endDate | Date | false |
 | reason | string \| undefined | false |
+| status | LeaveStatus | false |
+| approverId | string | false |
+| decidedAt | Date | false |
+| cancelledBy | string | false |
+| cancelledAt | Date | false |
 
 ### LeaveRequestQueryParams
 
 | Field | Type | Required |
 |-------|------|----------|
-| status | LeaveRequestStatus | false |
-| leaveTypeId | string | false |
+| status | LeaveStatus | false |
+| leaveTypeCode | LeaveTypeCode | false |
 | startDateFrom | Date | false |
 | startDateTo | Date | false |
 | endDateFrom | Date | false |
 | endDateTo | Date | false |
+| employeeIds | string[] | false |
 | limit | number | false |
 | offset | number | false |
 
@@ -215,7 +229,7 @@ Represents audit data managed by the `audit` module, including audit records, ch
 | id | string | true |
 | entityType | string | true |
 | entityId | string | true |
-| action | 'CREATE' \| 'UPDATE' \| 'DELETE' \| 'APPROVE' \| 'REJECT' | true |
+| action | 'CREATE' \| 'UPDATE' \| 'DELETE' \| 'APPROVE' \| 'REJECT' \| 'CANCEL' \| 'REVERSE' | true |
 | oldValues | Record<string, any> \| null | false |
 | newValues | Record<string, any> \| null | false |
 | performedBy | string \| null | false |
@@ -230,7 +244,7 @@ Represents audit data managed by the `audit` module, including audit records, ch
 | id | string | true |
 | entityType | string | true |
 | entityId | string | true |
-| action | 'CREATE' \| 'UPDATE' \| 'DELETE' \| 'APPROVE' \| 'REJECT' | true |
+| action | 'CREATE' \| 'UPDATE' \| 'DELETE' \| 'APPROVE' \| 'REJECT' \| 'CANCEL' \| 'REVERSE' | true |
 | oldValues | Record<string, any> \| null | false |
 | newValues | Record<string, any> \| null | false |
 | performedBy | string \| null | false |
