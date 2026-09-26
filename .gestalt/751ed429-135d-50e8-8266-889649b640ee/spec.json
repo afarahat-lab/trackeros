@@ -1,0 +1,230 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave",
+      "balance",
+      "audit",
+      "notification"
+    ],
+    "affectedLayers": [
+      "application (service)",
+      "domain (leave model contract)",
+      "infrastructure (repository interfaces consumed)"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "`npm run build` (tsc --noEmit) completes with zero type errors after the change to src/modules/leave/leave.service.ts.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The existing Jest suite stays green: the DRAFT and SUBMITTED cancel tests (in-place status \u2192 CANCELLED, cancelledBy/cancelledAt set, pendingDays release for SUBMITTED) pass unchanged.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Cancelling an APPROVED request never mutates the original row: its status remains APPROVED and approverId/approvalComment/decidedAt are unchanged, and the repository's update operation is never invoked with the original id.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Cancelling an APPROVED request inserts exactly one NEW leave_requests row via the repository's create operation, with a repository-generated id distinct from the original, reversesRequestId equal to the original id, status CANCELLED, requestedDays 0, approverId/approvalComment/submittedAt/decidedAt null, cancelledBy = actor.id, cancelledAt set, and employeeId/leaveTypeCode/startDate/endDate/reason copied verbatim from the original; that new row is what cancel returns.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The balance is released exactly once on the APPROVED path: usedDays is decremented by the ORIGINAL row's requestedDays (not the reversal's 0), exactly one balance update occurs, and the balance row is read with forUpdate = true before the write.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "When a reversal already exists for the original (findByReversesRequestId returns a row), cancel throws ConflictError and performs no insert, no balance write, and no audit write.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A reversal writes exactly TWO audit records, both with action AuditAction.REVERSE and entityType 'leave_request': one with entityId = original id (beforeState = the untouched APPROVED row, afterState = the new CANCELLED row) and one with entityId = the new row id (beforeState = null, afterState = the new row).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A reversal emits exactly one cancellation notification to the ORIGINAL request's employeeId with relatedEntityType 'leave_request' and relatedEntityId = the new reversal instance id.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The whole APPROVED reversal (guard read, balance lock+release, reversal insert, both audit records, notification) executes inside a single uow.withTransaction callback, with the transaction client forwarded to every participating repository/service call.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "assertCanCancel authorization and the startDate <= today timing guard behave exactly as before: owner may cancel DRAFT/SUBMITTED; only direct manager or ADMIN may cancel APPROVED; a begun leave is rejected with ConflictError.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Exactly ONE production file may change: src/modules/leave/leave.service.ts. No routes, no read-model changes, no tests, no migrations, no model/repository/type edits in this phase.",
+    "The APPROVED row is immutable in storage: its status, approverId, approvalComment and decidedAt must never be written after approval. The reversal path must call the repository's create operation, never update, on the original.",
+    "The service owns the unit of work: cancel must use the injected IUnitOfWork.withTransaction and must never import a pool, a client, or a module-level db helper. BEGIN/COMMIT/ROLLBACK stay exclusively in PgUnitOfWork.",
+    "Every participating repository/service call must receive the transaction PoolClient as the optional trailing parameter; no call may fall back to the shared pool inside the transaction.",
+    "The balance release must be computed from the ORIGINAL row's requestedDays and must happen exactly once \u2014 never double-released, never skipped, never derived from the reversal row's 0.",
+    "The reversal row's requestedDays must be 0, and its approverId/approvalComment/submittedAt/decidedAt must be null; approval data must not be copied onto it.",
+    "Both audit records must use AuditAction.REVERSE (not CANCEL) and entityType 'leave_request'; writing only one of the two leaves a row unaudited.",
+    "The reversal row's id must be repository-generated and distinct from the original's; the service must not supply or reuse the original id.",
+    "Strict TypeScript: no `any` (use unknown + type guards), no implicit any, strict null checks. No hardcoded secrets. No direct DB access outside the repository layer.",
+    "The double-reversal guard must be a clean ConflictError (409) surfaced from the in-transaction pre-check; the partial unique index 23505 \u2192 ConflictError mapping in the repository is the concurrency backstop and must not be bypassed or re-implemented in the service."
+  ],
+  "outOfScope": [
+    "Routes, controllers, and HTTP surface changes (leave.routes.ts) \u2014 no new endpoints, no query-flag parsing.",
+    "Read-model exposure: the derived isReversed boolean, the excludeReversals list flag, and any LeaveRequestQueryParams change (Phase 4).",
+    "New or modified tests (Phase 3) \u2014 this phase changes production code only.",
+    "Migrations, the leave model, the repository, and shared types/errors \u2014 all Phase 1 deliverables, treated as fixed contracts here.",
+    "Any change to submit/approve/reject/create/list/getById behaviour, or to the DRAFT/SUBMITTED cancel semantics.",
+    "Correcting the stale domain_entities block in .gestalt/architecture/reconciled.json (requestedDays copied verbatim / one CANCEL record)."
+  ],
+  "ambiguities": [
+    {
+      "description": "The reversal notification's message text is not pinned by the task; only relatedEntityId = the new reversal id is. Which id should be interpolated into the human-readable message \u2014 the original requestId or the new reversal id?",
+      "options": [
+        "Interpolate the original requestId (the request the employee recognises)",
+        "Interpolate the new reversal instance id (consistent with relatedEntityId)",
+        "Use a generic message with no id interpolation"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "description": "The existing APPROVED-path cancel tests were written against in-place semantics. Analysis of tests/unit/modules/leave/leave.service.test.ts shows they assert only the returned row's status/cancelledBy and the single balance update (usedDays delta), not repository.updateCalls, so they should still pass under reversal semantics \u2014 but this is not guaranteed by the task text.",
+      "options": [
+        "Leave the existing tests untouched and rely on them passing (verified: they assert only status/cancelledBy/balance delta)",
+        "Adjust the existing APPROVED cancel assertions in this phase",
+        "Defer any test adjustment to Phase 3"
+      ],
+      "impactIfWrong": "medium"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest (original APPROVED row)",
+      "mustExistOrExtend": true,
+      "invariant": "Once APPROVED, the row is immutable in storage: status stays APPROVED forever and approverId/approvalComment/decidedAt are never written again. Reversal never mutates it; the repository's update is never called with its id on the APPROVED path."
+    },
+    {
+      "entity": "LeaveRequest (reversal instance)",
+      "mustExistOrExtend": true,
+      "invariant": "A reversal is a NEW row created directly in CANCELLED with a distinct repository-generated id and reversesRequestId set to the original's id. It is terminal and inert: never submitted, approved, rejected, or cancelled again, and it never reserves or releases balance. At most one reversal may exist per original."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "On an APPROVED reversal, usedDays is decremented by the original's requestedDays exactly once, inside the same unit of work as the reversal insert. The row is read under a lock (forUpdate = true) before the write so concurrent decisions cannot lose an update."
+    },
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "A reversal produces exactly two immutable REVERSE records in the same transaction \u2014 one keyed to the original id and one keyed to the new reversal id \u2014 so neither row is left unaudited."
+    },
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "A reversal emits exactly one cancellation notice to the original request's employeeId, pointing at the new reversal instance id."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "LeaveService.cancel(actor, requestId) \u2014 APPROVED branch",
+      "authRule": "Unchanged: only the requester's direct manager (employee.managerId === actor.id) or an ADMIN may cancel an APPROVED request; the owner may not reverse their own APPROVED request. assertCanCancel is not modified.",
+      "idempotent": false,
+      "errorSemantics": "A second reversal of the same original throws ConflictError (409) from the in-transaction pre-check; a begun leave (startDate <= today) throws ConflictError; unauthorized callers throw ForbiddenError; a missing request throws NotFoundError. No partial writes on any throw."
+    },
+    {
+      "operation": "LeaveService.cancel(actor, requestId) \u2014 DRAFT/SUBMITTED branch",
+      "authRule": "Unchanged: the owner may cancel their own DRAFT or SUBMITTED request.",
+      "idempotent": false,
+      "errorSemantics": "Unchanged in-place behaviour: status \u2192 CANCELLED with cancelledBy/cancelledAt set; DRAFT touches no balance, SUBMITTED releases pendingDays. No reversal row is created and reversesRequestId stays null."
+    },
+    {
+      "operation": "ILeaveRepository.findByReversesRequestId(reversesRequestId, client?)",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns the reversal row or null; never throws. The service decides error semantics (ConflictError when non-null). Must be called with the transaction client."
+    },
+    {
+      "operation": "ILeaveRepository.create(input, client?)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Generates the id and persists the row; a 23505 unique violation on the partial reverses_request_id index is surfaced as ConflictError. Must be called with the transaction client."
+    },
+    {
+      "operation": "IBalanceRepository.findByKey(..., client?, forUpdate?) and update(id, changes, client?)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "findByKey must be called with forUpdate = true on the reversal path (the transaction writes the balance); update performs the single usedDays release. Both must receive the transaction client."
+    },
+    {
+      "operation": "IAuditService.record(input, client?) and INotificationService.create(input, client?)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Both must be called with the transaction client so the audit records and notification commit or roll back with the reversal. record is called twice with AuditAction.REVERSE; create is called once."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The reversal row must be built as a CreateLeaveRequestInput matching the canonical LeaveRequest shape (all 15 fields, reversesRequestId set) \u2014 no field added, renamed, or omitted.",
+      "referencePath": "src/modules/leave/leave.model.ts"
+    },
+    {
+      "requirement": "The reversal must use AuditAction.REVERSE and LeaveStatus.CANCELLED from the canonical enums; no new enum member or status value may be introduced.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The double-reversal guard must throw ConflictError from src/shared/errors (409), matching the repository's 23505 \u2192 ConflictError mapping; no raw driver error may escape.",
+      "referencePath": "src/shared/errors/index.ts"
+    },
+    {
+      "requirement": "The transaction boundary must follow the IUnitOfWork.withTransaction contract exactly as the other mutating methods (create/submit/approve/reject) already do, with the client threaded as the optional trailing parameter.",
+      "referencePath": "src/shared/db/unit-of-work.ts"
+    },
+    {
+      "requirement": "The timing guard must keep using startOfUtcDay from the shared date helpers, unchanged from the current cancel implementation.",
+      "referencePath": "src/shared/date/index.ts"
+    },
+    {
+      "requirement": "The reversal must satisfy GP-007 (completed approvals immutable) and GP-008 (release exactly once, in the same unit of work, at-most-one reversal enforced by the partial unique index surfaced as ConflictError).",
+      "referencePath": "docs/GOLDEN_PRINCIPLES.md"
+    },
+    {
+      "requirement": "The reversal branch must match the BINDING operator decisions: requestedDays = 0 on the reversal row, two AuditAction.REVERSE records, no back-pointer on the approved row, and the balance release computed from the original's requestedDays.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/leave/leave.repository.ts \u2014 ILeaveRepository.create / findByReversesRequestId",
+      "why": "The reversal insert and the at-most-one guard both go through these methods; the 23505 \u2192 ConflictError mapping lives here."
+    },
+    {
+      "target": "src/modules/balance/balance.service.ts \u2014 IBalanceRepository.findByKey(forUpdate) / update",
+      "why": "The single usedDays release is performed through the balance repository under a row lock."
+    },
+    {
+      "target": "src/modules/audit/audit.service.ts \u2014 IAuditService.record",
+      "why": "Two REVERSE audit records are written inside the reversal transaction."
+    },
+    {
+      "target": "src/modules/notification/notification.service.ts \u2014 INotificationService.create",
+      "why": "The single cancellation notification to the original's employeeId is emitted inside the same transaction."
+    },
+    {
+      "target": "src/modules/employee/employee.service.ts \u2014 IEmployeeService.getEmployeeById",
+      "why": "Supplies the direct-manager check used by assertCanCancel (unchanged) and the hireDate used by balance resolution."
+    },
+    {
+      "target": "src/shared/db/unit-of-work.ts \u2014 IUnitOfWork.withTransaction",
+      "why": "The service owns the boundary through this injected abstraction; it is the only place BEGIN/COMMIT/ROLLBACK occur."
+    }
+  ]
+}
