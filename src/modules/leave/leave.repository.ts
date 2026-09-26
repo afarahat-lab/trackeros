@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import { Pool, PoolClient, QueryResult } from 'pg';
 import { pool as defaultPool } from '../../shared/db/connection';
-import { NotFoundError } from '../../shared/errors';
+import { NotFoundError, ConflictError } from '../../shared/errors';
 import {
   LeaveRequestQueryParams,
   LeaveStatus,
@@ -15,6 +15,10 @@ export interface ILeaveRepository {
   findById(id: string, client?: PoolClient): Promise<LeaveRequest | null>;
   update(id: string, changes: UpdateLeaveRequestDto, client?: PoolClient): Promise<LeaveRequest>;
   findByQuery(params: LeaveRequestQueryParams, client?: PoolClient): Promise<LeaveRequest[]>;
+  findByReversesRequestId(
+    reversesRequestId: string,
+    client?: PoolClient
+  ): Promise<LeaveRequest | null>;
 }
 
 interface LeaveRequestRow {
@@ -32,11 +36,13 @@ interface LeaveRequestRow {
   decided_at: Date | null;
   cancelled_by: string | null;
   cancelled_at: Date | null;
+  reverses_request_id: string | null;
 }
 
 const COLUMNS =
   'id, employee_id, leave_type_code, start_date, end_date, requested_days, reason, ' +
-  'status, approver_id, approval_comment, submitted_at, decided_at, cancelled_by, cancelled_at';
+  'status, approver_id, approval_comment, submitted_at, decided_at, cancelled_by, cancelled_at, ' +
+  'reverses_request_id';
 
 type UpdateField = keyof UpdateLeaveRequestDto;
 
@@ -50,6 +56,16 @@ const FIELD_COLUMNS: Record<UpdateField, string> = {
   cancelledBy: 'cancelled_by',
   cancelledAt: 'cancelled_at',
 };
+
+/** Postgres unique-violation SQLSTATE, raised by the partial index on reverses_request_id. */
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as { code?: unknown }).code === '23505'
+  );
+}
 
 function mapRow(row: LeaveRequestRow): LeaveRequest {
   return {
@@ -67,6 +83,7 @@ function mapRow(row: LeaveRequestRow): LeaveRequest {
     decidedAt: row.decided_at,
     cancelledBy: row.cancelled_by,
     cancelledAt: row.cancelled_at,
+    reversesRequestId: row.reverses_request_id,
   };
 }
 
@@ -83,8 +100,8 @@ export class PgLeaveRequestRepository implements ILeaveRepository {
       INSERT INTO leave_requests (
         id, employee_id, leave_type_code, start_date, end_date, requested_days,
         reason, status, approver_id, approval_comment, submitted_at, decided_at,
-        cancelled_by, cancelled_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        cancelled_by, cancelled_at, reverses_request_id
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
       RETURNING ${COLUMNS}
     `;
     const values = [
@@ -102,14 +119,35 @@ export class PgLeaveRequestRepository implements ILeaveRepository {
       input.decidedAt,
       input.cancelledBy,
       input.cancelledAt,
+      input.reversesRequestId,
     ];
-    const result: QueryResult<LeaveRequestRow> = await this.db(client).query(query, values);
-    return mapRow(result.rows[0]);
+    try {
+      const result: QueryResult<LeaveRequestRow> = await this.db(client).query(query, values);
+      return mapRow(result.rows[0]);
+    } catch (error) {
+      // The partial unique index on reverses_request_id raises 23505 when a second
+      // reversal targets an already-reversed original; surface that as a clean 409.
+      if (isUniqueViolation(error)) {
+        throw new ConflictError('Leave request has already been reversed');
+      }
+      throw error;
+    }
   }
 
   async findById(id: string, client?: PoolClient): Promise<LeaveRequest | null> {
     const query = `SELECT ${COLUMNS} FROM leave_requests WHERE id = $1`;
     const result: QueryResult<LeaveRequestRow> = await this.db(client).query(query, [id]);
+    return result.rows.length ? mapRow(result.rows[0]) : null;
+  }
+
+  async findByReversesRequestId(
+    reversesRequestId: string,
+    client?: PoolClient
+  ): Promise<LeaveRequest | null> {
+    const query = `SELECT ${COLUMNS} FROM leave_requests WHERE reverses_request_id = $1`;
+    const result: QueryResult<LeaveRequestRow> = await this.db(client).query(query, [
+      reversesRequestId,
+    ]);
     return result.rows.length ? mapRow(result.rows[0]) : null;
   }
 

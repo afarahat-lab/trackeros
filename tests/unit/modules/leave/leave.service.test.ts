@@ -88,6 +88,10 @@ class FakeLeaveRepository implements ILeaveRepository {
   async findByQuery(): Promise<LeaveRequest[]> {
     return [...this.rows];
   }
+
+  async findByReversesRequestId(reversesRequestId: string): Promise<LeaveRequest | null> {
+    return this.rows.find((r) => r.reversesRequestId === reversesRequestId) ?? null;
+  }
 }
 
 class FakeBalanceRepository implements IBalanceRepository {
@@ -364,6 +368,7 @@ function makeRequest(overrides: Partial<LeaveRequest> = {}): LeaveRequest {
     decidedAt: null,
     cancelledBy: null,
     cancelledAt: null,
+    reversesRequestId: null,
     ...overrides,
   };
 }
@@ -888,6 +893,7 @@ describe('LeaveService concurrency and atomicity guarantees', () => {
       decidedAt: null,
       cancelledBy: null,
       cancelledAt: null,
+      reversesRequestId: null,
     });
   }
 
