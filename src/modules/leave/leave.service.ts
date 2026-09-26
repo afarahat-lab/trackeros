@@ -301,8 +301,12 @@ export class LeaveService implements ILeaveService {
       throw new ConflictError('Leave that has already begun cannot be cancelled');
     }
 
+    if (request.status === LeaveStatus.APPROVED) {
+      return this.reverse(actor, request);
+    }
+
     return this.uow.withTransaction(async (client) => {
-      if (request.status !== LeaveStatus.DRAFT) {
+      if (request.status === LeaveStatus.SUBMITTED) {
         // DRAFT reserved no balance, so it neither reads nor writes the balance row.
         const balance = await this.resolveBalance(
           request.employeeId,
@@ -312,21 +316,11 @@ export class LeaveService implements ILeaveService {
           true, // this transaction writes the balance below — lock the row
         );
 
-        if (request.status === LeaveStatus.SUBMITTED) {
-          await this.balanceRepository.update(
-            balance.id,
-            { pendingDays: balance.pendingDays - request.requestedDays },
-            client,
-          );
-        } else {
-          // APPROVED — release the full requestedDays back from usedDays (no pro-rating):
-          // the timing guard above makes cancellation only possible before the leave starts.
-          await this.balanceRepository.update(
-            balance.id,
-            { usedDays: balance.usedDays - request.requestedDays },
-            client,
-          );
-        }
+        await this.balanceRepository.update(
+          balance.id,
+          { pendingDays: balance.pendingDays - request.requestedDays },
+          client,
+        );
       }
 
       const updated = await this.repository.update(
@@ -364,6 +358,91 @@ export class LeaveService implements ILeaveService {
       );
 
       return updated;
+    });
+  }
+
+  // GP-008: an APPROVED request is immutable in storage (GP-007). Reversing it inserts a NEW
+  // CANCELLED row that back-points to the original; the original row is never updated.
+  private async reverse(actor: LeaveActor, original: LeaveRequest): Promise<LeaveRequest> {
+    return this.uow.withTransaction(async (client) => {
+      // Clean 409 pre-check; the partial UNIQUE index on reverses_request_id is the
+      // concurrency backstop (surfaced by the repository as ConflictError on 23505).
+      const existing = await this.repository.findByReversesRequestId(original.id, client);
+      if (existing !== null) {
+        throw new ConflictError('Leave request has already been reversed');
+      }
+
+      // Release exactly once, from the ORIGINAL row's requestedDays (never the reversal's 0).
+      const balance = await this.resolveBalance(
+        original.employeeId,
+        original.leaveTypeCode,
+        original.startDate,
+        client,
+        true, // this transaction writes the balance below — lock the row
+      );
+      await this.balanceRepository.update(
+        balance.id,
+        { usedDays: balance.usedDays - original.requestedDays },
+        client,
+      );
+
+      const now = new Date();
+      const reversalInput: CreateLeaveRequestInput = {
+        employeeId: original.employeeId,
+        leaveTypeCode: original.leaveTypeCode,
+        startDate: original.startDate,
+        endDate: original.endDate,
+        requestedDays: 0,
+        reason: original.reason,
+        status: LeaveStatus.CANCELLED,
+        approverId: null,
+        approvalComment: null,
+        submittedAt: null,
+        decidedAt: null,
+        cancelledBy: actor.id,
+        cancelledAt: now,
+        reversesRequestId: original.id,
+      };
+      const reversal = await this.repository.create(reversalInput, client);
+
+      // Two REVERSE records: one keyed to the original, one keyed to the new row, so neither
+      // is left unaudited (the audit log is the only record of who reversed what).
+      await this.auditService.record(
+        {
+          actorId: actor.id,
+          action: AuditAction.REVERSE,
+          entityType: 'leave_request',
+          entityId: original.id,
+          beforeState: original,
+          afterState: reversal,
+        },
+        client,
+      );
+      await this.auditService.record(
+        {
+          actorId: actor.id,
+          action: AuditAction.REVERSE,
+          entityType: 'leave_request',
+          entityId: reversal.id,
+          beforeState: null,
+          afterState: reversal,
+        },
+        client,
+      );
+
+      await this.notificationService.create(
+        {
+          recipientId: original.employeeId,
+          type: 'leave_request',
+          title: 'Leave request cancelled',
+          message: `Your leave request ${original.id} was cancelled.`,
+          relatedEntityType: 'leave_request',
+          relatedEntityId: reversal.id,
+        },
+        client,
+      );
+
+      return reversal;
     });
   }
 
