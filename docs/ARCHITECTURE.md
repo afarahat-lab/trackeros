@@ -1080,3 +1080,119 @@ Web tests use Vitest (project-specific instruction); backend test framework rema
 ### Open Questions
 None.
 <!-- gestalt:architecture feature=957fb3ff-3b3a-4d0e-9273-8b37869e315c END -->
+
+<!-- gestalt:architecture feature=34a1c500-7345-4f9f-aa73-0140a4bdd165 START -->
+## GP-008: An approved leave request is reversed, not mutated
+
+### Overview
+A completed approval is immutable (GP-008). Cancelling a DRAFT or SUBMITTED request still mutates the row in place; cancelling an APPROVED request leaves the approved row byte-identical and inserts a NEW `leave_requests` row with `status = CANCELLED` that references the original via the new nullable `reversesRequestId` column. Balance release, audit and notification semantics are unchanged in magnitude and happen exactly once, in the same transaction.
+
+### Domain entities
+- **LeaveRequest** — 15 fields: `id, employeeId, leaveTypeCode, startDate, endDate, requestedDays, reason, status, approverId, approvalComment, submittedAt, decidedAt, cancelledBy, cancelledAt, reversesRequestId`. `CreateLeaveRequestInput = Omit<LeaveRequest,'id'>`; every ordinary create supplies `reversesRequestId: null`.
+- **LeaveReversal** — the domain concept realized as a `leave_requests` row with `reversesRequestId` set. Created directly in CANCELLED; copies `employeeId, leaveTypeCode, startDate, endDate, requestedDays, reason` verbatim; `approverId/approvalComment/submittedAt/decidedAt` all null; `cancelledBy/cancelledAt` set.
+- **LeaveBalance**, **AuditLog**, **Notification** — shapes unchanged; only their reversal-time semantics are pinned.
+
+### Lifecycle states
+Stored states (unchanged enum `LeaveStatus`): **DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED**. No new enum member is added — `REVERSED` is deliberately NOT a status.
+Derived states introduced by this feature:
+- **CANCELLED_IN_PLACE** — `status = CANCELLED` and `reversesRequestId = null` (DRAFT/SUBMITTED cancelled in place).
+- **CANCELLED_BY_REVERSAL** — `status = CANCELLED` and `reversesRequestId != null` (the reversal instance).
+- **REVERSED** — `status = APPROVED` and some LeaveRequest has `reversesRequestId = this.id`. Derived, never stored; the original's status stays APPROVED forever.
+LeaveBalance: OPEN, CLOSED (derived from period vs now). AuditLog: RECORDED. Notification: PENDING, SENT, READ, ARCHIVED.
+
+Named transitions:
+- `cancelInPlace`: DRAFT → CANCELLED (same row; no balance touch); SUBMITTED → CANCELLED (same row; `pendingDays -= requestedDays`).
+- `reverseApproval`: APPROVED → REVERSED (original row untouched) **plus** creation of a new row in CANCELLED_BY_REVERSAL (`usedDays -= requestedDays`).
+- `createReversalInstance`: (none) → CANCELLED_BY_REVERSAL, terminal.
+- All other transitions (submit, approve, reject) unchanged.
+
+### Business rules
+1. **Completed-approval immutability (GP-008).** Once APPROVED, `status/approverId/approvalComment/decidedAt` are never written again. Reversal creates a NEW row and leaves the original byte-identical.
+2. **Two cancellation modes** selected by target status: IN-PLACE (DRAFT/SUBMITTED) or REVERSAL (APPROVED). No other status is cancellable.
+3. **Reversal copies `requestedDays` verbatim** — never re-derived. The canonical inclusive count `endDate - startDate + 1` (whole UTC calendar days, no weekend/holiday exclusion) remains the single derivation; the reversal reuses the persisted value so released == reserved.
+4. **Balance release exactly once**, in the same transaction, full `requestedDays`, no pro-rating: DRAFT releases nothing; SUBMITTED decrements `pendingDays`; APPROVED (reversal) decrements `usedDays`. No double-release, no skip.
+5. **Reversal instance is terminal and inert** — never submitted/approved/rejected/cancelled again, never reserves or releases balance.
+6. **Authorization** = requester's direct manager (`employee.managerId === actor.id`) or ADMIN; the owner may not reverse their own APPROVED request. Timing guard unchanged: blocked once `startDate <= today` (UTC) with ConflictError.
+7. **Exactly one AuditLog per cancellation**, action CANCEL. For a reversal `entityId` = the NEW reversal instance id, `beforeState` = the untouched APPROVED original, `afterState` = the reversal instance.
+8. **Read model exposes `reversesRequestId`** on every LeaveRequest (list and single-read) so the two rows are distinguishable without inferring from dates/employee.
+9. **Visibility unchanged** — the reversal row carries the same `employeeId`, so role-scoped visibility (EMPLOYEE own, MANAGER own + direct reports, ADMIN all) and the 404-equivalence rule apply unchanged. Reversal rows are not hidden.
+10. **`reversesRequestId` referential integrity** — nullable; when set must reference an existing APPROVED request with a different id; at most one reversal per original (second attempt → ConflictError).
+11. **"Reversed" is derived, never stored** — no REVERSED status value; the original's status stays APPROVED forever.
+12. **Atomic unit of work** — reversal insert + balance release + CANCEL audit + notification all succeed or none do.
+
+### Conceptual table specifications
+Only ONE table changes. No SQL DDL is written here; the code agent generates the migration from this spec.
+
+**`leave_requests`** — fields: `id, employee_id, leave_type_code, start_date, end_date, requested_days, reason, status, approver_id, approval_comment, submitted_at, decided_at, cancelled_by, cancelled_at, reverses_request_id`. PK `id`. FKs: `employee_id -> employees.id`, `leave_type_code -> leave_types.code`, `approver_id -> employees.id`, `cancelled_by -> employees.id`, `reverses_request_id -> leave_requests.id`.
+Index rationale: `reverses_request_id` (NEW) — the only way to find the reversal row for an original and the column the at-most-one-reversal guard reads; nullable, so the index is **partial** (`WHERE reverses_request_id IS NOT NULL`) and carries a **UNIQUE** constraint making double-reversal impossible at the storage layer (23505 mapped to ConflictError). `employee_id` — role-scoped list/getById filtering. `status` — status filter and the APPROVED-only cancellation lookup. `leave_type_code, start_date` — leave-type + date-range list queries; `start_date` drives `ORDER BY start_date DESC`. `employee_id, status` — existing composite for 'my requests in state X'. `approver_id`, `cancelled_by` — FK lookups, no extra index.
+
+**`leave_balances`** — fields: `id, employee_id, leave_type_code, period_start, period_end, entitled_days, used_days, pending_days`. PK `id`. FKs to `employees.id`, `leave_types.code`. Index: the `(employee_id, leave_type_code, period_start, period_end)` lookup key used by `findByKey` (with `forUpdate` row lock on the reversal path).
+
+**`audit_logs`** — fields: `id, actor_id, action, entity_type, entity_id, before_state, after_state, occurred_at`. PK `id`. FK `actor_id -> employees.id`. Index: `(entity_type, entity_id)` to reconstruct a request's history including its reversal; `actor_id`; `occurred_at`.
+
+**`notifications`** — fields: `id, recipient_id, type, title, message, related_entity_type, related_entity_id, status, created_at, read_at`. PK `id`. FK `recipient_id -> employees.id`. Index: `(recipient_id, status)`; `(related_entity_type, related_entity_id)`.
+
+Migration: new knex migration `migrations/<ts>_add_reverses_request_id_to_leave_requests.js` (`alterTable` up / `dropColumn` down), following the existing `20260913000001_add_password_hash_to_employees.js` convention.
+
+### Repository interfaces and concrete implementations
+All repositories are backed by the single `pg` Pool in `src/shared/db/connection.ts` (constructor-injected, defaults to the shared pool). Every method takes an optional trailing `PoolClient` and falls back to the pool when omitted; repositories never open BEGIN/COMMIT/ROLLBACK.
+
+- **`ILeaveRepository` / `PgLeaveRequestRepository`** (`src/modules/leave/leave.repository.ts`)
+  - `create(input: CreateLeaveRequestInput, client?): Promise<LeaveRequest>` — inserts all 15 columns including `reverses_request_id`; used to insert the NEW CANCELLED reversal row.
+  - `findById(id, client?): Promise<LeaveRequest | null>`
+  - `update(id, changes: UpdateLeaveRequestDto, client?): Promise<LeaveRequest>` — dynamic SET from FIELD_COLUMNS; MUST NOT be called with `status/approverId/approvalComment/decidedAt` for an APPROVED row (GP-008); still used for in-place DRAFT/SUBMITTED cancellation.
+  - `findByQuery(params: LeaveRequestQueryParams, client?): Promise<LeaveRequest[]>` — status/leaveTypeCode/date-range/employeeIds filters, `ORDER BY start_date DESC`, limit/offset; returns `reverses_request_id` on every row.
+  - `findByReversesRequestId(reversesRequestId, client?): Promise<LeaveRequest | null>` — resolves the reversal row for an original; called inside the cancellation transaction to guarantee the balance is released exactly once.
+- **`IBalanceRepository` / `PgLeaveBalanceRepository`** — `findByKey(employeeId, leaveTypeCode, periodStart, periodEnd, client?, forUpdate?)` (called with `forUpdate = true` on the APPROVED path so the `usedDays` delta is computed under a row lock); `update(id, changes, client?)` (the ONLY balance write on this path).
+- **`IAuditRepository` / `PgAuditLogRepository`** — `create(input, client?)` (CANCEL record; `beforeState` = untouched APPROVED original, `afterState` = new CANCELLED reversal row); `findById(id, client?)`.
+- **`INotificationRepository` / `PgNotificationRepository`** — `create(input, client?)`; `findById(id, client?)`; `updateStatus(id, status, client?)`.
+
+`UpdateLeaveRequestDto` deliberately does NOT gain `reversesRequestId`: the column is set only at insert time, never mutated — which is what keeps the reversal link immutable. GP-008 immutability is enforced at the data-access layer by omission: the APPROVED path calls `create` (new row) and never `update` on the original.
+
+### Module boundaries
+- **Presentation** — `src/modules/leave/leave.routes.ts` (Fastify handlers, `resolveActor`, `parseCreateBody`/`parseQuery`, `sendError`). No controller layer. Routes call the service directly and contain no business logic.
+- **Application** — `LeaveService` (`src/modules/leave/leave.service.ts`). Sole orchestrator; owns the transaction boundary via `IUnitOfWork.withTransaction` and the GP-008 reversal decision. Depends only on interfaces.
+- **Domain** — `LeaveRequest` (`leave.model.ts`), `LeaveBalance`, `LeavePolicy`, `AuditLog`, `Notification`, plus canonical enums/DTOs/`requestedDays` in `src/shared/types/`. No I/O.
+- **Infrastructure** — `PgLeaveRequestRepository`, `PgLeaveBalanceRepository`, `PgAuditLogRepository`, `PgNotificationRepository`, `PgEmployeeRepository`, `PgLeavePolicyRepository`, `PgUnitOfWork`, `src/shared/db/connection.ts`, `migrations/`. All SQL lives here (GP-001).
+
+Dependencies flow inward only: routes → service → repository interfaces → shared. Repositories never import services; shared never imports modules.
+
+### GP-008 mechanics
+`cancel(actor, requestId)` branches on the loaded request's status:
+- **DRAFT / SUBMITTED** — unchanged: `repository.update(requestId, { status: CANCELLED, cancelledBy, cancelledAt })` in place. DRAFT touches no balance row; SUBMITTED releases `pendingDays -= requestedDays`.
+- **APPROVED** — the approved row is **never** passed to `update`. Instead `repository.create({ ...copied span fields, status: CANCELLED, cancelledBy, cancelledAt, approverId: null, approvalComment: null, submittedAt: null, decidedAt: null, reversesRequestId: original.id })` inserts a NEW row, and that new row is what `cancel` returns. The original keeps its status, `approverId`, `approvalComment` and `decidedAt` byte-for-byte.
+
+Everything else in the APPROVED branch stays inside the **same single** `uow.withTransaction`: the balance row is read with `forUpdate = true` and `usedDays -= requestedDays` exactly once, one CANCEL audit record is written, one cancellation notification is sent to the requester. `assertCanCancel` and the `startDate <= today` ConflictError guard are untouched.
+
+### Dependency map
+Acyclic, all edges point inward: `leave → {balance, audit, notification, employee, policy, validation, shared-types, shared-errors, shared-db, shared-date}`; `balance → {policy, employee, shared-*}`; `policy → shared-*`; `employee/audit/notification/validation → shared-*`; `shared-date → {shared-errors, shared-types}`; `migrations → shared-db`. No module depends back on `leave`; no shared module depends on a module. `leave-type` is reached only through `policy` (via `createPolicyService()`), so no new edge is introduced.
+
+### Cross-cutting contracts
+**Auth.** `request.user: { id: string; role: EmployeeRole }` where `EmployeeRole = 'EMPLOYEE' | 'MANAGER' | 'ADMIN'`. Identity/role come from a JWT bearer token verified by the existing `registerAuth` preHandler (`src/shared/auth/index.ts`), populating `request.user` from `payload.sub` (id) and `payload.role`; `POST /auth/login` is the only public path. RBAC is enforced at the API boundary by `resolveActor` (throws UnauthorizedError on a missing/invalid actor) and in the service by `assertCanCancel` — never inline in the route handler. Cancellation authority: the owner may cancel their own DRAFT or SUBMITTED request; only an APPROVED request may be cancelled by a non-owner, and then only by the requester's direct manager (`employee.managerId === actor.id`) or an ADMIN (exempt from the direct-manager check). All other combinations throw ForbiddenError. The reversal row inherits the original's `employeeId`, so it is visible under the same role-scoped read rules.
+
+**Errors.** Errors return `{ error: string; code: string }` via the routes' `sendError` helper. Validation failure → 400 (ValidationError, code VALIDATION); authentication failure → 401 (UnauthorizedError, code UNAUTHORIZED); authorization failure → 403 (ForbiddenError, code FORBIDDEN); not found → 404 (NotFoundError, code NOT_FOUND); invalid state transition or a blocked cancellation (`startDate <= today`) → 409 (ConflictError, code CONFLICT); any other throw → 500 `{ error: 'Internal Server Error' }`. `POST /leaves/:id/cancel` returns 200 with the CANCELLED row — for an APPROVED original that is the NEW reversal row, not the original. `GET /leaves/:id` returns the same 404 for a request the caller may not see as for one that does not exist.
+
+**Transactions.** The SERVICE owns the unit of work. `LeaveService.cancel` wraps the whole operation in `IUnitOfWork.withTransaction` (`PgUnitOfWork`: acquires a `PoolClient` from the shared pool, BEGIN, runs the callback, COMMIT on resolve / ROLLBACK on throw, always releases). Every repository/service method that must join the caller's transaction takes an OPTIONAL trailing `client?: PoolClient` and falls back to the shared pool when omitted. The service passes the transaction client to each call in order: (1) `findByReversesRequestId(originalId, client)` guard, (2) `balanceRepository.findByKey(..., client, forUpdate = true)` row lock, (3) `balanceRepository.update(balanceId, { usedDays: usedDays - requestedDays }, client)` — the single release, (4) `repository.create(reversalRow, client)` — the new CANCELLED row, (5) `auditService.record(CANCEL, client)`, (6) `notificationService.create(..., client)`. Repositories never open BEGIN/COMMIT/ROLLBACK; only `PgUnitOfWork` does. The DRAFT/SUBMITTED paths keep the same shape but substitute `repository.update` in place of steps 1 and 4. Read paths (`list`, `getById`) open no transaction and forward no client.
+
+### Wire contract
+`GET /leaves` and `GET /leaves/:id` serialize the model, so `reversesRequestId` appears automatically (`null` on ordinary rows, the original's id on a reversal row). A client distinguishes the two rows by `status` (APPROVED vs CANCELLED) and by `reversesRequestId`. Role scoping is unaffected: the reversal row carries the same `employeeId`.
+
+### Phase recommendations
+1. **Phase 1 — reverses_request_id column, model field, repository plumbing** (~4 files). Migration (nullable text + FK + partial UNIQUE index, matching down()), `reversesRequestId` on `LeaveRequest`, thread through `COLUMNS`/`LeaveRequestRow`/`mapRow`/INSERT/`FIELD_COLUMNS`, add `findByReversesRequestId`. Verifiable by tsc + migration run.
+2. **Phase 2 — LeaveService.cancel reversal branch (GP-008)** (~1 file). DRAFT/SUBMITTED unchanged; APPROVED inserts a NEW CANCELLED row and never updates the original; balance release, CANCEL audit and notification stay in one `withTransaction`, executed exactly once.
+3. **Phase 3 — unit tests proving immutability and single release** (~1 file). Assert original still APPROVED with approver fields unchanged, new CANCELLED row with `reversesRequestId === original.id`, `update` never called with the original id, `usedDays` released exactly once, one CANCEL audit + one notification, all inside one `withTransaction`; DRAFT/SUBMITTED still mutate in place with `reversesRequestId` null.
+4. **Phase 4 — read-model exposure + smoke proof against real Postgres** (~2 files). Confirm `reversesRequestId` is serialized; extend `scripts/smoke.js` with an authenticated stage that approves, cancels, then asserts the original still reads APPROVED and a second CANCELLED row referencing it is present in `GET /leaves`.
+
+### Open questions
+1. Reuse `AuditAction.CANCEL` vs add `AuditAction.REVERSE` (or a distinct audit entityType).
+2. Whether `GET /leaves` should filter reversal rows (default both rows vs `excludeReversals`/`includeReversals` flag).
+3. Whether to expose a derived `isReversed` (or nested `reversedBy`) on the original APPROVED row in addition to `reversesRequestId` on the reversal.
+4. Whether the exactly-once release is enforced by a partial UNIQUE index on `reverses_request_id` or only by an in-transaction service check (recommended: both).
+5. Whether the reversal row participates in balance accounting / future aggregation over `leave_requests`, or is purely a wire-visible marker (double-count risk on `requestedDays`).
+
+### Resolved during reconciliation
+- **Audit `entityId`** — settled by domain rule 7: the NEW reversal instance id (`beforeState` = APPROVED original, `afterState` = reversal instance).
+- **Reversal row field contents** — settled by domain rule 3: copy `employeeId/leaveTypeCode/startDate/endDate/requestedDays/reason` verbatim; `approverId/approvalComment/submittedAt/decidedAt` null.
+- **Repository method** — `findByReversesRequestId` is canonical (the app slice's "no new repository method" is superseded; the guard requires it).
+- **Stack compliance** — TypeScript / Node 20 / npm / Jest / Fastify / React (Vite SPA) / PostgreSQL / modular-monolith: all three slices comply; no framework outside the declared stack appears.
+<!-- gestalt:architecture feature=34a1c500-7345-4f9f-aa73-0140a4bdd165 END -->
