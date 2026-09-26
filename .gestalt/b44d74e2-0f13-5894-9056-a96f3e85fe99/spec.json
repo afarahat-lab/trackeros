@@ -1,0 +1,220 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave",
+      "shared-types",
+      "shared-errors",
+      "database-schema"
+    ],
+    "affectedLayers": [
+      "migration",
+      "model",
+      "repository",
+      "shared-types",
+      "tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "`npm run build` (tsc) completes with zero errors after the model, repository, shared-types and migration changes.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The existing Jest suite is green, including the updated `AuditAction` member-set assertion in `tests/unit/shared/types.test.ts` which now expects exactly `['CREATE','UPDATE','DELETE','APPROVE','REJECT','CANCEL','REVERSE']` in that order.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The new migration applies cleanly against real Postgres (`knex migrate:up`) and rolls back cleanly (`knex migrate:down`), leaving `leave_requests` without the column and without the index after rollback.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "Against real Postgres, inserting two `leave_requests` rows with the same non-null `reverses_request_id` fails with a unique violation, while any number of rows with `reverses_request_id IS NULL` insert successfully (the partial index does not constrain ordinary rows).",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "`LeaveRequest` exposes `reversesRequestId: string | null` as its last field and no other field was renamed, added, split or removed; `CreateLeaveRequestInput` remains `Omit<LeaveRequest, 'id'>` so a create call must supply `reversesRequestId` (null for ordinary rows).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A round-trip through the repository (`create` then `findById`) returns a row whose `reversesRequestId` equals the value supplied on create, and `findByReversesRequestId` returns that row for the matching id and `null` for an id with no reversal.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "`update` cannot change `reversesRequestId`: passing it in an update changes object is a compile-time error (it is absent from `UpdateLeaveRequestDto`) and the generated SET clause never includes `reverses_request_id`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A Postgres `23505` unique violation raised on the partial index is surfaced by the repository as a `ConflictError` (409, code `CONFLICT`) from `src/shared/errors`, not as a raw driver error.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`AuditAction` exposes exactly `CREATE, UPDATE, DELETE, APPROVE, REJECT, CANCEL, REVERSE` with `REVERSE = 'REVERSE'` appended after `CANCEL`; no other enum or DTO in `src/shared/types/index.ts` changed.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Scope is persistence + type plumbing only. No service, route, controller, read-model, audit-write or notification behaviour may change in this phase; `LeaveService`, `leave.routes.ts` and `leave/index.ts` are untouched.",
+    "The new column is NULLABLE and the uniqueness constraint is PARTIAL (`WHERE reverses_request_id IS NOT NULL`). A plain (non-partial) unique index would forbid more than one ordinary row and is a defect, not a simplification.",
+    "The migration must be portable in the style of the existing migrations (string ids, `t.text`/`t.string`/`t.timestamp` rather than native uuid/json) so it applies under both pg and sqlite3, and `exports.down` must drop the index before the column.",
+    "`reversesRequestId` must NOT be added to `FIELD_COLUMNS` in `leave.repository.ts` nor to `UpdateLeaveRequestDto` in `src/shared/types/index.ts` \u2014 the reversal link is write-once at insert and immutable thereafter.",
+    "No back-pointer field (e.g. `reversedByRequestId`) may be added to the approved row or to the model: the approved row is immutable in storage and discovery is one-directional (reversal -> original).",
+    "`reversesRequestId` is a field of the leave-owned `LeaveRequest` entity, NOT a cross-module value type: it must not be added to `src/shared/types/index.ts` as a DTO/interface field. The only shared-types change permitted is the `AuditAction.REVERSE` member.",
+    "Repository methods keep the existing optional-trailing-`PoolClient` convention and fall back to the shared pool when omitted; the repository must never issue BEGIN/COMMIT/ROLLBACK (that stays exclusively in `PgUnitOfWork`).",
+    "`findByReversesRequestId` returns `null` when no reversal exists and never throws for absence \u2014 error semantics (409 on an existing reversal) belong to the service in a later phase.",
+    "Strict TypeScript: no `any` (use `unknown` + guards), no implicit any, strict null checks; no direct DB access outside the repository layer; no hardcoded secrets.",
+    "The FK on `reverses_request_id` references `leave_requests.id` (self-referential), matching the existing `t.string(...).references('id').inTable('leave_requests')` style; the column type must match the referenced `id` column type exactly."
+  ],
+  "outOfScope": [
+    "The `LeaveService.cancel` APPROVED reversal branch (inserting the reversal row, release-once balance logic, dual audit records, notification) \u2014 Phase 2.",
+    "Unit tests proving immutability and single release for the reversal branch \u2014 Phase 3.",
+    "Read-model exposure of `reversesRequestId` / derived `isReversed` / `excludeReversals` on `list`/`getById`, the route query parsing, and the `scripts/smoke.js` Postgres proof \u2014 Phase 4.",
+    "Any new endpoint, HTTP method, or route change; any change to `assertCanCancel` authorization or the `startDate <= today` timing guard.",
+    "Any change to `LeaveStatus`, `LeaveTypeCode`, `NotificationStatus`, `EmploymentStatus`, `EmployeeRole`, `EmployeeProfile`, `CreateLeaveRequestDto`, `UpdateLeaveRequestDto` or `LeaveRequestQueryParams`.",
+    "Backfilling or migrating existing `leave_requests` rows; the column is added nullable with no default and no data movement.",
+    "Refactoring the repository interface into a separate `leave.repository.interface.ts` file, or any other structural reorganisation of the leave module."
+  ],
+  "ambiguities": [
+    {
+      "description": "Whether the `23505` -> `ConflictError` mapping should be applied only to the partial-index violation on `reverses_request_id`, or to any unique violation the repository can raise.",
+      "options": [
+        "Map any 23505 raised by the repository's write paths to ConflictError",
+        "Map only the 23505 whose constraint name matches the new partial index"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "description": "Whether `findByReversesRequestId` should be added to the inline `ILeaveRepository` in `leave.repository.ts` (the balance/leave convention) or to a new extracted interface file.",
+      "options": [
+        "Extend the existing inline interface in leave.repository.ts",
+        "Extract a new leave.repository.interface.ts and declare it there"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "description": "Whether the migration should also add a supporting index on `reverses_request_id` for the lookup path, beyond the partial unique index.",
+      "options": [
+        "The partial unique index alone serves the lookup",
+        "Add a separate non-unique index on reverses_request_id"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "description": "Whether the migration filename/timestamp must be exactly `20260914000000_add_reverses_request_id_to_leave_requests.js` or merely sort after the existing migrations.",
+      "options": [
+        "Use the exact name given in the phase intent",
+        "Any name that sorts after 20260913000001"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "The entity gains exactly one field, `reversesRequestId: string | null`, appended LAST; the canonical field set is otherwise unchanged (no rename, split, addition or omission). It is null for every ordinary request and non-null only on a reversal instance, where it holds the id of the original request it reverses. It is set once at insert and is immutable thereafter."
+    },
+    {
+      "entity": "leave_requests (table)",
+      "mustExistOrExtend": true,
+      "invariant": "`reverses_request_id` is a nullable text column with a self-referential FK to `leave_requests.id`. At most one row may reference any given original id (enforced by the partial unique index); any number of rows may have it NULL. The referenced original row is never mutated by the link."
+    },
+    {
+      "entity": "AuditAction",
+      "mustExistOrExtend": true,
+      "invariant": "The enum gains exactly one member, `REVERSE = 'REVERSE'`, appended after `CANCEL`; the existing six members keep their names, values and order. `REVERSE` is reserved for reversal audit instances (Phase 2) and is not used by any code path in this phase."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "ILeaveRepository.findByReversesRequestId(reversesRequestId, client?)",
+      "authRule": "None \u2014 repository layer performs no authorization; the caller (service) owns it.",
+      "idempotent": true,
+      "errorSemantics": "Returns the matching `LeaveRequest` or `null` when no reversal exists; absence is never an error and this method never throws for a missing row. Accepts an optional trailing `PoolClient` and falls back to the shared pool when omitted; never opens a transaction."
+    },
+    {
+      "operation": "ILeaveRepository.create(input, client?)",
+      "authRule": "None \u2014 repository layer.",
+      "idempotent": false,
+      "errorSemantics": "Persists `reverses_request_id` from the input and returns the persisted row. A Postgres `23505` unique violation on the partial index surfaces as `ConflictError` (409, code `CONFLICT`) from `src/shared/errors`, not as a raw driver error. Optional trailing `PoolClient`; never opens a transaction."
+    },
+    {
+      "operation": "ILeaveRepository.update(id, changes, client?)",
+      "authRule": "None \u2014 repository layer.",
+      "idempotent": false,
+      "errorSemantics": "Unchanged semantics (NotFoundError on a missing row). `reversesRequestId` is not an accepted change field, so the generated SET clause can never include `reverses_request_id`."
+    },
+    {
+      "operation": "Migration exports.up / exports.down",
+      "authRule": "None.",
+      "idempotent": false,
+      "errorSemantics": "`up` adds the nullable column, the self-FK and the partial unique index; it must be re-runnable against a database that already has the initial schema. `down` drops the index first and then the column, restoring the pre-migration schema exactly."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The new migration must follow the style and portability conventions of the existing migrations: `exports.up`/`exports.down` async functions, `knex.schema.alterTable`, string ids, `t.text`/`t.string`/`t.timestamp` types, and a header comment explaining the column's nullability and why the index is partial.",
+      "referencePath": "migrations/20260913000001_add_password_hash_to_employees.js"
+    },
+    {
+      "requirement": "The column type and FK declaration must match the existing `leave_requests` DDL conventions (`t.string('id').primary()`, `t.string(...).references('id').inTable('leave_requests')`), and the new column must be added to the same table the repository's `COLUMNS` list selects from.",
+      "referencePath": "migrations/20260913000000_initial_schema.js"
+    },
+    {
+      "requirement": "`COLUMNS`, `LeaveRequestRow` and `mapRow` must be extended together so the SELECT list, the row type and the camelCase mapping stay in lockstep; `create`'s INSERT column/value lists must gain the new column in the same position as `COLUMNS`. `FIELD_COLUMNS` must NOT gain an entry for it.",
+      "referencePath": "src/modules/leave/leave.repository.ts"
+    },
+    {
+      "requirement": "`ConflictError` must be imported from the shared errors entry point (not re-declared, not a local class) and used with its existing 409 / `CONFLICT` semantics.",
+      "referencePath": "src/shared/errors/index.ts"
+    },
+    {
+      "requirement": "The `AuditAction` member-set assertion must be updated to the exact new order `['CREATE','UPDATE','DELETE','APPROVE','REJECT','CANCEL','REVERSE']`, matching the enum's declaration order in shared types.",
+      "referencePath": "tests/unit/shared/types.test.ts"
+    },
+    {
+      "requirement": "The repository must keep the existing optional-trailing-`PoolClient` convention and the private `db(client)` fallback pattern; the new method must not introduce a second connection-acquisition path.",
+      "referencePath": "src/modules/leave/leave.repository.ts"
+    },
+    {
+      "requirement": "`CreateLeaveRequestInput` must remain `Omit<LeaveRequest, 'id'>` so the new field flows into create automatically; the model's doc comment about the canonical shape must stay accurate after the addition.",
+      "referencePath": "src/modules/leave/leave.model.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/leave/leave.service.ts (Phase 2)",
+      "why": "The reversal branch consumes `reversesRequestId` on `CreateLeaveRequestInput`, calls `findByReversesRequestId` inside `uow.withTransaction` as the at-most-one-reversal pre-check, and relies on the repository's `23505` -> `ConflictError` mapping as the concurrency backstop."
+    },
+    {
+      "target": "src/modules/audit/audit.service.ts (Phase 2)",
+      "why": "The reversal writes two audit records with `action = AuditAction.REVERSE`; the audit service validates action membership via `Object.values(AuditAction).includes(...)`, so the new enum member is accepted without any audit-module change."
+    },
+    {
+      "target": "src/modules/leave/leave.routes.ts + read paths (Phase 4)",
+      "why": "The read model exposes `reversesRequestId` and derives `isReversed` from the same lookup this phase adds; the wire contract depends on the column being selected by `COLUMNS`/`mapRow`."
+    },
+    {
+      "target": "tests/unit/modules/leave/leave.service.test.ts (Phase 3)",
+      "why": "`FakeLeaveRepository` must gain `findByReversesRequestId` to keep satisfying `ILeaveRepository` once the interface is extended, or the existing suite fails to compile."
+    },
+    {
+      "target": "scripts/smoke.js (Phase 4)",
+      "why": "The Postgres smoke proof asserts the two-row reversal against real Postgres, which requires the migration to have applied and the repository to round-trip `reverses_request_id`."
+    },
+    {
+      "target": "src/shared/db/unit-of-work.ts",
+      "why": "The new repository method accepts the transaction client the service passes from `PgUnitOfWork`; the repository must not open its own transaction."
+    }
+  ]
+}
