@@ -1134,3 +1134,107 @@ describe('cancel APPROVED (GP-008 reversal)', () => {
     expect(notificationService.createClients[0]).toBe(client);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Read-model exposure (binding rules 2 and 3): isReversed is DERIVED at read time
+// and reversesRequestId rides through untouched. Neither is ever stored.
+// ---------------------------------------------------------------------------
+
+describe('LeaveService read model — reversesRequestId and derived isReversed', () => {
+  let repository: FakeLeaveRepository;
+  let service: LeaveService;
+
+  const original = makeRequest({
+    id: 'lr-original',
+    status: LeaveStatus.APPROVED,
+    approverId: MANAGER_ID,
+    decidedAt: new Date('2024-02-01T00:00:00Z'),
+  });
+  const reversal = makeRequest({
+    id: 'lr-reversal',
+    status: LeaveStatus.CANCELLED,
+    requestedDays: 0,
+    reversesRequestId: 'lr-original',
+  });
+
+  beforeEach(() => {
+    repository = new FakeLeaveRepository();
+    service = new LeaveService(
+      repository,
+      new FakeBalanceRepository(),
+      new FakeAuditService(),
+      new FakeNotificationService(),
+      new FakeValidationService(),
+      new FakeEmployeeService([
+        makeEmployee(REQUESTER_ID),
+        makeEmployee(MANAGER_ID, { role: EmployeeRole.MANAGER }),
+      ]),
+      new FakePolicyService([makePolicy()]),
+      new FakeUnitOfWork()
+    );
+  });
+
+  it('list exposes reversesRequestId on every row and derives isReversed on the APPROVED original', async () => {
+    repository.rows.push(original, reversal);
+
+    const rows = await service.list(makeActor(), {});
+    const byId = new Map(rows.map((r) => [r.id, r]));
+
+    // The reversal carries its back-pointer; the original's stays null. Neither is stripped.
+    expect(byId.get('lr-reversal')?.reversesRequestId).toBe('lr-original');
+    expect(byId.get('lr-original')?.reversesRequestId).toBeNull();
+
+    // The DERIVED flag lands on the original, resolved through findByReversesRequestId.
+    expect(byId.get('lr-original')?.isReversed).toBe(true);
+    // A reversal row is not APPROVED, so it never gets a derived flag.
+    expect(byId.get('lr-reversal')?.isReversed).toBeUndefined();
+  });
+
+  it('list returns BOTH rows by default — a reversal is never hidden implicitly', async () => {
+    repository.rows.push(original, reversal);
+
+    const rows = await service.list(makeActor(), {});
+
+    expect(rows.map((r) => r.id).sort()).toEqual(['lr-original', 'lr-reversal']);
+  });
+
+  it('list with excludeReversals=true drops only rows whose reversesRequestId is non-null', async () => {
+    repository.rows.push(original, reversal);
+
+    const rows = await service.list(makeActor(), { excludeReversals: true });
+
+    expect(rows.map((r) => r.id)).toEqual(['lr-original']);
+    expect(rows[0].isReversed).toBe(true);
+  });
+
+  it('list marks an APPROVED row isReversed=false when no reversal exists', async () => {
+    repository.rows.push(original);
+
+    const rows = await service.list(makeActor(), {});
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].isReversed).toBe(false);
+    expect(rows[0].reversesRequestId).toBeNull();
+  });
+
+  it('getById resolves isReversed in one call for an APPROVED reversal target', async () => {
+    repository.rows.push(original, reversal);
+
+    const found = await service.getById(makeActor(), 'lr-original');
+
+    expect(found.id).toBe('lr-original');
+    expect(found.status).toBe(LeaveStatus.APPROVED);
+    expect(found.isReversed).toBe(true);
+    // The original stays byte-identical: the approval fields are untouched by the reversal.
+    expect(found.approverId).toBe(MANAGER_ID);
+  });
+
+  it('getById leaves a non-APPROVED row without a derived flag', async () => {
+    repository.rows.push(reversal);
+
+    const found = await service.getById(makeActor(), 'lr-reversal');
+
+    expect(found.reversesRequestId).toBe('lr-original');
+    expect(found.isReversed).toBeUndefined();
+  });
+});

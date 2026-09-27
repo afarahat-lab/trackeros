@@ -98,7 +98,7 @@ console.log(`\n  smoke mode: ${MODE}${PG ? '' : '  (persistence NOT covered — 
   // router. (`printRoutes()` confirmed both modes register /leaves identically.)
   try {
     const { signToken } = require('../src/shared/auth');
-    const { EmployeeRole, EmploymentStatus, LeaveTypeCode } = require('../src/shared/types');
+    const { EmployeeRole, EmploymentStatus, LeaveTypeCode, LeaveStatus } = require('../src/shared/types');
 
     if (!app.hasRoute({ method: 'POST', url: '/leaves' })) {
       throw new Error('POST /leaves is not registered — leaveRoutes is not mounted in app.ts');
@@ -305,6 +305,150 @@ console.log(`\n  smoke mode: ${MODE}${PG ? '' : '  (persistence NOT covered — 
         throw new Error(`GET /leaves/:id did not return the seeded request: ${String(one.payload)}`);
       }
       ok('stage 7 getById — GET /leaves/:id returns the seeded request');
+
+      // ── Stage 7b — GP-008 reversal proof (Postgres mode only) ───────────────────
+      // create -> submit -> approve -> cancel an APPROVED request, then assert against
+      // real Postgres that the original stays APPROVED with derived isReversed, a NEW
+      // CANCELLED row back-points to it, the list returns both rows by default, and the
+      // balance released EXACTLY ONCE.
+      const { signToken: signToken2 } = require('../src/shared/auth');
+      const MANAGER = 'smoke-manager';
+      const managerToken = signToken2({ id: MANAGER, role: EmployeeRole.MANAGER });
+
+      const knexMw = require('knex')(require('../knexfile').smoke_pg);
+      try {
+        // The approver/canceller must be the requester's DIRECT manager (assertCanDecide /
+        // assertCanCancel both require employee.managerId === actor.id for a MANAGER).
+        await knexMw('employees').insert({
+          id: MANAGER, employee_number: 'E-0002', first_name: 'Smoke', last_name: 'Manager',
+          email: 'manager@example.com', role: EmployeeRole.MANAGER,
+          manager_id: null, department: 'Engineering',
+          hire_date: '2020-01-01', employment_status: EmploymentStatus.ACTIVE,
+          password_hash: bcrypt.hashSync(process.env.SMOKE_PASSWORD || 'smoke-check-password', 10),
+        });
+        await knexMw('employees').where({ id: EMP }).update({ manager_id: MANAGER });
+      } finally { await knexMw.destroy(); }
+
+      const submitRes = await app.inject({
+        method: 'POST', url: `/leaves/${seededRequestId}/submit`,
+        headers: { authorization: `Bearer ${loginToken}` },
+      });
+      if (submitRes.statusCode !== 200) {
+        throw new Error(`POST /leaves/:id/submit returned ${submitRes.statusCode}: ${String(submitRes.payload)}`);
+      }
+      const approveRes = await app.inject({
+        method: 'POST', url: `/leaves/${seededRequestId}/approve`,
+        headers: { authorization: `Bearer ${managerToken}` },
+      });
+      if (approveRes.statusCode !== 200) {
+        throw new Error(`POST /leaves/:id/approve returned ${approveRes.statusCode}: ${String(approveRes.payload)}`);
+      }
+      const approvedBody = JSON.parse(approveRes.payload);
+      const originalDays = approvedBody.requestedDays;
+      if (approvedBody.status !== LeaveStatus.APPROVED) {
+        throw new Error(`approved request status should be APPROVED, got ${approvedBody.status}`);
+      }
+
+      const cancelRes = await app.inject({
+        method: 'POST', url: `/leaves/${seededRequestId}/cancel`,
+        headers: { authorization: `Bearer ${managerToken}` },
+      });
+      if (cancelRes.statusCode !== 200) {
+        throw new Error(`POST /leaves/:id/cancel returned ${cancelRes.statusCode}: ${String(cancelRes.payload)}`);
+      }
+      const reversalBody = JSON.parse(cancelRes.payload);
+      if (reversalBody.status !== LeaveStatus.CANCELLED) {
+        throw new Error(`reversal row status should be CANCELLED, got ${reversalBody.status}`);
+      }
+      if (reversalBody.reversesRequestId !== seededRequestId) {
+        throw new Error(
+          `reversal row reversesRequestId should be ${seededRequestId}, got ${String(reversalBody.reversesRequestId)}`
+        );
+      }
+      if (reversalBody.requestedDays !== 0) {
+        throw new Error(`reversal row requestedDays should be 0, got ${reversalBody.requestedDays}`);
+      }
+
+      // (a) the ORIGINAL id still resolves APPROVED, with derived isReversed === true.
+      const originalOne = await app.inject({
+        method: 'GET', url: `/leaves/${seededRequestId}`,
+        headers: { authorization: `Bearer ${loginToken}` },
+      });
+      if (originalOne.statusCode !== 200) {
+        throw new Error(`GET /leaves/:id (original) returned ${originalOne.statusCode}`);
+      }
+      const originalBody = JSON.parse(originalOne.payload);
+      if (originalBody.status !== LeaveStatus.APPROVED) {
+        throw new Error(`original must stay APPROVED (GP-007), got ${originalBody.status}`);
+      }
+      if (originalBody.isReversed !== true) {
+        throw new Error(`original APPROVED row must expose isReversed === true, got ${JSON.stringify(originalBody.isReversed)}`);
+      }
+      if (originalBody.reversesRequestId !== null) {
+        throw new Error(`original row reversesRequestId must be null, got ${String(originalBody.reversesRequestId)}`);
+      }
+      ok('stage 7b(a) — original stays APPROVED with derived isReversed === true');
+
+      // (b) a NEW row exists with CANCELLED + reversesRequestId === originalId, read
+      // straight from Postgres (not just the HTTP response).
+      const knexAssert = require('knex')(require('../knexfile').smoke_pg);
+      let reversalRow;
+      let balanceRow;
+      try {
+        reversalRow = await knexAssert('leave_requests')
+          .where({ reverses_request_id: seededRequestId }).first();
+        balanceRow = await knexAssert('leave_balances').where({ id: 'bal-1' }).first();
+      } finally { await knexAssert.destroy(); }
+      if (!reversalRow) {
+        throw new Error(`no leave_requests row found with reverses_request_id = ${seededRequestId}`);
+      }
+      if (reversalRow.status !== LeaveStatus.CANCELLED) {
+        throw new Error(`reversal DB row status should be CANCELLED, got ${reversalRow.status}`);
+      }
+      if (reversalRow.id === seededRequestId) {
+        throw new Error('reversal must be a NEW row, not the original');
+      }
+      // (d) RELEASE-ONCE: usedDays returned exactly once. After approve used == originalDays;
+      // after the reversal it must be back to 0 — not -originalDays (a double release).
+      if (Number(balanceRow.used_days) !== 0) {
+        throw new Error(
+          `balance used_days should be 0 after releasing the original ${originalDays} days once, ` +
+          `got ${balanceRow.used_days}`
+        );
+      }
+      ok('stage 7b(b,d) — new CANCELLED row back-points to original; balance released exactly once');
+
+      // (c) GET /leaves returns BOTH rows by default and only the original with
+      // excludeReversals=true. Both rows belong to EMP, so the owner's scope sees them.
+      const bothList = JSON.parse((await app.inject({
+        method: 'GET', url: '/leaves',
+        headers: { authorization: `Bearer ${loginToken}` },
+      })).payload);
+      const bothIds = bothList.map((l) => l.id);
+      if (!bothIds.includes(seededRequestId) || !bothIds.includes(reversalRow.id)) {
+        throw new Error(
+          `GET /leaves default must return BOTH the original and its reversal; got ${JSON.stringify(bothIds)}`
+        );
+      }
+      const liveList = JSON.parse((await app.inject({
+        method: 'GET', url: '/leaves?excludeReversals=true',
+        headers: { authorization: `Bearer ${loginToken}` },
+      })).payload);
+      const liveIds = liveList.map((l) => l.id);
+      if (!liveIds.includes(seededRequestId) || liveIds.includes(reversalRow.id)) {
+        throw new Error(
+          `GET /leaves?excludeReversals=true must return only the original; got ${JSON.stringify(liveIds)}`
+        );
+      }
+      // The wire contract rejects anything but 'true'/'false' at the boundary (400).
+      const badFlag = await app.inject({
+        method: 'GET', url: '/leaves?excludeReversals=yes',
+        headers: { authorization: `Bearer ${loginToken}` },
+      });
+      if (badFlag.statusCode !== 400) {
+        throw new Error(`excludeReversals=yes should be rejected with 400, got ${badFlag.statusCode}`);
+      }
+      ok('stage 7b(c) — list returns both rows by default, only the original when excludeReversals=true');
 
       // ── Stage 8 — current-period balances omit effective policies with no row ──
       // ONLY the ANNUAL balance exists (the SICK leave type has an effective ACTIVE policy

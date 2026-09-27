@@ -44,8 +44,11 @@ export interface ILeaveService {
   approve(actor: LeaveActor, requestId: string): Promise<LeaveRequest>;
   reject(actor: LeaveActor, requestId: string): Promise<LeaveRequest>;
   cancel(actor: LeaveActor, requestId: string): Promise<LeaveRequest>;
-  list(actor: LeaveActor, params: LeaveRequestQueryParams): Promise<LeaveRequest[]>;
-  getById(actor: LeaveActor, requestId: string): Promise<LeaveRequest>;
+  list(
+    actor: LeaveActor,
+    params: LeaveRequestQueryParams,
+  ): Promise<(LeaveRequest & { isReversed?: boolean })[]>;
+  getById(actor: LeaveActor, requestId: string): Promise<LeaveRequest & { isReversed?: boolean }>;
 }
 
 /**
@@ -446,7 +449,10 @@ export class LeaveService implements ILeaveService {
     });
   }
 
-  async list(actor: LeaveActor, params: LeaveRequestQueryParams): Promise<LeaveRequest[]> {
+  async list(
+    actor: LeaveActor,
+    params: LeaveRequestQueryParams,
+  ): Promise<(LeaveRequest & { isReversed?: boolean })[]> {
     this.assertAuthenticated(actor);
 
     const query: LeaveRequestQueryParams = { ...params };
@@ -458,28 +464,62 @@ export class LeaveService implements ILeaveService {
     }
     // ADMIN: no employeeIds filter — sees every request.
 
-    return this.repository.findByQuery(query);
+    const rows = await this.repository.findByQuery(query);
+
+    // LIST DEFAULT (binding rule 2): return BOTH the original and its reversal.
+    // `excludeReversals=true` is the only thing that hides reversal instances. An
+    // unfiltered count double-counts a reversed request — the original stays APPROVED
+    // and the reversal row is CANCELLED, so a naive COUNT(*) sees two rows for one
+    // request. This is stated rather than silently filtered.
+    const filtered = query.excludeReversals
+      ? rows.filter((row) => row.reversesRequestId === null)
+      : rows;
+
+    return Promise.all(filtered.map((row) => this.withReversalFlag(row)));
   }
 
-  async getById(actor: LeaveActor, requestId: string): Promise<LeaveRequest> {
+  async getById(
+    actor: LeaveActor,
+    requestId: string,
+  ): Promise<LeaveRequest & { isReversed?: boolean }> {
     this.assertAuthenticated(actor);
 
     const request = await this.getRequest(requestId);
 
+    let visible: LeaveRequest & { isReversed?: boolean };
     if (actor.role === EmployeeRole.ADMIN) {
-      return request;
+      visible = request;
+    } else {
+      const visibleIds: string[] = [actor.id];
+      if (actor.role === EmployeeRole.MANAGER) {
+        const reports = await this.employeeService.getEmployeesByManagerId(actor.id);
+        visibleIds.push(...reports.map((e) => e.id));
+      }
+
+      if (!visibleIds.includes(request.employeeId)) {
+        throw new NotFoundError('Leave request not found');
+      }
+      visible = request;
     }
 
-    const visibleIds: string[] = [actor.id];
-    if (actor.role === EmployeeRole.MANAGER) {
-      const reports = await this.employeeService.getEmployeesByManagerId(actor.id);
-      visibleIds.push(...reports.map((e) => e.id));
-    }
+    // DERIVED isReversed (binding rule 3): resolved here, never stored, so a client
+    // fetching one APPROVED request needs no second query to learn it was reversed.
+    return this.withReversalFlag(visible);
+  }
 
-    if (!visibleIds.includes(request.employeeId)) {
-      throw new NotFoundError('Leave request not found');
+  /**
+   * Attaches the DERIVED `isReversed` boolean to APPROVED rows only, resolved through
+   * the same `findByReversesRequestId` lookup the reversal guard uses. `reversesRequestId`
+   * rides along on every row untouched — this is the read model, never a write.
+   */
+  private async withReversalFlag(
+    row: LeaveRequest,
+  ): Promise<LeaveRequest & { isReversed?: boolean }> {
+    if (row.status !== LeaveStatus.APPROVED) {
+      return row;
     }
-    return request;
+    const reversal = await this.repository.findByReversesRequestId(row.id);
+    return { ...row, isReversed: reversal !== null };
   }
 
   private async getRequest(requestId: string): Promise<LeaveRequest> {
