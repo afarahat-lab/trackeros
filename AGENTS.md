@@ -129,12 +129,37 @@ counter negative.
 DRAFT insert and its CREATE audit entry in a single `withTransaction`; written separately, a
 failing audit insert left a persisted request with no audit trail (GP-002).
 
+### 5b — an approved leave request is reversed, not mutated (decided 2026-09-15)
+
+Once a leave request is APPROVED its row is immutable (GP-008). `LeaveService.cancel` splits on
+status: DRAFT and SUBMITTED keep their in-place behaviour (the same row is updated to CANCELLED
+with `cancelledBy`/`cancelledAt`; SUBMITTED releases `pendingDays`), while APPROVED inserts a
+NEW `leave_requests` row with `status = CANCELLED` and `reversesRequestId` pointing at the
+original, and performs **no update at all** on the approved row.
+
+The APPROVED branch runs inside the same single `withTransaction` and, in order: guards against
+a second reversal via `repository.findByReversesRequestId` (`ConflictError`, 409 — never an
+idempotent 200; the repository's Postgres `23505` → `ConflictError` mapping is the concurrency
+backstop behind the partial unique index on `reverses_request_id`); releases the balance exactly
+once from the locked row (`usedDays -= original.requestedDays`, `pendingDays` untouched); inserts
+the reversal row (verbatim `employeeId`/`leaveTypeCode`/`startDate`/`endDate`, `requestedDays: 0`,
+null approval fields); writes TWO `AuditAction.REVERSE` records (one per row, so neither is left
+unaudited); and sends one notification whose `relatedEntityId` is the NEW row id. It returns the
+reversal row.
+
+The released quantity is always read from the ORIGINAL row's `requestedDays` via
+`reversesRequestId` — never re-derived from the dates. The pre-transaction guards
+(`assertCanCancel`, the `startOfUtcDay` timing guard) are unchanged and still govern the APPROVED
+path.
+
 ## What agents must never do
 
 - Violate principle GP-003 as defined in `GOLDEN_PRINCIPLES.md`.
 - Violate principle GP-004 as defined in `GOLDEN_PRINCIPLES.md`.
 - Violate principle GP-005 as defined in `GOLDEN_PRINCIPLES.md`.
 - Violate principle GP-006 as defined in `GOLDEN_PRINCIPLES.md`.
+- Violate principle GP-007 as defined in `GOLDEN_PRINCIPLES.md`.
+- Violate principle GP-008 as defined in `GOLDEN_PRINCIPLES.md`.
 
 ## When context is missing
 
