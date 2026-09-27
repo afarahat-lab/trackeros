@@ -147,6 +147,12 @@ function parseQuery(query: Record<string, unknown>): LeaveRequestQueryParams {
   if (query.offset !== undefined) {
     params.offset = toInteger(query.offset, 'offset');
   }
+  if (query.excludeReversals !== undefined) {
+    if (query.excludeReversals !== 'true' && query.excludeReversals !== 'false') {
+      throw new ValidationError('excludeReversals must be "true" or "false"');
+    }
+    params.excludeReversals = query.excludeReversals === 'true';
+  }
 
   return params;
 }

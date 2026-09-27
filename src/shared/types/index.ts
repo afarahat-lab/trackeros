@@ -92,6 +92,13 @@ export interface LeaveRequestQueryParams {
   employeeIds?: string[];
   limit?: number;
   offset?: number;
+  /**
+   * When true, rows that are reversal instances (non-null `reversesRequestId`) are
+   * excluded from a list result. Absent/false returns BOTH the original and its
+   * reversal, because an unfiltered count double-counts a reversed request: the
+   * original stays APPROVED and its reversal is a separate CANCELLED row.
+   */
+  excludeReversals?: boolean;
 }
 
 /**
