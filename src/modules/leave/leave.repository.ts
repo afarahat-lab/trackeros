@@ -208,6 +208,13 @@ export class PgLeaveRequestRepository implements ILeaveRepository {
       values.push(params.employeeIds);
       conditions.push(`employee_id = ANY($${values.length})`);
     }
+    // Optional reversal filter. Absence means "no reversal constraint": the default
+    // result set returns BOTH originals and reversal rows, so the wire never silently
+    // omits a reversal and lets a client believe an approved request is still live.
+    if (params.reversesRequestId !== undefined) {
+      values.push(params.reversesRequestId);
+      conditions.push(`reverses_request_id = $${values.length}`);
+    }
 
     let query = `SELECT ${COLUMNS} FROM leave_requests`;
     if (conditions.length > 0) {
