@@ -107,6 +107,28 @@ reasons unrelated to leave requests.
 Introducing a unit of work moves no invariant: negative guards and authorization stay in the
 services that already own them.
 
+### 5a — row locks for read-then-write (decided 2026-09-14)
+
+Being inside a transaction is NOT enough to make a read-then-write safe. PostgreSQL's default
+isolation (READ COMMITTED) lets two concurrent transactions read the same row and compute the
+same delta; the second write silently discards the first. The leave-balance counters
+(`pendingDays`, `usedDays`) are computed in application code — read the row, add/subtract, write
+the result — so every read that precedes a write must take a row-level lock.
+
+**The rule:** when a service reads a row inside a transaction and then writes it, the read must
+pass `forUpdate = true` (`SELECT ... FOR UPDATE`). `IBalanceRepository.findByKey(..., client,
+forUpdate)` and `findById(..., client, forUpdate)` implement this; the lock clause is emitted
+only when an explicit `client` is supplied, because a lock taken outside a transaction is
+released immediately and buys nothing. Reads that only validate — e.g. `LeaveService.create`'s
+balance lookup — pass `forUpdate = false` and take no lock. `LeaveService.submit` / `approve` /
+`reject` / `cancel` all lock the balance row before writing it, and `approve` / `reject` assert
+`pendingDays >= requestedDays` (`ConflictError` otherwise) so a lost update cannot drive the
+counter negative.
+
+**A state change and its audit record are ONE unit of work.** `LeaveService.create` wraps the
+DRAFT insert and its CREATE audit entry in a single `withTransaction`; written separately, a
+failing audit insert left a persisted request with no audit trail (GP-002).
+
 ## What agents must never do
 
 - Violate principle GP-003 as defined in `GOLDEN_PRINCIPLES.md`.
