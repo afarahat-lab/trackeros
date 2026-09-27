@@ -28,6 +28,7 @@ export enum AuditAction {
   APPROVE = 'APPROVE',
   REJECT = 'REJECT',
   CANCEL = 'CANCEL',
+  REVERSE = 'REVERSE',
 }
 
 export enum NotificationStatus {
