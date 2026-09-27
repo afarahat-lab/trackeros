@@ -844,6 +844,116 @@ describe('LeaveService', () => {
     it('rejects an unknown request with NotFoundError', async () => {
       await expect(service.cancel(makeActor(), 'missing')).rejects.toThrow(NotFoundError);
     });
+
+    it('reverses an APPROVED request into a NEW CANCELLED row and never mutates the original', async () => {
+      await balanceRepository.update('balance-1', { usedDays: REQUESTED_DAYS });
+      await repository.create(
+        makeRequest({
+          status: LeaveStatus.APPROVED,
+          approverId: MANAGER_ID,
+          approvalComment: 'looks fine',
+          submittedAt: new Date('2024-05-01T00:00:00Z'),
+          decidedAt: new Date('2024-05-02T00:00:00Z'),
+          startDate: FUTURE_START,
+          endDate: FUTURE_END,
+        })
+      );
+      balanceRepository.updateCalls.length = 0;
+      balanceRepository.findByKeyCalls.length = 0;
+      repository.createCalls.length = 0;
+
+      const reversal = await service.cancel(manager, 'lr-1');
+
+      // (a) the reversal row is self-describing, with no approval/timing data of its own
+      expect(repository.createCalls).toHaveLength(1);
+      const input = repository.createCalls[0].input;
+      expect(input.reversesRequestId).toBe('lr-1');
+      expect(input.requestedDays).toBe(0);
+      expect(input.status).toBe(LeaveStatus.CANCELLED);
+      expect(input.approverId).toBeNull();
+      expect(input.approvalComment).toBeNull();
+      expect(input.decidedAt).toBeNull();
+      expect(input.submittedAt).toBeNull();
+      expect(input.employeeId).toBe(REQUESTER_ID);
+      expect(input.leaveTypeCode).toBe(LeaveTypeCode.ANNUAL);
+      expect(input.startDate).toBe(FUTURE_START);
+      expect(input.endDate).toBe(FUTURE_END);
+      expect(input.cancelledBy).toBe(MANAGER_ID);
+      expect(repository.createCalls[0].client).toBe(uow.stubClient);
+
+      expect(reversal.status).toBe(LeaveStatus.CANCELLED);
+      expect(reversal.reversesRequestId).toBe('lr-1');
+
+      // (b) the original stays APPROVED — no update is ever issued against it
+      expect(repository.updateCalls).toHaveLength(0);
+      const original = await repository.findById('lr-1');
+      expect(original?.status).toBe(LeaveStatus.APPROVED);
+
+      // (c) usedDays is decremented by the original's requestedDays exactly once
+      expect(balanceRepository.updateCalls).toHaveLength(1);
+      expect(balanceRepository.updateCalls[0].changes.usedDays).toBe(0);
+      expect(balanceRepository.updateCalls[0].changes.pendingDays).toBeUndefined();
+      expect(balanceRepository.updateCalls[0].client).toBe(uow.stubClient);
+      expect(balanceRepository.findByKeyCalls.some((c) => c.forUpdate)).toBe(true);
+
+      // (d) two REVERSE records, one anchored on each row
+      expect(auditService.records).toHaveLength(2);
+      expect(auditService.records.map((r) => r.action)).toEqual([
+        AuditAction.REVERSE,
+        AuditAction.REVERSE,
+      ]);
+      expect(auditService.records[0].entityId).toBe('lr-1');
+      expect((auditService.records[0].afterState as LeaveRequest).status).toBe(
+        LeaveStatus.CANCELLED
+      );
+      expect(auditService.records[1].entityId).toBe(reversal.id);
+      expect(auditService.records[1].beforeState).toBeNull();
+      expect(auditService.recordClients[0]).toBe(uow.stubClient);
+      expect(auditService.recordClients[1]).toBe(uow.stubClient);
+
+      expect(uow.callCount).toBe(1);
+    });
+
+    it('(e) rejects a second cancel of the same original with ConflictError', async () => {
+      await balanceRepository.update('balance-1', { usedDays: REQUESTED_DAYS });
+      await repository.create(
+        makeRequest({
+          status: LeaveStatus.APPROVED,
+          startDate: FUTURE_START,
+          endDate: FUTURE_END,
+        })
+      );
+      repository.createCalls.length = 0;
+
+      await service.cancel(manager, 'lr-1');
+      await expect(service.cancel(manager, 'lr-1')).rejects.toThrow(ConflictError);
+      // the first reversal is the one that stands — no second row is inserted
+      expect(repository.createCalls).toHaveLength(1);
+    });
+
+    it('(f) still updates a SUBMITTED request in place with AuditAction.CANCEL and a null reversesRequestId', async () => {
+      await balanceRepository.update('balance-1', { pendingDays: REQUESTED_DAYS });
+      await repository.create(
+        makeRequest({
+          status: LeaveStatus.SUBMITTED,
+          startDate: FUTURE_START,
+          endDate: FUTURE_END,
+        })
+      );
+      repository.createCalls.length = 0;
+
+      const cancelled = await service.cancel(makeActor(), 'lr-1');
+
+      expect(cancelled.status).toBe(LeaveStatus.CANCELLED);
+      expect(cancelled.reversesRequestId).toBeNull();
+      expect(repository.createCalls).toHaveLength(0);
+      expect(repository.updateCalls).toHaveLength(1);
+      expect(repository.updateCalls[0].id).toBe('lr-1');
+      expect(repository.updateCalls[0].changes.status).toBe(LeaveStatus.CANCELLED);
+      expect(auditService.records).toHaveLength(1);
+      expect(auditService.records[0].action).toBe(AuditAction.CANCEL);
+    });
+
   });
 });
 

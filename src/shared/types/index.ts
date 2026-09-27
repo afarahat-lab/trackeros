@@ -90,6 +90,12 @@ export interface LeaveRequestQueryParams {
   endDateFrom?: Date;
   endDateTo?: Date;
   employeeIds?: string[];
+  /**
+   * Restrict the result to the reversal row that points at this original id.
+   * Absence means "no reversal constraint" (both originals and reversal rows are
+   * returned) — never "exclude reversals".
+   */
+  reversesRequestId?: string;
   limit?: number;
   offset?: number;
 }

@@ -152,6 +152,34 @@ The released quantity is always read from the ORIGINAL row's `requestedDays` via
 (`assertCanCancel`, the `startOfUtcDay` timing guard) are unchanged and still govern the APPROVED
 path.
 
+### 5c — the reversal read model (decided 2026-09-16)
+
+A reversed request is TWO rows, and the read model must not hide that. `ILeaveRepository.findByQuery`
+returns originals AND reversal rows when no reversal filter is supplied — a wire contract that
+silently omits state is how a client comes to believe an approved request is still live.
+`LeaveRequestQueryParams.reversesRequestId?: string` is the ONE optional filter; its absence means
+"no reversal constraint", never "exclude reversals". `reversesRequestId` is returned on every read
+path (`findById`, `findByQuery`) via `mapRow`/`COLUMNS`: null for an ordinary request, the
+original's id for a reversal row. The filter is applied at the type/repository layer only —
+`leave.routes.ts` `parseQuery` is NOT changed, so it is not yet exposed over the wire.
+
+Consequences to remember:
+
+- **An unfiltered `GET /leaves` counts a reversed request TWICE** — the untouched APPROVED
+  original and the CANCELLED reversal both appear. Row counts must de-duplicate via
+  `reversesRequestId` (drop a CANCELLED row whose original is also present) or filter explicitly.
+  Day-count aggregates that sum `requestedDays` are NOT inflated, because the reversal carries
+  `requestedDays = 0`.
+- **`status=CANCELLED` is a derived partition, not a synonym**: it returns BOTH in-place
+  cancellations (`reversesRequestId = null`, DRAFT/SUBMITTED origin) and reversal rows
+  (`reversesRequestId != null`, APPROVED origin). The two are discriminated ONLY by
+  `reversesRequestId`.
+- **A reversed original NO LONGER occupies its dates**: any overlap / "already on leave" check
+  must exclude APPROVED rows that have a reversal pointing at them. The balance was released, so
+  the employee has those days back; leaving the dates occupied would refund the days and
+  simultaneously forbid re-booking them. Nothing consumes this rule yet — it is recorded so a
+  later check is not written against the wrong assumption.
+
 ## What agents must never do
 
 - Violate principle GP-003 as defined in `GOLDEN_PRINCIPLES.md`.
