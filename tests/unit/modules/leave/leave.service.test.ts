@@ -56,6 +56,7 @@ class FakeLeaveRepository implements ILeaveRepository {
   createCalls: { input: CreateLeaveRequestInput; client?: PoolClient }[] = [];
   updateCalls: { id: string; changes: UpdateLeaveRequestDto; client?: PoolClient }[] = [];
   findByIdCalls: { id: string; client?: PoolClient }[] = [];
+  findByReversesRequestIdCalls: { reversesRequestId: string; client?: PoolClient }[] = [];
   private idCounter = 0;
 
   async create(input: CreateLeaveRequestInput, client?: PoolClient): Promise<LeaveRequest> {
@@ -89,7 +90,11 @@ class FakeLeaveRepository implements ILeaveRepository {
     return [...this.rows];
   }
 
-  async findByReversesRequestId(reversesRequestId: string): Promise<LeaveRequest | null> {
+  async findByReversesRequestId(
+    reversesRequestId: string,
+    client?: PoolClient
+  ): Promise<LeaveRequest | null> {
+    this.findByReversesRequestIdCalls.push({ reversesRequestId, client });
     return this.rows.find((r) => r.reversesRequestId === reversesRequestId) ?? null;
   }
 }
@@ -953,5 +958,179 @@ describe('LeaveService concurrency and atomicity guarantees', () => {
     auditService.failNext = true;
     await expect(service.create(makeActor(), makeDto())).rejects.toThrow('audit insert failed');
     expect(uow.rolledBack).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GP-008: cancelling an APPROVED request is a REVERSAL, not an in-place write
+// ---------------------------------------------------------------------------
+
+describe('cancel APPROVED (GP-008 reversal)', () => {
+  let repository: FakeLeaveRepository;
+  let balanceRepository: FakeBalanceRepository;
+  let auditService: FakeAuditService;
+  let notificationService: FakeNotificationService;
+  let uow: FakeUnitOfWork;
+  let service: LeaveService;
+
+  const FUTURE_START = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+  const FUTURE_END = new Date(Date.now() + 32 * 24 * 60 * 60 * 1000);
+  const DECIDED_AT = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const manager = makeActor({ id: MANAGER_ID, role: EmployeeRole.MANAGER });
+
+  beforeEach(async () => {
+    repository = new FakeLeaveRepository();
+    balanceRepository = new FakeBalanceRepository();
+    auditService = new FakeAuditService();
+    notificationService = new FakeNotificationService();
+    uow = new FakeUnitOfWork();
+    service = new LeaveService(
+      repository,
+      balanceRepository,
+      auditService,
+      notificationService,
+      new FakeValidationService(),
+      new FakeEmployeeService([
+        makeEmployee(REQUESTER_ID),
+        makeEmployee(MANAGER_ID, { role: EmployeeRole.MANAGER }),
+      ]),
+      new FakePolicyService([makePolicy()]),
+      uow
+    );
+    // The original approval reserved its days against usedDays.
+    await balanceRepository.create(makeBalance({ usedDays: REQUESTED_DAYS }));
+  });
+
+  // Seed the immutable APPROVED original and return it. The row is created through the
+  // repository so it carries a real, distinct id (lr-1) that the reversal must back-point to.
+  async function seedApproved(): Promise<LeaveRequest> {
+    return repository.create(
+      makeRequest({
+        startDate: FUTURE_START,
+        endDate: FUTURE_END,
+        status: LeaveStatus.APPROVED,
+        approverId: MANAGER_ID,
+        approvalComment: 'approved',
+        submittedAt: new Date('2024-05-01T00:00:00Z'),
+        decidedAt: DECIDED_AT,
+        reason: 'family trip',
+      })
+    );
+  }
+
+  it('leaves the original APPROVED row byte-identical and inserts a NEW CANCELLED reversal', async () => {
+    const original = await seedApproved();
+    const snapshot = { ...original };
+
+    const reversal = await service.cancel(manager, original.id);
+
+    // The original is never mutated — not in the fake store, and never through `update`.
+    expect(repository.updateCalls).toHaveLength(0);
+    const stored = await repository.findById(original.id);
+    expect(stored).toEqual(snapshot);
+    expect(stored?.status).toBe(LeaveStatus.APPROVED);
+    expect(stored?.approverId).toBe(MANAGER_ID);
+    expect(stored?.approvalComment).toBe('approved');
+    expect(stored?.decidedAt).toEqual(DECIDED_AT);
+
+    // A distinct CANCELLED row was inserted that back-points to the original.
+    expect(reversal.id).not.toBe(original.id);
+    expect(reversal.reversesRequestId).toBe(original.id);
+    expect(reversal.status).toBe(LeaveStatus.CANCELLED);
+    expect(reversal.requestedDays).toBe(0);
+    expect(reversal.approverId).toBeNull();
+    expect(reversal.approvalComment).toBeNull();
+    expect(reversal.submittedAt).toBeNull();
+    expect(reversal.decidedAt).toBeNull();
+    expect(reversal.cancelledBy).toBe(manager.id);
+    expect(reversal.cancelledAt).toBeInstanceOf(Date);
+    // Identity fields copied verbatim from the original.
+    expect(reversal.employeeId).toBe(original.employeeId);
+    expect(reversal.leaveTypeCode).toBe(original.leaveTypeCode);
+    expect(reversal.startDate).toEqual(original.startDate);
+    expect(reversal.endDate).toEqual(original.endDate);
+    expect(reversal.reason).toBe(original.reason);
+
+    expect(repository.createCalls).toHaveLength(2); // original + reversal
+    expect(repository.createCalls[1].input.reversesRequestId).toBe(original.id);
+    expect(repository.createCalls[1].input.requestedDays).toBe(0);
+  });
+
+  it('releases the ORIGINAL requestedDays exactly once, locking the balance row first', async () => {
+    const original = await seedApproved();
+
+    await service.cancel(manager, original.id);
+
+    // Exactly one write, driven by the original's requestedDays and never the reversal's 0.
+    expect(balanceRepository.updateCalls).toHaveLength(1);
+    expect(balanceRepository.updateCalls[0].changes.usedDays).toBe(0);
+    expect(balanceRepository.updateCalls[0].id).toBe(balanceRepository.rows[0].id);
+    // The balance row was locked (forUpdate) as part of the release.
+    expect(balanceRepository.findByKeyCalls.some((c) => c.forUpdate)).toBe(true);
+    expect(balanceRepository.rows[0].usedDays).toBe(0);
+  });
+
+  it('refuses a second reversal: ConflictError with no insert, balance write or audit write', async () => {
+    const original = await seedApproved();
+    // An existing reversal already back-points to the original.
+    await repository.create(
+      makeRequest({ status: LeaveStatus.CANCELLED, reversesRequestId: original.id })
+    );
+    const createsBefore = repository.createCalls.length;
+    const auditBefore = auditService.records.length;
+
+    await expect(service.cancel(manager, original.id)).rejects.toThrow(ConflictError);
+
+    expect(repository.findByReversesRequestIdCalls[0].reversesRequestId).toBe(original.id);
+    expect(repository.findByReversesRequestIdCalls[0].client).toBe(uow.stubClient);
+    expect(repository.createCalls).toHaveLength(createsBefore);
+    expect(balanceRepository.updateCalls).toHaveLength(0);
+    expect(auditService.records).toHaveLength(auditBefore);
+    // The aggregate is unwound rather than half-applied.
+    expect(uow.rolledBack).toBe(true);
+  });
+
+  it('writes exactly two REVERSE audit records — one keyed to the original, one to the reversal', async () => {
+    const original = await seedApproved();
+
+    const reversal = await service.cancel(manager, original.id);
+
+    expect(auditService.records).toHaveLength(2);
+    expect(auditService.records.every((r) => r.action === AuditAction.REVERSE)).toBe(true);
+
+    const toOriginal = auditService.records.find((r) => r.entityId === original.id);
+    const toReversal = auditService.records.find((r) => r.entityId === reversal.id);
+    expect(toOriginal).toBeDefined();
+    expect(toReversal).toBeDefined();
+    expect(toOriginal?.beforeState).toEqual(original);
+    expect(toOriginal?.afterState).toEqual(reversal);
+    expect(toReversal?.beforeState).toBeNull();
+    expect(toReversal?.afterState).toEqual(reversal);
+    expect(auditService.records.every((r) => r.actorId === manager.id)).toBe(true);
+  });
+
+  it('notifies the original employee about the reversal row', async () => {
+    const original = await seedApproved();
+
+    const reversal = await service.cancel(manager, original.id);
+
+    expect(notificationService.inputs).toHaveLength(1);
+    expect(notificationService.inputs[0].recipientId).toBe(original.employeeId);
+    expect(notificationService.inputs[0].relatedEntityId).toBe(reversal.id);
+  });
+
+  it('runs the whole reversal in ONE unit of work, forwarding the client everywhere', async () => {
+    const original = await seedApproved();
+
+    await service.cancel(manager, original.id);
+
+    expect(uow.callCount).toBe(1);
+    const client = repository.createCalls[1].client;
+    expect(client).toBe(uow.stubClient);
+    expect(repository.findByReversesRequestIdCalls[0].client).toBe(client);
+    expect(balanceRepository.updateCalls[0].client).toBe(client);
+    expect(auditService.recordClients[0]).toBe(client);
+    expect(auditService.recordClients[1]).toBe(client);
+    expect(notificationService.createClients[0]).toBe(client);
   });
 });
