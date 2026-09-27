@@ -1,0 +1,146 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave",
+      "shared-types",
+      "smoke-verification"
+    ],
+    "affectedLayers": [
+      "service",
+      "routes",
+      "shared-types",
+      "e2e-smoke"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "Both read paths (`ILeaveService.list` and `getById`) return rows that still carry `reversesRequestId` \u2014 null on ordinary rows, the original's id on a reversal row \u2014 with no field stripped from the entity.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Every returned row whose status is APPROVED carries a derived `isReversed` boolean (true when a reversal row exists for it, false otherwise), resolved at read time; rows in any other status (DRAFT/SUBMITTED/REJECTED/CANCELLED) carry no `isReversed` property at all. A single `getById` of an APPROVED request reports `isReversed === true` without the caller issuing a second query.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`list` returns BOTH the original APPROVED row and its CANCELLED reversal row by default (no rows hidden), and when `excludeReversals` is true it returns only rows whose `reversesRequestId` is null (the reversal row is filtered out).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The wire query parser accepts `excludeReversals` as the strings `'true'`/`'false'` and rejects any other value with a ValidationError (400); the parsed boolean reaches `leaveService.list`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`npm run smoke` against real Postgres (SMOKE_DATABASE_URL set) passes the new GP-008 stages: after create \u2192 submit \u2192 approve \u2192 cancel-as-manager/ADMIN, (a) GET /leaves/:id for the original id returns status APPROVED with isReversed === true, (b) a new row exists with status CANCELLED and reversesRequestId === originalId, (c) GET /leaves returns both rows by default and only the original with excludeReversals=true, (d) the balance usedDays returns to its pre-request value (0) and available to 25 \u2014 released exactly once, not double-released. New stages are gated to Postgres mode with the existing sqlite caveat.",
+      "testable": true,
+      "layer": "e2e"
+    },
+    {
+      "description": "`tsc` is clean and the full Jest suite is green with no changes required to existing tests (widening the read return type is backward-compatible).",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "`isReversed` is DERIVED at read time only \u2014 never stored, never a column, never added to `LeaveRequest`/`CreateLeaveRequestInput`/`UpdateLeaveRequestDto`, and never written by any repository. The approved row remains byte-identical in storage (GP-007).",
+    "`list` and `getById` stay read-only: no `uow.withTransaction`, no client forwarding, no writes, no audit records, no notifications. The derived flag and the filter are pure read-time transformations.",
+    "`excludeReversals` is applied in the service as a post-filter after `repository.findByQuery`; the repository is NOT modified and silently ignores the field. A code comment must state that the repository ignores the field and that an unfiltered count double-counts a reversed request.",
+    "`excludeReversals?: boolean` is declared only in `LeaveRequestQueryParams` in `src/shared/types/index.ts`; no local duplicate DTO is declared in the leave module.",
+    "No new endpoints, no controller layer, no new named read-model type. `GET /leaves` and `GET /leaves/:id` keep their existing conventions (`resolveActor` at the API boundary, `sendError` mapping).",
+    "The smoke test must not modify `EMP.manager_id` (stages 4/5 assert it is null); the approving/cancelling actor is seeded as an `employees` row with ADMIN role to satisfy the `approver_id`/`cancelled_by` FKs. The smoke request's `startDate` must be strictly in the future (UTC) so the cancel timing guard does not raise ConflictError.",
+    "No hardcoded secrets (no-hardcoded-secrets): the smoke actor's password hash is minted from `SMOKE_PASSWORD` as the existing stages do. No `any` (use `unknown` + guards). No direct DB access outside the repository layer."
+  ],
+  "outOfScope": [
+    "Any change to `src/modules/leave/leave.repository.ts` \u2014 the repository is not in this phase's file set and must not be modified (no `excludeReversals` support added there).",
+    "Any change to the reversal write path (`LeaveService.cancel`/`reverse`), the migration, the model, or the balance/audit/notification semantics \u2014 those are Phases 1\u20133 and are fixed contracts.",
+    "New endpoints, a controller layer, a named read-model type, or a `REVERSED` status value \u2014 none are sanctioned.",
+    "Frontend/web-client consumption of `isReversed`/`excludeReversals`, and any change to role-scoped visibility rules."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest (read projection)",
+      "mustExistOrExtend": true,
+      "invariant": "The read projection is `LeaveRequest & { isReversed?: boolean }`. `isReversed` is present (true|false) ONLY on rows whose status is APPROVED and is absent on all other statuses; it is derived at read time and never persisted. `reversesRequestId` is present on every returned row (null on ordinary rows, the original's id on a reversal row)."
+    },
+    {
+      "entity": "LeaveRequest (APPROVED original)",
+      "mustExistOrExtend": true,
+      "invariant": "An APPROVED row's stored fields are never mutated by the read path; its status stays APPROVED forever and `isReversed` is a read-time derivation, not a stored state. The reversal row carries `reversesRequestId` (non-null) instead."
+    },
+    {
+      "entity": "LeaveRequestQueryParams",
+      "mustExistOrExtend": true,
+      "invariant": "Gains an optional `excludeReversals?: boolean`. When true, rows with a non-null `reversesRequestId` are excluded from the result; when absent/false, both rows are returned. The field is a query DTO concern only and does not alter the entity."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "ILeaveService.list(actor, params) \u2014 read path",
+      "authRule": "Existing role-scoped visibility unchanged: EMPLOYEE sees own only, MANAGER own + direct reports, ADMIN all. Reversal rows inherit the original's employeeId and are visible under the same rules (not hidden).",
+      "idempotent": true,
+      "errorSemantics": "Read-only; no transaction, no client forwarding, no writes. Returns both rows by default; applies `excludeReversals` as a post-filter. Attaches `isReversed` to APPROVED rows only."
+    },
+    {
+      "operation": "ILeaveService.getById(actor, requestId) \u2014 read path",
+      "authRule": "Existing visibility unchanged; a request the caller may not see returns the same NotFoundError (404) as one that does not exist.",
+      "idempotent": true,
+      "errorSemantics": "Read-only; no transaction. For an APPROVED request, resolves and attaches `isReversed` so the caller needs no second query. NotFoundError when absent or not visible."
+    },
+    {
+      "operation": "Wire query parsing for `excludeReversals` (existing parseQuery helper)",
+      "authRule": "Unchanged \u2014 resolveActor at the API boundary.",
+      "idempotent": true,
+      "errorSemantics": "Accepts only the strings 'true'/'false'; any other value throws ValidationError \u2192 400 via sendError. Parsed value is passed through to leaveService.list."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "`excludeReversals` must be declared on the canonical `LeaveRequestQueryParams` DTO (the module that owns it), not a local duplicate.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The derived `isReversed` must be resolved via the existing `findByReversesRequestId` read lookup (or an equivalent read-path lookup) \u2014 the same method the reversal guard uses \u2014 rather than a new query shape.",
+      "referencePath": "src/modules/leave/leave.repository.ts"
+    },
+    {
+      "requirement": "The read projection must extend the existing `LeaveRequest` entity (which already carries `reversesRequestId`) rather than introduce a new named read-model type; `reversesRequestId` must not be stripped from returned rows.",
+      "referencePath": "src/modules/leave/leave.model.ts"
+    },
+    {
+      "requirement": "The smoke stages must follow the existing Postgres-mode stage conventions (knex against `knexfile.smoke_pg` with the per-run schema, `app.inject`, real-value assertions) and reuse the existing sqlite caveat gating.",
+      "referencePath": "scripts/smoke.js"
+    },
+    {
+      "requirement": "The read-path behaviour must match the reconciled business rules 2 (list default both rows + excludeReversals flag) and 3 (derived isReversed on the original APPROVED row, never stored).",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "The read paths must not violate GP-007 (approved rows immutable) or GP-008 (release exactly once) \u2014 the derived flag is read-only and the smoke proof must show the original still APPROVED and the balance released once.",
+      "referencePath": "docs/GOLDEN_PRINCIPLES.md"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/leave/leave.repository.ts \u2014 findByReversesRequestId",
+      "why": "The read path resolves `isReversed` through this existing lookup; the repository is not modified."
+    },
+    {
+      "target": "src/shared/types/index.ts \u2014 LeaveRequestQueryParams",
+      "why": "Owns the query DTO that gains `excludeReversals`; the routes parser and the service both consume it."
+    },
+    {
+      "target": "src/modules/leave/leave.routes.ts \u2014 parseQuery",
+      "why": "The wire boundary that parses `excludeReversals` and passes it to `leaveService.list`."
+    },
+    {
+      "target": "scripts/smoke.js \u2014 Postgres-mode stages",
+      "why": "Hosts the end-to-end GP-008 proof against real Postgres, gated to Postgres mode."
+    }
+  ]
+}
