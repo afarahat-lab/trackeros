@@ -1,0 +1,177 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave",
+      "shared-types",
+      "documentation"
+    ],
+    "affectedLayers": [
+      "domain",
+      "data-access",
+      "test",
+      "docs"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "`LeaveRequestQueryParams` in src/shared/types/index.ts exposes exactly ONE new optional reversal filter field, and no other DTO (CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveRequest) is modified.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`PgLeaveRequestRepository.findByQuery` applies the new filter when it is present, and when it is absent returns BOTH the original APPROVED row and its CANCELLED reversal row \u2014 reversal rows are never silently omitted from an unfiltered query.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`findByQuery` and `findById` both return `reversesRequestId` on every row (null for ordinary rows, the original's id for reversal rows), confirmed against the existing mapRow/COLUMNS threading.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "docs/ARCHITECTURE.md records three new binding rules in the GP-008 section: (i) a reversed original no longer occupies its dates for overlap/\"already on leave\" checks, (ii) an unfiltered GET /leaves double-counts a reversed request, (iii) status=CANCELLED returns both in-place cancellations and reversal rows.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "tests/unit/modules/leave/leave.service.test.ts asserts (a) cancelling an APPROVED request calls repository.create with reversesRequestId = original id, requestedDays 0, status CANCELLED, and approverId/approvalComment/decidedAt/submittedAt null.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The test asserts (b) repository.update is NEVER called with the original id in the APPROVED branch \u2014 the original stays APPROVED \u2014 and (c) usedDays is decremented by the original's requestedDays exactly once.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The test asserts (d) two AuditAction.REVERSE records are written, one per row; (e) a second cancel of the same original throws ConflictError; (f) cancelling a DRAFT/SUBMITTED request still updates in place with AuditAction.CANCEL.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Verification gate passes: `npm run build && npx jest --passWithNoTests --forceExit` (plus `npm run smoke`) exits zero with no new type errors and no regressions in the existing leave service suite.",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "Exactly ONE reversal filter field is added to LeaveRequestQueryParams and used consistently in findByQuery. Do not add two fields, and do not add a new cross-module value type.",
+    "The no-filter default of findByQuery MUST return both the original and its reversal row. Hiding reversal rows by default is forbidden (wire honesty: a client must not be led to believe an approved request is still live).",
+    "The filter field lives on LeaveRequestQueryParams in src/shared/types/index.ts; no other DTO in that file changes, and no new cross-module value type is introduced.",
+    "The HTTP route (leave.routes.ts parseQuery) is NOT modified \u2014 the filter is added at the type/repository layer only.",
+    "scripts/smoke.js is NOT touched \u2014 that is Phase 4.",
+    "Tests use Jest with mocked repositories (the existing Fake* classes) \u2014 no real database connection in the unit suite.",
+    "Phase 1 (model/repository/migration) and Phase 2 (service reversal branch) are fixed contracts \u2014 do not re-open or alter their behaviour; this phase only adds the filter, the docs rules, and the assertions.",
+    "Strict TypeScript: no `any` (use unknown + type guards); all DB access stays behind the repository interface (no inline SQL in the service or tests)."
+  ],
+  "outOfScope": [
+    "The HTTP route / query-string parsing (leave.routes.ts parseQuery) \u2014 the filter is not exposed over the wire in this phase.",
+    "scripts/smoke.js and any real-Postgres smoke proof \u2014 deferred to Phase 4.",
+    "Any consumer of the date-occupancy rule (overlap / \"already on leave\" detection) \u2014 the rule is recorded in ARCHITECTURE.md now but nothing implements it yet.",
+    "Changes to the web client's getAvailableLeaveActions / any frontend keying off reversesRequestId.",
+    "Any change to the leave_requests schema, migration, or the partial unique index \u2014 Phase 1 delivered those."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequestQueryParams",
+      "mustExistOrExtend": true,
+      "invariant": "Gains exactly one optional reversal filter field; all existing fields keep their current optional semantics and the type remains a pure query DTO (no new cross-module value type). Absence of the filter means \"no reversal constraint\" \u2014 never \"exclude reversals\"."
+    },
+    {
+      "entity": "LeaveRequest (read model)",
+      "mustExistOrExtend": true,
+      "invariant": "`reversesRequestId` is part of the canonical read shape and is returned by every read path (findById, findByQuery): null for an ordinary request, the original's id for a reversal row. A reversal row is terminal and never mutated; the original it points at stays APPROVED and immutable."
+    },
+    {
+      "entity": "LeaveRequestReversal (derived, two-row representation)",
+      "mustExistOrExtend": true,
+      "invariant": "A reversed original no longer occupies its dates for overlap / \"already on leave\" checks \u2014 any such check must exclude APPROVED rows that have a reversal pointing at them. This rule is recorded now and consumed by nothing in this phase."
+    },
+    {
+      "entity": "LeaveRequest status=CANCELLED (derived partition)",
+      "mustExistOrExtend": true,
+      "invariant": "status=CANCELLED denotes BOTH in-place cancellations (reversesRequestId null) and reversal rows (reversesRequestId set); the two are discriminated only by reversesRequestId, so a status-only filter returns both and an unfiltered read double-counts a reversed request."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "ILeaveRepository.findByQuery(params, client?)",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Applies the single new reversal filter when present; when absent returns both originals and reversal rows unfiltered. Takes the optional trailing PoolClient and falls back to the shared pool when omitted. No new error semantics."
+    },
+    {
+      "operation": "ILeaveRepository.findById(id, client?)",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns the row with reversesRequestId populated (null for ordinary rows); unchanged signature and error semantics."
+    },
+    {
+      "operation": "LeaveService.cancel(actor, requestId) \u2014 APPROVED branch",
+      "authRule": "Unchanged: owner may cancel own DRAFT/SUBMITTED; APPROVED only by the requester's direct manager or an ADMIN; timing guard blocks startDate <= today (UTC).",
+      "idempotent": false,
+      "errorSemantics": "A second cancel of an already-reversed original throws ConflictError (409), never an idempotent success. The original row is never updated; the reversal row is returned."
+    },
+    {
+      "operation": "LeaveService.cancel(actor, requestId) \u2014 DRAFT/SUBMITTED branch",
+      "authRule": "Unchanged: owner only.",
+      "idempotent": false,
+      "errorSemantics": "Still updates the same row in place to CANCELLED with cancelledBy/cancelledAt and writes AuditAction.CANCEL; SUBMITTED releases pendingDays, DRAFT touches no balance. reversesRequestId stays null."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The new filter field must be added to the existing LeaveRequestQueryParams interface without altering any other DTO in the same file.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "findByQuery must build the new condition through the existing conditions[]/values[] parameterised pattern (no string interpolation of values) and keep the existing ORDER BY start_date DESC / LIMIT / OFFSET behaviour.",
+      "referencePath": "src/modules/leave/leave.repository.ts"
+    },
+    {
+      "requirement": "The reversal row's shape asserted in the tests must match the APPROVED branch already implemented in the service (requestedDays 0, null approval/timing fields, reversesRequestId = original id, status CANCELLED).",
+      "referencePath": "src/modules/leave/leave.service.ts"
+    },
+    {
+      "requirement": "New assertions must follow the established Fake* mocking style (FakeLeaveRepository.createCalls/updateCalls, FakeAuditService.records, FakeUnitOfWork.stubClient) and be added to the existing cancel describe block.",
+      "referencePath": "tests/unit/modules/leave/leave.service.test.ts"
+    },
+    {
+      "requirement": "The new binding rules must extend the existing GP-008 section (feature b9cdf0f5) without contradicting its stated invariants (immutability, at-most-one reversal, release-once, wire honesty).",
+      "referencePath": "docs/ARCHITECTURE.md"
+    },
+    {
+      "requirement": "The reversal semantics documented here must stay consistent with the GP-008 principle statement (approved row immutable, reversal row, release once, second cancel = ConflictError).",
+      "referencePath": "docs/GOLDEN_PRINCIPLES.md"
+    },
+    {
+      "requirement": "The reversal row's persisted column mapping (reverses_request_id \u2192 reversesRequestId via mapRow/COLUMNS) must remain the single source of the read-model field; the filter must reference the same column.",
+      "referencePath": "src/modules/leave/leave.model.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/leave/leave.repository.ts (ILeaveRepository.findByQuery)",
+      "why": "The new filter is applied here; the no-filter default must return both rows."
+    },
+    {
+      "target": "src/shared/types/index.ts (LeaveRequestQueryParams)",
+      "why": "The single new filter field is declared here and consumed by findByQuery."
+    },
+    {
+      "target": "src/modules/leave/leave.service.ts (cancel APPROVED branch)",
+      "why": "The behaviour under test; the assertions must match its already-committed reversal semantics."
+    },
+    {
+      "target": "tests/unit/modules/leave/leave.service.test.ts (cancel describe block)",
+      "why": "Assertions (a)-(f) are added here using the existing fakes."
+    },
+    {
+      "target": "docs/ARCHITECTURE.md (GP-008 section)",
+      "why": "The three new binding rules (date occupancy, double-count, status=CANCELLED) are recorded here."
+    }
+  ]
+}
