@@ -287,3 +287,79 @@ describe('leave routes — GET /leaves and GET /leaves/:id role scoping', () => 
     await app.close();
   });
 });
+
+/**
+ * The `excludeReversals` wire flag is parsed at the HTTP boundary (`parseQuery`) and
+ * passed to the service as the canonical `LeaveRequestQueryParams`. These tests pin the
+ * boundary contract the smoke proof exercises against real Postgres.
+ */
+describe('leave routes — excludeReversals query flag', () => {
+  let app: FastifyInstance;
+  let listCalls: Array<{ actor: LeaveActor; params: unknown }>;
+
+  function buildApp(): FastifyInstance {
+    listCalls = [];
+    const service = {
+      list: jest.fn(async (actor: LeaveActor, params: unknown) => {
+        listCalls.push({ actor, params });
+        return [];
+      }),
+    } as unknown as ILeaveService;
+
+    const instance = Fastify();
+    (instance as unknown as { leaveService: ILeaveService }).leaveService = service;
+    instance.decorateRequest('user', undefined);
+    instance.addHook('preHandler', async (request) => {
+      (request as unknown as { user: unknown }).user = {
+        id: 'emp-1',
+        role: EmployeeRole.EMPLOYEE,
+      };
+    });
+    return instance;
+  }
+
+  beforeEach(async () => {
+    app = buildApp();
+    await app.register(leaveRoutes);
+    await app.ready();
+  });
+
+  afterEach(async () => {
+    await app.close();
+  });
+
+  it('passes excludeReversals=true through as a boolean on the DTO', async () => {
+    const response = await app.inject({ method: 'GET', url: '/leaves?excludeReversals=true' });
+
+    expect(response.statusCode).toBe(200);
+    expect(listCalls).toHaveLength(1);
+    expect(listCalls[0].params).toMatchObject({ excludeReversals: true });
+  });
+
+  it('passes excludeReversals=false through as a boolean on the DTO', async () => {
+    await app.inject({ method: 'GET', url: '/leaves?excludeReversals=false' });
+
+    expect(listCalls[0].params).toMatchObject({ excludeReversals: false });
+  });
+
+  it('leaves excludeReversals unset when the query omits it (both rows by default)', async () => {
+    await app.inject({ method: 'GET', url: '/leaves' });
+
+    expect(listCalls[0].params).not.toHaveProperty('excludeReversals');
+  });
+
+  it.each(['yes', 'TRUE', '1', ''])(
+    'rejects excludeReversals=%p with a 400 ValidationError',
+    async (value) => {
+      const response = await app.inject({
+        method: 'GET',
+        url: `/leaves?excludeReversals=${value}`,
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({ code: 'VALIDATION_ERROR' });
+      // The flag never reaches the service once the boundary rejects it.
+      expect(listCalls).toHaveLength(0);
+    }
+  );
+});
