@@ -302,8 +302,101 @@ export class LeaveService implements ILeaveService {
     }
 
     return this.uow.withTransaction(async (client) => {
-      if (request.status !== LeaveStatus.DRAFT) {
-        // DRAFT reserved no balance, so it neither reads nor writes the balance row.
+      if (request.status === LeaveStatus.APPROVED) {
+        // GP-008: a completed approval is immutable in storage. Cancelling it creates a
+        // NEW reversal row instead of mutating the original, so the APPROVED row keeps
+        // its status, approverId, approvalComment and decidedAt untouched.
+        const existing = await this.repository.findByReversesRequestId(requestId, client);
+        if (existing) {
+          // Binding rule 8: a second reversal is rejected, not idempotent-200 — the two
+          // calls are different requests and an earlier actor's cancellation is what stands.
+          throw new ConflictError('Leave request has already been reversed');
+        }
+
+        // Balance release is unchanged in amount and timing: the full requestedDays goes
+        // back from usedDays exactly once, in this transaction, from the locked row. The
+        // released quantity is always read from the ORIGINAL.
+        const balance = await this.resolveBalance(
+          request.employeeId,
+          request.leaveTypeCode,
+          request.startDate,
+          client,
+          true, // this transaction writes the balance below — lock the row
+        );
+        await this.balanceRepository.update(
+          balance.id,
+          { usedDays: balance.usedDays - request.requestedDays },
+          client,
+        );
+
+        // The reversal row is self-describing (verbatim employeeId/leaveTypeCode/dates)
+        // with requestedDays 0 — a zero makes double-counting structurally impossible,
+        // and the amount is always read from the original via reversesRequestId. The
+        // approval fields stay null: this row was never itself approved.
+        const reversal = await this.repository.create(
+          {
+            employeeId: request.employeeId,
+            leaveTypeCode: request.leaveTypeCode,
+            startDate: request.startDate,
+            endDate: request.endDate,
+            requestedDays: 0,
+            reason: null,
+            status: LeaveStatus.CANCELLED,
+            approverId: null,
+            approvalComment: null,
+            submittedAt: null,
+            decidedAt: null,
+            cancelledBy: actor.id,
+            cancelledAt: new Date(),
+            reversesRequestId: requestId,
+          },
+          client,
+        );
+
+        // Two REVERSE records so neither row is left unaudited: one anchored on the
+        // original (with its derived post-reversal state) and one on the new row.
+        await this.auditService.record(
+          {
+            actorId: actor.id,
+            action: AuditAction.REVERSE,
+            entityType: 'leave_request',
+            entityId: requestId,
+            beforeState: request,
+            afterState: { ...request, status: LeaveStatus.CANCELLED },
+          },
+          client,
+        );
+
+        await this.auditService.record(
+          {
+            actorId: actor.id,
+            action: AuditAction.REVERSE,
+            entityType: 'leave_request',
+            entityId: reversal.id,
+            beforeState: null,
+            afterState: reversal,
+          },
+          client,
+        );
+
+        await this.notificationService.create(
+          {
+            recipientId: request.employeeId,
+            type: 'leave_request',
+            title: 'Leave request cancelled',
+            message: `Your leave request ${requestId} was cancelled.`,
+            relatedEntityType: 'leave_request',
+            relatedEntityId: reversal.id,
+          },
+          client,
+        );
+
+        return reversal;
+      }
+
+      if (request.status === LeaveStatus.SUBMITTED) {
+        // SUBMITTED reserved pendingDays; release them. DRAFT reserved no balance, so it
+        // neither reads nor writes the balance row.
         const balance = await this.resolveBalance(
           request.employeeId,
           request.leaveTypeCode,
@@ -312,21 +405,11 @@ export class LeaveService implements ILeaveService {
           true, // this transaction writes the balance below — lock the row
         );
 
-        if (request.status === LeaveStatus.SUBMITTED) {
-          await this.balanceRepository.update(
-            balance.id,
-            { pendingDays: balance.pendingDays - request.requestedDays },
-            client,
-          );
-        } else {
-          // APPROVED — release the full requestedDays back from usedDays (no pro-rating):
-          // the timing guard above makes cancellation only possible before the leave starts.
-          await this.balanceRepository.update(
-            balance.id,
-            { usedDays: balance.usedDays - request.requestedDays },
-            client,
-          );
-        }
+        await this.balanceRepository.update(
+          balance.id,
+          { pendingDays: balance.pendingDays - request.requestedDays },
+          client,
+        );
       }
 
       const updated = await this.repository.update(
