@@ -1,0 +1,19 @@
+{
+  "scope": "feature f890ed1a-5294-4a63-8df5-8c0e0ad7332f",
+  "attempts": 1,
+  "findings": [
+    {
+      "rule_id": "review/architecture",
+      "file_path": "src/modules/leave/leave.service.ts",
+      "line": 297,
+      "message": "[review/architecture] The terminality guard only inspects the row's own `status`, but a reversal never mutates the original — after the first APPROVED cancellation the original row still reads `status: APPROVED`. So a second `POST /leaves/:id/cancel` on the ORIGINAL id passes this guard (and `assertCanCancel`, which permits an ADMIN/manager to cancel an APPROVED request), enters the transaction, and inserts a second reversal row, which the unique partial index rejects with a raw `DatabaseError` (`duplicate key value violates unique constraint \"leave_requests_reverses_request_id_unique\"`). The route's `sendError` maps that non-AppError to a 500, not the 409 the architecture's error contract specifies: docs/ARCHITECTURE.md states \"This feature adds one 409 case: cancelling an APPROVED request that already has a reversal row throws ConflictError (the release-exactly-once guard)\", and the phase spec's integrationPoints name `findByReversesRequestId` as \"the already-reversed lookup the …",
+      "quoted_line": "    if (request.status === LeaveStatus.CANCELLED) {",
+      "severity": "",
+      "agent_role": "",
+      "status": "open",
+      "first_seen_attempt": 1,
+      "last_seen_attempt": 1,
+      "fixed_at_attempt": null
+    }
+  ]
+}
