@@ -1,0 +1,173 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave"
+    ],
+    "affectedLayers": [
+      "model",
+      "repository",
+      "service",
+      "tests"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "`LeaveRequest` in src/modules/leave/leave.model.ts exposes `reversesRequestId: string | null` as its LAST field (after `cancelledAt`), giving the interface exactly 15 fields; `CreateLeaveRequestInput` remains `Omit<LeaveRequest, 'id'>` and therefore also carries the field. No `LeaveRequestEffectiveState` type is declared in this file.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`PgLeaveRequestRepository` persists and reads back `reversesRequestId`: `create` inserts the column (15 values) from `input.reversesRequestId`, and every read path (`findById`, `findByQuery`, `update`'s RETURNING) maps the stored column to `reversesRequestId` on the returned `LeaveRequest` \u2014 a row created with a non-null value reads back non-null, and a row created with `null` reads back `null`.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "`ILeaveRepository` declares `findByReversesRequestId(reversesRequestId: string, client?: PoolClient): Promise<LeaveRequest | null>` and `PgLeaveRequestRepository` implements it: it returns the matching `LeaveRequest` when a row references the given id, returns `null` (never throws) when none does, and honors the optional trailing `PoolClient` (the query runs on the supplied client when one is passed).",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "`update` cannot write `reverses_request_id`: `UpdateLeaveRequestDto` and the repository's `FIELD_COLUMNS` map do not gain the field, so no `update` call can set or clear it on an existing row.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`LeaveService.create` supplies `reversesRequestId: null` in the object it passes to `repository.create`, so an original request reverses nothing; no other method of `LeaveService` changes in this phase (in particular `cancel` is untouched and no reversal branch exists yet).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`npm run build` (tsc) is clean, the existing Jest suite passes unchanged (no new test cases added this phase), and `npm run smoke` is green \u2014 the `makeRequest` fixture in tests/unit/modules/leave/leave.service.test.ts carries `reversesRequestId: null` so the full `LeaveRequest` literal still type-checks.",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "The persisted column name is `reverses_request_id` and the model field is `reversesRequestId`; the column is nullable text and is NULL on an original request, equal to the original's `id` on a reversal row. The model field must be appended LAST (after `cancelledAt`) and the column appended LAST in the repository's column list, so model order and column order stay aligned.",
+    "The column is write-once at insert and never updated. `UpdateLeaveRequestDto` (src/shared/types/index.ts) and the repository's `FIELD_COLUMNS` map must NOT gain `reversesRequestId`; `update` must remain structurally unable to write this column. This is what keeps an APPROVED row immutable (GP-008).",
+    "The repository must never open BEGIN/COMMIT/ROLLBACK. `findByReversesRequestId` is read-only and must use the existing private `db(client)` helper so the optional trailing `PoolClient` is honored and the shared pool is the fallback when it is omitted.",
+    "`findByReversesRequestId` returns `null` when no row matches and does not throw \u2014 the service decides error semantics (a duplicate reversal becomes a ConflictError in Phase 3). No error type is introduced by this phase.",
+    "No route, controller, or wire-contract change: `reversesRequestId` serializes with the model, so the existing read endpoints expose it automatically. No new endpoint, no new status code, no change to any request body.",
+    "No `LeaveRequestEffectiveState` type is added anywhere in this phase \u2014 that value object is derived, never persisted, and is not part of this feature's file set. No new module, no new cross-module dependency edge, and no change to `src/shared/types/index.ts`.",
+    "Strict TypeScript: no `any` (use `unknown` with type guards), no implicit any, strict null checks. No direct DB access outside the repository layer (GP-001). No hardcoded secrets."
+  ],
+  "outOfScope": [
+    "The APPROVED reversal branch in `LeaveService.cancel` (inserting the new CANCELLED row, releasing the balance once, the duplicate-reversal ConflictError, the CANCEL audit entry and the notification) \u2014 Phase 3. `cancel` must not be touched this phase.",
+    "New test cases for the reversal path (immutability, single release, terminality) \u2014 Phase 4. This phase only keeps the existing suite compiling and green.",
+    "The real-Postgres smoke stage proving the reversal end-to-end \u2014 Phase 5. `scripts/smoke.js` is not modified this phase.",
+    "Any change to the migration from Phase 1 (migrations/20260914000001_add_reverses_request_id_to_leave_requests.js) \u2014 it is read as a dependency, not edited. Also out of scope: any query filter or server-side collapsing of reversal rows in `findByQuery`, and any change to `leave.routes.ts`."
+  ],
+  "ambiguities": [
+    {
+      "description": "Whether `findByReversesRequestId` should be added to the repository interface only, or also surfaced through the service/route layer in this phase.",
+      "options": [
+        "Repository interface + implementation only (service consumes it in Phase 3)",
+        "Also expose a service method now"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "description": "Whether the `makeRequest` fixture in the leave service test constructs a full `LeaveRequest` literal (requiring the new field) or a partial/overrides object (requiring no change).",
+      "options": [
+        "Full literal \u2014 add `reversesRequestId: null`",
+        "Partial/overrides \u2014 no change needed"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "description": "Whether the repository's `COLUMNS` constant should be a single string (current shape) or split into a list; the new column must be appended last either way.",
+      "options": [
+        "Keep the existing single concatenated string, append the column last",
+        "Restructure into an array"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "A row is either an ORIGINAL request (`reversesRequestId` null) or a REVERSAL of one (`reversesRequestId` = the original's `id`). Both are the same entity type with the same 15-field shape; the field is the only discriminator. The persisted lifecycle state set is unchanged (DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED) \u2014 no new persisted status is introduced. The field is set once at insert and never mutated afterwards."
+    },
+    {
+      "entity": "LeaveRequest (canonical shape)",
+      "mustExistOrExtend": true,
+      "invariant": "The canonical shape is a cross-module data contract: no existing field may be renamed, retyped, reordered, or removed, and no field may be added other than `reversesRequestId`. `CreateLeaveRequestInput` stays `Omit<LeaveRequest, 'id'>` \u2014 its form does not change, it only inherits the new field."
+    },
+    {
+      "entity": "leave_requests (persisted row)",
+      "mustExistOrExtend": true,
+      "invariant": "The persisted row must round-trip: a value written to `reverses_request_id` at insert is returned unchanged by every read path, and a NULL is returned as `null` (never `undefined`, never a synthesized value). The repository never derives or defaults the field."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "ILeaveRepository.findByReversesRequestId(reversesRequestId: string, client?: PoolClient): Promise<LeaveRequest | null>",
+      "authRule": "None at this layer \u2014 the repository performs no authorization; role-scoped visibility stays in the service (GP-005).",
+      "idempotent": true,
+      "errorSemantics": "Read-only. Returns the matching LeaveRequest, or `null` when no row references the given id. Never throws for absence; never opens BEGIN/COMMIT/ROLLBACK. Honors the optional trailing PoolClient (falls back to the shared pool when omitted)."
+    },
+    {
+      "operation": "ILeaveRepository.create(input: CreateLeaveRequestInput, client?: PoolClient): Promise<LeaveRequest>",
+      "authRule": "None at this layer.",
+      "idempotent": false,
+      "errorSemantics": "Signature and error semantics unchanged. It now persists `input.reversesRequestId` (nullable) and returns the persisted row including it. A unique-index violation on `reverses_request_id` surfaces as the driver's error and is left to the caller's transaction to roll back \u2014 the repository does not translate it."
+    },
+    {
+      "operation": "ILeaveRepository.update(id: string, changes: UpdateLeaveRequestDto, client?: PoolClient): Promise<LeaveRequest>",
+      "authRule": "None at this layer.",
+      "idempotent": true,
+      "errorSemantics": "Unchanged: NotFoundError(404) when the row is missing (both the empty-changes branch and the zero-affected-row branch). It must remain unable to write `reverses_request_id` \u2014 the field is absent from `UpdateLeaveRequestDto` and from `FIELD_COLUMNS`."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The model field name, nullability and position must match the reconciled entity shape exactly: `reversesRequestId: string | null` appended last after `cancelledAt`, giving the canonical 15-field `LeaveRequest`.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "The repository's column list, row type, `mapRow` mapping and INSERT value list must stay in the same order and cover the same 15 columns as the model \u2014 `reverses_request_id` appended last, matching the model field order, so `mapRow` and the INSERT cannot drift apart.",
+      "referencePath": "src/modules/leave/leave.repository.ts"
+    },
+    {
+      "requirement": "The persisted column must match the Phase 1 migration: nullable text `reverses_request_id`, NULL on an original, equal to the original's `id` on a reversal, write-once, with the unique partial index on non-null values as the exactly-once guarantee. The repository must not assume a NOT NULL constraint or a foreign key.",
+      "referencePath": "migrations/20260914000001_add_reverses_request_id_to_leave_requests.js"
+    },
+    {
+      "requirement": "`UpdateLeaveRequestDto` must remain unchanged \u2014 it must NOT gain `reversesRequestId` \u2014 so the repository's `FIELD_COLUMNS` map (typed `Record<keyof UpdateLeaveRequestDto, string>`) stays exhaustive and `update` stays unable to write the column.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "`LeaveService.create` must supply `reversesRequestId: null` in the `CreateLeaveRequestInput` literal it builds, matching the existing literal's field order and null conventions (an original request reverses nothing). No other line of the service changes.",
+      "referencePath": "src/modules/leave/leave.service.ts"
+    },
+    {
+      "requirement": "The `makeRequest` fixture must construct a complete `LeaveRequest` literal including `reversesRequestId: null`, so the fixture stays assignable to the 15-field interface and `tsc` stays clean. No new test cases are added.",
+      "referencePath": "tests/unit/modules/leave/leave.service.test.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "migrations/20260914000001_add_reverses_request_id_to_leave_requests.js",
+      "why": "Phase 1's migration is the schema contract this phase maps: the column name, nullability and write-once semantics must match it exactly, and the unique partial index is the exactly-once guarantee the later reversal branch relies on."
+    },
+    {
+      "target": "src/shared/types/index.ts (UpdateLeaveRequestDto)",
+      "why": "The repository's `FIELD_COLUMNS` is typed against `UpdateLeaveRequestDto`; leaving the DTO unchanged is what structurally prevents `update` from writing the new column."
+    },
+    {
+      "target": "src/modules/leave/leave.service.ts (create)",
+      "why": "The only consumer of `CreateLeaveRequestInput` today; it must supply the new field as null or the build breaks. It is also the seam Phase 3 extends with the reversal branch."
+    },
+    {
+      "target": "src/modules/leave/leave.routes.ts (read endpoints)",
+      "why": "No change is required: `reversesRequestId` serializes with the model, so the existing read endpoints expose it automatically. The route layer must not be touched."
+    },
+    {
+      "target": "src/shared/db (IUnitOfWork / PoolClient convention)",
+      "why": "`findByReversesRequestId` must accept the optional trailing `PoolClient` so Phase 3 can call it inside the service-owned transaction; the repository never opens the transaction itself."
+    }
+  ]
+}
