@@ -639,16 +639,24 @@ agents:
     - HARNESS.json
     - docs/ARCHITECTURE.md
     - docs/GOLDEN_PRINCIPLES.md
-    # 🔴 TEMPORARY (2026-09-28) — 40 -> 85. Feature b9cdf0f5 phase 3 blocked `gate-inconclusive`:
-    # the constraint-agent was cut at 40 turns having spent 359,238 of its 1,200,000 budget (30%),
-    # so the ITERATION cap bound and the park message advising a budget raise named the wrong knob.
-    # Arithmetic: 359,238 / 40 = 8,981 budget-tokens per turn; Pro finishes a gate in 7-41 calls and
-    # Flash needs ~2x, so 2 x 41 = 82 is the projected worst case and 85 covers it. 85 x 8,981 =
-    # 763,385, comfortably inside the 1.2M already declared above, so iterations stay the binding
-    # bound. REMOVE when the platform's gate stops answering existence questions with repo-wide
-    # greps — the capped attempt spent 36 of its 60 executeScript calls on tree sweeps its own
-    # prompt forbids. Exit condition tracked in the platform's STATE.md.
-    max_iterations: 85
+    # 🔴 TEMPORARY (2026-09-28, Brief 2) — 40 -> 62 turns. Supersedes an 85 set hours earlier from
+    # a cross-model ratio; this is derived from the SUCCESSFUL attempts in the two runs themselves.
+    # Every constraint-agent attempt in runs 34a1c500 and b9cdf0f5:
+    #     successful  14, 15, 19, 31, 31   (max 31, twice, in two different runs)
+    #     capped      40, 40, 40           (ALL censored at the cap, so we have no observation
+    #                                       of what a hard phase actually needs)
+    # 40 was only 1.29x the largest successful attempt. 2 x 31 = 62 lets a phase be twice as
+    # demanding as anything observed to converge. token_budget stays at the 1,200,000 this project
+    # already declared: 62 x 15,584 (the worst observed per-turn spend) = 966,208, so iterations
+    # remain the binding bound with room to spare.
+    # WHAT THE TURNS ACTUALLY BUY, from the capped attempt's 69 tool calls: rule R6 (symbol
+    # ownership) drove 26 of them, 25 being repo-wide sweeps, against 8 calls for ALL FIVE
+    # layering and dependency rules combined. R6 asks a whole-repository question while the same
+    # prompt forbids sweeping the tree; the final turn before the cap was building a complete
+    # `export` index of src/ and piping it through `uniq -d`.
+    # LOWER THIS once the platform answers symbol ownership deterministically — re-measure the
+    # call counts then. Exit condition tracked in the platform's STATE.md.
+    max_iterations: 62
     schema:
       models:
         _Finding:
