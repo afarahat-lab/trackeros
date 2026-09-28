@@ -298,6 +298,17 @@ export class LeaveService implements ILeaveService {
       throw new ConflictError('This leave request has already been cancelled');
     }
     await this.assertCanCancel(actor, request);
+    // The APPROVED row is immutable: reversing it inserts a new row and leaves this
+    // one reading APPROVED, so its own status cannot reveal that it is already
+    // reversed. Resolve the existing reversal up front and conflict here rather than
+    // letting the unique index on reverses_request_id surface as a raw database
+    // error (500) on a second cancel of the same original.
+    if (request.status === LeaveStatus.APPROVED) {
+      const existingReversal = await this.repository.findByReversesRequestId(request.id);
+      if (existingReversal) {
+        throw new ConflictError('This leave request has already been reversed');
+      }
+    }
     // Cancellation is only valid strictly before the leave's calendar start day: a
     // startDate of today (or earlier) is blocked, which is what removes any need to
     // pro-rate the released balance.
