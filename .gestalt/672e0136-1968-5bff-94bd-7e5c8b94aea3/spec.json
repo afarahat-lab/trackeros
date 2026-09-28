@@ -1,0 +1,171 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave",
+      "balance",
+      "audit",
+      "notification"
+    ],
+    "affectedLayers": [
+      "service"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "Cancelling an APPROVED leave request inserts a NEW leave_requests row (status CANCELLED, reversesRequestId = the original request's id) and issues ZERO update calls against the original row; the original row still reads status APPROVED with its approverId, approvalComment and decidedAt unchanged.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The new reversal row carries employeeId, leaveTypeCode, startDate, endDate and reason copied from the original; status CANCELLED; reversesRequestId = original.id; requestedDays = 0; approverId, approvalComment, submittedAt and decidedAt all null; cancelledBy = actor.id; cancelledAt set.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The balance release happens exactly once per APPROVED cancellation: usedDays is decremented by the ORIGINAL row's requestedDays (not the reversal's 0), pendingDays is untouched, the balance row is read with forUpdate = true before the write, and exactly one balance update call is made.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Cancelling a request whose status is already CANCELLED throws ConflictError (409, code CONFLICT) before any work: no insert, no balance read/write, no audit record, no notification.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The APPROVED reversal path runs inside exactly one uow.withTransaction callback (uow.callCount === 1) with the transaction client forwarded to the reversal insert, the balance read and write, the audit record and the notification create.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Exactly one CANCEL audit record is written for a reversal (AuditAction.CANCEL, entityType 'leave_request', entityId = the ORIGINAL request id, beforeState = the original row, afterState = the new reversal row) and exactly one synchronous cancellation notification is created for the original request's employeeId.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The DRAFT path (no balance read or write) and the SUBMITTED path (pendingDays -= requestedDays, in-place update to CANCELLED) behave exactly as before, and the existing authorization (assertCanCancel), timing (startDate <= today \u2192 ConflictError) and NotFoundError guards still hold.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "npm run build is clean, the existing Jest suite is green, and npm run smoke is green.",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "Only the APPROVED branch of LeaveService.cancel may change. The actor/authorization guards (assertCanCancel), the startDate <= today timing guard, the DRAFT path, the SUBMITTED path, the single uow.withTransaction wrapping, and the client threading through every repository/service call must remain byte-for-byte as they are today.",
+    "The APPROVED original row is immutable: no repository.update call may be issued against it, and its status, approverId, approvalComment and decidedAt must not be written by any path in this phase.",
+    "The balance release must use the ORIGINAL row's requestedDays and must occur exactly once \u2014 no double release, no skipped release, and no release ledger.",
+    "A request whose status is already CANCELLED must be rejected with ConflictError (409) before any work is done; chained reversals are not implemented.",
+    "ILeaveService.cancel's signature must not change, leave.routes.ts must not change, and no reason/comment field may be added to the cancel wire contract.",
+    "No new files and no new route; the change is confined to src/modules/leave/leave.service.ts (approximately 1 file).",
+    "The service owns the unit of work: cancel must use the injected IUnitOfWork.withTransaction and must never import a pool, a client, or a module-level db helper; repositories never open BEGIN/COMMIT/ROLLBACK.",
+    "No tests in this phase \u2014 Phase 4 owns them; the existing Jest suite must remain green."
+  ],
+  "outOfScope": [
+    "Unit tests for the reversal path (immutability, single release, terminality) \u2014 Phase 4 owns them.",
+    "The real-Postgres smoke stage proving the reversal end-to-end \u2014 Phase 5 owns it.",
+    "Any change to leave.model.ts, leave.repository.ts, leave.routes.ts, the migration, or ILeaveService.cancel's signature \u2014 Phase 2 delivered the model/repository and the route already calls cancel unchanged.",
+    "Chained reversals, a release ledger, a reason/comment field on the cancel wire contract, and any server-side collapsing or filtering of reversal rows in list/read paths.",
+    "Amending reconciled.json to match the phase-authoritative audit entityId decision \u2014 documentation reconciliation is not part of this phase."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "A row is either an original request (reversesRequestId null) or a reversal of one (reversesRequestId = the original's id). Once a row reaches APPROVED its status, approverId, approvalComment and decidedAt are immutable \u2014 a reversal never updates it. A reversal row is terminal: it can never be cancelled or reversed again. At most one reversal exists per original request."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "A reversal releases the original reservation exactly once, against the accrual period containing the ORIGINAL request's startDate: usedDays -= original.requestedDays, pendingDays untouched. The reversal row itself (requestedDays 0, status CANCELLED) reserves and releases nothing, so it can never trigger a second release."
+    },
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "A reversal writes exactly one CANCEL entry, in the same transaction as the reversal insert, with beforeState = the untouched APPROVED original and afterState = the new CANCELLED reversal row."
+    },
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "A reversal creates exactly one synchronous cancellation notification to the ORIGINAL request's employeeId, in the same transaction as the reversal insert; no notification is sent to the actor."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "ILeaveService.cancel(actor, requestId): Promise<LeaveRequest>",
+      "authRule": "Unchanged: the owner may cancel their own DRAFT or SUBMITTED request; only the requester's direct manager or an ADMIN may cancel an APPROVED request (no self-cancellation of one's own APPROVED request). Enforced by assertCanCancel, never inline in the route.",
+      "idempotent": false,
+      "errorSemantics": "NotFoundError (404) for an unknown id; ForbiddenError (403) on an authorization failure; ConflictError (409) when startDate <= today, and ConflictError (409) when the request's status is already CANCELLED (terminality). Returns the new CANCELLED reversal row for the APPROVED path, and the updated row for DRAFT/SUBMITTED."
+    },
+    {
+      "operation": "ILeaveRepository.create(input, client?)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Must accept all 15 LeaveRequest fields (CreateLeaveRequestInput = Omit<LeaveRequest,'id'>), including reversesRequestId, and must be called with the transaction client so the reversal insert joins the caller's unit of work."
+    },
+    {
+      "operation": "IBalanceRepository.findByKey(employeeId, leaveTypeCode, periodStart, periodEnd, client?, forUpdate?)",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "The release read must pass forUpdate = true together with the transaction client so the row lock is taken before the write; a missing balance row surfaces NotFoundError (404) via resolveBalance."
+    },
+    {
+      "operation": "IAuditService.record(entry, client?) and INotificationService.create(input, client?)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "Both must accept and forward the optional trailing PoolClient so the audit record and the notification join the reversal transaction; neither opens its own transaction."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The reversal insert must supply all 15 fields of CreateLeaveRequestInput, including reversesRequestId, matching the LeaveRequest model field names and nullability exactly.",
+      "referencePath": "src/modules/leave/leave.model.ts"
+    },
+    {
+      "requirement": "The reversal insert must go through ILeaveRepository.create with the transaction client; the original row must never be passed to ILeaveRepository.update, and reversesRequestId must not be writable via update (FIELD_COLUMNS/UpdateLeaveRequestDto exclude it).",
+      "referencePath": "src/modules/leave/leave.repository.ts"
+    },
+    {
+      "requirement": "The APPROVED branch must preserve the existing cancel contract: assertCanCancel, the startDate <= today timing guard, the DRAFT/SUBMITTED in-place paths, the single uow.withTransaction, and the client threaded to every call.",
+      "referencePath": "src/modules/leave/leave.service.ts"
+    },
+    {
+      "requirement": "The reversal row's status must use LeaveStatus.CANCELLED and the audit action must use AuditAction.CANCEL \u2014 the canonical enum members, never bare string literals.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The balance release must resolve the accrual period via the shared periodContaining helper (anchored on the employee's hireDate) and read the balance with forUpdate = true before writing, matching the submit/approve/reject pattern.",
+      "referencePath": "src/shared/date/index.ts"
+    },
+    {
+      "requirement": "The transaction boundary must follow the AGENTS.md decision: the service owns the unit of work via the injected IUnitOfWork.withTransaction, participating repository/service methods take the client as an optional last parameter, and no repository opens BEGIN/COMMIT/ROLLBACK.",
+      "referencePath": "AGENTS.md"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/leave/leave.repository.ts \u2014 ILeaveRepository.create / findByReversesRequestId",
+      "why": "The reversal row is inserted through create (all 15 fields, client threaded); findByReversesRequestId is the already-reversed lookup the terminality/exactly-once guard relies on."
+    },
+    {
+      "target": "src/modules/balance/balance.repository.ts \u2014 IBalanceRepository.findByKey / update",
+      "why": "The single balance release reads with forUpdate = true and writes usedDays -= original.requestedDays inside the reversal transaction."
+    },
+    {
+      "target": "src/modules/audit/audit.service.ts \u2014 IAuditService.record",
+      "why": "The CANCEL audit record (GP-002) is written in the same transaction with the client forwarded."
+    },
+    {
+      "target": "src/modules/notification/notification.service.ts \u2014 INotificationService.create",
+      "why": "The synchronous cancellation notification to the requester is created in the same transaction with the client forwarded."
+    },
+    {
+      "target": "src/shared/db/unit-of-work.ts \u2014 IUnitOfWork.withTransaction",
+      "why": "The whole reversal operation runs inside one withTransaction callback; the service never imports a pool or client directly."
+    }
+  ]
+}
