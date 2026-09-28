@@ -1,0 +1,172 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave",
+      "balance",
+      "audit",
+      "notification"
+    ],
+    "affectedLayers": [
+      "unit"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "A new describe block covering the APPROVED reversal path exists inside tests/unit/modules/leave/leave.service.test.ts (no second test file), and the full Jest suite passes green.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Immutability acceptance test: after cancelling an APPROVED request, the original row still reads status APPROVED with approverId, approvalComment and decidedAt unchanged, and the fake repository recorded ZERO update calls against the original id; a NEW row is created with status CANCELLED, reversesRequestId === original.id, requestedDays === 0, approverId/approvalComment/decidedAt/submittedAt all null, cancelledBy === actor.id, cancelledAt set, and employeeId/leaveTypeCode/startDate/endDate/reason copied from the original.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Single-release test: usedDays is decremented by exactly the ORIGINAL row's requestedDays (not the reversal's 0), pendingDays is untouched, the balance is read with forUpdate = true before the write, and exactly ONE balance update call is recorded (no double release, no skipped release).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Side-effects test: exactly one CANCEL audit entry (AuditAction.CANCEL, entityType 'leave_request', entityId === the ORIGINAL id) and exactly one cancellation notification to the requester are recorded.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Atomicity test: uow.callCount === 1 and the stub client is forwarded to the reversal insert, the balance read and write, the audit record and the notification create.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Terminality test: cancelling a row whose status is already CANCELLED throws ConflictError (409) and performs no insert, no balance write, no audit and no notification.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Regression: the existing DRAFT (no balance touch) and SUBMITTED (pendingDays release) cancel paths still pass unchanged, and the existing authorization, timing and NotFoundError guards still hold.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "npm run build is clean, the full Jest suite is green, and npm run smoke is green.",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "Test-only phase: no production source changes. Do not modify src/modules/leave/leave.service.ts, leave.model.ts, leave.repository.ts, or any other src/ file.",
+    "Extend the existing suite at tests/unit/modules/leave/leave.service.test.ts only \u2014 do not create a second test file and do not rewrite the existing cancel describe block.",
+    "Reuse the existing eight in-memory fakes and the makeRequest/makeActor/makeBalance/makeEmployee/makePolicy fixtures; do not introduce parallel fakes or fixtures.",
+    "FakeLeaveRepository must record create calls together with the forwarded client and must implement findByReversesRequestId; makeRequest must carry reversesRequestId: null for originals.",
+    "Assertions must be containment-based (e.g. .some(...), length checks) rather than exact-call-order dependent, matching the existing suite's transaction assertions.",
+    "Strict TypeScript: no implicit any, strict null checks; use unknown with type guards instead of any (HARNESS constraint no-any).",
+    "Tests must not query a database directly or import a pool/client; all data access goes through the injected fakes (GP-001).",
+    "Verification commands: build = tsc --noEmit; test = jest --passWithNoTests --forceExit; smoke = node scripts/smoke.js. All three must pass."
+  ],
+  "outOfScope": [
+    "Any production source change to the leave service, model, repository, or other src/ modules \u2014 this phase is test-only.",
+    "Integration/e2e tests exercising the real PostgreSQL reversal path, the unique index on reverses_request_id, or the HTTP layer.",
+    "Rewriting or re-asserting the existing cancel describe block's DRAFT/SUBMITTED/authorization/timing cases beyond confirming they still pass.",
+    "Reconciling the stale reconciled.json text (audit entityId, findByReversesRequestId rationale) \u2014 documentation drift is not fixed in this phase.",
+    "New behavior for reversal rows (e.g. re-cancelling a reversal, listing reversals) beyond the terminality guard already implemented."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest (original APPROVED row)",
+      "mustExistOrExtend": true,
+      "invariant": "Once APPROVED, the row is immutable with respect to cancellation: status stays APPROVED and approverId, approvalComment and decidedAt are never written. Cancellation of an APPROVED request must not produce any update against the original id."
+    },
+    {
+      "entity": "LeaveRequest (reversal row)",
+      "mustExistOrExtend": true,
+      "invariant": "A reversal row is a NEW row with status CANCELLED and reversesRequestId pointing at the original id; it is terminal (never cancelled or reversed again) and carries requestedDays 0 so it reserves and releases nothing. Its employeeId, leaveTypeCode, startDate, endDate and reason mirror the original; approverId, approvalComment, submittedAt and decidedAt are null; cancelledBy is the acting actor and cancelledAt is set."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "Cancelling an APPROVED request releases usedDays exactly once, by the ORIGINAL row's requestedDays; pendingDays is untouched. The balance row is read with forUpdate = true before the write, and exactly one balance update occurs."
+    },
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "Exactly one CANCEL audit entry is written per APPROVED cancellation, with entityType 'leave_request' and entityId equal to the ORIGINAL request id (not the reversal row id)."
+    },
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "Exactly one cancellation notification is emitted to the requester (recipientId = original employeeId), related to the ORIGINAL request id."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "LeaveService.cancel(actor, requestId) \u2014 APPROVED path",
+      "authRule": "Only the requester's direct manager or an ADMIN may cancel an APPROVED request; the owner and non-direct managers are rejected with ForbiddenError. Missing/invalid actor is rejected with UnauthorizedError/ForbiddenError.",
+      "idempotent": false,
+      "errorSemantics": "A request already in status CANCELLED throws ConflictError (409) before any transaction work \u2014 no insert, no balance write, no audit, no notification. A leave whose startDate is today or earlier throws ConflictError. An unknown request throws NotFoundError."
+    },
+    {
+      "operation": "ILeaveRepository.create(input, client?)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "The reversal insert must be invoked with the transaction client forwarded as the optional last parameter; the fake must record the forwarded client so the test can assert it equals the stub client."
+    },
+    {
+      "operation": "ILeaveRepository.findByReversesRequestId(reversesRequestId, client?)",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Must exist on the fake and return the row whose reversesRequestId matches, or null. The service does not call it in the APPROVED path (terminality is a pre-transaction status guard), but the interface must remain implemented."
+    },
+    {
+      "operation": "IBalanceRepository.findByKey(..., client?, forUpdate?)",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "The APPROVED cancellation must read the balance with forUpdate = true before writing it; the fake records forUpdate so the test can assert it."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Reuse the existing eight in-memory fakes (FakeLeaveRepository, FakeBalanceRepository, FakeAuditService, FakeNotificationService, FakeValidationService, FakeEmployeeService, FakePolicyService, FakeUnitOfWork) and the makeRequest/makeActor/makeBalance/makeEmployee/makePolicy fixtures exactly as defined; do not duplicate them.",
+      "referencePath": "tests/unit/modules/leave/leave.service.test.ts"
+    },
+    {
+      "requirement": "The reversal field names and semantics asserted must match the LeaveRequest contract: status, reversesRequestId, requestedDays, approverId, approvalComment, submittedAt, decidedAt, cancelledBy, cancelledAt, employeeId, leaveTypeCode, startDate, endDate, reason.",
+      "referencePath": "src/modules/leave/leave.model.ts"
+    },
+    {
+      "requirement": "The findByReversesRequestId signature (reversesRequestId: string, client?: PoolClient) and the create(input, client?) signature the fake implements must match the repository interface.",
+      "referencePath": "src/modules/leave/leave.repository.ts"
+    },
+    {
+      "requirement": "The asserted APPROVED-cancel behavior (no original update, reversal row creation, usedDays release by original requestedDays, CANCEL audit with entityId = original id, single notification, pre-transaction CANCELLED guard throwing ConflictError) must match the implemented service.",
+      "referencePath": "src/modules/leave/leave.service.ts"
+    },
+    {
+      "requirement": "Transaction assertions must follow the existing containment-based pattern (uow.callCount === 1, client === uow.stubClient forwarded to each participating call) rather than exact call ordering.",
+      "referencePath": "tests/unit/modules/leave/leave.service.test.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/leave/leave.service.ts (LeaveService.cancel APPROVED branch)",
+      "why": "The tests exercise the implemented reversal behavior; the service is the system under test and must not be modified."
+    },
+    {
+      "target": "src/modules/leave/leave.repository.ts (ILeaveRepository.create / findByReversesRequestId)",
+      "why": "The fake must satisfy this interface, including the optional-last-parameter client convention."
+    },
+    {
+      "target": "src/modules/leave/leave.model.ts (LeaveRequest / CreateLeaveRequestInput)",
+      "why": "Field names and nullability asserted by the reversal tests come from this contract."
+    },
+    {
+      "target": "src/shared/db (IUnitOfWork)",
+      "why": "Atomicity assertions rely on the FakeUnitOfWork stub client and callCount."
+    },
+    {
+      "target": "src/shared/types (LeaveStatus, AuditAction)",
+      "why": "Status and audit-action enums asserted in the new cases."
+    }
+  ]
+}
