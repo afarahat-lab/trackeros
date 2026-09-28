@@ -429,11 +429,15 @@ agents:
     prompt_extensions: []
     profile: context
     reference_paths:
-    - HARNESS.json
+    # §3 — narrowed to the files this agent MAINTAINS. Audited on run f890ed1a: all five
+    # previous references were read exactly 8 times each (once per invocation) — the turn-1
+    # bulk load, not evidence of need. GOLDEN_PRINCIPLES.md dropped because Brief 1 means this
+    # agent cannot write it and documenting what a phase built does not need to read it;
+    # HARNESS.json and PLAN.md dropped as redundant with the injected phase spec.
     - docs/ARCHITECTURE.md
-    - docs/GOLDEN_PRINCIPLES.md
+    - docs/DOMAIN.md
+    - docs/DECISIONS.md
     - AGENTS.md
-    - PLAN.md
     artifact_path: .gestalt/{correlation_id}/context-updates.json
     token_budget: 800000
     schema:
@@ -444,6 +448,17 @@ agents:
               type: str
               optional: false
               description: Context file path, e.g. docs/DOMAIN.md or AGENTS.md
+            section:
+              type: str
+              optional: true
+              description: >-
+                STRONGLY PREFERRED. The exact markdown heading text whose body this update
+                replaces, e.g. "Phase 3 delivered" — copy it verbatim from the heading index in
+                your task. With it, `content` is the NEW BODY OF THAT SECTION ONLY and every
+                other byte of the file is left untouched, so you need only read that section.
+                You may write the body alone — the heading line is kept for you.
+                Omit it ONLY to create a new file or to rewrite one whole, which requires having
+                read the entire file and is refused otherwise.
             content:
               type: str
               optional: false
@@ -608,7 +623,7 @@ agents:
     - Each architectural layer communicates only with its immediately adjacent layer. Layers must not bypass intermediate layers.
     - Dependencies flow in one direction only — from outer layers toward inner layers. Inner layers must not depend on outer layers. Separately, a CROSS-MODULE dependency is permitted ONLY if the importing module's entry in the dependency map in ARCHITECTURE.md lists the imported module. An import of a module that is absent from that list IS a violation even when both modules sit at the same layer — report it with rule id dependency-direction.
     - Error handling must be explicit. Callers must not be exposed to unhandled failures from dependencies.
-    - Do not redefine a symbol another module already owns. Before declaring an error class, DTO, interface, enum, or constant, check whether a symbol representing the SAME concept is already exported by another module; if so, import it from that module's public entry point instead of declaring a second copy. The test is conceptual identity, NOT name identity — a symbol that shares a name but represents a genuinely DIFFERENT concept (different fields or meaning, owned by THIS module) is a legitimately distinct declaration and is not a violation; only flag a declaration that duplicates the shape and meaning of an existing exported symbol.
+    - 'Do not redefine a symbol another module already owns. The platform has ALREADY enumerated every exported declaration in this repository and given you the complete list of names exported by more than one module, in the ''Symbol-ownership candidates (R6)'' section below. Judge those candidates: for each one, read the declarations and decide whether they are the SAME CONCEPT (same shape, same meaning, one rightful owner) or genuinely DIFFERENT concepts that happen to share a name. The test is conceptual identity, NOT name identity — a shared name with different fields or meaning, owned by THIS module, is a legitimately distinct declaration and is not a violation. Where they ARE the same concept, the fix is to import from the owning module''s public entry point instead of declaring a second copy. DO NOT search, grep, list or sweep the tree for candidates: the list is computed and complete, and a sweep is how this rule used to consume an entire review budget without reaching a verdict. If the section is absent, this repository has no cross-module name collisions and R6 passes.'
     verificationGuidance:
     - Before evaluating any finding, read ARCHITECTURE.md to understand this project's specific layer names, boundaries, and directory structure. Use this to determine what constitutes the data access layer, business logic layer, and routing layer for this project.
     - A finding is only valid if it violates a rule given the actual structure of this project as described in ARCHITECTURE.md.
@@ -633,7 +648,7 @@ agents:
       temperature: 0.0
       max_tokens: 4000
     tools:
-      builtin: [executeScript, readFile, searchFiles, getFileTree]
+      builtin: [executeScript, readFile, searchFiles, getFileTree, gitDiff]
     prompt_extensions: []
     reference_paths:
     - HARNESS.json
@@ -1258,6 +1273,7 @@ agents:
       - readFile
       - searchFiles
       - getFileTree
+      - gitDiff
     reference_paths:
     - HARNESS.json
     - docs/ARCHITECTURE.md
