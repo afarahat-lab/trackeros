@@ -62,6 +62,21 @@ As implemented (Phase 2): `LeaveRequest` carries `reversesRequestId: string | nu
 - The reconciled architecture described `findByReversesRequestId` as the pre-release "already reversed" lookup; the implementation does **not** call it in `cancel` — the terminality guard is the `status === CANCELLED` check, and the unique partial index is the structural backstop. The repository method exists but is currently unused by the service.
 - The derived `LeaveRequestEffectiveState` / `REVERSED` value object described in the reconciled architecture is **not** implemented (the phase spec explicitly excluded it); no persisted status was added.
 
+**Reversal tests as built (Phase 4)** — test-only phase; no production source changed. `tests/unit/modules/leave/leave.service.test.ts` gained a `cancel — APPROVED reversal` describe block (extending the existing suite — no second test file, and the existing `cancel` describe block was not rewritten), reusing the eight in-memory fakes and the `makeRequest`/`makeActor`/`makeBalance`/`makeEmployee`/`makePolicy` fixtures. `FakeLeaveRepository` now records `create` calls together with the forwarded client (`createCalls`) and implements `findByReversesRequestId`; `makeRequest` carries `reversesRequestId: null` for originals. Cases:
+
+- **Immutability (the acceptance test)** — after cancelling an APPROVED request the stored original still reads `status: APPROVED` with its `approverId`, `approvalComment` and `decidedAt` unchanged, and the fake recorded **zero** `update` calls against the original id; a NEW row is created with `status: CANCELLED`, `reversesRequestId === original.id`, `requestedDays === 0`, `approverId`/`approvalComment`/`submittedAt`/`decidedAt` all `null`, `cancelledBy === actor.id`, `cancelledAt` set, and `employeeId`/`leaveTypeCode`/`startDate`/`endDate`/`reason` copied from the original.
+- **Single release** — `usedDays` decremented by exactly the ORIGINAL row's `requestedDays` (not the reversal's 0), `pendingDays` untouched, the balance read with `forUpdate = true` before the write, and exactly ONE balance `update` call.
+- **Side effects** — exactly one CANCEL audit entry (`AuditAction.CANCEL`, `entityType 'leave_request'`, `entityId` = the ORIGINAL id) and one cancellation notification to the requester (`relatedEntityId` = the ORIGINAL id).
+- **Atomicity** — `uow.callCount === 1` with the stub client forwarded to the reversal insert, the balance read/write, the audit record and the notification create.
+- **Terminality** — cancelling a row already in status `CANCELLED` throws `ConflictError` (409) and performs no insert, no balance read/write, no audit, no notification, and opens no transaction (`uow.callCount === 0`).
+
+Assertions are containment-based (`.some(...)`, length checks), matching the existing suite's transaction assertions.
+
+**Divergences from the reconciled architecture worth noting (Phase 4):**
+- The tests assert the audit `entityId` and the notification `relatedEntityId` against the ORIGINAL request id, matching the implemented service — not the reconciled architecture's rule 8/9 (which named the NEW reversal row). The tests pin the code as built.
+- `findByReversesRequestId` is exercised only as an interface-completeness check on the fake (it resolves the reversal row); `cancel` does not call it, so no test asserts a pre-release "already reversed" lookup.
+- The reconciled architecture's derived `LeaveRequestEffectiveState` / `REVERSED` state is not asserted anywhere — it is not implemented.
+
 ### CreateLeaveRequestDto
 
 | Field | Type | Required |
