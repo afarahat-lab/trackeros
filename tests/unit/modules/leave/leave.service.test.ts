@@ -1000,6 +1000,30 @@ describe('LeaveService', () => {
       expect(notificationService.inputs).toHaveLength(0);
       expect(uow.callCount).toBe(0);
     });
+
+    it('rejects a second cancel of an already-reversed APPROVED original with ConflictError and no work', async () => {
+      const original = await seedApproved();
+
+      // The first cancel inserts the reversal row; the original keeps reading APPROVED.
+      await service.cancel(manager, original.id);
+      repository.createCalls.length = 0;
+      balanceRepository.findByKeyCalls.length = 0;
+      balanceRepository.updateCalls.length = 0;
+      auditService.records.length = 0;
+      notificationService.inputs.length = 0;
+      uow.callCount = 0;
+
+      // A second cancel of the SAME original must conflict before entering the
+      // transaction, rather than racing the unique index into a raw 500.
+      await expect(service.cancel(manager, original.id)).rejects.toThrow(ConflictError);
+
+      expect(repository.createCalls).toHaveLength(0);
+      expect(balanceRepository.findByKeyCalls).toHaveLength(0);
+      expect(balanceRepository.updateCalls).toHaveLength(0);
+      expect(auditService.records).toHaveLength(0);
+      expect(notificationService.inputs).toHaveLength(0);
+      expect(uow.callCount).toBe(0);
+    });
   });
 });
 
