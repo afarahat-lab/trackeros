@@ -1,6 +1,6 @@
 {
   "scope": "feature f890ed1a-5294-4a63-8df5-8c0e0ad7332f",
-  "attempts": 1,
+  "attempts": 2,
   "findings": [
     {
       "rule_id": "review/architecture",
@@ -10,9 +10,22 @@
       "quoted_line": "    if (request.status === LeaveStatus.CANCELLED) {",
       "severity": "",
       "agent_role": "",
-      "status": "open",
+      "status": "fixed",
       "first_seen_attempt": 1,
       "last_seen_attempt": 1,
+      "fixed_at_attempt": 2
+    },
+    {
+      "rule_id": "review/test-reliability",
+      "file_path": "scripts/smoke.js",
+      "line": 395,
+      "message": "[review/test-reliability] Stage 9's cancellable span is derived as `max(now, curPeriod.start) + 2 days`, but the comment above it requires the span to be INSIDE the current accrual period (\"must be future-dated ... AND inside the CURRENT period, which is where stage 8 re-keyed bal-1 — otherwise resolveBalance finds no row and the request never reaches APPROVED\"). When the smoke run happens within 2 days of the period end (for the seeded hireDate 2020-01-01 with accrualPeriodMonths 12, the period ends Jan 1), `now + 2 days` lands on or past `curPeriod.end`. `periodContaining` is half-open `[start, end)`, so `resolveBalance` then resolves the NEXT period, whose `leave_balances` row does not exist (stage 8 re-keyed `bal-1` to the current period only). `POST /leaves` returns 404 and stage 9a fails — a date-dependent CI flake that only reproduces near the period boundary. The span should be clamped to stay strictly inside `[curPeriod.start, curPeriod.end)` (e.g. anchor on `curPeriod.start` …",
+      "quoted_line": "        Math.max(Date.now(), curPeriod.start.getTime()) + 2 * dayMs,",
+      "severity": "",
+      "agent_role": "",
+      "status": "open",
+      "first_seen_attempt": 2,
+      "last_seen_attempt": 2,
       "fixed_at_attempt": null
     }
   ]
