@@ -362,6 +362,211 @@ console.log(`\n  smoke mode: ${MODE}${PG ? '' : '  (persistence NOT covered — 
         throw new Error(`seeded balance available should be 25, got ${annualBalance.available}`);
       }
       ok('stage 8 balances — /balances/me returns exactly the seeded balance (sick omitted)');
+
+      // ── Stage 9 — real-Postgres reversal proof ─────────────────────────────────
+      // A cancellation of an APPROVED request must NOT rewrite the approved row.
+      // cancel() inserts a NEW terminal reversal row (status CANCELLED,
+      // reversesRequestId = original.id) and releases the ORIGINAL's requestedDays
+      // from usedDays exactly once. This stage proves all three properties against
+      // real Postgres with real values — not status codes.
+      //
+      // Stage 9 needs a SECOND actor: an APPROVED request may only be cancelled by a
+      // MANAGER or ADMIN, never by its owner. Mint an ADMIN token with `signToken` and
+      // seed the matching employee row so the audit/notification writes stay real.
+      const { LeaveStatus } = require('../src/shared/types');
+      const ADMIN_ID = 'smoke-admin';
+
+      const knexAdmin = require('knex')(require('../knexfile').smoke_pg);
+      try {
+        await knexAdmin('employees').insert({
+          id: ADMIN_ID, employee_number: 'E-0002', first_name: 'Smoke', last_name: 'Admin',
+          email: 'smoke-admin@example.com', role: EmployeeRole.ADMIN,
+          manager_id: null, department: 'Operations',
+          hire_date: '2020-01-01', employment_status: EmploymentStatus.ACTIVE,
+        });
+      } finally { await knexAdmin.destroy(); }
+      const adminToken = signToken({ id: ADMIN_ID, role: EmployeeRole.ADMIN });
+
+      // The cancellable span must be future-dated (cancel blocks a leave that already
+      // began) AND inside the CURRENT period, which is where stage 8 re-keyed bal-1 —
+      // otherwise resolveBalance finds no row and the request never reaches APPROVED.
+      const dayMs = 86_400_000;
+      const cancelStartDate = new Date(
+        Math.max(Date.now(), curPeriod.start.getTime()) + 2 * dayMs,
+      );
+      const cancelEndDate = new Date(cancelStartDate.getTime() + dayMs);
+      const cancelStartStr = cancelStartDate.toISOString().slice(0, 10);
+      const cancelEndStr = cancelEndDate.toISOString().slice(0, 10);
+
+      // 9a — create + submit + approve, so a genuine APPROVED row exists.
+      const created9 = await app.inject({
+        method: 'POST', url: '/leaves',
+        headers: { authorization: `Bearer ${loginToken}` },
+        payload: {
+          leaveTypeCode: LeaveTypeCode.ANNUAL,
+          startDate: cancelStartStr,
+          endDate: cancelEndStr,
+        },
+      });
+      if (created9.statusCode !== 201) {
+        throw new Error(`stage 9 create returned ${created9.statusCode}: ${String(created9.payload)}`);
+      }
+      const originalId = JSON.parse(created9.payload).id;
+      if (typeof originalId !== 'string' || originalId.length === 0) {
+        throw new Error(`stage 9 create returned no id: ${String(created9.payload)}`);
+      }
+
+      const submitted9 = await app.inject({
+        method: 'POST', url: `/leaves/${originalId}/submit`,
+        headers: { authorization: `Bearer ${loginToken}` },
+      });
+      if (submitted9.statusCode !== 200) {
+        throw new Error(`stage 9 submit returned ${submitted9.statusCode}: ${String(submitted9.payload)}`);
+      }
+
+      const approved9 = await app.inject({
+        method: 'POST', url: `/leaves/${originalId}/approve`,
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      if (approved9.statusCode !== 200) {
+        throw new Error(`stage 9 approve returned ${approved9.statusCode}: ${String(approved9.payload)}`);
+      }
+      const approvedBody = JSON.parse(approved9.payload);
+      if (approvedBody.status !== LeaveStatus.APPROVED || approvedBody.approverId !== ADMIN_ID) {
+        throw new Error(`stage 9 approve did not produce an APPROVED row: ${String(approved9.payload)}`);
+      }
+      const originalRequestedDays = approvedBody.requestedDays;
+      ok(`stage 9a approve — request ${originalId} is APPROVED by ${ADMIN_ID} (${originalRequestedDays} day(s))`);
+
+      // 9b — record usedDays immediately before the cancellation, as a delta baseline.
+      const readUsedDays = async () => {
+        const resp = await app.inject({
+          method: 'GET', url: '/balances/me',
+          headers: { authorization: `Bearer ${loginToken}` },
+        });
+        if (resp.statusCode !== 200) {
+          throw new Error(`stage 9 GET /balances/me returned ${resp.statusCode}`);
+        }
+        const list = JSON.parse(resp.payload);
+        const annual = list.find((b) => b.leaveTypeCode === LeaveTypeCode.ANNUAL);
+        if (!annual) throw new Error(`stage 9 no annual balance: ${String(resp.payload)}`);
+        return annual.usedDays;
+      };
+      const usedBefore = await readUsedDays();
+      if (usedBefore !== originalRequestedDays) {
+        throw new Error(
+          `stage 9 balance before cancel: usedDays ${usedBefore} != approved ${originalRequestedDays}`
+        );
+      }
+
+      // 9c — cancel the APPROVED request as ADMIN.
+      const cancel9 = await app.inject({
+        method: 'POST', url: `/leaves/${originalId}/cancel`,
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      if (cancel9.statusCode !== 200) {
+        throw new Error(`stage 9 cancel returned ${cancel9.statusCode}: ${String(cancel9.payload)}`);
+      }
+      ok('stage 9c cancel — POST /leaves/:id/cancel on the APPROVED request returned 200');
+
+      // 9d — immutability: the ORIGINAL row still reads APPROVED, keeps its
+      // approverId/decidedAt, and carries no reversesRequestId.
+      const originalAfter = await app.inject({
+        method: 'GET', url: `/leaves/${originalId}`,
+        headers: { authorization: `Bearer ${loginToken}` },
+      });
+      if (originalAfter.statusCode !== 200) {
+        throw new Error(`stage 9 GET /leaves/${originalId} returned ${originalAfter.statusCode}`);
+      }
+      const originalRow = JSON.parse(originalAfter.payload);
+      if (originalRow.status !== LeaveStatus.APPROVED) {
+        throw new Error(`stage 9 immutability: original status is ${originalRow.status}, expected APPROVED`);
+      }
+      if (originalRow.approverId !== approvedBody.approverId ||
+          originalRow.decidedAt !== approvedBody.decidedAt) {
+        throw new Error(
+          `stage 9 immutability: original approverId/decidedAt changed: ${JSON.stringify(originalRow)}`
+        );
+      }
+      if (originalRow.reversesRequestId !== null) {
+        throw new Error(
+          `stage 9 immutability: original reversesRequestId is ${String(originalRow.reversesRequestId)}, expected null`
+        );
+      }
+      ok('stage 9d immutability — the original row still reads APPROVED with its approval intact');
+
+      // 9e — reversal: GET /leaves returns BOTH rows. No server-side collapsing and
+      // no query filter — reversesRequestId alone tells the two apart.
+      const list9 = await app.inject({
+        method: 'GET', url: '/leaves',
+        headers: { authorization: `Bearer ${loginToken}` },
+      });
+      if (list9.statusCode !== 200) throw new Error(`stage 9 GET /leaves returned ${list9.statusCode}`);
+      const rows9 = JSON.parse(list9.payload);
+      const listedOriginal = rows9.find((l) => l.id === originalId);
+      const listedReversal = rows9.find((l) => l.reversesRequestId === originalId);
+      if (!listedOriginal) {
+        throw new Error('stage 9 reversal: the original row is missing from GET /leaves');
+      }
+      if (!listedReversal) {
+        throw new Error('stage 9 reversal: no row references the original via reversesRequestId');
+      }
+      if (listedReversal.id === originalId) {
+        throw new Error('stage 9 reversal: original and reversal share an id');
+      }
+      if (listedOriginal.reversesRequestId !== null) {
+        throw new Error('stage 9 reversal: the listed original carries a reversesRequestId');
+      }
+      if (listedReversal.status !== LeaveStatus.CANCELLED) {
+        throw new Error(`stage 9 reversal: reversal status is ${listedReversal.status}, expected CANCELLED`);
+      }
+      if (listedReversal.requestedDays !== 0) {
+        throw new Error(`stage 9 reversal: reversal requestedDays is ${listedReversal.requestedDays}, expected 0`);
+      }
+      if (listedReversal.approverId !== null || listedReversal.decidedAt !== null) {
+        throw new Error(
+          `stage 9 reversal: reversal was never approved but carries approverId/decidedAt: ` +
+          `${JSON.stringify(listedReversal)}`
+        );
+      }
+      for (const field of ['startDate', 'endDate', 'leaveTypeCode', 'employeeId']) {
+        if (listedReversal[field] !== listedOriginal[field]) {
+          throw new Error(
+            `stage 9 reversal: ${field} mismatch ${JSON.stringify(listedReversal[field])} vs ` +
+            `${JSON.stringify(listedOriginal[field])}`
+          );
+        }
+      }
+      ok('stage 9e reversal — a distinct CANCELLED row references the original via reversesRequestId');
+
+      // 9f — single release: usedDays fell by exactly the original's requestedDays.
+      // Releasing twice would land at usedBefore - 2*requestedDays and fail here.
+      const usedAfter = await readUsedDays();
+      if (usedAfter !== usedBefore - originalRequestedDays) {
+        throw new Error(
+          `stage 9 single release: usedDays ${usedBefore} -> ${usedAfter}, expected a single ` +
+          `release of ${originalRequestedDays}`
+        );
+      }
+      ok(`stage 9f single release — usedDays ${usedBefore} -> ${usedAfter} (released once)`);
+
+      // 9g — terminality: the reversal row is CANCELLED, so a second cancel conflicts.
+      const recancel9 = await app.inject({
+        method: 'POST', url: `/leaves/${listedReversal.id}/cancel`,
+        headers: { authorization: `Bearer ${loginToken}` },
+      });
+      if (recancel9.statusCode !== 409) {
+        throw new Error(
+          `stage 9 terminality: re-cancelling the reversal returned ${recancel9.statusCode}, expected 409`
+        );
+      }
+      const recancelBody = JSON.parse(recancel9.payload);
+      if (recancelBody.code !== 'CONFLICT') {
+        throw new Error(
+          `stage 9 terminality: re-cancel code is ${String(recancelBody.code)}, expected CONFLICT`
+        );
+      }
+      ok('stage 9g terminality — re-cancelling the reversal row returns 409 CONFLICT');
     }
   } catch (e) { die('probe', e); }
   finally {
