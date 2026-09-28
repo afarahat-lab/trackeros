@@ -1,0 +1,126 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave",
+      "persistence"
+    ],
+    "affectedLayers": [
+      "migration",
+      "database-schema"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "Exactly one new file exists at `migrations/20260914000001_add_reverses_request_id_to_leave_requests.js`, is CommonJS, and exports both `up` and `down` as async functions taking `knex` \u2014 matching the signature of the two existing migrations. No other file in the repo is added or modified.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "After `up` runs, `leave_requests` has a `reverses_request_id` column that is nullable and text-typed (no NOT NULL, no default, no foreign key constraint), and every pre-existing row reads NULL for it \u2014 i.e. the addition is backward compatible with rows created before the migration.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "After `up` runs, a UNIQUE index named `leave_requests_reverses_request_id_unique` exists on `leave_requests(reverses_request_id)` and is PARTIAL \u2014 restricted to rows where `reverses_request_id IS NOT NULL`. Verified behaviourally: inserting two rows with NULL `reverses_request_id` succeeds, while inserting a second row with the same non-null `reverses_request_id` is rejected by the database.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "`down` reverses `up` completely and in the correct order: the index is dropped before the column, and after `down` the `leave_requests` table has no `reverses_request_id` column and no leftover index of that name. A migrate:latest -> migrate:rollback -> migrate:latest cycle completes without error.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "The migration applies cleanly from an empty database on BOTH engines the smoke check uses: `npx knex migrate:latest --env test` (sqlite3) and `--env smoke_pg` (PostgreSQL) both exit 0 with the new migration recorded in `knex_migrations`.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "The full verification command stays green with no source changes: `npm run build` (tsc) exits 0, the Jest suite passes, and `npm run smoke` passes \u2014 the nullable column is inert because the leave repository's `COLUMNS` list does not yet select it.",
+      "testable": true,
+      "layer": "e2e"
+    }
+  ],
+  "constraints": [
+    "Scope is exactly one file: `migrations/20260914000001_add_reverses_request_id_to_leave_requests.js`. No TypeScript source, model, repository, service, route, seed, or test file may be created or modified in this phase.",
+    "The column must be nullable text with NO foreign key, NO NOT NULL, and NO default. The self-reference to `leave_requests.id` is expressed only by the value convention, not by a DB constraint \u2014 portability across pg and sqlite3 is the reason.",
+    "The unique index MUST be partial (`WHERE reverses_request_id IS NOT NULL`). A plain unique index would collide on the NULLs carried by every original row and break the existing table.",
+    "`down` must drop the index before the column, and both steps must be idempotent-safe (`DROP INDEX IF EXISTS`). Dropping the column first would leave a dangling index.",
+    "The migration must be portable across pg and sqlite3 \u2014 no engine-specific DDL, no `t.uuid`, no `json`/`jsonb`, no `ALTER ... ADD CONSTRAINT`. Both engines must accept the column, the partial unique index, and the drop sequence.",
+    "The migration file must be CommonJS (`exports.up` / `exports.down`), not ESM, and its timestamp prefix must sort after `20260913000000` and `20260913000001` so it applies last.",
+    "The file must carry a comment documenting the semantics: NULL on an original request, equal to the original's `id` on a reversal row, and a reversal row is terminal (never itself reversed).",
+    "No secondary non-unique access-path index on `reverses_request_id` in this phase \u2014 only the column and the unique partial index."
+  ],
+  "outOfScope": [
+    "Any TypeScript change: `leave.model.ts`, `leave.repository.ts`, `leave.service.ts`, routes, controllers, or the `@trackeros/contracts` surface. The column is inert until Phase 2.",
+    "Any test file \u2014 no new Jest unit tests, no smoke stage additions. Phase 4 and Phase 5 own those.",
+    "A foreign key constraint from `reverses_request_id` to `leave_requests.id`, despite the reconciled architecture prose calling it a self-referencing FK. The task and PLAN.md explicitly forbid it for pg/sqlite3 portability.",
+    "The secondary non-unique `reverses_request_id` access-path index mentioned incidentally in the reconciled architecture. Only the unique partial index is in scope.",
+    "The reversal business logic itself \u2014 the APPROVED branch of `LeaveService.cancel`, balance release, audit record, notification, and terminality rejection. Phase 3 owns it.",
+    "Any change to `knexfile.js`, `package.json`, seeds, or the existing two migrations."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "leave_requests.reverses_request_id",
+      "mustExistOrExtend": true,
+      "invariant": "NULL means the row is an original request; a non-null value equals the `id` of the original request this row reverses. The column is write-once at insert and is never updated \u2014 a reversal row is terminal and is never itself reversed."
+    },
+    {
+      "entity": "leave_requests (reversal uniqueness)",
+      "mustExistOrExtend": true,
+      "invariant": "At most one row may exist per non-null `reverses_request_id`; any number of rows may carry NULL. This is the structural exactly-once guarantee that a completed approval is reversed at most once."
+    },
+    {
+      "entity": "leave_requests (existing rows)",
+      "mustExistOrExtend": true,
+      "invariant": "Every row that existed before this migration remains valid and readable with `reverses_request_id` NULL; no existing column, constraint, or index is altered or dropped."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "Knex migration contract: `exports.up(knex)` and `exports.down(knex)`",
+      "authRule": "Not applicable \u2014 schema DDL, no request context, no RBAC surface.",
+      "idempotent": false,
+      "errorSemantics": "Both functions are async and must reject/throw on failure so knex aborts the migration and does not record it in `knex_migrations`. `up` must be safe to run against a database where the two prior migrations have already applied. `down` must not throw when the index or column is already absent."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Match the module format, function signature, and leading block-comment convention of the existing migrations exactly \u2014 CommonJS `exports.up = async function up(knex)` / `exports.down = async function down(knex)`, with a comment explaining the column's nullability and semantics.",
+      "referencePath": "migrations/20260913000001_add_password_hash_to_employees.js"
+    },
+    {
+      "requirement": "The column type convention must match how the initial schema types `leave_requests.id` and its free-text columns \u2014 `t.text(...)`, nullable, string ids rather than native uuid \u2014 so the schema stays portable across pg and sqlite3.",
+      "referencePath": "migrations/20260913000000_initial_schema.js"
+    },
+    {
+      "requirement": "The migration must be discovered and applied by the existing knex configuration without any config change: `migrations.directory` is `./migrations` and `tableName` is `knex_migrations` for every env, including the per-run `smoke_pg` schema.",
+      "referencePath": "knexfile.js"
+    },
+    {
+      "requirement": "The column name must be exactly `reverses_request_id` (snake_case, matching the table's existing column naming) so the Phase 2 repository `COLUMNS`/`mapRow` mapping to `reversesRequestId` resolves against a real column.",
+      "referencePath": "src/modules/leave/leave.repository.ts"
+    },
+    {
+      "requirement": "The index name must be exactly `leave_requests_reverses_request_id_unique` so the `down` drop and any later reference resolve to the same object.",
+      "referencePath": "migrations/20260914000001_add_reverses_request_id_to_leave_requests.js"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "scripts/smoke.js stage 1 (`npx knex migrate:latest --env test|smoke_pg`)",
+      "why": "The smoke check migrates from empty on sqlite3 or real Postgres; this migration must apply cleanly on both or the whole smoke run fails."
+    },
+    {
+      "target": "src/modules/leave/leave.repository.ts (COLUMNS / LeaveRequestRow / mapRow / create)",
+      "why": "Phase 2 threads this column through the repository. This phase must leave the column inert \u2014 the repository's fixed COLUMNS list does not select it yet, so no existing query breaks."
+    },
+    {
+      "target": "knexfile.js migration config (directory, tableName, smoke_pg searchPath/schemaName)",
+      "why": "The file is picked up by the existing config with no change; the per-run smoke schema means the migration must be schema-agnostic (no hardcoded schema qualification)."
+    }
+  ]
+}
