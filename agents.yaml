@@ -639,7 +639,16 @@ agents:
     - HARNESS.json
     - docs/ARCHITECTURE.md
     - docs/GOLDEN_PRINCIPLES.md
-    max_iterations: 40
+    # 🔴 TEMPORARY (2026-09-28) — 40 -> 85. Feature b9cdf0f5 phase 3 blocked `gate-inconclusive`:
+    # the constraint-agent was cut at 40 turns having spent 359,238 of its 1,200,000 budget (30%),
+    # so the ITERATION cap bound and the park message advising a budget raise named the wrong knob.
+    # Arithmetic: 359,238 / 40 = 8,981 budget-tokens per turn; Pro finishes a gate in 7-41 calls and
+    # Flash needs ~2x, so 2 x 41 = 82 is the projected worst case and 85 covers it. 85 x 8,981 =
+    # 763,385, comfortably inside the 1.2M already declared above, so iterations stay the binding
+    # bound. REMOVE when the platform's gate stops answering existence questions with repo-wide
+    # greps — the capped attempt spent 36 of its 60 executeScript calls on tree sweeps its own
+    # prompt forbids. Exit condition tracked in the platform's STATE.md.
+    max_iterations: 85
     schema:
       models:
         _Finding:
@@ -1245,7 +1254,9 @@ agents:
     - HARNESS.json
     - docs/ARCHITECTURE.md
     - docs/GOLDEN_PRINCIPLES.md
-    max_iterations: 60
+    # 🔴 TEMPORARY (2026-09-28) — 60 -> 120, purely to keep this whole-tree tier above the
+    # per-phase one raised to 85 above. Not evidence about this agent: it has never capped.
+    max_iterations: 120
     token_budget: 1200000
     schema:
       models:
