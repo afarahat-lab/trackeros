@@ -391,8 +391,16 @@ console.log(`\n  smoke mode: ${MODE}${PG ? '' : '  (persistence NOT covered — 
       // began) AND inside the CURRENT period, which is where stage 8 re-keyed bal-1 —
       // otherwise resolveBalance finds no row and the request never reaches APPROVED.
       const dayMs = 86_400_000;
+      // Clamp into [curPeriod.start, curPeriod.end): near the period boundary
+      // `now + 2 days` can land on or past curPeriod.end, which makes periodContaining
+      // resolve the NEXT period — whose leave_balances row does not exist — and the
+      // request never reaches APPROVED. Keep the start strictly inside the current
+      // period while still landing a whole period-boundary margin below it.
       const cancelStartDate = new Date(
-        Math.max(Date.now(), curPeriod.start.getTime()) + 2 * dayMs,
+        Math.min(
+          Math.max(Date.now(), curPeriod.start.getTime()) + 2 * dayMs,
+          curPeriod.end.getTime() - dayMs,
+        ),
       );
       const cancelEndDate = new Date(cancelStartDate.getTime() + dayMs);
       const cancelStartStr = cancelStartDate.toISOString().slice(0, 10);

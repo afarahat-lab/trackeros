@@ -81,7 +81,7 @@ Assertions are containment-based (`.some(...)`, length checks), matching the exi
 **Reversal smoke proof as built (Phase 5)** — test-only phase; no production source changed. The only project file touched is `scripts/smoke.js`, which gained a Postgres-only **stage 9** (inside the existing `if (PG)` branch, so it is skipped with the existing persistence caveat in sqlite mode) proving the reversal end to end against real Postgres with real values, not status codes.
 
 - **Second actor** — stage 9 seeds a second employee row (`smoke-admin`, `EmployeeRole.ADMIN`, employee number `E-0002`) and mints an ADMIN token with `signToken`; the seeded `smoke-employee` is an EMPLOYEE and can neither approve nor cancel an APPROVED request. The admin token is hand-minted (like stages 3b/3c), not a login token.
-- **9a — create + submit + approve** — `POST /leaves` (login token) → `POST /leaves/:id/submit` → `POST /leaves/:id/approve` (ADMIN token); asserts 201/200/200 and that the approved body reads `status === APPROVED` with `approverId === 'smoke-admin'`. Captures `originalId` from the create response (never predicted — the repository generates it via `randomUUID()`) and `originalRequestedDays` from the approve response. The cancellable span is future-dated (`Math.max(Date.now(), curPeriod.start) + 2 days`) and inside the CURRENT period that stage 8 re-keyed `bal-1` to, so `resolveBalance` finds the row and the request reaches APPROVED.
+- **9a — create + submit + approve** — `POST /leaves` (login token) → `POST /leaves/:id/submit` → `POST /leaves/:id/approve` (ADMIN token); asserts 201/200/200 and that the approved body reads `status === APPROVED` with `approverId === 'smoke-admin'`. Captures `originalId` from the create response (never predicted — the repository generates it via `randomUUID()`) and `originalRequestedDays` from the approve response. The cancellable span is future-dated and clamped strictly inside the CURRENT period that stage 8 re-keyed `bal-1` to (see the Phase 7 clamp below), so `resolveBalance` finds the row and the request reaches APPROVED.
 - **9b — baseline** — reads `usedDays` via `GET /balances/me` immediately before the cancellation and asserts it equals `originalRequestedDays`.
 - **9c — cancel** — `POST /leaves/:id/cancel` as the ADMIN token; asserts 200.
 - **9d — immutability** — `GET /leaves/:id` for the ORIGINAL id still returns `status === APPROVED` with its `approverId`/`decidedAt` byte-identical to the approve response, and `reversesRequestId === null`.
@@ -103,6 +103,14 @@ Assertions are containment-based (`.some(...)`, length checks), matching the exi
 
 **Divergences from the reconciled architecture worth noting (Phase 6):**
 - None — the pre-transaction `findByReversesRequestId` guard is exactly what the reconciled architecture's transaction contract prescribed ("Pre-transaction reads (findById, assertCanCancel, timing guard, findByReversesRequestId) happen outside"), and the unique index remains the in-transaction backstop.
+
+**Smoke stage 9 period-boundary clamp as built (Phase 7)** — test-only phase; no production source changed. The only project file touched is `scripts/smoke.js` (stage 9's cancellable-span derivation).
+
+- **The clamp** — stage 9's `cancelStartDate` is now `new Date(Math.min(Math.max(Date.now(), curPeriod.start.getTime()) + 2 * dayMs, curPeriod.end.getTime() - dayMs))` (with `cancelEndDate = cancelStartDate + 1 day`), replacing the earlier unclamped `Math.max(Date.now(), curPeriod.start) + 2 days`. The upper bound is load-bearing: near the current period's boundary, `now + 2 days` can land on or past `curPeriod.end`, which makes `periodContaining` resolve the NEXT period — whose `leave_balances` row does not exist — so `resolveBalance` throws NotFoundError and the request never reaches APPROVED. The clamp keeps the start strictly inside the current period (a whole period-boundary margin below `curPeriod.end`) while still future-dating it, so the timing guard (`startDate <= today` → ConflictError) and the balance lookup both hold.
+- **No other stage changed** — stages 1–8 and 9b–9g are untouched; the assertions (immutability, reversal row shape, single release, terminality) are unchanged.
+
+**Divergences from the plan worth noting (Phase 7):**
+- None — this is a robustness fix to the Phase 5 smoke stage, not a plan-prescribed phase. It corrects the Phase 5 delivered note above, which described the span as the unclamped `Math.max(Date.now(), curPeriod.start) + 2 days`.
 
 ### CreateLeaveRequestDto
 
