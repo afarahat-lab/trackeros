@@ -845,6 +845,162 @@ describe('LeaveService', () => {
       await expect(service.cancel(makeActor(), 'missing')).rejects.toThrow(NotFoundError);
     });
   });
+
+  // -------------------------------------------------------------------------
+  // APPROVED cancellation: the original row is immutable and the reversal is a
+  // NEW terminal row. Balance is released exactly once, off the original's days.
+  // -------------------------------------------------------------------------
+  describe('cancel — APPROVED reversal', () => {
+    const manager = makeActor({ id: MANAGER_ID, role: EmployeeRole.MANAGER });
+    const FUTURE_START = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    const FUTURE_END = new Date(Date.now() + 32 * 24 * 60 * 60 * 1000);
+    const DECIDED_AT = new Date('2024-05-20T10:00:00Z');
+    const USED_DAYS = 10;
+
+    async function seedApproved(): Promise<LeaveRequest> {
+      await balanceRepository.create(makeBalance({ usedDays: USED_DAYS, pendingDays: 2 }));
+      const original = await repository.create(
+        makeRequest({
+          status: LeaveStatus.APPROVED,
+          startDate: FUTURE_START,
+          endDate: FUTURE_END,
+          approverId: MANAGER_ID,
+          approvalComment: 'Enjoy the time off',
+          decidedAt: DECIDED_AT,
+          reason: 'Family trip',
+        })
+      );
+      // Ignore the seeding writes; only the cancellation's writes are asserted.
+      balanceRepository.updateCalls.length = 0;
+      balanceRepository.findByKeyCalls.length = 0;
+      repository.createCalls.length = 0;
+      return original;
+    }
+
+    it('inserts a terminal reversal row and never mutates the approved original', async () => {
+      const original = await seedApproved();
+
+      const cancelled = await service.cancel(manager, original.id);
+
+      // The original row is untouched: same status, approver, comment and decision.
+      const storedOriginal = repository.rows.find((r) => r.id === original.id);
+      expect(storedOriginal).toBeDefined();
+      expect(storedOriginal?.status).toBe(LeaveStatus.APPROVED);
+      expect(storedOriginal?.approverId).toBe(MANAGER_ID);
+      expect(storedOriginal?.approvalComment).toBe('Enjoy the time off');
+      expect(storedOriginal?.decidedAt).toBe(DECIDED_AT);
+      // ...and no UPDATE was ever issued against it.
+      expect(repository.updateCalls.filter((c) => c.id === original.id)).toHaveLength(0);
+
+      // A brand new reversal row points back at the original.
+      expect(cancelled.id).not.toBe(original.id);
+      expect(cancelled.status).toBe(LeaveStatus.CANCELLED);
+      expect(cancelled.reversesRequestId).toBe(original.id);
+      expect(cancelled.requestedDays).toBe(0);
+      expect(cancelled.approverId).toBeNull();
+      expect(cancelled.approvalComment).toBeNull();
+      expect(cancelled.decidedAt).toBeNull();
+      expect(cancelled.submittedAt).toBeNull();
+      expect(cancelled.cancelledBy).toBe(MANAGER_ID);
+      expect(cancelled.cancelledAt).toBeInstanceOf(Date);
+      // Span and descriptive fields mirror the original so the row self-describes.
+      expect(cancelled.employeeId).toBe(original.employeeId);
+      expect(cancelled.leaveTypeCode).toBe(original.leaveTypeCode);
+      expect(cancelled.startDate).toBe(original.startDate);
+      expect(cancelled.endDate).toBe(original.endDate);
+      expect(cancelled.reason).toBe(original.reason);
+
+      const reversalRow = repository.rows.find((r) => r.reversesRequestId === original.id);
+      expect(reversalRow).toBeDefined();
+      expect(reversalRow?.id).toBe(cancelled.id);
+      // The reversal itself satisfies the interface lookup (terminal, never re-cancelled).
+      await expect(
+        repository.findByReversesRequestId(original.id)
+      ).resolves.toMatchObject({ id: cancelled.id, status: LeaveStatus.CANCELLED });
+    });
+
+    it('releases usedDays exactly once by the ORIGINAL days and never touches pendingDays', async () => {
+      const original = await seedApproved();
+
+      await service.cancel(manager, original.id);
+
+      // The row is read with a lock before it is written.
+      expect(balanceRepository.findByKeyCalls).toHaveLength(1);
+      expect(balanceRepository.findByKeyCalls[0].forUpdate).toBe(true);
+      expect(balanceRepository.findByKeyCalls[0].client).toBe(uow.stubClient);
+
+      // Exactly one release: usedDays decremented by the original's requestedDays,
+      // not the reversal's 0. pendingDays is untouched.
+      expect(balanceRepository.updateCalls).toHaveLength(1);
+      expect(balanceRepository.updateCalls[0].id).toBe(balanceRepository.rows[0].id);
+      expect(balanceRepository.updateCalls[0].changes.usedDays).toBe(
+        USED_DAYS - original.requestedDays
+      );
+      expect(balanceRepository.updateCalls[0].changes.usedDays).toBe(USED_DAYS - REQUESTED_DAYS);
+      expect(balanceRepository.updateCalls[0].changes.pendingDays).toBeUndefined();
+      expect(balanceRepository.rows[0].usedDays).toBe(USED_DAYS - REQUESTED_DAYS);
+      expect(balanceRepository.rows[0].pendingDays).toBe(2);
+    });
+
+    it('writes exactly one CANCEL audit entry for the original and one notification to the requester', async () => {
+      const original = await seedApproved();
+
+      await service.cancel(manager, original.id);
+
+      expect(auditService.records).toHaveLength(1);
+      expect(auditService.records[0].action).toBe(AuditAction.CANCEL);
+      expect(auditService.records[0].entityType).toBe('leave_request');
+      expect(auditService.records[0].entityId).toBe(original.id);
+      expect(auditService.records[0].actorId).toBe(MANAGER_ID);
+
+      expect(notificationService.inputs).toHaveLength(1);
+      expect(notificationService.inputs[0].recipientId).toBe(original.employeeId);
+      expect(notificationService.inputs[0].relatedEntityType).toBe('leave_request');
+      expect(notificationService.inputs[0].relatedEntityId).toBe(original.id);
+    });
+
+    it('performs the whole reversal inside one unit of work with the stub client forwarded everywhere', async () => {
+      const original = await seedApproved();
+
+      await service.cancel(manager, original.id);
+
+      expect(uow.callCount).toBe(1);
+      const client = uow.stubClient;
+      expect(repository.createCalls).toHaveLength(1);
+      expect(repository.createCalls[0].client).toBe(client);
+      expect(balanceRepository.findByKeyCalls[0].client).toBe(client);
+      expect(balanceRepository.updateCalls[0].client).toBe(client);
+      expect(auditService.recordClients[0]).toBe(client);
+      expect(notificationService.createClients[0]).toBe(client);
+    });
+
+    it('rejects cancelling an already-CANCELLED row with ConflictError and does no work', async () => {
+      await balanceRepository.create(makeBalance({ usedDays: USED_DAYS }));
+      await repository.create(
+        makeRequest({
+          status: LeaveStatus.CANCELLED,
+          startDate: FUTURE_START,
+          endDate: FUTURE_END,
+          cancelledBy: MANAGER_ID,
+          cancelledAt: new Date(),
+          reversesRequestId: 'lr-original',
+        })
+      );
+      balanceRepository.updateCalls.length = 0;
+      balanceRepository.findByKeyCalls.length = 0;
+      repository.createCalls.length = 0;
+
+      await expect(service.cancel(manager, 'lr-1')).rejects.toThrow(ConflictError);
+
+      // Terminal: no insert, no balance read/write, no audit, no notification, no transaction.
+      expect(repository.createCalls).toHaveLength(0);
+      expect(balanceRepository.findByKeyCalls).toHaveLength(0);
+      expect(balanceRepository.updateCalls).toHaveLength(0);
+      expect(auditService.records).toHaveLength(0);
+      expect(notificationService.inputs).toHaveLength(0);
+      expect(uow.callCount).toBe(0);
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
