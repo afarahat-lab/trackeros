@@ -37,11 +37,14 @@ Represents a leave record managed by the `leave` module, including leave request
 | status | LeaveRequestStatus | true |
 | approvedBy | string \| null | false |
 | approvedAt | Date \| null | false |
+| reversesRequestId | string \| null | false |
 | createdAt | Date | true |
 | updatedAt | Date | true |
 
 **Relationships**
 - `Employee` — many-to-one
+
+**Reversal link (`reversesRequestId`)** — added by migration `20260914000001_add_reverses_request_id_to_leave_requests.js` (feature `f890ed1a`, Phase 1). The column is nullable text (`reverses_request_id`), with no NOT NULL, no default, and no foreign-key constraint (the self-reference to `leave_requests.id` is a value convention only, for pg/sqlite3 portability). Semantics: `NULL` means the row is an original request; a non-null value equals the `id` of the original request this row reverses. The column is write-once at insert and never updated — a reversal row is terminal and is never itself reversed. A UNIQUE **partial** index `leave_requests_reverses_request_id_unique` on `reverses_request_id` restricted to `WHERE reverses_request_id IS NOT NULL` enforces at most one reversal per original (the structural exactly-once guarantee); the partial predicate is load-bearing because every original row carries NULL and NULLs must not collide. The column is inert until the leave model/repository thread it through (a later phase); the existing repository `COLUMNS` list does not yet select it.
 
 ### CreateLeaveRequestDto
 
