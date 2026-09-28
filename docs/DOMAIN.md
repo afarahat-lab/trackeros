@@ -77,6 +77,22 @@ Assertions are containment-based (`.some(...)`, length checks), matching the exi
 - `findByReversesRequestId` is exercised only as an interface-completeness check on the fake (it resolves the reversal row); `cancel` does not call it, so no test asserts a pre-release "already reversed" lookup.
 - The reconciled architecture's derived `LeaveRequestEffectiveState` / `REVERSED` state is not asserted anywhere — it is not implemented.
 
+**Reversal smoke proof as built (Phase 5)** — test-only phase; no production source changed. The only project file touched is `scripts/smoke.js`, which gained a Postgres-only **stage 9** (inside the existing `if (PG)` branch, so it is skipped with the existing persistence caveat in sqlite mode) proving the reversal end to end against real Postgres with real values, not status codes.
+
+- **Second actor** — stage 9 seeds a second employee row (`smoke-admin`, `EmployeeRole.ADMIN`, employee number `E-0002`) and mints an ADMIN token with `signToken`; the seeded `smoke-employee` is an EMPLOYEE and can neither approve nor cancel an APPROVED request. The admin token is hand-minted (like stages 3b/3c), not a login token.
+- **9a — create + submit + approve** — `POST /leaves` (login token) → `POST /leaves/:id/submit` → `POST /leaves/:id/approve` (ADMIN token); asserts 201/200/200 and that the approved body reads `status === APPROVED` with `approverId === 'smoke-admin'`. Captures `originalId` from the create response (never predicted — the repository generates it via `randomUUID()`) and `originalRequestedDays` from the approve response. The cancellable span is future-dated (`Math.max(Date.now(), curPeriod.start) + 2 days`) and inside the CURRENT period that stage 8 re-keyed `bal-1` to, so `resolveBalance` finds the row and the request reaches APPROVED.
+- **9b — baseline** — reads `usedDays` via `GET /balances/me` immediately before the cancellation and asserts it equals `originalRequestedDays`.
+- **9c — cancel** — `POST /leaves/:id/cancel` as the ADMIN token; asserts 200.
+- **9d — immutability** — `GET /leaves/:id` for the ORIGINAL id still returns `status === APPROVED` with its `approverId`/`decidedAt` byte-identical to the approve response, and `reversesRequestId === null`.
+- **9e — reversal** — `GET /leaves` returns BOTH rows: the original (APPROVED, `reversesRequestId` null) and a distinct row with `reversesRequestId === originalId`, `status === CANCELLED`, `requestedDays === 0`, `approverId`/`decidedAt` null, and `startDate`/`endDate`/`leaveTypeCode`/`employeeId` matching the original. No server-side collapsing and no query filter — `reversesRequestId` alone distinguishes the pair.
+- **9f — single release** — `usedDays` decreased by exactly `originalRequestedDays` (a double release would land at `usedBefore - 2*requestedDays` and fail).
+- **9g — terminality** — a second `POST /leaves/:id/cancel` on the reversal row returns 409 with `code: 'CONFLICT'`.
+
+**Divergences from the plan worth noting (Phase 5):**
+- PLAN.md Phase 5 step 1 said to approve "as the seeded manager/ADMIN actor"; the implementation seeds a NEW `smoke-admin` employee and mints its token with `signToken` rather than reusing the seeded `smoke-employee` (an EMPLOYEE, which cannot approve or cancel an APPROVED request). The plan's "using the login token and the seeded employee already established by the earlier stages" holds for the create/submit/read steps, but the approve/cancel steps need the second actor.
+- The plan's step 2 allowed "via `GET /balances/me` or a direct read"; the implementation uses `GET /balances/me` for both the baseline and the post-cancel read, so the release is asserted as a delta through the same read path the application serves.
+- The plan's step 5 asked to assert the reversal row's `startDate`/`endDate`/`leaveTypeCode`/`employeeId` match the original; the implementation does exactly that and additionally asserts the two rows do not share an id.
+
 ### CreateLeaveRequestDto
 
 | Field | Type | Required |
