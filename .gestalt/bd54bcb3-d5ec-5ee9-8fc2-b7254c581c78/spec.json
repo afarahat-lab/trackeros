@@ -1,0 +1,130 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave",
+      "balance",
+      "verification"
+    ],
+    "affectedLayers": [
+      "e2e-smoke",
+      "scripts"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "scripts/smoke.js Postgres mode contains a reversal stage that drives a request through create \u2192 submit \u2192 approve, then cancels the APPROVED request as an authorized actor, and the stage executes only when SMOKE_DATABASE_URL is set (sqlite mode still skips it with the existing caveat).",
+      "testable": true,
+      "layer": "e2e"
+    },
+    {
+      "description": "After the cancel call, reading the original request back returns status APPROVED with its approverId and decidedAt byte-identical to the values captured from the approve response \u2014 the approved row was not mutated.",
+      "testable": true,
+      "layer": "e2e"
+    },
+    {
+      "description": "A second leave-request row exists (distinct id from the original) whose reversesRequestId equals the original's id and whose status is CANCELLED, observable both in the cancel response and in the owner's list read.",
+      "testable": true,
+      "layer": "e2e"
+    },
+    {
+      "description": "The balance release happened exactly once: the original request's requestedDays is returned out of usedDays (usedDays back to its pre-approval value) and pendingDays is unchanged, verified against the persisted balance row.",
+      "testable": true,
+      "layer": "e2e"
+    },
+    {
+      "description": "All pre-existing smoke stages (migrate, boot, mount, auth, persistence, login, profile, list, getById, balances) and the sqlite-mode skip caveat remain present and unmodified in behaviour; `npm run smoke` passes against real Postgres and the full Jest suite still passes.",
+      "testable": true,
+      "layer": "e2e"
+    }
+  ],
+  "constraints": [
+    "Only scripts/smoke.js may be edited. No production source edits, no new endpoints, no web test changes, no new test files (unit/integration tests belong to a sibling sub-phase).",
+    "The reversal stage must run in Postgres mode only, after the existing stages that seed the employee/admin/leave-type/policy/balance rows, and before any stage that re-keys the seeded balance to the current period (the request's startDate must still resolve to the seeded balance row).",
+    "No hardcoded credentials or tokens: reuse the existing SMOKE_PASSWORD env-derived password and the existing signToken helper / login token; do not introduce literal secrets (no-hardcoded-secrets).",
+    "The stage must assert against the real migrated schema and the real HTTP surface (app.inject), not by reading repository internals or mocking; the only direct DB read permitted is the existing pattern of a knex connection to the per-run schema for the balance-row check.",
+    "The stage must fail loudly (die/throw with a descriptive message) on any assertion mismatch, and must not leave the per-run schema behind \u2014 the existing finally-block drop must still run."
+  ],
+  "outOfScope": [
+    "tests/unit/modules/leave/leave.service.test.ts \u2014 the reversal unit test is owned by sibling sub-phase 4a; do not create or edit it here.",
+    "Any production source change (leave.service.ts, leave.repository.ts, leave.model.ts, leave.routes.ts, migrations, web/src) \u2014 Phases 1\u20133 are fixed contracts.",
+    "New endpoints, new routes, or changes to the cancel/approve/submit route contracts.",
+    "Web/frontend test changes and any client-side reversal logic."
+  ],
+  "ambiguities": [
+    {
+      "description": "Which actor the smoke stage uses to cancel the APPROVED request \u2014 the direct manager or ADMIN. The seeded employee has manager_id null, so no direct manager exists; the ADMIN row was seeded for exactly this purpose.",
+      "options": [
+        "Use the seeded ADMIN actor (smoke-admin) as the canceller",
+        "Seed a manager row and use it as the direct manager",
+        "Either is acceptable as long as the actor is authorized"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "Whether the balance-release assertion reads the persisted balance row directly via knex or infers it from a balances read endpoint. The existing stage 8 re-keys the balance to the current period, so a direct row read before that re-key is the reliable check.",
+      "options": [
+        "Read the seeded balance row directly via knex before the re-key stage",
+        "Assert via GET /balances/me after the re-key",
+        "Both"
+      ],
+      "impactIfWrong": "medium"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest (original APPROVED row)",
+      "mustExistOrExtend": true,
+      "invariant": "An APPROVED request is immutable: cancelling it must not change its status, approverId, approvalComment or decidedAt. It remains readable as APPROVED after the reversal."
+    },
+    {
+      "entity": "LeaveRequest (reversal row)",
+      "mustExistOrExtend": true,
+      "invariant": "A reversal is a NEW row with a distinct id, status CANCELLED, reversesRequestId pointing at the original, and approverId/approvalComment/submittedAt/decidedAt null; it is terminal and can never itself be cancelled."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "Cancelling an APPROVED request releases the original's requestedDays from usedDays exactly once; pendingDays is untouched."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "Cancel an APPROVED leave request (reversal)",
+      "authRule": "Only an authorized actor (direct manager or ADMIN) may cancel; unauthorized actors are refused.",
+      "idempotent": false,
+      "errorSemantics": "A second cancel of an already-reversed request is rejected with a conflict (409); the reversal insert, balance release, audit write and notification are atomic."
+    },
+    {
+      "operation": "Read a leave request by id after reversal",
+      "authRule": "Owner/authorized reader; returns the original row unchanged.",
+      "idempotent": true,
+      "errorSemantics": "Returns the original APPROVED row with approverId/decidedAt intact; the reversal row is a separate entry."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The smoke stage must assert the reversal contract exactly as the service implements it: original stays APPROVED, new CANCELLED row carries reversesRequestId = original id, balance released once. Match the field names and semantics in the leave model/repository/service.",
+      "referencePath": "src/modules/leave/leave.service.ts"
+    },
+    {
+      "requirement": "The reversal row's read-model field name (reversesRequestId) and the CANCELLED status value must match the canonical LeaveRequest shape and LeaveStatus enum used by the repository mapper.",
+      "referencePath": "src/modules/leave/leave.repository.ts"
+    },
+    {
+      "requirement": "The stage must reuse the existing smoke conventions: signToken/login token, app.inject, the per-run schema knex connection, and the existing die()/ok() reporting \u2014 not invent a parallel harness.",
+      "referencePath": "scripts/smoke.js"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "scripts/smoke.js Postgres-mode stage sequence",
+      "why": "The new reversal stage must slot into the existing seeded-data flow and ordering without disturbing later stages."
+    },
+    {
+      "target": "src/modules/leave/leave.routes.ts cancel/approve/submit endpoints",
+      "why": "The stage drives the real HTTP surface end to end; it depends on those routes being mounted and returning the reversal row."
+    }
+  ]
+}
